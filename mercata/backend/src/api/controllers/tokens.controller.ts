@@ -5,6 +5,7 @@ import {
   getBalance,
   createToken,
   transferToken,
+  bulkTransferToken,
   approveToken,
   transferFromToken,
   setTokenStatus,
@@ -16,6 +17,7 @@ import {
   validateAddressArgs,
   validateCreateTokensArgs,
   validateTransferItemArgs,
+  validateBulkTransferArgs,
   validateApproveArgs,
   validateTransferFromArgs,
   validateQueryParams,
@@ -120,6 +122,24 @@ class TokensController {
       validateTransferItemArgs(body);
 
       const result = await transferToken(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async bulkTransfer(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateBulkTransferArgs(body);
+
+      const result = await bulkTransferToken(
+        accessToken,
+        userAddress as string,
+        body.address,
+        body.transfers
+      );
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {

@@ -20,6 +20,7 @@ import Data.Attoparsec.ByteString.Char8 (scientific)
 import Data.Binary
 import Data.Bool (bool)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.UTF8 as UTF8
@@ -27,9 +28,9 @@ import qualified Data.ByteString.Unsafe as BU
 import Data.Char
 import Data.Hashable
 import Data.Maybe
+import qualified Data.OpenApi as OPENAPI
 import Data.Scientific (isInteger, toBoundedInteger)
 import Data.String
-import qualified Data.Swagger as SWAGGER
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
@@ -48,6 +49,7 @@ import Servant
 data BasicValue
   = BInteger !Integer
   | BString !B.ByteString
+  | BBytes !B.ByteString  -- Raw bytes (bytes, bytesN) - distinct from BString
   | BDecimal !B.ByteString
   | BBool !Bool
   | BAddress !Address
@@ -83,18 +85,18 @@ instance FromHttpApiData BasicValue where
       Nothing -> Left $ T.pack $ "malformed value string in call to parseUrlPiece: " ++ show v
       Just theBasicValue -> Right theBasicValue
 
-instance SWAGGER.ToParamSchema BasicValue where
+instance OPENAPI.ToParamSchema BasicValue where
   toParamSchema _ =
       mempty
-        & SWAGGER.type_   ?~ SWAGGER.SwaggerString
-        & SWAGGER.format  ?~ "simple SolidVM expression"
+        & OPENAPI.type_   ?~ OPENAPI.OpenApiString
+        & OPENAPI.format  ?~ "simple SolidVM expression"
 
-instance SWAGGER.ToSchema BasicValue where
+instance OPENAPI.ToSchema BasicValue where
   declareNamedSchema _ =
-    pure $ SWAGGER.NamedSchema (Just "BasicValue") $
+    pure $ OPENAPI.NamedSchema (Just "BasicValue") $
       mempty
-        & SWAGGER.type_        ?~ SWAGGER.SwaggerString
-        & SWAGGER.format       ?~ "simple SolidVM expression"
+        & OPENAPI.type_        ?~ OPENAPI.OpenApiString
+        & OPENAPI.format       ?~ "simple SolidVM expression"
 
 instance JSON.ToJSON BasicValue where
   toJSON v = JSON.toJSON $ format v
@@ -144,6 +146,7 @@ textToBasicValue v =
 isDefault :: BasicValue -> Bool
 isDefault (BInteger i) = i == 0
 isDefault (BString bs) = B.null bs
+isDefault (BBytes bs) = B.null bs
 isDefault (BDecimal v) = v == "0"
 isDefault (BBool b) = not b
 isDefault (BAddress a) = a == 0x0
@@ -154,6 +157,7 @@ isDefault BDefault = True
 formatBasicValue :: BasicValue -> String
 formatBasicValue (BInteger i) = show i
 formatBasicValue (BString s) = show $ UTF8.toString s
+formatBasicValue (BBytes bs) = "hex\"" ++ C8.unpack (B16.encode bs) ++ "\""
 formatBasicValue (BDecimal v) = show v
 formatBasicValue (BBool True) = "true"
 formatBasicValue (BBool False) = "false"
@@ -164,11 +168,13 @@ formatBasicValue BDefault = "<unknown>"
 
 instance Format BasicValue where
   format (BString s) = ('"' :) . (++ "\"") $ UTF8.toString s
+  format (BBytes bs) = ("hex\"" ++) . (++ "\"") $ C8.unpack (B16.encode bs)
   format bv          = formatBasicValue bv
 
 formatBasicValueForSQL :: BasicValue -> Text
 formatBasicValueForSQL (BInteger i) = T.pack $ show i
 formatBasicValueForSQL (BString s) = either (const . T.pack $ C8.unpack s) id $ decodeUtf8' s
+formatBasicValueForSQL (BBytes bs) = decodeUtf8 $ B16.encode bs
 formatBasicValueForSQL (BDecimal v) = T.pack $ show v
 formatBasicValueForSQL (BBool True) = "true"
 formatBasicValueForSQL (BBool False) = "false"
@@ -237,18 +243,18 @@ instance FromHttpApiData StoragePath where
       Left e -> Left $ T.pack $ "malformed value string in call to parseUrlPiece: " ++ show v ++ "\n" ++ e
       Right theStoragePath -> Right theStoragePath
 
-instance SWAGGER.ToParamSchema StoragePath where
+instance OPENAPI.ToParamSchema StoragePath where
   toParamSchema _ =
       mempty
-        & SWAGGER.type_   ?~ SWAGGER.SwaggerString
-        & SWAGGER.format  ?~ "Path to SolidVM storage location"
+        & OPENAPI.type_   ?~ OPENAPI.OpenApiString
+        & OPENAPI.format  ?~ "Path to SolidVM storage location"
 
-instance SWAGGER.ToSchema StoragePath where
+instance OPENAPI.ToSchema StoragePath where
   declareNamedSchema _ =
-    pure $ SWAGGER.NamedSchema (Just "StoragePath") $
+    pure $ OPENAPI.NamedSchema (Just "StoragePath") $
       mempty
-        & SWAGGER.type_        ?~ SWAGGER.SwaggerString
-        & SWAGGER.format       ?~ "Path to SolidVM storage location"
+        & OPENAPI.type_        ?~ OPENAPI.OpenApiString
+        & OPENAPI.format       ?~ "Path to SolidVM storage location"
 
 empty :: StoragePath
 empty = StoragePath []
@@ -408,6 +414,7 @@ instance RLPSerializable BasicValue where
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
     BEnumVal a b c -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b, rlpEncode c]
     BDecimal v -> RLPArray [RLPScalar 7, rlpEncode v]
+    BBytes bs -> RLPArray [RLPScalar 8, rlpEncode bs]
   rlpDecode x@(RLPArray ((RLPScalar t) : s)) =
     case (t, s) of
       (0, [f]) -> BInteger $ rlpDecode f
@@ -417,6 +424,7 @@ instance RLPSerializable BasicValue where
       (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
       (5, [f, s', c']) -> BEnumVal (rlpDecode f) (rlpDecode s') (rlpDecode c')
       (7, [f]) -> BDecimal (rlpDecode f)
+      (8, [f]) -> BBytes $ rlpDecode f
       _ -> error $ "invalid type or data length for BasicValue: " ++ show x
   rlpDecode (RLPString "") = BDefault
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x

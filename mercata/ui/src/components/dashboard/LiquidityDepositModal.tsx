@@ -19,7 +19,7 @@ import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 const formatNumber = (value: string | number): string => {
@@ -103,7 +103,7 @@ const LiquidityDepositModal = ({
   const handleClose = () => {
     setToken1Amount('');
     setToken2Amount('');
-    setDepositMode('A');
+    setDepositMode('A&B');
     setStakeLPToken(rewardsEnabled); // Reset to default based on rewardsEnabled
     onClose();
   };
@@ -273,10 +273,10 @@ const LiquidityDepositModal = ({
       const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
       
       // Calculate what Token A amount would be needed for full Token B balance
-      const tokenAAmountForFullB = (availableTokenB * aToBRatioWei) / BigInt(10 ** 18);
+      const tokenAAmountForFullB = (availableTokenB * bToARatioWei) / BigInt(10 ** 18);
       
       // Calculate what Token B amount would be needed for full Token A balance  
-      const tokenBAmountForFullA = (availableTokenA * bToARatioWei) / BigInt(10 ** 18);
+      const tokenBAmountForFullA = (availableTokenA * aToBRatioWei) / BigInt(10 ** 18);
       
       let finalTokenAAmount: bigint;
       let finalTokenBAmount: bigint;
@@ -408,7 +408,7 @@ const LiquidityDepositModal = ({
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Deposit Liquidity</DialogTitle>
@@ -647,7 +647,7 @@ const LiquidityDepositModal = ({
             // For single token mode: pass input amount (less accurate estimate)
             if (depositMode === 'A&B') {
               return (
-                <CompactRewardsDisplay
+                <RewardsWidget
                   userRewards={userRewards}
                   activityName={activity.activity.name}
                   inputAmount={token1Amount || ""}
@@ -662,7 +662,7 @@ const LiquidityDepositModal = ({
               // Note: This is an estimate since single-token deposits involve a swap
               const singleTokenAmount = depositMode === 'A' ? token1Amount : token2Amount;
               return (
-                <CompactRewardsDisplay
+                <RewardsWidget
                   userRewards={userRewards}
                   activityName={activity.activity.name}
                   inputAmount={singleTokenAmount || ""}

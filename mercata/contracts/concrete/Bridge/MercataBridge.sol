@@ -48,7 +48,13 @@ contract record MercataBridge is Ownable {
     event DepositAborted(uint256 srcChainId, string srcTxHash);
 
     /// @notice Emitted when a deposit is completed and tokens are minted
-    event DepositCompleted(uint256 srcChainId, string srcTxHash);
+    /// @param externalChainId The external chain identifier where the deposit occurred
+    /// @param externalSender The address that sent the transaction on the external chain
+    /// @param externalTxHash The transaction hash on the external chain
+    /// @param stratoRecipient The STRATO address to receive the minted tokens
+    /// @param stratoToken The STRATO token address that was minted
+    /// @param stratoTokenAmount The amount of STRATO tokens that were minted
+    event DepositCompleted(uint256 externalChainId, address externalSender, string externalTxHash, address stratoRecipient, address stratoToken, uint256 stratoTokenAmount);
 
     /// @notice Emitted when a deposit is initiated
     /// @param externalChainId The external chain identifier where the deposit occurred
@@ -644,7 +650,7 @@ contract record MercataBridge is Ownable {
 
         d.bridgeStatus = BridgeStatus.COMPLETED;
         d.timestamp = block.timestamp;
-        emit DepositCompleted(externalChainId, normalizedTxHash);
+        emit DepositCompleted(externalChainId, d.externalSender, normalizedTxHash, d.stratoRecipient, d.stratoToken, d.stratoTokenAmount);
     }
 
     /**

@@ -144,6 +144,8 @@ export interface Pool {
   oracleAToBRatio: string;
   oracleBToARatio: string;
   isStable: boolean;
+  isPaused: boolean;
+  isDisabled: boolean;
 }
 
 /**
@@ -172,6 +174,7 @@ export interface RawToken {
   _symbol: string;
   customDecimals: number;
   _totalSupply: string;
+  status: string;
   balances: TokenBalance[];
   images: Array<{ value: string }>;
 }
@@ -185,6 +188,7 @@ export interface RawLPToken {
   _symbol: string;
   customDecimals: number;
   _totalSupply: string;
+  status: string;
   balances: TokenBalance[];
   images: Array<{ value: string }>;
 }
@@ -204,6 +208,8 @@ export interface RawGetPool {
   swapFeeRate: number;
   lpSharePercent: number;
   isStable: boolean;
+  isPaused?: boolean;  // Optional for backward compatibility with older indexed pools
+  isDisabled?: boolean;
 }
 
 /**

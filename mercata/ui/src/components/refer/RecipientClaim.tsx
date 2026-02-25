@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "@/utils/numberUtils";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/axios";
+import { redirectToLogin } from "@/lib/auth";
 import { useTokenContext } from "@/context/TokenContext";
 
 type CirrusRow = {
@@ -371,13 +372,7 @@ export function RecipientClaim(props: Props) {
   const location = useLocation();
   
   const handleSignUp = () => {
-    // Store current URL with all query params for redirect after login
-    const returnUrl = location.pathname + location.search;
-    localStorage.setItem("claimReturnUrl", returnUrl);
-    
-    // Redirect to login
-    const theme = localStorage.getItem('theme') || 'light';
-    window.location.href = `/login?theme=${theme}`;
+    redirectToLogin(location.pathname + location.search);
   };
 
   // Format all amounts (normalize to array first)

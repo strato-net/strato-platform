@@ -58,7 +58,10 @@ if ngx.req.get_headers()["Authorization"] then
 else
   -- Else - use the openidc authenticate flow
 
-  local authenticate_res, authenticate_err
+  local authenticate_res, authenticate_err, authenticate_session
+  -- Allow anonymous access only for safe/read-only methods on endpoints that explicitly allow it
+  local method = ngx.req.get_method()
+  local allow_anonymous_request = ngx.var.allow_optional_anon_access == "true" and (method == "GET" or method == "HEAD" or method == "OPTIONS")
   -- if requested_uri is the UI page (like SMD), else the API call
   if ngx.var.is_ui == "true" then
     -- authenticate with browser UI flow (Authorization Code grant, token exchange) - authenticate(opts) with no additional params will 302-Redirect if unauthorized
@@ -72,15 +75,49 @@ else
     end
   else
     -- only validate the session (do not redirect automatically for Auth Code Grant flow)
-    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "deny")
+    -- 4th return value is the session object, needed to detect dead refresh tokens below
+    authenticate_res, authenticate_err, _, authenticate_session = openidc.authenticate(authenticate_opts, nil, "deny")
     if (authenticate_res == nil or authenticate_err ~= nil) then
       if (authenticate_err ~= nil) then
         ngx.log(ngx.DEBUG, 'User authentication error: ', authenticate_err)
       end
+
+      -- If the session had a refresh token but authenticate() still failed, the
+      -- refresh token is dead. Destroy the session to prevent every subsequent
+      -- request from retrying it and flooding Keycloak with REFRESH_TOKEN_ERROR.
+      -- We check session state because lua-resty-openidc swallows the token
+      -- endpoint error (sets err=nil) and returns generic "unauthorized request".
+      if authenticate_session
+          and authenticate_session.data
+          and authenticate_session.data.authenticated
+          and authenticate_session.data.refresh_token
+      then
+        ngx.log(ngx.DEBUG, "Destroying stale session due to failed token refresh: ", authenticate_err)
+        authenticate_session:destroy()
+      end
+
+      -- Handle OIDC callback state mismatch (multi-tab race condition):
+      -- When multiple tabs initiate auth flows, each overwrites the OIDC state in the shared
+      -- session cookie. The tab whose callback arrives with the old state gets this error.
+      -- Recovery: destroy the stale session and redirect to start a fresh auth flow.
+      -- Since Keycloak already has an active SSO session, the user won't need to re-enter credentials.
+      local args = ngx.req.get_uri_args()
+      if ngx.var.uri == authenticate_opts.redirect_uri
+          and args.code
+          and authenticate_err
+          and string.find(authenticate_err, "does not match state restored from session", 1, true)
+      then
+        ngx.log(ngx.WARN, "OIDC state mismatch on callback (multi-tab race condition), restarting auth flow: ", authenticate_err)
+        local session = require("resty.session").open()
+        if session then
+          session:destroy()
+        end
+        return ngx.redirect("/")
+      end
+
       -- Let client know in the response that client is not (or no longer) authenticated (so that the UI could notify user that he's been signed out)
       ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
-      -- Respond with 401 Unauthorized if the requested endpoint does not allow anonymous access
-      if (ngx.var.allow_optional_anon_access ~= "true") then
+      if not allow_anonymous_request then
         -- respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
         ngx.exit(ngx.HTTP_UNAUTHORIZED)
       end
@@ -90,8 +127,8 @@ else
   if authenticate_res ~= nil and authenticate_res.access_token then
     user_access_token = authenticate_res.access_token
   else
-    -- not expected to get here if not allow_optional_anon_access
-    if ngx.var.allow_optional_anon_access ~= "true" then
+    -- not expected to get here if anonymous access is not allowed for this request
+    if not allow_anonymous_request then
       ngx.status = 500
       ngx.log(ngx.ERR, 'Unexpected error: not expected to be here if the endpoint does not allow anonymous access')
       ngx.say('Unexpected server error occurred during authentication (#1010)')

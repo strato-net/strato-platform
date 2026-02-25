@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/axios";
 import { isAuthenticated, logout } from "@/lib/auth";
+import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 
 interface UserContextType {
   userAddress: string | null;
@@ -17,6 +18,9 @@ interface UserContextType {
   openIssues: object;
   openIssuesLoading: boolean;
   getOpenIssues: () => Promise<void>;
+  executedIssues: object;
+  executedIssuesLoading: boolean;
+  getExecutedIssues: (page?: number, limit?: number) => Promise<void>;
   contractSearchResults: object[];
   contractSearchResultsLoading: boolean;
   contractSearch: (search: string) => Promise<void>;
@@ -40,6 +44,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [openIssues, setOpenIssues] = useState<object>({})
   const [openIssuesLoading, setOpenIssuesLoading] = useState<boolean>(false);
+  const [executedIssues, setExecutedIssues] = useState<object>({})
+  const [executedIssuesLoading, setExecutedIssuesLoading] = useState<boolean>(false);
   const [contractSearchResults, setContractSearchResults] = useState<object[]>([])
   const [contractSearchResultsLoading, setContractSearchResultsLoading] = useState<boolean>(false)
   const [contractDetailsResults, setContractDetailsResults] = useState<object>({});
@@ -103,6 +109,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       await api.post('/user/admin/vote', { target, func, args });
       await getOpenIssues();
+      // Show the recently executed issue
+      await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
     } catch (error) {
       await getOpenIssues();
       throw error;
@@ -113,6 +121,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       await api.post('/user/admin/vote/by-id', { issueId });
       await getOpenIssues();
+      // Show the recently executed issue
+      await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
     } catch (error) {
       await getOpenIssues();
       throw error;
@@ -129,6 +139,24 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } finally {
       setOpenIssuesLoading(false);
+    }
+  };
+
+  const getExecutedIssues = async (page: number = 1, limit: number = 10) => {
+    try {
+      setExecutedIssuesLoading(true);
+      try {
+        const response = await api.get('/user/admin/issues/executed', {
+          params: {
+            page,
+            limit,
+          },
+        });
+        setExecutedIssues(response?.data || {});
+      } catch (error) {
+      }
+    } finally {
+      setExecutedIssuesLoading(false);
     }
   };
 
@@ -201,6 +229,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     openIssuesLoading,
     openIssues,
     getOpenIssues,
+    executedIssues,
+    executedIssuesLoading,
+    getExecutedIssues,
     castVoteOnIssue,
     castVoteOnIssueById,
     dismissIssue,
@@ -213,7 +244,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     contractDetailsResults,
     contractDetailsResultsLoading,
   }), [userAddress, isLoggedIn, isAdmin, loading, userName,
-    openIssues, openIssuesLoading, getOpenIssues, castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
+    openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
+    castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,
     getContractDetails, contractDetailsResults, contractDetailsResultsLoading,
   ]);

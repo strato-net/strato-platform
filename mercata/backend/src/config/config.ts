@@ -38,6 +38,7 @@ export const nodeUrl = process.env.NODE_URL;
 export const baseUrl = process.env.BASE_URL || "http://localhost";
 
 // Smart contract addresses
+export const burnAddress = process.env.BURN_ADDRESS || "0000000000000000000000000000000000000000";
 export const poolConfigurator = process.env.POOL_CONFIGURATOR || "0000000000000000000000000000000000001006";
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";
@@ -74,13 +75,19 @@ export const defaultReferralServiceFor: Record<string, string> = {
   "33056204878082667": "http://ec2-18-218-166-133.us-east-2.compute.amazonaws.com", // Upquark mainnet
 };
 
+export const defaultVaultFactoryFor: Record<string, string> = {
+  "114784819836269": "37b446ec53607a0cdae38c820b838baf240a8b74", // Helium testnet
+  "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
 export let referralUrl: string | undefined;
 export let escrow: string = '';
+export let vaultFactory: string = '';
 
-export function setBridgeConfig(networkId: string) {
+function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
     bridgeUrl = process.env.BRIDGE_SERVICE_URL;
   } else {
@@ -88,7 +95,7 @@ export function setBridgeConfig(networkId: string) {
   }
 }
 
-export function setRewardsConfig(networkId: string) {
+function setRewardsConfig(networkId: string) {
   if (process.env.REWARDS) {
     rewards = process.env.REWARDS;
   } else {
@@ -96,7 +103,7 @@ export function setRewardsConfig(networkId: string) {
   }
 }
 
-export function setReferralConfig(networkId: string) {
+function setReferralConfig(networkId: string) {
   if (process.env.ESCROW_ADDRESS) {
     escrow = process.env.ESCROW_ADDRESS;
   } else {
@@ -106,6 +113,14 @@ export function setReferralConfig(networkId: string) {
     referralUrl = process.env.REDEMPTION_SERVER_URL;
   } else {
     referralUrl = defaultReferralServiceFor[networkId];
+  }
+}
+
+function setVaultFactoryConfig(networkId: string) {
+  if (process.env.VAULT_FACTORY) {
+    vaultFactory = process.env.VAULT_FACTORY;
+  } else {
+    vaultFactory = defaultVaultFactoryFor[networkId];
   }
 }
 
@@ -121,4 +136,71 @@ export async function initNetworkConfig() {
   setBridgeConfig(networkId);
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
+  setVaultFactoryConfig(networkId);
+}
+
+// Addresses of internal protocol contracts whose Token:Transfer events should
+// be excluded from the activity feed (gas fees, pool operations, minting, etc.).
+// Populated at startup by initInternalAddresses().
+export let internalAddresses: Array<string> = [];
+
+/**
+ * Fetch and cache internal protocol contract addresses by querying the on-chain registries and factories.
+ * Must be called after initNetworkConfig() so network-specific addresses are available.
+ * Used to exclude internal transfers from the My Activity / All Activity feed.
+ */
+export async function initInternalAddresses() {
+  const { cirrus } = await import("../utils/mercataApiHelper");
+  const accessToken = await getServiceToken();
+
+  // Static: well-known system contract addresses from config
+  const addresses: string[] = [
+    mercataBridge,
+    burnAddress,
+  ];
+
+  // Network-specific addresses (set by initNetworkConfig)
+  addresses.push(rewards || '', escrow, vaultFactory);
+
+  // Lending Registry --> lendingPool, collateralVault, liquidityPool
+  const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {
+    params: {
+      address: `eq.${lendingRegistry}`,
+      select: "lendingPool:lendingPool_fkey(address),collateralVault:collateralVault_fkey(address),liquidityPool:liquidityPool_fkey(address)",
+    },
+  });
+  addresses.push(lending.lendingPool.address, lending.collateralVault.address, lending.liquidityPool.address);
+
+  // CDP Registry --> cdpEngine, cdpVault, feeCollector
+  const { data: [cdp] } = await cirrus.get(accessToken, "/BlockApps-CDPRegistry", {
+    params: {
+      address: `eq.${cdpRegistry}`,
+      select: "feeCollector,cdpEngine:cdpEngine_fkey(address),cdpVault:cdpVault_fkey(address),cdpReserve:cdpReserve_fkey(address)",
+    },
+  });
+  addresses.push(cdp.feeCollector, cdp.cdpEngine.address, cdp.cdpVault.address, cdp.cdpReserve.address);
+
+  // Pool Factory --> all swap pool addresses
+  const { data: pools } = await cirrus.get(accessToken, "/BlockApps-PoolFactory-allPools", {
+    params: { address: `eq.${poolFactory}`, select: "value" },
+  });
+  addresses.push(...pools.map((pool: any) => pool.value));
+
+  // Vault Factory --> all vault addresses + their botExecutor addresses
+  if (vaultFactory) {
+    const { data: vaults } = await cirrus.get(accessToken, "/BlockApps-VaultFactory-allVaults", {
+      params: { address: `eq.${vaultFactory}`, select: "value" },
+    });
+    const vaultAddresses = vaults.map((v: any) => v.value);
+    addresses.push(...vaultAddresses);
+
+    if (vaultAddresses.length > 0) {
+      const { data: vaultRecords } = await cirrus.get(accessToken, "/BlockApps-Vault", {
+        params: { address: `in.(${vaultAddresses.join(",")})`, select: "botExecutor" },
+      });
+      addresses.push(...vaultRecords.map((v: any) => v.botExecutor));
+    }
+  }
+
+  internalAddresses = Array.from(new Set(addresses.filter(Boolean)));
 }

@@ -27,6 +27,7 @@ export const SWAP_TOKEN_SELECT_FIELDS = [
   "_symbol",
   "_totalSupply::text",
   "customDecimals",
+  "status",
   `balances:${SWAP_CONTRACTS.Token}-_balances(user:key,balance:value::text)`,
   `images:${SWAP_CONTRACTS.Token}-images(value)`,
 ] as const;
@@ -46,6 +47,8 @@ export const SWAP_POOL_SELECT_FIELDS = [
   "tokenBBalance::text",
   `lpToken:lpToken_fkey(${SWAP_TOKEN_SELECT_FIELDS.join(',')})`,
   "isStable",
+  "isPaused",
+  "isDisabled",
 ] as const;
 
 /**

@@ -61,6 +61,96 @@ export const getSafetyModuleConfig = (): SafetyModuleConfig => {
   };
 };
 
+export const getPublicSafetyModuleInfo = async (
+  accessToken: string
+): Promise<SafetyModuleInfo> => {
+  // NOTE: This function does NOT fetch any user-specific data.
+  // It only queries public contract data (SafetyModule config and sToken total supply).
+  // All user-specific fields are returned as "0" or false.
+  
+  const safetyModuleConfig = getSafetyModuleConfig();
+  const safetyModuleAddress = safetyModuleConfig.safetyModule.address;
+  const sTokenAddress = safetyModuleConfig.sToken.address;
+
+  try {
+    let safetyModuleData: any[] = [];
+    let sTokenTotalSupply: any[] = [];
+
+    try {
+      // Query SafetyModule contract configuration and _managedAssets (public data only)
+      // No user-specific queries - no balances, no cooldown data, no staked balances
+      const response1 = await cirrus.get(
+        accessToken,
+        `/BlockApps-SafetyModule`,
+        {
+          params: {
+            address: `eq.${safetyModuleAddress}`,
+            select: "*,_managedAssets::text"
+          }
+        }
+      );
+      safetyModuleData = response1.data || [];
+    } catch (error) {
+      console.warn("SafetyModule contract not found or not deployed:", error);
+    }
+
+    try {
+      // Query sToken total supply (public data only - no user balances)
+      const response2 = await cirrus.get(
+        accessToken,
+        `/BlockApps-Token`,
+        {
+          params: {
+            address: `eq.${sTokenAddress}`,
+            select: "_totalSupply::text"
+            // NOTE: No balances query - we don't fetch user-specific token balances
+          }
+        }
+      );
+      sTokenTotalSupply = response2.data || [];
+    } catch (error) {
+      console.warn("sToken total supply query failed:", error);
+    }
+
+    // Extract data from responses
+    const safetyModule = safetyModuleData?.[0] || {};
+    
+    // Get totalAssets from SafetyModule's _managedAssets state variable (public data)
+    const totalAssets = safetyModule._managedAssets || "0";
+    
+    // Get totalShares from sToken's total supply (public data)
+    const totalShares = sTokenTotalSupply?.[0]?._totalSupply || "0";
+    
+    // Get config values from SafetyModule contract (public data)
+    const cooldownSeconds = safetyModule.COOLDOWN_SECONDS?.toString() || "259200"; // 3 days default
+    const unstakeWindow = safetyModule.UNSTAKE_WINDOW?.toString() || "172800"; // 2 days default
+
+    // Calculate exchange rate (assets per share) - public calculation
+    const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n 
+      ? (BigInt(totalAssets) * BigInt("1000000000000000000")) / BigInt(totalShares) // 18 decimals
+      : BigInt("1000000000000000000"); // 1:1 ratio initially
+
+    // Return public data only - no user-specific fields included
+    return {
+      totalAssets,
+      totalShares,
+      cooldownSeconds,
+      unstakeWindow,
+      exchangeRate: exchangeRate.toString(),
+    } as SafetyModuleInfo;
+  } catch (error) {
+    console.error("Error fetching public SafetyModule info:", error);
+    // Return default public values in case of error - no user-specific fields
+    return {
+      totalAssets: "0",
+      totalShares: "0",
+      cooldownSeconds: "259200",
+      unstakeWindow: "172800",
+      exchangeRate: "1000000000000000000",
+    } as SafetyModuleInfo;
+  }
+};
+
 export const getSafetyModuleInfo = async (
   accessToken: string,
   userAddress: string

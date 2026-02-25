@@ -1,6 +1,10 @@
 import * as config from "../../config/config";
 import { constants } from "../../config/constants";
 import { cirrus } from "../../utils/mercataApiHelper";
+import stakeSemanticsConfig from "./rewardsStakeSemantics.json";
+import { getCompletePriceMap } from "../helpers/oracle.helper";
+import { getSafetyModuleConfig } from "./safety.service";
+import { getVaultShareTokenAddress } from "./vault.service";
 import {
   calculatePersonalEmissionRate,
   parseActivityType,
@@ -14,7 +18,188 @@ import {
   fetchAllUsersLeaderboard
 } from "../helpers/rewards/rewards.helpers";
 
-const { Token } = constants;
+const { Token, LendingPool, lendingRegistry, DECIMALS } = constants;
+const ONE_USD_WEI = (10n ** 18n).toString();
+
+const mulDiv1e18 = (amountWei: string, priceWei: string): string => {
+  const amount = BigInt(amountWei || "0");
+  const price = BigInt(priceWei || "0");
+  if (amount === 0n || price === 0n) return "0";
+  return ((amount * price) / (10n ** 18n)).toString();
+};
+
+export type StakeDenomination = "token_units" | "usd_notional" | "unknown";
+
+type StakeSemanticsConfig = {
+  usd_notional: {
+    swapSources: string[];
+    depositCompletedSources: string[];
+    amountUsdSources: string[];
+  };
+  token_units: {
+    lpMintBurnSources: string[];
+  };
+};
+
+const normalizeAddr = (a: string): string => a.toLowerCase();
+
+const STAKE_SEMANTICS: StakeSemanticsConfig = stakeSemanticsConfig as StakeSemanticsConfig;
+
+const USD_NOTIONAL_SWAP_SOURCES = new Set<string>(STAKE_SEMANTICS.usd_notional.swapSources.map(normalizeAddr));
+const USD_NOTIONAL_DEPOSIT_COMPLETED_SOURCES = new Set<string>(STAKE_SEMANTICS.usd_notional.depositCompletedSources.map(normalizeAddr));
+const USD_NOTIONAL_AMOUNT_USD_SOURCES = new Set<string>(STAKE_SEMANTICS.usd_notional.amountUsdSources.map(normalizeAddr));
+const TOKEN_UNITS_SOURCES = new Set<string>(STAKE_SEMANTICS.token_units.lpMintBurnSources.map(normalizeAddr));
+
+const inferStakeSemantics = (activity: {
+  name?: string;
+  activityType?: number;
+  sourceContract?: string;
+}): { stakeDenomination: StakeDenomination; stakeAssetAddress: string | null } => {
+  const sourceContract = (activity.sourceContract || "").toLowerCase();
+
+  /**
+   * Stake semantics are configured in `rewardsStakeSemantics.json` (derived from rewards-poller):
+   * - Swap: USD-notional (amountIn * oracle(tokenIn))
+   * - DepositCompleted: USD-notional (stratoTokenAmount * oracle(stratoToken)) but only when stratoToken == USDST
+   * - USDSTMinted/Burned: amountUSD from payload (USD-denominated units)
+   * - LP Minted/Burned: Token-Transfer value (LP token units)
+   */
+
+  const isUsdNotional =
+    USD_NOTIONAL_SWAP_SOURCES.has(sourceContract) ||
+    USD_NOTIONAL_DEPOSIT_COMPLETED_SOURCES.has(sourceContract) ||
+    USD_NOTIONAL_AMOUNT_USD_SOURCES.has(sourceContract);
+
+  if (isUsdNotional) {
+    return { stakeDenomination: "usd_notional", stakeAssetAddress: null };
+  }
+
+  // For everything else, the poller passes through raw units. Sometimes those units are
+  // token quantities (e.g. LP token transfer `value`), but sometimes they're shares or
+  // protocol-specific units. We only confidently mark token_units when the source itself
+  // is the token contract (LP token mint/burn is tracked via Token-Transfer on that token).
+  if (TOKEN_UNITS_SOURCES.has(sourceContract)) {
+    return { stakeDenomination: "token_units", stakeAssetAddress: sourceContract };
+  }
+
+  // Default: unknown units (do not imply token address).
+  return { stakeDenomination: "unknown", stakeAssetAddress: null };
+};
+
+
+
+const getMTokenAddress = async (accessToken: string): Promise<string | null> => {
+  try {
+    const { data } = await cirrus.get(accessToken, `/${LendingPool}`, {
+      params: {
+        select: "mToken",
+        registry: `eq.${lendingRegistry}`,
+        order: "block_timestamp.desc",
+        limit: "1",
+      }
+    });
+    return data?.[0]?.mToken || null;
+  } catch {
+    return null;
+  }
+};
+
+type StakeUsdInfo = {
+  stakeUnitPriceUsd: string | null; // 1e18-scaled USD per 1 stake unit
+  totalStakeUsd: string | null;     // 1e18-scaled USD value of totalStake
+  userStakeUsd?: string | null;     // 1e18-scaled USD value of userStake (only for user endpoints)
+};
+
+const inferStakeUsdInfo = (
+  ctx: {
+    priceMap: Map<string, string>;
+    mTokenAddress: string | null;
+    sTokenAddress: string | null;
+    vaultShareTokenAddress: string | null;
+  },
+  baseActivity: { name: string; sourceContract: string; totalStake: string; stakeDenomination: StakeDenomination; stakeAssetAddress: string | null },
+  userStakeWei?: string
+): StakeUsdInfo => {
+  // Default: no USD info
+  const empty: StakeUsdInfo = { stakeUnitPriceUsd: null, totalStakeUsd: null, userStakeUsd: userStakeWei ? null : undefined };
+
+  // If poller already posts USD-notional stake, unit price is 1 and USD value == stake value.
+  if (baseActivity.stakeDenomination === "usd_notional") {
+    return {
+      stakeUnitPriceUsd: ONE_USD_WEI,
+      totalStakeUsd: baseActivity.totalStake || "0",
+      userStakeUsd: userStakeWei ?? undefined,
+    };
+  }
+
+  // 1) Swap LP token mint/burn: stakeAssetAddress is the LP token contract itself.
+  if (baseActivity.stakeAssetAddress) {  
+    const price =
+      ctx.priceMap.get(baseActivity.stakeAssetAddress.toLowerCase()) ||
+      ctx.priceMap.get(baseActivity.stakeAssetAddress) ||
+      null;
+    if (price) {
+      return {
+        stakeUnitPriceUsd: price,
+        totalStakeUsd: mulDiv1e18(baseActivity.totalStake, price),
+        userStakeUsd: userStakeWei ? mulDiv1e18(userStakeWei, price) : undefined,
+      };
+    }
+  }
+
+  // 2) Safety Module: stake is sUSDST shares (priced via calculateSTokenPrice in getCompletePriceMap)
+  // 3) Lending Pool Liquidity: stake is mToken shares (priced via getExchangeRateFromCirrus in getCompletePriceMap)
+  // We infer these from activity name, since Rewards stake units are abstract and multiple activities can share a sourceContract.
+  const lower = (baseActivity.name || "").toLowerCase();
+
+  if (lower.includes("safety")) {
+    const sTokenAddr = (ctx.sTokenAddress || "").toLowerCase();
+    const price = sTokenAddr ? (ctx.priceMap.get(sTokenAddr) || null) : null;
+    if (price) {
+      return {
+        stakeUnitPriceUsd: price,
+        totalStakeUsd: mulDiv1e18(baseActivity.totalStake, price),
+        userStakeUsd: userStakeWei ? mulDiv1e18(userStakeWei, price) : undefined,
+      };
+    }
+  }
+
+  if (lower.includes("lending pool liquidity")) {
+    const mTokenAddr = (ctx.mTokenAddress || "").toLowerCase();
+    const price = mTokenAddr ? (ctx.priceMap.get(mTokenAddr) || null) : null;
+    if (price) {
+      return {
+        stakeUnitPriceUsd: price,
+        totalStakeUsd: mulDiv1e18(baseActivity.totalStake, price),
+        userStakeUsd: userStakeWei ? mulDiv1e18(userStakeWei, price) : undefined,
+      };
+    }
+  }
+
+  // 4) Lending Pool Borrow: stake is USDST amount (assumed always USDST per user guidance)
+  if (lower.includes("borrow")) {
+    return {
+      stakeUnitPriceUsd: ONE_USD_WEI,
+      totalStakeUsd: baseActivity.totalStake || "0",
+      userStakeUsd: userStakeWei ?? undefined,
+    };
+  }
+
+  // 5) Vault Token: stake is SLP shares (priced via getVaultShareTokenPrice in getCompletePriceMap)
+  if (lower.includes("vault")) {
+    const vaultAddr = (ctx.vaultShareTokenAddress || "").toLowerCase();
+    const price = vaultAddr ? (ctx.priceMap.get(vaultAddr) || null) : null;
+    if (price) {
+      return {
+        stakeUnitPriceUsd: price,
+        totalStakeUsd: mulDiv1e18(baseActivity.totalStake, price),
+        userStakeUsd: userStakeWei ? mulDiv1e18(userStakeWei, price) : undefined,
+      };
+    }
+  }
+
+  return empty;
+};
 
 /**
  * Get rewards contract address or throw error
@@ -44,8 +229,13 @@ export interface UserActivity {
   accRewardPerStake: string;
   lastUpdateTime: string;
   totalStake: string;
+  totalStakeUsd: string | null;
   sourceContract: string;
+  stakeDenomination: StakeDenomination;
+  stakeAssetAddress: string | null;
+  stakeUnitPriceUsd: string | null;
   userStake: string;
+  userStakeUsd: string | null;
   userIndex: string;
   personalEmissionRate: string;
 }
@@ -61,7 +251,11 @@ export interface SystemActivity {
   accRewardPerStake: string;
   lastUpdateTime: string;
   totalStake: string;
+  totalStakeUsd: string | null;
   sourceContract: string;
+  stakeDenomination: StakeDenomination;
+  stakeAssetAddress: string | null;
+  stakeUnitPriceUsd: string | null;
 }
 
 /**
@@ -203,8 +397,22 @@ export const fetchUserActivities = async (
       fetchClaimedRewards(accessToken, rewardsAddress,)
     ]);
 
+    // Build shared pricing context once (used for LP/share-token TVL conversions)
+    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
+      getCompletePriceMap(accessToken),
+      getMTokenAddress(accessToken),
+      getVaultShareTokenAddress(accessToken).catch(() => ""),
+    ]);
+    const { sToken } = getSafetyModuleConfig();
+    const pricingCtx = {
+      priceMap,
+      mTokenAddress,
+      sTokenAddress: sToken.address || null,
+      vaultShareTokenAddress: vaultShareTokenAddress || null,
+    };
+
     // Combine all data
-    const userActivities = activities.map((activity: any) => {
+    const userActivities = await Promise.all(activities.map(async (activity: any) => {
       const activityId = activity.activityId;
       const state = activityStatesMap.get(activityId);
       const userInfo = userInfoMap.get(activityId) || { stake: "0", userIndex: "0" };
@@ -220,6 +428,13 @@ export const fetchUserActivities = async (
         sourceContract: activity.sourceContract || "",
       };
 
+      const { stakeDenomination, stakeAssetAddress } = inferStakeSemantics(baseActivity);
+      const stakeUsdInfo = inferStakeUsdInfo(pricingCtx, {
+        ...baseActivity,
+        stakeDenomination,
+        stakeAssetAddress,
+      }, userInfo.stake);
+
       const personalEmissionRate = calculatePersonalEmissionRate(
         userInfo.stake,
         baseActivity.totalStake,
@@ -228,11 +443,16 @@ export const fetchUserActivities = async (
 
       return {
         ...baseActivity,
+        stakeDenomination,
+        stakeAssetAddress,
+        stakeUnitPriceUsd: stakeUsdInfo.stakeUnitPriceUsd,
+        totalStakeUsd: stakeUsdInfo.totalStakeUsd,
         userStake: userInfo.stake,
+        userStakeUsd: stakeUsdInfo.userStakeUsd ?? null,
         userIndex: userInfo.userIndex,
         personalEmissionRate
       };
-    });
+    }));
 
     // Get claimed rewards for this user from the cached map (O(1) lookup)
     const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
@@ -273,12 +493,26 @@ export const fetchAllActivities = async (
       return [];
     }
 
+    // Build shared pricing context once (used for LP/share-token TVL conversions)
+    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
+      getCompletePriceMap(accessToken),
+      getMTokenAddress(accessToken),
+      getVaultShareTokenAddress(accessToken).catch(() => ""),
+    ]);
+    const { sToken } = getSafetyModuleConfig();
+    const pricingCtx = {
+      priceMap,
+      mTokenAddress,
+      sTokenAddress: sToken.address || null,
+      vaultShareTokenAddress: vaultShareTokenAddress || null,
+    };
+
     // Combine activities with their states
-    return activities.map((activity: any) => {
+    const enriched = await Promise.all(activities.map(async (activity: any) => {
       const activityId = activity.activityId;
       const state = activityStatesMap.get(activityId);
 
-      return {
+      const baseActivity = {
         activityId,
         name: activity.name || "",
         activityType: parseActivityType(activity.activityType),
@@ -288,7 +522,23 @@ export const fetchAllActivities = async (
         totalStake: state?.totalStake || "0",
         sourceContract: activity.sourceContract || "",
       };
-    });
+      const { stakeDenomination, stakeAssetAddress } = inferStakeSemantics(baseActivity);
+      const stakeUsdInfo = inferStakeUsdInfo(pricingCtx, {
+        ...baseActivity,
+        stakeDenomination,
+        stakeAssetAddress,
+      });
+
+      return {
+        ...baseActivity,
+        stakeDenomination,
+        stakeAssetAddress,
+        stakeUnitPriceUsd: stakeUsdInfo.stakeUnitPriceUsd,
+        totalStakeUsd: stakeUsdInfo.totalStakeUsd,
+      };
+    }));
+
+    return enriched;
   } catch (error) {
     console.error("Failed to fetch all activities:", error);
     throw error;

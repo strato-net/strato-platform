@@ -79,7 +79,7 @@ const ActivityFeedList = () => {
 
   // Load filter options once
   useEffect(() => {
-    if (!isLoggedIn || filterOptionsLoaded) return;
+    if (filterOptionsLoaded) return;
     
     const loadOptions = async () => {
       try {
@@ -92,14 +92,10 @@ const ActivityFeedList = () => {
     };
     
     loadOptions();
-  }, [isLoggedIn, filterCache, filterOptionsLoaded]);
+  }, [filterCache, filterOptionsLoaded]);
 
   useEffect(() => {
     const fetchEvents = async () => {
-      if (!isLoggedIn) {
-        return;
-      }
-      
       setLoading(true);
       try {
         const offset = (currentPage - 1) * itemsPerPage;
@@ -134,7 +130,7 @@ const ActivityFeedList = () => {
     }, 300); // 300ms delay
 
     return () => clearTimeout(timeoutId);
-  }, [currentPage, isLoggedIn, filters]);
+  }, [currentPage, filters]);
 
   // Memoized utility functions to prevent unnecessary re-renders
   const formatAddress = useCallback((address: string | null) => {

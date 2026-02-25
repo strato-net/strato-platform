@@ -13,7 +13,7 @@ const createTokensSchema = Joi.object({
   files: Joi.array().items(Joi.string()).required(),
   fileNames: Joi.array().items(Joi.string()).required(),
   symbol: Joi.string().required(),
-  initialSupply: numericStringField("initialSupply"),
+  initialSupply: numericStringField("initialSupply", { allowZero: true }),
   customDecimals: Joi.number().integer().min(0).max(18).required(),
 });
 
@@ -21,6 +21,25 @@ const transferItemSchema = Joi.object({
   address: validateAddressField("address"),
   to: validateAddressField("to"),
   value: numericStringField("value"),
+});
+
+const bulkTransferItemSchema = Joi.object({
+  to: validateAddressField("to"),
+  value: numericStringField("value"),
+});
+
+const bulkTransferSchema = Joi.object({
+  address: validateAddressField("address"),
+  transfers: Joi.array()
+    .items(bulkTransferItemSchema)
+    .min(1)
+    .max(50)
+    .required()
+    .messages({
+      "array.min": `"transfers" must contain at least 1 transfer`,
+      "array.max": `"transfers" cannot exceed 50 transfers per batch`,
+      "any.required": `"transfers" is required`,
+    }),
 });
 
 
@@ -102,5 +121,12 @@ export function validateSetStatusArgs(args: any) {
   const { error } = setStatusArgsSchema.validate(args);
   if (error) {
     throw new Error("SetStatus Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateBulkTransferArgs(args: any) {
+  const { error } = bulkTransferSchema.validate(args);
+  if (error) {
+    throw new Error("Bulk Transfer Argument Validation Error: " + error.message);
   }
 }

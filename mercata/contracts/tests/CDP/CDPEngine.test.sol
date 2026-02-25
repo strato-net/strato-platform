@@ -2,12 +2,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
 
-// Per‑vault state keyed by (user, asset)
-struct Vault {
-    uint collateral; // raw token units
-    uint scaledDebt; // index‑denominated debt
-}
-
 // User contract for multi-user testing
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -17,6 +11,11 @@ contract User {
 }
 
 contract Describe_CDPEngine is Authorizable {
+    // Per‑vault state keyed by (user, asset)
+    struct Vault {
+        uint collateral; // raw token units
+        uint scaledDebt; // index‑denominated debt
+    }
     Mercata m;
     string[] emptyArray;
 
@@ -45,6 +44,15 @@ contract Describe_CDPEngine is Authorizable {
     uint256 DEBT_FLOOR = 1e18; // 1 USDST minimum
     uint256 DEBT_CEILING = 1000000e18; // 1M USD maximum
     uint256 UNIT_SCALE = 1e18; // 18 decimals
+
+    function _openPositionForStabilityFeeMath(uint256 collateralAmount, uint256 mintAmount) internal {
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+        cdpEngine.mint(collateralTokenAddress, mintAmount);
+    }
 
     function beforeAll() {
         bypassAuthorizations = true;
@@ -1711,9 +1719,9 @@ contract Describe_CDPEngine is Authorizable {
         // // Fast forward a bit to avoid timestamp 0 issues
         fastForward(1);
 
-        // Update oracle prices after time advancement to prevent staleness
+        // Update collateral oracle price after time advancement.
+        // Avoid touching USDST oracle state here due to SolidVM oracleState index instability.
         priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
-        priceOracle.setAssetPrice(usdstAddress, 1e18);
 
         // Set up collateral and mint debt
         uint256 collateralAmount = 1000e18;
@@ -1742,9 +1750,9 @@ contract Describe_CDPEngine is Authorizable {
         fastForward(secondsInYear);
         uint256 timestampAfter = block.timestamp;
 
-        // Update oracle prices after time advancement to prevent staleness
+        // Update collateral oracle price after time advancement.
+        // Avoid touching USDST oracle state here due to SolidVM oracleState index instability.
         priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
-        priceOracle.setAssetPrice(usdstAddress, 1e18);
 
         // log("Time before fastForward", timestampBefore);
         // log("Time after fastForward", timestampAfter);
@@ -1783,10 +1791,6 @@ contract Describe_CDPEngine is Authorizable {
         // Fast forward to avoid timestamp 0
         fastForward(1);
 
-        // Update oracle prices after time advancement to prevent staleness
-        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
-        priceOracle.setAssetPrice(usdstAddress, 1e18);
-
         // Set up initial position
         uint256 collateralAmount = 1000e18;
         uint256 debtAmount = 100e18;
@@ -1808,10 +1812,6 @@ contract Describe_CDPEngine is Authorizable {
         uint256 sixMonths = 182 * 24 * 60 * 60; // ~6 months
         fastForward(sixMonths);
 
-        // Update oracle prices after time advancement to prevent staleness
-        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
-        priceOracle.setAssetPrice(usdstAddress, 1e18);
-
         // Trigger accrual
         cdpEngine.mint(collateralTokenAddress, 1);
 
@@ -1822,10 +1822,6 @@ contract Describe_CDPEngine is Authorizable {
 
         // Fast forward another 6 months
         fastForward(sixMonths);
-
-        // Update oracle prices after time advancement to prevent staleness
-        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
-        priceOracle.setAssetPrice(usdstAddress, 1e18);
 
         // Trigger accrual again
         cdpEngine.mint(collateralTokenAddress, 1);
@@ -1909,6 +1905,624 @@ contract Describe_CDPEngine is Authorizable {
         uint256 totalRepaid = debtBefore;
         // log("Total amount repaid", totalRepaid);
         require(totalRepaid > debtAmount, "Should have paid interest on top of principal");
+    }
+
+    function it_stability_fee_manual_example_multi_step_rate_and_fee_split() {
+        // Reconfigure with an intentionally simple per-second factor:
+        // stabilityFeeRate = 2.0 RAY so each second doubles rateAccumulator.
+        // This makes hand calculations exact and easy to verify.
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            2e27, // 2.0 RAY
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        cdpEngine.setFeeToReserveBps(2500); // 25% reserve, 75% collector
+
+        // Open position: scaledDebt = 100e18 because initial rateAccumulator = 1.0 RAY
+        _openPositionForStabilityFeeMath(2000e18, 100e18);
+
+        // Snapshot baseline addresses for fee routing assertions
+        address reserveAddr = address(cdpReserve);
+        address collectorAddr = address(cdpRegistry.feeCollector());
+        uint256 reserveBefore = ERC20(usdstAddress).balanceOf(reserveAddr);
+        uint256 collectorBefore = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        // Step 1 (dt = 1s):
+        // oldRate = 1RAY, newRate = 2RAY
+        // feeUSD = totalScaledDebt * (new-old)/RAY = 100 * (2-1) = 100
+        fastForward(1);
+        cdpEngine.repay(collateralTokenAddress, 1); // triggers _accrue, scaledDelta=0 at rate=2RAY
+
+        (uint256 rateAfterStep1, , uint256 totalScaledAfterStep1) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        require(rateAfterStep1 == 2e27, "Step1: rateAccumulator should be exactly 2.0 RAY");
+        require(totalScaledAfterStep1 == 100e18, "Step1: totalScaledDebt should remain 100");
+
+        uint256 reserveAfterStep1 = ERC20(usdstAddress).balanceOf(reserveAddr);
+        uint256 collectorAfterStep1 = ERC20(usdstAddress).balanceOf(collectorAddr);
+        require(reserveAfterStep1 - reserveBefore == 25e18, "Step1: reserve should receive 25");
+        require(collectorAfterStep1 - collectorBefore == 75e18, "Step1: collector should receive 75");
+
+        // Step 2 (additional dt = 2s):
+        // factor = 2^2 = 4, so newRate = 2 * 4 = 8RAY
+        // incremental feeUSD = 100 * (8-2) = 600
+        fastForward(2);
+        cdpEngine.repay(collateralTokenAddress, 1); // triggers second accrual, scaledDelta still 0
+
+        (uint256 rateAfterStep2, , uint256 totalScaledAfterStep2) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        require(rateAfterStep2 == 8e27, "Step2: rateAccumulator should be exactly 8.0 RAY");
+        require(totalScaledAfterStep2 == 100e18, "Step2: totalScaledDebt should remain 100");
+
+        uint256 reserveAfterStep2 = ERC20(usdstAddress).balanceOf(reserveAddr);
+        uint256 collectorAfterStep2 = ERC20(usdstAddress).balanceOf(collectorAddr);
+        require(reserveAfterStep2 - reserveAfterStep1 == 150e18, "Step2: reserve should receive 150");
+        require(collectorAfterStep2 - collectorAfterStep1 == 450e18, "Step2: collector should receive 450");
+
+        // Final debt check from manual math:
+        // debtUSD = scaledDebt * rate / RAY = 100 * 8 = 800
+        (, uint256 scaledDebtFinal) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        uint256 debtFinal = (scaledDebtFinal * rateAfterStep2) / RAY;
+        require(debtFinal == 800e18, "Final debt should be exactly 800");
+    }
+
+    function it_stability_fee_manual_example_repay_rounding_after_accrual() {
+        // Same simple factor for deterministic hand math.
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            2e27, // 2.0 RAY
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+
+        _openPositionForStabilityFeeMath(2000e18, 100e18);
+
+        // Move to rate = 8RAY (1s then 2s), keeping scaled debt unchanged at 100.
+        fastForward(1);
+        cdpEngine.repay(collateralTokenAddress, 1);
+        fastForward(2);
+        cdpEngine.repay(collateralTokenAddress, 1);
+
+        (uint256 rateBeforeRepay, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        require(rateBeforeRepay == 8e27, "Rate before repay should be exactly 8.0 RAY");
+
+        uint256 userBalanceBeforeRepay = ERC20(usdstAddress).balanceOf(address(this));
+
+        // Manual repay example at rate = 8:
+        // repayAmount(request) = 50e18
+        // scaledDelta = floor((50e18 * RAY) / 8RAY) = 6.25e18
+        // owedForDelta = (6.25e18 * 8RAY) / RAY = 50e18 (this is what burns)
+        cdpEngine.repay(collateralTokenAddress, 50e18);
+
+        uint256 userBalanceAfterRepay = ERC20(usdstAddress).balanceOf(address(this));
+        require(
+            userBalanceBeforeRepay - userBalanceAfterRepay == 50e18,
+            "Repay burn should be exactly 50 with fixed-point scaled rounding"
+        );
+
+        (, uint256 scaledDebtAfterRepay) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        require(scaledDebtAfterRepay == 9375e16, "Scaled debt should be 93.75");
+
+        // Debt after repay at unchanged rate:
+        // debt = 93.75 * 8 = 750
+        uint256 debtAfterRepay = (scaledDebtAfterRepay * rateBeforeRepay) / RAY;
+        require(debtAfterRepay == 750e18, "Debt after rounded repay should be exactly 750");
+    }
+
+    function it_stability_fee_2pct_one_year_on_100_routes_2_to_fee_collector() {
+        // Configure a simple 2% APR scenario and route all fees to FeeCollector.
+        uint256 twoPctPerYear = RAY + ((RAY * 2) / 100 / 31536000);
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            twoPctPerYear,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        cdpEngine.setFeeToReserveBps(0);
+
+        _openPositionForStabilityFeeMath(2000e18, 100e18);
+
+        address collectorAddr = address(cdpRegistry.feeCollector());
+        uint256 collectorBefore = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        // Advance one year, then trigger accrual.
+        fastForward(365 * 24 * 60 * 60);
+        cdpEngine.repay(collateralTokenAddress, 1);
+
+        (uint256 rateAfter, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        (, uint256 scaledDebtAfter) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        uint256 debtAfter = (scaledDebtAfter * rateAfter) / RAY;
+        uint256 feeAccrued = debtAfter - 100e18;
+
+        uint256 collectorAfter = ERC20(usdstAddress).balanceOf(collectorAddr);
+        uint256 collectorDelta = collectorAfter - collectorBefore;
+
+        // Exact wei value can include sub-USDST fractions; validate whole-USDST target.
+        require(feeAccrued / WAD == 2, "Expected ~2 USDST fees after 1 year on 100 at 2% APR");
+        require(collectorDelta / WAD == 2, "FeeCollector should receive ~2 USDST fees");
+    }
+
+    function it_stability_fee_2pct_second_borrow_after_6_months_routes_3_to_fee_collector() {
+        // Scenario:
+        // t0: mint 100
+        // t0 + 6 months: mint another 100 (accrues first tranche for ~6 months)
+        // t0 + 12 months: accrue again
+        // Expected whole-fee check: ~3 USDST total routed to collector.
+        uint256 twoPctPerYear = RAY + ((RAY * 2) / 100 / 31536000);
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            twoPctPerYear,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        cdpEngine.setFeeToReserveBps(0);
+
+        _openPositionForStabilityFeeMath(3000e18, 100e18);
+
+        address collectorAddr = address(cdpRegistry.feeCollector());
+        uint256 collectorBefore = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        // Half-year passes; second borrow triggers first accrual period.
+        fastForward(182 * 24 * 60 * 60);
+        cdpEngine.mint(collateralTokenAddress, 100e18);
+
+        // Complete the year from initial borrow, then trigger accrual again.
+        fastForward(183 * 24 * 60 * 60);
+        cdpEngine.repay(collateralTokenAddress, 1);
+
+        (uint256 rateAfter, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        (, uint256 scaledDebtAfter) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        uint256 debtAfter = (scaledDebtAfter * rateAfter) / RAY;
+        uint256 feeAccrued = debtAfter - 200e18;
+
+        uint256 collectorAfter = ERC20(usdstAddress).balanceOf(collectorAddr);
+        uint256 collectorDelta = collectorAfter - collectorBefore;
+
+        // Why 3 is the right validation criterion:
+        // - First 100 accrues for ~1 year => ~2
+        // - Second 100 accrues for ~0.5 year => ~1
+        // Total whole-fee expectation => 3.
+        require(feeAccrued / WAD == 3, "Expected ~3 USDST total fees in staggered-borrow scenario");
+        require(collectorDelta / WAD == 3, "FeeCollector should receive ~3 USDST in staggered-borrow scenario");
+    }
+
+    function it_stability_fee_2pct_repay_50_at_6_months_tracks_fee_collector_each_accrue() {
+        // Scenario (builds on scenario 1):
+        // 1) Mint 100 USDST at t0
+        // 2) At t0 + 6 months, call repay(50) -> triggers accrual #1
+        // 3) At t0 + 12 months, trigger accrual #2
+        // Assert FeeCollector balance increments exactly by feeUSD each accrual call.
+        uint256 twoPctPerYear = RAY + ((RAY * 2) / 100 / 31536000);
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            twoPctPerYear,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        cdpEngine.setFeeToReserveBps(0); // 100% to FeeCollector for direct assertions
+
+        _openPositionForStabilityFeeMath(2000e18, 100e18);
+
+        address collectorAddr = address(cdpRegistry.feeCollector());
+        uint256 collectorStart = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        uint256 halfYearSeconds = 31536000 / 2;
+
+        // ---------- Accrual #1 at 6 months ----------
+        fastForward(halfYearSeconds);
+
+        (uint256 rateBefore1, , uint256 totalScaledBefore1) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+
+        // repay() calls _accrue() first, then applies repayment.
+        cdpEngine.repay(collateralTokenAddress, 50e18);
+
+        (uint256 rateAfter1, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 collectorAfter1 = ERC20(usdstAddress).balanceOf(collectorAddr);
+        uint256 expectedFee1 = (totalScaledBefore1 * (rateAfter1 - rateBefore1)) / RAY;
+
+        require(
+            collectorAfter1 - collectorStart == expectedFee1,
+            "Accrual #1: FeeCollector delta must equal exact feeUSD"
+        );
+
+        // First 6 months on 100 at 2% APR is ~1 USDST (whole-unit expectation)
+        require(
+            (collectorAfter1 - collectorStart) / WAD == 1,
+            "Accrual #1: expected ~1 USDST routed to FeeCollector"
+        );
+
+        // ---------- Accrual #2 at 12 months ----------
+        fastForward(halfYearSeconds);
+
+        (uint256 rateBefore2, , uint256 totalScaledBefore2) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+
+        // Trigger accrual again. Small repay is enough to execute _accrue().
+        cdpEngine.repay(collateralTokenAddress, 1);
+
+        (uint256 rateAfter2, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 collectorAfter2 = ERC20(usdstAddress).balanceOf(collectorAddr);
+        uint256 expectedFee2 = (totalScaledBefore2 * (rateAfter2 - rateBefore2)) / RAY;
+
+        require(
+            collectorAfter2 - collectorAfter1 == expectedFee2,
+            "Accrual #2: FeeCollector delta must equal exact feeUSD"
+        );
+
+        // After repaying 50 at mid-year, second-half fees are ~0.5 USDST.
+        // So cumulative collector after both accruals is ~1.5 USDST.
+        uint256 collectorTotalDelta = collectorAfter2 - collectorStart;
+        require(
+            collectorTotalDelta >= 15e17 && collectorTotalDelta < 16e17,
+            "Cumulative collector fees should be ~1.5 USDST after 1 year with mid-year repay"
+        );
+    }
+
+    function it_stability_fee_ugly_numbers_single_accrue_exact_split() {
+        // Stress rounding with ugly principal + ugly dt + uneven split.
+        uint256 sevenPctPerYear = RAY + ((RAY * 7) / 100 / 31536000);
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            sevenPctPerYear,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        cdpEngine.setFeeToReserveBps(3333); // intentionally uneven split
+
+        uint256 uglyMint = 1234567891234567890123; // 1234.567891234567890123
+        _openPositionForStabilityFeeMath(2000e18, uglyMint);
+
+        address reserveAddr = address(cdpReserve);
+        address collectorAddr = address(cdpRegistry.feeCollector());
+
+        uint256 reserveBefore = ERC20(usdstAddress).balanceOf(reserveAddr);
+        uint256 collectorBefore = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        uint256 uglyDt = 1234567;
+        fastForward(uglyDt);
+
+        (uint256 rateBefore, , uint256 totalScaledBefore) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        cdpEngine.repay(collateralTokenAddress, 1); // trigger accrue
+        (uint256 rateAfter, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+
+        uint256 feeUSD = (totalScaledBefore * (rateAfter - rateBefore)) / RAY;
+        uint256 expectedReserve = (feeUSD * 3333) / 10000;
+        uint256 expectedCollector = feeUSD - expectedReserve;
+
+        uint256 reserveAfter = ERC20(usdstAddress).balanceOf(reserveAddr);
+        uint256 collectorAfter = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        require(
+            reserveAfter - reserveBefore == expectedReserve,
+            "Ugly single accrue: reserve routing mismatch"
+        );
+        require(
+            collectorAfter - collectorBefore == expectedCollector,
+            "Ugly single accrue: collector routing mismatch"
+        );
+    }
+
+    function it_stability_fee_ugly_numbers_mid_repay_rounding_and_second_accrue() {
+        // Stress odd repayment amount and verify exact burn + per-accrual fee routing.
+        uint256 threePctPerYear = RAY + ((RAY * 3) / 100 / 31536000);
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            threePctPerYear,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        cdpEngine.setFeeToReserveBps(0); // all fees to collector for simpler assertions
+
+        uint256 uglyMint = 987654321987654321000; // 987.654321987654321
+        _openPositionForStabilityFeeMath(2000e18, uglyMint);
+
+        address collectorAddr = address(cdpRegistry.feeCollector());
+        uint256 collectorStart = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        // Accrual #1, then repay an ugly amount.
+        fastForward(1111111);
+        (uint256 rateBefore1, , uint256 totalScaledBefore1) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        (, uint256 userScaledBefore1) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        uint256 userBalanceBeforeRepay = ERC20(usdstAddress).balanceOf(address(this));
+
+        uint256 uglyRepayRequest = 123456789012345678901; // 123.456789012345678901
+        cdpEngine.repay(collateralTokenAddress, uglyRepayRequest);
+
+        (uint256 rateAfter1, , uint256 totalScaledAfter1) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        (, uint256 userScaledAfter1) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        uint256 collectorAfter1 = ERC20(usdstAddress).balanceOf(collectorAddr);
+        uint256 userBalanceAfterRepay = ERC20(usdstAddress).balanceOf(address(this));
+
+        uint256 expectedFee1 = (totalScaledBefore1 * (rateAfter1 - rateBefore1)) / RAY;
+        require(
+            collectorAfter1 - collectorStart == expectedFee1,
+            "Ugly repay: accrual #1 collector routing mismatch"
+        );
+
+        uint256 expectedScaledDelta = (uglyRepayRequest * RAY) / rateAfter1;
+        if (expectedScaledDelta > userScaledBefore1) expectedScaledDelta = userScaledBefore1;
+        uint256 expectedBurn = (expectedScaledDelta * rateAfter1) / RAY;
+
+        require(
+            userBalanceBeforeRepay - userBalanceAfterRepay == expectedBurn,
+            "Ugly repay: burn amount mismatch"
+        );
+        require(
+            userScaledBefore1 - userScaledAfter1 == expectedScaledDelta,
+            "Ugly repay: scaledDebt delta mismatch"
+        );
+        require(
+            totalScaledBefore1 - totalScaledAfter1 == expectedScaledDelta,
+            "Ugly repay: totalScaledDebt delta mismatch"
+        );
+
+        // Accrual #2 with updated (post-repay) scaled debt.
+        fastForward(777777);
+        (uint256 rateBefore2, , uint256 totalScaledBefore2) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        cdpEngine.repay(collateralTokenAddress, 1);
+        (uint256 rateAfter2, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 collectorAfter2 = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        uint256 expectedFee2 = (totalScaledBefore2 * (rateAfter2 - rateBefore2)) / RAY;
+        require(
+            collectorAfter2 - collectorAfter1 == expectedFee2,
+            "Ugly repay: accrual #2 collector routing mismatch"
+        );
+    }
+
+    function it_stability_fee_ugly_numbers_two_step_split_with_exact_running_balances() {
+        // Verify running reserve/collector balances over two odd accrual windows.
+        uint256 elevenPctPerYear = RAY + ((RAY * 11) / 100 / 31536000);
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            elevenPctPerYear,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        cdpEngine.setFeeToReserveBps(2718); // odd split percent
+
+        uint256 uglyMint = 432109876543210987654; // 432.109876543210987654
+        _openPositionForStabilityFeeMath(2000e18, uglyMint);
+
+        address reserveAddr = address(cdpReserve);
+        address collectorAddr = address(cdpRegistry.feeCollector());
+
+        uint256 reserveStart = ERC20(usdstAddress).balanceOf(reserveAddr);
+        uint256 collectorStart = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        // Window #1
+        fastForward(246813);
+        (uint256 rateBefore1, , uint256 totalScaledBefore1) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        cdpEngine.repay(collateralTokenAddress, 1);
+        (uint256 rateAfter1, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+
+        uint256 fee1 = (totalScaledBefore1 * (rateAfter1 - rateBefore1)) / RAY;
+        uint256 reserveExp1 = (fee1 * 2718) / 10000;
+        uint256 collectorExp1 = fee1 - reserveExp1;
+
+        uint256 reserveAfter1 = ERC20(usdstAddress).balanceOf(reserveAddr);
+        uint256 collectorAfter1 = ERC20(usdstAddress).balanceOf(collectorAddr);
+        require(reserveAfter1 == reserveStart + reserveExp1, "Ugly two-step: reserve after #1 mismatch");
+        require(collectorAfter1 == collectorStart + collectorExp1, "Ugly two-step: collector after #1 mismatch");
+
+        // Window #2
+        fastForward(135791);
+        (uint256 rateBefore2, , uint256 totalScaledBefore2) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        cdpEngine.repay(collateralTokenAddress, 1);
+        (uint256 rateAfter2, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+
+        uint256 fee2 = (totalScaledBefore2 * (rateAfter2 - rateBefore2)) / RAY;
+        uint256 reserveExp2 = (fee2 * 2718) / 10000;
+        uint256 collectorExp2 = fee2 - reserveExp2;
+
+        uint256 reserveAfter2 = ERC20(usdstAddress).balanceOf(reserveAddr);
+        uint256 collectorAfter2 = ERC20(usdstAddress).balanceOf(collectorAddr);
+        require(
+            reserveAfter2 == reserveStart + reserveExp1 + reserveExp2,
+            "Ugly two-step: reserve running balance mismatch"
+        );
+        require(
+            collectorAfter2 == collectorStart + collectorExp1 + collectorExp2,
+            "Ugly two-step: collector running balance mismatch"
+        );
+    }
+
+    function it_stability_fee_ugly_numbers_multiple_mints_and_repays() {
+        // Multi-step stress case: ugly mints + ugly repays + odd time windows.
+        uint256 ninePctPerYear = RAY + ((RAY * 9) / 100 / 31536000);
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            LIQUIDATION_RATIO,
+            160e16,
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            ninePctPerYear,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        cdpEngine.setFeeToReserveBps(2468); // ugly split
+
+        // Keep collateral value comfortably above borrow cap.
+        uint256 initialMint = 1234567891234567890123;
+        _openPositionForStabilityFeeMath(10000e18, initialMint);
+
+        address reserveAddr = address(cdpReserve);
+        address collectorAddr = address(cdpRegistry.feeCollector());
+
+        uint256 reserveRunning = ERC20(usdstAddress).balanceOf(reserveAddr);
+        uint256 collectorRunning = ERC20(usdstAddress).balanceOf(collectorAddr);
+
+        // -------- Step 1: mint ugly #2 (accrual first) --------
+        uint256 mint2 = 2345678912345678901234;
+        fastForward(987654);
+        (uint256 rateBefore1, , uint256 totalScaledBefore1) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        cdpEngine.mint(collateralTokenAddress, mint2);
+        (uint256 rateAfter1, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 fee1 = (totalScaledBefore1 * (rateAfter1 - rateBefore1)) / RAY;
+        uint256 reserveExp1 = (fee1 * 2468) / 10000;
+        uint256 collectorExp1 = fee1 - reserveExp1;
+        reserveRunning += reserveExp1;
+        collectorRunning += collectorExp1;
+        require(
+            ERC20(usdstAddress).balanceOf(reserveAddr) == reserveRunning,
+            "Multi ugly step1: reserve mismatch"
+        );
+        require(
+            ERC20(usdstAddress).balanceOf(collectorAddr) == collectorRunning,
+            "Multi ugly step1: collector mismatch"
+        );
+
+        // -------- Step 2: repay ugly #1 (accrual first + rounding-aware burn) --------
+        uint256 repay1 = 456789123456789012345;
+        fastForward(543210);
+        (uint256 rateBefore2, , uint256 totalScaledBefore2) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        (, uint256 userScaledBefore2) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        uint256 userUSDSTBefore2 = ERC20(usdstAddress).balanceOf(address(this));
+
+        cdpEngine.repay(collateralTokenAddress, repay1);
+
+        (uint256 rateAfter2, , uint256 totalScaledAfter2) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        (, uint256 userScaledAfter2) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        uint256 userUSDSTAfter2 = ERC20(usdstAddress).balanceOf(address(this));
+
+        uint256 fee2 = (totalScaledBefore2 * (rateAfter2 - rateBefore2)) / RAY;
+        uint256 reserveExp2 = (fee2 * 2468) / 10000;
+        uint256 collectorExp2 = fee2 - reserveExp2;
+        reserveRunning += reserveExp2;
+        collectorRunning += collectorExp2;
+        require(
+            ERC20(usdstAddress).balanceOf(reserveAddr) == reserveRunning,
+            "Multi ugly step2: reserve mismatch"
+        );
+        require(
+            ERC20(usdstAddress).balanceOf(collectorAddr) == collectorRunning,
+            "Multi ugly step2: collector mismatch"
+        );
+
+        uint256 expectedScaledDelta2 = (repay1 * RAY) / rateAfter2;
+        if (expectedScaledDelta2 > userScaledBefore2) expectedScaledDelta2 = userScaledBefore2;
+        uint256 expectedBurn2 = (expectedScaledDelta2 * rateAfter2) / RAY;
+        require(userUSDSTBefore2 - userUSDSTAfter2 == expectedBurn2, "Multi ugly step2: burn mismatch");
+        require(userScaledBefore2 - userScaledAfter2 == expectedScaledDelta2, "Multi ugly step2: user scaled delta mismatch");
+        require(totalScaledBefore2 - totalScaledAfter2 == expectedScaledDelta2, "Multi ugly step2: total scaled delta mismatch");
+
+        // -------- Step 3: mint ugly #3 (accrual first) --------
+        uint256 mint3 = 345678912345678901234;
+        fastForward(246801);
+        (uint256 rateBefore3, , uint256 totalScaledBefore3) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        cdpEngine.mint(collateralTokenAddress, mint3);
+        (uint256 rateAfter3, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 fee3 = (totalScaledBefore3 * (rateAfter3 - rateBefore3)) / RAY;
+        uint256 reserveExp3 = (fee3 * 2468) / 10000;
+        uint256 collectorExp3 = fee3 - reserveExp3;
+        reserveRunning += reserveExp3;
+        collectorRunning += collectorExp3;
+        require(
+            ERC20(usdstAddress).balanceOf(reserveAddr) == reserveRunning,
+            "Multi ugly step3: reserve mismatch"
+        );
+        require(
+            ERC20(usdstAddress).balanceOf(collectorAddr) == collectorRunning,
+            "Multi ugly step3: collector mismatch"
+        );
+
+        // -------- Step 4: repay ugly #2 (accrual first + rounding-aware burn) --------
+        uint256 repay2 = 321098765432109876543;
+        fastForward(135792);
+        (uint256 rateBefore4, , uint256 totalScaledBefore4) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        (, uint256 userScaledBefore4) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        uint256 userUSDSTBefore4 = ERC20(usdstAddress).balanceOf(address(this));
+
+        cdpEngine.repay(collateralTokenAddress, repay2);
+
+        (uint256 rateAfter4, , uint256 totalScaledAfter4) =
+            cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        (, uint256 userScaledAfter4) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        uint256 userUSDSTAfter4 = ERC20(usdstAddress).balanceOf(address(this));
+
+        uint256 fee4 = (totalScaledBefore4 * (rateAfter4 - rateBefore4)) / RAY;
+        uint256 reserveExp4 = (fee4 * 2468) / 10000;
+        uint256 collectorExp4 = fee4 - reserveExp4;
+        reserveRunning += reserveExp4;
+        collectorRunning += collectorExp4;
+        require(
+            ERC20(usdstAddress).balanceOf(reserveAddr) == reserveRunning,
+            "Multi ugly step4: reserve mismatch"
+        );
+        require(
+            ERC20(usdstAddress).balanceOf(collectorAddr) == collectorRunning,
+            "Multi ugly step4: collector mismatch"
+        );
+
+        uint256 expectedScaledDelta4 = (repay2 * RAY) / rateAfter4;
+        if (expectedScaledDelta4 > userScaledBefore4) expectedScaledDelta4 = userScaledBefore4;
+        uint256 expectedBurn4 = (expectedScaledDelta4 * rateAfter4) / RAY;
+        require(userUSDSTBefore4 - userUSDSTAfter4 == expectedBurn4, "Multi ugly step4: burn mismatch");
+        require(userScaledBefore4 - userScaledAfter4 == expectedScaledDelta4, "Multi ugly step4: user scaled delta mismatch");
+        require(totalScaledBefore4 - totalScaledAfter4 == expectedScaledDelta4, "Multi ugly step4: total scaled delta mismatch");
     }
 
     // function it_cdp_engine_reverts_mint_with_stale_prices() {

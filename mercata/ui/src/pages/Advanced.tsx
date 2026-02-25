@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
@@ -8,25 +9,41 @@ import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
-import MintPlanner from '@/components/cdp/MintPlanner';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BadDebtView from '@/components/cdp/BadDebtView';
 // New v2 components
-import Mint from '@/components/cdp/v2/Mint';
-import DebtPosition from '@/components/cdp/v2/DebtPosition';
+import Mint from '@/components/cdp/v2/components/Mint/Mint';
+import DebtPosition from '@/components/cdp/v2/components/DebtPosition';
 import { useCDP } from '@/context/CDPContext';
-import { CompactRewardsDisplay } from '@/components/rewards/CompactRewardsDisplay';
+import { useUser } from '@/context/UserContext';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useUserTokens } from '@/context/UserTokensContext';
+import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 const Advanced = () => {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations" | "safety" | "mint">("mint");
   const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
+
+  // Handle query parameters for tab navigation from rewards page
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const subtabParam = searchParams.get('subtab');
+
+    if (tabParam && ['lending', 'swap', 'liquidations', 'safety', 'mint'].includes(tabParam)) {
+      setActiveTab(tabParam as "lending" | "swap" | "liquidations" | "safety" | "mint");
+    }
+
+    if (subtabParam && ['vaults', 'bad-debt', 'liquidations'].includes(subtabParam)) {
+      setBorrowActiveTab(subtabParam);
+    }
+  }, [searchParams]);
   const { refreshVaults } = useCDP();
+  const { isLoggedIn } = useUser();
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
   const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
-  const { userRewards, loading: rewardsLoading, refetch: refetchRewards } = useRewardsUserInfo();
+  const { refetch: refetchRewards } = useRewardsUserInfo();
   const { fetchTokens } = useUserTokens();
 
   // Unified refresh function that refreshes ALL CDP components after any transaction
@@ -97,43 +114,64 @@ const Advanced = () => {
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="vaults">
+                      {!isLoggedIn && (
+                        <GuestSignInBanner message="Sign in to create vaults and mint USDST" />
+                      )}
                       <div className="flex flex-col lg:flex-row gap-6">
                         {/* Left Column - Mint Section (New v2) */}
-                        <div className="w-full lg:w-[60%]">
+                        <div className={isLoggedIn ? "w-full lg:w-[60%]" : "w-full"}>
                           <Mint
                             onSuccess={handleQuickMintSuccess}
                             refreshTrigger={mintPlannerRefreshTrigger}
+                            guestMode={!isLoggedIn}
                           />
                         </div>
 
-                        {/* Right Column - Position and Vaults (New v2) */}
-                        <div className="w-full lg:w-[40%] space-y-6">
-                          <DebtPosition refreshTrigger={vaultsRefreshTrigger} />
-                          <VaultsList
-                            refreshTrigger={vaultsRefreshTrigger}
-                            onVaultActionSuccess={handleVaultActionSuccess}
-                          />
-                        </div>
+                        {/* Right Column - Position and Vaults (only for logged-in users) */}
+                        {isLoggedIn && (
+                          <div className="w-full lg:w-[40%] space-y-6">
+                            <DebtPosition refreshTrigger={vaultsRefreshTrigger} />
+                            <VaultsList
+                              refreshTrigger={vaultsRefreshTrigger}
+                              onVaultActionSuccess={handleVaultActionSuccess}
+                            />
+                          </div>
+                        )}
                       </div>
                     </TabsContent>
                     <TabsContent value="bad-debt">
-                      <BadDebtView />
+                      <BadDebtView guestMode={!isLoggedIn} />
                     </TabsContent>
                     <TabsContent value="liquidations">
-                      <LiquidationsView />
+                      {!isLoggedIn && (
+                        <GuestSignInBanner message="Sign in to view and liquidate CDP positions" />
+                      )}
+                      <LiquidationsView guestMode={!isLoggedIn} />
                     </TabsContent>
                   </Tabs>
                 </TabsContent>
                 <TabsContent value="lending">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to deposit liquidity and start earning" />
+                  )}
                   <LendingPoolSection />
                 </TabsContent>
                 <TabsContent value="swap">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to add liquidity to swap pools and earn rewards" />
+                  )}
                   <SwapPoolsSection />
                 </TabsContent>
                 <TabsContent value="safety">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to stake USDST in the Safety Module" />
+                  )}
                   <SafetyModuleSection />
                 </TabsContent>
                 <TabsContent value="liquidations">
+                  {!isLoggedIn && (
+                    <GuestSignInBanner message="Sign in to view and liquidate unhealthy positions" />
+                  )}
                   <LiquidationsSection />
                 </TabsContent>
               </Tabs>

@@ -57,7 +57,7 @@ instance ToSchema ContractName where
   declareNamedSchema proxy =
     genericDeclareNamedSchema defaultSchemaOptions proxy
       & mapped . schema . description ?~ "The name of the smart contract."
-      & mapped . schema . paramSchema . type_ ?~ SwaggerString
+      & mapped . schema . type_ ?~ OpenApiString
       & mapped . schema . example ?~ toJSON (ContractName "MySmartContract")
 
 --------------------------------------------------------------------------------
@@ -97,7 +97,7 @@ instance ToSchema JwtToken where
       NamedSchema
         (Just "R5cCI6IkpXVCJ9.eyJzdFAKESTUFFF.asd123nKJF")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ toJSON (JwtToken "Nikita")
             & description ?~ "User Name"
         )
@@ -126,7 +126,7 @@ instance ToSchema TxParams where
       NamedSchema
         (Just "Transaction Parameters")
         ( mempty
-            & type_ ?~ SwaggerObject
+            & type_ ?~ OpenApiObject
             & example
               ?~ toJSON
                 (TxParams (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876)))

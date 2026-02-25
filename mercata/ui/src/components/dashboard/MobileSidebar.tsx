@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, Download, Coins, UserPlus } from 'lucide-react';
+import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, Download, Coins, UserPlus, Vault } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
@@ -22,6 +22,7 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
     { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
+    { icon: <Vault size={20} />, label: 'Vault', path: '/dashboard/vault' },
     { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
     { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
     { icon: <UserPlus size={20} />, label: 'My Referrals', path: '/dashboard/referrals' },

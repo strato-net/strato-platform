@@ -2,26 +2,19 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Modal } from "antd";
 import { CheckCircle2, Loader2, Clock, AlertCircle, Ban } from "lucide-react";
 import { formatNumberWithCommas, parseCommaNumber } from "@/utils/numberUtils";
+import type { TransactionProgress } from "@/components/cdp/v2/cdpTypes";
 
-export type MintStep = 
+export type ProgressStep =
+  | ""
   | "depositing"
   | "minting"
   | "complete"
   | "error";
 
-interface MintTransaction {
-  symbol: string;
-  type: "deposit" | "mint";
-  amount: string;
-  status: "pending" | "processing" | "completed" | "error";
-  hash?: string;
-  error?: string;
-}
-
 interface MintProgressModalProps {
   open: boolean;
-  currentStep: MintStep;
-  transactions: MintTransaction[];
+  currentStep: ProgressStep;
+  transactions: TransactionProgress[];
   error?: string;
   onClose?: () => void;
 }
@@ -38,7 +31,7 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
   // Determine if a transaction was skipped (marked as error with "Skipped" message)
   const hasError = currentStep === "error";
   const errorIndex = transactions.findIndex(tx => tx.status === "error" && tx.error && !tx.error.includes("Skipped"));
-  const isSkipped = (tx: MintTransaction) => tx.status === "error" && tx.error && tx.error.includes("Skipped");
+  const isSkipped = (tx: TransactionProgress) => tx.status === "error" && tx.error && tx.error.includes("Skipped");
 
   // Transaction summary for error state
   const summary = useMemo(() => {
@@ -59,7 +52,7 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
     setCollapsedTxs(newCollapsed);
   }, [transactions]);
 
-  const getTransactionIcon = (tx: MintTransaction) => {
+  const getTransactionIcon = (tx: TransactionProgress) => {
     if (tx.status === "completed") {
       return <CheckCircle2 className="w-5 h-5 text-green-500" />;
     }
@@ -75,7 +68,7 @@ const MintProgressModal: React.FC<MintProgressModalProps> = ({
     return <Clock className="w-5 h-5 text-muted-foreground" />;
   };
 
-  const getStatusBadge = (tx: MintTransaction) => {
+  const getStatusBadge = (tx: TransactionProgress) => {
     if (tx.status === "completed") {
       return <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 font-medium">Completed</span>;
     }

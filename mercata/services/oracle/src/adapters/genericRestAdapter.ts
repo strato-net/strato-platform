@@ -2,43 +2,38 @@ import { apiRequest } from '../utils/apiClient';
 import { SourceConfig, BatchPriceResult, Asset } from '../types';
 import { logError } from '../utils/logger';
 
-// Helper functions for simplified configuration
-function getApiKey(sourceConfig: SourceConfig): string {
-    return sourceConfig.apiKeyEnvVar ? process.env[sourceConfig.apiKeyEnvVar] || '' : '';
-}
-
-export function extractNestedProperty(obj: any, path: string): any {
+function extractNestedProperty(obj: any, path: string): any {
     if (!path) return undefined;
-    // Use bracket notation to handle both object properties and array indices
     return path.split('.').reduce((o, key) => {
-        // Convert array notation like "data[0]" to bracket notation
         const accessKey = key.replace(/\[(\d+)\]/g, '.$1');
         return accessKey.split('.').reduce((nested, k) => nested?.[k], o);
     }, obj);
 }
 
-export function generateConstantPrices(assets: Asset[]): BatchPriceResult {
+function isValidPrice(price: number): boolean {
+    return price > 0 && isFinite(price);
+}
+
+// Generate constant prices for asset keys
+export function generateConstantPrices(assetKeys: string[], assets: Record<string, Asset>): BatchPriceResult {
     const result: BatchPriceResult = {};
     const timestamp = new Date().toISOString();
     
-    assets.forEach(asset => {
-        if (!asset.constantPrice) {
-            throw new Error(`Asset ${asset.name} is configured for constant price but has no constantPrice field`);
+    assetKeys.forEach(key => {
+        const asset = assets[key];
+        if (!asset || !asset.constantPrice) {
+            throw new Error(`Asset ${key} has no constantPrice`);
         }
-        
-        result[asset.name] = {
-            price: asset.constantPrice,
-            feedTimestamp: timestamp
-        };
+        result[key] = { price: asset.constantPrice, feedTimestamp: timestamp };
     });
     
     return result;
-} 
+}
 
-export async function fetchBatchPrices(assets: Asset[], sourceConfig: SourceConfig): Promise<BatchPriceResult> {
-    const apiKey = getApiKey(sourceConfig);
-    const url = buildBatchUrl(sourceConfig, assets, apiKey);
-    const requestOptions = buildBatchRequestOptions(sourceConfig, url, apiKey, assets);
+// Main fetch function - uses sourceConfig directly
+export async function fetchPrices(sourceConfig: SourceConfig): Promise<BatchPriceResult> {
+    const url = buildUrl(sourceConfig);
+    const requestOptions = buildRequestOptions(sourceConfig, url);
 
     const response = await apiRequest(requestOptions, {
         logPrefix: 'GenericRestAdapter',
@@ -46,52 +41,52 @@ export async function fetchBatchPrices(assets: Asset[], sourceConfig: SourceConf
         method: requestOptions.method || 'GET'
     });
 
-    // Check for API error responses that don't throw HTTP errors
     if (response.data && response.data.success === false) {
         const errorMessage = response.data.error?.message || response.data.error || 'API returned error response';
         throw new Error(`${sourceConfig.url}: ${errorMessage}`);
     }
 
-    return parseBatchResponse(response.data, sourceConfig, assets);
+    return parseResponse(response.data, sourceConfig);
 }
 
-function buildBatchUrl(sourceConfig: SourceConfig, assets: Asset[], apiKey: string): string {
-    let url = sourceConfig.url;
-    
-    // Replace API key placeholder
+function buildUrl(sourceConfig: SourceConfig): string {
+    let url = sourceConfig.url || '';
+    const symbols = sourceConfig.assets;
+    const apiKey = sourceConfig.apiKey || '';
+
     if (apiKey) {
         url = url.replace(/\$\{API_KEY\}/g, apiKey);
     }
-    
-    // Add URL parameters
+
+    // Handle OANDA account ID substitution
+    if (sourceConfig.accountId) {
+        url = url.replace(/\$\{ACCOUNT_ID\}/g, sourceConfig.accountId);
+    }
+
+    // Handle ${SYMBOLS} path substitution (e.g., DefiLlama: /prices/current/${SYMBOLS})
+    if (url.includes('${SYMBOLS}')) {
+        const mapped = symbols.map(s => sourceConfig.symbolMapping?.[s] || s).join(',');
+        url = url.replace(/\$\{SYMBOLS\}/g, mapped);
+    }
+
     if (sourceConfig.params) {
-        const params = sourceConfig.params.split(',').map(p => p.trim());
         const queryParams = new URLSearchParams();
-        
-        params.forEach(param => {
-            // API key params
-            if ((param === 'api_key' || param === 'access_key' || param === 'x_cg_pro_api_key') && apiKey) {
+        sourceConfig.params.split(',').map(p => p.trim()).forEach(param => {
+            // API key params (contains '_key' or is 'api_key'/'access_key'/'apikey')
+            if ((param.includes('_key') || param === 'api_key' || param === 'access_key' || param === 'apikey') && apiKey) {
                 queryParams.append(param, apiKey);
-            // Dynamic asset-based params
-            } else if (param === 'ids') {
-                const ids = assets.map(asset => {
-                    const symbol = asset.name.split('-')[0];
-                    return sourceConfig.symbolMapping?.[symbol] || symbol.toLowerCase();
-                }).join(',');
-                queryParams.append('ids', ids);
-            } else if (param === 'symbol' || param === 'symbols') {
-                const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
-                queryParams.append(param, symbols);
-            } else if (param === 'metals') {
-                const metals = assets.map(asset => {
-                    const symbol = asset.name.split('-')[0];
-                    return sourceConfig.symbolMapping?.[symbol] || symbol;
-                }).join(',');
-                queryParams.append('metals', metals);
             // Static key=value params
             } else if (param.includes('=')) {
                 const [key, value] = param.split('=');
                 queryParams.append(key, value);
+            // Repeated assets param (e.g., symbols[])
+            } else if (param.endsWith('[]')) {
+                const paramName = param.slice(0, -2);
+                symbols.forEach(s => queryParams.append(paramName, sourceConfig.symbolMapping?.[s] || s));
+            // Comma-separated assets param
+            } else {
+                const mapped = symbols.map(s => sourceConfig.symbolMapping?.[s] || s).join(',');
+                queryParams.append(param, mapped);
             }
         });
         
@@ -103,158 +98,203 @@ function buildBatchUrl(sourceConfig: SourceConfig, assets: Asset[], apiKey: stri
     return url;
 }
 
-function buildBatchRequestOptions(sourceConfig: SourceConfig, url: string, apiKey: string, assets: Asset[]): any {
+function buildRequestOptions(sourceConfig: SourceConfig, url: string): any {
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     };
 
-    // Add authorization headers
-    if (sourceConfig.headers) {
-        const headerNames = sourceConfig.headers.split(',').map(h => h.trim());
-        headerNames.forEach(headerName => {
-            if (headerName === 'X-CMC_PRO_API_KEY' && apiKey) {
-                headers[headerName] = apiKey;
+    // Add API key headers
+    if (sourceConfig.headers && sourceConfig.apiKey) {
+        sourceConfig.headers.split(',').forEach(h => {
+            const headerName = h.trim();
+            // OANDA uses Bearer token auth
+            if (headerName === 'Authorization') {
+                headers[headerName] = `Bearer ${sourceConfig.apiKey}`;
+            } else {
+                headers[headerName] = sourceConfig.apiKey!;
             }
         });
     }
 
-    const requestOptions: any = {
-        method: sourceConfig.method || 'GET',
-        url,
-        headers
-    };
+    const requestOptions: any = { method: sourceConfig.method || 'GET', url, headers };
 
-    // Handle POST request body
+    // Add POST body if needed
     if (sourceConfig.body && sourceConfig.method === 'POST') {
-        if (sourceConfig.body === 'addresses') {
-            requestOptions.data = {
-                addresses: assets.map(asset => ({
-                    network: "eth-mainnet",
-                    address: asset.tokenAddress
-                }))
-            };
-        }
+        requestOptions.data = {
+            codes: sourceConfig.assets.map(s => sourceConfig.symbolMapping?.[s] || s),
+            currency: 'USD',
+            meta: false
+        };
     }
 
     return requestOptions;
 }
 
-/**
- * Parses batch API responses based on source configuration
- * Supports multiple response formats: array-based, object-based, and metals-specific
- */
-function parseBatchResponse(
-    data: any, 
-    sourceConfig: SourceConfig, 
-    assets: Asset[]
-): BatchPriceResult {
+function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult {
     const result: BatchPriceResult = {};
-    
-    if (!assets || !Array.isArray(assets)) {
-        throw new Error('Batch feed must have assets array');
-    }
-    
     const parsePattern = sourceConfig.parse;
-    const timestampPattern = sourceConfig.timestamp;
+    const symbols = sourceConfig.assets;
     
-    // Handle array-based responses (like Alchemy)
+    // Alchemy: data[].prices[0].value
     if (parsePattern === 'data[].prices[0].value' && data.data && Array.isArray(data.data)) {
-        data.data.forEach((item: any, index: number) => {
-            const asset = assets[index];
-            if (item.prices && item.prices.length > 0) {
-                const priceUSD = parseFloat(item.prices[0].value);
-                if (priceUSD > 0) {
-                    const price = Math.floor(priceUSD * 1e18);
-                    const feedTimestamp = item.prices[0].lastUpdatedAt || new Date().toISOString();
-                    result[asset.name] = { price, feedTimestamp };
-                }
+        symbols.forEach(symbol => {
+            const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const item = data.data.find((d: any) => d.symbol === mapped);
+            if (item?.prices?.[0]?.value) {
+                const price = Math.floor(parseFloat(item.prices[0].value) * 1e18);
+                if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: item.prices[0].lastUpdatedAt || new Date().toISOString() };
             }
         });
         
-    // Handle object-based responses with symbols as keys (like CoinMarketCap)
-    } else if (parsePattern.includes('data.{symbol}[0].quote.USD.price') && data.data && typeof data.data === 'object') {
-        assets.forEach(asset => {
-            const symbol = asset.name.split('-')[0];
+    // CoinMarketCap: data.{symbol}[0].quote.USD.price
+    } else if (parsePattern.includes('data.{symbol}[0].quote.USD.price') && data.data) {
+        symbols.forEach(symbol => {
             const symbolData = data.data[symbol];
-            if (symbolData && symbolData[0] && symbolData[0].quote && symbolData[0].quote.USD) {
-                const priceUSD = parseFloat(symbolData[0].quote.USD.price);
-                if (priceUSD > 0) {
-                    const price = Math.floor(priceUSD * 1e18);
-                    const feedTimestamp = symbolData[0].quote.USD.last_updated || new Date().toISOString();
-                    result[asset.name] = { price, feedTimestamp };
-                }
+            if (symbolData?.[0]?.quote?.USD?.price) {
+                const price = Math.floor(parseFloat(symbolData[0].quote.USD.price) * 1e18);
+                if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: symbolData[0].quote.USD.last_updated || new Date().toISOString() };
             }
         });
         
-    // Handle CoinGecko response structures
+    // CoinGecko: {id}.usd
     } else if (parsePattern === '{id}.usd') {
-        assets.forEach(asset => {
-            const symbol = asset.name.split('-')[0];
+        symbols.forEach(symbol => {
             const id = sourceConfig.symbolMapping?.[symbol] || symbol.toLowerCase();
-            const priceData = data[id];
-            
-            if (priceData && priceData.usd) {
-                const priceUSD = parseFloat(priceData.usd);
-                if (priceUSD > 0) {
-                    const price = Math.floor(priceUSD * 1e18);
-                    const feedTimestamp = priceData.last_updated_at 
-                        ? new Date(priceData.last_updated_at * 1000).toISOString()
-                        : new Date().toISOString();
-                    result[asset.name] = { price, feedTimestamp };
+            if (data[id]?.usd) {
+                const price = Math.floor(parseFloat(data[id].usd) * 1e18);
+                if (isValidPrice(price)) {
+                    const ts = data[id].last_updated_at ? new Date(data[id].last_updated_at * 1000).toISOString() : new Date().toISOString();
+                    result[symbol] = { price, feedTimestamp: ts };
                 }
             }
         });
         
-    // Handle metals-specific response structures
+    // CoinAPI: assets array
+    } else if (parsePattern === 'assets' && Array.isArray(data)) {
+        symbols.forEach(symbol => {
+            const assetId = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const assetData = data.find((a: any) => a.asset_id === assetId);
+            if (assetData?.price_usd) {
+                const price = Math.floor(parseFloat(assetData.price_usd) * 1e18);
+                if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: assetData.data_quote_start || new Date().toISOString() };
+            }
+        });
+        
+    // DefiLlama: coins.{coinId}.price
+    } else if (parsePattern === 'defiLlama' && data.coins) {
+        symbols.forEach(symbol => {
+            const coinId = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const coinData = data.coins[coinId];
+            if (coinData?.price) {
+                const price = Math.floor(parseFloat(coinData.price) * 1e18);
+                if (isValidPrice(price)) {
+                    const ts = coinData.timestamp ? new Date(coinData.timestamp * 1000).toISOString() : new Date().toISOString();
+                    result[symbol] = { price, feedTimestamp: ts };
+                }
+            }
+        });
+        
+    // Commodities-API: data.rates.{symbol}
+    } else if (parsePattern === 'data.rates.{symbol}' && data.data?.rates) {
+        symbols.forEach(symbol => {
+            const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const rate = data.data.rates[mapped];
+            if (rate) {
+                const price = Math.floor((1 / parseFloat(rate)) * 1e18); // Inverted rate
+                if (isValidPrice(price)) {
+                    const ts = data.data.timestamp ? new Date(data.data.timestamp * 1000).toISOString() : new Date().toISOString();
+                    result[symbol] = { price, feedTimestamp: ts };
+                }
+            }
+        });
+        
+    // Metals.dev / MetalsAPI
     } else if (parsePattern.includes('metals.{metal}') || parsePattern.includes('rates.USD{symbol}')) {
-        assets.forEach(asset => {
+        symbols.forEach(symbol => {
             let priceUSD: number;
-            let feedTimestamp: string;
+            let ts: string;
             
             if (parsePattern.includes('metals.{metal}')) {
-                // Metals.dev format
-                const symbol = asset.name.split('-')[0];
                 const metalKey = sourceConfig.symbolMapping?.[symbol] || symbol;
                 priceUSD = parseFloat(data.metals[metalKey]);
-                feedTimestamp = data.timestamps?.metal || new Date().toISOString();
+                ts = data.timestamps?.metal || new Date().toISOString();
             } else {
-                // MetalPriceAPI format
-                const symbol = asset.name.split('-')[0];
-                const rateKey = `USD${symbol}`;
-                priceUSD = parseFloat(data.rates[rateKey]);
-                feedTimestamp = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
+                priceUSD = parseFloat(data.rates[`USD${symbol}`]);
+                ts = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
             }
             
             if (!isNaN(priceUSD) && priceUSD > 0) {
                 const price = Math.floor(priceUSD * 1e18);
-                result[asset.name] = { price, feedTimestamp };
+                if (isValidPrice(price)) {
+                    result[symbol] = { price, feedTimestamp: ts };
+                }
             }
         });
         
-    // Generic fallback for other response formats
-    } else {
-        assets.forEach(asset => {
-            try {
-                const symbol = asset.name.split('-')[0];
-                const assetParsePath = parsePattern.replace(/\{symbol\}/g, symbol);
-                const priceUSD = extractNestedProperty(data, assetParsePath);
-                
+    // CommodityPriceAPI: rates.{symbol} object with close price
+    } else if (parsePattern === 'rates.{symbol}' && data.rates) {
+        symbols.forEach(symbol => {
+            const rate = data.rates[symbol];
+            if (rate) {
+                // Handle both direct number and object with close price
+                const priceUSD = typeof rate === 'number' ? rate : (rate.close || rate.price || rate.value);
                 if (priceUSD) {
-                    const parsedPrice = parseFloat(priceUSD);
-                    if (!isNaN(parsedPrice) && parsedPrice > 0) {
-                        const price = Math.floor(parsedPrice * 1e18);
-                        const feedTimestamp = timestampPattern 
-                            ? extractNestedProperty(data, timestampPattern) || new Date().toISOString()
-                            : new Date().toISOString();
-                        result[asset.name] = { price, feedTimestamp };
+                    const price = Math.floor(parseFloat(priceUSD) * 1e18);
+                    if (isValidPrice(price)) {
+                        const ts = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
+                        result[symbol] = { price, feedTimestamp: ts };
                     }
                 }
-            } catch (error) {
-                logError('GenericRestAdapter', new Error(`Failed to parse price for ${asset.name}: ${error}`));
+            }
+        });
+
+    // TwelveData: {symbol}.price where symbol is mapped (e.g., XAU/USD)
+    // Single symbol returns {"price": "..."}, multiple returns {"XAU/USD": {"price": "..."}}
+    } else if (parsePattern === '{symbol}.price') {
+        symbols.forEach(symbol => {
+            const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
+            // Handle single symbol response (direct price) vs batch response (keyed by symbol)
+            const symbolData = data[mapped] || (symbols.length === 1 ? data : null);
+            if (symbolData?.price) {
+                const price = Math.floor(parseFloat(symbolData.price) * 1e18);
+                if (isValidPrice(price)) {
+                    result[symbol] = { price, feedTimestamp: new Date().toISOString() };
+                }
+            }
+        });
+
+    // OANDA: prices array with instrument, bids, asks - use mid price (avg of best bid/ask)
+    } else if (parsePattern === 'oanda.prices' && data.prices && Array.isArray(data.prices)) {
+        symbols.forEach(symbol => {
+            const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const priceData = data.prices.find((p: any) => p.instrument === mapped);
+            if (priceData?.bids?.[0]?.price && priceData?.asks?.[0]?.price) {
+                const bid = parseFloat(priceData.bids[0].price);
+                const ask = parseFloat(priceData.asks[0].price);
+                const midPrice = (bid + ask) / 2;
+                const price = Math.floor(midPrice * 1e18);
+                if (isValidPrice(price)) {
+                    result[symbol] = { price, feedTimestamp: priceData.time || new Date().toISOString() };
+                }
+            }
+        });
+
+    // Generic fallback
+    } else {
+        symbols.forEach(symbol => {
+            try {
+                const path = parsePattern.replace(/\{symbol\}/g, symbol);
+                const priceUSD = extractNestedProperty(data, path);
+                if (priceUSD) {
+                    const price = Math.floor(parseFloat(priceUSD) * 1e18);
+                    if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: new Date().toISOString() };
+                }
+            } catch (err) {
+                logError('GenericRestAdapter', new Error(`Failed to parse ${symbol}: ${err}`));
             }
         });
     }
     
     return result;
-} 
+}

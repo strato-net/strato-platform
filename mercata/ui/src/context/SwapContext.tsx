@@ -160,6 +160,26 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const togglePause = useCallback(async (poolAddress: string, isPaused: boolean) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/swap-pools/toggle-pause', { poolAddress, isPaused });
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const toggleDisable = useCallback(async (poolAddress: string, isDisabled: boolean) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/swap-pools/toggle-disable', { poolAddress, isDisabled });
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const fetchUserPositions = useCallback(async () => {
     setPoolsLoading(true);
     setError(null);
@@ -321,10 +341,13 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // INITIALIZATION
   // ============================================================================
   useEffect(() => {
-    if (!isLoggedIn) return;
-    
-    fetchSwappableTokens();
+    // Pool data is public - always fetch for all users
     fetchPools();
+    
+    // User-specific token data - only fetch when logged in
+    if (isLoggedIn) {
+      fetchSwappableTokens();
+    }
   }, [fetchSwappableTokens, fetchPools, isLoggedIn]);
 
   // ============================================================================
@@ -367,6 +390,8 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         swapHistoryCount,
         swapHistoryLoading,
         setPoolRates,
+        togglePause,
+        toggleDisable,
         pools
       }}
     >

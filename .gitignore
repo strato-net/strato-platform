@@ -12,6 +12,10 @@ docker-compose.allDocker.push.yml
 docker-compose.allDocker.push.ecr.yml
 docker-compose.allDocker.yml
 docker-compose.allDocker.ecr.yml
+docker-compose.bridge.push.yml
+docker-compose.bridge.push.ecr.yml
+docker-compose.bridge.yml
+docker-compose.bridge.ecr.yml
 docker-compose.highway.push.yml
 docker-compose.highway.push.ecr.yml
 docker-compose.highway.yml
@@ -34,6 +38,11 @@ strato/hpc
 !strato/simulator/strato-obelisk/**/*.cabal
 *~
 bridge_image_tag*
+
+docker-compose.bridge.ecr.yml
+docker-compose.bridge.push.ecr.yml
+docker-compose.bridge.push.yml
+docker-compose.bridge.yml
 
 # Obsolete services, lines to be removed soon:
 rewards-server/src/config/latestBlock.json
@@ -60,3 +69,68 @@ docker-compose.oracle.yml
 /app
 /mynode/
 .aider*
+
+# Documentation working files (summaries, verification reports, commit messages)
+/*_SUMMARY.md
+/*_VERIFICATION.md
+/*_COMPLETE.md
+/*_FIXES*.md
+/*_FIX*.md
+/*_REPORT.md
+/COMMIT_MESSAGE*.txt
+/COMMIT_MESSAGE*.md
+/COMPREHENSIVE*.txt
+/COMPREHENSIVE*.md
+/CRITICAL*.md
+/ACTUAL*.md
+/APPROVAL*.md
+/DCA*.md
+/DEVELOPER*.md
+/DOCUMENTATION*.md
+/EXAMPLE*.md
+/PLATFORM*.md
+/PORTFOLIO*.md
+/RELEASE*.md
+/RESTRUCTURE*.md
+/SCENARIO*.md
+/STRATEGY*.md
+/SWAP*.md
+/TESTING*.md
+/TROUBLESHOOTING*.md
+/VOUCHER*.md
+
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# macOS
+.DS_Store
+
+# IDE
+.worktrees/
+
+
+# More documentation working files
+/*_PLAN.md
+/COMPLETE_*.md
+/COMPLETE_*.txt
+/DOCS_*.md
+/FINAL_*.txt
+/FINAL_*.md
+/LENDING_*.md
+/MAXIMIZE_*.md
+/RISK_*.md
+/verify_docs_accuracy.py
+
+# Old docs folders (obsolete)
+/docs/developer/
+/docs/end-user/

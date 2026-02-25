@@ -46,8 +46,8 @@ import Data.Coerce
 import Data.Conduit (ConduitT)
 import Data.Data
 import Data.Maybe
-import Data.Swagger (ToSchema)
-import Data.Swagger.Internal.Schema (binarySchema, declareNamedSchema, named)
+import Data.OpenApi (ToSchema(..), binarySchema)
+import Data.OpenApi.Internal.Schema (named)
 import qualified Data.Text as T
 import GHC.Generics
 import qualified LabeledError

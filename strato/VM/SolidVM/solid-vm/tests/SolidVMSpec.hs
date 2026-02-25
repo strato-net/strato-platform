@@ -1079,7 +1079,7 @@ contract qq {
   }
 }|]
         )
-        `shouldThrow` failedRequirementMsg "SString \"Who is John Galt?\""
+        `shouldThrow` failedRequirementMsg "Who is John Galt?"
 
     it "can handle failed requirement without message" $
       runTest

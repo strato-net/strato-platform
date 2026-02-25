@@ -4,6 +4,9 @@ import path from "path";
 const ERROR_FILE_NAME = "oracle-error.flag";
 const ERROR_FILE_PATH = path.join(process.cwd(), ERROR_FILE_NAME);
 
+const WARNING_FILE_NAME = "oracle-warning.log";
+const WARNING_FILE_PATH = path.join(process.cwd(), WARNING_FILE_NAME);
+
 class HealthMonitor {
 
     async appendToErrorFile(error_data: any) {
@@ -13,6 +16,15 @@ class HealthMonitor {
             console.log('Added the error message to the error file.', errorJsonString);
         } catch (err) {
             console.error('WARNING! Error occurred while appending to the file:', err);
+        }
+    }
+
+    async appendToWarningFile(warning_data: any) {
+        try {
+            const warningJsonString = JSON.stringify({timestamp: new Date().toISOString(), warning: warning_data})
+            await fs.appendFile(WARNING_FILE_PATH, warningJsonString + '\n');
+        } catch (err) {
+            console.error('Error occurred while appending to the warning file:', err);
         }
     }
 

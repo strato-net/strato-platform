@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { cdpService, JuniorNote as JuniorNoteType } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
+import { redirectToLogin } from "@/lib/auth";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import CopyableHash from "../common/CopyableHash";
 
@@ -16,9 +17,10 @@ interface UserJuniorNote extends JuniorNoteType {
 interface JuniorNoteProps {
   refreshTrigger?: number;
   onNoteActionSuccess?: () => void;
+  guestMode?: boolean;
 }
 
-const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuccess }) => {
+const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuccess, guestMode = false }) => {
   const [note, setNote] = useState<UserJuniorNote | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,7 +34,8 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
 
   // Fetch junior note from backend
   const fetchJuniorNote = useCallback(async (showRefreshing = false) => {
-    if (!userAddress) {
+    // Skip API call for guests
+    if (guestMode || !userAddress) {
       setLoading(false);
       setRefreshing(false);
       return;
@@ -84,7 +87,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userAddress, toast]);
+  }, [userAddress, toast, guestMode]);
 
   // Handle claimable amount click
   const handleClaimableClick = () => {
@@ -153,6 +156,22 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
   const handleRefresh = () => {
     fetchJuniorNote(true);
   };
+
+  // Guest mode: show sign-in prompt (user-specific data requires login)
+  if (guestMode) {
+    return (
+      <div className="text-center py-6">
+        <p className="text-sm text-muted-foreground mb-4">
+          Sign in to view your Junior Note details, claimable rewards, and remaining cap.
+        </p>
+        <Button
+          onClick={() => redirectToLogin()}
+        >
+          Sign In to View Your Junior Note
+        </Button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

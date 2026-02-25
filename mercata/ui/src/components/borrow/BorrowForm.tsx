@@ -20,13 +20,14 @@ import {
   sortCollateralAssets,
   calculateMaxCollateralValueUSDCentFloored,
   centCeil,
-  centFloor
+  centFloor,
+  getTextColor,
+  getRiskLabel
 } from "@/utils/lendingUtils";
-import { getRiskLabel } from "@/utils/lendingUtils";
 import { useLendingContext } from "@/context/LendingContext";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { UserRewardsData } from "@/services/rewardsService";
-import { CompactRewardsDisplay } from "../rewards/CompactRewardsDisplay";
+import { RewardsWidget } from "../rewards/RewardsWidget";
 import BorrowProgressModal, { BorrowStep } from "./BorrowProgressModal";
 
 interface BorrowFormProps {
@@ -40,6 +41,7 @@ interface BorrowFormProps {
   stopPolling?: () => void;
   userRewards?: UserRewardsData | null;
   rewardsLoading?: boolean;
+  guestMode?: boolean;
 }
 
   // In custom mode, each asset row can be driven by:
@@ -49,7 +51,7 @@ type CustomCollateralEntry =
   | { source: "wei"; wei: bigint }
   | { source: "usd"; usd: string };
 
-const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading }: BorrowFormProps) => {
+const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling, userRewards, rewardsLoading, guestMode = false }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
   const [borrowAmountError, setBorrowAmountError] = useState<string>("");
   const [customBorrowError, setCustomBorrowError] = useState<string>("");
@@ -83,19 +85,18 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
   // Calculate available to borrow based on current health factor setting
   // Includes all available collateral balances (max potential borrowing power)
+  // Amount is in wei; 10n**18n = 1 USD
   const availableToBorrow = useMemo(() => {
+    if (!loans || !collateralInfo || collateralInfo.length === 0) return 0n;
     return calculateAvailableToBorrowUSD(loans, targetHealthFactor, potentialCollateral);
-  }, [loans, targetHealthFactor, potentialCollateral]);
+  }, [loans, collateralInfo, targetHealthFactor, potentialCollateral]);
 
   // Calculate maximum borrowable at slider minimum (riskiest) health factor
+  // Amount is in wei; 10n**18n = 1 USD
   const maxAtMinHF = useMemo(() => {
     return calculateAvailableToBorrowUSD(loans, sliderExtrema.min, potentialCollateral);
   }, [loans, sliderExtrema.min, potentialCollateral]);
 
-  // Max borrowable amount in wei
-  const maxAmount = useMemo(() => {
-    return BigInt(Math.round(Number(availableToBorrow) * 1e18)).toString();
-  }, [availableToBorrow]);
 
   // Current health factor display
   const currentHF = useMemo(() => {
@@ -239,34 +240,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     }
   }, [txFee, voucherBalance, usdstBalance]);
 
-  // Update custom error message when borrow amount exceeds maximum at selected health factor
-  useEffect(() => {
-    if (!borrowAmount || !loans) {
-      setCustomBorrowError("");
-      return;
-    }
 
-    const borrowAmountNum = parseFloat(borrowAmount);
-    if (isNaN(borrowAmountNum) || borrowAmountNum <= 0) {
-      setCustomBorrowError("");
-      return;
-    }
-
-    const borrowAmountWei = safeParseUnits(borrowAmount, 18);
-    const maxAmountWei = BigInt(maxAmount);
-    
-    // Only set custom error if amount exceeds maximum
-    if (borrowAmountWei > maxAmountWei) {
-      const errorMsg = determineErrorMessage(
-        borrowAmountNum,
-        availableToBorrow,
-        maxAtMinHF
-      );
-      setCustomBorrowError(errorMsg);
-    } else {
-      setCustomBorrowError("");
-    }
-  }, [borrowAmount, loans, maxAmount, availableToBorrow, maxAtMinHF]);
 
   // Automatically reset to auto-supply mode when borrow amount or health factor changes
   useEffect(() => {
@@ -449,8 +423,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
   }, [sliderExtrema]);
 
   const borrowAmountExceedsMax = useMemo(() => {
-    return safeParseUnits(borrowAmount || "0", 18) > BigInt(maxAmount);
-  }, [borrowAmount, maxAmount]);
+    return safeParseUnits(borrowAmount || "0", 18) > availableToBorrow;
+  }, [borrowAmount, availableToBorrow]);
 
   // We handle borrowAmountExceedsMax separately, since it updates on HF slider
   const setBorrowAmountErrorIgnoringMax = (value: string) => {
@@ -461,6 +435,31 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
     setBorrowAmountError(value);
   };
 
+  // Update custom error message when borrow amount exceeds maximum at selected health factor
+  useEffect(() => {
+    if (!borrowAmount || !loans) {
+      setCustomBorrowError("");
+      return;
+    }
+
+    const borrowAmountNum = parseFloat(borrowAmount);
+    if (isNaN(borrowAmountNum) || borrowAmountNum <= 0) {
+      setCustomBorrowError("");
+      return;
+    }
+
+    if (borrowAmountExceedsMax) {
+      const errorMsg = determineErrorMessage(
+        borrowAmountNum,
+        availableToBorrow,
+        maxAtMinHF
+      );
+      setCustomBorrowError(errorMsg);
+    } else {
+      setCustomBorrowError("");
+    }
+  }, [borrowAmount, loans, availableToBorrow, maxAtMinHF, borrowAmountExceedsMax]);
+
   return (
     <div className="space-y-4 pt-4">
       {/* Header: Borrow USDST */}
@@ -468,7 +467,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
         <h3 className="text-lg font-semibold">Borrow USDST</h3>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Available to Borrow</span>
-          <span className="font-medium">USDST {Number(availableToBorrow).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span className="font-medium">USDST {Number(formatUnits(availableToBorrow, 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Interest Rate</span>
@@ -487,9 +486,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               value={addCommasToInput(borrowAmount)}
               onChange={(e) => {
                 const value = e.target.value;
-                handleAmountInputChange(value, setBorrowAmount, setBorrowAmountErrorIgnoringMax, maxAmount);
+                handleAmountInputChange(value, setBorrowAmount, setBorrowAmountErrorIgnoringMax, availableToBorrow.toString());
                 handlePollingUpdate(value);
               }}
+              disabled={guestMode}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">USDST</span>
           </div>
@@ -497,12 +497,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             variant="outline"
             onClick={() => {
               try {
-                setBorrowAmount(formatUnits(BigInt(maxAmount)));
+                const formattedMax = Number(formatUnits(availableToBorrow, 18)).toFixed(2);
+                setBorrowAmount(formattedMax);
                 setBorrowAmountError("");
-                handlePollingUpdate(formatUnits(BigInt(maxAmount)));
+                handlePollingUpdate(formattedMax);
               } catch {}
             }}
-            disabled={Number(availableToBorrow) <= 0}
+            disabled={ guestMode || availableToBorrow <= 0n}
             className="px-4"
           >
             MAX
@@ -541,6 +542,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             step={0.01}
             onValueChange={handleSliderChange}
             className="w-full"
+            disabled={guestMode}
           />
 
           <div className="flex justify-between text-xs text-muted-foreground">
@@ -552,9 +554,15 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           <div className="flex justify-between items-center text-sm border-t pt-3">
             <span className="text-muted-foreground">Health Impact</span>
             <span className="font-medium tabular-nums">
-              {currentHF === null ? 'No Loan' : currentHF.toFixed(2)}
+              {currentHF === null ? (
+                <span style={{ color: getTextColor(0, 3, true) }}>No Loan</span>
+              ) : (
+                <span style={{ color: getTextColor(currentHF, 3) }}>{currentHF.toFixed(2)}</span>
+              )}
               {' → '}
-              {afterBorrowHF && !customBorrowError ? afterBorrowHF.toFixed(2) : '-'}
+              {afterBorrowHF && !customBorrowError ? (
+                <span style={{ color: getTextColor(Number(afterBorrowHF), 3) }}>{Number(afterBorrowHF).toFixed(2)}</span>
+              ) : '-'}
             </span>
           </div>
         </div>
@@ -584,6 +592,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       <Button
         onClick={handleBorrow}
         disabled={
+          guestMode ||
           !borrowAmount ||
           !!borrowAmountError ||
           !!customBorrowError ||
@@ -612,6 +621,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
               id="auto-supply"
               checked={autoSupplyCollateral}
               onCheckedChange={handleAutoSupplyChange}
+              disabled={guestMode}
             />
             <label
               htmlFor="auto-supply"
@@ -624,10 +634,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           {/* Additional Collateral Needed Dropdown */}
           <Collapsible
             open={isCollateralExpanded}
-            onOpenChange={setIsCollateralExpanded}
+            onOpenChange={guestMode ? undefined : setIsCollateralExpanded}
             className="border rounded-lg"
           >
-        <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors">
+        <CollapsibleTrigger 
+          className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={guestMode}
+        >
           <span>
             Additional Collateral Needed{' '}
             <span className="text-muted-foreground font-normal">
@@ -754,6 +767,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
                             })()}
                             onChange={(e) => handleCustomValueChange(item.collateral.address, e.target.value)}
                             className={`collateral-value-input w-20 h-7 text-right text-sm px-2 ${collateralExceedsMaxMap.get(item.collateral.address) ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                            disabled={guestMode}
                           />
                         </div>
                       )}
@@ -799,7 +813,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
       )}
 
       {/* Rewards Display */}
-      <CompactRewardsDisplay
+      <RewardsWidget
         userRewards={userRewards}
         activityName="Lending Pool Borrow"
         inputAmount={borrowAmount}
@@ -808,7 +822,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
 
       {/* Conditional Warning Messages */}
       {(() => {
-        const isZeroAvailable = Number(availableToBorrow) <= 0;
+        const isZeroAvailable = availableToBorrow <= 0n;
         const eligibleCollateralTokens = collateralInfo || [];
 
         if (isZeroAvailable && eligibleCollateralTokens.length === 0) {

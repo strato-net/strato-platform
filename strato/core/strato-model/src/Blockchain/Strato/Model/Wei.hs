@@ -11,8 +11,8 @@ import Blockchain.Strato.Model.ExtendedWord
 import Control.DeepSeq (NFData)
 import Control.Lens.Operators
 import Data.Aeson hiding (Array, String)
+import Data.OpenApi
 import Data.Proxy
-import Data.Swagger
 import GHC.Generics
 import Test.QuickCheck hiding ((.&.))
 
@@ -32,7 +32,7 @@ instance ToSchema Wei where
       NamedSchema
         (Just "Wei")
         ( mempty
-            & type_ ?~ SwaggerInteger
+            & type_ ?~ OpenApiInteger
             & example ?~ toJSON (Wei 1000000)
             & description ?~ "Number of Wei currency units"
         )

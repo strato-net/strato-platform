@@ -15,6 +15,7 @@ interface AssetSummaryProps {
   isActive?: boolean;
   isLoading?: boolean;
   additionalContent?: React.ReactNode;
+  valueClassName?: string;
 }
 
 const AssetSummary = ({
@@ -27,6 +28,7 @@ const AssetSummary = ({
   isActive = false,
   isLoading = false,
   additionalContent,
+  valueClassName = "",
 }: AssetSummaryProps) => {
   return (
     <div 
@@ -56,7 +58,7 @@ const AssetSummary = ({
               <span className="text-muted-foreground text-sm">Loading...</span>
             </div>
           ) : (
-            <h3 className="text-lg md:text-2xl font-bold mt-1">{value}</h3>
+            <h3 className={`text-lg md:text-2xl font-bold mt-1 ${valueClassName}`}>{value}</h3>
           )}
           {additionalContent && (
             <div className="mt-2" onClick={(e) => e.stopPropagation()}>

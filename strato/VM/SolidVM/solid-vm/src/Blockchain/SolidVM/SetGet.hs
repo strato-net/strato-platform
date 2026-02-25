@@ -24,9 +24,12 @@ module Blockchain.SolidVM.SetGet
   )
 where
 
+import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.DB.SolidStorageDB
+import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -53,6 +56,7 @@ fromBasic = \case
   MS.BString s -> case decodeUtf8' s of
     Right t -> SString $ T.unpack t
     Left _ -> SString $ BC.unpack s
+  MS.BBytes bs -> SBytes bs
   MS.BDecimal v -> SDecimal $ read $ BC.unpack v
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a False
@@ -60,8 +64,8 @@ fromBasic = \case
   MS.BEnumVal k v num -> SEnumVal k v num
   MS.BDefault -> SNULL
 
-toBasic :: Value -> Maybe MS.BasicValue
-toBasic = \case
+toBasic :: Integer -> Value -> Maybe MS.BasicValue
+toBasic currentBlockNum = \case
   SInteger i -> Just $ MS.BInteger i
   SString s -> Just . MS.BString . encodeUtf8 $ T.pack s
   SDecimal v -> Just $ MS.BDecimal $ BC.pack $ show v
@@ -69,8 +73,12 @@ toBasic = \case
   SAddress a _ -> Just $ MS.BAddress a
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
-  SUserDefined _ _ x -> toBasic x
-  SBytes bs -> Just $ MS.BString bs
+  SUserDefined _ _ x -> toBasic currentBlockNum x
+  SBytes bs -> Just $ MS.BBytes bs
+  SNULL ->
+    let heliumToBasicForkBlock = 33918 :: Integer
+        snullToBasicEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumToBasicForkBlock)
+     in if snullToBasicEnabled then Just MS.BDefault else Nothing
   _ -> Nothing
 
 setVar :: MonadSM m => Variable -> Value -> m ()
@@ -114,11 +122,13 @@ setVal (STuple dstVector) (STuple srcVector) =
 setVal dst@(SReference (AddressPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
-  let basicSrc = case src of
-        SString s -> Just . MS.BString . UTF8.fromString $ s
-        _ -> toBasic src
+  basicSrc <- case src of
+    SString s -> pure . Just . MS.BString . UTF8.fromString $ s
+    _ -> do
+      currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+      pure $ toBasic currentBlockNum src
   case basicSrc of
-    Nothing -> typeError "non basic solidity type cannot be stored atomically" src
+    Nothing -> typeError "non basic solidity type cannot be stored atomically" $ show src
     Just b -> do
       markDiffForAction addr path b
       putSolidStorageKeyVal' addr path b
@@ -185,7 +195,7 @@ getInt p = do
     SInteger s -> return s
     SNULL -> return 0
     SReference{} -> pure 0
-    _ -> typeError "getInt" (p, v)
+    _ -> typeError "getInt" $ show (p, v)
 
 getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
 getRealNum p = do
@@ -195,7 +205,7 @@ getRealNum p = do
     SDecimal s -> return $ Right s
     SNULL -> return $ Left 0
     SReference{} -> pure $ Left 0
-    _ -> typeError "getRealNum" (p, v)
+    _ -> typeError "getRealNum" $ show (p, v)
 
 getBool :: MonadSM m => Variable -> m Bool
 getBool p = do
@@ -205,7 +215,7 @@ getBool p = do
     SInteger i -> return $ i /= 0
     SNULL -> return False
     SReference{} -> pure False
-    _ -> typeError "getBool" (p, v)
+    _ -> typeError "getBool" $ show (p, v)
 
 deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference (AddressPath addr path))) = do

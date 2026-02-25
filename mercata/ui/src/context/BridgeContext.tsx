@@ -34,9 +34,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const [withdrawalSummary, setWithdrawalSummary] = useState<WithdrawalSummaryResponse | null>(null);
   const [loadingWithdrawalSummary, setLoadingWithdrawalSummary] = useState(false);
   const [depositRefreshKey, setDepositRefreshKey] = useState(0);
+  const [withdrawalRefreshKey, setWithdrawalRefreshKey] = useState(0);
 
   const triggerDepositRefresh = useCallback(() => {
     setDepositRefreshKey(prev => prev + 1);
+  }, []);
+
+  const triggerWithdrawalRefresh = useCallback(() => {
+    setWithdrawalRefreshKey(prev => prev + 1);
   }, []);
 
   // ========== REFS ==========
@@ -81,6 +86,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           depositRouter: cfg.chainInfo.depositRouter,
         }));
 
+      networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
       setAvailableNetworks(networks);
       setNetworksLoaded(true);
 
@@ -89,6 +95,12 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         setSelectedNetwork(defaultName);
         await fetchTokensForChain(networks[0].chainId);
       }
+    } catch (error) {
+      // Silently handle errors for guest-safe endpoints
+      // Error toast is already handled by axios interceptor for non-guest-safe URLs
+      console.error("Failed to load networks and tokens:", error);
+      setAvailableNetworks([]);
+      setNetworksLoaded(true); // Set to true to prevent retry loops
     } finally {
       setLoading(false);
     }
@@ -355,6 +367,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         fetchWithdrawalSummary,
         depositRefreshKey,
         triggerDepositRefresh,
+        withdrawalRefreshKey,
+        triggerWithdrawalRefresh,
       }}
     >
       {children}

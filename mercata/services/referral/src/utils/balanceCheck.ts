@@ -11,6 +11,7 @@ const fetchVoucherBalance = async (): Promise<bigint> => {
     '/BlockApps-Voucher-_balances',
     {
       params: {
+        address: `eq.${config.voucher.contractAddress}`,
         key: `eq.${userAddress}`,
         select: 'balance:value::text'
       }
@@ -57,7 +58,7 @@ export const checkBalances = async (): Promise<void> => {
     const usdstBalanceUSD = Number(usdstBalance) / 1e18;
     
     // Check if total transactions are below minimum threshold
-    if (totalTransactions < config.balance.minTransactionsThreshold) {
+    if (totalTransactions <= config.balance.minTransactionsThreshold) {
       const error = `WARNING: Total possible transactions (${totalTransactions}) below minimum threshold (${config.balance.minTransactionsThreshold}). Voucher: ${voucherBalanceUSD} (${voucherTransactions} txs), USDST: ${usdstBalanceUSD} (${usdstTransactions} txs)`;
       logError('BalanceChecker', new Error(error));
       

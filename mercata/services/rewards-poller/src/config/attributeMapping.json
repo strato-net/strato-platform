@@ -1,13 +1,20 @@
 {
   "0000000000000000000000000000000000001004": {
     "Deposited": {
-      "amount": "mTokenMinted"
+      "amount": "mTokenMinted",
+      "user": "user"
     },
     "Withdrawn": {
       "amount": "mTokenBurned"
     },
     "Borrowed": {
       "amount": "amount"
+    }
+  },
+  "0000000000000000000000000000000000001008": {
+    "DepositCompleted": {
+      "amount": "stratoTokenAmount",
+      "user": "stratoRecipient"
     }
   },
   "0000000000000000000000000000000000001011": {
@@ -97,6 +104,43 @@
     }
   },
   "69010124cdaa64286f6e413267a7001ea9379df4": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "72f029994b1003447b4fcae5025ae78fcbec258e": {
+    "Swap": {
+      "amount": "amountIn"
+    }
+  },
+  "2e99b16c78474c437c7003c814ca79a3ba50e5d8": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "2d436fce87f609a4d15f7ccb7cbbfaa8ffd143b3": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "af543d9086416b048564fa165f9587aa565cce2f": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "96c26f8306a0097d985d1654b4596c48bb6277c4": {
     "Minted": {
       "amount": "value"
     },

@@ -23,7 +23,7 @@ import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class (blockHash)
+import Blockchain.Strato.Model.Class (blockHash, blockHeader, blockHeaderBlockNumber)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
@@ -151,16 +151,19 @@ nextRound nt = do
   proposer .= leader
   proposal .= Nothing
   self <- use selfAddr
-  when (Just leader == fmap Validator self) $ do
+  valB <- use validatorBehavior
+  when (Just leader == fmap Validator self && valB) $ do
     lock <- use blockLock
+    v <- use view
     case lock of
-      Nothing -> yieldR MakeBlockCommand
-      Just lb -> do
-        v <- use view
-        valB <- use validatorBehavior
-        when (isJust self && valB) $ do
-          msg <- signMessage (Preprepare v lb)
+      Nothing -> use myBlock >>= \case
+        Just myBlk | blockHeaderBlockNumber (blockHeader myBlk) == fromIntegral (v ^. sequence) + 1 -> do
+          msg <- signMessage (Preprepare v myBlk)
           yieldR msg
+        _ -> pure ()
+      Just lb -> do
+        msg <- signMessage (Preprepare v lb)
+        yieldR msg
 
   prepared .= M.empty
   committed .= M.empty
@@ -189,6 +192,7 @@ commitBlock blk = do
   $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
   lastParent .= Just hsh
   clearLock
+  myBlock .= Nothing
   whenM (use hasPreprepared) $
     recordProposal
   s <- use $ view . sequence
@@ -271,15 +275,15 @@ eventLoop ctx = execStateC ctx $
             let blockWithVs = addValidators (S.toList vs) blk
             pseal <- proposerSeal blockWithVs
             commitBlock $ addProposerSeal pseal blockWithVs
-            yieldR MakeBlockCommand
           ppl <- use proposal
           leader <- use proposer
           self <- use selfAddr
+          vs <- use validators
+          let blockWithVs = addValidators (S.toList vs) blk
+          pseal <- proposerSeal blockWithVs
+          let sealedBlk = addProposerSeal pseal blockWithVs
+          myBlock ?= sealedBlk
           when (isNothing ppl && Just leader == fmap Validator self) $ do
-            vs <- use validators
-            let blockWithVs = addValidators (S.toList vs) blk
-            pseal <- proposerSeal blockWithVs
-            let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
             let realSealed = fromMaybe sealedBlk mLocked
             wantParent <- use lastParent
@@ -292,7 +296,6 @@ eventLoop ctx = execStateC ctx $
                   -- peers will be able to commit the lock and historic replay of it
                   -- could absolve us.
                   $logErrorS "blockstanbul" "Lock has wrong block number; cannot commit"
-                yieldR MakeBlockCommand
               Right () -> do
                 hasPreprepared .= True
                 proposal .= Just realSealed
@@ -495,7 +498,6 @@ recordOutEvent eev =
         OMsg _ RoundChange {} -> inc "roundchange_message"
         ToCommit {} -> inc "to_commit_block"
         FailedHistoric {} -> inc "failed_historic"
-        MakeBlockCommand -> inc "make_block_command"
         ResetTimer {} -> inc "reset_timer"
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"

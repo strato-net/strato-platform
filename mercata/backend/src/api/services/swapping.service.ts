@@ -66,9 +66,12 @@ export const getPools = async (
     })
   ]);
 
-  // Filter out hidden pools
+  // Filter out hidden pools and pools with deactivated tokens (status !== 2 = ACTIVE)
+  const ACTIVE_TOKEN_STATUS = "2";
   const validatedPools = (poolData as RawGetPool[]).filter(
     pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenA.status === ACTIVE_TOKEN_STATUS
+      && pool.tokenB.status === ACTIVE_TOKEN_STATUS
   );
   const validatedFactory = factoryData[0] as RawPoolFactory;
   const tokenAddresses = extractTokenAddresses(validatedPools);
@@ -120,15 +123,19 @@ export const getSwapableTokens = async (
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
     params: {
       poolFactory: "eq." + constants.poolFactory,
+      isDisabled: "eq.false",
       select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text,tokenBBalance::text`,
       "tokenA.balances.key": `eq.${userAddress}`,
       "tokenB.balances.key": `eq.${userAddress}`,
     }
   });
 
-  // Filter out hidden pools
+  // Filter out hidden pools and pools with deactivated tokens
+  const ACTIVE_TOKEN_STATUS = "2";
   const validatedPools = (poolData as (PoolWithTokens & { address: string })[]).filter(
     pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenA.status === ACTIVE_TOKEN_STATUS
+      && pool.tokenB.status === ACTIVE_TOKEN_STATUS
   ) as PoolWithTokens[];
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
@@ -162,6 +169,7 @@ export const getSwapableTokenPairs = async (
     cirrus.get(accessToken, `/${Pool}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
+        isDisabled: "eq.false",
         select: `address,tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenBBalance::text`,
         tokenA: "eq." + tokenAddress,
         "tokenB.balances.key": `eq.${userAddress}`,
@@ -170,6 +178,7 @@ export const getSwapableTokenPairs = async (
     cirrus.get(accessToken, `/${Pool}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
+        isDisabled: "eq.false",
         select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text`,
         tokenB: "eq." + tokenAddress,
         "tokenA.balances.key": `eq.${userAddress}`,
@@ -177,12 +186,15 @@ export const getSwapableTokenPairs = async (
     })
   ]);
 
-  // Filter out hidden pools
+  // Filter out hidden pools and pools with deactivated tokens
+  const ACTIVE_TOKEN_STATUS = "2";
   const validatedPoolsA = (poolDataA as (PoolWithTokenB & { address: string })[]).filter(
     pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenB.status === ACTIVE_TOKEN_STATUS
   ) as PoolWithTokenB[];
   const validatedPoolsB = (poolDataB as (PoolWithTokenA & { address: string })[]).filter(
     pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenA.status === ACTIVE_TOKEN_STATUS
   ) as PoolWithTokenA[];
 
   const allTokens: Array<{token: RawToken, poolBalance: string}> = [
@@ -505,6 +517,74 @@ export const setPoolRates = async (
       poolAddress: poolAddress,
       newSwapFeeRate: swapFeeRate.toString(),
       newLpSharePercent: lpSharePercent.toString(),
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const pausePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(Pool),
+    contractAddress: poolAddress,
+    method: "setPaused",
+    args: {
+      _isPaused: true,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const unpausePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(Pool),
+    contractAddress: poolAddress,
+    method: "setPaused",
+    args: {
+      _isPaused: false,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const disablePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(Pool),
+    contractAddress: poolAddress,
+    method: "setDisabled",
+    args: {
+      _isDisabled: true,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const enablePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(Pool),
+    contractAddress: poolAddress,
+    method: "setDisabled",
+    args: {
+      _isDisabled: false,
     },
   }, userAddress, accessToken);
 

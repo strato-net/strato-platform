@@ -14,6 +14,7 @@ import { api } from '@/lib/axios';
 import ConsolidatedPriceChart from '@/components/charts/ConsolidatedPriceChart';
 import CopyButton from '@/components/ui/copy';
 import { addCommasToInput, roundToDecimals } from '@/utils/numberUtils';
+import { usdstAddress } from '@/lib/constants';
 
 type PricePoint = {
   date: string;
@@ -44,6 +45,11 @@ interface Pool {
   aToBRatio: string;
   bToARatio: string;
 }
+
+const isLPToken = (token: Token): boolean => {
+  const symbol = token?.token?._symbol || token?._symbol || '';
+  return symbol.endsWith('-LP');
+};
 
 const fetchPriceHistory = async (assetAddress: string): Promise<PricePoint[]> => {
   try {
@@ -94,10 +100,23 @@ const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint
       return [];
     }
 
-    // Fetch swap history for each pool and combine the data
+    // Only use the USDST-paired pool for STRATO Price calculation
+    const usdstPool = pools.find(pool => {
+      const otherAddr = pool.tokenA?.address?.toLowerCase() === assetAddress.toLowerCase()
+        ? pool.tokenB?.address?.toLowerCase()
+        : pool.tokenA?.address?.toLowerCase();
+      return otherAddr === usdstAddress.toLowerCase();
+    });
+
+    if (!usdstPool) {
+      return [];
+    }
+
+    const selectedPools = [usdstPool];
+
+    // Fetch swap history for selected pool(s)
     const allSwapPrices: SwapPricePoint[] = [];
-    
-    for (const pool of pools) {
+    for (const pool of selectedPools) {
       try {
         // Determine which token is being viewed and which is the other token
         const isViewingAssetTokenB = pool.tokenB?.address?.toLowerCase() === assetAddress.toLowerCase();
@@ -212,11 +231,16 @@ const AssetDetail = () => {
           .then(data => setPriceData(data.slice(-(PRICE_WINDOW * 24)))) // Show last N days (24 hours each)
           .finally(() => setPriceDataLoading(false));
 
-        // Fetch swap pool price history
-        setSwapPriceDataLoading(true);
-        fetchSwapPoolPrices(foundAsset.address)
-          .then(data => setSwapPriceData(data))
-          .finally(() => setSwapPriceDataLoading(false));
+        // Only fetch swap pool prices for non-LP tokens
+        if (isLPToken(foundAsset)) {
+          setSwapPriceData([]);
+          setSwapPriceDataLoading(false);
+        } else {
+          setSwapPriceDataLoading(true);
+          fetchSwapPoolPrices(foundAsset.address)
+            .then(data => setSwapPriceData(data))
+            .finally(() => setSwapPriceDataLoading(false));
+        }
       }
     };
 
@@ -466,7 +490,12 @@ const AssetDetail = () => {
                   spotLoading={priceDataLoading}
                   swapLoading={swapPriceDataLoading}
                   title="Price History"
-                  subtitle="Spot price (blue) and STRATO price (orange)"
+                  subtitle={
+                    isLPToken(asset)
+                      ? "Net Asset Value per token, calculated from pool balances and oracle prices"
+                      : "Spot price (blue) and STRATO price (orange)"
+                  }
+                  isLPToken={isLPToken(asset)}
                 />
             </div>
           </div>

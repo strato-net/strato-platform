@@ -201,12 +201,12 @@ const CreateTokenForm = () => {
             rules={{ 
               required: 'Token symbol is required',
               pattern: {
-                value: /^[A-Z]+$/,
-                message: 'Symbol must be uppercase letters only'
+                value: /^[A-Za-z]+$/,
+                message: 'Symbol must be letters only'
               },
               maxLength: {
-                value: 10,
-                message: 'Symbol must be 10 characters or less'
+                value: 12,
+                message: 'Symbol must be 12 characters or less'
               }
             }}
             render={({ field }) => (
@@ -216,10 +216,6 @@ const CreateTokenForm = () => {
                   <Input 
                     placeholder="GOLD" 
                     {...field}
-                    onChange={(e) => {
-                      const uppercaseValue = e.target.value.toUpperCase();
-                      field.onChange(uppercaseValue);
-                    }}
                   />
                 </FormControl>
                 <FormDescription>

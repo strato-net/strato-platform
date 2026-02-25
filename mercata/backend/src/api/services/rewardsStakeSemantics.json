@@ -1,0 +1,37 @@
+{
+  "usd_notional": {
+    "swapSources": [
+      "0000000000000000000000000000000000001017",
+      "0000000000000000000000000000000000001019",
+      "000000000000000000000000000000000000101b",
+      "000000000000000000000000000000000000101d",
+      "cb85e12ca5d98de95715fc75ae251a66b662ea06",
+      "34d7caf576cf9493f054d9eced99dcd463eba4b7"
+    ],
+    "depositCompletedSources": [
+      "0000000000000000000000000000000000001008"
+    ],
+    "amountUsdSources": [
+      "0000000000000000000000000000000000001011"
+    ],
+    "notes": [
+      "swapSources are USD-notional in rewards-poller: amountIn * oracle(tokenIn) at event timestamp",
+      "depositCompletedSources are USD-notional in rewards-poller only when stratoToken == USDST (otherwise event is skipped)",
+      "amountUsdSources use amountUSD from event payload (treated as USD-denominated units)"
+    ]
+  },
+  "token_units": {
+    "lpMintBurnSources": [
+      "0000000000000000000000000000000000001018",
+      "000000000000000000000000000000000000101a",
+      "000000000000000000000000000000000000101c",
+      "000000000000000000000000000000000000101e",
+      "ac621a150f49198036f84ffe90b4f2286b623583",
+      "69010124cdaa64286f6e413267a7001ea9379df4"
+    ],
+    "notes": [
+      "lpMintBurnSources are raw token units in rewards-poller: Token-Transfer value for Minted/Burned"
+    ]
+  }
+}
+

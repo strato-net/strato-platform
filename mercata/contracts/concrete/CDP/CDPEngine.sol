@@ -318,7 +318,7 @@ contract record CDPEngine is Ownable {
         if (assetConfig.debtFloor > 0) {
             require(totalDebtAfter >= assetConfig.debtFloor, "CDPEngine: below debt floor");
         }
-        // Mint USDST to the user; fees will be realized on repay
+        // Mint USDST to the user; fees are realized in _accrue
         Token(_usdst()).mint(msg.sender, amountUSD);
         emit USDSTMinted(msg.sender, asset, amountUSD, assetState.totalScaledDebt, assetState.rateAccumulator);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
@@ -392,13 +392,8 @@ contract record CDPEngine is Ownable {
 
         // Exact extinguished USD at current index
         uint owedForDelta = (scaledDelta * assetState.rateAccumulator) / RAY;
-        uint baseUSD = scaledDelta;
-        uint feeUSD  = owedForDelta > baseUSD ? (owedForDelta - baseUSD) : 0;
 
         Token(_usdst()).burn(msg.sender, owedForDelta);
-
-        // Route fees between Reserve and FeeCollector
-        _routeFees(asset, feeUSD);
 
         userVault.scaledDebt = newScaledDebt;
         assetState.totalScaledDebt -= scaledDelta;
@@ -430,13 +425,6 @@ contract record CDPEngine is Ownable {
         uint scaledDebtToRemove = userVault.scaledDebt;
         // Burn user's USDST equal to owed
         Token(_usdst()).burn(msg.sender, owed);
-        // Split owed into base principal and fee components
-        uint baseUSD = scaledDebtToRemove; // normalized principal (scaled units)
-        uint feeUSD = owed > baseUSD ? (owed - baseUSD) : 0;
-
-        // Route fees between Reserve and FeeCollector
-        _routeFees(asset, feeUSD);
-
         userVault.scaledDebt = 0;
         assetState.totalScaledDebt -= scaledDebtToRemove;
 
@@ -506,11 +494,8 @@ contract record CDPEngine is Ownable {
         }
         uint owedForDelta = (scaledDebtToLiquidate * assetState.rateAccumulator) / RAY;
 
-        // burn exact, route only interest
+        // Burn exact extinguished debt
         Token(_usdst()).burn(msg.sender, owedForDelta);
-
-        uint feeWei = owedForDelta > scaledDebtToLiquidate ? (owedForDelta - scaledDebtToLiquidate) : 0;
-        if (feeWei > 0) _routeFees(collateralAsset, feeWei);
 
         borrowerVault.scaledDebt   -= scaledDebtToLiquidate;
         assetState.totalScaledDebt -= scaledDebtToLiquidate;
@@ -561,6 +546,7 @@ contract record CDPEngine is Ownable {
     /**
      * @notice Accrue stability fees for an asset by advancing the rateAccumulator
      * @dev Uses discrete compounding: newRate = oldRate * rpow(stabilityFeeRate, dt, RAY) / RAY
+     * @dev Routes fees from exact index growth
      */
     function _accrue(address asset) internal {
         // Load config/state for the collateral asset
@@ -577,6 +563,11 @@ contract record CDPEngine is Ownable {
         uint factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
         // Advance accumulator, ensuring monotonicity (never below RAY)
         uint newRate = (oldRate * factor) / RAY; if (newRate < RAY) { newRate = RAY; }
+        // Route fees from exact index growth:
+        if (assetState.totalScaledDebt > 0 && newRate > oldRate) {
+            uint feeUSD = (assetState.totalScaledDebt * (newRate - oldRate)) / RAY;
+            _routeFees(asset, feeUSD);
+        }
         // Persist state and emit observability event
         assetState.rateAccumulator = newRate; assetState.lastAccrual = block.timestamp;
         emit Accrued(asset, oldRate, assetState.rateAccumulator, dt, assetState.totalScaledDebt);

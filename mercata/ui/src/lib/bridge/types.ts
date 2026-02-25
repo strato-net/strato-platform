@@ -51,6 +51,9 @@ export type BridgeContextType = {
   // Deposit refresh trigger
   depositRefreshKey: number;
   triggerDepositRefresh: () => void;
+  // Withdrawal refresh trigger
+  withdrawalRefreshKey: number;
+  triggerWithdrawalRefresh: () => void;
 };
 
 export interface ContractValidationResult {
@@ -147,6 +150,7 @@ export type SupportedChainId =
   | 80002
   | 10
   | 8453
+  | 84532
   | 42161
   | 42170
   | 56
