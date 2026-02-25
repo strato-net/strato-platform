@@ -193,16 +193,18 @@ contract Describe_Mercata is Authorizable {
 
     function it_can_verify_p256() {
         string message = "Hallelujah!";
-        uint r = 111812406968280556887309161541670890688342740771217603417112256244675252770954;
-        uint s = 69794988671688531321311227746003226764691315458172986192026128195324243923064;
-        uint x = 102396230969586467009226886506862623657318724148434895532623014254764145364321;
-        uint y = 87130768018175665529254388393063563572785429725661944920479895196939055716302;
+        uint r = 29576957218913890340491659409841852068033084215229700711255507061323143814549;
+        uint s = 101557168712526122138100485234540408883990559892858822894344366649907264877720;
+        uint x = 16241039676017158139658647491575996736571373479493265913891396969380226787542;
+        uint y = 59216528153676978070808029460682524906485316850686665728311789336192423162328;
+        bytes pub = bytes(0x0423e81a4a99319639971cff670b796702ebd275f76b39056ecc06c25911cbe8d682eb5e007feea20a52a2dc4268dd1518975c14889c8d9e58c9861ef49839f1d8);
         bytes authenticatorData = bytes(0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000);
         bytes clientDataJSON = bytes('{"type":"webauthn.get","challenge":"SGFsbGVsdWphaCE","origin":"http://localhost:8085","crossOrigin":false}');
         bytes clientDataHash = sha256(clientDataJSON);
         bytes fullData = authenticatorData + bytes(clientDataHash);
         bytes h = sha256(fullData);
-        require(verifyP256(h, r, s, x, y), "P256 verification failed");
+        require(verifyP256(h, r, s, x, y), "P256 verification by pubkey coordinates failed");
+        require(verifyP256(h, r, s, pub), "P256 verification by pubkey bytestring failed");
     }
 
     string output;

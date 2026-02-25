@@ -2316,16 +2316,32 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pa
     case theSignerAddress of
       Nothing -> return . ((flip SAddress) False) $ fromIntegral theZero
       Just theAddress -> return . ((flip SAddress) False) $ theAddress
-callBuiltin "verifyP256" [SBytes h, r', s', x', y'] = case digestFromByteString @SHA256 h of
+callBuiltin "verifyP256" ((SBytes h) : r' : s' : p') = case digestFromByteString @SHA256 h of
   Nothing -> invalidArguments "Could not decode hash from string" h
   Just digest -> do
     let int = getInt . Constant
-    (r,s,x,y) <- (,,,) <$> int r' <*> int s' <*> int x' <*> int y'
+    pub <- case p' of
+      [x', y'] -> P256.pointFromIntegers <$> ((,) <$> int x' <*> int y')
+      [pub'] -> do
+        pubBS' <- case pub' of
+          SBytes bs -> pure bs
+          SString s -> case B16.decode $ DT.encodeUtf8 $ T.pack s of
+            Left e -> invalidArguments "Could not decode public key from string: invalid hex" (s, e)
+            Right b -> pure b
+          _ -> invalidArguments "Could not decode public key: invalid value" pub'
+        pubBS <- case B.length pubBS' of
+          65 -> pure $ B.drop 1 pubBS'
+          64 -> pure pubBS'
+          _ -> invalidArguments "Could not decode public key from bytestring: invalid length" pubBS'
+        case P256.pointFromBinary pubBS of
+          CryptoPassed p -> pure p
+          CryptoFailed e -> invalidArguments "Could not decode public key from bytestring" (pubBS', e)
+      _ -> invalidArguments "Invalid arguments for P-256 public key" p'
+    (r,s) <- (,) <$> int r' <*> int s'
     sig <- case signatureFromIntegers (Mod.Proxy @Curve_P256R1) (r, s) of
       CryptoPassed sig' -> pure sig'
       CryptoFailed e -> invalidArguments "Invalid P256 signature" e
-    let pub = P256.pointFromIntegers (x, y)
-        !isValidSig = verifyDigest (Mod.Proxy @Curve_P256R1) pub sig digest
+    let !isValidSig = verifyDigest (Mod.Proxy @Curve_P256R1) pub sig digest
     pure $ SBool isValidSig
 callBuiltin "sha256" [SBytes bs] = pure . SBytes $ SHA256.hash bs
 callBuiltin "sha256" args = pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args

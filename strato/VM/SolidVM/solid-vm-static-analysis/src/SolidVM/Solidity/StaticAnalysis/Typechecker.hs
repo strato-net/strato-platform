@@ -1508,12 +1508,19 @@ ecrecoverArgs x = Product [ stringType' x
                           ] x
 
 verifyP256Args :: SourceAnnotation Text -> Type'
-verifyP256Args x = Product [ bytesType' x
-                           , Sum $ (stringType' x) :| [intType' x]
-                           , Sum $ (stringType' x) :| [intType' x]
-                           , Sum $ (stringType' x) :| [intType' x]
-                           , Sum $ (stringType' x) :| [intType' x]
-                           ] x
+verifyP256Args x = Sum $
+  Product [ bytesType' x
+          , Sum $ (stringType' x) :| [intType' x]
+          , Sum $ (stringType' x) :| [intType' x]
+          , Sum $ (stringType' x) :| [intType' x]
+          , Sum $ (stringType' x) :| [intType' x]
+          ] x
+  :| [ Product [ bytesType' x
+               , Sum $ (stringType' x) :| [intType' x]
+               , Sum $ (stringType' x) :| [intType' x]
+               , Sum $ (stringType' x) :| [bytesType' x]
+               ] x
+     ]
 
 addmodArgs :: SourceAnnotation Text -> Type'
 addmodArgs x = Product [intType' x, intType' x, intType' x] x
