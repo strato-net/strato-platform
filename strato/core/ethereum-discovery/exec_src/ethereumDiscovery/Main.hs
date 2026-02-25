@@ -8,6 +8,7 @@ import Blockchain.Strato.Discovery.ContextLite
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Discovery.UDPServer
+import Control.Monad.Composable.Vault (runVaultM)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
@@ -33,8 +34,8 @@ main = do
             udpPort = UDPPort port'
             tcpPort = TCPPort port' -- TODO: where do we get the TCP port from?
             minPeers = minAvailablePeers (discoveryConfig ethConf)
-        cxt <- initContextLite vaultUrl' udpPort tcpPort
-        runResourceT . flip runReaderT cxt $
+        cxt <- initContextLite udpPort tcpPort
+        runVaultM vaultUrl' . runResourceT . flip runReaderT cxt $
           bracket
             (connectMe udpPort)
             (liftIO . S.close)

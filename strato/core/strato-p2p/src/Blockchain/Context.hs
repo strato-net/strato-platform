@@ -50,7 +50,6 @@ module Blockchain.Context
 
 import           Conduit
 import           Control.Applicative
-import           Control.Concurrent
 import           Control.Exception                       hiding (bracket, catch)
 import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
@@ -100,15 +99,11 @@ import           Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
 import           Control.Monad                           (void)
+import           Control.Monad.Composable.Vault          (VaultM)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
 import           Network.Wai.Handler.Warp.Internal       (setSocketCloseOnExec)
-import           Servant.Client                          (ClientError)
-import           Strato.Vault.Client                     (VaultEnv, newVaultEnv, runVault)
-import qualified Strato.Strato23.API                     as VC
-import qualified Strato.Strato23.Client                  as VC
-
 import           UnliftIO
 
 -- TODO: These type families should be exposed by monad-alter, not defined here
@@ -136,10 +131,8 @@ newtype Outbound a = Outbound {unOutbound :: a}
 data Config = Config
   { configSQLDB                    :: SQLDB,
     configRedisBlockDB             :: RBDB.RedisConnection,
-    configVaultClient              :: VaultEnv,
     configContext                  :: IORef Context,
-    configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
-    configPubKey                   :: PublicKey
+    configBlockstanbulWireMessages :: IORef (S.OSet Keccak256)
   }
 
 newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
@@ -167,7 +160,7 @@ makeLenses ''Context
 
 newtype GenesisBlockHash = GenesisBlockHash {unGenesisBlockHash :: Keccak256}
 
-type ContextM = ReaderT Config (ResourceT (LoggingT IO))
+type ContextM = ReaderT Config (ResourceT (VaultM (LoggingT IO)))
 
 data P2pConduits m = P2pConduits
   { _peerSource :: ConduitM () B.ByteString m (),
@@ -210,9 +203,6 @@ instance RunsServer ContextM where
       catch
         (handler conduits ip)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
-  access _ = asks configPubKey
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) where
   lookup _ = RBDB.withRedisBlockDB . getHeader
@@ -406,31 +396,8 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Point PPeer (Reader
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
   output = void . runKafkaMConfigured "strato-p2p" . SK.writeUnseqEvents
 
-instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
-  sign bs = do
-    vc <- asks configVaultClient
-    $logInfoS "HasVault" "Calling vault for a signature"
-    waitOnVault $ liftIO $ runVault vc (VC.postSignature Nothing (VC.MsgHash bs))
-
-  getPub = asks configPubKey
-
-  getShared pub = do
-    vc <- asks configVaultClient
-    $logInfoS "HasVault" "Calling vault to get a shared key"
-    waitOnVault $ liftIO $ runVault vc (VC.getSharedKey Nothing True pub)
-
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
-
-waitOnVault :: (MonadLogger m, MonadIO m) => m (Either ClientError b) -> m b
-waitOnVault action = do
-  res <- action
-  case res of
-    Left err -> do
-      $logErrorS "HasVault" . T.pack $ "Got an error from vault: " ++ show err
-      liftIO $ threadDelay 2000000
-      waitOnVault action
-    Right val -> return val
 
 type MonadP2P m =
   ( MonadIO m,
@@ -451,8 +418,7 @@ type MonadP2P m =
       m,
     All
       '[Mod.Accessible]
-      '[ GenesisBlockHash,
-         PublicKey
+      '[ GenesisBlockHash
        ]
       m,
     All
@@ -519,20 +485,13 @@ initConfig wireMessagesRef = do
   runSqlPool (SQL.runMigration SYNCTASK.migrateAll) $ sqlDB' dbs
 
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  vaultClient <- liftIO $ newVaultEnv (vaultUrl . urlConfig $ ethConf)
-  nodePubKey <- do
-    $logInfoS "HasVault" "Calling vault to get the node's public key"
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runVault vaultClient (VC.getKey Nothing Nothing)
-
   initState <- initContext
   initStateF <- newIORef initState
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
-    , configVaultClient = vaultClient
     , configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef
-    , configPubKey = nodePubKey
     }
 
 initContext :: MonadIO m => m Context

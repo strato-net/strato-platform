@@ -14,14 +14,16 @@ import Blockchain.Model.SyncState
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Monad
+import Blockchain.Strato.Model.Address (fromPublicKey)
 import Blockchain.Strato.Model.Options (flags_network)
+import Blockchain.Strato.Model.Secp256k1 (getPub)
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.SyncDB
-import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async as Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
+import Control.Monad.Composable.Vault (runVaultM)
 import Data.Maybe
 import Data.String
 import qualified Database.Redis as Redis
@@ -30,22 +32,7 @@ import HFlags
 import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
-import Servant.Client (ClientError)
-import Strato.Vault.Client (newVaultEnv, runVault)
-import qualified Strato.Strato23.API as VC
-import qualified Strato.Strato23.Client as VC
 import Text.Format
-
-waitOnVault :: IO (Either ClientError b) -> IO b
-waitOnVault action = do
-  putStrLn "asking vault for the node address"
-  res <- action
-  case res of
-    Left err -> do
-      putStrLn $ "failed to get node address from vault: " ++ show err
-      threadDelay 2000000 -- 2 seconds
-      waitOnVault action
-    Right val -> return val
 
 main :: IO ()
 main = do
@@ -68,12 +55,9 @@ main = do
 
   pkg <- atomically newCablePackage
 
-  -- setup the connection with vault
-  vaultEnv <- newVaultEnv vaultUrl'
-
-  selfAddress <- do
-    addrAndKey <- waitOnVault $ runVault vaultEnv (VC.getKey Nothing Nothing)
-    return $ VC.unAddress addrAndKey
+  selfAddress <- runVaultM vaultUrl' $ do
+    pubKey <- getPub
+    return $ fromPublicKey pubKey
 
   putStrLn $ "strato-sequencer nodeAddress: " ++ format selfAddress
 
@@ -103,10 +87,9 @@ main = do
             cablePackage = pkg,
             maxEventsPerIter = flags_seq_max_events_per_iter,
             maxUsPerIter = flags_seq_max_us_per_iter,
-            vaultClient = Just vaultEnv,
             kafkaClientId = fromString flags_kafkaclientid,
             redisConn = RBDB.RedisConnection conn
           }
-  race_ (runLoggingT (runSequencerM seqCfg ctx sequencer ))
+  race_ (runLoggingT (runSequencerM vaultUrl' seqCfg ctx sequencer))
     . run 8050
     $ metricsApp

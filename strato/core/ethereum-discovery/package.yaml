@@ -29,8 +29,6 @@ library:
     - binary
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-vault-wrapper-api #Will need to be changed
-    - blockapps-vault-wrapper-client
     - blockDB
     - bytestring
     - common-log
@@ -60,10 +58,9 @@ library:
     - persistent-postgresql
     - prometheus-client
     - random
-    - servant-client
     - split
     - strato-conf
-    - strato-vault-client
+    - vault-monad
     - strato-model
     - strato-redis-blockdb
     - text
@@ -86,6 +83,7 @@ executables:
       - process-monitor
       - resourcet
       - strato-conf
+      - vault-monad
       - text
       - unliftio
   strato-network-monitor:

@@ -43,7 +43,6 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
-import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.SyncDB
 import           Control.Arrow                         (second, (&&&))
 import           Control.Monad
@@ -205,8 +204,7 @@ handleEvents peer = awaitForever $ \case
       yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
     where
       getUntilMissing ::
-        ( (Keccak256 `Alters` OutputBlock) m,
-          Accessible PublicKey m
+        ( (Keccak256 `Alters` OutputBlock) m
         ) =>
         [Keccak256] ->
         m [OutputBlock]

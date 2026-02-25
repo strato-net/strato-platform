@@ -14,6 +14,7 @@ import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
 
 import           Blockchain.Context
+import           Blockchain.EthConf
 import           Blockchain.Options
 import           Blockchain.Strato.Model.Options()
 import           Blockchain.Participation (p2pApp, setParticipationMode)
@@ -21,6 +22,7 @@ import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import           Blockchain.Threads
+import           Control.Monad.Composable.Vault (runVaultM)
 import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
@@ -40,8 +42,9 @@ initP2P = labelTheThread "initP2P" $ do
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef
-  let sSource = seqEventNotificationSource . contextKafkaState
-      runner f = runLoggingT $ do
+  let vaultUrl' = vaultUrl . urlConfig $ ethConf
+      sSource = seqEventNotificationSource . contextKafkaState
+      runner f = runLoggingT $ runVaultM vaultUrl' $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         let cfg' = cfg { configContext = ctx }

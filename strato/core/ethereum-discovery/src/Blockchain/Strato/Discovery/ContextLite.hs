@@ -39,7 +39,6 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.SyncDB
-import           Control.Concurrent                    (threadDelay)
 import           Control.Exception                     hiding (catch)
 import           Control.Monad                         (void)
 import           Control.Monad.Catch                   hiding (bracket)
@@ -60,15 +59,11 @@ import qualified Database.Persist.Postgresql           as SQL
 import qualified Database.Redis                        as Redis
 import           Network.Socket
 import qualified Network.Socket.ByteString             as NB
-import qualified Strato.Strato23.API                   as VC
-import qualified Strato.Strato23.Client                as VC
-import           Strato.Vault.Client                   (VaultEnv, newVaultEnv, runVault)
 import           System.Timeout
 
 data ContextLite = ContextLite
   { liteSQLDB    :: SQLDB,
     redisBlockDB :: RBDB.RedisConnection,
-    vaultEnv     :: VaultEnv,
     sock         :: Socket,
     myUdpPort    :: UDPPort,
     myTcpPort    :: TCPPort
@@ -184,19 +179,6 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Awaitable UDPPacket (ReaderT Conte
     mPacket <- liftIO . timeout 10000000 $ NB.recvFrom sock' 80000
     pure $ UDPPacket <$> mPacket
 
-instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m) where
-  sign msg = do
-    ve <- asks vaultEnv
-    $logInfoS "HasVault" "asking vault for a message signature"
-    waitOnVault $ liftIO $ runVault ve (VC.postSignature Nothing (VC.MsgHash msg))
-
-  getPub = do
-    ve <- asks vaultEnv
-    $logInfoS "HasVault" "asking vault for the node's public key"
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runVault ve (VC.getKey Nothing Nothing)
-
-  getShared _ = error "called HasVault's getShared in ethereum-discovery, but this should never happen"
-
 type DiscoveryRunner n m a = (Int -> n a) -> m a
 
 type MonadDiscovery m =
@@ -217,26 +199,14 @@ type MonadDiscovery m =
     A.Selectable (Maybe Host, UDPPort) SockAddr m
   )
 
-waitOnVault :: (MonadIO m, MonadLogger m, Show a) => m (Either a b) -> m b
-waitOnVault action = do
-  res <- action
-  case res of
-    Left err -> do
-      $logErrorS "HasVault" . T.pack $ "vault returned an error: " ++ show err
-      liftIO $ threadDelay 2000000 -- 2 seconds
-      waitOnVault action
-    Right val -> return val
-
-initContextLite :: MonadUnliftIO m => String -> UDPPort -> TCPPort -> m ContextLite
-initContextLite vaultUrl' udpPort tcpPort = do
+initContextLite :: MonadUnliftIO m => UDPPort -> TCPPort -> m ContextLite
+initContextLite udpPort tcpPort = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  ve <- liftIO $ newVaultEnv vaultUrl'
   return
     ContextLite
       { liteSQLDB = sqlDB' dbs,
         redisBlockDB = RBDB.RedisConnection redisBDBPool,
-        vaultEnv = ve,
         sock = error "initContextLite: Uninitialized socket",
         myUdpPort = udpPort,
         myTcpPort = tcpPort
