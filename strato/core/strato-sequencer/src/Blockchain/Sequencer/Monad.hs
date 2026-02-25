@@ -71,7 +71,8 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import qualified Database.LevelDB as LDB
 import qualified LabeledError
-import Servant.Client
+import Servant.Client (ClientError)
+import Strato.Vault.Client (VaultEnv, runVault)
 import qualified Strato.Strato23.API.Types as VC hiding (Address (..))
 import qualified Strato.Strato23.Client as VC
 import System.Directory (createDirectoryIfMissing)
@@ -114,7 +115,7 @@ data SequencerConfig = SequencerConfig
     cablePackage :: CablePackage,
     maxEventsPerIter :: Int,
     maxUsPerIter :: Int,
-    vaultClient :: Maybe ClientEnv, -- Nothing in tests
+    vaultClient :: Maybe VaultEnv, -- Nothing in tests
     kafkaClientId :: KafkaClientId,
     redisConn :: RBDB.RedisConnection
   }
@@ -191,7 +192,7 @@ instance (MonadIO m, MonadLogger m) => HasVault (ReaderT SequencerConfig m) wher
     mVc <- asks vaultClient
     case mVc of
       Nothing -> return $ signMsg testPriv mesg
-      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash mesg)) vc
+      Just vc -> waitOnVault $ liftIO $ runVault vc (VC.postSignature Nothing (VC.MsgHash mesg))
 
   getPub = error "called getPub in SequencerM, but this should never happen"
   getShared _ = error "called getShared in SequencerM, but this should never happen"
@@ -201,13 +202,13 @@ instance (MonadIO m, HasVault m) => HasVault (StateT SequencerContext m) where
   getPub    = lift getPub
   getShared = lift . getShared
 
-waitOnVault :: (Show a, MonadIO m, MonadLogger m) => m (Either a b) -> m b
+waitOnVault :: (MonadIO m, MonadLogger m) => m (Either ClientError b) -> m b
 waitOnVault action = do
-  $logInfoS "HasVault" "Asking the vault-proxy to sign a Blockstanbul message"
+  $logInfoS "HasVault" "Asking vault to sign a Blockstanbul message"
   res <- action
   case res of
     Left err -> do
-      $logErrorS "HasVault" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
+      $logErrorS "HasVault" . T.pack $ "failed to get signature from vault: " ++ show err
       liftIO $ threadDelay 2000000 -- 2 seconds
       waitOnVault action
     Right val -> do

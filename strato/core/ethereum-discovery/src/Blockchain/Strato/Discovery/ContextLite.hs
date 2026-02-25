@@ -222,7 +222,7 @@ waitOnVault action = do
   res <- action
   case res of
     Left err -> do
-      $logErrorS "HasVault" . T.pack $ "vault-proxy returned an error: " ++ show err
+      $logErrorS "HasVault" . T.pack $ "vault returned an error: " ++ show err
       liftIO $ threadDelay 2000000 -- 2 seconds
       waitOnVault action
     Right val -> return val

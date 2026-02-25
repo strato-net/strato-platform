@@ -103,10 +103,9 @@ import           Control.Monad                           (void)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
-import           Network.HTTP.Client                     (defaultManagerSettings,
-                                                          newManager)
 import           Network.Wai.Handler.Warp.Internal       (setSocketCloseOnExec)
-import           Servant.Client
+import           Servant.Client                          (ClientError)
+import           Strato.Vault.Client                     (VaultEnv, newVaultEnv, runVault)
 import qualified Strato.Strato23.API                     as VC
 import qualified Strato.Strato23.Client                  as VC
 
@@ -137,7 +136,7 @@ newtype Outbound a = Outbound {unOutbound :: a}
 data Config = Config
   { configSQLDB                    :: SQLDB,
     configRedisBlockDB             :: RBDB.RedisConnection,
-    configVaultClient              :: ClientEnv,
+    configVaultClient              :: VaultEnv,
     configContext                  :: IORef Context,
     configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
     configPubKey                   :: PublicKey
@@ -410,25 +409,25 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Outputs (ReaderT Config m) [Ingest
 instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
   sign bs = do
     vc <- asks configVaultClient
-    $logInfoS "HasVault" "Calling vault-wrapper for a signature"
-    waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash bs)) vc
+    $logInfoS "HasVault" "Calling vault for a signature"
+    waitOnVault $ liftIO $ runVault vc (VC.postSignature Nothing (VC.MsgHash bs))
 
   getPub = asks configPubKey
 
   getShared pub = do
     vc <- asks configVaultClient
-    $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
-    waitOnVault $ liftIO $ runClientM (VC.getSharedKey Nothing True pub) vc
+    $logInfoS "HasVault" "Calling vault to get a shared key"
+    waitOnVault $ liftIO $ runVault vc (VC.getSharedKey Nothing True pub)
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
 
-waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
+waitOnVault :: (MonadLogger m, MonadIO m) => m (Either ClientError b) -> m b
 waitOnVault action = do
   res <- action
   case res of
     Left err -> do
-      $logErrorS "HasVault" . T.pack $ "Got an error from vault-wrapper: " ++ show err
+      $logErrorS "HasVault" . T.pack $ "Got an error from vault: " ++ show err
       liftIO $ threadDelay 2000000
       waitOnVault action
     Right val -> return val
@@ -520,12 +519,10 @@ initConfig wireMessagesRef = do
   runSqlPool (SQL.runMigration SYNCTASK.migrateAll) $ sqlDB' dbs
 
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  vaultClient <- do
-    mgr <- liftIO $ newManager defaultManagerSettings
-    return $ mkClientEnv mgr (vaultProxyUrl . urlConfig $ ethConf)
+  vaultClient <- liftIO $ newVaultEnv (vaultUrl . urlConfig $ ethConf)
   nodePubKey <- do
-    $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vaultClient
+    $logInfoS "HasVault" "Calling vault to get the node's public key"
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runVault vaultClient (VC.getKey Nothing Nothing)
 
   initState <- initContext
   initStateF <- newIORef initState

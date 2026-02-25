@@ -31,13 +31,14 @@ import BlockApps.Logging
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Nonce
 import Control.Monad.Change.Modify hiding (modify)
-import Control.Monad.Composable.Vault hiding (httpManager)
+import Control.Monad.Composable.Vault
 import Control.Monad.Reader
 import Data.Cache
 import Data.Text (Text)
 import GHC.Stack
 import SQLM
-import Servant.Client
+import Servant.Client (ClientM)
+import Strato.Auth.Client (runWithAuth)
 import qualified Strato.Strato23.API.Types         as V
 import UnliftIO hiding (Handler (..))
 
@@ -64,10 +65,9 @@ blocVaultWrapper ::
   ClientM x ->
   m x
 blocVaultWrapper client' = do
-  logInfoCS callStack "Querying Vault Wrapper"
-  VaultData url mgr <- access Proxy
-  resultEither <-
-    liftIO $ runClientM client' (mkClientEnv mgr url)
+  logInfoCS callStack "Querying Vault"
+  env <- access Proxy
+  resultEither <- liftIO $ runWithAuth env client'
   either (blocError . VaultWrapperError) return resultEither
 
 blocMaybe :: MonadIO m => Text -> Maybe x -> m x

@@ -38,7 +38,7 @@ import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.SQL
-import Control.Monad.Composable.Vault hiding (httpManager)
+import Control.Monad.Composable.Vault
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
@@ -166,7 +166,7 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
         . runCirrusM
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
-        . runVaultM ("http://localhost:8013/strato/v2.3")
+        . runVaultM (vaultUrl . urlConfig $ ethConf)
         $ x `catch` handleRuntimeError `catch` handleApiError
       case y of
         Right a -> pure a
@@ -181,7 +181,7 @@ main = do
 
   -- check that all urls are derivable (or else crash and fail in a flaming disaster)
   let urlMap = fromList
-        [ ("vault", flags_vaultUrl),
+        [ ("vault", vaultUrl . urlConfig $ ethConf),
           ("oauthDiscovery", flags_oauthDiscoveryUrl),
           ("notificationServer", flags_notificationServerUrl),
           ( "fileServer",
@@ -226,7 +226,7 @@ main = do
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
 
   pubKey <- runLoggingT
-          . runVaultM ("http://localhost:8013/strato/v2.3")
+          . runVaultM (vaultUrl . urlConfig $ ethConf)
           . fmap V.unPubKey
           . blocVaultWrapper
           $ getKey Nothing Nothing

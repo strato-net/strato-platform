@@ -73,6 +73,7 @@ library:
     - seqevents
     - servant-client
     - servant-server
+    - strato-vault-client
     - split
     - sql-monad
     - stm-conduit

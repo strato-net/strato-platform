@@ -44,6 +44,7 @@ library:
     - strato-model
     - strato-redis-blockdb
     - servant-client
+    - strato-vault-client
     - text
     - time
     - classy-prelude
@@ -69,12 +70,12 @@ executables:
       - format
       - hedis
       - hflags
-      - http-client
       - process-monitor
       - prometheus-client
       - seqevents
       - servant-client
       - stm
+      - strato-vault-client
       - stm-chans
       - strato-conf
       - strato-model
