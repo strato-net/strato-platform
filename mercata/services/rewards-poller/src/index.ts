@@ -4,10 +4,10 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import { logInfo, logError } from "./utils/logger";
-import { initializeRewardsPolling } from "./polling/rewardsPolling";
-import { initOpenIdConfig } from "./auth";
-import { healthMonitor } from "./utils/healthMonitor";
+import { logInfo, logError } from "./infra/observability/logger";
+import { initializeRewardsPolling } from "./features/polling/polling.bootstrap";
+import { initOpenIdConfig } from "./infra/auth/tokenProvider";
+import { healthMonitor } from "./infra/observability/healthMonitor";
 
 const app = express();
 const port = process.env.PORT || 3004;
@@ -52,4 +52,3 @@ app.listen(port, async () => {
     process.exit(1);
   }
 });
-
