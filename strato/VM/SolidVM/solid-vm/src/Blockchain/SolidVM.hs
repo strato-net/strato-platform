@@ -2294,6 +2294,7 @@ callBuiltin name [SString s]
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
+callBuiltin "keccak256" [SBytes bs] = pure . SBytes . keccak256ToByteString $ hash bs
 callBuiltin "keccak256" args = pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pack h) of
   Left err -> invalidArguments err ("" :: String)
@@ -2345,6 +2346,7 @@ callBuiltin "verifyP256" ((SBytes h) : r' : s' : p') = case digestFromByteString
     pure $ SBool isValidSig
 callBuiltin "sha256" [SBytes bs] = pure . SBytes $ SHA256.hash bs
 callBuiltin "sha256" args = pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "ripemd160" [SBytes bs] = pure . SBytes $ RIPEMD160.hash bs
 callBuiltin "ripemd160" args = pure . SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "modExp" [SInteger b, SInteger e, SInteger m] = pure . SInteger $ Builtins.modExp b e m
 callBuiltin "ecAdd" [SInteger x1, SInteger y1, SInteger x2, SInteger y2] =
