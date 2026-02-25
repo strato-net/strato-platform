@@ -432,4 +432,68 @@ router.get("/swap-history/:poolAddress", authHandler.authorizeRequest(true), Swa
  */
 router.post("/swap-pools/set-rates", authHandler.authorizeRequest(), SwappingController.setPoolRates);
 
+/**
+ * @openapi
+ * /swap-pools/toggle-pause:
+ *   post:
+ *     summary: Toggle pause state of a swap pool (admin)
+ *     tags: [Swap]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - poolAddress
+ *               - isPaused
+ *             properties:
+ *               poolAddress:
+ *                 type: string
+ *               isPaused:
+ *                 type: boolean
+ *                 description: true to pause, false to unpause
+ *     responses:
+ *       200:
+ *         description: Transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/swap-pools/toggle-pause", authHandler.authorizeRequest(), SwappingController.togglePause);
+
+/**
+ * @openapi
+ * /swap-pools/toggle-disable:
+ *   post:
+ *     summary: Toggle disabled state of a swap pool (admin)
+ *     tags: [Swap]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - poolAddress
+ *               - isDisabled
+ *             properties:
+ *               poolAddress:
+ *                 type: string
+ *               isDisabled:
+ *                 type: boolean
+ *                 description: true to disable, false to enable
+ *     responses:
+ *       200:
+ *         description: Transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/swap-pools/toggle-disable", authHandler.authorizeRequest(), SwappingController.toggleDisable);
+
 export default router;

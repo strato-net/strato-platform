@@ -62,6 +62,8 @@ export interface SwapContextActions {
   getPoolByAddress: (address: string) => Promise<Pool>;
   fetchPools: () => Promise<Pool[]>;
   setPoolRates: (data: SetPoolRatesParams) => Promise<void>;
+  togglePause: (poolAddress: string, isPaused: boolean) => Promise<void>;
+  toggleDisable: (poolAddress: string, isDisabled: boolean) => Promise<void>;
   fetchUserPositions: () => Promise<void>;
   
   // Swap operations
