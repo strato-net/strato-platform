@@ -900,12 +900,6 @@ contract record Rewards is Ownable {
             action.eventIndex
         );
 
-        if (activity.directPayout) {
-            unclaimedRewards[action.user] += action.amount;
-            emit DirectPayoutApplied(activityId, action.user, action.amount);
-            return;
-        }
-
         // Determine if this is an increase or decrease
         bool isIncrease = (actionType != ActionType.Withdraw);
 
