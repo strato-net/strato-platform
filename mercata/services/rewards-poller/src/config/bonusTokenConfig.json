@@ -1,3 +1,3 @@
 [
-  { "address": "00000000000000000000000000000000000000a1", "bonusPercentage": 5, "minBalance": "1" }
+  { "address": "00000000000000000000000000000000000000a1", "bonusBps": 500, "minBalance": "1" }
 ]

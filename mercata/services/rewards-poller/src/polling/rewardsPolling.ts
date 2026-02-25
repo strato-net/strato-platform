@@ -16,6 +16,7 @@ import { blockTrackingService } from "../services/blockTrackingService";
 import { bonusTrackingService } from "../services/bonusTrackingService";
 import { nextCursorAfter } from "../utils/eventHelpers";
 import { calculateBonusCreditsForUsers, getCronIntervalSeconds, MAX_BONUS_INTERVAL_SECONDS } from "../utils/bonusUtils";
+import { isValidBonusCredit } from "../utils/bonusValidation";
 
 const processEvents = async (): Promise<void> => {
   try {
@@ -110,13 +111,23 @@ const processBonus = async (): Promise<void> => {
       : [];
 
     const allCredits = [...state.pendingCredits, ...newCredits];
+    const invalidCredit = allCredits.find((credit) => !isValidBonusCredit(credit));
+    if (invalidCredit) {
+      throw new Error("Invalid bonus credit state detected; refusing to apply bonus with missing fields");
+    }
     if (allCredits.length === 0) {
-      await bonusTrackingService.updateState({ lastSuccessfulTimestamp: new Date().toISOString(), pendingCredits: [] });
+      await bonusTrackingService.updateState({
+        lastSuccessfulTimestamp: new Date().toISOString(),
+        pendingCredits: [],
+      });
       return;
     }
 
     if (state.pendingCredits.length > 0) {
-      logInfo("RewardsBonusPolling", `Retrying ${state.pendingCredits.length} pending + ${newCredits.length} new credits`);
+      logInfo(
+        "RewardsBonusPolling",
+        `Retrying ${state.pendingCredits.length} pending + ${newCredits.length} new credits`
+      );
     }
 
     await bonusTrackingService.clearPending();
@@ -130,7 +141,11 @@ const processBonus = async (): Promise<void> => {
         await batchAddBonus(batch);
         applied += batch.length;
       } catch (error) {
-        logError("RewardsBonusPolling", error as Error, { operation: "processBonus", message: "Batch failed - added to pending", batchSize: batch.length });
+        logError("RewardsBonusPolling", error as Error, {
+          operation: "processBonus",
+          message: "Batch failed - added to pending",
+          batchSize: batch.length,
+        });
         await bonusTrackingService.appendPending(batch);
       }
     }

@@ -97,6 +97,45 @@ export type ValidEventPairs = Set<string>;
 const makeEventPairKey = (contract: string, eventName: string): string =>
   `${contract}:${eventName}`;
 
+const normalizeAddress = (address: string): string =>
+  address.toLowerCase().replace(/^0x/, "");
+
+const isDirectPayoutEnabled = (directPayout: unknown): boolean =>
+  directPayout === true ||
+  directPayout === "true" ||
+  directPayout === "1" ||
+  directPayout === 1;
+
+const parseActionableEventNames = (actionableEvents: unknown): string[] => {
+  if (!actionableEvents) return [];
+
+  if (typeof actionableEvents === "string") {
+    try {
+      return parseActionableEventNames(parseJson(actionableEvents));
+    } catch {
+      return [];
+    }
+  }
+
+  if (Array.isArray(actionableEvents)) {
+    return actionableEvents
+      .map((event) => String(event?.eventName ?? "").trim())
+      .filter((eventName) => eventName.length > 0);
+  }
+
+  if (typeof actionableEvents === "object") {
+    return Object.keys(actionableEvents as Record<string, unknown>)
+      .filter((key) => /^\d+$/.test(key))
+      .sort((a, b) => Number(a) - Number(b))
+      .map((key) =>
+        String((actionableEvents as Record<string, any>)[key]?.eventName ?? "").trim()
+      )
+      .filter((eventName) => eventName.length > 0);
+  }
+
+  return [];
+};
+
 export const getEventQueryParams = async (): Promise<{
   contractAddresses: string[];
   eventNames: string[];
@@ -267,8 +306,12 @@ export const getBonusEligibleUsers = async (
 
   const ruleByToken = new Map(
     tokenConfigs.map((c) => [
-      c.address.toLowerCase(),
-      { bonusPercentage: c.bonusPercentage, minBalance: BigInt(c.minBalance) },
+      normalizeAddress(c.address),
+      {
+        sourceContract: c.address,
+        bonusBps: c.bonusBps,
+        minBalance: BigInt(c.minBalance),
+      },
     ])
   );
 
@@ -286,101 +329,157 @@ export const getBonusEligibleUsers = async (
 
   if (!Array.isArray(data) || data.length === 0) return [];
 
-  const userBonusMap = new Map<string, number>();
+  const userBonusMap = new Map<string, BonusEligibleUser>();
   for (const row of data) {
-    const rule = ruleByToken.get(row.address.toLowerCase());
+    const rule = ruleByToken.get(normalizeAddress(String(row.address ?? "")));
     if (!rule || BigInt(row.balance || "0") <= rule.minBalance) continue;
-    userBonusMap.set(row.user, Math.max(userBonusMap.get(row.user) ?? 0, rule.bonusPercentage));
+
+    const current = userBonusMap.get(row.user);
+    if (!current || rule.bonusBps > current.bonusBps) {
+      userBonusMap.set(row.user, {
+        sourceContract: rule.sourceContract,
+        user: row.user,
+        bonusBps: rule.bonusBps,
+      });
+    }
   }
 
-  const users = [...userBonusMap.entries()].map(([user, bonusPercentage]) => ({ user, bonusPercentage }));
+  const users = [...userBonusMap.values()];
   logInfo("CirrusService", `Loaded ${users.length} bonus-eligible users from ${addresses.length} bonus tokens`);
   return users;
 };
 
 export const getUserEmissionRates = async (
-  users: string[]
-): Promise<Map<string, bigint>> => {
-  if (users.length === 0) return new Map();
+  users: string[],
+  bonusTokenAddresses: string[] = []
+): Promise<{ rateByUser: Map<string, bigint>; bonusEventByToken: Map<string, string> }> => {
+  if (users.length === 0 && bonusTokenAddresses.length === 0) {
+    return { rateByUser: new Map(), bonusEventByToken: new Map() };
+  }
 
   const rewardsAddress = config.rewards.address;
-  const [activitiesData, statesData, userInfoData] = await Promise.all([
-    retryWithBackoff(
-      () => cirrus.get("/mapping", {
-        params: {
-          address: `eq.${rewardsAddress}`,
-          collection_name: "eq.activities",
-          select: "key,value",
-        },
-      }),
-      "CirrusService-getUserEmissionRates-activities",
-      CIRRUS_RETRY_OPTS
-    ),
-    retryWithBackoff(
-      () => cirrus.get("/mapping", {
-        params: {
-          address: `eq.${rewardsAddress}`,
-          collection_name: "eq.activityStates",
-          select: "key,value",
-        },
-      }),
-      "CirrusService-getUserEmissionRates-states",
-      CIRRUS_RETRY_OPTS
-    ),
-    retryWithBackoff(
-      () => cirrus.get("/mapping", {
-        params: {
-          address: `eq.${rewardsAddress}`,
-          collection_name: "eq.userInfo",
-          key: `in.(${users.join(",")})`,
-          select: "key,key2,value",
-        },
-      }),
-      "CirrusService-getUserEmissionRates-userInfo",
-      CIRRUS_RETRY_OPTS
-    ),
-  ]);
+  const mappingRows = await retryWithBackoff(
+    () => cirrus.get("/mapping", {
+      params: {
+        address: `eq.${rewardsAddress}`,
+        collection_name: "in.(activities,activityStates,userInfo)",
+        select: "collection_name,key,value",
+      },
+    }),
+    "CirrusService-getUserEmissionRates",
+    CIRRUS_RETRY_OPTS
+  );
 
   const parseValue = (v: any): any => {
     if (v && typeof v === "object") return v;
     if (typeof v === "string") { try { return JSON.parse(v); } catch { return {}; } }
     return {};
   };
+
+  const getKeyParts = (key: any): { key1: string; key2: string } => {
+    if (key && typeof key === "object") {
+      const key1 = String((key as any).key ?? "");
+      const key2 = String((key as any).key2 ?? "");
+      return { key1, key2 };
+    }
+    return { key1: String(key ?? ""), key2: "" };
+  };
+
   const toBigInt = (v: any): bigint => {
     try { return BigInt(v); } catch { return 0n; }
   };
 
+  const targetUsers = new Set(users.map((u) => u.toLowerCase()));
+  const requestedBonusTokens = new Set(
+    bonusTokenAddresses.map((address) => normalizeAddress(address))
+  );
   const emissionByActivity = new Map<string, bigint>();
-  if (Array.isArray(activitiesData)) {
-    for (const row of activitiesData) {
-      emissionByActivity.set(String(row.key), toBigInt(parseValue(row.value).emissionRate));
-    }
-  }
-
   const totalStakeByActivity = new Map<string, bigint>();
-  if (Array.isArray(statesData)) {
-    for (const row of statesData) {
-      totalStakeByActivity.set(String(row.key), toBigInt(parseValue(row.value).totalStake));
+  const directPayoutEventsByToken = new Map<string, Set<string>>();
+  const userRows: Array<{ user: string; activityId: string; stake: bigint }> = [];
+  const rateByUser = new Map<string, bigint>();
+  if (Array.isArray(mappingRows)) {
+    for (const row of mappingRows) {
+      const collectionName = String(row.collection_name ?? "");
+      const { key1, key2 } = getKeyParts(row.key);
+      const value = parseValue(row.value);
+
+      if (collectionName === "activities") {
+        if (key1.length > 0) {
+          emissionByActivity.set(key1, toBigInt(value.emissionRate));
+        }
+
+        const sourceContract = normalizeAddress(String(value.sourceContract ?? "").trim());
+        if (
+          requestedBonusTokens.has(sourceContract) &&
+          isDirectPayoutEnabled(value.directPayout)
+        ) {
+          for (const eventName of parseActionableEventNames(value.actionableEvents)) {
+            const events = directPayoutEventsByToken.get(sourceContract) ?? new Set<string>();
+            events.add(eventName);
+            directPayoutEventsByToken.set(sourceContract, events);
+          }
+        }
+        continue;
+      }
+
+      if (collectionName === "activityStates") {
+        if (key1.length > 0) {
+          totalStakeByActivity.set(key1, toBigInt(value.totalStake));
+        }
+        continue;
+      }
+
+      if (collectionName === "userInfo") {
+        const user = key1;
+        const activityId = key2;
+        if (user.length === 0 || activityId.length === 0 || !targetUsers.has(user.toLowerCase())) {
+          continue;
+        }
+
+        const stake = toBigInt(value.stake);
+        if (stake <= 0n) continue;
+        userRows.push({ user, activityId, stake });
+      }
     }
   }
 
-  const rateByUser = new Map<string, bigint>();
-  if (Array.isArray(userInfoData)) {
-    for (const row of userInfoData) {
-      const user = String(row.key);
-      const activityId = String(row.key2);
-      const stake = toBigInt(parseValue(row.value).stake);
-      if (stake <= 0n) continue;
+  for (const { user, activityId, stake } of userRows) {
+    const emissionRate = emissionByActivity.get(activityId) ?? 0n;
+    const totalStake = totalStakeByActivity.get(activityId) ?? 0n;
+    if (emissionRate <= 0n || totalStake <= 0n) continue;
 
-      const emissionRate = emissionByActivity.get(activityId) ?? 0n;
-      const totalStake = totalStakeByActivity.get(activityId) ?? 0n;
-      if (emissionRate <= 0n || totalStake <= 0n) continue;
+    const personalRate = (stake * emissionRate) / totalStake;
+    rateByUser.set(user, (rateByUser.get(user) ?? 0n) + personalRate);
+  }
 
-      const personalRate = (stake * emissionRate) / totalStake;
-      rateByUser.set(user, (rateByUser.get(user) ?? 0n) + personalRate);
+  const bonusEventByToken = new Map<string, string>();
+  const missing: string[] = [];
+  const ambiguous: string[] = [];
+  for (const token of requestedBonusTokens) {
+    const events = directPayoutEventsByToken.get(token);
+    if (!events || events.size === 0) {
+      missing.push(token);
+      continue;
     }
+
+    if (events.size > 1) {
+      ambiguous.push(`${token}=>[${[...events].join(",")}]`);
+      continue;
+    }
+
+    bonusEventByToken.set(token, [...events][0]);
+  }
+
+  if (missing.length > 0 || ambiguous.length > 0) {
+    const details = [
+      missing.length > 0 ? `missing direct payout activity for: ${missing.join(", ")}` : "",
+      ambiguous.length > 0 ? `multiple direct payout events per token (ambiguous): ${ambiguous.join("; ")}` : "",
+    ].filter(Boolean).join(" | ");
+
+    throw new Error(`Invalid direct payout activity mapping: ${details}`);
   }
 
   logInfo("CirrusService", `Computed emission rates for ${rateByUser.size}/${users.length} users`);
-  return rateByUser;
+  return { rateByUser, bonusEventByToken };
 };

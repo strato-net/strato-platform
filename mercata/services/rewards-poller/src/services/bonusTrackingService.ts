@@ -12,12 +12,21 @@ const DEFAULT_STATE: BonusRunState = {
   pendingCredits: [],
 };
 
-function isValidState(x: any): x is BonusRunState {
+function isValidStateShape(x: any): boolean {
   return (
     x &&
     (x.lastSuccessfulTimestamp === null || typeof x.lastSuccessfulTimestamp === "string") &&
     Array.isArray(x.pendingCredits)
   );
+}
+
+function normalizeState(x: any): BonusRunState {
+  if (!isValidStateShape(x)) return { ...DEFAULT_STATE };
+
+  return {
+    lastSuccessfulTimestamp: x.lastSuccessfulTimestamp,
+    pendingCredits: x.pendingCredits,
+  };
 }
 
 class BonusTrackingService {
@@ -48,7 +57,7 @@ class BonusTrackingService {
       const raw = await fs.readFile(BONUS_TRACKING_PATH, "utf-8");
       const parsed = JSON.parse(raw);
 
-      if (!isValidState(parsed)) {
+      if (!isValidStateShape(parsed)) {
         logError(
           "BonusTrackingService",
           new Error(`Invalid bonus tracking file format`),
@@ -57,8 +66,9 @@ class BonusTrackingService {
         return { ...DEFAULT_STATE };
       }
 
-      this.cached = parsed;
-      return parsed;
+      const normalized = normalizeState(parsed);
+      this.cached = normalized;
+      return normalized;
     } catch (error: any) {
       if (error?.code !== "ENOENT") {
         logError("BonusTrackingService", error as Error, {
