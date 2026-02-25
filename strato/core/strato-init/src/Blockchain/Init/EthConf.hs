@@ -49,9 +49,7 @@ genEthConf = do
       return "localhost"
     h -> return h
 
-  pgPass <- case flags_password of
-    "" -> error "specify password for postgres user: "
-    p -> return p
+  pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
   kafkaHost' <- case flags_kafkahost of
     "" -> do

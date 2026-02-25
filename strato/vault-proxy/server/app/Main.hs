@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
@@ -30,6 +31,7 @@ import Network.Wai.Handler.Warp (run)
 import Options
 import Servant.Client as S
 import Servant.Client.Core (addHeader)
+import Strato.Auth.ClientCredentials (ClientCredentialsConfig(..), clientCredentialsConfig)
 import Strato.VaultProxy.DataTypes as VaultProxy
 import Strato.VaultProxy.GetPing as GP
 import Strato.VaultProxy.RawOauth as RO
@@ -64,6 +66,7 @@ main = do
     ]
   _ <- $initHFlags "Setup Vault Proxy flags"
   when (flags_VAULT_URL == "") $ error "There is no shared vault connection 😓"
+  let ClientCredentialsConfig{..} = clientCredentialsConfig
   vaultProxyDebug flags_VAULT_PROXY_DEBUG "Checking if the connection to the VAULT is https encrypted"
 
   --Initialize a new connection manager, ensure TLS communication as everything is sensitive info from here on out.
@@ -71,7 +74,7 @@ main = do
 
   traceM "Trying to parse the oauth url"
   --Parse the shared vault url
-  ourl <- parseBaseUrl $ T.unpack flags_OAUTH_DISCOVERY_URL
+  ourl <- parseBaseUrl $ T.unpack discoveryUrl
   --Connect to the oauth provider
   rawOauthInfo <- runClientM RO.connectRawOauth (mkClientEnv mgr ourl)
   noErrorOauth <- case rawOauthInfo of
@@ -81,7 +84,7 @@ main = do
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "Making an intial call to the OAUTH provider, please note that there will be two calls to the oauth provider."
   vaultProxyDebug flags_VAULT_PROXY_DEBUG $ "First call is used to see if everything is alive, then if everything is working it will store it in cache."
   --make an initial call to see if the vault is working
-  initialToken <- getVirginToken flags_OAUTH_CLIENT_ID flags_OAUTH_CLIENT_SECRET noErrorOauth
+  initialToken <- getVirginToken clientId clientSecret noErrorOauth
 
   let minimumVersion :: Int
       minimumVersion = 0
@@ -117,9 +120,9 @@ main = do
         VaultConnection
           { vaultUrl = flags_VAULT_URL,
             httpManager = mgr,
-            oauthUrl = flags_OAUTH_DISCOVERY_URL,
-            oauthClientId = flags_OAUTH_CLIENT_ID,
-            oauthClientSecret = flags_OAUTH_CLIENT_SECRET,
+            oauthUrl = discoveryUrl,
+            oauthClientId = clientId,
+            oauthClientSecret = clientSecret,
             oauthReserveSeconds = flags_OAUTH_RESERVE_SECONDS,
             vaultProxyUrl = flags_VAULT_PROXY_URL,
             vaultProxyPort = flags_VAULT_PROXY_PORT,

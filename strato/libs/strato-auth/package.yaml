@@ -16,11 +16,13 @@ dependencies:
   - servant-client-core
   - text
   - time
+  - yaml
 
 library:
   source-dirs: src
   exposed-modules:
     - Strato.Auth
+    - Strato.Auth.ClientCredentials
 
 executables:
   strato-auth:

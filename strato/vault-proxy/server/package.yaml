@@ -57,6 +57,7 @@ executables:
       - regex-compat
       - servant-client
       - servant-client-core
+      - strato-auth
       - text
       - wai
       - warp
