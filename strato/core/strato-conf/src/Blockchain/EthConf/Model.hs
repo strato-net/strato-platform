@@ -18,7 +18,6 @@ import Data.Yaml
 import qualified Database.PostgreSQL.Simple as PS (ConnectInfo (..), postgreSQLConnectionString)
 import qualified Database.Redis as Redis
 import GHC.Generics
-import Servant.Client (BaseUrl, parseBaseUrl)
 
 postgreSQLConnectionString :: SqlConf -> B.ByteString
 postgreSQLConnectionString sqlc =
@@ -134,8 +133,7 @@ data ContractsConf = ContractsConf
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data UrlConfig = UrlConfig
-  { vaultProxyUrl :: BaseUrl
-  , vaultUrl :: String
+  { vaultUrl :: String
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -202,10 +200,7 @@ instance Default ContractsConf where
 
 instance Default UrlConfig where
   def = UrlConfig
-    { vaultProxyUrl = case parseBaseUrl "http://localhost:8013/strato/v2.3" of
-        Just url -> url
-        Nothing -> error "Invalid default vaultProxyUrl"
-    , vaultUrl = "https://vault.blockapps.net:8093/strato/v2.3"
+    { vaultUrl = "https://vault.blockapps.net:8093/strato/v2.3"
     }
 
 instance Default EthConf where

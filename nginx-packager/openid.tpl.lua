@@ -139,6 +139,10 @@ end
 
 if user_access_token ~= '' then
   ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+  -- Also store in nginx variable for proxy_set_header usage
+  if ngx.var.user_access_token ~= nil then
+    ngx.var.user_access_token = user_access_token
+  end
 end
 
 -- Check if session was rotated during authentication and mark for CSRF token regeneration

@@ -51,9 +51,9 @@ function newnode {
   # if alternative log in methods are provided then use them
   mkdir -p logs
 
-  echo "trying to see if the alternative OAUTH parameters are available"
-  if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}} || -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}} ]]; then
-    echo "Could not obtain OAUTH parameters for Vault Proxy"
+  echo "Checking if OAUTH parameters are available"
+  if [[ -z ${OAUTH_CLIENT_ID} || -z ${OAUTH_CLIENT_SECRET} ]]; then
+    echo "Could not obtain OAUTH parameters"
     exit 2
   elif [[ -z ${OAUTH_DISCOVERY_URL} ]]; then
     if [ "${network}" == "mercata-hydrogen" ] || [ "${networkID}" == "7596898649924658542" ]; then # connecting to testnet
@@ -65,33 +65,8 @@ function newnode {
       OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
     fi
   else
-    echo "OAUTH parameters for Vault Proxy are available"
+    echo "OAUTH parameters are available"
   fi
-
-  runBackgroundProcess blockapps-vault-proxy-server \
-    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} \
-    --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
-    --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS:-13} \
-    --VAULT_URL=${VAULT_URL} \
-    --VAULT_PROXY_PORT=8013 \
-    --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG:-false} &>> logs/vault-proxy
-
-  set +x
-  echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
-  started=$(date +%s)
-  timeout=30
-  while ! curl --silent --output /dev/null --fail --max-time 1 --location http://localhost:8013; do
-    if [[ $(date +%s) -ge ${started}+${timeout} ]]; then
-      echo -e "\n tail -n40 logs/vault-proxy"
-      tail -n40 logs/vault-proxy
-      echo -e "\n${Red}vault-proxy takes too long to start. It most probably failed. Check the tail of the vault-proxy log above. Sleeping now.${NC}"
-      sleep 60
-    fi
-    sleep 0.3
-  done
-  echo 'vault-proxy is available'
-  set -x
 
   if [[ ! -f .initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):

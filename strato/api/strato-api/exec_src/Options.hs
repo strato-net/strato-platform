@@ -3,8 +3,6 @@
 
 module Options where
 
-import HFlags
-
 --defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 --defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
 --defineFlag "pgport" ("5432" :: String) "Postgres port"
@@ -17,4 +15,3 @@ import HFlags
 --defineFlag "nonceCounterTimeout" (10::Integer) "The number of seconds nonces are held in the global nonce counter cache"
 --defineFlag "sourceCacheTimeout" (60::Integer) "The number of seconds nonces are held in the global source code cache"
 --defineFlag "txQueueSize" (4096::Integer) "The maximum number of requests to queue"
-defineFlag "vaultProxyPort" ("8013" :: String) "URL to Vault"

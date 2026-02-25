@@ -46,7 +46,6 @@ export VAULT_URL=https://vault.blockapps.net:8093
 
 function cleanup {
     docker compose -p strato down # -v -t 0 --remove-orphans
-    killall blockapps-vault-proxy-server
 }
 
 trap 'cleanup' INT
@@ -77,7 +76,7 @@ cd $1
 
 mkdir -p logs
 
-# Create YAML oauth credentials for vault-proxy
+# Create YAML oauth credentials for services
 if [ ! -f secrets/oauth_credentials.yaml ]; then
     mkdir -p secrets
     cat > secrets/oauth_credentials.yaml << EOF
@@ -87,10 +86,6 @@ clientSecret: "$OAUTH_CLIENT_SECRET"
 EOF
     chmod 600 secrets/oauth_credentials.yaml
 fi
-
-echo "######## starting blockapps-vault-proxy-server"
-
-blockapps-vault-proxy-server --VAULT_URL=$VAULT_URL > logs/blockapps-vault-proxy-server 2>&1 &
 
 if [ ! -e .ethereumH/ethconf.yaml ]
 then
