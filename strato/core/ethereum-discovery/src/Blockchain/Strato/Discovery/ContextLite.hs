@@ -58,19 +58,17 @@ import           Data.Maybe
 import qualified Data.Text                             as T
 import qualified Database.Persist.Postgresql           as SQL
 import qualified Database.Redis                        as Redis
-import           Network.HTTP.Client                   (defaultManagerSettings,
-                                                        newManager)
 import           Network.Socket
 import qualified Network.Socket.ByteString             as NB
-import           Servant.Client
 import qualified Strato.Strato23.API                   as VC
 import qualified Strato.Strato23.Client                as VC
+import           Strato.Vault.Client                   (VaultEnv, newVaultEnv, runVault)
 import           System.Timeout
 
 data ContextLite = ContextLite
   { liteSQLDB    :: SQLDB,
     redisBlockDB :: RBDB.RedisConnection,
-    vaultClient  :: ClientEnv,
+    vaultEnv     :: VaultEnv,
     sock         :: Socket,
     myUdpPort    :: UDPPort,
     myTcpPort    :: TCPPort
@@ -188,14 +186,14 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Awaitable UDPPacket (ReaderT Conte
 
 instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m) where
   sign msg = do
-    vc <- asks vaultClient
-    $logInfoS "HasVault" "asking vault-proxy for a message signature"
-    waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash msg)) vc
+    ve <- asks vaultEnv
+    $logInfoS "HasVault" "asking vault for a message signature"
+    waitOnVault $ liftIO $ runVault ve (VC.postSignature Nothing (VC.MsgHash msg))
 
   getPub = do
-    vc <- asks vaultClient
-    $logInfoS "HasVault" "asking vault-proxy for the node's public key"
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vc
+    ve <- asks vaultEnv
+    $logInfoS "HasVault" "asking vault for the node's public key"
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runVault ve (VC.getKey Nothing Nothing)
 
   getShared _ = error "called HasVault's getShared in ethereum-discovery, but this should never happen"
 
@@ -229,16 +227,16 @@ waitOnVault action = do
       waitOnVault action
     Right val -> return val
 
-initContextLite :: MonadUnliftIO m => BaseUrl -> UDPPort -> TCPPort -> m ContextLite
-initContextLite vaultUrl udpPort tcpPort = do
+initContextLite :: MonadUnliftIO m => String -> UDPPort -> TCPPort -> m ContextLite
+initContextLite vaultUrl' udpPort tcpPort = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  mgr <- liftIO $ newManager defaultManagerSettings
+  ve <- liftIO $ newVaultEnv vaultUrl'
   return
     ContextLite
       { liteSQLDB = sqlDB' dbs,
         redisBlockDB = RBDB.RedisConnection redisBDBPool,
-        vaultClient = mkClientEnv mgr vaultUrl,
+        vaultEnv = ve,
         sock = error "initContextLite: Uninitialized socket",
         myUdpPort = udpPort,
         myTcpPort = tcpPort

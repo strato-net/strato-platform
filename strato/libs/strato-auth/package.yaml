@@ -6,12 +6,16 @@ description:         Provides transparent OAuth device flow authentication for S
 dependencies:
   - base >= 4.7 && < 5
   - aeson
+  - base64
   - bytestring
   - directory
+  - filelock
   - filepath
   - http-client
   - http-client-tls
   - http-types
+  - modern-uri
+  - req
   - servant-client
   - servant-client-core
   - text
@@ -22,7 +26,9 @@ library:
   source-dirs: src
   exposed-modules:
     - Strato.Auth
+    - Strato.Auth.Client
     - Strato.Auth.ClientCredentials
+    - Strato.Auth.Token
 
 executables:
   strato-auth:

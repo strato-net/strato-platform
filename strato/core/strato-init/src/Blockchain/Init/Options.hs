@@ -34,5 +34,7 @@ defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for m
 
 defineFlag "apiIPAddress" "127.0.0.1" "The IP address that strato-api will bind to"
 
+defineFlag "vaultUrl" "https://vault.blockapps.net:8093/strato/v2.3" "URL of the shared vault service"
+
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 $(return [])

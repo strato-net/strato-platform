@@ -76,4 +76,7 @@ genEthConf = do
     , quarryConfig = def
         { lazyBlocks = flags_lazyblocks
         }
+    , urlConfig = def
+        { vaultUrl = flags_vaultUrl
+        }
     }

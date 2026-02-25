@@ -135,6 +135,7 @@ data ContractsConf = ContractsConf
 
 data UrlConfig = UrlConfig
   { vaultProxyUrl :: BaseUrl
+  , vaultUrl :: String
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -204,6 +205,7 @@ instance Default UrlConfig where
     { vaultProxyUrl = case parseBaseUrl "http://localhost:8013/strato/v2.3" of
         Just url -> url
         Nothing -> error "Invalid default vaultProxyUrl"
+    , vaultUrl = "https://vault.blockapps.net:8093/strato/v2.3"
     }
 
 instance Default EthConf where

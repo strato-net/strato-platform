@@ -63,6 +63,7 @@ library:
     - servant-client
     - split
     - strato-conf
+    - strato-vault-client
     - strato-model
     - strato-redis-blockdb
     - text
