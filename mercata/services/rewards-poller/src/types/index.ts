@@ -78,13 +78,17 @@ export interface RewardsAction {
 
 export interface BonusTokenConfig {
   address: string;
-  bonusPercentage: number;
+  bonusBps: number;
   minBalance: string;
 }
 
 export interface BonusCredit {
+  sourceContract: string;
+  eventName: string;
   user: string;
   amount: string;
+  blockNumber: number;
+  eventIndex: number;
 }
 
 export interface BonusRunState {
@@ -93,8 +97,9 @@ export interface BonusRunState {
 }
 
 export interface BonusEligibleUser {
+  sourceContract: string;
   user: string;
-  bonusPercentage: number;
+  bonusBps: number;
 }
 
 export interface EventCursor {
@@ -112,4 +117,3 @@ export interface CirrusEvent {
   transaction_sender: string;
   attributes: Record<string, any>;
 }
-
