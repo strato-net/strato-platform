@@ -1,17 +1,11 @@
 import bonusTokenConfigsRaw from "./bonusTokenConfig.json";
+import { parseBonusTokenConfigs } from "../utils/bonusValidation";
 
 export const ERROR_FILE_NAME = "rewards-poller-error.flag";
 export const BLOCK_TRACKING_FILE = "lastProcessedBlock.json";
 export const BONUS_TRACKING_FILE = "lastBonusRun.json";
 
-const bonusTokenConfigs = (Array.isArray(bonusTokenConfigsRaw) ? bonusTokenConfigsRaw : [])
-  .filter((item: any) => item && typeof item.address === "string")
-  .map((item: any) => ({
-    address: item.address,
-    bonusPercentage: Number(item.bonusPercentage) || 0,
-    minBalance: typeof item.minBalance === "string" ? item.minBalance : "0",
-  }))
-  .filter((item) => item.address.length > 0 && item.bonusPercentage > 0);
+const bonusTokenConfigs = parseBonusTokenConfigs(bonusTokenConfigsRaw);
 
 const config = {
   auth: {
@@ -99,4 +93,3 @@ if (missingEnvVars.length > 0) {
   console.error(error);
   process.exit(2);
 }
-

@@ -36,18 +36,19 @@ export const batchHandleAction = async (
 export const batchAddBonus = async (
   credits: NonEmptyArray<BonusCredit>
 ): Promise<void> => {
+  const sourceContracts = credits.map((c) => c.sourceContract);
+  const eventNames = credits.map((c) => c.eventName);
   const users = credits.map((c) => c.user);
   const amounts = credits.map((c) => c.amount);
+  const blockNumbers = credits.map((c) => c.blockNumber);
+  const eventIndexes = credits.map((c) => c.eventIndex);
 
   const input: FunctionInput = {
     contractName: "Rewards",
     contractAddress: config.rewards.address!,
-    method: "batchAddBonus",
-    args: { users, amounts },
+    method: "batchHandleAction",
+    args: { sourceContracts, eventNames, users, amounts, blockNumbers, eventIndexes },
   };
 
-  await retryWithBackoff(
-    () => execute(input),
-    "RewardsService-batchAddBonus"
-  );
+  await execute(input);
 };
