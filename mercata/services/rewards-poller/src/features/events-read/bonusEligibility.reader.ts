@@ -29,7 +29,7 @@ export const getBonusEligibleUsers = async (
   const userBonusMap = new Map<string, BonusEligibleUser>();
   for (const row of data) {
     const rule = ruleByToken.get(normalizeAddressValue(row.address));
-    if (!rule || BigInt(row.balance || "0") <= rule.minBalance) continue;
+    if (!rule || BigInt(row.balance || "0") < rule.minBalance) continue;
 
     const current = userBonusMap.get(row.user);
     if (!current || rule.bonusBps > current.bonusBps) {
