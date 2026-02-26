@@ -66,7 +66,7 @@ class OnrampController {
 
       // Crypto onramp event types are not yet in the official Stripe TS definitions (public preview)
       if ((event.type as string) === "crypto.onramp_session.updated") {
-        handleSessionUpdate((event.data as any).object);
+        await handleSessionUpdate((event.data as any).object);
       }
 
       res.json({ received: true });
