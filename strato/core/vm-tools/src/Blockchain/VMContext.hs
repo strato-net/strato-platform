@@ -83,6 +83,7 @@ import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
@@ -113,7 +114,6 @@ import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
 import Debugger
-import Executable.EVMFlags
 import GHC.Generics
 import SolidVM.Model.Storable
 import SolidVM.Model.Value
@@ -267,7 +267,7 @@ instance Default ContextState where
       { _memDBs = def,
         _baggerState = defaultBaggerState,
         _bestBlockInfo = Unspecified,
-        _vmGasCap = Gas flags_gasLimit,
+        _vmGasCap = Gas (Conf.gasLimit $ networkConfig ethConf),
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
@@ -363,8 +363,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       let ldbOptions =
             DB.defaultOptions
               { DB.createIfMissing = True,
-                DB.cacheSize = flags_ldbCacheSize,
-                DB.blockSize = flags_ldbBlockSize
+                DB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
+                DB.blockSize = Conf.blockSize (levelDBConfig ethConf)
               }
       let openDB base = DB.open (tmpdir ++ base) ldbOptions
       sdb <- openDB stateDBPath
@@ -436,8 +436,8 @@ initContext dSettings = do
   let ldbOptions =
         DB.defaultOptions
           { DB.createIfMissing = True,
-            DB.cacheSize = flags_ldbCacheSize,
-            DB.blockSize = flags_ldbBlockSize
+            DB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
+            DB.blockSize = Conf.blockSize (levelDBConfig ethConf)
           }
   sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
   hdb <- DB.open (dbDir "h" ++ hashDBPath) ldbOptions

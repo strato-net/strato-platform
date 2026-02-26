@@ -81,10 +81,10 @@ import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.Model.SyncState
 import qualified Blockchain.Model.SyncTask               as SYNCTASK
 import           Blockchain.Model.WrappedBlock
-import           Blockchain.Options
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka              as SK
@@ -332,7 +332,7 @@ instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    if diffTime > fromIntegral flags_connectionTimeout
+    if diffTime > fromIntegral (Conf.connectionTimeout (p2pConfig ethConf))
       then do
         -- stale cache; override it
         Mod.put (Proxy @[BlockHeader]) []
@@ -350,7 +350,7 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) wh
     (remBHeaders, lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    if diffTime > fromIntegral flags_connectionTimeout
+    if diffTime > fromIntegral (Conf.connectionTimeout (p2pConfig ethConf))
       then do
         -- stale cache; override it
         let emptyRBH = RemainingBlockHeaders []

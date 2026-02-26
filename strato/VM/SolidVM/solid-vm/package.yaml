@@ -45,6 +45,7 @@ library:
   - solid-vm-parser
   - solid-vm-static-analysis
   - source-tools
+  - strato-conf
   - strato-model
   - text
   - time

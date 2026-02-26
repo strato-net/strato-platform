@@ -122,13 +122,8 @@ function newnode {
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
-     --averageTxsPerBlock=${averageTxsPerBlock:-40} \
-     --connectionTimeout=${connectionTimeout:-3600} \
-     --maxConn=${maxConn:-1000} \
-     --maxReturnedHeaders=${maxReturnedHeaders:-500} \
-     --networkID=${networkID:--1} \
      --minLogLevel=$p2pMinLogLevel \
-     ${networkFlag} "${iFlag}" &>> logs/strato-p2p
+     "${iFlag}" &>> logs/strato-p2p
 
   if [ -n "${strictBlockstanbul}" ]; then
       sBFlag="--strictBlockstanbul=${strictBlockstanbul}"
@@ -136,14 +131,12 @@ function newnode {
 
   echo "Starting strato-sequencer"
   runBackgroundProcess strato-sequencer \
-    --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
-    --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-120} \
     --minLogLevel=$seqMinLogLevel \
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
     --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
     --validatorBehavior=${validatorBehavior:-true} \
     --test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
-    "${networkFlag}" "${iFlag}" "${sBFlag}" \
+    "${iFlag}" "${sBFlag}" \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
@@ -161,12 +154,6 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
-  if [ -n "${FILE_SERVER_URL}" ]; then
-      fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
-  fi
-  if [ -n "${NOTIFICATION_SERVER_URL}" ]; then
-      nsFlag="--notificationServerUrl=${NOTIFICATION_SERVER_URL}"
-  fi
   if [ -n "${strictGas}" ]; then
       sgFlag="--strictGas=${strictGas}"
   fi
@@ -182,15 +169,10 @@ function newnode {
     --debugWSHost=${debugWSHost:-strato} \
     --debugWSPort=${debugWSPort:-8052} \
     --diffPublish=${diffPublish:-true} \
-    --maxTxsPerBlock=${maxTxsPerBlock:-500} \
     --minLogLevel=${vmMinLogLevel} \
-    --networkID=${networkID:--1} \
     --sqlDiff=${sqlDiff:-true} \
     --svmDev=${svmDev:-false} \
     --svmTrace=${svmTrace:-false} \
-    ${networkFlag} \
-    "${txsFlag}" \
-    "${gasFlag}" \
     "${iFlag}" \
     "${sgFlag}" \
     "${sglFlag}" \
@@ -200,14 +182,6 @@ function newnode {
   echo "Starting strato-api"
   runBackgroundProcess strato-api \
     --minLogLevel=$apiDebugMode \
-    --networkID=${networkID:--1} \
-    --vaultUrl=${VAULT_URL} \
-    --oauthDiscoveryUrl=${OAUTH_DISCOVERY_URL} \
-    "${networkFlag}" \
-    "${txsFlag}" \
-    "${gasFlag}" \
-    "${fsFlag}" \
-    "${nsFlag}" \
     "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   SLIPSTREAM_CMD="slipstream \
@@ -289,12 +263,10 @@ function doInit {
 
   args="--addBootnodes=$addBootnodes \
   --apiIPAddress=0.0.0.0 \
-  --blockTime=${blockTime:-13} \
   --generateKey=$generateKey \
   --kafkahost=$kafkaHost \
   --lazyblocks=${lazyBlocks:-true} \
   --minPeers=${numMinPeers:-100} \
-  --minBlockDifficulty=${minBlockDifficulty:-131072} \
   --pguser=$pgUser \
   --password=$pgPass \
   --pghost=$pgHost \

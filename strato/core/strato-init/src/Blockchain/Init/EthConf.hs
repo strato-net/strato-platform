@@ -6,7 +6,7 @@ module Blockchain.Init.EthConf (genEthConf) where
 import Blockchain.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Options (flags_network)
+import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
 import Data.Default
 
 -- | Get Railgun contract addresses for known networks
@@ -30,6 +30,13 @@ runtimeConfig = def
       }
   , kafkaConfig = def { kafkaHost = "kafka" }
   , discoveryConfig = def { minAvailablePeers = flags_minPeers }
+  , p2pConfig = def
+      { maxConnections = flags_maxConn
+      , connectionTimeout = flags_connectionTimeout
+      , maxReturnedHeaders = flags_maxReturnedHeaders
+      , averageTxsPerBlock = flags_averageTxsPerBlock
+      , maxHeadersTxsLens = flags_maxHeadersTxsLens
+      }
   , apiConfig = def { ipAddress = flags_apiIPAddress }
   , contractsConfig = getRailgunProxyForNetwork flags_network >>= \addr ->
       Just ContractsConf { railgunProxy = Just addr }
@@ -69,14 +76,38 @@ genEthConf = do
         , password = pgPass
         }
     , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = kafkaHost' }
-    , blockConfig = def
-        { blockTime = flags_blockTime
-        , minBlockDifficulty = flags_minBlockDifficulty
+    , levelDBConfig = def
+        { cacheSize = flags_ldbCacheSize
+        , blockSize = flags_ldbBlockSize
         }
     , quarryConfig = def
         { lazyBlocks = flags_lazyblocks
+        , maxTxsPerBlock = flags_maxTxsPerBlock
+        , mempoolLivenessCutoff = flags_mempoolLivenessCutoff
         }
     , urlConfig = def
         { vaultUrl = flags_vaultUrl
+        , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
+        , notificationServerUrl = flags_notificationServerUrl
+        }
+    , networkConfig = def
+        { network = flags_network
+        , networkID = computeNetworkID
+        , txSizeLimit = flags_txSizeLimit
+        , gasLimit = flags_gasLimit
+        , blockPeriodMs = flags_blockstanbul_block_period_ms
+        , roundPeriodS = flags_blockstanbul_round_period_s
         }
     }
+
+-- | Derive file server URL from network if not explicitly provided
+deriveFileServerUrl :: String -> String -> String
+deriveFileServerUrl "" "mercata-hydrogen" = "https://fileserver.mercata-testnet2.blockapps.net/highway"
+deriveFileServerUrl "" network
+  | take 6 network == "helium" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "upquark" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "mercata" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "uranium" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "lithium" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" _ = ""  -- Unknown networks get empty string
+deriveFileServerUrl url _ = url  -- Explicit URL takes precedence

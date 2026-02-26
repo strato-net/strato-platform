@@ -8,14 +8,10 @@ module Blockchain.VMOptions
     flags_sqlDiff,
     flags_diffPublish,
     flags_queryBlocks,
-    flags_txSizeLimit,
-    flags_gasLimit,
     flags_strictGas,
     flags_strictGasLimit,
   )
 where
-
-import Blockchain.Strato.Model.Options
 import HFlags
 
 defineFlag "debug" False "turn debug info on or off"

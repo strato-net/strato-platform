@@ -4,6 +4,8 @@
 module Flags where
 
 import Blockchain.Constants
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Sequencer.Constants
 import Blockchain.Strato.Model.Address
 import qualified Data.Text as T
@@ -46,8 +48,8 @@ exportFlagsAsMetrics = do
   set "depblockdbpath" flags_depblockdbpath
   set "depblockdbcachesize" $ show flags_depblockcachesize
   set "kafkaclientid" $ show flags_kafkaclientid
-  set "blockstanbul_block_period_ms" $ show flags_blockstanbul_block_period_ms
-  set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
+  set "blockstanbul_block_period_ms" $ show (Conf.blockPeriodMs (networkConfig ethConf))
+  set "blockstanbul_round_period_s" $ show (Conf.roundPeriodS (networkConfig ethConf))
   set "validatorBehavior" $ show flags_validatorBehavior
   set "seq_debug_mode" $ show flags_seq_debug_mode
   set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter

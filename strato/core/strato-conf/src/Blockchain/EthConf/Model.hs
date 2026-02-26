@@ -48,11 +48,12 @@ data EthConf = EthConf
     kafkaConfig :: KafkaConf,
     levelDBConfig :: LevelDBConf,
     quarryConfig :: QuarryConf,
-    blockConfig :: BlockConf,
     discoveryConfig :: DiscoveryConf,
+    p2pConfig :: P2PConf,
     apiConfig :: ApiConfig,
     contractsConfig :: Maybe ContractsConf,
-    urlConfig :: UrlConfig
+    urlConfig :: UrlConfig,
+    networkConfig :: NetworkConf
   }
   deriving (Show, Eq, Generic)
 
@@ -62,13 +63,14 @@ instance FromJSON EthConf where
     <*> v .: "cirrusConfig"
     <*> v .: "redisBlockDBConfig"
     <*> v .: "kafkaConfig"
-    <*> v .: "levelDBConfig"
-    <*> v .: "quarryConfig"
-    <*> v .: "blockConfig"
+    <*> v .:? "levelDBConfig" .!= def
+    <*> v .:? "quarryConfig" .!= def
     <*> v .: "discoveryConfig"
+    <*> v .:? "p2pConfig" .!= def
     <*> v .: "apiConfig"
     <*> v .:? "contractsConfig"
     <*> v .:? "urlConfig" .!= def
+    <*> v .:? "networkConfig" .!= def
 
 instance ToJSON EthConf where
   toJSON = Aeson.genericToJSON Aeson.defaultOptions { Aeson.omitNothingFields = True }
@@ -81,6 +83,15 @@ data ApiConfig = ApiConfig
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
     minAvailablePeers :: Int
+  }
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+data P2PConf = P2PConf
+  { maxConnections :: Int
+  , connectionTimeout :: Int
+  , maxReturnedHeaders :: Int
+  , averageTxsPerBlock :: Int
+  , maxHeadersTxsLens :: Int
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -112,18 +123,16 @@ data RedisBlockDBConf = RedisBlockDBConf
 
 data LevelDBConf = LevelDBConf
   { table :: String,
-    path :: String
+    path :: String,
+    cacheSize :: Int,
+    blockSize :: Int
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data QuarryConf = QuarryConf
   { lazyBlocks :: Bool
-  }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
-
-data BlockConf = BlockConf
-  { blockTime :: Integer,
-    minBlockDifficulty :: Integer
+  , maxTxsPerBlock :: Integer
+  , mempoolLivenessCutoff :: Integer
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -134,6 +143,18 @@ data ContractsConf = ContractsConf
 
 data UrlConfig = UrlConfig
   { vaultUrl :: String
+  , fileServerUrl :: String
+  , notificationServerUrl :: String
+  }
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+data NetworkConf = NetworkConf
+  { network :: String
+  , networkID :: Integer
+  , txSizeLimit :: Int
+  , gasLimit :: Integer
+  , blockPeriodMs :: Int
+  , roundPeriodS :: Int
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -169,23 +190,30 @@ instance Default LevelDBConf where
   def = LevelDBConf
     { table = ""
     , path = ""
+    , cacheSize = 33554432  -- 32 MiB
+    , blockSize = 4096      -- 4 KiB
     }
 
 instance Default QuarryConf where
   def = QuarryConf
     { lazyBlocks = False
-    }
-
-instance Default BlockConf where
-  def = BlockConf
-    { blockTime = 13
-    , minBlockDifficulty = 131072
+    , maxTxsPerBlock = 500
+    , mempoolLivenessCutoff = 60  -- seconds
     }
 
 instance Default DiscoveryConf where
   def = DiscoveryConf
     { discoveryPort = 30303
     , minAvailablePeers = 0
+    }
+
+instance Default P2PConf where
+  def = P2PConf
+    { maxConnections = 1000
+    , connectionTimeout = 3600
+    , maxReturnedHeaders = 500
+    , averageTxsPerBlock = 40
+    , maxHeadersTxsLens = 2500
     }
 
 instance Default ApiConfig where
@@ -201,6 +229,18 @@ instance Default ContractsConf where
 instance Default UrlConfig where
   def = UrlConfig
     { vaultUrl = "https://vault.blockapps.net:8093/strato/v2.3"
+    , fileServerUrl = ""
+    , notificationServerUrl = ""
+    }
+
+instance Default NetworkConf where
+  def = NetworkConf
+    { network = "upquark"
+    , networkID = -1  -- will be computed from network name
+    , txSizeLimit = 2097152  -- 2 MiB
+    , gasLimit = 1000000
+    , blockPeriodMs = 1000   -- minimum delay between blocks
+    , roundPeriodS = 120     -- max seconds one validator is proposer
     }
 
 instance Default EthConf where
@@ -211,9 +251,10 @@ instance Default EthConf where
     , kafkaConfig = def
     , levelDBConfig = def
     , quarryConfig = def
-    , blockConfig = def
     , discoveryConfig = def
+    , p2pConfig = def
     , apiConfig = def
     , contractsConfig = Nothing
     , urlConfig = def
+    , networkConfig = def
     }

@@ -26,7 +26,8 @@ where
 import BlockApps.Logging
 import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Options (computeNetworkID)
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
@@ -111,7 +112,7 @@ getMetaData =
     isSynced <- checkIsSynced
     V.AddressAndKey a k <- getPubKeyAndAddress
     urlMap <- access (Proxy @UrlMap)
-    pure $ MetadataResponse k a validators isSynced True (show computeNetworkID) urlMap
+    pure $ MetadataResponse k a validators isSynced True (show $ Conf.networkID (networkConfig ethConf)) urlMap
 
 getPubKeyAndAddress :: (MonadLogger m, Accessible V.PublicKey m) => m V.AddressAndKey
 getPubKeyAndAddress = do

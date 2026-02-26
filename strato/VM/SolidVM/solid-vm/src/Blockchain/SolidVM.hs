@@ -60,7 +60,8 @@ import Blockchain.Strato.Model.Util (byteString2Integer)
 import Blockchain.Stream.Action (Action)
 import Blockchain.VMContext
 import Blockchain.VMOptions
-import Blockchain.Strato.Model.Options (computeNetworkID)
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Control.Applicative
 import Control.DeepSeq (force)
 import Control.Exception (throw)
@@ -1024,7 +1025,7 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
   -- Helium network ID = 114784819836269
   -- Blocks before 25000 on helium have TXs that relied on the buggy behavior, so preserve it there
-  let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 25000
+  let isHeliumPreFork = Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < 25000
   pure . apSnoc parPath $ case idx of
     SAddress a _ -> MS.Index . BC.pack $ show a
     SInteger i -> MS.Index . BC.pack $ show i
@@ -1242,7 +1243,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SBuiltinVariable "block", "gaslimit") ->
       (Constant . SInteger . BlockHeader.gasLimit . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "chainid") ->
-      return $ Constant $ SInteger computeNetworkID
+      return $ Constant $ SInteger (Conf.networkID (networkConfig ethConf))
     (SBuiltinVariable "super", method) -> do
       ctract <- getCurrentContract
       (_, cc) <- getCurrentCodeCollection
@@ -1484,7 +1485,7 @@ expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
           currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
           -- Helium network ID = 114784819836269
           -- Blocks before 31000 on helium have TXs that relied on the buggy behavior, so preserve it there
-          let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 31000
+          let isHeliumPreFork = Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < 31000
           if isHeliumPreFork
             then unknownVariable "getVariableOfName" ("bytes32" :: String)
             else Constant <$> callBuiltin name argVals
@@ -1502,7 +1503,7 @@ expToVar' (CC.FunctionCall _ e args) = do
       -- Set to high value until network upgrade is coordinated
       currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
       let heliumPassByRefForkBlock = 33918 :: Integer
-      let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
+      let passByRefEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
       let argVars = if passByRefEnabled then argVarsRaw else []
       case e of -- FunctionCall Special Case when calling a function via Member Access
         (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall e argVals argVars Nothing --Because of the hardcoded Util functions
@@ -2618,7 +2619,7 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
   -- Set to high value until network upgrade is coordinated
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
   let heliumPassByRefForkBlock = 33918 :: Integer
-  let passByRefEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
+  let passByRefEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumPassByRefForkBlock)
   localVars1 <-
     forM (zip3 locals argVarsPadded (map snd argLocations ++ repeat Nothing)) $ \((n, v), mVar, mLoc) -> do
       newVar <- case mVar of

@@ -85,19 +85,19 @@ createCommandsFile :: IO ()
 createCommandsFile =
   writeFile "commands.txt" [r|ethereum-discover +RTS -T -RTS
 
-strato-p2p --averageTxsPerBlock=40 --connectionTimeout=3600 --maxConn=1000 --maxReturnedHeaders=500 --networkID=-1 --minLogLevel=LevelInfo --network=helium +RTS -T -RTS
+strato-p2p +RTS -T -RTS
 
-strato-sequencer --blockstanbul_block_period_ms=1000 --blockstanbul_round_period_s=120 --minLogLevel=LevelInfo --seq_max_events_per_iter=500 --seq_max_us_per_iter=50000 --validatorBehavior=true --test_mode_bypass_blockstanbul=false --network=helium +RTS -T -RTS +RTS -N1
+strato-sequencer +RTS -T -N1 -RTS
 
-vm-runner --debug=false --debugEnabled=false --debugPort=8051 --debugWSHost=strato --debugWSPort=8052 --diffPublish=true --maxTxsPerBlock=500 --minLogLevel=LevelInfo --networkID=-1 --sqlDiff=true --svmDev=false --svmTrace=false --network=helium +RTS -T -RTS +RTS -I2 -N1
+vm-runner --debugWSHost=strato --diffPublish=true +RTS -T -I2 -N1 -RTS
 
 strato-p2p-indexer
 
 strato-api-indexer
 
-slipstream --minLogLevel=LevelInfo +RTS -T -RTS
+slipstream +RTS -T -RTS
 
-strato-api --minLogLevel=LevelInfo --networkID=-1 --vaultUrl=https://vault.blockapps.net:8093 --oauthDiscoveryUrl=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration --network=helium +RTS -T -RTS +RTS -N1
+strato-api +RTS -T -N1 -RTS
 
 strato-network-monitor
 |]

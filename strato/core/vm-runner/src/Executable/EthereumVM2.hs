@@ -41,6 +41,8 @@ import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.VMContext
 import Blockchain.VMMetrics
+import Blockchain.EthConf (ethConf, quarryConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Conduit hiding (Flush)
 import Control.Arrow ((&&&), (***))
 import Control.Monad
@@ -51,7 +53,6 @@ import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Traversable (for)
-import Executable.EVMFlags
 import Prometheus
 import qualified Text.Colors as CL
 import Text.Format (format)
@@ -59,7 +60,7 @@ import Text.Printf
 import Text.Tools
 
 microtimeCutoff :: Microtime
-microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
+microtimeCutoff = secondsToMicrotime (Conf.mempoolLivenessCutoff (quarryConfig ethConf))
 {-# NOINLINE microtimeCutoff #-}
 
 handleVmEvents ::

@@ -15,7 +15,7 @@ import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address (fromPublicKey)
-import Blockchain.Strato.Model.Options (flags_network)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Secp256k1 (getPub)
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.SyncDB
@@ -47,7 +47,7 @@ main = do
 
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
-  putStrLn $ "strato-sequencer network: " ++ show flags_network
+  putStrLn $ "strato-sequencer network: " ++ show (Conf.network (networkConfig ethConf))
   putStrLn $ "strato-sequencer validators: " ++ show validators
   let vaultUrl' = vaultUrl . urlConfig $ ethConf
   putStrLn $ "strato-sequencer vault URL: " ++ vaultUrl'
@@ -62,16 +62,18 @@ main = do
   putStrLn $ "strato-sequencer nodeAddress: " ++ format selfAddress
 
   ctx <- do
-    unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError $
-      "--blockstanbul_block_period_ms must be nonnegative"
-    unless (flags_blockstanbul_round_period_s > 0) . ioError . userError $
-      "--blockstanbul_round_period_s must be positive"
+    let blockPeriodMs' = Conf.blockPeriodMs (networkConfig ethConf)
+    let roundPeriodS' = Conf.roundPeriodS (networkConfig ethConf)
+    unless (blockPeriodMs' >= 0) . ioError . userError $
+      "blockPeriodMs must be nonnegative"
+    unless (roundPeriodS' > 0) . ioError . userError $
+      "roundPeriodS must be positive"
 
     putStrLn $ "ACTUAL validators list: " ++ show validators
 
     let ckpt = def {checkpointValidators = validators, checkpointView=View 0 $ fromIntegral $ bestSequencedBlockNumber bestSequencedBlock}
 
-    return $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior
+    return $ newContext (Conf.network (networkConfig ethConf)) ckpt (Just selfAddress) flags_validatorBehavior
 
   cht <- atomically newTMChan
 
@@ -81,8 +83,8 @@ main = do
             depBlockDBCacheSize = flags_depblockcachesize,
             depBlockDBPath = flags_depblockdbpath,
             seenTransactionDBSize = flags_txdedupwindow,
-            blockstanbulBlockPeriod = BlockPeriod $ fromIntegral flags_blockstanbul_block_period_ms / 1000.0,
-            blockstanbulRoundPeriod = RoundPeriod $ fromIntegral flags_blockstanbul_round_period_s,
+            blockstanbulBlockPeriod = BlockPeriod $ fromIntegral (Conf.blockPeriodMs (networkConfig ethConf)) / 1000.0,
+            blockstanbulRoundPeriod = RoundPeriod $ fromIntegral (Conf.roundPeriodS (networkConfig ethConf)),
             blockstanbulTimeouts = cht,
             cablePackage = pkg,
             maxEventsPerIter = flags_seq_max_events_per_iter,

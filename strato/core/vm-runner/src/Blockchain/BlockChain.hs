@@ -57,7 +57,6 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.Stream.Action hiding (blockHash)
 import qualified Blockchain.Stream.Action as Action
@@ -69,6 +68,8 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Conduit
 import Control.Applicative ((<|>))
@@ -228,7 +229,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
         bSum <- setParentStateRoot b
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
-        when (computeNetworkID == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
+        when (Conf.networkID (networkConfig ethConf) == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
 
         let pHash = proposalHash bd
             mSig = getProposerSeal bd  -- Signature is Maybe type
@@ -428,9 +429,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
-  when (txSize >= toInteger flags_txSizeLimit)
+  when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
     . throwE
-    $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
+    $ TFTXSizeLimitExceeded txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
 
   let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
