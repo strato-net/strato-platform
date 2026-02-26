@@ -15,6 +15,32 @@ interface ILpSeeder {
     function seedAndLock(uint usdAmount, uint stratoAmount, uint price, address lpTokenRecipient) external returns (address lpToken, uint lpTokensMinted);
 }
 
+enum BidState { NULL, ACTIVE, CANCELED, FINALIZED }
+enum RefundReason { BID_CANCELED, FINALIZED, AUCTION_CANCELED }
+
+struct Bid {
+    address bidder;
+    uint budgetUSDST;
+    uint maxPriceUSDST;
+    uint createdAt;
+    uint canceledAt;
+    BidState state;
+    uint tier;
+    uint tokensUncapped;
+    uint tokensCapped;
+    uint spentUSDST;
+    uint refundUSDST;
+    uint bonusTokens;
+    bool distributed;
+    bool distributionVaulted;
+    bool canceledRefundWithdrawn;
+    bool finalizedRefundWithdrawn;
+    uint distributionAttempts;
+    uint vaultedImmediate;
+    uint vaultedBonusTokens;
+    uint tokensDistributed;
+}
+
 // Uniform clearing price auction with tiered windows, refunds, and TGE flow.
 //
 // Bidders escrow USDST with a max price; clearing price P* is the highest
@@ -33,31 +59,6 @@ interface ILpSeeder {
 // Without whitelisting, distribution, burn, and unwind operations
 // will revert while the token is paused (pre-TGE).
 contract record TokenLaunchAuction is Ownable {
-    enum BidState { NULL, ACTIVE, CANCELED, FINALIZED }
-    enum RefundReason { BID_CANCELED, FINALIZED, AUCTION_CANCELED }
-
-    struct Bid {
-        address bidder;
-        uint budgetUSDST;
-        uint maxPriceUSDST;
-        uint createdAt;
-        uint canceledAt;
-        BidState state;
-        uint tier;
-        uint tokensUncapped;
-        uint tokensCapped;
-        uint spentUSDST;
-        uint refundUSDST;
-        uint bonusTokens;
-        bool distributed;
-        bool distributionVaulted;
-        bool canceledRefundWithdrawn;
-        bool finalizedRefundWithdrawn;
-        uint distributionAttempts;
-        uint vaultedImmediate;
-        uint vaultedBonusTokens;
-        uint tokensDistributed;
-    }
 
     event AuctionInitialized(address usdToken, address stratoToken, uint saleSupply);
     event AuctionStarted(uint startTime, uint endTime, uint closeBufferStart);
@@ -646,11 +647,12 @@ contract record TokenLaunchAuction is Ownable {
 
     // Backwards-compatible finalize wrapper (runs both phases).
     function finalize() external {
+        require(!priceFinalized || !finalized, "Auction already finalized");
         if (!priceFinalized) {
             _finalizePriceInternal();
         }
         if (!finalized) {
-            _finalizeAllocationsBatchInternal(bids.length);
+            _finalizeAllocationsBatchInternal((bids.length + 1) * 6);
         }
     }
 
