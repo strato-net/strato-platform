@@ -1,6 +1,4 @@
-#!/usr/bin/env node
-//
-// recover-eoa-funds.js
+// @file: scripts/recover-eoa-funds/recover-eoa-funds.js
 //
 // Recovers ERC-20 tokens sent to a STRATO address that matches an Ethereum EOA.
 // Since STRATO uses identical secp256k1/keccak256 address derivation, the same
@@ -10,20 +8,17 @@
 // core API. The signature proves ownership of the sending address.
 //
 // Authentication: Uses the same OAuth flow as mercata/contracts/deploy/ scripts.
-// Set OAUTH_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET env vars (or a .env file),
-// then pass --username and --password. Alternatively, pass a pre-acquired token
-// via --auth-token.
+// Set OAUTH_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, USERNAME, PASSWORD, and PRIVATE_KEY
+// in a .env file (see .env.example).
 //
 // Usage:
+//   # Copy .env.example to .env and fill in secrets, then:
 //   node scripts/recover-eoa-funds.js \
-//     --private-key 0xabc123... \
-//     --destination 0x742d35Cc... \
+//     --from 0xSourceEOA... \
+//     --to 0x742d35Cc... \
 //     --token-contract 0x8f3Cf7ad... \
 //     --amount 1000000 \
-//     --nonce 0 \
-//     --strato-url http://localhost \
-//     --network mercata \
-//     --username admin --password secret
+//     --nonce 0
 //
 // Prerequisites:
 //   npm install ethers yargs blockapps-rest dotenv
@@ -34,15 +29,27 @@ const { oauthUtil } = require("blockapps-rest");
 const yargs = require("yargs/yargs");
 const { hideBin } = require("yargs/helpers");
 
+// ── Secrets (from .env only — never passed on the command line) ──────────────
+
+const privateKey = process.env.PRIVATE_KEY;
+const password = process.env.STRATO_PASSWORD;
+const oauthClientSecret = process.env.OAUTH_CLIENT_SECRET;
+
+// Non-secrets from .env
+const oauthUrl = process.env.OAUTH_URL;
+const oauthClientId = process.env.OAUTH_CLIENT_ID;
+const username = process.env.STRATO_USERNAME;
+const stratoUrl = (process.env.NODE_URL || "http://localhost").replace(/\/+$/, "");
+
 // ── CLI argument parsing ────────────────────────────────────────────────────
 
 const argv = yargs(hideBin(process.argv))
-  .option("private-key", {
+  .option("from", {
     type: "string",
     demandOption: true,
-    describe: "Ethereum private key (hex, with or without 0x prefix)",
+    describe: "EOA address whose funds are being recovered (must match PRIVATE_KEY)",
   })
-  .option("destination", {
+  .option("to", {
     type: "string",
     demandOption: true,
     describe: "STRATO address to receive the tokens",
@@ -50,17 +57,12 @@ const argv = yargs(hideBin(process.argv))
   .option("token-contract", {
     type: "string",
     demandOption: true,
-    describe: "ERC-20 token contract address on STRATO",
+    describe: "Token contract address on STRATO (from Asset Details page)",
   })
   .option("amount", {
     type: "string",
     demandOption: true,
-    describe: "Token amount in base units (wei)",
-  })
-  .option("strato-url", {
-    type: "string",
-    default: "http://localhost",
-    describe: "STRATO node URL",
+    describe: "Token amount in base units (wei); i.e. 12000000000000000000 for 12 USDST (which has 18 decimals)",
   })
   .option("network", {
     type: "string",
@@ -76,18 +78,6 @@ const argv = yargs(hideBin(process.argv))
     type: "number",
     default: 100000000,
     describe: "Gas limit for the transaction",
-  })
-  .option("username", {
-    type: "string",
-    describe: "OAuth username (Resource Owner Password Credentials flow)",
-  })
-  .option("password", {
-    type: "string",
-    describe: "OAuth password",
-  })
-  .option("auth-token", {
-    type: "string",
-    describe: "Pre-acquired OAuth Bearer token (alternative to username/password)",
   })
   .option("dry-run", {
     type: "boolean",
@@ -132,25 +122,32 @@ function addressToRlpHex(addr) {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const privateKey = argv.privateKey.startsWith("0x")
-    ? argv.privateKey
-    : "0x" + argv.privateKey;
-  const destination = ethers.getAddress(argv.destination);
+  if (!privateKey) {
+    throw new Error("PRIVATE_KEY required in .env");
+  }
+  const privateKeyHex = privateKey.startsWith("0x") ? privateKey : "0x" + privateKey;
+  const from = ethers.getAddress(argv.from);
+  const to = ethers.getAddress(argv.to);
   const tokenContract = ethers.getAddress(argv.tokenContract);
   const amount = argv.amount;
-  const stratoUrl = argv.stratoUrl.replace(/\/+$/, "");
   const network = argv.network;
   const gasLimit = argv.gasLimit;
 
-  // Step 1: Derive STRATO address from private key
+  // Step 1: Derive STRATO address from private key and verify it matches --from
   // Same as Ethereum: pubkey → keccak256 → last 20 bytes
-  // Reference: strato/core/strato-model/.../Address.hs:97-99
-  const signingKey = new ethers.SigningKey(privateKey);
+  const signingKey = new ethers.SigningKey(privateKeyHex);
   const derivedAddress = ethers.computeAddress(signingKey.publicKey);
 
-  console.log("==> Step 1: Address derivation");
-  console.log(`    Derived address: ${derivedAddress}`);
-  console.log(`    Destination:     ${destination}`);
+  if (derivedAddress !== from) {
+    throw new Error(
+      `PRIVATE_KEY derives address ${derivedAddress}, but --from is ${from}. ` +
+      "The private key must correspond to the source EOA."
+    );
+  }
+
+  console.log("==> Step 1: Address verification");
+  console.log(`    From (verified): ${from}`);
+  console.log(`    To:              ${to}`);
   console.log(`    Token contract:  ${tokenContract}`);
   console.log(`    Amount:          ${amount}`);
   console.log(`    Network:         ${network}`);
@@ -177,7 +174,7 @@ async function main() {
   //   _to: address wrapped in literal quotes → "\"0x742d35Cc...\""
   //   _value: plain decimal string → "1000000"
   // Reference: strato/api/bloc/bloc2/src/Bloc/Server/Transaction.hs:605-659
-  const args = [`"${destination}"`, amount];
+  const args = [`"${to}"`, amount];
 
   const rlpData = [
     intToRlpHex(2), // type discriminator (MessageTX)
@@ -231,7 +228,7 @@ async function main() {
   // r, s, v are hex strings WITHOUT 0x prefix (parsed by readHex)
   const payload = {
     next: "",
-    from: derivedAddress,
+    from: from,
     nonce: nonce,
     gasLimit: gasLimit,
     to: tokenContract,
@@ -252,32 +249,28 @@ async function main() {
     return;
   }
 
-  // Step 7: Acquire OAuth token if needed
+  // Step 7: Acquire OAuth token
   //
   // Same pattern as mercata/contracts/deploy/auth.js — uses blockapps-rest oauthUtil
   // with Resource Owner Password Credentials grant.
-  // Requires env vars: OAUTH_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET
-  let authToken = argv.authToken;
-  if (!authToken && argv.username && argv.password) {
-    const oauthUrl = process.env.OAUTH_URL;
-    const clientId = process.env.OAUTH_CLIENT_ID;
-    const clientSecret = process.env.OAUTH_CLIENT_SECRET;
-    if (!oauthUrl || !clientId) {
+  let authToken;
+  if (username && password) {
+    if (!oauthUrl || !oauthClientId || !oauthClientSecret) {
       throw new Error(
-        "OAUTH_URL and OAUTH_CLIENT_ID env vars required for username/password auth. " +
-        "See mercata/contracts/scripts/token-transfer/env.example for reference."
+        "OAUTH_URL, OAUTH_CLIENT_ID, and OAUTH_CLIENT_SECRET required in .env for authentication. " +
+        "See .env.example for reference."
       );
     }
-    console.log(`\n==> Authenticating as ${argv.username}...`);
+    console.log(`\n==> Authenticating as ${username}...`);
     const oauth = await oauthUtil.init({
       openIdDiscoveryUrl: oauthUrl,
-      clientId,
-      clientSecret,
+      clientId: oauthClientId,
+      clientSecret: oauthClientSecret,
       tokenField: "access_token",
     });
     const tokenObj = await oauth.getAccessTokenByResourceOwnerCredential(
-      argv.username,
-      argv.password
+      username,
+      password
     );
     authToken = tokenObj.token.access_token;
     console.log("    Authenticated successfully");
