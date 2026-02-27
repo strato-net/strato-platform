@@ -66,13 +66,15 @@ export HTTP_PORT=8081 #You can change this to 80 for Linux, Mac seems to forbid 
 export NODE_HOST="localhost:8081"
 export blocHost=$STRATO_HOSTNAME:3000
 
+# Pre-create directories so they're owned by current user (not root)
 mkdir -p $1
+cd $1
+mkdir -p postgres redis kafka prometheus
 
-docker compose -p strato up -d
+cp ../docker-compose.yml .
+DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d
 
 sleep 10
-
-cd $1
 
 mkdir -p logs
 
