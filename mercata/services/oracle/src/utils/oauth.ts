@@ -10,11 +10,16 @@ class OAuthClient {
     private clientSecret: string;
     private username: string;
     private password: string;
-    
+
     private accessToken: string | null = null;
     private tokenExpiry: number | null = null;
     private tokenEndpoint: string | null = null;
     private userAddress: string | null = null;
+
+    // Promise deduplication: concurrent callers share one in-flight request
+    private refreshPromise: Promise<string> | null = null;
+    private discoveryPromise: Promise<string> | null = null;
+    private addressPromise: Promise<string> | null = null;
 
     constructor() {
         this.discoveryUrl = process.env.OAUTH_DISCOVERY_URL!;
@@ -29,24 +34,35 @@ class OAuthClient {
             return this.tokenEndpoint;
         }
 
-        try {
-            logInfo('OAuth', 'Discovering token endpoint...');
-            const response = await apiGet(
-                this.discoveryUrl,
-                { timeout: 10000 },
-                { logPrefix: 'OAuth', apiUrl: this.discoveryUrl, method: 'GET' }
-            );
-            this.tokenEndpoint = response.data.token_endpoint;
-
-            if (!this.tokenEndpoint) {
-                throw new Error('Token endpoint not found in discovery document');
-            }
-
-            logInfo('OAuth', `Token endpoint discovered: ${this.tokenEndpoint}`);
-            return this.tokenEndpoint;
-        } catch (error: any) {
-            throw new Error(`OAuth discovery failed: ${error.message}`);
+        // Deduplicate concurrent discovery requests
+        if (this.discoveryPromise) {
+            return this.discoveryPromise;
         }
+
+        this.discoveryPromise = (async () => {
+            try {
+                logInfo('OAuth', 'Discovering token endpoint...');
+                const response = await apiGet(
+                    this.discoveryUrl,
+                    { timeout: 10000 },
+                    { logPrefix: 'OAuth', apiUrl: this.discoveryUrl, method: 'GET' }
+                );
+                this.tokenEndpoint = response.data.token_endpoint;
+
+                if (!this.tokenEndpoint) {
+                    throw new Error('Token endpoint not found in discovery document');
+                }
+
+                logInfo('OAuth', `Token endpoint discovered: ${this.tokenEndpoint}`);
+                return this.tokenEndpoint;
+            } catch (error: any) {
+                throw new Error(`OAuth discovery failed: ${error.message}`);
+            } finally {
+                this.discoveryPromise = null;
+            }
+        })();
+
+        return this.discoveryPromise;
     }
 
     async getAccessToken(): Promise<string> {
@@ -55,9 +71,16 @@ class OAuthClient {
             return this.accessToken;
         }
 
-        // Request new token
-        await this.refreshToken();
-        return this.accessToken!;
+        // Deduplicate concurrent refresh requests
+        if (this.refreshPromise) {
+            return this.refreshPromise;
+        }
+
+        this.refreshPromise = this.refreshToken().finally(() => {
+            this.refreshPromise = null;
+        });
+
+        return this.refreshPromise;
     }
 
     async refreshToken(): Promise<string> {
@@ -121,27 +144,38 @@ class OAuthClient {
             return this.userAddress;
         }
 
-        const keyEndpoint = `${process.env.STRATO_NODE_URL}/strato/v2.3/key`;
-        try {
-            const accessToken = await this.getAccessToken();
-            const response = await apiGet(
-                keyEndpoint,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    timeout: 10000
-                },
-                { logPrefix: 'OAuth', apiUrl: keyEndpoint, method: 'GET' }
-            );
-
-            this.userAddress = response.data.address;
-            return this.userAddress!;
-        } catch (error: any) {
-            const errorMessage = error.response?.data?.message || error.message;
-            throw new Error(`Failed to get user address: ${errorMessage}`);
+        // Deduplicate concurrent address requests
+        if (this.addressPromise) {
+            return this.addressPromise;
         }
+
+        this.addressPromise = (async () => {
+            const keyEndpoint = `${process.env.STRATO_NODE_URL}/strato/v2.3/key`;
+            try {
+                const accessToken = await this.getAccessToken();
+                const response = await apiGet(
+                    keyEndpoint,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        timeout: 10000
+                    },
+                    { logPrefix: 'OAuth', apiUrl: keyEndpoint, method: 'GET' }
+                );
+
+                this.userAddress = response.data.address;
+                return this.userAddress!;
+            } catch (error: any) {
+                const errorMessage = error.response?.data?.message || error.message;
+                throw new Error(`Failed to get user address: ${errorMessage}`);
+            } finally {
+                this.addressPromise = null;
+            }
+        })();
+
+        return this.addressPromise;
     }
 
 
