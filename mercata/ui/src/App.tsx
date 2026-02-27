@@ -57,6 +57,7 @@ import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { initializeCsrfToken, csrfOnRequest } from "./lib/csrf";
+import { HelmetProvider } from "react-helmet-async";
 
 
 const queryClient = new QueryClient();
@@ -88,7 +89,7 @@ const App = () => {
 
   useEffect(() => {
     if (!loading) {
-      const appName = "Mercata";
+      const appName = "STRATO";
       const chains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
       const transports: Record<number, Transport> = Object.fromEntries(
         chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
@@ -120,6 +121,7 @@ const App = () => {
   }
 
   return (
+    <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <NetworkProvider>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
@@ -301,6 +303,7 @@ const App = () => {
         </ThemeProvider>
       </NetworkProvider>
     </QueryClientProvider>
+    </HelmetProvider>
   );
 };
 

@@ -1,17 +1,16 @@
 
-import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
+import PageMeta from '@/components/PageMeta';
 
 const Index = () => {
-  useEffect(() => {
-    document.title = "STRATO | Where Stability Meets Opportunity";
-  }, []);
-
-
   return (
     <div className="min-h-screen relative bg-background">
+      <PageMeta
+        title="STRATO | Where Stability Meets Opportunity"
+        description="Diverse asset classes, one platform. From crypto to precious metals to tokenized securities — investing made simple for everyone."
+      />
       <Navbar />
       <Hero />
       

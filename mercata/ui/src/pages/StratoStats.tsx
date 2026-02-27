@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
+import PageMeta from '@/components/PageMeta';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -323,6 +324,10 @@ const StratoStats = () => {
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
+      <PageMeta
+        title="Protocol Stats | STRATO"
+        description="Real-time STRATO protocol statistics — token supply, market cap, CDP stats, and protocol revenue at a glance."
+      />
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>

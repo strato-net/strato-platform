@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import PageMeta from '@/components/PageMeta';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import { Button } from '@/components/ui/button';
@@ -222,7 +223,7 @@ const AssetDetail = () => {
     // Helper function to handle asset setup and price fetching
     const setupAsset = (foundAsset: Token) => {
       setAsset(foundAsset);
-      document.title = `${foundAsset?.token?._name || foundAsset?._name} | Asset Details`;
+      // title handled by PageMeta
 
       // Fetch oracle price history if address exists
       if (foundAsset?.address) {
@@ -300,8 +301,15 @@ const AssetDetail = () => {
   // const handleBridge = () => { };
 
   
+  const assetName = asset?.token?._name || asset?._name;
+  const assetSymbol = asset?.token?._symbol || asset?._symbol;
+
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta
+        title={assetName ? `${assetName} | STRATO` : "Asset Details | STRATO"}
+        description={assetName && assetSymbol ? `View ${assetName} (${assetSymbol}) price history, pool info, and your holdings on STRATO.` : undefined}
+      />
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 16rem)' }}>

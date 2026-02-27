@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
+import PageMeta from '@/components/PageMeta';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { 
@@ -74,6 +75,10 @@ const DepositsPage = () => {
 
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
+      <PageMeta
+        title="Deposits | STRATO"
+        description="Deposit and earn on vaulted gold, silver, and crypto. Bridge assets in or use Easy Savings to start earning instantly."
+      />
       <DashboardSidebar />
 
       <div className="h-screen flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>

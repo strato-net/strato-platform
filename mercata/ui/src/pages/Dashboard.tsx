@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import PageMeta from "@/components/PageMeta";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -154,7 +155,7 @@ const Dashboard = () => {
   }), [netBalanceHistoryCache, rewardsHistoryCache, borrowedHistoryCache, selectedTimeRange, totalBalance, cataBalance, totalBorrowed]);
 
   useEffect(() => {
-    document.title = "Dashboard | STRATO";
+    // title handled by PageMeta
     
     // Check if user just logged in and needs to be redirected back to claim page
     const claimReturnUrl = localStorage.getItem("claimReturnUrl");
@@ -336,6 +337,10 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta
+        title="Dashboard | STRATO"
+        description="Track your portfolio, manage deposits, monitor rewards, and borrow against your assets — all in one place."
+      />
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
