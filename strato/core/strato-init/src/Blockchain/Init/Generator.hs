@@ -19,9 +19,6 @@ import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
-import Blockchain.Init.Options
-import qualified Blockchain.Network as Net
-import Blockchain.Strato.Model.Options (flags_network)
 import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Monad
@@ -39,7 +36,6 @@ import qualified Text.Colors as CL
 import qualified Data.Map as M
 import qualified Data.Yaml as YAML
 import Database.Persist.Postgresql
-import qualified Executable.EthDiscoverySetup as EthDiscovery
 import System.FilePath ((</>))
 import Text.RawString.QQ
 import Turtle (chmod, roo)
@@ -168,15 +164,6 @@ mkAll network = do
 
   let uniqueTopicMap = M.fromList $ map (\x -> (x, x)) topics
   liftIO $ YAML.encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
-
-  bootnodes <- case (flags_addBootnodes, flags_stratoBootnode) of
-    (False, _) -> return Nothing
-    (True, []) -> liftIO $ fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
-    (True, _) -> return $ Just flags_stratoBootnode
-
-  $logInfoS "ethconf/bootnodes" . T.pack $ CL.yellow ">>>> Inserting bootnodes"
-  $logInfoLS "ethconf/bootnodes" bootnodes
-  EthDiscovery.setup bootnodes
 
   liftIO createCommandsFile
 

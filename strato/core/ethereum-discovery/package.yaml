@@ -37,6 +37,7 @@ library:
     - containers
     - cpu
     - crypto-pubkey-types
+    - data-default
     - either
     - entropy
     - errors
@@ -78,11 +79,12 @@ executables:
       - ethereum-discovery
       - format
       - hflags
-      - monad-alter
+      - monad-logger
       - mtl
       - process-monitor
       - resourcet
       - strato-conf
+      - strato-networks
       - vault-monad
       - text
       - unliftio

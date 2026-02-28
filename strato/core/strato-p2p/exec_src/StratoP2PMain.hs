@@ -6,6 +6,7 @@
 
 import           Control.Monad.IO.Class
 import           Control.Concurrent.Async.Lifted.Safe
+import           Control.Exception (SomeException, try)
 import           Blockchain.VMOptions       ()
 
 import           HFlags
@@ -37,7 +38,11 @@ initP2P :: LoggingT IO ()
 initP2P = labelTheThread "initP2P" $ do
   liftIO $ blockappsInit "strato_p2p"
   liftIO $ runInstrumentation "strato-p2p"
-  liftIO $ resetPeers
+  -- Reset peer active states on startup. We ignore errors here because on first startup,
+  -- ethereum-discover is responsible for creating the p_peer table, and it may not have
+  -- run its migrations yet. If the table doesn't exist, there's nothing to reset anyway -
+  -- a freshly created table will already have all peers in the inactive state.
+  _ <- liftIO $ (try resetPeers :: IO (Either SomeException ()))
   _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
