@@ -45,6 +45,11 @@ Prometheus Packager
 Contains additional third-party components and notices. See
 prometheus-packager/NOTICE.
 
+
+-------------------------------------------------------------------------------
+WORK IN PROGRESS:
+-------------------------------------------------------------------------------
+
 Appendix: License Audit Notes (detailed with evidence)
 
 1. strato/libs/groth16-rapidsnark/vendor/rapidsnark (LGPL-3.0)
