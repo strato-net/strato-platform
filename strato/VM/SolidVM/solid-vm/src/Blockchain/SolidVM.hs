@@ -76,6 +76,7 @@ import Data.Bits
 import Data.Bool (bool)
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
 import Data.Char (isDigit)
@@ -2300,6 +2301,8 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pa
       Just theAddress -> return . ((flip SAddress) False) $ theAddress
 callBuiltin "sha256" args = pure . SString . BC.unpack . SHA256.hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "ripemd160" args = pure . SString . BC.unpack . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "base64urlencode" [SBytes bs] = pure . SString . BC.unpack . BC.takeWhile (/= '=') $ B64URL.encode bs
+callBuiltin "base64urlencode" [SString s] = pure . SString . BC.unpack . BC.takeWhile (/= '=') . B64URL.encode $ BC.pack s
 callBuiltin "modExp" [SInteger b, SInteger e, SInteger m] = pure . SInteger $ Builtins.modExp b e m
 callBuiltin "ecAdd" [SInteger x1, SInteger y1, SInteger x2, SInteger y2] =
   let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
