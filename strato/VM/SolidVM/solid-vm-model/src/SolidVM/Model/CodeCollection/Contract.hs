@@ -27,7 +27,6 @@ module SolidVM.Model.CodeCollection.Contract
     constructor,
     contractType,
     importedFrom,
-    isContractRecord,
     contractContext,
   )
 where
@@ -74,7 +73,6 @@ data ContractF a = Contract
     _usings :: Map SolidString [UsingF a],
     _contractType :: ContractType,
     _importedFrom :: Maybe Address,
-    _isContractRecord :: Bool,
     _contractContext :: a
   }
   deriving (Eq, Generic, NFData, Functor, Foldable, Traversable)
@@ -97,7 +95,6 @@ instance (Show a) => Show (ContractF a) where
     ++ CL.cyan "\n_usings\t" ++ show _usings
     ++ CL.cyan "\n_contractType\t" ++ show _contractType
     ++ CL.cyan "\n_importedFrom\t" ++ show _importedFrom
-    ++ CL.cyan "\n_isContractRecord\t" ++ show _isContractRecord
     ++ CL.cyan "\n_contractContext\t" ++ show _contractContext
 
 instance Semigroup (ContractF a) where
@@ -118,7 +115,6 @@ instance Semigroup (ContractF a) where
         _usings = _usings c1 <> _usings c2,
         _contractType = _contractType c1,
         _importedFrom = _importedFrom c1 <|> _importedFrom c2,
-        _isContractRecord = _isContractRecord c1 || _isContractRecord c2,
         _contractContext = _contractContext c1
       }
 
@@ -149,7 +145,6 @@ instance Default a => Default (ContractF a) where
         _usings = empty,
         _contractType = ContractType,
         _importedFrom = Nothing,
-        _isContractRecord = False,
         _contractContext = def
       }
 
@@ -180,7 +175,6 @@ instance Arbitrary Contract where
               _usings = empty,
               _contractType = ContractType,
               _importedFrom = Nothing,
-              _isContractRecord = False,
               _contractContext = a
             }
       ]

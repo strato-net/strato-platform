@@ -183,7 +183,7 @@ getTopLevelAbstractsForContract cc = go
   where
     go c =
       let m = doParents c
-       in if _contractType c == AbstractType && _isContractRecord c
+       in if _contractType c == AbstractType
             then M.insert (_contractName c) c m
             else m
     doParents = M.unions . map (maybe M.empty go . flip M.lookup (_contracts cc)) . _parents
