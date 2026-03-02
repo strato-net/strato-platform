@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatUnits } from "ethers";
 import {
   ArrowLeftRight,
@@ -53,14 +53,18 @@ const Borrow = () => {
   const { getPrice } = useOracleContext();
 
   const [borrowInput, setBorrowInput] = useState("");
+  const [selectedBorrowPreset, setSelectedBorrowPreset] = useState<number | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [inlineBorrowError, setInlineBorrowError] = useState("");
   const [autoAllocate, setAutoAllocate] = useState(true);
   const [targetHealthFactor, setTargetHealthFactor] = useState(2.1);
   const [showDetails, setShowDetails] = useState(true);
+  const [isDraggingHealthBar, setIsDraggingHealthBar] = useState(false);
+  const healthBarRef = useRef<HTMLDivElement | null>(null);
   const { userRewards } = useRewardsUserInfo();
 
   const guestMode = !isLoggedIn;
+  type CustomCollateralEntry = { source: "wei"; wei: bigint } | { source: "usd"; usd: string };
   const normalizedBorrowInput = borrowInput.replace(/,/g, "").trim();
   const requestedBorrow = Number(normalizedBorrowInput || "0");
   const requestedBorrowWei = safeParseUnits(normalizedBorrowInput || "0", 18);
@@ -119,6 +123,9 @@ const Borrow = () => {
     return map;
   }, [collateralInfo]);
 
+  const [customCollateralEntries, setCustomCollateralEntries] = useState<Map<string, CustomCollateralEntry>>(new Map());
+  const [manualCollateralInputErrors, setManualCollateralInputErrors] = useState<Map<string, string>>(new Map());
+
   const sliderExtrema = useMemo(() => {
     return calculateHFSliderExtrema(loans, collateralInfo);
   }, [loans, collateralInfo]);
@@ -135,36 +142,167 @@ const Borrow = () => {
     return recommendCollateralToSupply(loans, targetHealthFactor, requestedBorrow, [...collateralInfo]);
   }, [loans, collateralInfo, requestedBorrow, targetHealthFactor]);
 
+  const getManualCollateralAmount = (asset: CollateralData, entry?: CustomCollateralEntry): bigint => {
+    if (!entry) return 0n;
+    const balance = BigInt(asset.userBalance || "0");
+    if (entry.source === "wei") {
+      return entry.wei > balance ? balance : entry.wei;
+    }
+    const usdInput = entry.usd.trim();
+    if (!usdInput) return 0n;
+    const price = BigInt(asset.assetPrice || "0");
+    if (price <= 0n) return 0n;
+    const decimals = BigInt(asset.customDecimals ?? 18);
+    const usdWei = safeParseUnits(usdInput, 18);
+    if (usdWei <= 0n) return 0n;
+    const computedAmount = (usdWei * (10n ** decimals)) / price;
+    return computedAmount > balance ? balance : computedAmount;
+  };
+
+  const manualCollateral = useMemo(() => {
+    const map = new Map<CollateralData, bigint>();
+    if (autoAllocate) return map;
+    for (const collateral of potentialCollateral.keys()) {
+      const entry = customCollateralEntries.get(collateral.address);
+      const amount = getManualCollateralAmount(collateral, entry);
+      if (amount > 0n) {
+        map.set(collateral, amount);
+      }
+    }
+    return map;
+  }, [autoAllocate, potentialCollateral, customCollateralEntries]);
+
+  const selectedCollateral = useMemo(() => {
+    return autoAllocate ? recommendedCollateral : manualCollateral;
+  }, [autoAllocate, recommendedCollateral, manualCollateral]);
+
   const totalCollateralUsedWei = useMemo(() => {
-    return Array.from(recommendedCollateral.entries()).reduce((sum, [asset, amount]) => {
+    return Array.from(selectedCollateral.entries()).reduce((sum, [asset, amount]) => {
       const decimals = BigInt(asset.customDecimals ?? 18);
       const price = BigInt(asset.assetPrice || "0");
       return sum + (amount * price) / (10n ** decimals);
     }, 0n);
-  }, [recommendedCollateral]);
+  }, [selectedCollateral]);
+
+  const handleAutoAllocateToggle = () => {
+    setAutoAllocate((prev) => {
+      const next = !prev;
+      if (!next) {
+        const initialEntries = new Map<string, CustomCollateralEntry>();
+        for (const collateral of potentialCollateral.keys()) {
+          const recommendedAmount = recommendedCollateral.get(collateral);
+          if (recommendedAmount && recommendedAmount > 0n) {
+            initialEntries.set(collateral.address, { source: "wei", wei: recommendedAmount });
+          } else {
+            initialEntries.set(collateral.address, { source: "usd", usd: "0.00" });
+          }
+        }
+        setCustomCollateralEntries(initialEntries);
+        setManualCollateralInputErrors(new Map());
+      } else {
+        setCustomCollateralEntries(new Map());
+        setManualCollateralInputErrors(new Map());
+      }
+      return next;
+    });
+  };
+
+  const handleCustomCollateralValueChange = (address: string, value: string) => {
+    if (!/^\d*\.?\d*$/.test(value)) return;
+    const asset = Array.from(potentialCollateral.keys()).find((item) => item.address === address);
+    const maxUsd = asset ? Number(formatUnits(BigInt(asset.userBalanceValue || "0"), 18)) : 0;
+    let nextValue = value;
+    let errorText = "";
+    if (value !== "") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed) && parsed > maxUsd) {
+        nextValue = maxUsd.toFixed(2);
+        errorText = `Max available is $${maxUsd.toFixed(2)}`;
+      }
+    }
+    setCustomCollateralEntries((prev) => {
+      const next = new Map(prev);
+      next.set(address, { source: "usd", usd: nextValue });
+      return next;
+    });
+    setManualCollateralInputErrors((prev) => {
+      const next = new Map(prev);
+      if (errorText) {
+        next.set(address, errorText);
+      } else {
+        next.delete(address);
+      }
+      return next;
+    });
+  };
+
+  const handleFillMaxCollateral = (asset: CollateralData) => {
+    setCustomCollateralEntries((prev) => {
+      const next = new Map(prev);
+      next.set(asset.address, { source: "wei", wei: BigInt(asset.userBalance || "0") });
+      return next;
+    });
+    setManualCollateralInputErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(asset.address);
+      return next;
+    });
+  };
 
   const collateralRows = useMemo(() => {
-    return Array.from(recommendedCollateral.entries())
-      .filter(([, amount]) => amount > 0n)
-      .slice(0, 3)
-      .map(([asset, amount]) => {
-        const decimals = asset.customDecimals ?? 18;
-        const tokenAmount = Number(formatUnits(amount, decimals));
-        const usdValue = Number((amount * BigInt(asset.assetPrice || "0")) / (10n ** BigInt(decimals))) / 1e18;
-        return {
-          symbol: asset._symbol,
-          balanceText: `Balance: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
-          amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
-          usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
-          muted: false,
-        };
-      });
-  }, [recommendedCollateral]);
+    const rowsFromAmounts = (entries: Array<[CollateralData, bigint]>) => {
+      return entries
+        .filter(([, amount]) => amount > 0n)
+        .slice(0, 3)
+        .map(([asset, amount]) => {
+          const decimals = asset.customDecimals ?? 18;
+          const tokenAmount = Number(formatUnits(amount, decimals));
+          const usdValue = Number((amount * BigInt(asset.assetPrice || "0")) / (10n ** BigInt(decimals))) / 1e18;
+          return {
+            address: asset.address,
+            symbol: asset._symbol,
+            balanceText: `Balance: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
+            amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
+            usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
+            muted: false,
+            manual: false,
+            inputValue: "",
+            availableText: "",
+            asset,
+          };
+        });
+    };
+
+    if (autoAllocate) {
+      return rowsFromAmounts(Array.from(recommendedCollateral.entries()));
+    }
+
+    return Array.from(potentialCollateral.keys()).map((asset) => {
+      const decimals = asset.customDecimals ?? 18;
+      const entry = customCollateralEntries.get(asset.address);
+      const amount = getManualCollateralAmount(asset, entry);
+      const tokenAmount = Number(formatUnits(amount, decimals));
+      const usdValue = Number((amount * BigInt(asset.assetPrice || "0")) / (10n ** BigInt(decimals))) / 1e18;
+      const inputValue = entry?.source === "usd" ? entry.usd : usdValue.toFixed(2);
+      return {
+        address: asset.address,
+        symbol: asset._symbol,
+        balanceText: `Balance: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
+        amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
+        usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
+        muted: false,
+        manual: true,
+        inputValue,
+        availableText: formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true),
+        asset,
+      };
+    });
+  }, [autoAllocate, recommendedCollateral, potentialCollateral, customCollateralEntries]);
 
   const afterBorrowHF = useMemo(() => {
     if (!loans || requestedBorrow <= 0) return null;
-    return calculateAfterBorrowHealthFactor(loans, requestedBorrow, recommendedCollateral);
-  }, [loans, requestedBorrow, recommendedCollateral]);
+    return calculateAfterBorrowHealthFactor(loans, requestedBorrow, selectedCollateral);
+  }, [loans, requestedBorrow, selectedCollateral]);
 
   const ltvNow = useMemo(() => {
     const debt = Number(formatUnits(BigInt(loans?.totalAmountOwed || "0"), 18));
@@ -202,11 +340,56 @@ const Borrow = () => {
   }, [sliderExtrema, targetHealthFactor]);
 
   const displayHealthFactor = useMemo(() => {
-    const hfRaw = afterBorrowHF ?? loans?.healthFactor ?? targetHealthFactor;
-    const hf = Number(hfRaw);
-    if (!Number.isFinite(hf) || hf <= 0 || hf > 100) return targetHealthFactor;
-    return hf;
-  }, [afterBorrowHF, loans?.healthFactor, targetHealthFactor]);
+    const min = Number(sliderExtrema.min);
+    const max = Number(sliderExtrema.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return targetHealthFactor;
+    return Math.max(min, Math.min(max, targetHealthFactor));
+  }, [sliderExtrema, targetHealthFactor]);
+
+  const updateTargetHealthFactorFromClientX = (clientX: number) => {
+    const barEl = healthBarRef.current;
+    if (!barEl) return;
+    const rect = barEl.getBoundingClientRect();
+    if (rect.width <= 0) return;
+
+    const min = Number(sliderExtrema.min);
+    const max = Number(sliderExtrema.max);
+    if (max <= min) return;
+
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const next = min + ratio * (max - min);
+    setTargetHealthFactor(Number(next.toFixed(2)));
+  };
+
+  useEffect(() => {
+    if (!isDraggingHealthBar) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      updateTargetHealthFactorFromClientX(event.clientX);
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      updateTargetHealthFactorFromClientX(touch.clientX);
+    };
+
+    const stopDragging = () => {
+      setIsDraggingHealthBar(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", stopDragging);
+    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("touchend", stopDragging);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", stopDragging);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", stopDragging);
+    };
+  }, [isDraggingHealthBar, sliderExtrema]);
 
   const handleBorrowNow = async () => {
     if (guestMode) return;
@@ -222,11 +405,9 @@ const Borrow = () => {
     setInlineBorrowError("");
     try {
       setBorrowLoading(true);
-      if (autoAllocate) {
-        for (const [collateral, amount] of recommendedCollateral.entries()) {
-          if (amount <= 0n) continue;
-          await supplyCollateral({ asset: collateral.address, amount: amount.toString() });
-        }
+      for (const [collateral, amount] of selectedCollateral.entries()) {
+        if (amount <= 0n) continue;
+        await supplyCollateral({ asset: collateral.address, amount: amount.toString() });
       }
       if (requestedBorrowWei >= availableToBorrow && availableToBorrow > 0n) {
         await borrowMax();
@@ -243,6 +424,7 @@ const Borrow = () => {
       });
       await Promise.all([refreshLoans(), refreshCollateral(), fetchUsdstBalance()]);
       setBorrowInput("");
+      setSelectedBorrowPreset(null);
     } catch (error) {
       // Error toast is handled globally by axios interceptor
     } finally {
@@ -281,6 +463,7 @@ const Borrow = () => {
                         const value = e.target.value.replace(/,/g, "");
                         if (/^\d*\.?\d*$/.test(value)) {
                           setBorrowInput(value);
+                          setSelectedBorrowPreset(null);
                         }
                       }}
                       disabled={guestMode}
@@ -298,11 +481,16 @@ const Borrow = () => {
                       key={percent}
                       variant="outline"
                       size="sm"
-                      className="h-9 px-4 rounded-lg border-border bg-transparent hover:bg-muted/70 dark:border-[#394472] dark:bg-[#1e274e] dark:hover:bg-[#2b376a]"
+                      className={`h-9 px-4 rounded-lg border-border dark:border-[#394472] ${
+                        selectedBorrowPreset === percent
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:text-primary-foreground"
+                          : "bg-transparent hover:bg-muted/70 dark:bg-[#1e274e] dark:hover:bg-[#2b376a]"
+                      }`}
                       disabled={guestMode || availableToBorrow <= 0n}
                       onClick={() => {
                         const percentAmount = Number(formatUnits(availableToBorrow, 18)) * (percent / 100);
                         setBorrowInput(percentAmount.toFixed(2));
+                        setSelectedBorrowPreset(percent);
                       }}
                     >
                       {percent}%
@@ -311,9 +499,16 @@ const Borrow = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-9 px-4 rounded-lg border-border bg-transparent hover:bg-muted/70 dark:border-[#394472] dark:bg-[#1e274e] dark:hover:bg-[#2b376a]"
+                    className={`h-9 px-4 rounded-lg border-border dark:border-[#394472] ${
+                      selectedBorrowPreset === 100
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:text-primary-foreground"
+                        : "bg-transparent hover:bg-muted/70 dark:bg-[#1e274e] dark:hover:bg-[#2b376a]"
+                    }`}
                     disabled={guestMode || availableToBorrow <= 0n}
-                    onClick={() => setBorrowInput(Number(formatUnits(availableToBorrow, 18)).toFixed(2))}
+                    onClick={() => {
+                      setBorrowInput(Number(formatUnits(availableToBorrow, 18)).toFixed(2));
+                      setSelectedBorrowPreset(100);
+                    }}
                   >
                     Max
                   </Button>
@@ -337,7 +532,7 @@ const Borrow = () => {
                   </div>
                   <button
                     className="inline-flex items-center"
-                    onClick={() => setAutoAllocate((prev) => !prev)}
+                    onClick={handleAutoAllocateToggle}
                     disabled={guestMode}
                   >
                     <span className={`w-12 h-6 rounded-full transition ${autoAllocate ? "bg-primary" : "bg-muted"} relative`}>
@@ -360,10 +555,37 @@ const Borrow = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          {row.amountText ? (
-                            <p className="font-semibold">{row.amountText}</p>
-                          ) : null}
-                          <p className={`text-xs text-muted-foreground ${row.muted ? "opacity-70" : ""}`}>{row.usedText}</p>
+                          {row.manual ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-xs text-muted-foreground">$</span>
+                                <Input
+                                  value={row.inputValue}
+                                  onChange={(e) => handleCustomCollateralValueChange(row.address, e.target.value)}
+                                  disabled={guestMode}
+                                  className={`h-7 w-24 px-2 text-right text-xs ${manualCollateralInputErrors.get(row.address) ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                                />
+                              </div>
+                              {manualCollateralInputErrors.get(row.address) ? (
+                                <p className="text-[10px] text-red-500">{manualCollateralInputErrors.get(row.address)}</p>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => handleFillMaxCollateral(row.asset)}
+                                className="text-xs text-muted-foreground underline"
+                                disabled={guestMode}
+                              >
+                                {row.availableText}
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              {row.amountText ? (
+                                <p className="font-semibold">{row.amountText}</p>
+                              ) : null}
+                              <p className={`text-xs text-muted-foreground ${row.muted ? "opacity-70" : ""}`}>{row.usedText}</p>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -396,10 +618,25 @@ const Borrow = () => {
                   </span>
                   <span className="font-semibold">Health Factor: {displayHealthFactor.toFixed(1)}x</span>
                 </div>
-                <div className="relative h-3 rounded-full overflow-hidden bg-muted/30">
+                <div
+                  ref={healthBarRef}
+                  className={`relative h-3 rounded-full overflow-hidden bg-muted/30 ${guestMode ? "cursor-not-allowed" : "cursor-pointer"}`}
+                  onMouseDown={(event) => {
+                    if (guestMode) return;
+                    setIsDraggingHealthBar(true);
+                    updateTargetHealthFactorFromClientX(event.clientX);
+                  }}
+                  onTouchStart={(event) => {
+                    if (guestMode) return;
+                    const touch = event.touches[0];
+                    if (!touch) return;
+                    setIsDraggingHealthBar(true);
+                    updateTargetHealthFactorFromClientX(touch.clientX);
+                  }}
+                >
                   <div className="h-full w-full bg-gradient-to-r from-red-500 via-yellow-400 to-emerald-500" />
                   <span
-                    className="absolute top-1/2 -translate-y-1/2 w-1 h-5 rounded-full bg-white shadow-sm"
+                    className="absolute top-1/2 -translate-y-1/2 w-1 h-5 rounded-full bg-white shadow-sm pointer-events-none"
                     style={{ left: `${Math.max(2, Math.min(98, progressValue))}%` }}
                   />
                 </div>
@@ -498,29 +735,29 @@ const Borrow = () => {
                 </div>
                 <Card className="border-0 shadow-none bg-transparent">
                   <CardContent className="p-2 md:p-0 grid grid-cols-1 md:grid-cols-3 gap-4 bg-transparent border-0">
-                    <div className="rounded-2xl border border-[#2f3b6c] bg-[#212a52] p-4 min-h-[160px]">
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#2a3567] mb-3">
-                        <ArrowLeftRight className="h-4 w-4 text-[#98A4FF]" />
+                    <div className="rounded-2xl border border-border bg-card p-4 min-h-[160px] dark:border-[#2f3b6c] dark:bg-[#212a52]">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-muted mb-3 dark:bg-[#2a3567]">
+                        <ArrowLeftRight className="h-4 w-4 text-primary dark:text-[#98A4FF]" />
                       </span>
                       <p className="font-semibold text-3xl leading-8">Swap</p>
-                      <p className="text-base text-[#9DA7C5] mt-2 leading-6">Trade for ETHST, GOLDST, etc.</p>
-                      <p className="text-3xl mt-3 font-semibold text-violet-400 leading-8">{routePreview.swapPairs} pairs available</p>
+                      <p className="text-base text-muted-foreground mt-2 leading-6 dark:text-[#9DA7C5]">Trade for ETHST, GOLDST, etc.</p>
+                      <p className="text-3xl mt-3 font-semibold text-violet-500 leading-8 dark:text-violet-400">{routePreview.swapPairs} pairs available</p>
                     </div>
-                    <div className="rounded-2xl border border-[#2f3b6c] bg-[#212a52] p-4 min-h-[160px]">
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#1f4d5b] mb-3">
-                        <HandCoins className="h-4 w-4 text-emerald-300" />
+                    <div className="rounded-2xl border border-border bg-card p-4 min-h-[160px] dark:border-[#2f3b6c] dark:bg-[#212a52]">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 mb-3 dark:bg-[#1f4d5b]">
+                        <HandCoins className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
                       </span>
                       <p className="font-semibold text-3xl leading-8">Earn</p>
-                      <p className="text-base text-[#9DA7C5] mt-2 leading-6">Lend or provide liquidity</p>
-                      <p className="text-3xl mt-3 font-semibold text-emerald-400 leading-8">up to {routePreview.earnApr.toFixed(1)}% APR</p>
+                      <p className="text-base text-muted-foreground mt-2 leading-6 dark:text-[#9DA7C5]">Lend or provide liquidity</p>
+                      <p className="text-3xl mt-3 font-semibold text-emerald-600 leading-8 dark:text-emerald-400">up to {routePreview.earnApr.toFixed(1)}% APR</p>
                     </div>
-                    <div className="rounded-2xl border border-[#2f3b6c] bg-[#212a52] p-4 min-h-[160px]">
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#203765] mb-3">
-                        <Send className="h-4 w-4 text-[#68A2FF]" />
+                    <div className="rounded-2xl border border-border bg-card p-4 min-h-[160px] dark:border-[#2f3b6c] dark:bg-[#212a52]">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 mb-3 dark:bg-[#203765]">
+                        <Send className="h-4 w-4 text-blue-600 dark:text-[#68A2FF]" />
                       </span>
                       <p className="font-semibold text-3xl leading-8">Transfer</p>
-                      <p className="text-base text-[#9DA7C5] mt-2 leading-6">Send to another address</p>
-                      <p className="text-3xl mt-3 font-semibold text-blue-400 leading-8">Instant on STRATO</p>
+                      <p className="text-base text-muted-foreground mt-2 leading-6 dark:text-[#9DA7C5]">Send to another address</p>
+                      <p className="text-3xl mt-3 font-semibold text-blue-600 leading-8 dark:text-blue-400">Instant on STRATO</p>
                     </div>
                   </CardContent>
                 </Card>
