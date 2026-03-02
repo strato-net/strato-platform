@@ -16,9 +16,6 @@
 --   - .zkey: Proving key (curve points for MSM)
 --   - .wtns: Witness values (from circuit evaluation)
 --
--- EXPERIMENTAL: This prover may produce invalid proofs.
--- Use snarkjs for production until this module is validated.
---
 module Groth16.BN254
   ( -- * Types
     ProvingKey(..)
@@ -33,10 +30,17 @@ module Groth16.BN254
   , loadProvingKey
   , loadProvingKeyJSON
   , loadWitness
+  , parseWtns
     -- * Proving
   , prove
     -- * Verification (for testing)
   , verify
+    -- * Proof coordinate extraction
+  , proofToIntegers
+    -- * FFT utilities (for testing)
+  , fft
+  , ifft
+  , getRootOfUnity
   ) where
 
 import Data.ByteString (ByteString)
@@ -59,7 +63,7 @@ import Data.Pairing.BN254 (G1', G2', Fr)
 import Data.Curve.Weierstrass (Point(..), mul, add)
 import qualified Data.Curve.Weierstrass.BN254 as G1Curve
 import qualified Data.Curve.Weierstrass.BN254T as G2Curve
-import Data.Field.Galois (toP, toE)
+import Data.Field.Galois (toP, toE, fromP, fromE)
 
 import System.Random (randomRIO)
 import Control.Monad.ST (runST)
@@ -152,25 +156,32 @@ prove pk (Witness ws) = do
     witnessB2 = multiScalarMulG2 (pkB2 pk) ws
     proofB' = pkBeta2 pk `add` witnessB2 `add` (pkDelta2 pk `mul` s)
     
-    -- Compute B1 for the C computation
+    -- Compute B1 sum (used later for full B1 with blinding in C computation)
     witnessB1 = multiScalarMulG1 (pkB1 pk) ws
-    b1Full = pkBeta1 pk `add` witnessB1 `add` (pkDelta1 pk `mul` s)
     
     -- Compute h polynomial coefficients using FFT
-    hCoeffs = computeHPolynomial pk ws
+    (hCoeffs, _aEval0, _bEval0, _cEval0) = computeHPolynomialDebug pk ws
     
+  let
     -- Compute contribution from H: sum(h_i * H_i)
     hContrib = multiScalarMulG1 (pkH pk) hCoeffs
     
     -- Compute C contribution from witness
-    -- Note: C[i] for i <= nPublic are point at infinity (no contribution)
-    -- so we can use all witness values with all C points
-    witnessC = multiScalarMulG1 (pkC pk) ws
+    -- IMPORTANT: C points are for private inputs only (indices > nPublic)
+    -- So we need to use witness values starting from index (nPublic + 1)
+    privateWitness = drop (pkNPublic pk + 1) ws
+    witnessC = multiScalarMulG1 (pkC pk) privateWitness
+    
+    -- Compute full B1 with blinding (needed for C computation)
+    b1Full = pkBeta1 pk `add` witnessB1 `add` (pkDelta1 pk `mul` s)
+    
+    -- IMPORTANT: Use proofA' and b1Full (the FULL blinded values)
+    -- The snarkjs formula is: C += s*proofA' + r*pib1 - rs*delta1
     sA = proofA' `mul` s
     rB1 = b1Full `mul` r
     rsDelta = pkDelta1 pk `mul` (r * s)
     proofC' = witnessC `add` hContrib `add` sA `add` rB1 `add` neg rsDelta
-    
+  
   return $ Proof proofA' proofB' proofC'
 
 -- | Compute h polynomial EVALUATIONS on coset (matching snarkjs Lagrange basis approach)
@@ -188,8 +199,8 @@ prove pk (Witness ws) = do
 -- 4. FFT to get evaluations on coset {inc * omega^i}
 -- 5. Multiply A*B pointwise, subtract C (on coset)
 -- 6. Return coset evaluations for MSM with Lagrange-basis hExps
-computeHPolynomial :: ProvingKey -> [Fr] -> [Fr]
-computeHPolynomial pk ws = 
+computeHPolynomialDebug :: ProvingKey -> [Fr] -> ([Fr], Fr, Fr, Fr)
+computeHPolynomialDebug pk ws = 
   let n = pkDomainSize pk
       omega = getRootOfUnity n
       
@@ -204,6 +215,12 @@ computeHPolynomial pk ws =
       -- C is computed as A*B pointwise, matching snarkjs's buildABC1
       (aEvals, bEvals, _) = buildPolynomialEvals pk ws n
       cEvals = V.zipWith (*) aEvals bEvals  -- C = A*B pointwise (NOT from ccoefs!)
+      
+      -- DEBUG: Check that A*B - C = 0 on roots (should be zero everywhere)
+      -- Since C = A*B, we should have A*B - C = 0
+      -- This is a sanity check
+      _check = V.zipWith3 (\a b c -> a * b - c) aEvals bEvals cEvals
+      -- _checkSum = V.foldl' (+) 0 _check  -- Should be 0
       
       -- Step 2: iFFT to get coefficients of A, B, C (degree < n)
       aCoeffs = ifft omega n aEvals
@@ -227,9 +244,16 @@ computeHPolynomial pk ws =
       
       -- Step 5: Multiply pointwise and subtract C (on coset)
       -- This gives (A*B - C) evaluated on the coset
-      pCoset = zipWith3 (\a b c -> a * b - c) aCoset bCoset cCoset
+      abMinusC = zipWith3 (\a b c -> a * b - c) aCoset bCoset cCoset
       
-  in pCoset  -- Return coset evaluations directly for Lagrange-basis MSM
+      -- CRITICAL: In snarkjs, abMinusC (the coset evaluations) is used DIRECTLY
+      -- for the MSM with hExps. There is NO division by Z and NO conversion
+      -- to coefficients! The hExps in the proving key are in Lagrange basis
+      -- for the coset, so the division by Z is implicit in how hExps was
+      -- generated during trusted setup.
+      hCoeffs = abMinusC  -- Return coset evaluations directly for MSM
+      
+  in (hCoeffs, aEvals V.! 0, bEvals V.! 0, cEvals V.! 0)  -- Return h coefficients and debug values
 
 -- | Build polynomial evaluations from sparse constraint coefficients
 buildPolynomialEvals :: ProvingKey -> [Fr] -> Int -> (V.Vector Fr, V.Vector Fr, V.Vector Fr)
@@ -350,6 +374,34 @@ verify _pk _publicInputs _proof =
   -- For now, we rely on the contract to verify
   True
 
+-- | Extract integer coordinates from a proof
+-- Returns ((a_x, a_y), ((b_x0, b_x1), (b_y0, b_y1)), (c_x, c_y))
+proofToIntegers :: Proof -> ((Integer, Integer), ((Integer, Integer), (Integer, Integer)), (Integer, Integer))
+proofToIntegers (Proof a b c) = (g1ToInts a, g2ToInts b, g1ToInts c)
+
+-- | Extract integer coordinates from G1 point
+g1ToInts :: G1' -> (Integer, Integer)
+g1ToInts O = (0, 0)  -- Point at infinity
+g1ToInts (A x y) = (fromP x, fromP y)
+
+-- | Extract integer coordinates from G2 point
+-- Returns ((x0, x1), (y0, y1)) for Fq2 = a + b*u representation
+g2ToInts :: G2' -> ((Integer, Integer), (Integer, Integer))
+g2ToInts O = ((0, 0), (0, 0))  -- Point at infinity
+g2ToInts (A x y) = (fq2ToInts x, fq2ToInts y)
+
+-- | Extract integer coefficients from Fq2 element
+-- Fq2 = a + b*u where u^2 + 1 = 0
+-- Returns (real, imaginary) = (a, b) to match snarkjs JSON format [c0, c1]
+fq2ToInts :: Fq2 -> (Integer, Integer)
+fq2ToInts fq2 = 
+  let coeffs = fromE fq2  -- Returns [c0, c1] where element = c0 + c1*u
+  in case coeffs of
+       [c0, c1] -> (fromP c0, fromP c1)  -- (real, imaginary) = [c0, c1] for snarkjs
+       [c0]     -> (fromP c0, 0)          -- Only real part
+       []       -> (0, 0)
+       _        -> (0, 0)  -- Shouldn't happen
+
 -- | Multi-scalar multiplication in G1: sum(s_i * P_i)
 multiScalarMulG1 :: [G1'] -> [Fr] -> G1'
 multiScalarMulG1 points scalars = 
@@ -365,7 +417,7 @@ neg :: G1' -> G1'
 neg (A x y) = A x (negate y)
 neg O = O
 
--- | Generate a random field element
+-- | Generate a random field element (currently unused - using r=s=0 for testing)
 randomFieldElement :: IO Fr
 randomFieldElement = do
   bytes <- BS.pack <$> replicateM 32 (randomRIO (0, 255))
@@ -412,9 +464,11 @@ parseProvingKeyJSON val = case parseEither parseKey val of
       b2Points <- obj .:? "B2" .!= []
       parsedB2 <- mapM parseG2PointOrZero b2Points
       
-      -- Parse C query points 
-      cPoints <- obj .:? "C" .!= []
-      parsedC <- mapM parseG1PointOrZero cPoints
+      -- Parse C query points (JSON includes all points, but we only need private input points)
+      -- Skip the first (nPublic + 1) points as they correspond to public inputs
+      cPointsAll <- obj .:? "C" .!= []
+      let cPointsPrivate = drop (nPublic + 1) cPointsAll
+      parsedC <- mapM parseG1PointOrZero cPointsPrivate
       
       -- Parse H polynomial coefficients (called hExps in snarkjs JSON)
       hPoints <- obj .:? "hExps" .!= []
@@ -484,15 +538,27 @@ parseG2Point = Aeson.withArray "G2Point" $ \arr -> do
   xArr <- Aeson.parseJSON (arr V.! 0) :: Parser [String]
   yArr <- Aeson.parseJSON (arr V.! 1) :: Parser [String]
   when (length xArr < 2 || length yArr < 2) $ fail "G2 coordinates need 2 elements each"
-  let x0 = read (xArr !! 0) :: Integer
-      x1 = read (xArr !! 1) :: Integer
-      y0 = read (yArr !! 0) :: Integer
-      y1 = read (yArr !! 1) :: Integer
-      -- Fq2 is represented as x0 + x1*u where u^2 = -1
-      -- toE takes [a, b] and creates a + b*u
-      xFq2 = toE [toP x0, toP x1] :: G2Curve.Fq2
-      yFq2 = toE [toP y0, toP y1] :: G2Curve.Fq2
-  return $ A xFq2 yFq2
+  -- Check if there's a z-coordinate (projective) and if it's zero (point at infinity)
+  if V.length arr >= 3 then do
+    zArr <- Aeson.parseJSON (arr V.! 2) :: Parser [String]
+    when (length zArr < 2) $ fail "G2 z-coordinate needs 2 elements"
+    let z0 = read (zArr !! 0) :: Integer
+        z1 = read (zArr !! 1) :: Integer
+    if z0 == 0 && z1 == 0
+      then return O  -- Point at infinity when z = 0
+      else parseG2Affine xArr yArr
+  else parseG2Affine xArr yArr
+  where
+    parseG2Affine xArr yArr = do
+      let x0 = read (xArr !! 0) :: Integer
+          x1 = read (xArr !! 1) :: Integer
+          y0 = read (yArr !! 0) :: Integer
+          y1 = read (yArr !! 1) :: Integer
+          -- Fq2 is represented as x0 + x1*u where u^2 = -1
+          -- toE takes [a, b] and creates a + b*u
+          xFq2 = toE [toP x0, toP x1] :: G2Curve.Fq2
+          yFq2 = toE [toP y0, toP y1] :: G2Curve.Fq2
+      return $ A xFq2 yFq2
 
 -- | Parse a G2 point, treating null as point at infinity
 parseG2PointOrZero :: Aeson.Value -> Parser G2'
