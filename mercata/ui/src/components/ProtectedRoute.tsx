@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
+import { redirectToLogin } from '@/lib/auth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,8 +13,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     // Only redirect if not loading and not authenticated
     if (!loading && !isLoggedIn) {
       // Redirect to login page if not authenticated
-      const theme = localStorage.getItem('theme') || 'light';
-      window.location.href = `/login?theme=${theme}`;
+      redirectToLogin();
     }
   }, [isLoggedIn, loading]);
 

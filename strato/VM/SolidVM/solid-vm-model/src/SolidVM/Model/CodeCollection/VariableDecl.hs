@@ -17,7 +17,6 @@ module SolidVM.Model.CodeCollection.VariableDecl
     varInitialVal,
     varContext,
     isImmutable,
-    isRecord,
   )
 where
 
@@ -39,8 +38,7 @@ data VariableDeclF a = VariableDecl
     _varVisibility :: Maybe Visibility,
     _varInitialVal :: Maybe (ExpressionF a),
     _varContext :: a,
-    _isImmutable :: Bool,
-    _isRecord :: Bool
+    _isImmutable :: Bool
   }
   deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
@@ -57,6 +55,6 @@ type VariableDecl = Positioned VariableDeclF
 instance Arbitrary VariableDecl where
   arbitrary =
     oneof
-      [ (VariableDecl (SVMType.Int Nothing Nothing)) <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> pure False,
-        (VariableDecl (SVMType.String $ Just True)) <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> pure False
+      [ (VariableDecl (SVMType.Int Nothing Nothing)) <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary,
+        (VariableDecl (SVMType.String $ Just True)) <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
       ]

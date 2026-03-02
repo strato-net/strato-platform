@@ -247,6 +247,9 @@ library PoseidonT4 {
 contract RailgunLogic is Commitments, TokenBlocklist, Verifier {
   using SafeERC20 for IERC20;
 
+  // Initialization guard for proxy pattern
+  bool private initialized;
+
   address payable public treasury;
   uint120 private constant BASIS_POINTS = 10000;
   uint120 public shieldFee;
@@ -289,6 +292,9 @@ contract RailgunLogic is Commitments, TokenBlocklist, Verifier {
     uint256 _nftFee,
     address _owner
   ) public {
+    require(!initialized, "RailgunLogic: Already initialized");
+    initialized = true;
+
     Commitments.initializeCommitments();
 
     changeTreasury(_treasury);
@@ -297,6 +303,9 @@ contract RailgunLogic is Commitments, TokenBlocklist, Verifier {
     snarkSafetyVector[11991246288605609459798790887503763024866871101] = true;
     snarkSafetyVector[135932600361240492381964832893378343190771392134] = true;
     snarkSafetyVector[1165567609304106638376634163822860648671860889162] = true;
+
+    // Transfer ownership to the specified owner
+    transferOwnership(_owner);
   }
 
   function changeTreasury(address payable _treasury) public onlyOwner {
@@ -846,6 +855,35 @@ contract Verifier is Ownable {
   }
 
 }
+
+/**
+ * @title Proxy
+ * @notice Upgradeable proxy for RailgunSmartWallet
+ * @dev Separates contract logic from storage, allowing logic upgrades while preserving state
+ *      Named "Proxy" so STRATO's API automatically resolves delegated functions
+ *      Uses "contract record" for storage indexing
+ */
+contract record Proxy is Ownable {
+    address logicContract;
+
+    event LogicContractUpdated(address indexed oldLogic, address indexed newLogic);
+
+    constructor(address _logicContract, address _initialOwner) {
+        logicContract = _logicContract;
+        transferOwnership(_initialOwner);
+    }
+
+    function setLogicContract(address _logicContract) external onlyOwner {
+        address oldLogic = logicContract;
+        logicContract = _logicContract;
+        emit LogicContractUpdated(oldLogic, _logicContract);
+    }
+
+    fallback(variadic args) external returns (variadic) {
+        return logicContract.delegatecall(msg.sig, args);
+    }
+}
+
 
 interface IERC20 {
     event Transfer(address indexed from, address indexed to, uint256 value);

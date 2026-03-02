@@ -14,6 +14,7 @@ import { api } from '@/lib/axios';
 import ConsolidatedPriceChart from '@/components/charts/ConsolidatedPriceChart';
 import CopyButton from '@/components/ui/copy';
 import { addCommasToInput, roundToDecimals } from '@/utils/numberUtils';
+import { usdstAddress } from '@/lib/constants';
 
 type PricePoint = {
   date: string;
@@ -99,10 +100,23 @@ const fetchSwapPoolPrices = async (assetAddress: string): Promise<SwapPricePoint
       return [];
     }
 
-    // Fetch swap history for each pool and combine the data
+    // Only use the USDST-paired pool for STRATO Price calculation
+    const usdstPool = pools.find(pool => {
+      const otherAddr = pool.tokenA?.address?.toLowerCase() === assetAddress.toLowerCase()
+        ? pool.tokenB?.address?.toLowerCase()
+        : pool.tokenA?.address?.toLowerCase();
+      return otherAddr === usdstAddress.toLowerCase();
+    });
+
+    if (!usdstPool) {
+      return [];
+    }
+
+    const selectedPools = [usdstPool];
+
+    // Fetch swap history for selected pool(s)
     const allSwapPrices: SwapPricePoint[] = [];
-    
-    for (const pool of pools) {
+    for (const pool of selectedPools) {
       try {
         // Determine which token is being viewed and which is the other token
         const isViewingAssetTokenB = pool.tokenB?.address?.toLowerCase() === assetAddress.toLowerCase();

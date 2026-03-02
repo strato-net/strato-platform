@@ -200,7 +200,7 @@ const CreatePoolForm = () => {
               <FormItem>
                 <FormLabel>Is Stable Pool</FormLabel>
                 <div className="w-80" />
-                <Switch className="dark:bg-input" onCheckedChange={field.onChange} defaultChecked={field.value} />
+                <Switch onCheckedChange={field.onChange} checked={field.value} />
                 <FormDescription>
                   Toggling this field on will result in a stable swap pool being created,
                   rather than a traditional pool using the constant product formula.

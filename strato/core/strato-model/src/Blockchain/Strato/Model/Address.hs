@@ -18,6 +18,8 @@ module Blockchain.Strato.Model.Address
     stringAddress,
     getNewAddress_unsafe,
     getNewAddressWithSalt_unsafe,
+    addressToByteString,
+    addressFromByteString,
     addressAsNibbleString,
     addressFromNibbleString,
     addressToHex,
@@ -47,8 +49,8 @@ import Data.Char
 import Data.Data
 import Data.Hashable
 import qualified Data.NibbleString as N
-import Data.Swagger hiding (Format, format, get, put)
-import qualified Data.Swagger as Sw
+import Data.OpenApi hiding (Format, format, get, put)
+import qualified Data.OpenApi as OPENAPI
 import qualified Data.Text as T
 import Database.Persist.Sql hiding (get)
 -- import Debug.Trace
@@ -217,10 +219,10 @@ instance ToCapture (Capture "userAddress" Address) where
 instance ToParamSchema Address where
   toParamSchema _ =
     mempty
-      & type_ ?~ SwaggerString
+      & type_ ?~ OpenApiString
       & minimum_ ?~ fromInteger (toInteger . unAddress $ (minBound :: Address))
       & maximum_ ?~ fromInteger (toInteger . unAddress $ (maxBound :: Address))
-      & Sw.format ?~ "hex string"
+      & OPENAPI.format ?~ "hex string"
 
 unAddress :: Address -> Word160
 unAddress (Address n) = n
@@ -231,7 +233,7 @@ instance ToSchema Address where
       NamedSchema
         (Just "Address")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ "address=deadbeef" --toJSON (Address 0xdeadbeef) -- FIXME if causing troubles outside /faucet
             & description ?~ "Ethereum Address, 20 byte hex encoded string"
         )
@@ -258,12 +260,17 @@ getNewAddressWithSalt_unsafe creator salt codeHash args =
         ++ (rlpEncode <$> args)
    in decode $ BL.drop 12 $ encode theHash
 
+addressToByteString :: Address -> B.ByteString
+addressToByteString (Address s) = BL.toStrict $ encode s
+
+addressFromByteString :: B.ByteString -> Address
+addressFromByteString = Address . decode . BL.fromStrict
+
 addressAsNibbleString :: Address -> N.NibbleString
-addressAsNibbleString (Address s) =
-  byteString2NibbleString $ BL.toStrict $ encode s
+addressAsNibbleString = byteString2NibbleString . addressToByteString
 
 addressFromNibbleString :: N.NibbleString -> Address
-addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteString
+addressFromNibbleString = addressFromByteString . nibbleString2ByteString
 
 formatAddressWithoutColor :: Address -> String
 formatAddressWithoutColor x = padZeros 40 $ showHex x ""

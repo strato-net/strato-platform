@@ -37,7 +37,7 @@ library:
   - servant-server
   - source-tools
   - strato-model
-  - swagger2
+  - openapi3
   - text
   - utf8-string
   - vector

@@ -3,29 +3,24 @@
 
 module Main where
 
-import Control.Concurrent (threadDelay)
 import Control.Exception (try, SomeException)
 import Control.Monad (when, unless, forM_)
-import Data.Aeson (decode, encode, (.:), (.=), object)
--- import qualified Data.Aeson as Aeson  -- Used by debug code below
-import Data.Aeson.Types (parseMaybe)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Lazy as LBS
-import Data.Time.Clock.POSIX (getPOSIXTime)
+import Data.Yaml (decodeFileEither)
 import Options.Applicative
 import System.Directory (doesFileExist, doesDirectoryExist, createDirectoryIfMissing, getHomeDirectory, listDirectory)
 import Data.List (isPrefixOf)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>))
 import System.IO (hPutStrLn, stderr, hFlush, stdout, hGetEcho, stdin, hSetEcho)
-import Network.HTTP.Client (newManager, httpLbs, parseRequest, urlEncodedBody, responseBody, Manager)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
+
+import Blockchain.EthConf.Model (EthConf(..), ContractsConf(..))
+import Blockchain.Strato.Model.Address (formatAddressWithoutColor)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
-import Network.URI (parseURI, uriAuthority, uriRegName, uriPort)
 import Text.Printf (printf)
 
 import Bloc.API (BlocTransactionResult(..))
@@ -34,7 +29,10 @@ import Blockchain.Strato.Model.Keccak256 (keccak256ToHex)
 import Railgun.Keys (deriveFromMnemonic, railgunAddress, getMasterPublicKeyPoint)
 import Railgun.Shield (createERC20ShieldRequest, serializeShieldRequest)
 import Railgun.Unshield (createUnshieldRequest)
-import Railgun.API (StratoConfig(..), defaultConfig, callShield, callTransact, approveToken, getChainId, getMerkleRoot, getTreeNumber, getBoundParamsHash, getUserAddress, getTokenBalance, getTokenDecimals, formatTokenAmount, parseTokenAmount)
+import Railgun.API (callShield, callTransact, approveToken, getMerkleRoot, getTreeNumber, getBoundParamsHash, getUserAddress, getTokenBalance, getTokenDecimals, formatTokenAmount, parseTokenAmount)
+import Strato.Auth (runServant)
+import Handlers.Metadata (getMetaDataClient, MetadataResponse(..))
+import Servant.Client (BaseUrl(..), Scheme(..))
 import Railgun.Types (RailgunAddress(..), RailgunKeys(..), TokenType(..))
 import Railgun.Balance (scanShieldedBalance, TokenBalance(..))
 import qualified Railgun.Balance as Bal
@@ -46,7 +44,7 @@ import Railgun.Transfer (parseRecipientAddress, createTransferRequest, TransferN
 import qualified Railgun.Transfer
 import qualified Railgun.Unshield
 import Railgun.Unshield (CommitmentCiphertext(..))
-import Railgun.Prover (generateProof, defaultProverConfig)
+import Railgun.Prover (generateProof, getProverConfig)
 import Railgun.Signing (deriveSigningKey, signTransactionData, computeSignatureMessage, RailgunSignature(..))
 
 -- | Path to the mnemonic file for a named wallet
@@ -59,162 +57,57 @@ mnemonicFilePath walletName = do
                  else "railgunMnemonic." ++ walletName
   return $ home </> ".secrets" </> filename
 
-
--- | Path to the auth token file
-tokenFilePath :: IO FilePath
-tokenFilePath = do
+-- | Get the node directory from ~/.strato/default-node
+getDefaultNodeDir :: IO (Maybe FilePath)
+getDefaultNodeDir = do
   home <- getHomeDirectory
-  return $ home </> ".secrets" </> "stratoToken"
-
--- | Path to the OAuth config file (shared with other tools)
-oauthConfigFilePath :: IO FilePath
-oauthConfigFilePath = do
-  home <- getHomeDirectory
-  return $ home </> ".secrets" </> "oauth_credentials"
-
--- | OAuth configuration
-data OAuthConfig = OAuthConfig
-  { oauthTokenUrl :: T.Text
-  , oauthDeviceUrl :: T.Text
-  , oauthClientId :: T.Text
-  , oauthClientSecret :: T.Text
-  } deriving (Show)
-
--- | Read OAuth config from file
--- Uses OAUTH_DISCOVERY_URL to derive token and device endpoints
-readOAuthConfig :: IO OAuthConfig
-readOAuthConfig = do
-  configPath <- oauthConfigFilePath
-  exists <- doesFileExist configPath
+  let defaultNodeFile = home </> ".strato" </> "default-node"
+  exists <- doesFileExist defaultNodeFile
   if exists
     then do
-      content <- TIO.readFile configPath
-      let pairs = map (T.breakOn "=") $ T.lines content
-          getValue key = case lookup key [(T.strip k, T.strip $ T.drop 1 v) | (k, v) <- pairs] of
-            Just val -> val
-            Nothing -> ""
-          discoveryUrl = getValue "OAUTH_DISCOVERY_URL"
-          clientId = getValue "OAUTH_CLIENT_ID"
-          clientSecret = getValue "OAUTH_CLIENT_SECRET"
-          -- Derive token and device URLs from discovery URL
-          -- Discovery URL: https://host/auth/realms/realm/.well-known/openid-configuration
-          -- Token URL: https://host/auth/realms/realm/protocol/openid-connect/token
-          -- Device URL: https://host/auth/realms/realm/protocol/openid-connect/auth/device
-          realmUrl = T.replace "/.well-known/openid-configuration" "" discoveryUrl
-          tokenUrl = realmUrl <> "/protocol/openid-connect/token"
-          deviceUrl = realmUrl <> "/protocol/openid-connect/auth/device"
-      return OAuthConfig
-        { oauthTokenUrl = tokenUrl
-        , oauthDeviceUrl = deviceUrl
-        , oauthClientId = clientId
-        , oauthClientSecret = clientSecret
-        }
-    else do
-      hPutStrLn stderr $ "Error: OAuth config not found at " ++ configPath
-      hPutStrLn stderr ""
-      hPutStrLn stderr "Please create the file with:"
-      hPutStrLn stderr "  OAUTH_DISCOVERY_URL=https://your-keycloak/.well-known/openid-configuration"
-      hPutStrLn stderr "  OAUTH_CLIENT_ID=your_client_id"
-      hPutStrLn stderr "  OAUTH_CLIENT_SECRET=your_client_secret"
-      exitFailure
-
--- | Token data stored in file
-data StoredToken = StoredToken
-  { storedAccessToken :: T.Text
-  , storedRefreshToken :: T.Text
-  , storedExpiresAt :: Integer  -- Unix timestamp
-  } deriving (Show)
-
--- | Read auth token from file, auto-refreshing if expired
-readAuthToken :: IO T.Text
-readAuthToken = do
-  path <- tokenFilePath
-  exists <- doesFileExist path
-  if not exists
-    then do
-      hPutStrLn stderr "Not logged in. Please run 'airlock login' first."
-      exitFailure
-    else do
-      content <- LBS.readFile path
-      case decode content of
-        Just tokenJson -> do
-          let getField key = parseMaybe (\obj -> obj .: key) tokenJson :: Maybe T.Text
-              getFieldInt key = parseMaybe (\obj -> obj .: key) tokenJson :: Maybe Integer
-          case (getField "access_token", getField "refresh_token", getFieldInt "expires_at") of
-            (Just accessToken, Just refreshToken, Just expiresAt) -> do
-              now <- round <$> getPOSIXTime
-              -- Refresh if token expires in less than 60 seconds
-              if now >= expiresAt - 60
-                then do
-                  TIO.hPutStrLn stderr "Token expired, refreshing..."
-                  refreshAuthToken refreshToken
-                else return accessToken
-            _ -> do
-              hPutStrLn stderr "Session expired. Please run 'airlock login' again."
-              exitFailure
-        Nothing -> do
-          hPutStrLn stderr "Session expired. Please run 'airlock login' again."
+      contents <- TIO.readFile defaultNodeFile
+      let nodeDir = T.unpack $ T.strip contents
+      dirExists <- doesDirectoryExist nodeDir
+      if dirExists
+        then return $ Just nodeDir
+        else do
+          hPutStrLn stderr $ "Error: Node directory not found: " ++ nodeDir
           exitFailure
+    else return Nothing
 
--- | Refresh the auth token using refresh_token
-refreshAuthToken :: T.Text -> IO T.Text
-refreshAuthToken refreshToken = do
-  config <- readOAuthConfig
-  manager <- newManager tlsManagerSettings
-  
-  tokenReq <- parseRequest $ T.unpack $ oauthTokenUrl config
-  let tokenReqWithBody = urlEncodedBody
-        [ ("client_id", TE.encodeUtf8 $ oauthClientId config)
-        , ("client_secret", TE.encodeUtf8 $ oauthClientSecret config)
-        , ("grant_type", "refresh_token")
-        , ("refresh_token", TE.encodeUtf8 refreshToken)
-        ] tokenReq
-  
-  tokenResp <- httpLbs tokenReqWithBody manager
-  
-  case decode (responseBody tokenResp) of
-    Nothing -> do
-      hPutStrLn stderr "Session expired. Please run 'airlock login' again."
-      exitFailure
-    Just tokenJson -> do
-      let getField key = parseMaybe (\obj -> obj .: key) tokenJson :: Maybe T.Text
-          getFieldInt key = parseMaybe (\obj -> obj .: key) tokenJson :: Maybe Int
-          getError = getField "error"
-      
-      case getError of
-        Just _ -> do
-          hPutStrLn stderr "Session expired. Please run 'airlock login' again."
+-- | Read Railgun contract address from node's ethconf.yaml
+readContractAddress :: IO (Maybe String)
+readContractAddress = do
+  maybeNodeDir <- getDefaultNodeDir
+  case maybeNodeDir of
+    Nothing -> return Nothing
+    Just nodeDir -> do
+      let ethconfPath = nodeDir </> ".ethereumH" </> "ethconf.yaml"
+      exists <- doesFileExist ethconfPath
+      if not exists
+        then do
+          hPutStrLn stderr $ "Error: Node config not found. Is the node initialized?"
           exitFailure
-        Nothing -> do
-          case (getField "access_token", getFieldInt "expires_in") of
-            (Just newAccessToken, Just expiresIn) -> do
-              -- Get new refresh token if provided, otherwise keep old one
-              let newRefreshToken = case getField "refresh_token" of
-                    Just rt -> rt
-                    Nothing -> refreshToken
-              
-              -- Save new tokens
-              now <- round <$> getPOSIXTime
-              saveTokens newAccessToken newRefreshToken (now + fromIntegral expiresIn)
-              
-              TIO.hPutStrLn stderr "Token refreshed successfully."
-              return newAccessToken
-            _ -> do
-              hPutStrLn stderr "Session expired. Please run 'airlock login' again."
+        else do
+          result <- decodeFileEither ethconfPath
+          case result of
+            Left err -> do
+              hPutStrLn stderr $ "Error: Invalid node config: " ++ show err
               exitFailure
+            Right ethConf -> 
+              return $ formatAddressWithoutColor <$> (contractsConfig ethConf >>= railgunProxy)
 
--- | Save tokens to file
-saveTokens :: T.Text -> T.Text -> Integer -> IO ()
-saveTokens accessToken refreshToken expiresAt = do
-  path <- tokenFilePath
-  home <- getHomeDirectory
-  createDirectoryIfMissing True (home </> ".secrets")
-  let tokenData = object
-        [ "access_token" .= accessToken
-        , "refresh_token" .= refreshToken
-        , "expires_at" .= expiresAt
-        ]
-  LBS.writeFile path (encode tokenData)
+-- | Require the Railgun contract address, failing with helpful message if not set
+requireContractAddress :: String -> IO String
+requireContractAddress cliAddr
+  | not (null cliAddr) = return cliAddr
+  | otherwise = do
+      maybeAddr <- readContractAddress
+      case maybeAddr of
+        Just addr | not (null addr) -> return addr
+        _ -> do
+          hPutStrLn stderr "Error: Railgun contract address not found. Has it been deployed?"
+          exitFailure
 
 -- | Read mnemonic from file for a named wallet, or fail with instructions
 readMnemonicFromFile :: String -> IO T.Text
@@ -236,8 +129,7 @@ readMnemonicFromFile walletName = do
 --------------------------------------------------------------------------------
 
 data Command
-  = Login
-  | SetupWallet SetupWalletOpts
+  = SetupWallet SetupWalletOpts
   | ListWallets
   | ListAddresses ListAddressesOpts
   | Shield ShieldOpts
@@ -298,10 +190,6 @@ data BalanceOpts = BalanceOpts
   , boTokenAddress :: Maybe String  -- ^ Optional: check specific token's unshielded balance
   } deriving (Show)
 
--- | Parser for login command
-loginParser :: Parser Command
-loginParser = pure Login
-
 -- | Parser for setup_wallet command
 setupWalletParser :: Parser Command
 setupWalletParser = SetupWallet <$> (SetupWalletOpts
@@ -356,9 +244,9 @@ shieldParser = Shield <$> (ShieldOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "95be101d075f44084ca1cf51d0106c8606773952"
+     <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address" )
+     <> help "Railgun contract address (reads from node config if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -402,9 +290,9 @@ unshieldParser = Unshield <$> (UnshieldOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "95be101d075f44084ca1cf51d0106c8606773952"
+     <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address" )
+     <> help "Railgun contract address (reads from node config if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -445,9 +333,9 @@ transferParser = Transfer <$> (TransferOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "95be101d075f44084ca1cf51d0106c8606773952"
+     <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address" )
+     <> help "Railgun contract address (reads from node config if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -488,9 +376,9 @@ balanceParser = Balance <$> (BalanceOpts
      <> help "STRATO base URL" )
   <*> strOption
       ( long "railguncontractaddr"
-     <> value "95be101d075f44084ca1cf51d0106c8606773952"
+     <> value ""
      <> metavar "ADDRESS"
-     <> help "Railgun contract address" )
+     <> help "Railgun contract address (reads from node config if not specified)" )
   <*> option auto
       ( long "derivationindex"
      <> value 0
@@ -507,10 +395,7 @@ balanceParser = Balance <$> (BalanceOpts
 -- | Combined command parser
 commandParser :: Parser Command
 commandParser = hsubparser
-  ( command "login"
-    (info loginParser
-      (progDesc "Authenticate using OAuth device flow"))
-  <> command "setup_wallet"
+  ( command "setup_wallet"
     (info setupWalletParser
       (progDesc "Set up a wallet with your recovery phrase"))
   <> command "list_wallets"
@@ -543,8 +428,17 @@ opts = info (commandParser <**> helper)
 main :: IO ()
 main = do
   cmd <- customExecParser prefs' opts
+  -- Trigger auth early for commands that need it (before any other checks)
   case cmd of
-    Login -> runLogin
+    SetupWallet _ -> return ()  -- Local only, no auth needed
+    ListWallets -> return ()    -- Local only, no auth needed
+    ListAddresses _ -> return () -- Local only, no auth needed
+    _ -> do
+      -- Make an authenticated call to trigger login if needed
+      _ <- getUserAddress
+      return ()
+  -- Now run the actual command
+  case cmd of
     SetupWallet o -> runSetupWallet o
     ListWallets -> runListWallets
     ListAddresses o -> runListAddresses o
@@ -554,126 +448,6 @@ main = do
     Balance o -> runBalance o
   where
     prefs' = prefs showHelpOnEmpty
-
-runLogin :: IO ()
-runLogin = do
-  TIO.putStrLn "=== Airlock Login (OAuth Device Flow) ==="
-  TIO.putStrLn ""
-  
-  -- Read OAuth config
-  config <- readOAuthConfig
-  
-  when (T.null $ oauthClientSecret config) $ do
-    hPutStrLn stderr "Error: OAUTH_CLIENT_SECRET not set in config file"
-    exitFailure
-  
-  manager <- newManager tlsManagerSettings
-  
-  -- Step 1: Request device code
-  TIO.putStrLn "Requesting device code..."
-  deviceReq <- parseRequest $ T.unpack $ oauthDeviceUrl config
-  let deviceReqWithBody = urlEncodedBody
-        [ ("client_id", TE.encodeUtf8 $ oauthClientId config)
-        , ("client_secret", TE.encodeUtf8 $ oauthClientSecret config)
-        ] deviceReq
-  
-  deviceResp <- httpLbs deviceReqWithBody manager
-  
-  case decode (responseBody deviceResp) of
-    Nothing -> do
-      hPutStrLn stderr $ "Error: Failed to parse device code response: " ++ show (responseBody deviceResp)
-      exitFailure
-    Just deviceJson -> do
-      let getValue key = parseMaybe (\obj -> obj .: key) deviceJson :: Maybe T.Text
-          getValueInt key = parseMaybe (\obj -> obj .: key) deviceJson :: Maybe Int
-      
-      case (getValue "user_code", getValue "verification_uri", getValue "device_code", getValueInt "interval") of
-        (Just userCode, Just verifyUri, Just deviceCode, Just interval) -> do
-          TIO.putStrLn ""
-          TIO.putStrLn "============================================================"
-          TIO.putStrLn ""
-          TIO.putStrLn $ "  Go to: " <> verifyUri
-          TIO.putStrLn $ "  Enter code: " <> userCode
-          TIO.putStrLn ""
-          TIO.putStrLn "============================================================"
-          TIO.putStrLn ""
-          TIO.putStrLn "Waiting for authentication..."
-          
-          -- Step 2: Poll for token
-          pollForToken manager config deviceCode interval
-        _ -> do
-          hPutStrLn stderr "Error: Invalid device code response"
-          exitFailure
-
-pollForToken :: Manager -> OAuthConfig -> T.Text -> Int -> IO ()
-pollForToken manager config deviceCode interval = do
-  threadDelay (interval * 1000000)  -- Wait interval seconds
-  
-  tokenReq <- parseRequest $ T.unpack $ oauthTokenUrl config
-  let tokenReqWithBody = urlEncodedBody
-        [ ("client_id", TE.encodeUtf8 $ oauthClientId config)
-        , ("client_secret", TE.encodeUtf8 $ oauthClientSecret config)
-        , ("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
-        , ("device_code", TE.encodeUtf8 deviceCode)
-        ] tokenReq
-  
-  tokenResp <- httpLbs tokenReqWithBody manager
-  
-  case decode (responseBody tokenResp) of
-    Nothing -> do
-      hPutStrLn stderr $ "Error: Failed to parse token response"
-      exitFailure
-    Just tokenJson -> do
-      let getError = parseMaybe (\obj -> obj .: "error") tokenJson :: Maybe T.Text
-          getToken = parseMaybe (\obj -> obj .: "access_token") tokenJson :: Maybe T.Text
-      
-      case (getError, getToken) of
-        (Just "authorization_pending", _) -> do
-          TIO.putStr "."
-          hFlush stdout
-          pollForToken manager config deviceCode interval
-        (Just "slow_down", _) -> do
-          TIO.putStr "."
-          hFlush stdout
-          pollForToken manager config deviceCode (interval + 1)
-        (Just err, _) -> do
-          TIO.putStrLn ""
-          TIO.hPutStrLn stderr $ "Authentication failed: " <> err
-          exitFailure
-        (Nothing, Just token) -> do
-          let getRefresh = parseMaybe (\obj -> obj .: "refresh_token") tokenJson :: Maybe T.Text
-              getExpiresIn = parseMaybe (\obj -> obj .: "expires_in") tokenJson :: Maybe Int
-          
-          case (getRefresh, getExpiresIn) of
-            (Just refreshTok, Just expiresIn) -> do
-              TIO.putStrLn ""
-              TIO.putStrLn ""
-              TIO.putStrLn "Login successful!"
-              
-              -- Save tokens with expiry
-              now <- round <$> getPOSIXTime
-              saveTokens token refreshTok (now + fromIntegral expiresIn)
-              
-              path <- tokenFilePath
-              TIO.putStrLn $ "Token saved to: " <> T.pack path
-              TIO.putStrLn "Token will auto-refresh when expired."
-              exitSuccess
-            _ -> do
-              TIO.putStrLn ""
-              TIO.putStrLn ""
-              TIO.putStrLn "Login successful! (no refresh token received)"
-              
-              -- Save without refresh token (will need to re-login when expired)
-              now <- round <$> getPOSIXTime
-              saveTokens token "" (now + 300)  -- Assume 5 min default
-              
-              path <- tokenFilePath
-              TIO.putStrLn $ "Token saved to: " <> T.pack path
-              exitSuccess
-        _ -> do
-          TIO.putStrLn ""
-          hPutStrLn stderr $ "Unexpected response: " ++ show (responseBody tokenResp)
-          exitFailure
 
 runSetupWallet :: SetupWalletOpts -> IO ()
 runSetupWallet swopts = do
@@ -820,20 +594,13 @@ runShield sopts = do
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
   
-  -- Read auth token for API calls
-  authToken <- readAuthToken
+  -- Resolve contract address (validates it exists in ethconf.yaml)
+  _ <- requireContractAddress (soRailgunContractAddr sopts)
   
-  let (host, port) = parseHostPort (soBaseUrl sopts)
-      config = StratoConfig
-        { stratoHost = T.pack host
-        , stratoPort = port
-        , stratoAuthToken = authToken
-        , railgunContractAddress = T.pack $ soRailgunContractAddr sopts
-        }
-      tokenAddr = T.pack $ soTokenAddress sopts
+  let tokenAddr = T.pack $ soTokenAddress sopts
   
   -- Get token decimals and parse amount
-  decimals <- getTokenDecimals config tokenAddr
+  decimals <- getTokenDecimals tokenAddr
   amountWei <- case parseTokenAmount (T.pack $ soAmount sopts) decimals of
     Left err -> do
       TIO.hPutStrLn stderr $ "Error: " <> err
@@ -854,7 +621,7 @@ runShield sopts = do
       -- Optionally approve tokens first
       when (soApproveFirst sopts) $ do
         TIO.putStrLn $ "Approving " <> formatTokenAmount amountWei decimals <> " tokens..."
-        approveResult <- approveToken config tokenAddr amountWei
+        approveResult <- approveToken tokenAddr amountWei
         case approveResult of
           Left err -> do
             TIO.hPutStrLn stderr $ "Approval failed: " <> err
@@ -863,7 +630,7 @@ runShield sopts = do
       
       -- Send shield transaction
       TIO.putStrLn "Sending shield transaction..."
-      shieldResult <- callShield config [shieldReq]
+      shieldResult <- callShield [shieldReq]
       case shieldResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Shield failed: " <> err
@@ -893,22 +660,14 @@ runUnshield uopts = do
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
   
-  -- Read auth token
-  authToken <- readAuthToken
+  -- Resolve contract address (validates it exists in ethconf.yaml)
+  _ <- requireContractAddress (uoRailgunContractAddr uopts)
   
-  let (host, port) = parseHostPort (uoBaseUrl uopts)
-      config = StratoConfig
-        { stratoHost = T.pack host
-        , stratoPort = port
-        , stratoAuthToken = authToken
-        , railgunContractAddress = T.pack $ uoRailgunContractAddr uopts
-        }
-      baseUrl = "http://" <> T.pack host <> ":" <> T.pack (show port)
-      tokenAddr = T.toLower $ normalizeAddress $ T.pack $ uoTokenAddress uopts
+  let tokenAddr = T.toLower $ normalizeAddress $ T.pack $ uoTokenAddress uopts
   
   -- Step 1: Scan for our notes
   TIO.putStrLn "\nScanning for shielded notes..."
-  notesResult <- scanShieldedBalance keys baseUrl authToken (railgunContractAddress config)
+  notesResult <- scanShieldedBalance keys
   (notes, _) <- case notesResult of
     Left err -> do
       TIO.hPutStrLn stderr $ "Failed to scan notes: " <> err
@@ -918,7 +677,7 @@ runUnshield uopts = do
   TIO.putStrLn $ "Found " <> T.pack (show $ length notes) <> " note(s)"
   
   -- Get token decimals for formatting and parsing
-  decimals <- getTokenDecimals config tokenAddr
+  decimals <- getTokenDecimals tokenAddr
   
   -- Parse requested amount (empty string = entire note)
   requestedAmount <- case parseTokenAmount (T.pack $ uoAmount uopts) decimals of
@@ -966,17 +725,19 @@ runUnshield uopts = do
     else do
       -- Step 3: Get chain ID and merkle root
       TIO.putStrLn "\nFetching chain ID..."
-      chainIdResult <- getChainId config
-      chainId <- case chainIdResult of
-        Left err -> do
-          TIO.hPutStrLn stderr $ "Failed to get chain ID: " <> err
+      let metadataUrl = BaseUrl Http "localhost" 8081 "/strato-api/eth/v1.2"
+      metadataResult <- runServant metadataUrl getMetaDataClient
+      chainId <- case metadataResult of
+        Left clientErr -> do
+          TIO.hPutStrLn stderr $ "Failed to get metadata: " <> T.pack (show clientErr)
           exitFailure
-        Right cid -> do
+        Right metadata -> do
+          let cid = read (networkID metadata) :: Integer
           TIO.putStrLn $ "Chain ID: " <> T.pack (show cid)
           return cid
       
       TIO.putStrLn "Fetching merkle root..."
-      merkleRootResult <- getMerkleRoot config
+      merkleRootResult <- getMerkleRoot
       merkleRootHex <- case merkleRootResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to get merkle root: " <> err
@@ -986,7 +747,7 @@ runUnshield uopts = do
           return root
       
       TIO.putStrLn "Fetching tree number..."
-      treeNumResult <- getTreeNumber config
+      treeNumResult <- getTreeNumber
       treeNum <- case treeNumResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to get tree number: " <> err
@@ -997,11 +758,7 @@ runUnshield uopts = do
       
       -- Step 4: Get Merkle proof for the note
       TIO.putStrLn "Fetching Merkle tree data..."
-      merkleDataResult <- fetchMerkleTreeData 
-                            (stratoHost config) 
-                            (stratoPort config) 
-                            authToken 
-                            (railgunContractAddress config)
+      merkleDataResult <- fetchMerkleTreeData
       treeData <- case merkleDataResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to fetch Merkle data: " <> err
@@ -1066,7 +823,7 @@ runUnshield uopts = do
             , ccAnnotationData = BS.empty
             , ccMemo = BS.empty
             }
-      boundParamsHashResult <- getBoundParamsHash config (fromIntegral treeNum) chainId [dummyCiphertext] True -- True = unshield
+      boundParamsHashResult <- getBoundParamsHash (fromIntegral treeNum) chainId [dummyCiphertext] True -- True = unshield
       boundParamsHash <- case boundParamsHashResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to get boundParamsHash: " <> err
@@ -1121,7 +878,7 @@ runUnshield uopts = do
       
       -- Step 8: Generate proof using snarkjs
       TIO.putStrLn "\nGenerating SNARK proof..."
-      let proverConfig = defaultProverConfig
+      proverConfig <- getProverConfig
       
       proofResult <- generateProof proverConfig witnessResult
       snarkProof <- case proofResult of
@@ -1147,7 +904,7 @@ runUnshield uopts = do
                           (fromIntegral treeNum)
       
       TIO.putStrLn "\nSending unshield transaction..."
-      unshieldResult <- callTransact config unshieldReq
+      unshieldResult <- callTransact unshieldReq
       case unshieldResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Unshield failed: " <> err
@@ -1211,22 +968,14 @@ runTransfer topts = do
   let addr = railgunAddress keys
   TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
   
-  -- Read auth token
-  authToken <- readAuthToken
+  -- Resolve contract address (validates it exists in ethconf.yaml)
+  _ <- requireContractAddress (toRailgunContractAddr topts)
   
-  let (host, port) = parseHostPort (toBaseUrl topts)
-      config = StratoConfig
-        { stratoHost = T.pack host
-        , stratoPort = port
-        , stratoAuthToken = authToken
-        , railgunContractAddress = T.pack $ toRailgunContractAddr topts
-        }
-      baseUrl = "http://" <> T.pack host <> ":" <> T.pack (show port)
-      tokenAddr = T.toLower $ normalizeAddress $ T.pack $ toTokenAddress topts
+  let tokenAddr = T.toLower $ normalizeAddress $ T.pack $ toTokenAddress topts
   
   -- Step 1: Scan for our notes
   TIO.putStrLn "\nScanning for shielded notes..."
-  notesResult <- scanShieldedBalance keys baseUrl authToken (railgunContractAddress config)
+  notesResult <- scanShieldedBalance keys
   (notes, _) <- case notesResult of
     Left err -> do
       TIO.hPutStrLn stderr $ "Failed to scan notes: " <> err
@@ -1236,7 +985,7 @@ runTransfer topts = do
   TIO.putStrLn $ "Found " <> T.pack (show $ length notes) <> " note(s)"
   
   -- Get token decimals
-  decimals <- getTokenDecimals config tokenAddr
+  decimals <- getTokenDecimals tokenAddr
   
   -- Parse requested amount
   requestedAmount <- case parseTokenAmount (T.pack $ toAmount topts) decimals of
@@ -1282,17 +1031,19 @@ runTransfer topts = do
     else do
       -- Step 3: Get chain ID and merkle root
       TIO.putStrLn "\nFetching chain ID..."
-      chainIdResult <- getChainId config
-      chainId <- case chainIdResult of
-        Left err -> do
-          TIO.hPutStrLn stderr $ "Failed to get chain ID: " <> err
+      let metadataUrl = BaseUrl Http "localhost" 8081 "/strato-api/eth/v1.2"
+      metadataResult <- runServant metadataUrl getMetaDataClient
+      chainId <- case metadataResult of
+        Left clientErr -> do
+          TIO.hPutStrLn stderr $ "Failed to get metadata: " <> T.pack (show clientErr)
           exitFailure
-        Right cid -> do
+        Right metadata -> do
+          let cid = read (networkID metadata) :: Integer
           TIO.putStrLn $ "Chain ID: " <> T.pack (show cid)
           return cid
       
       TIO.putStrLn "Fetching merkle root..."
-      merkleRootResult <- getMerkleRoot config
+      merkleRootResult <- getMerkleRoot
       merkleRootHex <- case merkleRootResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to get merkle root: " <> err
@@ -1302,7 +1053,7 @@ runTransfer topts = do
           return root
       
       TIO.putStrLn "Fetching tree number..."
-      treeNumResult <- getTreeNumber config
+      treeNumResult <- getTreeNumber
       treeNum <- case treeNumResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to get tree number: " <> err
@@ -1313,11 +1064,7 @@ runTransfer topts = do
       
       -- Step 4: Get Merkle proof
       TIO.putStrLn "Fetching Merkle tree data..."
-      merkleDataResult <- fetchMerkleTreeData 
-                            (stratoHost config) 
-                            (stratoPort config) 
-                            authToken 
-                            (railgunContractAddress config)
+      merkleDataResult <- fetchMerkleTreeData
       treeData <- case merkleDataResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to fetch Merkle data: " <> err
@@ -1412,7 +1159,7 @@ runTransfer topts = do
         Right ct -> return ct
       
       -- Get bound params hash using the ACTUAL ciphertexts
-      boundParamsHashResult <- getBoundParamsHash config (fromIntegral treeNum) chainId 
+      boundParamsHashResult <- getBoundParamsHash (fromIntegral treeNum) chainId 
                                  [changeCiphertext, transferCiphertext] False
       boundParamsHash <- case boundParamsHashResult of
         Left err -> do
@@ -1473,7 +1220,7 @@ runTransfer topts = do
       
       -- Step 8: Generate SNARK proof
       TIO.putStrLn "\nGenerating SNARK proof..."
-      let proverConfig = defaultProverConfig
+      proverConfig <- getProverConfig
       
       proofResult <- generateProof proverConfig witnessResult
       snarkProof <- case proofResult of
@@ -1499,7 +1246,7 @@ runTransfer topts = do
       TIO.putStrLn "\nSending shielded transfer transaction..."
       
       -- Use callTransact (same as unshield) since the contract interface is the same
-      transferResult <- callTransact config (trToUnshield transferReq)
+      transferResult <- callTransact (trToUnshield transferReq)
       case transferResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Transfer failed: " <> err
@@ -1539,194 +1286,125 @@ runTransfer topts = do
 
 runBalance :: BalanceOpts -> IO ()
 runBalance bopts = do
-  -- Load keys from mnemonic file
-  TIO.putStrLn $ "Loading Railgun keys (wallet: " <> T.pack (boWallet bopts) <> ")..."
+  -- Load keys
   keys <- loadKeys (boWallet bopts) (boDerivationIndex bopts)
+  -- Validate contract address exists in ethconf.yaml
+  _ <- requireContractAddress (boRailgunContractAddr bopts)
   
-  let addr = railgunAddress keys
-  TIO.putStrLn $ "Railgun address: " <> unRailgunAddress addr
-  TIO.putStrLn ""
-  
-  -- Read auth token
-  authToken <- readAuthToken
-  
-  -- Create config for API calls
-  let config = defaultConfig
-        { stratoAuthToken = authToken
-        , stratoHost = T.pack $ extractHost (boBaseUrl bopts)
-        , stratoPort = extractPort (boBaseUrl bopts)
-        , railgunContractAddress = T.pack $ boRailgunContractAddr bopts
-        }
-  
-  -- Get user's Ethereum address for unshielded balances
-  TIO.putStrLn "Getting user address..."
-  userAddrResult <- getUserAddress config
+  -- Get addresses
+  let railgunAddr = railgunAddress keys
+  userAddrResult <- getUserAddress
   let maybeUserAddr = case userAddrResult of
         Right addr' -> Just addr'
         Left _ -> Nothing
   
-  case maybeUserAddr of
-    Just userAddr -> TIO.putStrLn $ "Ethereum address: 0x" <> userAddr
-    Nothing -> return ()
-  TIO.putStrLn ""
-  
-  TIO.putStrLn "Scanning Shield events..."
-  TIO.putStrLn ""
-  
   -- Scan for shielded notes
-  result <- scanShieldedBalance keys 
-              (T.pack $ boBaseUrl bopts) 
-              authToken 
-              (T.pack $ boRailgunContractAddr bopts)
+  result <- scanShieldedBalance keys
   
   case result of
     Left err -> do
-      TIO.hPutStrLn stderr $ "Error scanning events: " <> err
+      TIO.hPutStrLn stderr $ "Error: " <> err
       exitFailure
     Right (notes, balances) -> do
-      TIO.putStrLn "============================================================"
-      TIO.putStrLn "                    BALANCE SUMMARY"
-      TIO.putStrLn "============================================================"
+      -- Header with addresses
+      TIO.putStrLn $ "Wallet: " <> T.pack (boWallet bopts)
+      TIO.putStrLn $ "  Railgun:  " <> unRailgunAddress railgunAddr
+      case maybeUserAddr of
+        Just userAddr -> TIO.putStrLn $ "  Ethereum: 0x" <> userAddr
+        Nothing -> return ()
       TIO.putStrLn ""
       
       -- If a specific token address is requested, show its balance
       case boTokenAddress bopts of
         Just tokenAddr -> do
           let tokenAddrT = T.pack tokenAddr
-              -- Find shielded balance for this token if any
               maybeShielded = filter (\tb -> T.toLower (tbTokenAddress tb) == T.toLower (normalizeAddr tokenAddrT)) balances
               shieldedValue = sum $ map tbTotalValue maybeShielded
               shieldedNotes = sum $ map tbNoteCount maybeShielded
               shieldedInTokens = fromIntegral shieldedValue / (1e18 :: Double)
           
-          TIO.putStrLn $ "  Token: 0x" <> normalizeAddr tokenAddrT
-          TIO.putStrLn $ "    Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " tokens (" <> T.pack (show shieldedNotes) <> " notes)"
+          TIO.putStrLn $ "Token 0x" <> normalizeAddr tokenAddrT <> ":"
+          TIO.putStrLn $ "  Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " (" <> T.pack (show shieldedNotes) <> " notes)"
           
           case maybeUserAddr of
             Just userAddr -> do
-              unshieldedResult <- getTokenBalance config tokenAddrT userAddr
+              unshieldedResult <- getTokenBalance tokenAddrT userAddr
               case unshieldedResult of
                 Right unshieldedWei -> do
                   let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
                       totalInTokens = shieldedInTokens + unshieldedInTokens
-                  TIO.putStrLn $ "    Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
-                  TIO.putStrLn $ "    Total:      " <> T.pack (printf "%.6f" totalInTokens) <> " tokens"
+                  TIO.putStrLn $ "  Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens)
+                  TIO.putStrLn $ "  Total:      " <> T.pack (printf "%.6f" totalInTokens)
                 Left _ -> 
-                  TIO.putStrLn "    Unshielded: (unable to fetch)"
+                  TIO.putStrLn "  Unshielded: (error)"
             Nothing -> 
-              TIO.putStrLn "    Unshielded: (unable to fetch user address)"
+              TIO.putStrLn "  Unshielded: (no eth address)"
         
         Nothing -> do
           -- No specific token requested - show all balances
-          -- Include default tokens (like USDST) even if no shielded notes
           let defaultTokens = ["937efa7e3a77e20bbdbd7c0d32b6514f368c1010"]  -- USDST
               shieldedTokenAddrs = map (T.toLower . tbTokenAddress) balances
-              -- Find default tokens that aren't already in shielded balances
               extraTokens = filter (\t -> T.toLower t `notElem` shieldedTokenAddrs) defaultTokens
           
           -- Show shielded balances with unshielded
-          unless (null balances) $ do
-            mapM_ (printBalanceWithUnshielded config maybeUserAddr) balances
+          mapM_ (printTokenBalance maybeUserAddr) balances
           
           -- Show default tokens that only have unshielded balance
-          forM_ extraTokens $ \tokenAddr -> do
-            case maybeUserAddr of
-              Just userAddr -> do
-                unshieldedResult <- getTokenBalance config tokenAddr userAddr
-                case unshieldedResult of
-                  Right unshieldedWei | unshieldedWei > 0 -> do
-                    let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
-                    TIO.putStrLn $ "  Token: 0x" <> tokenAddr <> " (USDST)"
-                    TIO.putStrLn $ "    Shielded:   0.000000 tokens (0 notes)"
-                    TIO.putStrLn $ "    Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
-                    TIO.putStrLn $ "    Total:      " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
-                    TIO.putStrLn ""
-                  _ -> return ()
-              Nothing -> return ()
+          forM_ extraTokens $ \tokenAddr ->
+            printTokenBalance maybeUserAddr TokenBalance
+              { tbTokenAddress = tokenAddr
+              , tbTotalValue = 0
+              , tbNoteCount = 0
+              , tbTokenType = ERC20
+              }
           
           when (null balances && null extraTokens) $
-            TIO.putStrLn "  No balances found."
-          
-          unless (null notes) $ do
-            TIO.putStrLn ""
-            TIO.putStrLn $ "  Total shielded notes: " <> T.pack (show $ length notes)
+            TIO.putStrLn "No balances found."
       
       -- Optionally show individual notes
       when (boShowNotes bopts && not (null notes)) $ do
         TIO.putStrLn ""
-        TIO.putStrLn "============================================================"
-        TIO.putStrLn "                   INDIVIDUAL NOTES"
-        TIO.putStrLn "============================================================"
-        TIO.putStrLn ""
+        TIO.putStrLn "Notes:"
         mapM_ printNote notes
-      
-      TIO.putStrLn ""
-      TIO.putStrLn "============================================================"
-      exitSuccess
   where
     normalizeAddr t = if "0x" `T.isPrefixOf` T.toLower t then T.drop 2 (T.toLower t) else T.toLower t
 
--- | Extract host from URL like "http://localhost:8081"
-extractHost :: String -> String
-extractHost url = 
-  let withoutScheme = dropWhile (/= '/') $ dropWhile (/= ':') url
-      hostPart = takeWhile (/= ':') $ drop 2 withoutScheme  -- skip "//"
-  in if null hostPart then "localhost" else hostPart
+-- | Known token names
+tokenName :: T.Text -> T.Text
+tokenName addr = case T.toLower addr of
+  "937efa7e3a77e20bbdbd7c0d32b6514f368c1010" -> "USDST"
+  _ -> "ERC20"
 
--- | Extract port from URL like "http://localhost:8081"
-extractPort :: String -> Int
-extractPort url =
-  let afterHost = dropWhile (/= ':') $ drop 7 url  -- skip "http://"
-      portStr = takeWhile (\c -> c >= '0' && c <= '9') $ drop 1 afterHost
-  in if null portStr then 8081 else read portStr
-
-printBalance :: TokenBalance -> IO ()
-printBalance tb = do
-  let tokenDisplay = case tbTokenType tb of
-        ERC20 -> "ERC20"
-        ERC721 -> "ERC721"
-        ERC1155 -> "ERC1155"
-      valueInTokens = fromIntegral (tbTotalValue tb) / (1e18 :: Double)
-  TIO.putStrLn $ "  Token: 0x" <> tbTokenAddress tb <> " (" <> tokenDisplay <> ")"
-  TIO.putStrLn $ "  Shielded: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
-  TIO.putStrLn $ "  Raw wei: " <> T.pack (show $ tbTotalValue tb)
-  TIO.putStrLn $ "  Notes: " <> T.pack (show $ tbNoteCount tb)
-  TIO.putStrLn ""
-
-printBalanceWithUnshielded :: StratoConfig -> Maybe T.Text -> TokenBalance -> IO ()
-printBalanceWithUnshielded config maybeUserAddr tb = do
-  let tokenDisplay = case tbTokenType tb of
-        ERC20 -> "ERC20"
-        ERC721 -> "ERC721"
-        ERC1155 -> "ERC1155"
-      shieldedInTokens = fromIntegral (tbTotalValue tb) / (1e18 :: Double)
+-- | Print balance for a token (shielded + unshielded)
+printTokenBalance :: Maybe T.Text -> TokenBalance -> IO ()
+printTokenBalance maybeUserAddr tb = do
+  let shieldedWei = tbTotalValue tb
+      shieldedInTokens = fromIntegral shieldedWei / (1e18 :: Double)
   
-  TIO.putStrLn $ "  Token: 0x" <> tbTokenAddress tb <> " (" <> tokenDisplay <> ")"
-  TIO.putStrLn $ "    Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " tokens (" <> T.pack (show $ tbNoteCount tb) <> " notes)"
-  
-  -- Get unshielded balance if we have user address
-  case maybeUserAddr of
+  -- Get unshielded balance
+  unshieldedWei <- case maybeUserAddr of
     Just userAddr -> do
-      unshieldedResult <- getTokenBalance config (tbTokenAddress tb) userAddr
-      case unshieldedResult of
-        Right unshieldedWei -> do
-          let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
-              totalInTokens = shieldedInTokens + unshieldedInTokens
-          TIO.putStrLn $ "    Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens) <> " tokens"
-          TIO.putStrLn $ "    Total:      " <> T.pack (printf "%.6f" totalInTokens) <> " tokens"
-        Left _ -> 
-          TIO.putStrLn "    Unshielded: (unable to fetch)"
-    Nothing -> 
-      TIO.putStrLn "    Unshielded: (unable to fetch user address)"
-  TIO.putStrLn ""
+      result <- getTokenBalance (tbTokenAddress tb) userAddr
+      return $ either (const 0) id result
+    Nothing -> return 0
+  
+  -- Only print if there's some balance
+  when (shieldedWei > 0 || unshieldedWei > 0) $ do
+    let unshieldedInTokens = fromIntegral unshieldedWei / (1e18 :: Double)
+        totalInTokens = shieldedInTokens + unshieldedInTokens
+    
+    TIO.putStrLn $ "Token 0x" <> tbTokenAddress tb <> " (" <> tokenName (tbTokenAddress tb) <> "):"
+    TIO.putStrLn $ "  Shielded:   " <> T.pack (printf "%.6f" shieldedInTokens) <> " (" <> T.pack (show $ tbNoteCount tb) <> " notes)"
+    TIO.putStrLn $ "  Unshielded: " <> T.pack (printf "%.6f" unshieldedInTokens)
+    when (shieldedWei > 0 && unshieldedWei > 0) $
+      TIO.putStrLn $ "  Total:      " <> T.pack (printf "%.6f" totalInTokens)
+    TIO.putStrLn ""
 
 printNote :: Bal.ShieldedNote -> IO ()
 printNote note = do
   let valueInTokens = fromIntegral (Bal.snValue note) / (1e18 :: Double)
-  TIO.putStrLn $ "  Note at tree position " <> T.pack (show $ Bal.snTreePosition note) <> " (block " <> Bal.snBlockNumber note <> ")"
-  TIO.putStrLn $ "    Token: 0x" <> Bal.snTokenAddress note
-  TIO.putStrLn $ "    Value: " <> T.pack (printf "%.18f" valueInTokens) <> " tokens"
-  TIO.putStrLn ""
+  TIO.putStrLn $ "  [" <> T.pack (show $ Bal.snTreePosition note) <> "] " 
+    <> T.pack (printf "%.6f" valueInTokens) <> " @ 0x" <> Bal.snTokenAddress note
 
 -- | Print transaction result with status
 printTxResult :: BlocTransactionResult -> IO ()
@@ -1737,18 +1415,6 @@ printTxResult result = do
     Bloc.Success -> TIO.putStrLn $ "  Transaction " <> txHash <> ": SUCCESS"
     Bloc.Failure -> TIO.putStrLn $ "  Transaction " <> txHash <> ": FAILED"
     Bloc.Pending -> TIO.putStrLn $ "  Transaction " <> txHash <> ": PENDING"
-
--- | Parse host and port from a URL string like "http://localhost:8081"
-parseHostPort :: String -> (String, Int)
-parseHostPort url = case parseURI url of
-  Just uri -> case uriAuthority uri of
-    Just auth -> 
-      let host = uriRegName auth
-          portStr = dropWhile (== ':') (uriPort auth)
-          port = if null portStr then 80 else read portStr
-      in (host, port)
-    Nothing -> ("localhost", 8081)
-  Nothing -> ("localhost", 8081)
 
 -- | Convert hex string to ByteString
 hexToBytes :: T.Text -> BS.ByteString

@@ -3,7 +3,7 @@
 module SortDirection where
 
 import Control.Lens.Operators
-import Data.Swagger
+import Data.OpenApi
 import qualified Data.Text as T
 import qualified Database.Esqueleto.Legacy as E
 import Database.Persist.Postgresql
@@ -23,7 +23,7 @@ instance FromHttpApiData Sortby where
       _ -> Left $ T.pack $ "Could not parse sortby parameter: " ++ show x
 
 instance ToParamSchema Sortby where
-  toParamSchema _ = mempty & type_ ?~ SwaggerString
+  toParamSchema _ = mempty & type_ ?~ OpenApiString
 
 sortToOrderBy ::
   PersistField a =>

@@ -49,7 +49,7 @@ build_all_docker: build_common_docker strato_docker apex highway highway-nginx n
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend bridge bridge-nginx oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper
+.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend bridge bridge-nginx oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions
 
 apex:
 	@echo Now building apex...
@@ -254,3 +254,41 @@ test:
 
 docker-clean:
 	rm -rf ${FAKEROOT}
+
+# Shell completion installation - detects OS and shell, installs appropriate completions
+UNAME_S := $(shell uname -s)
+USER_SHELL := $(shell basename $$SHELL)
+
+ifeq ($(UNAME_S),Darwin)
+    BASH_COMPLETION_DIR := $(shell brew --prefix 2>/dev/null)/etc/bash_completion.d
+    ifeq ($(BASH_COMPLETION_DIR),/etc/bash_completion.d)
+        BASH_COMPLETION_DIR := $(HOME)/.local/share/bash-completion/completions
+    endif
+else
+    BASH_COMPLETION_DIR := $(HOME)/.local/share/bash-completion/completions
+endif
+ZSH_COMPLETION_DIR := $(HOME)/.zsh/completions
+
+install-completions:
+ifeq ($(USER_SHELL),zsh)
+	@$(MAKE) install-zsh-completions
+else
+	@$(MAKE) install-bash-completions
+endif
+
+install-bash-completions:
+	@mkdir -p $(BASH_COMPLETION_DIR)
+	@stack exec -- airlock --bash-completion-script airlock > $(BASH_COMPLETION_DIR)/airlock
+	@stack exec -- baby-jubjub-cli --bash-completion-script baby-jubjub-cli > $(BASH_COMPLETION_DIR)/baby-jubjub-cli
+	@echo '_strato_barometer() { COMPREPLY=($$(CMDARGS_COMPLETE=$$((COMP_CWORD-1)) strato-barometer "$${COMP_WORDS[@]:1}" 2>/dev/null | sed "s/^VALUE //")); }; complete -F _strato_barometer strato-barometer' > $(BASH_COMPLETION_DIR)/strato-barometer
+	@echo "Bash completions installed to $(BASH_COMPLETION_DIR)"
+
+install-zsh-completions:
+	@mkdir -p $(ZSH_COMPLETION_DIR)
+	@stack exec -- airlock --zsh-completion-script airlock > $(ZSH_COMPLETION_DIR)/_airlock
+	@stack exec -- baby-jubjub-cli --zsh-completion-script baby-jubjub-cli > $(ZSH_COMPLETION_DIR)/_baby-jubjub-cli
+	@echo '#compdef strato-barometer' > $(ZSH_COMPLETION_DIR)/_strato-barometer
+	@echo '_strato_barometer() { local completions; completions=($${(f)"$$(CMDARGS_COMPLETE=$$((CURRENT-1)) strato-barometer "$${words[@]:1}" 2>/dev/null | sed "s/^VALUE //")"}); _describe "command" completions; }' >> $(ZSH_COMPLETION_DIR)/_strato-barometer
+	@echo '_strato_barometer "$$@"' >> $(ZSH_COMPLETION_DIR)/_strato-barometer
+	@echo "Zsh completions installed to $(ZSH_COMPLETION_DIR)"
+	@echo "Add 'fpath=(~/.zsh/completions \$$fpath)' to ~/.zshrc if not already present"
