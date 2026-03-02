@@ -5,6 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -70,6 +71,11 @@ import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
+import Crypto.ECC (Curve_P256R1)
+import Crypto.Error
+import qualified Crypto.PubKey.ECC.P256 as P256
+import Crypto.PubKey.ECDSA (signatureFromIntegers, verifyDigest)
+import "crypton" Crypto.Hash (SHA256, digestFromByteString)
 import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
 import qualified Crypto.Hash.SHA256 as SHA256
 import Data.Bits
@@ -808,18 +814,18 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
           sfsRes <- runStatementBlock statementsForSuccess
           return $ sfsRes
         Just xs -> do
-          case aRealVal of
-            STuple vecOfVars -> do
-              let vars = V.toList vecOfVars
-              if length vars /= length returnsDecl
-                then typeError "try/catch statement expected a tuple of the same length as the returns statement" $ show (tryExpression, aRealVal)
-                else do
-                  forM_ (zip vars xs) $ \(var, (name, _)) -> do
-                    val <- getVar var
-                    addLocalVariable name val
-                  sfsRes' <- runStatementBlock statementsForSuccess
-                  return sfsRes'
-            _ -> typeError "try/catch statement expected a tuple" $ show (tryExpression, aRealVal)
+          vecOfVars <- case aRealVal of
+            STuple vec -> pure vec
+            v -> pure . V.singleton $ Constant v
+          let vars = V.toList vecOfVars
+          if length vars /= length returnsDecl
+            then typeError "try/catch statement expected a tuple of the same length as the returns statement" $ show (tryExpression, aRealVal)
+            else do
+              forM_ (zip vars xs) $ \(var, (name, _)) -> do
+                val <- getVar var
+                addLocalVariable name val
+              sfsRes' <- runStatementBlock statementsForSuccess
+              return sfsRes'
 runStatement (CC.TryCatchStatement tryBlock catchBlockMap pos) = do
   solidVMBreakpoint pos
   mRes <- EUnsafe.try $ do
@@ -1940,6 +1946,17 @@ expToVarAdd expr1 expr2 = do
             deductGasForOp . fromIntegral $ length a
             return . Constant $ SString a
           _ -> typeError "expToVarAdd" $ show (i1, i2)
+        SBytes a -> case i2 of
+          SBytes b -> do
+            deductGasForOp . fromIntegral $ ((+) `on` B.length) a b
+            return . Constant . SBytes $ a <> b
+          SNULL -> do
+            deductGasForOp . fromIntegral $ B.length a
+            return . Constant $ SBytes a
+          SReference{} -> do
+            deductGasForOp . fromIntegral $ B.length a
+            return . Constant $ SBytes a
+          _ -> typeError "expToVarAdd" $ show (i1, i2)
         SNULL -> case i2 of
           SNULL -> return $ Constant SNULL
           _ -> addEm i2 i1
@@ -2222,15 +2239,21 @@ callBuiltin "address" [SBytes bs] = pure . flip SAddress False . Address . bytes
 callBuiltin "address" [SNULL] = return $ SAddress 0 False
 callBuiltin "address" [SReference{}] = return $ SAddress 0 False
 callBuiltin "address" vs = typeError "address cast" $ show vs
-callBuiltin ("addmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a + b) `mod` c
-callBuiltin ("mulmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a * b) `mod` c
-callBuiltin ("blockhash") [SInteger blockNum] | blockNum < 0 = invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
-callBuiltin ("blockhash") [SInteger blockNum] = do
+callBuiltin ("addmod") [a', b', c'] = do
+  (a,b,c) <- (,,) <$> int a' <*> int b' <*> int c'
+  return . SInteger $ (a + b) `mod` c
+callBuiltin ("mulmod") [a', b', c'] = do
+  (a,b,c) <- (,,) <$> int a' <*> int b' <*> int c'
+  return . SInteger $ (a * b) `mod` c
+callBuiltin ("blockhash") [bNum] = do
+  blockNum <- int bNum
+  when (blockNum < 0) $ invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
   env' <- getEnv
   let curBlock = Env.blockHeader env'
   maybeTheHash <- getBlockHashWithNumber blockNum (BlockHeader.parentHash curBlock)
   maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
-callBuiltin ("selfdestruct") [SAddress a _] = do
+callBuiltin ("selfdestruct") [a'] = do
+  a <- getAddressVal a'
   contract' <- getCurrentAddress
   contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract'
   _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
@@ -2243,15 +2266,20 @@ callBuiltin "bool" [SBool b] = return $ SBool b
 callBuiltin "bool" [SString "true"] = return $ SBool True
 callBuiltin "bool" [SString "false"] = return $ SBool False
 callBuiltin "bool" [SNULL] = return $ SBool False
+callBuiltin "bool" [SReference _] = return $ SBool False
 callBuiltin "bool" vs = typeError "bool cast" $ show vs
 callBuiltin "byte" [SInteger n] = return $ SInteger (n .&. 0xff)
 callBuiltin "byte" [SNULL] = return $ SInteger 0
+callBuiltin "byte" [SReference _] = return $ SInteger 0
 callBuiltin "byte" vs = typeError "byte cast" $ show vs
 callBuiltin "bytes" [SInteger i] = pure . SBytes $ integer2Bytes i
 callBuiltin "bytes" [SString s] = pure . SBytes . DT.encodeUtf8 $ T.pack s
+callBuiltin "bytes" [SBytes bs] = pure $ SBytes bs
 callBuiltin "bytes" [SString s, SString "utf-8"] = pure . SBytes . DT.encodeUtf8 $ T.pack s
 callBuiltin "bytes" [SString s, SString "raw"] = pure . SBytes $ BC.pack s
 callBuiltin "bytes" [SAddress a _] = pure . SBytes . B.pack . word160ToBytes $ unAddress a
+callBuiltin "bytes" [SNULL] = pure $ SBytes B.empty
+callBuiltin "bytes" [SReference _] = pure $ SBytes B.empty
 callBuiltin "uint" args = return $ intBuiltin False Nothing args
 callBuiltin "int" args = return $ intBuiltin True Nothing args
 -- Handle sized integer type casts (uint256, uint128, uint120, int256, etc.)
@@ -2276,10 +2304,11 @@ callBuiltin name [SString s]
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
+callBuiltin "keccak256" [SBytes bs] = pure . SBytes . keccak256ToByteString $ hash bs
 callBuiltin "keccak256" args = pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
-callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pack h) of
-  Left err -> invalidArguments err ("" :: String)
-  Right bytestringHash -> do
+callBuiltin "ecrecover" [h', v', r', s'] = do
+    bytestringHash <- getBytesVal h'
+    v <- int v'
     rIntHash <- case r' of
       SInteger r -> pure r
       SString r -> case parseBaseInt r 16 of
@@ -2298,60 +2327,72 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pa
     case theSignerAddress of
       Nothing -> return . ((flip SAddress) False) $ fromIntegral theZero
       Just theAddress -> return . ((flip SAddress) False) $ theAddress
-callBuiltin "sha256" args = pure . SString . BC.unpack . SHA256.hash . rlpSerialize $ rlpEncodeValues args
-callBuiltin "ripemd160" args = pure . SString . BC.unpack . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
-callBuiltin "modExp" [SInteger b, SInteger e, SInteger m] = pure . SInteger $ Builtins.modExp b e m
-callBuiltin "ecAdd" [SInteger x1, SInteger y1, SInteger x2, SInteger y2] =
+callBuiltin "verifyP256" (h' : r' : s' : p') = getBytesVal h' >>= \h -> case digestFromByteString @SHA256 h of
+  Nothing -> invalidArguments "Could not decode hash from string" h
+  Just digest -> do
+    pub <- case p' of
+      [x', y'] -> P256.pointFromIntegers <$> ((,) <$> int x' <*> int y')
+      [pub'] -> do
+        pubBS' <- case pub' of
+          SBytes bs -> pure bs
+          SString s -> case B16.decode $ DT.encodeUtf8 $ T.pack s of
+            Left e -> invalidArguments "Could not decode public key from string: invalid hex" (s, e)
+            Right b -> pure b
+          _ -> invalidArguments "Could not decode public key: invalid value" pub'
+        pubBS <- case B.length pubBS' of
+          65 -> pure $ B.drop 1 pubBS'
+          64 -> pure pubBS'
+          _ -> invalidArguments "Could not decode public key from bytestring: invalid length" pubBS'
+        case P256.pointFromBinary pubBS of
+          CryptoPassed p -> pure p
+          CryptoFailed e -> invalidArguments "Could not decode public key from bytestring" (pubBS', e)
+      _ -> invalidArguments "Invalid arguments for P-256 public key" p'
+    (r,s) <- (,) <$> int r' <*> int s'
+    sig <- case signatureFromIntegers (Mod.Proxy @Curve_P256R1) (r, s) of
+      CryptoPassed sig' -> pure sig'
+      CryptoFailed e -> invalidArguments "Invalid P256 signature" e
+    let !isValidSig = verifyDigest (Mod.Proxy @Curve_P256R1) pub sig digest
+    pure $ SBool isValidSig
+callBuiltin "sha256" [SBytes bs] = pure . SBytes $ SHA256.hash bs
+callBuiltin "sha256" args = pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "ripemd160" [SBytes bs] = pure . SBytes $ RIPEMD160.hash bs
+callBuiltin "ripemd160" args = pure . SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "modExp" [b, e, m] = SInteger <$> (Builtins.modExp <$> int b <*> int e <*> int m)
+callBuiltin "ecAdd" [a, b, c, d] = do
+  (x1, y1, x2, y2) <- (,,,) <$> int a <*> int b <*> int c <*> int d
   let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
-   in pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
-callBuiltin "ecMul" [SInteger x1, SInteger y1, SInteger s] =
+  pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+callBuiltin "ecMul" [a, b, c] = do
+  (x1, y1, s) <- (,,) <$> int a <*> int b <*> int c
   let (x, y) = Builtins.ecMul (x1, y1) s
-   in pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+  pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
 callBuiltin "ecPairing" [SVariadic xs] =
-  let go (SInteger x : xs') = (x:) <$> go xs'
-      go []   = Right []
-      go xs' = Left xs'
-   in case go xs of
-        Right points -> pure . SBool $ Builtins.ecPairing points
-        Left xs' -> typeError "invalid args passed to ecPairing" $ show xs'
+  SBool . Builtins.ecPairing <$> traverse int xs
 callBuiltin "ecPairing" [SArray xs] =
   SBool . Builtins.ecPairing <$> traverse getInt (V.toList xs)
-callBuiltin "ecPairing" xs =
-  let go (SInteger x : xs') = (x:) <$> go xs'
-      go []   = Right []
-      go xs' = Left xs'
-   in case go xs of
-        Right points -> pure . SBool $ Builtins.ecPairing points
-        Left xs' -> typeError "invalid args passed to ecPairing" $ show xs'
-callBuiltin "poseidon" [SVariadic xs] =
-  let go !n (SInteger x : xs') = fmap (x:) <$> go (n+1) xs'
-      go !n []   = Right (n, [])
-      go _ xs' = Left xs'
-   in case go (0 :: Int) xs of
-        Right (n, inputs) | n > 0 && n <= 8 -> pure . SInteger $ Builtins.poseidonHash inputs
-        Right _ -> typeError "invalid args passed to poseidon" $ show xs
-        Left xs' -> typeError "invalid args passed to poseidon" $ show xs'
+callBuiltin "ecPairing" xs = do
+  SBool . Builtins.ecPairing <$> traverse int xs
+callBuiltin "poseidon" [SVariadic xs] = case length xs of
+  n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
+  _ -> typeError "invalid args passed to poseidon" $ show xs
 callBuiltin "poseidon" [SArray xs] = case V.length xs of
   n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse getInt (V.toList xs)
   _ -> typeError "invalid args passed to poseidon" $ show xs
-callBuiltin "poseidon" xs =
-  let go !n (SInteger x : xs') = fmap (x:) <$> go (n+1) xs'
-      go !n []   = Right (n, [])
-      go _ xs' = Left xs'
-   in case go (0 :: Int) xs of
-        Right (n, inputs) | n > 0 && n <= 8 -> pure . SInteger $ Builtins.poseidonHash inputs
-        Right _ -> typeError "invalid args passed to poseidon" $ show xs
-        Left xs' -> typeError "invalid args passed to poseidon" $ show xs'
-callBuiltin ("payable") [SAddress a _] = return $ SAddress a True
-callBuiltin "require" (SBool cond : msg) = do
+callBuiltin "poseidon" xs = case length xs of
+  n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
+  _ -> typeError "invalid args passed to poseidon" $ show xs
+callBuiltin ("payable") [a] = flip SAddress True <$> getAddressVal a
+callBuiltin "require" (condVar : msg) = do
+  cond <- getBoolVal condVar
   case msg of
     [] -> require cond Nothing
     (SString s : _) -> require cond (Just s)
     (m : _) -> require cond (Just $ show m)
   return SNULL
-callBuiltin "assert" [SBool cond] = SNULL <$ assert cond
+callBuiltin "assert" [cond] = pure . const SNULL =<< assert =<< getBoolVal cond
 
-callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals) = do
+callBuiltin "create" args@(cName : src : argVals) = do
+  (contractName', contractSrc) <- (,) <$> getStringVal cName <*> getStringVal src
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
 
@@ -2374,7 +2415,8 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
-callBuiltin "create2" args@(salt : n@(SString contractName') : SString contractSrc : argVals) = do
+callBuiltin "create2" args@(salt : n : src : argVals) = do
+  (contractName', contractSrc) <- (,) <$> getStringVal n <*> getStringVal src
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
 
@@ -2394,7 +2436,8 @@ callBuiltin "create2" args@(salt : n@(SString contractName') : SString contractS
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
-callBuiltin "fastForward" [SInteger seconds] = do
+callBuiltin "fastForward" [secs] = do
+  seconds <- int secs
   -- Only allow fastForward during testing
   env' <- getEnv
   if not (Env.runningTests env')

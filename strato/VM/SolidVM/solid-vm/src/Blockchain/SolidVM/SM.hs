@@ -613,6 +613,7 @@ getVariableOfName name = do
                        "derive",
                        "sha256",
                        "ecrecover",
+                       "verifyP256",
                        "blockhash",
                        "addmod",
                        "mulmod",
