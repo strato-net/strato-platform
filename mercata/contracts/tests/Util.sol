@@ -73,16 +73,14 @@ library TestUtils {
 
     /**
      * @notice Assert that an error message matches the expected value
-     * @dev Wraps the expected error in SString format as required by SolidVM
      * @param actualError The error string captured from the catch block
-     * @param expectedError The expected error message (without SString wrapper)
+     * @param expectedError The expected error message
      * @param context Additional context for the assertion failure message
      */
     function assertErrorMessage(string memory actualError, string memory expectedError, string memory context) internal pure {
-        string memory expectedWrapped = string.concat('SString "', expectedError, '"');
         require(
-            actualError == expectedWrapped,
-            string.concat(context, " - Expected: ", expectedWrapped, ", Got: ", actualError)
+            actualError == expectedError,
+            string.concat(context, " - Expected: ", expectedError, ", Got: ", actualError)
         );
     }
 }

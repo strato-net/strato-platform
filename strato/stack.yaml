@@ -1,5 +1,10 @@
 packages:
 - libs/poseidon-hash
+- libs/baby-jubjub
+- libs/groth16-native
+- libs/groth16-snarkjs
+- libs/groth16-rapidsnark
+- libs/strato-auth
 
 - api/bloc/bloc2
 - api/bloc/bloc2api

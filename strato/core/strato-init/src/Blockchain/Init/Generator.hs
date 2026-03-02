@@ -75,6 +75,7 @@ createGenesisInfo network = do
                     [ (0x96714c4a2163a3ee55356e20bc23fe8ea5e7aaf0, 100_000 * HELIUM.oneE18)
                     , (0x523fef378674d39363aa8b6ac5122e301c528432, 100_000 * HELIUM.oneE18)
                     ]
+          "lithium" -> HELIUM.lithiumGenesisBlock
           _ -> HELIUM.genesisBlock
 
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
@@ -112,6 +113,16 @@ mkAll network = do
   liftIO $ createDirectoryIfMissing True dir
   liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
   liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
+
+  -- Set this node as the default for airlock and other tools
+  liftIO $ do
+    nodeDir <- getCurrentDirectory
+    home <- getHomeDirectory
+    let stratoDir = home </> ".strato"
+        defaultNodeFile = stratoDir </> "default-node"
+    createDirectoryIfMissing True stratoDir
+    writeFile defaultNodeFile nodeDir
+    putStrLn $ "Set default node directory: " ++ nodeDir
 
   genesisExists <- doesFileExist "genesis.json"
 

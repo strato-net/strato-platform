@@ -23,6 +23,11 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/advanced?tab=mint&subtab=vaults';
   }
   
+  // Vault activities - goes to the Vault page
+  if (lowerName.includes('vault')) {
+    return '/dashboard/vault';
+  }
+  
   // Swap LP activities - goes to the Advanced page, Swap Pools tab
   if (lowerName.includes('swap lp')) {
     return '/dashboard/advanced?tab=swap';

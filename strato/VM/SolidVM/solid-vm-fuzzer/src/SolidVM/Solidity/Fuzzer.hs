@@ -143,9 +143,9 @@ accessible Nothing         = True
 accessible _               = False
 
 emptyOrBool :: [(a, IndexedType)] -> Bool
-emptyOrBool []                                = True
-emptyOrBool [(_, IndexedType _ SVMType.Bool)] = True
-emptyOrBool _                                 = False
+emptyOrBool []                                  = True
+emptyOrBool [(_, IndexedType _ SVMType.Bool _)] = True
+emptyOrBool _                                   = False
 
 test :: VMBase m => Address -> SolidString -> Func -> FuzzerM m FuzzerResult
 test addr fName f =

@@ -51,6 +51,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
     selectedToken,
     setSelectedToken,
     fetchWithdrawalSummary,
+    triggerWithdrawalRefresh,
   } = useBridgeContext();
 
   // State
@@ -299,6 +300,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         refetchBalance(),
         fetchWithdrawalSummary(false),
       ]);
+      triggerWithdrawalRefresh();
     } finally {
       setIsLoading(false);
     }

@@ -1,0 +1,50 @@
+name:                baby-jubjub
+version:             0.1.0.0
+synopsis:            Baby JubJub elliptic curve and EdDSA signatures for SNARK circuits
+description:         |
+  Implementation of the Baby JubJub twisted Edwards curve and EdDSA signature
+  scheme, compatible with circom/snarkjs. Baby JubJub is defined over the
+  BN254 scalar field and is commonly used in zkSNARK applications.
+  
+  This library is intended for generating valid SNARK witness inputs.
+  It has not been audited for use cases requiring timing-attack resistance.
+license:             MIT
+license-file:        LICENSE
+author:              BlockApps
+maintainer:          info@blockapps.net
+category:            Cryptography
+build-type:          Simple
+
+extra-source-files:
+  - README.md
+
+dependencies:
+  - base >= 4.12 && < 5
+  - bytestring >= 0.10
+  - text >= 1.2
+  - cryptonite >= 0.25
+  - memory >= 0.14
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Crypto.Curve.BabyJubJub
+    - Crypto.Curve.BabyJubJub.EdDSA
+
+executables:
+  baby-jubjub-cli:
+    main:                Main.hs
+    source-dirs:         app
+    dependencies:
+      - baby-jubjub
+      - optparse-applicative >= 0.14
+      - base16-bytestring >= 1.0
+
+tests:
+  baby-jubjub-test:
+    main:                Spec.hs
+    source-dirs:         test
+    dependencies:
+      - baby-jubjub
+      - hspec >= 2.7
+      - QuickCheck >= 2.13

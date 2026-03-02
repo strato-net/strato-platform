@@ -30,6 +30,7 @@ import Control.Lens ((^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
 import Data.Decimal
 import Data.Foldable (asum)
 import Data.IORef
@@ -160,6 +161,11 @@ instance Eq Value where
   (SEnumVal _ _ n1) == SNULL = n1 == 0
   SReference{} == (SEnumVal _ _ n2) = 0 == n2
   (SEnumVal _ _ n1) == SReference{} = n1 == 0
+  (SBytes b1) == (SBytes b2) = b1 == b2
+  SNULL == (SBytes b2) = B.null b2
+  (SBytes b1) == SNULL = B.null b1
+  SReference{} == (SBytes b2) = B.null b2
+  (SBytes b1) == SReference{} = B.null b1
   x == y = todo "Value/Eq" (x, y)
 
 instance Ord Value where
@@ -189,6 +195,11 @@ instance Ord Value where
   compare (SAddress a1 _) SNULL = compare a1 0x0
   compare SReference{} (SAddress a2 _) = compare 0x0 a2
   compare (SAddress a1 _) SReference{} = compare a1 0x0
+  compare (SBytes b1) (SBytes b2) = compare b1 b2
+  compare SNULL (SBytes b2) = compare B.empty b2
+  compare (SBytes b1) SNULL = compare b1 B.empty
+  compare SReference{} (SBytes b2) = compare B.empty b2
+  compare (SBytes b1) SReference{} = compare b1 B.empty
   compare x y = todo "Value/Ord" (x, y)
 
 instance RLPSerializable Value where

@@ -10,6 +10,9 @@
     "PAXG": {
       "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d"
     },
+    "RETH": {
+      "targetAssetAddress": "2e4789eb7db143576da25990a3c0298917a8a87d"
+    },
     "SUSDS": {
       "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
     },
@@ -28,8 +31,7 @@
     },
     "XAG": {
       "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
-      "weekendProxy": "KAG",
-      "equivalentAssets": ["KAG"]
+      "comment": "Weekend fallback intentionally disabled. To restore, set weekendProxy to KAG and equivalentAssets to [\"KAG\"] once KAG feeds are reliable again."
     },
     "XAU": {
       "targetAssetAddress": "cdc93d30182125e05eec985b631c7c61b3f63ff0",

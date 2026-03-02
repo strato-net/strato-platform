@@ -21,7 +21,7 @@ import Control.Arrow ((&&&))
 import Control.DeepSeq
 import Data.Binary
 import Data.Function (on)
-import Data.Swagger hiding (Format, format)
+import Data.OpenApi hiding (Format, format)
 import qualified Database.Persist.Postgresql as SQL
 import qualified Generic.Random as GR
 import Servant.Docs hiding (pretty)
