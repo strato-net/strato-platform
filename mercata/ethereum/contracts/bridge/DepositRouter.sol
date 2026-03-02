@@ -39,6 +39,8 @@ contract DepositRouter is
     uint96 public depositId;
     // address(0) represents ETH configuration for depositETH()
     mapping(address => TokenConfig) public tokenConfig;
+    // key: external token => target STRATO token => permitted route
+    mapping(address => mapping(address => bool)) public routePermitted;
 
     // ============ Structs ============
     struct TokenConfig {
@@ -52,11 +54,17 @@ contract DepositRouter is
         uint256 amount,
         address indexed sender,
         address indexed stratoAddress,
+        address targetStratoToken,
         uint96 depositId
     );
     event TokenConfigUpdated(
         address indexed token,
         uint256 minAmount,
+        bool isPermitted
+    );
+    event RoutePermittedUpdated(
+        address indexed token,
+        address indexed targetStratoToken,
         bool isPermitted
     );
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
@@ -92,6 +100,7 @@ contract DepositRouter is
         address token,
         uint256 amount,
         address stratoAddress,
+        address targetStratoToken,
         uint256 nonce,
         uint256 deadline,
         bytes calldata signature
@@ -99,11 +108,13 @@ contract DepositRouter is
         if (amount == 0) revert ZeroAmount();
         if (token == address(0)) revert UseDepositETH();
         if (stratoAddress == address(0)) revert InvalidAddress();
+        if (targetStratoToken == address(0)) revert InvalidAddress();
         if (deadline < block.timestamp) revert PermitExpired();
 
         TokenConfig storage c = tokenConfig[token];
         if (amount < c.min) revert BelowMinimum();
         if (!c.isPermitted) revert NotPermitted();
+        if (!routePermitted[token][targetStratoToken]) revert NotPermitted();
 
         address safe = gnosisSafe;
         unchecked {
@@ -140,20 +151,24 @@ contract DepositRouter is
             depositedAmount,
             msg.sender,
             stratoAddress,
+            targetStratoToken,
             depositId
         );
     }
 
     // using address(0) for ETH
     function depositETH(
-        address stratoAddress
+        address stratoAddress,
+        address targetStratoToken
     ) external payable whenNotPaused nonReentrant {
         if (msg.value == 0) revert ZeroAmount();
         if (stratoAddress == address(0)) revert InvalidAddress();
+        if (targetStratoToken == address(0)) revert InvalidAddress();
 
         TokenConfig storage c = tokenConfig[address(0)];
         if (msg.value < c.min) revert BelowMinimum();
         if (!c.isPermitted) revert NotPermitted();
+        if (!routePermitted[address(0)][targetStratoToken]) revert NotPermitted();
 
         address safe = gnosisSafe;
         unchecked {
@@ -168,6 +183,7 @@ contract DepositRouter is
             msg.value,
             msg.sender,
             stratoAddress,
+            targetStratoToken,
             depositId
         );
     }
@@ -187,6 +203,17 @@ contract DepositRouter is
         if (c.isPermitted == isPermitted) return;
         c.isPermitted = isPermitted;
         emit TokenConfigUpdated(token, c.min, isPermitted);
+    }
+
+    function setRoutePermitted(
+        address token,
+        address targetStratoToken,
+        bool isPermitted
+    ) external onlyOwner {
+        if (targetStratoToken == address(0)) revert InvalidAddress();
+        if (routePermitted[token][targetStratoToken] == isPermitted) return;
+        routePermitted[token][targetStratoToken] = isPermitted;
+        emit RoutePermittedUpdated(token, targetStratoToken, isPermitted);
     }
 
     function batchUpdateTokens(
@@ -230,18 +257,21 @@ contract DepositRouter is
 
     function canDeposit(
         address token,
-        uint256 amount
+        uint256 amount,
+        address targetStratoToken
     ) external view returns (bool) {
         if (amount == 0 || paused()) return false;
+        if (targetStratoToken == address(0)) return false;
 
         TokenConfig storage c = tokenConfig[token];
         if (amount < c.min) return false;
         if (!c.isPermitted) return false;
+        if (!routePermitted[token][targetStratoToken]) return false;
         return true;
     }
 
     function version() external pure virtual returns (string memory) {
-        return "1.0.0";
+        return "2.0.0";
     }
 
     function _authorizeUpgrade(
