@@ -51,6 +51,8 @@ import qualified Data.Text as T
 import Data.Bits (shiftL, (.|.))
 import Control.Monad (replicateM, when, forM_)
 import Data.Binary.Get (Get, runGetOrFail, getWord32le, getWord64le, getByteString, skip)
+import Control.Parallel.Strategies (parMap, rdeepseq)
+import Data.List (foldl')
 
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.:), (.:?), (.!=))
@@ -403,14 +405,37 @@ fq2ToInts fq2 =
        _        -> (0, 0)  -- Shouldn't happen
 
 -- | Multi-scalar multiplication in G1: sum(s_i * P_i)
+-- Uses parallel evaluation and chunked reduction for better performance
 multiScalarMulG1 :: [G1'] -> [Fr] -> G1'
 multiScalarMulG1 points scalars = 
-  foldr add O $ zipWith mul points scalars  -- O is point at infinity (identity)
+  let -- Filter out zero scalars (they contribute nothing)
+      nonZeroPairs = [(p, s) | (p, s) <- zip points scalars, s /= 0]
+      -- Compute scalar multiplications in parallel
+      products = parMap rdeepseq (uncurry mul) nonZeroPairs
+      -- Sum in chunks for better cache locality, then combine
+      chunkSize = 256
+      chunks = chunksOf chunkSize products
+      chunkSums = parMap rdeepseq (foldl' add O) chunks
+  in foldl' add O chunkSums
 
 -- | Multi-scalar multiplication in G2: sum(s_i * P_i)  
+-- Uses parallel evaluation and chunked reduction for better performance
 multiScalarMulG2 :: [G2'] -> [Fr] -> G2'
 multiScalarMulG2 points scalars =
-  foldr add O $ zipWith mul points scalars  -- O is point at infinity (identity)
+  let -- Filter out zero scalars (they contribute nothing)
+      nonZeroPairs = [(p, s) | (p, s) <- zip points scalars, s /= 0]
+      -- Compute scalar multiplications in parallel
+      products = parMap rdeepseq (uncurry mul) nonZeroPairs
+      -- Sum in chunks for better cache locality, then combine
+      chunkSize = 256
+      chunks = chunksOf chunkSize products
+      chunkSums = parMap rdeepseq (foldl' add O) chunks
+  in foldl' add O chunkSums
+
+-- | Split a list into chunks of given size
+chunksOf :: Int -> [a] -> [[a]]
+chunksOf _ [] = []
+chunksOf n xs = let (chunk, rest) = splitAt n xs in chunk : chunksOf n rest
 
 -- | Negate a G1 point
 neg :: G1' -> G1'

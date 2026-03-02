@@ -73,6 +73,10 @@ executables:
     source-dirs: exec_src/
     main: Main.hs
     other-modules: []
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
     dependencies:
       - aeson
       - airlock
