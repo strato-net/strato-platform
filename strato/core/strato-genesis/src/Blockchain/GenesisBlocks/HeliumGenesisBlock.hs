@@ -1351,6 +1351,33 @@ validators = [
 admins :: [Address]
 admins = [blockappsTestAddress]
 
+-- Lithium network configuration
+lithiumValidatorAddress :: Address
+lithiumValidatorAddress = 0x98e97f0514e425532cd3ffd5c36349c18f6ad365
+
+lithiumValidators :: [Validator]
+lithiumValidators = [Validator lithiumValidatorAddress]
+
+lithiumAdmins :: [Address]
+lithiumAdmins = [lithiumValidatorAddress]
+
+lithiumConfig :: HeliumGenesisBlockConfig
+lithiumConfig = HeliumGenesisBlockConfig
+  lithiumValidators
+  lithiumAdmins
+  lithiumValidatorAddress
+  [sepolia]
+  [eth, wbtc, paxg, usdc, usdt]
+  (bridgeRelayerAddress, 100_000 * oneE18)
+  ((,100_000 * oneE18) <$> [oracleAddress1, oracleAddress2])
+
+-- Lithium genesis block with funded validator account
+lithiumGenesisBlock :: GenesisInfo
+lithiumGenesisBlock = 
+  let baseGenesis = genesisBlockTemplate lithiumConfig
+      fundedValidator = NonContract lithiumValidatorAddress 1809251394333065553493296640760748560207343510400633813116524750123642650624
+  in baseGenesis { addressInfo = fundedValidator : addressInfo baseGenesis }
+
 descriptions :: M.Map Text Text
 descriptions = M.fromList
   [ ("PAXGST", "PAXGST is a digital asset on STRATO Mercata pegged 1:1 to PAX Gold (PAXG) on Ethereum, enabling holders to bridge their PAXG into Mercata, and access DeFi and staking opportunities."),

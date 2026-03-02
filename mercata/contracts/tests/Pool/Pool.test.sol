@@ -1812,6 +1812,195 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
   require(balB1 == balB2, "tokenB reserve mismatch");
 }
 
+    // ============ PAUSE & DISABLE TESTS ============
+
+    function it_pool_pause_allows_removes_but_blocks_other_operations() {
+        // Setup: add initial liquidity while unpaused
+        uint256 amountA = 1000e18;
+        uint256 amountB = 2000e18;
+        require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
+        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+
+        uint256 initialLPBalance = ERC20(pool.lpToken()).balanceOf(address(this));
+
+        // Pause the pool
+        pool.setPaused(true);
+        require(pool.isPaused() == true, "Pool should be paused");
+
+        // TEST: RemoveLiquidity should STILL WORK when paused (exit always allowed)
+        require(ERC20(pool.lpToken()).approve(address(pool), initialLPBalance / 4), "Remove approval failed");
+        (uint256 tokenBReceived, uint256 tokenAReceived) = pool.removeLiquidity(initialLPBalance / 4, 1, 1, block.timestamp + 3600);
+        require(tokenAReceived > 0 && tokenBReceived > 0, "RemoveLiquidity should work when paused");
+
+        // Unpause and verify operations work again
+        pool.setPaused(false);
+        require(pool.isPaused() == false, "Pool should be unpaused");
+
+        // Now swap should work
+        uint256 swapAmount = 100e18;
+        require(ERC20(tokenAAddress).approve(address(pool), swapAmount), "Swap approval after unpause failed");
+        uint256 output = pool.swap(true, swapAmount, 1, block.timestamp + 3600);
+        require(output > 0, "Swap should work after unpause");
+
+        // AddLiquidity should work (use single token to avoid ratio issues after swap)
+        uint256 addAmountA = 100e18;
+        require(ERC20(tokenAAddress).approve(address(pool), addAmountA), "Add A approval failed");
+        uint256 minted = pool.addLiquiditySingleToken(true, addAmountA, block.timestamp + 3600);
+        require(minted > 0, "AddLiquiditySingleToken should work after unpause");
+    }
+
+    function it_pool_disable_blocks_removes_but_reenable_allows_operations() {
+        // Setup: add initial liquidity while enabled
+        uint256 amountA = 1000e18;
+        uint256 amountB = 2000e18;
+        require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
+        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+
+        uint256 lpBalance = ERC20(pool.lpToken()).balanceOf(address(this));
+
+        // Disable the pool (sets both isPaused and isDisabled)
+        pool.setDisabled(true);
+        require(pool.isPaused() == true, "Pool should be paused when disabled");
+        require(pool.isDisabled() == true, "Pool should be disabled");
+
+        // Re-enable: clears isDisabled but isPaused remains true (must unpause separately)
+        pool.setDisabled(false);
+        require(pool.isDisabled() == false, "Pool should be re-enabled (isDisabled cleared)");
+        require(pool.isPaused() == true, "Pool should STILL be paused after re-enable (safety feature)");
+
+        // TEST: RemoveLiquidity should work after re-enable (even though still paused)
+        require(ERC20(pool.lpToken()).approve(address(pool), lpBalance / 4), "Remove approval failed");
+        (uint256 tokenBReceived, uint256 tokenAReceived) = pool.removeLiquidity(lpBalance / 4, 1, 1, block.timestamp + 3600);
+        require(tokenAReceived > 0 && tokenBReceived > 0, "RemoveLiquidity should work after re-enable");
+
+        // Must explicitly unpause to allow swaps/adds again
+        pool.setPaused(false);
+        require(pool.isPaused() == false, "Pool should be unpaused after explicit setPaused(false)");
+
+        // Now swaps should work
+        uint256 swapAmount = 100e18;
+        require(ERC20(tokenAAddress).approve(address(pool), swapAmount), "Swap approval failed");
+        uint256 output = pool.swap(true, swapAmount, 1, block.timestamp + 3600);
+        require(output > 0, "Swap should work after explicit unpause");
+    }
+
+    function it_pool_tokens_must_remain_active_for_operations() {
+        // Setup: add initial liquidity while tokens are active
+        uint256 amountA = 1000e18;
+        uint256 amountB = 2000e18;
+        require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
+        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+
+        // Verify tokens are initially active
+        require(Token(tokenAAddress).status() == TokenStatus.ACTIVE, "TokenA should start active");
+        require(Token(tokenBAddress).status() == TokenStatus.ACTIVE, "TokenB should start active");
+
+        // Deactivate tokenA (status != ACTIVE)
+        Token(tokenAAddress).setStatus(1); // Not ACTIVE
+        require(Token(tokenAAddress).status() != TokenStatus.ACTIVE, "TokenA should be inactive");
+
+        // Reactivate tokenA
+        Token(tokenAAddress).setStatus(2); // ACTIVE
+        require(Token(tokenAAddress).status() == TokenStatus.ACTIVE, "TokenA should be active again");
+
+        // TEST: Operations should work with active tokens
+        uint256 swapAmount = 100e18;
+        require(ERC20(tokenAAddress).approve(address(pool), swapAmount), "Swap approval after reactivate failed");
+        uint256 output = pool.swap(true, swapAmount, 1, block.timestamp + 3600);
+        require(output > 0, "Swap should work with active tokens");
+    }
+
+    function it_pool_initialize_checks_token_status() {
+        // Create new tokens with different statuses
+        address newTokenA = m.tokenFactory().createToken(
+            "New Token A", "Test New A", emptyArray, emptyArray, emptyArray, "NTA", 10000000e18, 18
+        );
+        address newTokenB = m.tokenFactory().createToken(
+            "New Token B", "Test New B", emptyArray, emptyArray, emptyArray, "NTB", 10000000e18, 18
+        );
+        
+        // Set both tokens to active
+        Token(newTokenA).setStatus(2); // ACTIVE
+        Token(newTokenB).setStatus(2); // ACTIVE
+
+        // Verify tokens are active before pool creation
+        require(Token(newTokenA).status() == TokenStatus.ACTIVE, "NewTokenA should be active");
+        require(Token(newTokenB).status() == TokenStatus.ACTIVE, "NewTokenB should be active");
+
+        // Create pool with active tokens - should succeed
+        Token(newTokenA).mint(address(this), 100000000e18);
+        Token(newTokenB).mint(address(this), 100000000e18);
+        
+        address newPoolAddress = m.poolFactory().createPool(newTokenA, newTokenB);
+        require(newPoolAddress != address(0), "Pool should be created with active tokens");
+        
+        Pool newPool = Pool(newPoolAddress);
+        require(address(newPool.tokenA()) == newTokenA, "Pool should have correct tokenA");
+        require(address(newPool.tokenB()) == newTokenB, "Pool should have correct tokenB");
+    }
+
+    function it_pool_owner_can_toggle_pause_and_disable() {
+        // Test setPaused
+        require(pool.isPaused() == false, "Pool should start unpaused");
+        
+        pool.setPaused(true);
+        require(pool.isPaused() == true, "setPaused(true) should pause pool");
+        
+        pool.setPaused(false);
+        require(pool.isPaused() == false, "setPaused(false) should unpause pool");
+
+        // Test setDisabled behavior
+        require(pool.isDisabled() == false, "Pool should start enabled");
+        
+        // Disable: should set both isPaused and isDisabled
+        pool.setDisabled(true);
+        require(pool.isPaused() == true, "setDisabled(true) should set isPaused");
+        require(pool.isDisabled() == true, "setDisabled(true) should set isDisabled");
+        
+        // Re-enable: should clear isDisabled but KEEP isPaused (safety feature)
+        pool.setDisabled(false);
+        require(pool.isPaused() == true, "setDisabled(false) should KEEP isPaused (must unpause separately)");
+        require(pool.isDisabled() == false, "setDisabled(false) should clear isDisabled");
+
+        // Must explicitly unpause
+        pool.setPaused(false);
+        require(pool.isPaused() == false, "Explicit setPaused(false) should clear isPaused");
+
+        // Test setDisabled when already paused
+        pool.setPaused(true);
+        require(pool.isPaused() == true, "Pool should be paused");
+        
+        pool.setDisabled(true);
+        require(pool.isPaused() == true, "setDisabled(true) should keep isPaused when already paused");
+        require(pool.isDisabled() == true, "setDisabled(true) should set isDisabled");
+    }
+
+    function it_pool_pause_state_persists_across_operations() {
+        // Setup: add initial liquidity
+        uint256 amountA = 1000e18;
+        uint256 amountB = 2000e18;
+        require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
+        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+
+        // Pause
+        pool.setPaused(true);
+        
+        // Verify pause state persists even after allowed operations (remove)
+        uint256 lpBalance = ERC20(pool.lpToken()).balanceOf(address(this));
+        require(ERC20(pool.lpToken()).approve(address(pool), lpBalance / 4), "Remove approval failed");
+        pool.removeLiquidity(lpBalance / 4, 1, 1, block.timestamp + 3600);
+        
+        require(pool.isPaused() == true, "Pause state should persist after remove operation");
+        
+        // Unpause
+        pool.setPaused(false);
+        require(pool.isPaused() == false, "Pool should be unpaused");
+    }
+
 
 
 }

@@ -13,6 +13,8 @@ import {
 import { useVaultContext } from "@/context/VaultContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits, parseUnits } from "ethers";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { api } from "@/lib/axios";
 import WithdrawBasketPreview, { BasketItem } from "./WithdrawBasketPreview";
 import { Alert, AlertDescription } from "../ui/alert";
@@ -59,6 +61,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
 
   const { vaultState, withdraw, refreshVault } = useVaultContext();
   const { toast } = useToast();
+  const { userRewards } = useRewardsUserInfo();
 
   const {
     userShares,
@@ -363,6 +366,15 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
               </div>
             </div>
           )}
+
+          {/* Estimated Rewards */}
+          <RewardsWidget
+            userRewards={userRewards}
+            activityName=" Vault Token"
+            inputAmount={sharesToBurn !== "0" ? formatUnits(sharesToBurn, 18) : undefined}
+            isWithdrawal={true}
+            actionLabel="Withdraw"
+          />
 
           {/* Submit Button */}
           <Button

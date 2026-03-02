@@ -20,6 +20,8 @@ import CollateralManagementTable from "@/components/borrow/CollateralManagementT
 import { useSmartPolling } from "@/hooks/useSmartPolling";
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
+import { useSearchParams } from 'react-router-dom';
+import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
 
 const Borrow = () => {
   const { userAddress, isLoggedIn } = useUser();
@@ -33,8 +35,18 @@ const Borrow = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [repayLoading, setRepayLoading] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
-  const [activeTab, setActiveTab] = useState<"borrow" | "repay">("borrow");
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') === 'repay' ? 'repay' : 'borrow') as "borrow" | "repay";
+  const [activeTab, setActiveTab] = useState<"borrow" | "repay">(initialTab);
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+
+  // Update active tab when URL query param changes
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'repay' || tabParam === 'borrow') {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   const { toast } = useToast();
   const {
@@ -242,6 +254,7 @@ const Borrow = () => {
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to borrow USDST" />
           )}
+          {isLoggedIn && <LiquidationAlertBanner />}
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Left Column - Borrow/Repay Tabbed Card */}

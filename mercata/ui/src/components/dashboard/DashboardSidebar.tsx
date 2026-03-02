@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { 
@@ -14,8 +14,6 @@ import {
   Droplets, 
   Shield,
   UserPlus,
-  ChevronUp,
-  ChevronDown,
   LucideIcon,
   Vault
 } from 'lucide-react';
@@ -38,9 +36,6 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
-];
-
-const MORE_NAV_ITEMS: NavItem[] = [
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
   { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
@@ -53,7 +48,6 @@ const DashboardSidebar = () => {
   const { isAdmin } = useUser();
   const { pathname } = useLocation();
   const { resolvedTheme } = useTheme();
-  const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -66,18 +60,6 @@ const DashboardSidebar = () => {
     window.addEventListener('resize', updateWidth);
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
-
-  // Auto-expand "More" if any of its items is active
-  useEffect(() => {
-    const isMoreItemActive = MORE_NAV_ITEMS
-      .filter(item => !item.adminOnly || isAdmin)
-      .some(item => 
-        item.path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.path)
-      );
-    if (isMoreItemActive) {
-      setIsMoreOpen(true);
-    }
-  }, [pathname, isAdmin]);
 
   const isActive = (path: string) => 
     path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(path);
@@ -113,33 +95,12 @@ const DashboardSidebar = () => {
       </div>
 
       <nav className="flex-1 py-4 px-3 overflow-y-auto">
-        {/* Primary Navigation */}
+        {/* Navigation */}
         <ul className="space-y-1">
-          {PRIMARY_NAV_ITEMS.map(renderNavItem)}
+          {PRIMARY_NAV_ITEMS
+            .filter(item => !item.adminOnly || isAdmin)
+            .map(renderNavItem)}
         </ul>
-
-        {/* More Section */}
-        <div className="mt-4">
-          <button
-            onClick={() => setIsMoreOpen(!isMoreOpen)}
-            className="flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors"
-          >
-            <span>More</span>
-            {isMoreOpen ? (
-              <ChevronUp size={18} className="text-gray-400" />
-            ) : (
-              <ChevronDown size={18} className="text-gray-400" />
-            )}
-          </button>
-          
-          {isMoreOpen && (
-            <ul className="mt-1 space-y-1">
-              {MORE_NAV_ITEMS
-                .filter(item => !item.adminOnly || isAdmin)
-                .map(renderNavItem)}
-            </ul>
-          )}
-        </div>
       </nav>
     </aside>
   );

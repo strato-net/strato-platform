@@ -119,13 +119,23 @@ export const getEventQueryParams = async (): Promise<{
         continue;
       }
 
-      const actionableEventsArray =
-        typeof item.actionableEvents === "string"
-          ? JSON.parse(item.actionableEvents)
-          : [];
+      let actionableEventsArray: any[] = [];
+      if (typeof item.actionableEvents === "string") {
+        try {
+          const parsed = JSON.parse(item.actionableEvents);
+          actionableEventsArray = Array.isArray(parsed)
+            ? parsed
+            : Object.keys(parsed || {})
+                .filter((key) => /^\d+$/.test(key))
+                .sort((a, b) => Number(a) - Number(b))
+                .map((key) => parsed[key]);
+        } catch {
+          actionableEventsArray = [];
+        }
+      }
 
       for (const evt of actionableEventsArray) {
-        if (evt.eventName) {
+        if (evt?.eventName) {
           contractAddresses.add(item.sourceContract);
           eventNames.add(evt.eventName);
           validPairs.add(makeEventPairKey(item.sourceContract, evt.eventName));

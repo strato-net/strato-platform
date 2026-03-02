@@ -4,6 +4,7 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import stakeSemanticsConfig from "./rewardsStakeSemantics.json";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getSafetyModuleConfig } from "./safety.service";
+import { getVaultShareTokenAddress } from "./vault.service";
 import {
   calculatePersonalEmissionRate,
   parseActivityType,
@@ -114,6 +115,7 @@ const inferStakeUsdInfo = (
     priceMap: Map<string, string>;
     mTokenAddress: string | null;
     sTokenAddress: string | null;
+    vaultShareTokenAddress: string | null;
   },
   baseActivity: { name: string; sourceContract: string; totalStake: string; stakeDenomination: StakeDenomination; stakeAssetAddress: string | null },
   userStakeWei?: string
@@ -181,6 +183,19 @@ const inferStakeUsdInfo = (
       totalStakeUsd: baseActivity.totalStake || "0",
       userStakeUsd: userStakeWei ?? undefined,
     };
+  }
+
+  // 5) Vault Token: stake is SLP shares (priced via getVaultShareTokenPrice in getCompletePriceMap)
+  if (lower.includes("vault")) {
+    const vaultAddr = (ctx.vaultShareTokenAddress || "").toLowerCase();
+    const price = vaultAddr ? (ctx.priceMap.get(vaultAddr) || null) : null;
+    if (price) {
+      return {
+        stakeUnitPriceUsd: price,
+        totalStakeUsd: mulDiv1e18(baseActivity.totalStake, price),
+        userStakeUsd: userStakeWei ? mulDiv1e18(userStakeWei, price) : undefined,
+      };
+    }
   }
 
   return empty;
@@ -383,15 +398,17 @@ export const fetchUserActivities = async (
     ]);
 
     // Build shared pricing context once (used for LP/share-token TVL conversions)
-    const [priceMap, mTokenAddress] = await Promise.all([
+    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
       getCompletePriceMap(accessToken),
       getMTokenAddress(accessToken),
+      getVaultShareTokenAddress(accessToken).catch(() => ""),
     ]);
     const { sToken } = getSafetyModuleConfig();
     const pricingCtx = {
       priceMap,
       mTokenAddress,
       sTokenAddress: sToken.address || null,
+      vaultShareTokenAddress: vaultShareTokenAddress || null,
     };
 
     // Combine all data
@@ -477,15 +494,17 @@ export const fetchAllActivities = async (
     }
 
     // Build shared pricing context once (used for LP/share-token TVL conversions)
-    const [priceMap, mTokenAddress] = await Promise.all([
+    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
       getCompletePriceMap(accessToken),
       getMTokenAddress(accessToken),
+      getVaultShareTokenAddress(accessToken).catch(() => ""),
     ]);
     const { sToken } = getSafetyModuleConfig();
     const pricingCtx = {
       priceMap,
       mTokenAddress,
       sTokenAddress: sToken.address || null,
+      vaultShareTokenAddress: vaultShareTokenAddress || null,
     };
 
     // Combine activities with their states

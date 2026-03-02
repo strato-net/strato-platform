@@ -7,6 +7,7 @@ import ActivityFeedCards from "../components/dashboard/ActivityFeedCards";
 import { Activity, LogIn } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { useUser } from "@/context/UserContext";
+import { redirectToLogin } from "@/lib/auth";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,7 @@ const ActivityFeed = () => {
   }, []);
 
   const handleLogin = () => {
-    const theme = localStorage.getItem('theme') || 'light';
-    window.location.href = `/login?theme=${theme}`;
+    redirectToLogin();
   };
 
   const GuestLoginPrompt = () => (
