@@ -19,8 +19,6 @@ module Blockchain.DB.ChainDB
     getChainStateRoot,
     putChainStateRoot,
     deleteChainStateRoot,
-    getChainBestBlock,
-    putChainBestBlock,
   )
 where
 
@@ -323,26 +321,3 @@ deleteChainStateRoot chainId bHash = do
     Just (parentHash, chainRoot) -> do
       newChainRoot <- MP.deleteKey chainRoot (word256ToMPKey chainId)
       putChainBlockHashInfo bHash parentHash newChainRoot
-
-getChainBestBlock ::
-  ( Modifiable BestBlockRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Maybe Word256 ->
-  m (Maybe (Keccak256, Integer))
-getChainBestBlock chainId = do
-  bbr <- unBestBlockRoot <$> get Proxy
-  getkv bbr (word256ToMPKey chainId)
-
-putChainBestBlock ::
-  ( Modifiable BestBlockRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Maybe Word256 ->
-  Keccak256 ->
-  Integer ->
-  m ()
-putChainBestBlock chainId bHash ordering = do
-  bbr <- unBestBlockRoot <$> get Proxy
-  newBestBlockRoot <- putkv bbr (word256ToMPKey chainId) (bHash, ordering)
-  put Proxy $ BestBlockRoot newBestBlockRoot

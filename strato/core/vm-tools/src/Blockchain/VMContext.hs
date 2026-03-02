@@ -84,7 +84,6 @@ import Blockchain.Data.DataDefs
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
-import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
@@ -299,14 +298,10 @@ type VMBase m =
     Mod.Modifiable ContextState m,
     Mod.Accessible ContextState m,
     Mod.Modifiable MemDBs m,
-    Mod.Accessible MemDBs m,
     Mod.Modifiable BlockHashRoot m,
-    Mod.Modifiable GenesisRoot m,
-    Mod.Modifiable BestBlockRoot m,
     Mod.Modifiable CurrentBlockHash m,
     Mod.Modifiable GasCap m,
     HasMemAddressStateDB m,
-    A.Selectable Address AddressState m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
@@ -315,8 +310,7 @@ type VMBase m =
     (N.NibbleString `A.Alters` N.NibbleString) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m,
-    (Keccak256 `A.Alters` BlockSummary) m,
-    Mod.Accessible (Maybe WorldBestBlock) m
+    (Keccak256 `A.Alters` BlockSummary) m
   )
 
 withCurrentBlockHash ::

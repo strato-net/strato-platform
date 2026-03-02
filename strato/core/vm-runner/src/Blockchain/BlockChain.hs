@@ -782,7 +782,6 @@ completeDiff ::
     HasHashDB m,
     Mod.Modifiable MemDBs m,
     Mod.Modifiable CurrentBlockHash m,
-    Mod.Modifiable BestBlockRoot m,
     HasMemAddressStateDB m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
@@ -800,3 +799,4 @@ completeDiff src' dst hsh num = withCurrentBlockHash hsh $ do
   runConduit $
     SD.stateDiff Nothing num hsh src' dst
       .| mapM_C (yield . OutStateDiff)
+

@@ -25,7 +25,6 @@ import Blockchain.BlockChain
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.BlockSummaryDB
-import Blockchain.DB.ChainDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
@@ -75,15 +74,13 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   lift . for_ mpNodesResps $ A.insertMany (A.Proxy @MP.NodeData) . M.fromList . map (toSR &&& id)
 
   rpcResps <- lift $ do
-    bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
-    resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
+    resps <- traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
   yieldMany $! uncurry OutJSONRPC <$> rpcResps
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   processBlocks blocks
-
 
   mPreDec <- lift $ do
     case preprepareBlock of
