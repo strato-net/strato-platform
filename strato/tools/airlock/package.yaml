@@ -12,6 +12,7 @@ license: Apache-2.0
 
 data-files:
   - circuits/01x02/*
+  - data/english.txt
 
 dependencies:
   - base
@@ -24,6 +25,7 @@ library:
     - Railgun.Unshield
     - Railgun.Transfer
     - Railgun.Crypto
+    - Railgun.BIP39
     - Railgun.Types
     - Railgun.API
     - Railgun.Scan
