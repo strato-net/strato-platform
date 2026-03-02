@@ -5,7 +5,7 @@ pipeline {
   options { disableConcurrentBuilds() }
   
   environment {
-    GIT_URL = 'https://github.com/blockapps/strato-platform'
+    GIT_URL = 'https://github.com/strato-net/strato-platform'
     BRANCH_DEVELOP = 'develop'
     BRANCH_A = 'master'
     BRANCH_B = 'marketplace-master'
