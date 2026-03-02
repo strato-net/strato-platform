@@ -94,6 +94,7 @@ export interface DepositArgs {
   externalTokenAmount: string;
   externalTxHash: string;
   stratoRecipient: string;
+  targetStratoToken: string;
 }
 
 export interface ConfirmDepositArgs {
