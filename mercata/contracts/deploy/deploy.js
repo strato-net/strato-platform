@@ -65,6 +65,9 @@ async function main() {
     console.log(`Safety Module: ${deployedContract.managers.safetyModule}`);
     console.log(`Rewards: ${deployedContract.managers.rewards}`);
     console.log(`Escrow: ${deployedContract.managers.escrow}`);
+    console.log(`Token Launch Auction: ${deployedContract.managers.tokenLaunchAuction}`);
+    console.log(`Pool LP Seeder: ${deployedContract.managers.poolLpSeeder}`);
+    console.log(`LP Token Lock Vault: ${deployedContract.managers.lpTokenLockVault}`);
     console.log('===================================\n');
     
     // Return the deployed contract address for scripting
@@ -93,6 +96,9 @@ async function main() {
       SAFETY_MODULE: deployedContract.managers.safetyModule,
       REWARDS: deployedContract.managers.rewards,
       ESCROW: deployedContract.managers.escrow,
+      TOKEN_LAUNCH_AUCTION: deployedContract.managers.tokenLaunchAuction,
+      POOL_LP_SEEDER: deployedContract.managers.poolLpSeeder,
+      LP_TOKEN_LOCK_VAULT: deployedContract.managers.lpTokenLockVault,
       MERCATA_CORE: deployedContract.address,
     };
     Object.entries(envLines).forEach(([k, v]) => {
