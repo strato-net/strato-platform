@@ -53,7 +53,6 @@ import Control.Monad (replicateM, when, forM_)
 import Data.Binary.Get (Get, runGetOrFail, getWord32le, getWord64le, getByteString, skip)
 import Control.Parallel.Strategies (parMap, rdeepseq)
 import Data.List (foldl')
-import qualified Data.IntMap.Strict as IntMap
 
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.:), (.:?), (.!=))
@@ -439,7 +438,7 @@ multiScalarMulG2 points scalars =
      then O 
      else pippengerG2 nonZeroPairs
 
--- | Pippenger's algorithm for G1 MSM
+-- | Pippenger's algorithm for G1 MSM using mutable vectors for O(1) bucket access
 pippengerG1 :: [(G1', Integer)] -> G1'
 pippengerG1 pairs = 
   let n = length pairs
@@ -454,32 +453,31 @@ pippengerG1 pairs =
       -- Combine windows: w[0] + 2^c * w[1] + 2^(2c) * w[2] + ...
   in foldl' (\acc w -> doubleNTimesG1 c acc `safeAddG1` w) O (reverse windowResults)
 
--- | Process one window for Pippenger G1
+-- | Process one window for Pippenger G1 using mutable vector
 processWindowG1 :: [(G1', Integer)] -> Int -> Int -> Int -> G1'
-processWindowG1 pairs c numBuckets windowIdx =
+processWindowG1 pairs c numBuckets windowIdx = runST $ do
   let shift = windowIdx * c
       mask = (1 `shiftL` c) - 1
-      buckets = foldl' (addToBucketG1 shift mask) IntMap.empty pairs
-  in bucketReductionG1 numBuckets buckets
-
--- | Add a point to the appropriate G1 bucket
-addToBucketG1 :: Int -> Integer -> IntMap.IntMap G1' -> (G1', Integer) -> IntMap.IntMap G1'
-addToBucketG1 shift mask buckets (pt, scalar) =
-  let bucketIdx = fromIntegral ((scalar `shiftR` shift) .&. mask)
-  in if bucketIdx == 0
-     then buckets
-     else IntMap.insertWith safeAddG1 bucketIdx pt buckets
-
--- | Bucket reduction for G1: compute sum where bucket[i] contributes i times
-bucketReductionG1 :: Int -> IntMap.IntMap G1' -> G1'
-bucketReductionG1 numBuckets buckets =
-  let go idx running total
-        | idx < 1 = total
-        | otherwise = 
-            let bucket = IntMap.findWithDefault O idx buckets
-                running' = running `safeAddG1` bucket
-            in go (idx - 1) running' (total `safeAddG1` running')
-  in go (numBuckets - 1) O O
+  
+  -- Create mutable bucket array initialized to O (identity)
+  buckets <- MV.replicate numBuckets O
+  
+  -- Fill buckets - O(1) per point
+  forM_ pairs $ \(pt, scalar) -> do
+    let bucketIdx = fromIntegral ((scalar `shiftR` shift) .&. mask)
+    when (bucketIdx /= 0) $ do
+      current <- MV.read buckets bucketIdx
+      MV.write buckets bucketIdx (current `safeAddG1` pt)
+  
+  -- Bucket reduction: compute sum where bucket[i] contributes i times
+  let reduceG1 idx running total
+        | idx < 1 = return total
+        | otherwise = do
+            bucket <- MV.read buckets idx
+            let running' = running `safeAddG1` bucket
+            reduceG1 (idx - 1) running' (total `safeAddG1` running')
+  
+  reduceG1 (numBuckets - 1) O O
 
 -- | Double a G1 point n times (multiply by 2^n)
 doubleNTimesG1 :: Int -> G1' -> G1'
@@ -487,6 +485,7 @@ doubleNTimesG1 0 p = p
 doubleNTimesG1 n p = doubleNTimesG1 (n-1) (dbl p)
 
 -- | Pippenger's algorithm for G2 MSM
+-- | Pippenger's algorithm for G2 MSM using mutable vectors
 pippengerG2 :: [(G2', Integer)] -> G2'
 pippengerG2 pairs = 
   let n = length pairs
@@ -497,32 +496,31 @@ pippengerG2 pairs =
       windowResults = parMap rdeepseq (processWindowG2 pairs c numBuckets) [0..numWindows-1]
   in foldl' (\acc w -> doubleNTimesG2 c acc `safeAddG2` w) O (reverse windowResults)
 
--- | Process one window for Pippenger G2
+-- | Process one window for Pippenger G2 using mutable vector
 processWindowG2 :: [(G2', Integer)] -> Int -> Int -> Int -> G2'
-processWindowG2 pairs c numBuckets windowIdx =
+processWindowG2 pairs c numBuckets windowIdx = runST $ do
   let shift = windowIdx * c
       mask = (1 `shiftL` c) - 1
-      buckets = foldl' (addToBucketG2 shift mask) IntMap.empty pairs
-  in bucketReductionG2 numBuckets buckets
-
--- | Add a point to the appropriate G2 bucket
-addToBucketG2 :: Int -> Integer -> IntMap.IntMap G2' -> (G2', Integer) -> IntMap.IntMap G2'
-addToBucketG2 shift mask buckets (pt, scalar) =
-  let bucketIdx = fromIntegral ((scalar `shiftR` shift) .&. mask)
-  in if bucketIdx == 0
-     then buckets
-     else IntMap.insertWith safeAddG2 bucketIdx pt buckets
-
--- | Bucket reduction for G2
-bucketReductionG2 :: Int -> IntMap.IntMap G2' -> G2'
-bucketReductionG2 numBuckets buckets =
-  let go idx running total
-        | idx < 1 = total
-        | otherwise = 
-            let bucket = IntMap.findWithDefault O idx buckets
-                running' = running `safeAddG2` bucket
-            in go (idx - 1) running' (total `safeAddG2` running')
-  in go (numBuckets - 1) O O
+  
+  -- Create mutable bucket array initialized to O (identity)
+  buckets <- MV.replicate numBuckets O
+  
+  -- Fill buckets - O(1) per point
+  forM_ pairs $ \(pt, scalar) -> do
+    let bucketIdx = fromIntegral ((scalar `shiftR` shift) .&. mask)
+    when (bucketIdx /= 0) $ do
+      current <- MV.read buckets bucketIdx
+      MV.write buckets bucketIdx (current `safeAddG2` pt)
+  
+  -- Bucket reduction
+  let reduceG2 idx running total
+        | idx < 1 = return total
+        | otherwise = do
+            bucket <- MV.read buckets idx
+            let running' = running `safeAddG2` bucket
+            reduceG2 (idx - 1) running' (total `safeAddG2` running')
+  
+  reduceG2 (numBuckets - 1) O O
 
 -- | Double a G2 point n times
 doubleNTimesG2 :: Int -> G2' -> G2'
