@@ -5,7 +5,7 @@
     "parse": "data[].prices[0].value",
     "timestamp": "data[0].prices[0].lastUpdatedAt",
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH"]
   },
   "CoinMarketCap": {
     "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
@@ -14,7 +14,7 @@
     "parse": "data.{symbol}[0].quote.USD.price",
     "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
     "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH", "SYRUPUSDC"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH", "SYRUPUSDC", "RETH"]
   },
   "Metals.dev": {
     "url": "https://api.metals.dev/v1/latest",
@@ -42,7 +42,7 @@
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
     "apiKeyEnvVar": "COINGECKO_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
@@ -50,7 +50,8 @@
       "XAUT": "tether-gold",
       "SUSDS": "susds",
       "WSTETH": "wrapped-steth",
-      "SYRUPUSDC": "syrupusdc"
+      "SYRUPUSDC": "syrupusdc",
+      "RETH": "rocket-pool-eth"
     }
   },
   "CoinAPI": {
@@ -66,7 +67,7 @@
     "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",
     "parse": "defiLlama",
     "apiKeyEnvVar": "DEFILLAMA_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH"],
     "symbolMapping": {
       "ETH": "coingecko:ethereum",
       "WBTC": "coingecko:wrapped-bitcoin",
@@ -74,7 +75,8 @@
       "XAUT": "coingecko:tether-gold",
       "SUSDS": "coingecko:susds",
       "WSTETH": "coingecko:wrapped-steth",
-      "SYRUPUSDC": "coingecko:syrupusdc"
+      "SYRUPUSDC": "coingecko:syrupusdc",
+      "RETH": "coingecko:rocket-pool-eth"
     }
   },
   "Commodities-API": {

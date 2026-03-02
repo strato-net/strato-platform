@@ -1,0 +1,123 @@
+BlockApps, Inc.
+Copyright 2015-2026 BlockApps, Inc.
+
+This product includes software and a platform developed by BlockApps, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License"). You may obtain a copy
+of the License at: http://www.apache.org/licenses/LICENSE-2.0
+
+BlockApps and STRATO are trademarks of BlockApps, Inc. Use of these trademarks is
+subject to BlockApps' trademark policy and does not imply endorsement.
+
+Third-Party Notices
+
+json-rpc-server
+Copyright (c) 2013 Kristen Kozak
+Licensed under the MIT License. See strato/libs/json-rpc-server/LICENSE.
+
+json-rpc-client
+Copyright (c) 2014 Kristen Kozak
+Licensed under the MIT License. See strato/libs/json-rpc-client/LICENSE.
+
+bloomfilter
+Copyright 2008 Bryan O'Sullivan
+Licensed under the BSD 3-Clause License. See strato/libs/bloomfilter/LICENSE.
+
+milena (Kafka client)
+Copyright (c)2014, Tyler Holien
+Licensed under the BSD 3-Clause License. See strato/libs/kafka/milena/LICENSE.
+
+rapidsnark
+Copyright iden3
+Licensed under the GNU Lesser General Public License v3. See
+strato/libs/groth16-rapidsnark/vendor/rapidsnark/COPYING.
+
+wasm3
+Copyright (c) 2019 Steven Massey, Volodymyr Shymanskyy
+Licensed under the MIT License. See
+strato/libs/groth16-rapidsnark/vendor/wasm3/LICENSE.
+
+Monaco Editor (VS Code)
+Copyright (c) 2015-present Microsoft Corporation
+Licensed under the MIT License. See smd-ui/public/vs/LICENSE.txt.
+
+Prometheus Packager
+Contains additional third-party components and notices. See
+prometheus-packager/NOTICE.
+
+
+-------------------------------------------------------------------------------
+WORK IN PROGRESS:
+-------------------------------------------------------------------------------
+
+Appendix: License Audit Notes (detailed with evidence)
+
+1. strato/libs/groth16-rapidsnark/vendor/rapidsnark (LGPL-3.0)
+Vendored C++ source is compiled as part of the groth16-rapidsnark Haskell
+package and linked into the Airlock CLI. Evidence:
+strato/libs/groth16-rapidsnark/package.yaml:7
+strato/libs/groth16-rapidsnark/package.yaml:14
+strato/libs/groth16-rapidsnark/package.yaml:74
+strato/tools/airlock/src/Railgun/Prover.hs:25
+strato/tools/airlock/src/Railgun/Prover.hs:26
+strato/tools/airlock/src/Railgun/Prover.hs:111
+strato/tools/airlock/src/Railgun/Prover.hs:118
+
+2. legacy/pre-erc20-Jun2025/marketplace/ui node-forge (BSD-3-Clause OR GPL-2.0)
+node-forge is a transitive dependency of listhen and selfsigned (dev HTTPS
+helpers). Evidence:
+legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:16330
+legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:16347
+legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:17051
+legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:17055
+legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:21699
+legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:21706
+
+3. mercata/ethereum solidity-coverage and web3-utils (LGPL-3.0)
+solidity-coverage is pulled in as a peer dependency of
+@nomicfoundation/hardhat-toolbox and brings web3-utils (LGPL-3.0). Evidence:
+mercata/ethereum/package.json:18
+mercata/ethereum/package-lock.json:1765
+mercata/ethereum/package-lock.json:1785
+mercata/ethereum/package-lock.json:7942
+mercata/ethereum/package-lock.json:7968
+mercata/ethereum/package-lock.json:8928
+mercata/ethereum/package-lock.json:8933
+
+4. mercata/services/bridge and mercata/services/referral rpc-websockets
+(LGPL-3.0-only) via @solana/web3.js and alchemy-sdk
+alchemy-sdk is a declared dependency; it depends on @solana/web3.js, which in
+turn depends on rpc-websockets. The bridge service fetches chain data via raw
+JSON-RPC (eth_blockNumber/eth_getLogs). Evidence:
+mercata/services/bridge/package.json:20
+mercata/services/referral/package.json:20
+mercata/services/bridge/package-lock.json:1140
+mercata/services/bridge/package-lock.json:1503
+mercata/services/bridge/package-lock.json:6151
+mercata/services/bridge/package-lock.json:6155
+mercata/services/referral/package-lock.json:1140
+mercata/services/referral/package-lock.json:1503
+mercata/services/referral/package-lock.json:6151
+mercata/services/referral/package-lock.json:6155
+mercata/services/bridge/src/services/rpcService.ts:13
+mercata/services/bridge/src/services/rpcService.ts:35
+
+5. mercata/ui rpc-websockets (LGPL-3.0-only) via @coinbase/cdp-sdk and
+@solana/web3.js
+@base-org/account depends on @coinbase/cdp-sdk, which depends on
+@solana/web3.js, which depends on rpc-websockets. Evidence:
+mercata/ui/package-lock.json:243
+mercata/ui/package-lock.json:349
+mercata/ui/package-lock.json:352
+mercata/ui/package-lock.json:358
+mercata/ui/package-lock.json:7253
+mercata/ui/package-lock.json:14861
+mercata/ui/package-lock.json:14865
+
+6. mercata/ui sharp / @img/sharp-* / @img/sharp-libvips-* (LGPL-3.0-or-later)
+Next lists sharp as an optional dependency, and sharp pulls @img/sharp-* and
+@img/sharp-libvips-* platform packages with LGPL-3.0-or-later licenses. Evidence:
+mercata/ui/package-lock.json:12999
+mercata/ui/package-lock.json:1315
+mercata/ui/package-lock.json:1359
+mercata/ui/package-lock.json:1366

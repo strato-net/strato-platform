@@ -100,6 +100,10 @@ contract record Pool is Ownable {
 
     bool public isStable = false;
 
+    bool public isPaused = false;
+
+    bool public isDisabled = false;
+
     // ============ MODIFIERS ============
 
     /// @notice Prevents reentrant calls to functions
@@ -120,18 +124,44 @@ contract record Pool is Ownable {
         _;
     }
 
+    modifier whenNotPaused() {
+        require(!isPaused, "Pool is paused");
+        _;
+    }
+
+    modifier whenNotDisabled() {
+        require(!isDisabled, "Pool is disabled");
+        _;
+    }
+
+    modifier onlyActiveTokens() {
+        require(_tokenFactory().isTokenActive(address(tokenA)), "TokenA is not active");
+        require(_tokenFactory().isTokenActive(address(tokenB)), "TokenB is not active");
+        _;
+    }
+
+    // ============ OWNER FUNCTIONS ============
+
+    function setPaused(bool _isPaused) external onlyOwner {
+        require(!isDisabled, "Pool pause cannot be set while isDisabled = true");
+        isPaused = _isPaused;
+    }
+
+    function setDisabled(bool _isDisabled) external onlyOwner {
+        isPaused = _isDisabled ? true : isPaused;
+        isDisabled = _isDisabled;
+    }
+
     // ============ INTERNAL FUNCTIONS ============
+
+    function _tokenFactory() internal view returns (TokenFactory) { 
+      return TokenFactory(address(PoolFactory(address(poolFactory)).tokenFactory())); 
+    }
 
     /// @notice Get the fee collector address from the factory
     /// @return The address of the fee collector contract
     function _feeCollector() internal view returns (address) {
         return PoolFactory(poolFactory).feeCollector();
-    }
-
-    /// @notice Get the token factory address from the factory
-    /// @return The address of the token factory contract
-    function _tokenFactory() internal view returns (address) {
-        return PoolFactory(poolFactory).tokenFactory();
     }
 
     /// @notice Get the effective swap fee rate for this pool
@@ -165,23 +195,26 @@ contract record Pool is Ownable {
     function initialize(
         address tokenAAddr,
         address tokenBAddr,
-        address lpTokenAddr
+        address lpTokenAddr,
+        address poolFactoryAddr
     ) external onlyOwner {
         require(tokenAAddr != address(0), "Zero tokenA address");
         require(tokenBAddr != address(0), "Zero tokenB address");
         require(lpTokenAddr != address(0), "Zero lpToken address");
+        require(poolFactoryAddr != address(0), "Zero pool factory address");
+
+        poolFactory = PoolFactory(address(poolFactoryAddr));
 
         // @dev important: must be set here for proxied instances;
         // ensure consistency with desired initial values
         zapSwapFeesEnabled = true;
+        isStable = false;
+        isPaused = false;
+        isDisabled = false;
 
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
         lpToken = Token(lpTokenAddr);
-
-        poolFactory = PoolFactory(msg.sender);
-
-        isStable = false;
     }
 
     // ============ UTILITY FUNCTIONS ============
@@ -259,7 +292,7 @@ contract record Pool is Ownable {
         uint256 tokenBAmount,
         uint256 maxTokenAAmount,
         uint256 deadline
-    ) external returns (uint256) {
+    ) external whenNotPaused onlyActiveTokens returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
 
@@ -302,7 +335,7 @@ contract record Pool is Ownable {
         uint256 minTokenBAmount,
         uint256 minTokenAAmount,
         uint256 deadline
-    ) external returns (uint256, uint256) {
+    ) external whenNotDisabled onlyActiveTokens returns (uint256, uint256) {
         require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = lpToken.totalSupply();
@@ -356,7 +389,7 @@ contract record Pool is Ownable {
         uint256 amountIn,
         uint256 minAmountOut,
         uint256 deadline
-    ) external nonReentrant returns (uint256 amountOut) {
+    ) external whenNotPaused onlyActiveTokens nonReentrant returns (uint256 amountOut) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
 
@@ -468,7 +501,7 @@ contract record Pool is Ownable {
         bool isAToB,
         uint256 amountIn,
         uint256 deadline
-    ) external returns (uint256 liquidityMinted) {
+    ) external whenNotPaused onlyActiveTokens returns (uint256 liquidityMinted) {
         require(amountIn > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
         require(lpToken.totalSupply() > 0, "POOL_EMPTY");
