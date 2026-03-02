@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import PageMeta from "@/components/PageMeta";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { RecipientClaim } from "@/components/refer/RecipientClaim";
 import { useUser } from "@/context/UserContext";
@@ -13,9 +14,7 @@ const Claim = () => {
   const { resolvedTheme } = useTheme();
   const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
 
-  useEffect(() => {
-    document.title = "Claim Tokens | STRATO";
-  }, []);
+  // title handled by PageMeta
 
   // Store return URL in localStorage when user needs to sign up
   // This will be used after login to redirect back to this page with all query params
@@ -55,6 +54,10 @@ const Claim = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageMeta
+        title="Claim Your STRATO Tokens"
+        description="You've been invited to STRATO. Claim your tokens and start earning on vaulted gold, silver & crypto."
+      />
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* STRATO Branding Header */}

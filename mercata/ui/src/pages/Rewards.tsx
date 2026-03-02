@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import PageMeta from "@/components/PageMeta";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -38,7 +39,7 @@ const Rewards = () => {
   const { entries: leaderboardEntries, total: leaderboardTotal, loading: leaderboardLoading, refetch: refetchLeaderboard } = useRewardsLeaderboard(leaderboardLimit, leaderboardOffset);
 
   useEffect(() => {
-    document.title = "Rewards | STRATO";
+    // title handled by PageMeta
     // Only fetch inactive tokens if logged in
     if (isLoggedIn && inactiveTokens.length === 0) {
       getInactiveTokens(true);
@@ -114,6 +115,10 @@ const Rewards = () => {
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
+      <PageMeta
+        title="Rewards | STRATO"
+        description="Earn CATA rewards by participating in the STRATO ecosystem. View your earnings, activities, and leaderboard rankings."
+      />
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
