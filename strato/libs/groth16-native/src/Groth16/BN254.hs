@@ -48,11 +48,12 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Bits (shiftL, (.|.))
+import Data.Bits (shiftL, shiftR, (.|.), (.&.))
 import Control.Monad (replicateM, when, forM_)
 import Data.Binary.Get (Get, runGetOrFail, getWord32le, getWord64le, getByteString, skip)
 import Control.Parallel.Strategies (parMap, rdeepseq)
 import Data.List (foldl')
+import qualified Data.IntMap.Strict as IntMap
 
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.:), (.:?), (.!=))
@@ -62,7 +63,7 @@ import qualified Data.Vector.Mutable as MV
 
 -- BN254 curve types from pairing library
 import Data.Pairing.BN254 (G1', G2', Fr)
-import Data.Curve.Weierstrass (Point(..), mul, add)
+import Data.Curve.Weierstrass (Point(..), mul, add, dbl)
 import qualified Data.Curve.Weierstrass.BN254 as G1Curve
 import qualified Data.Curve.Weierstrass.BN254T as G2Curve
 import Data.Field.Galois (toP, toE, fromP, fromE)
@@ -404,38 +405,129 @@ fq2ToInts fq2 =
        []       -> (0, 0)
        _        -> (0, 0)  -- Shouldn't happen
 
+-- | Safe point addition for G1 that handles P + P (uses doubling)
+safeAddG1 :: G1' -> G1' -> G1'
+safeAddG1 O q = q
+safeAddG1 p O = p
+safeAddG1 p q
+  | p == q    = dbl p
+  | otherwise = add p q
+
+-- | Safe point addition for G2 that handles P + P (uses doubling)
+safeAddG2 :: G2' -> G2' -> G2'
+safeAddG2 O q = q
+safeAddG2 p O = p
+safeAddG2 p q
+  | p == q    = dbl p
+  | otherwise = add p q
+
 -- | Multi-scalar multiplication in G1: sum(s_i * P_i)
--- Uses parallel evaluation and chunked reduction for better performance
+-- Uses Pippenger's bucket method for efficiency
 multiScalarMulG1 :: [G1'] -> [Fr] -> G1'
 multiScalarMulG1 points scalars = 
-  let -- Filter out zero scalars (they contribute nothing)
-      nonZeroPairs = [(p, s) | (p, s) <- zip points scalars, s /= 0]
-      -- Compute scalar multiplications in parallel
-      products = parMap rdeepseq (uncurry mul) nonZeroPairs
-      -- Sum in chunks for better cache locality, then combine
-      chunkSize = 256
-      chunks = chunksOf chunkSize products
-      chunkSums = parMap rdeepseq (foldl' add O) chunks
-  in foldl' add O chunkSums
+  let nonZeroPairs = [(p, fromP s) | (p, s) <- zip points scalars, s /= 0]
+  in if null nonZeroPairs 
+     then O 
+     else pippengerG1 nonZeroPairs
 
 -- | Multi-scalar multiplication in G2: sum(s_i * P_i)  
--- Uses parallel evaluation and chunked reduction for better performance
+-- Uses Pippenger's bucket method for efficiency
 multiScalarMulG2 :: [G2'] -> [Fr] -> G2'
 multiScalarMulG2 points scalars =
-  let -- Filter out zero scalars (they contribute nothing)
-      nonZeroPairs = [(p, s) | (p, s) <- zip points scalars, s /= 0]
-      -- Compute scalar multiplications in parallel
-      products = parMap rdeepseq (uncurry mul) nonZeroPairs
-      -- Sum in chunks for better cache locality, then combine
-      chunkSize = 256
-      chunks = chunksOf chunkSize products
-      chunkSums = parMap rdeepseq (foldl' add O) chunks
-  in foldl' add O chunkSums
+  let nonZeroPairs = [(p, fromP s) | (p, s) <- zip points scalars, s /= 0]
+  in if null nonZeroPairs 
+     then O 
+     else pippengerG2 nonZeroPairs
 
--- | Split a list into chunks of given size
-chunksOf :: Int -> [a] -> [[a]]
-chunksOf _ [] = []
-chunksOf n xs = let (chunk, rest) = splitAt n xs in chunk : chunksOf n rest
+-- | Pippenger's algorithm for G1 MSM
+pippengerG1 :: [(G1', Integer)] -> G1'
+pippengerG1 pairs = 
+  let n = length pairs
+      -- Optimal window size: c ≈ log2(n) but at least 4, at most 16
+      c = max 4 (min 16 (ceiling (logBase 2 (fromIntegral n :: Double)) :: Int))
+      numBuckets = 2 ^ c
+      numWindows = (256 + c - 1) `div` c
+      
+      -- Process each window in parallel
+      windowResults = parMap rdeepseq (processWindowG1 pairs c numBuckets) [0..numWindows-1]
+      
+      -- Combine windows: w[0] + 2^c * w[1] + 2^(2c) * w[2] + ...
+  in foldl' (\acc w -> doubleNTimesG1 c acc `safeAddG1` w) O (reverse windowResults)
+
+-- | Process one window for Pippenger G1
+processWindowG1 :: [(G1', Integer)] -> Int -> Int -> Int -> G1'
+processWindowG1 pairs c numBuckets windowIdx =
+  let shift = windowIdx * c
+      mask = (1 `shiftL` c) - 1
+      buckets = foldl' (addToBucketG1 shift mask) IntMap.empty pairs
+  in bucketReductionG1 numBuckets buckets
+
+-- | Add a point to the appropriate G1 bucket
+addToBucketG1 :: Int -> Integer -> IntMap.IntMap G1' -> (G1', Integer) -> IntMap.IntMap G1'
+addToBucketG1 shift mask buckets (pt, scalar) =
+  let bucketIdx = fromIntegral ((scalar `shiftR` shift) .&. mask)
+  in if bucketIdx == 0
+     then buckets
+     else IntMap.insertWith safeAddG1 bucketIdx pt buckets
+
+-- | Bucket reduction for G1: compute sum where bucket[i] contributes i times
+bucketReductionG1 :: Int -> IntMap.IntMap G1' -> G1'
+bucketReductionG1 numBuckets buckets =
+  let go idx running total
+        | idx < 1 = total
+        | otherwise = 
+            let bucket = IntMap.findWithDefault O idx buckets
+                running' = running `safeAddG1` bucket
+            in go (idx - 1) running' (total `safeAddG1` running')
+  in go (numBuckets - 1) O O
+
+-- | Double a G1 point n times (multiply by 2^n)
+doubleNTimesG1 :: Int -> G1' -> G1'
+doubleNTimesG1 0 p = p
+doubleNTimesG1 n p = doubleNTimesG1 (n-1) (dbl p)
+
+-- | Pippenger's algorithm for G2 MSM
+pippengerG2 :: [(G2', Integer)] -> G2'
+pippengerG2 pairs = 
+  let n = length pairs
+      c = max 4 (min 16 (ceiling (logBase 2 (fromIntegral n :: Double)) :: Int))
+      numBuckets = 2 ^ c
+      numWindows = (256 + c - 1) `div` c
+      
+      windowResults = parMap rdeepseq (processWindowG2 pairs c numBuckets) [0..numWindows-1]
+  in foldl' (\acc w -> doubleNTimesG2 c acc `safeAddG2` w) O (reverse windowResults)
+
+-- | Process one window for Pippenger G2
+processWindowG2 :: [(G2', Integer)] -> Int -> Int -> Int -> G2'
+processWindowG2 pairs c numBuckets windowIdx =
+  let shift = windowIdx * c
+      mask = (1 `shiftL` c) - 1
+      buckets = foldl' (addToBucketG2 shift mask) IntMap.empty pairs
+  in bucketReductionG2 numBuckets buckets
+
+-- | Add a point to the appropriate G2 bucket
+addToBucketG2 :: Int -> Integer -> IntMap.IntMap G2' -> (G2', Integer) -> IntMap.IntMap G2'
+addToBucketG2 shift mask buckets (pt, scalar) =
+  let bucketIdx = fromIntegral ((scalar `shiftR` shift) .&. mask)
+  in if bucketIdx == 0
+     then buckets
+     else IntMap.insertWith safeAddG2 bucketIdx pt buckets
+
+-- | Bucket reduction for G2
+bucketReductionG2 :: Int -> IntMap.IntMap G2' -> G2'
+bucketReductionG2 numBuckets buckets =
+  let go idx running total
+        | idx < 1 = total
+        | otherwise = 
+            let bucket = IntMap.findWithDefault O idx buckets
+                running' = running `safeAddG2` bucket
+            in go (idx - 1) running' (total `safeAddG2` running')
+  in go (numBuckets - 1) O O
+
+-- | Double a G2 point n times
+doubleNTimesG2 :: Int -> G2' -> G2'
+doubleNTimesG2 0 p = p
+doubleNTimesG2 n p = doubleNTimesG2 (n-1) (dbl p)
 
 -- | Negate a G1 point
 neg :: G1' -> G1'

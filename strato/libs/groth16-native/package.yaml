@@ -30,6 +30,7 @@ library:
     - random
     - deepseq
     - parallel
+    - containers
 
 ghc-options:
   - -Wall
