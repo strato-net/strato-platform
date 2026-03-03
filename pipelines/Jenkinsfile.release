@@ -217,22 +217,22 @@ pipeline {
             sh "echo ${env.RELEASE_VERSION} > VERSION"
             sh 'git add VERSION'
             sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m 'Update latest release version to ${env.RELEASE_VERSION}' --allow-empty"
-            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/strato-net/strato-platform master'
             sh "git tag ${env.RELEASE_VERSION}"
-            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform --tags'
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/strato-net/strato-platform --tags'
 
             // A trick to avoid error: "fatal: 'develop' is already checked out at <...>/jenkins/workspace/RELEASE_STRATO_release_build"
             sh "(cd ../ && git checkout ${env.GIT_TAG})"
 
             // Merge VERSION change back to develop
             sh 'git checkout develop'
-            sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
+            sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/strato-net/strato-platform develop'
             sh 'git merge master'
             
             // The following step requires `cd-blockapps` user to be able to push directly to develop bypassing the required Status Check to pass ("continuous-integration/jenkins/pr-merge")
             // This can't be bypassed based on the GitHub branch settings as it is done for pull requests. So we are manually temporary disabling that check ("Require status checks to pass before merging") for develop branch on Github to execute it.
             // any ideas how to avoid that?
-            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/strato-net/strato-platform develop'
             
             // Release to blockapps/strato-getting-started
             sh '''#!/bin/bash -le
@@ -249,11 +249,11 @@ pipeline {
               # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
               # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
             '''
-            // Release to blockapps/strato-platform
+            // Release to strato-net/strato-platform
             sh '''#!/bin/bash -le
               set -x
               RELEASE_VERSION=$(<VERSION)
-              STRATOPLATFORM_RELEASE_FLAGS="--user blockapps --repo strato-platform --tag ${RELEASE_VERSION}"
+              STRATOPLATFORM_RELEASE_FLAGS="--user strato-net --repo strato-platform --tag ${RELEASE_VERSION}"
               github-release delete $STRATOPLATFORM_RELEASE_FLAGS || true
               github-release release $STRATOPLATFORM_RELEASE_FLAGS --name "${RELEASE_VERSION}" --generate-release-notes
               sleep 5

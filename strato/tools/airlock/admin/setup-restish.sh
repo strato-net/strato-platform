@@ -46,4 +46,17 @@ else
     echo "{\"strato\":$CONFIG}" > "$DIR/apis.json"
 fi
 
-echo "Done. Test: restish strato --help"
+echo "Setting up shell completions..."
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    mkdir -p ~/.zsh/completions
+    restish completion zsh > ~/.zsh/completions/_restish
+    if ! grep -q 'fpath.*\.zsh/completions' ~/.zshrc 2>/dev/null; then
+        echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+        echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+    fi
+else
+    mkdir -p ~/.local/share/bash-completion/completions
+    restish completion bash > ~/.local/share/bash-completion/completions/restish
+fi
+
+echo "Done. Open a new terminal, then test: restish strato --help"
