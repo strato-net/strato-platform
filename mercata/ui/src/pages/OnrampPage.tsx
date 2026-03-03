@@ -32,6 +32,11 @@ interface OnrampTransaction {
   completedAt?: string;
 }
 
+const STRATO_TOKEN: Record<string, string> = {
+  eth: "ETHST",
+  usdc: "USDST",
+};
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   initialized: { label: "Started", color: "text-gray-500" },
   requires_payment: { label: "Awaiting Payment", color: "text-yellow-600" },
@@ -39,6 +44,103 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   fulfillment_complete: { label: "Complete", color: "text-green-600" },
   rejected: { label: "Rejected", color: "text-red-600" },
   failed: { label: "Failed", color: "text-red-600" },
+};
+
+const ITEMS_PER_PAGE = 7;
+
+const PurchaseHistory = ({ transactions }: { transactions: OnrampTransaction[] }) => {
+  const [page, setPage] = useState(1);
+  const purchases = transactions.filter((tx) => tx.status === "fulfillment_complete" || tx.status === "rejected");
+  const totalPages = Math.ceil(purchases.length / ITEMS_PER_PAGE);
+  const pageItems = purchases.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-base">Purchase History</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {purchases.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            No purchases yet. Complete a purchase to see it here.
+          </p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-2 font-medium">Date</th>
+                    <th className="pb-2 font-medium">Token</th>
+                    <th className="pb-2 font-medium">Amount</th>
+                    <th className="pb-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageItems.map((tx) => {
+                    const statusInfo = STATUS_LABELS[tx.status] || {
+                      label: tx.status,
+                      color: "text-gray-500",
+                    };
+                    return (
+                      <tr key={tx.stripeSessionId} className="border-b last:border-0">
+                        <td className="py-3">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                            {new Date(tx.createdAt).toLocaleDateString()}
+                          </div>
+                        </td>
+                        <td className="py-3">
+                          <span className="uppercase">{tx.destinationCurrency || "—"}</span>
+                          {tx.destinationCurrency && STRATO_TOKEN[tx.destinationCurrency] && (
+                            <span className="text-muted-foreground"> → {STRATO_TOKEN[tx.destinationCurrency]}</span>
+                          )}
+                        </td>
+                        <td className="py-3" title={tx.destinationAmount || ""}>
+                          {tx.destinationAmount
+                            ? Number(tx.destinationAmount).toFixed(6)
+                            : "—"}
+                        </td>
+                        <td className={`py-3 font-medium ${statusInfo.color}`}>
+                          {statusInfo.label}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-3 border-t mt-2">
+                <span className="text-xs text-muted-foreground">
+                  {purchases.length} purchase{purchases.length !== 1 ? "s" : ""}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-2 py-1 text-xs rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-xs text-muted-foreground px-2">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="px-2 py-1 text-xs rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 };
 
 const OnrampPage = () => {
@@ -236,59 +338,7 @@ const OnrampPage = () => {
                   </ol>
                 </div>
 
-                {(() => {
-                  const purchases = transactions.filter((tx) => tx.status === "fulfillment_complete" || tx.status === "rejected");
-                  return (
-                    <Card className="shadow-sm">
-                      <CardHeader>
-                        <CardTitle className="text-base">Purchase History</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {purchases.length === 0 ? (
-                          <p className="text-sm text-muted-foreground py-4 text-center">
-                            No purchases yet. Complete a purchase to see it here.
-                          </p>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="border-b text-left text-muted-foreground">
-                                  <th className="pb-2 font-medium">Date</th>
-                                  <th className="pb-2 font-medium">Currency</th>
-                                  <th className="pb-2 font-medium">Amount</th>
-                                  <th className="pb-2 font-medium">Status</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {purchases.map((tx) => {
-                                  const statusInfo = STATUS_LABELS[tx.status] || {
-                                    label: tx.status,
-                                    color: "text-gray-500",
-                                  };
-                                  return (
-                                    <tr key={tx.stripeSessionId} className="border-b last:border-0">
-                                      <td className="py-3">
-                                        <div className="flex items-center gap-1.5">
-                                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                          {new Date(tx.createdAt).toLocaleDateString()}
-                                        </div>
-                                      </td>
-                                      <td className="py-3 uppercase">{tx.destinationCurrency || "—"}</td>
-                                      <td className="py-3">{tx.destinationAmount || "—"}</td>
-                                      <td className={`py-3 font-medium ${statusInfo.color}`}>
-                                        {statusInfo.label}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })()}
+                <PurchaseHistory transactions={transactions} />
               </div>
             )}
           </div>
