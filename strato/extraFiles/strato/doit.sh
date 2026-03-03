@@ -68,6 +68,13 @@ function newnode {
     echo "OAUTH parameters are available"
   fi
 
+  mkdir -p secrets
+  cat > secrets/oauth_credentials.yaml << EOF
+discoveryUrl: "${OAUTH_DISCOVERY_URL}"
+clientId: "${OAUTH_CLIENT_ID}"
+clientSecret: "${OAUTH_CLIENT_SECRET}"
+EOF
+
   if [[ ! -f .initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
     if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
