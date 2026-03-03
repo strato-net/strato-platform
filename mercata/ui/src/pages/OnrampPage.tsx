@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
+import OnrampProgressModal from "../components/bridge/OnrampProgressModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
@@ -47,6 +48,8 @@ const OnrampPage = () => {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [transactions, setTransactions] = useState<OnrampTransaction[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [onrampTxHash, setOnrampTxHash] = useState<string | null>(null);
   const onrampContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchTransactions = useCallback(async () => {
@@ -101,7 +104,12 @@ const OnrampPage = () => {
         const status = e.payload.session.status;
         setSessionStatus(status as SessionStatus);
         if (status === "fulfillment_complete") {
+          const session = e.payload.session;
+          const txHash = session.quote?.blockchain_tx_id || session.transaction_details?.transaction_id;
+          console.log(`[OnrampPage] fulfillment_complete — txHash=${txHash}`);
+          setOnrampTxHash(txHash || null);
           fetchTransactions();
+          setShowProgressModal(true);
         }
       });
 
@@ -126,23 +134,12 @@ const OnrampPage = () => {
   const renderStatusBadge = () => {
     switch (sessionStatus) {
       case "fulfillment_processing":
-        return (
-          <div className="flex items-start gap-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg text-sm">
-            <Loader2 className="h-4 w-4 animate-spin mt-0.5 shrink-0" />
-            <span>
-              Payment received! Stripe is purchasing crypto and delivering it to
-              STRATO. Once received, we'll credit the tokens to your account.
-            </span>
-          </div>
-        );
+        return null;
       case "fulfillment_complete":
         return (
           <div className="flex items-start gap-2 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg text-sm">
             <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>
-              Purchase complete! Tokens have been credited to your STRATO
-              account and will appear in your portfolio shortly.
-            </span>
+            <span>Purchase complete! Processing deposit...</span>
           </div>
         );
       case "rejected":
@@ -299,6 +296,11 @@ const OnrampPage = () => {
       </div>
 
       <MobileBottomNav />
+      <OnrampProgressModal
+        open={showProgressModal}
+        externalTxHash={onrampTxHash}
+        onClose={() => setShowProgressModal(false)}
+      />
     </div>
   );
 };
