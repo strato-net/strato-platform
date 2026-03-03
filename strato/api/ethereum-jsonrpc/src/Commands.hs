@@ -169,7 +169,7 @@ eth_coinbase = toMethod "eth_coinbase" f ()
   where
     f :: RpcResult Server String
     f = do
-      return $ coinbaseAddress $ quarryConfig ethConf
+      throwError $ rpcError 1 "eth_coinbase is not implemented"
 
 eth_mining :: Method Server
 eth_mining = toMethod "eth_mining" f ()

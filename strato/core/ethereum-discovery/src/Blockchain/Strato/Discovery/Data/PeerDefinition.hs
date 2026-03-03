@@ -39,16 +39,12 @@ PPeer
     ip IP Maybe
     tcpPort Int
     udpPort Int
-    numSessions Int
     lastMsg T.Text
-    lastMsgTime UTCTime
     enableTime UTCTime
     udpEnableTime UTCTime
-    lastTotalDifficulty Integer
     lastBestBlockHash Keccak256
     bondState Int
     activeState Int
-    version T.Text
     disableException T.Text
     nextDisableWindowSeconds Int default=5
     nextUdpDisableWindowSeconds Int default=5

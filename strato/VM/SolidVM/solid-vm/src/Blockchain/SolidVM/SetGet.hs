@@ -41,8 +41,9 @@ import Blockchain.DB.SolidStorageDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Options (computeNetworkID)
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -91,7 +92,7 @@ toBasic currentBlockNum = \case
   SBytes bs -> Just $ MS.BBytes bs
   SNULL ->
     let heliumToBasicForkBlock = 33918 :: Integer
-        snullToBasicEnabled = not (computeNetworkID == 114784819836269 && currentBlockNum < heliumToBasicForkBlock)
+        snullToBasicEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumToBasicForkBlock)
      in if snullToBasicEnabled then Just MS.BDefault else Nothing
   _ -> Nothing
 

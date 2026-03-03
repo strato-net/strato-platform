@@ -4,6 +4,8 @@
 module Flags where
 
 import Blockchain.Constants
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Sequencer.Constants
 import Blockchain.Strato.Model.Address
 import qualified Data.Text as T
@@ -20,15 +22,12 @@ defineFlag "c:depblockcachesize" (0 :: Int) "Cache size of LevelDB for dependent
 -- kafka-related flags
 defineFlag "k:kafkaclientid" defaultKafkaClientId' "KafkaClientId (for runKafkaConfigured)"
 
-defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to."
-
 -- blockstanbul related flags
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag
   "blockstanbul_round_period_s"
   (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
-defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
 defineFlag "validatorBehavior" (True :: Bool) "Whether to disable validator behavior if enabled"
 
 defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
@@ -49,10 +48,8 @@ exportFlagsAsMetrics = do
   set "depblockdbpath" flags_depblockdbpath
   set "depblockdbcachesize" $ show flags_depblockcachesize
   set "kafkaclientid" $ show flags_kafkaclientid
-  set "kafkaaddress" flags_kafkaaddress
-  set "blockstanbul_block_period_ms" $ show flags_blockstanbul_block_period_ms
-  set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
-  set "vaultWrapperUrl" $ flags_vaultWrapperUrl
+  set "blockstanbul_block_period_ms" $ show (Conf.blockPeriodMs (networkConfig ethConf))
+  set "blockstanbul_round_period_s" $ show (Conf.roundPeriodS (networkConfig ethConf))
   set "validatorBehavior" $ show flags_validatorBehavior
   set "seq_debug_mode" $ show flags_seq_debug_mode
   set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter

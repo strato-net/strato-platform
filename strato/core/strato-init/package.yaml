@@ -30,7 +30,6 @@ library:
   - conduit
   - containers
   - directory
-  - ethereum-discovery
   - ethereum-rlp
   - evm-solidity
   - exceptions
@@ -59,7 +58,6 @@ library:
   - strato-genesis
   - strato-index
   - strato-model
-  - strato-networks
   - strato-sequencer
   - strato-statediff
   # - strato-p2p

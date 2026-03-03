@@ -129,7 +129,6 @@ services:
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - connectionTimeout=${connectionTimeout}
-    - debugFail=${debugFail}
     - debugPort=${debugPort}
     - debugWSHost=${debugWSHost}
     - debugWSPort=${debugWSPort}
@@ -167,8 +166,6 @@ services:
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
-    - seqEventsBatchSize=${seqEventsBatchSize}
-    - seqEventsCostHeuristic=${seqEventsCostHeuristic}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}

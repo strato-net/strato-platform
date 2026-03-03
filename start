@@ -31,6 +31,13 @@ export OAUTH_DISCOVERY_URL
 export OAUTH_CLIENT_ID
 export OAUTH_CLIENT_SECRET
 
+# Write postgres password to secrets file (hardcoded for now)
+mkdir -p $1/secrets
+if [ ! -f $1/secrets/postgres_password ]; then
+    echo -n "api" > $1/secrets/postgres_password
+    chmod 600 $1/secrets/postgres_password
+fi
+
 export network=${network:-helium}
 export svmTrace=${svmTrace:-false}
 export VAULT_URL=https://vault.blockapps.net:8093
@@ -39,7 +46,6 @@ export VAULT_URL=https://vault.blockapps.net:8093
 
 function cleanup {
     docker compose -p strato down # -v -t 0 --remove-orphans
-    killall blockapps-vault-proxy-server
 }
 
 trap 'cleanup' INT
@@ -60,27 +66,36 @@ export HTTP_PORT=8081 #You can change this to 80 for Linux, Mac seems to forbid 
 export NODE_HOST="localhost:8081"
 export blocHost=$STRATO_HOSTNAME:3000
 
+# Pre-create directories so they're owned by current user (not root)
 mkdir -p $1
+cd $1
+mkdir -p postgres redis kafka prometheus
 
-docker compose -p strato up -d
+cp ../docker-compose.yml .
+DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d
 
 sleep 10
 
-cd $1
-
 mkdir -p logs
 
-echo "######## starting blockapps-vault-proxy-server"
-
-blockapps-vault-proxy-server --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --VAULT_URL=$VAULT_URL > logs/blockapps-vault-proxy-server 2>&1 &
+# Create YAML oauth credentials for services
+if [ ! -f secrets/oauth_credentials.yaml ]; then
+    mkdir -p secrets
+    cat > secrets/oauth_credentials.yaml << EOF
+discoveryUrl: "$OAUTH_DISCOVERY_URL"
+clientId: "$OAUTH_CLIENT_ID"
+clientSecret: "$OAUTH_CLIENT_SECRET"
+EOF
+    chmod 600 secrets/oauth_credentials.yaml
+fi
 
 if [ ! -e .ethereumH/ethconf.yaml ]
 then
     echo "######## running first time setup"
-    PGPASSWORD=api createdb -h localhost -U postgres cirrus
+    PGPASSWORD=$(cat secrets/postgres_password) createdb -h localhost -U postgres cirrus
 
     echo "Running setup"
-    strato-setup -p api -K localhost --network=$network --apiIPAddress=$STRATO_IP > logs/strato-setup 2>&1
+    strato-setup -K localhost --network=$network --apiIPAddress=$STRATO_IP > logs/strato-setup 2>&1
     sed -i.bak "s|--network=helium|--network=$network|g" commands.txt && rm commands.txt.bak
     sed -i.bak "s|--svmTrace=false|--svmTrace=$svmTrace|g" commands.txt && rm commands.txt.bak
     echo "Setup complete"

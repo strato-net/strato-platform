@@ -51,9 +51,9 @@ function newnode {
   # if alternative log in methods are provided then use them
   mkdir -p logs
 
-  echo "trying to see if the alternative OAUTH parameters are available"
-  if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}} || -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}} ]]; then
-    echo "Could not obtain OAUTH parameters for Vault Proxy"
+  echo "Checking if OAUTH parameters are available"
+  if [[ -z ${OAUTH_CLIENT_ID} || -z ${OAUTH_CLIENT_SECRET} ]]; then
+    echo "Could not obtain OAUTH parameters"
     exit 2
   elif [[ -z ${OAUTH_DISCOVERY_URL} ]]; then
     if [ "${network}" == "mercata-hydrogen" ] || [ "${networkID}" == "7596898649924658542" ]; then # connecting to testnet
@@ -65,33 +65,15 @@ function newnode {
       OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
     fi
   else
-    echo "OAUTH parameters for Vault Proxy are available"
+    echo "OAUTH parameters are available"
   fi
 
-  runBackgroundProcess blockapps-vault-proxy-server \
-    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} \
-    --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
-    --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS:-13} \
-    --VAULT_URL=${VAULT_URL} \
-    --VAULT_PROXY_PORT=8013 \
-    --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG:-false} &>> logs/vault-proxy
-
-  set +x
-  echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
-  started=$(date +%s)
-  timeout=30
-  while ! curl --silent --output /dev/null --fail --max-time 1 --location http://localhost:8013; do
-    if [[ $(date +%s) -ge ${started}+${timeout} ]]; then
-      echo -e "\n tail -n40 logs/vault-proxy"
-      tail -n40 logs/vault-proxy
-      echo -e "\n${Red}vault-proxy takes too long to start. It most probably failed. Check the tail of the vault-proxy log above. Sleeping now.${NC}"
-      sleep 60
-    fi
-    sleep 0.3
-  done
-  echo 'vault-proxy is available'
-  set -x
+  mkdir -p secrets
+  cat > secrets/oauth_credentials.yaml << EOF
+discoveryUrl: "${OAUTH_DISCOVERY_URL}"
+clientId: "${OAUTH_CLIENT_ID}"
+clientSecret: "${OAUTH_CLIENT_SECRET}"
+EOF
 
   if [[ ! -f .initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
@@ -147,15 +129,8 @@ function newnode {
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
-     --averageTxsPerBlock=${averageTxsPerBlock:-40} \
-     --connectionTimeout=${connectionTimeout:-3600} \
-     --debugFail=${debugFail:-true}  \
-     --maxConn=${maxConn:-1000} \
-     --maxReturnedHeaders=${maxReturnedHeaders:-500} \
-     --networkID=${networkID:--1} \
-     --sqlPeers=true \
      --minLogLevel=$p2pMinLogLevel \
-     ${networkFlag} "${iFlag}" &>> logs/strato-p2p
+     "${iFlag}" &>> logs/strato-p2p
 
   if [ -n "${strictBlockstanbul}" ]; then
       sBFlag="--strictBlockstanbul=${strictBlockstanbul}"
@@ -163,14 +138,12 @@ function newnode {
 
   echo "Starting strato-sequencer"
   runBackgroundProcess strato-sequencer \
-    --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
-    --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-120} \
     --minLogLevel=$seqMinLogLevel \
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
     --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
     --validatorBehavior=${validatorBehavior:-true} \
     --test_mode_bypass_blockstanbul=${test_mode_bypass_blockstanbul:-false} \
-    "${networkFlag}" "${iFlag}" "${sBFlag}" \
+    "${iFlag}" "${sBFlag}" \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
@@ -188,12 +161,6 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
-  if [ -n "${FILE_SERVER_URL}" ]; then
-      fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
-  fi
-  if [ -n "${NOTIFICATION_SERVER_URL}" ]; then
-      nsFlag="--notificationServerUrl=${NOTIFICATION_SERVER_URL}"
-  fi
   if [ -n "${strictGas}" ]; then
       sgFlag="--strictGas=${strictGas}"
   fi
@@ -209,17 +176,10 @@ function newnode {
     --debugWSHost=${debugWSHost:-strato} \
     --debugWSPort=${debugWSPort:-8052} \
     --diffPublish=${diffPublish:-true} \
-    --maxTxsPerBlock=${maxTxsPerBlock:-500} \
     --minLogLevel=${vmMinLogLevel} \
-    --networkID=${networkID:--1} \
-    --seqEventsBatchSize=${seqEventsBatchSize:--1} \
-    --seqEventsCostHeuristic=${seqEventsCostHeuristic:-20000} \
     --sqlDiff=${sqlDiff:-true} \
     --svmDev=${svmDev:-false} \
     --svmTrace=${svmTrace:-false} \
-    ${networkFlag} \
-    "${txsFlag}" \
-    "${gasFlag}" \
     "${iFlag}" \
     "${sgFlag}" \
     "${sglFlag}" \
@@ -229,26 +189,10 @@ function newnode {
   echo "Starting strato-api"
   runBackgroundProcess strato-api \
     --minLogLevel=$apiDebugMode \
-    --networkID=${networkID:--1} \
-    --vaultUrl=${VAULT_URL} \
-    --oauthDiscoveryUrl=${OAUTH_DISCOVERY_URL} \
-    "${networkFlag}" \
-    "${txsFlag}" \
-    "${gasFlag}" \
-    "${fsFlag}" \
-    "${nsFlag}" \
     "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   SLIPSTREAM_CMD="slipstream \
-  --database=${postgres_slipstream_db} \
-  --kafkahost=${kafkaHost} \
-  --kafkaport=${kafkaPort} \
   --minLogLevel=${slipMinLogLevel} \
-  --pghost=${postgres_host} \
-  --pgport=${postgres_port} \
-  --pguser=${postgres_user} \
-  --password=${postgres_password} \
-  --stratourl=http://localhost:3000/eth/v1.2 \
   ${iFlag}"
 
   echo "Starting slipstream"
@@ -324,21 +268,21 @@ function cleanupDB {
 
 function doInit {
 
+  mkdir -p secrets
+  echo -n "$pgPass" > secrets/postgres_password
+
   args="--addBootnodes=$addBootnodes \
   --apiIPAddress=0.0.0.0 \
-  --blockTime=${blockTime:-13} \
   --generateKey=$generateKey \
   --kafkahost=$kafkaHost \
   --lazyblocks=${lazyBlocks:-true} \
   --minPeers=${numMinPeers:-100} \
-  --minBlockDifficulty=${minBlockDifficulty:-131072} \
   --pguser=$pgUser \
-  --password=$pgPass \
   --pghost=$pgHost \
   --redisHost=$redisBDBHost \
   --redisPort=$redisBDBPort \
   --redisDBNumber=${redisBDBNumber:-0} \
-  --zkhost=$zkHost \
+  --vaultUrl=${VAULT_URL}/strato/v2.3 \
   ${networkFlag} \
   ${stratoBootnode}"
 

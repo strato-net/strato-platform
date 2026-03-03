@@ -26,6 +26,7 @@ import Text.Printf (printf)
 import Bloc.API (BlocTransactionResult(..))
 import qualified Bloc.API as Bloc
 import Blockchain.Strato.Model.Keccak256 (keccak256ToHex)
+import Railgun.BIP39 (generateMnemonic)
 import Railgun.Keys (deriveFromMnemonic, railgunAddress, getMasterPublicKeyPoint)
 import Railgun.Shield (createERC20ShieldRequest, serializeShieldRequest)
 import Railgun.Unshield (createUnshieldRequest)
@@ -141,6 +142,7 @@ data Command
 data SetupWalletOpts = SetupWalletOpts
   { swoWalletName :: String
   , swoForceOverwrite :: Bool
+  , swoGenerate :: Bool
   } deriving (Show)
 
 data ListAddressesOpts = ListAddressesOpts
@@ -201,7 +203,10 @@ setupWalletParser = SetupWallet <$> (SetupWalletOpts
      <> help "Wallet name (default: 'default')" )
   <*> switch
       ( long "force"
-     <> help "Overwrite existing wallet" ))
+     <> help "Overwrite existing wallet" )
+  <*> switch
+      ( long "generate"
+     <> help "Generate a new random mnemonic (12 words) instead of entering one" ))
 
 -- | Parser for list_addresses command
 listAddressesParser :: Parser Command
@@ -462,21 +467,34 @@ runSetupWallet swopts = do
   
   TIO.putStrLn $ "=== Setup Wallet" <> (if walletName == "default" then "" else ": " <> T.pack walletName) <> " ==="
   TIO.putStrLn ""
-  TIO.putStrLn "Enter your BIP39 mnemonic phrase (12-24 words)."
-  TIO.putStrLn "This is your recovery phrase - keep it safe!"
-  TIO.putStrLn ""
-  TIO.putStr "Mnemonic: "
-  hFlush stdout
   
-  mnemonic <- getHiddenLine
-  TIO.putStrLn ""
-  
-  let mnemonicText = T.strip $ T.pack mnemonic
-      wordCount = length $ T.words mnemonicText
-  
-  when (wordCount `notElem` [12, 15, 18, 21, 24]) $ do
-    hPutStrLn stderr $ "Error: Invalid mnemonic - expected 12, 15, 18, 21, or 24 words, got " ++ show wordCount
-    exitFailure
+  mnemonicText <- if swoGenerate swopts
+    then do
+      result <- generateMnemonic 12
+      case result of
+        Left err -> do
+          TIO.hPutStrLn stderr $ "Error generating mnemonic: " <> err
+          exitFailure
+        Right m -> do
+          TIO.putStrLn "Generated new mnemonic phrase. Write this down and keep it safe!"
+          TIO.putStrLn ""
+          TIO.putStrLn $ "  " <> m
+          TIO.putStrLn ""
+          return m
+    else do
+      TIO.putStrLn "Enter your BIP39 mnemonic phrase (12-24 words)."
+      TIO.putStrLn "This is your recovery phrase - keep it safe!"
+      TIO.putStrLn ""
+      TIO.putStr "Mnemonic: "
+      hFlush stdout
+      mnemonic <- getHiddenLine
+      TIO.putStrLn ""
+      let m = T.strip $ T.pack mnemonic
+          wordCount = length $ T.words m
+      when (wordCount `notElem` [12, 15, 18, 21, 24]) $ do
+        hPutStrLn stderr $ "Error: Invalid mnemonic - expected 12, 15, 18, 21, or 24 words, got " ++ show wordCount
+        exitFailure
+      return m
   
   -- Verify keys can be derived
   case deriveFromMnemonic mnemonicText "" 0 of
@@ -626,7 +644,12 @@ runShield sopts = do
           Left err -> do
             TIO.hPutStrLn stderr $ "Approval failed: " <> err
             exitFailure
-          Right results -> TIO.putStrLn $ "Approval successful: " <> T.pack (show $ length results) <> " transaction(s)"
+          Right results -> do
+            TIO.putStrLn $ "Approval response: " <> T.pack (show $ length results) <> " transaction(s)"
+            mapM_ printTxResult results
+            when (any ((== Bloc.Failure) . blocTransactionStatus) results) $ do
+              TIO.hPutStrLn stderr "Approval transaction failed on-chain"
+              exitFailure
       
       -- Send shield transaction
       TIO.putStrLn "Sending shield transaction..."
