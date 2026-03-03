@@ -106,9 +106,13 @@ class OnrampController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userAddress = req.address;
-      const transactions = await getUserTransactions(userAddress);
-      res.json({ success: true, data: { transactions } });
+      const { accessToken, address: userAddress, query } = req;
+      const { limit, offset } = query;
+      const params: Record<string, string> = {};
+      if (limit) params.limit = String(limit);
+      if (offset) params.offset = String(offset);
+      const result = await getUserTransactions(accessToken, userAddress, params);
+      res.json({ success: true, data: result });
     } catch (error: any) {
       next(error);
     }

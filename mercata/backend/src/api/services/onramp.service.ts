@@ -15,7 +15,7 @@ const { MercataBridge, mercataBridge } = constants;
 // ————————————————————————————————————————————————————————————————
 
 export interface OnrampTransaction {
-  stripeSessionId: string;
+  externalTxHash: string;
   status: string;
   createdAt: string;
   destinationCurrency?: string;
@@ -278,19 +278,56 @@ export async function getDepositStatus(accessToken: string, externalTxHash: stri
   return { status: "pending" };
 }
 
-export async function getUserTransactions(userStratoAddress: string): Promise<OnrampTransaction[]> {
-  const resource = new OnrampSessionResource(stripe);
-  const response = await resource.list({ limit: 100 });
+export async function getUserTransactions(
+  accessToken: string,
+  userStratoAddress: string,
+  params: Record<string, string> = {},
+): Promise<{ data: OnrampTransaction[]; totalCount: number }> {
+  const hotWallet = (process.env.ONRAMP_HOT_WALLET_ADDRESS || "").replace(/^0x/, "");
 
-  return (response.data as any[])
-    .filter((s: any) => s.metadata?.strato_user_address === userStratoAddress)
-    .map((s: any) => ({
-      stripeSessionId: s.id,
-      status: s.status,
-      createdAt: new Date(s.created * 1000).toISOString(),
-      destinationCurrency: s.transaction_details?.destination_currency,
-      destinationNetwork: s.transaction_details?.destination_network,
-      destinationAmount: s.transaction_details?.destination_amount,
-    }))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const baseParams: Record<string, string> = {
+    address: `eq.${mercataBridge}`,
+    select: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp",
+    "value->>externalSender": `eq.${hotWallet}`,
+    "value->>stratoRecipient": `eq.${userStratoAddress}`,
+    order: "block_timestamp.desc",
+    ...params,
+  };
+
+  const countParams: Record<string, string> = {
+    address: `eq.${mercataBridge}`,
+    select: "count()",
+    "value->>externalSender": `eq.${hotWallet}`,
+    "value->>stratoRecipient": `eq.${userStratoAddress}`,
+  };
+
+  const [dataRes, countRes] = await Promise.all([
+    cirrus.get(accessToken, `/${MercataBridge}-deposits`, { params: baseParams }),
+    cirrus.get(accessToken, `/${MercataBridge}-deposits`, { params: countParams }),
+  ]);
+
+  const deposits = (dataRes.data || []).map((d: any) => {
+    const isEth = d.DepositInfo?.externalToken === ZERO_ADDRESS;
+    const rawAmount = BigInt(d.DepositInfo?.stratoTokenAmount || "0");
+    const decimals = 18n;
+    const whole = rawAmount / (10n ** decimals);
+    const frac = rawAmount % (10n ** decimals);
+    const humanAmount = `${whole}.${frac.toString().padStart(Number(decimals), "0")}`;
+
+    return {
+      externalTxHash: d.externalTxHash,
+      status: d.DepositInfo?.bridgeStatus === "3" ? "fulfillment_complete"
+        : d.DepositInfo?.bridgeStatus === "1" ? "fulfillment_processing"
+        : d.DepositInfo?.bridgeStatus === "2" ? "fulfillment_processing"
+        : "unknown",
+      createdAt: d.block_timestamp,
+      destinationCurrency: isEth ? "eth" : "usdc",
+      destinationNetwork: "ethereum",
+      destinationAmount: humanAmount,
+    };
+  });
+
+  const totalCount = countRes.data?.[0]?.count ?? 0;
+
+  return { data: deposits, totalCount };
 }
