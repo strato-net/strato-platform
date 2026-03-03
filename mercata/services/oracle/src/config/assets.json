@@ -10,6 +10,9 @@
     "PAXG": {
       "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d"
     },
+    "RETH": {
+      "targetAssetAddress": "2e4789eb7db143576da25990a3c0298917a8a87d"
+    },
     "SUSDS": {
       "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
     },

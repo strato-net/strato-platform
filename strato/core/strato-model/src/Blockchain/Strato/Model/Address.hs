@@ -18,6 +18,8 @@ module Blockchain.Strato.Model.Address
     stringAddress,
     getNewAddress_unsafe,
     getNewAddressWithSalt_unsafe,
+    addressToByteString,
+    addressFromByteString,
     addressAsNibbleString,
     addressFromNibbleString,
     addressToHex,
@@ -258,12 +260,17 @@ getNewAddressWithSalt_unsafe creator salt codeHash args =
         ++ (rlpEncode <$> args)
    in decode $ BL.drop 12 $ encode theHash
 
+addressToByteString :: Address -> B.ByteString
+addressToByteString (Address s) = BL.toStrict $ encode s
+
+addressFromByteString :: B.ByteString -> Address
+addressFromByteString = Address . decode . BL.fromStrict
+
 addressAsNibbleString :: Address -> N.NibbleString
-addressAsNibbleString (Address s) =
-  byteString2NibbleString $ BL.toStrict $ encode s
+addressAsNibbleString = byteString2NibbleString . addressToByteString
 
 addressFromNibbleString :: N.NibbleString -> Address
-addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteString
+addressFromNibbleString = addressFromByteString . nibbleString2ByteString
 
 formatAddressWithoutColor :: Address -> String
 formatAddressWithoutColor x = padZeros 40 $ showHex x ""

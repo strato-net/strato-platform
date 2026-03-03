@@ -21,6 +21,7 @@ library:
   - common-log
   - containers
   - cryptohash
+  - crypton
   - data-default
   - debugger
   - Decimal

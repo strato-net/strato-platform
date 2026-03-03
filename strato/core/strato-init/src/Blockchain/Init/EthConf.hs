@@ -13,7 +13,7 @@ import Data.Default
 -- Returns Nothing for networks where contracts haven't been deployed yet
 getRailgunProxyForNetwork :: String -> Maybe Address
 getRailgunProxyForNetwork network = case network of
-  "helium"  -> Nothing  -- TODO: Set when deployed
+  "helium"  -> Just 0x84340ae5a421a216339d74173aa39408aab61d74
   "upquark" -> Nothing  -- TODO: Set when deployed
   "lithium" -> Nothing  -- TODO: Set when deployed
   _         -> Nothing

@@ -233,7 +233,10 @@ main = do
             Bloc.Monad.globalNonceCounter = nonceCache,
             Bloc.Monad.nodePubKey = pubKey
           }
-  runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app env theDoc urlMap
+  let bindHost = ipAddress $ apiConfig ethConf
+      bindPort = 3000 :: Int
+  putStrLn $ "Starting strato-api on " ++ bindHost ++ ":" ++ show bindPort
+  runSettings (setPort bindPort $ setHost (fromString bindHost) defaultSettings) $ app env theDoc urlMap
 
 app :: BlocEnv -> OpenApi -> UrlMap -> Application
 app blocEnv theDoc urlMap =

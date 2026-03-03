@@ -51,6 +51,9 @@ export type BridgeContextType = {
   // Deposit refresh trigger
   depositRefreshKey: number;
   triggerDepositRefresh: () => void;
+  // Withdrawal refresh trigger
+  withdrawalRefreshKey: number;
+  triggerWithdrawalRefresh: () => void;
 };
 
 export interface ContractValidationResult {

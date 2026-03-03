@@ -234,7 +234,7 @@ contract record PoolFactory is Ownable {
         // deploy new pool first
         _updatePoolImplementation();
         pool = address(new Proxy(poolImplementation, address(this)));
-        Pool(pool).initialize(tokenA, tokenB, lpTokenAddress);
+        Pool(pool).initialize(tokenA, tokenB, lpTokenAddress, address(this));
         address thisOwner = owner();
         Pool(pool).transferOwnership(thisOwner);
         Ownable(lpTokenAddress).transferOwnership(thisOwner);

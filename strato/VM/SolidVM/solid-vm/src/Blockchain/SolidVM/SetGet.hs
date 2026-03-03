@@ -13,9 +13,20 @@ module Blockchain.SolidVM.SetGet
   ( setVar,
     weakGetVar,
     getVar,
+    getIntEither,
+    getIntValEither,
     getInt,
+    getIntVal,
+    int,
     getRealNum,
     getBool,
+    getBoolVal,
+    getAddress,
+    getAddressVal,
+    getString,
+    getStringVal,
+    getBytes,
+    getBytesVal,
     deleteVar,
     toBasic,
     fromBasic,
@@ -25,12 +36,14 @@ module Blockchain.SolidVM.SetGet
 where
 
 import qualified Blockchain.Data.BlockHeader as BlockHeader
+import Blockchain.Data.Util
 import Blockchain.DB.SolidStorageDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
 import Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
+import Blockchain.Strato.Model.Address
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -49,6 +62,7 @@ import qualified SolidVM.Model.Storable as MS
 import SolidVM.Model.Value
 import Text.Format
 import Text.Printf
+import Text.Read (readMaybe)
 import UnliftIO
 
 fromBasic :: MS.BasicValue -> Value
@@ -189,14 +203,24 @@ getVar (Constant (SPush v (Just var))) = do
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
 
+getIntEither :: MonadSM m => Variable -> m (Either Value Integer)
+getIntEither p = getIntValEither <$> getVar p
+
+getIntValEither :: Value -> Either Value Integer
+getIntValEither = \case
+  SInteger s -> Right s
+  SNULL -> Right 0
+  SReference{} -> Right 0
+  v -> Left v
+
 getInt :: MonadSM m => Variable -> m Integer
-getInt p = do
-  v <- getVar p
-  case v of
-    SInteger s -> return s
-    SNULL -> return 0
-    SReference{} -> pure 0
-    _ -> typeError "getInt" $ show (p, v)
+getInt = either (typeError "getInt" . show) pure <=< getIntEither
+
+getIntVal :: MonadSM m => Value -> m Integer
+getIntVal = either (typeError "getIntVal" . show) pure . getIntValEither
+
+int :: MonadSM m => Value -> m Integer
+int = getIntVal
 
 getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
 getRealNum p = do
@@ -209,14 +233,60 @@ getRealNum p = do
     _ -> typeError "getRealNum" $ show (p, v)
 
 getBool :: MonadSM m => Variable -> m Bool
-getBool p = do
-  v <- getVar p
-  case v of
-    SBool b -> return b
-    SInteger i -> return $ i /= 0
-    SNULL -> return False
-    SReference{} -> pure False
-    _ -> typeError "getBool" $ show (p, v)
+getBool = getBoolVal <=< getVar
+
+getBoolVal :: MonadSM m => Value -> m Bool
+getBoolVal = \case
+  SBool b -> return b
+  SInteger i -> return $ i /= 0
+  SNULL -> return False
+  SReference{} -> pure False
+  v -> typeError "getBool" $ show v
+
+getAddress :: MonadSM m => Variable -> m Address
+getAddress = getAddressVal <=< getVar
+
+getAddressVal :: MonadSM m => Value -> m Address
+getAddressVal = \case
+  SInteger i -> pure $ fromIntegral i
+  SAddress a _ -> pure a
+  SContract _ a -> pure a
+  SString s -> case readMaybe s of
+    Nothing -> typeError "getAddress" $ show s
+    Just a -> pure a
+  SBytes b -> pure $ addressFromByteString b
+  SNULL -> pure 0
+  SReference{} -> pure 0
+  v -> typeError "getAddress" $ show v
+
+getString :: MonadSM m => Variable -> m String
+getString = getStringVal <=< getVar
+
+getStringVal :: MonadSM m => Value -> m String
+getStringVal = \case
+  SString s -> pure s
+  SBytes b -> case decodeUtf8' b of
+    Left _ -> pure $ BC.unpack b
+    Right r -> pure $ T.unpack r
+  SNULL -> pure ""
+  SReference{} -> pure ""
+  v -> typeError "getString" $ show v
+
+getBytes :: MonadSM m => Variable -> m BC.ByteString
+getBytes = getBytesVal <=< getVar
+
+getBytesVal :: MonadSM m => Value -> m BC.ByteString
+getBytesVal = \case
+  SInteger i -> pure $ integer2Bytes i
+  SAddress a _ -> pure $ addressToByteString a
+  SContract _ a -> pure $ addressToByteString a
+  SString s -> case B16.decode $ BC.pack s of
+    Right r -> pure r
+    _ -> pure . encodeUtf8 $ T.pack s
+  SBytes b -> pure b
+  SNULL -> pure BC.empty
+  SReference{} -> pure BC.empty
+  v -> typeError "getAddress" $ show v
 
 deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference (AddressPath addr path))) = do

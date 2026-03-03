@@ -135,6 +135,30 @@ export function validateSwapHistoryArgs(args: any) {
   }
 }
 
+export function validateTogglePauseArgs(args: any) {
+  const schema = Joi.object({
+    poolAddress: validateAddressField("poolAddress"),
+    isPaused: Joi.boolean().required(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Toggle Pause Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateToggleDisableArgs(args: any) {
+  const schema = Joi.object({
+    poolAddress: validateAddressField("poolAddress"),
+    isDisabled: Joi.boolean().required(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Toggle Disable Argument Validation Error: " + error.message);
+  }
+}
+
 export function validateSetPoolRatesArgs(args: any) {
   const schema = Joi.object({
     poolAddress: validateAddressField("poolAddress"),
