@@ -1,8 +1,0 @@
-#!/bin/bash
-
-set -e
-
-sourceCode=`cat $1 | perl -pe 's/\n/\\\\n/g' | perl -pe 's/"/\\\\"/g'`
-
-./scurl -d "{\"txs\": [{\"type\": \"CONTRACT\", \"payload\": {\"src\": \"$sourceCode\", \"metadata\": {\"VM\": \"SolidVM\"}}}]}" -i http://localhost/strato-api/bloc/v2.2/transaction
-
