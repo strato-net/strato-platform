@@ -20,10 +20,10 @@ import Groth16.BN254
 main :: IO ()
 main = do
     args <- getArgs
-    let witnessPath = case args of
-            (x:_) -> x
-            [] -> "/tmp/witness.wtns"
-    let pkPath = "circuits/01x02/circuit_pk.json"
+    let (pkPath, witnessPath) = case args of
+            (pk:w:_) -> (pk, w)
+            (w:_) -> ("circuits/01x02/circuit_pk.json", w)
+            [] -> ("circuits/01x02/circuit_pk.json", "/tmp/witness.wtns")
     
     putStrLn "=== Native Groth16 Prover Benchmark ==="
     putStrLn $ "Witness: " ++ witnessPath
@@ -58,10 +58,21 @@ main = do
                     putStrLn "\nGenerating proof with native prover..."
                     putStrLn "(This may take a while...)"
                     t4 <- getCurrentTime
-                    (Proof !_piA !_piB !_piC) <- prove pk witness
+                    proof@(Proof !_piA !_piB !_piC) <- prove pk witness
                     t5 <- getCurrentTime
                     let proveTime = realToFrac (diffUTCTime t5 t4) :: Double
                     putStrLn "  Proof generated!"
+                    
+                    -- Print proof coordinates for debugging
+                    let ((ax, ay), ((bx0, bx1), (by0, by1)), (cx, cy)) = proofToIntegers proof
+                    putStrLn "\n=== PROOF COORDINATES ==="
+                    putStrLn $ "A.x: " ++ show ax
+                    putStrLn $ "A.y: " ++ show ay
+                    putStrLn $ "B.x: [" ++ show bx0 ++ ", " ++ show bx1 ++ "]"
+                    putStrLn $ "B.y: [" ++ show by0 ++ ", " ++ show by1 ++ "]"
+                    putStrLn $ "C.x: " ++ show cx
+                    putStrLn $ "C.y: " ++ show cy
+                    
                     printf "\n=== RESULTS ===\n"
                     printf "PK load time:     %.2f seconds\n" loadTime
                     printf "Witness load:     %.3f seconds\n" witnessTime
