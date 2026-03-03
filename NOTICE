@@ -81,7 +81,6 @@ Status:
 Evidence:
 - mercata/services/bridge/package-lock.json:1503
 - mercata/services/bridge/package-lock.json:6155
-- mercata/services/referral/package-lock.json:1503
 - mercata/services/referral/package-lock.json:6155
 Risk:
 - High.
@@ -122,32 +121,16 @@ Recommendation:
 Status:
 - sharp optional dependency chain includes LGPL libvips platform packages.
 Evidence:
-- mercata/ui/package-lock.json:12999
 - mercata/ui/package-lock.json:1366
-- mercata/ui/package-lock.json:1478
-- mercata/ui/package-lock.json:15041
+- mercata/ui/package-lock.json:12999
+- mercata/ui/package-lock.json:14865
 Risk:
 - Medium (optional/platform-dependent install path).
 Recommendation:
 - If Apache-only distribution is required, disable sharp-dependent path or
   provide separate compliance handling for LGPL components.
 
-6) legacy/pre-erc20-Jun2025/marketplace/ui node-forge
-   (BSD-3-Clause OR GPL-2.0)
-Status:
-- node-forge appears in lockfile as dual-license package, pulled by listhen and
-  selfsigned.
-Evidence:
-- legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:16330
-- legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:17055
-- legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:21706
-Risk:
-- Low to Medium. Dual license permits BSD-3-Clause path (Apache-compatible), but
-  item should still be documented.
-Recommendation:
-- Keep only if legacy scope is still distributed.
-
-7) strato/extraFiles license bundle contains GPL texts
+6) strato/extraFiles license bundle contains GPL texts
 Status:
 - Build copies strato/extraFiles into STRATO image build context.
 Evidence:
@@ -168,7 +151,3 @@ Priority order:
 3. Minimize dev-tool LGPL path in mercata/ethereum.
 4. Audit and prune strato/extraFiles license bundle.
 5. Re-generate NOTICE and SBOM after dependency lock updates.
-
-Repository scope note:
-- In this checkout, legacy/ is present. If legacy/ is removed from distributed
-  artifacts in a future revision, remove item (6) and related evidence lines.
