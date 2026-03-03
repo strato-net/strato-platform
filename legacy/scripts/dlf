@@ -1,2 +1,0 @@
-#!/usr/bin/env sh
-docker logs --follow "strato_${1}_1"
