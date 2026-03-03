@@ -615,6 +615,8 @@ getVariableOfName name = do
                        "sha256",
                        "ecrecover",
                        "verifyP256",
+                       "base64encode",
+                       "base64urlencode",
                        "blockhash",
                        "addmod",
                        "mulmod",
