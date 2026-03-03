@@ -5,6 +5,7 @@ packages:
 - libs/groth16-snarkjs
 - libs/groth16-rapidsnark
 - libs/strato-auth
+- libs/strato-vault-client
 
 - api/bloc/bloc2
 - api/bloc/bloc2api
@@ -82,8 +83,6 @@ packages:
 - vault/api
 - vault/client
 - vault/server
-- vault-proxy/api
-- vault-proxy/server
 
 #- VM/EVM/ethereum-vm
 - VM/EVM/evm-solidity

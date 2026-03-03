@@ -83,7 +83,7 @@ import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
-import Blockchain.Model.SyncState
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
@@ -113,7 +113,6 @@ import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
 import Debugger
-import Executable.EVMFlags
 import GHC.Generics
 import SolidVM.Model.Storable
 import SolidVM.Model.Value
@@ -267,7 +266,7 @@ instance Default ContextState where
       { _memDBs = def,
         _baggerState = defaultBaggerState,
         _bestBlockInfo = Unspecified,
-        _vmGasCap = Gas flags_gasLimit,
+        _vmGasCap = Gas (Conf.gasLimit $ networkConfig ethConf),
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
@@ -299,14 +298,10 @@ type VMBase m =
     Mod.Modifiable ContextState m,
     Mod.Accessible ContextState m,
     Mod.Modifiable MemDBs m,
-    Mod.Accessible MemDBs m,
     Mod.Modifiable BlockHashRoot m,
-    Mod.Modifiable GenesisRoot m,
-    Mod.Modifiable BestBlockRoot m,
     Mod.Modifiable CurrentBlockHash m,
     Mod.Modifiable GasCap m,
     HasMemAddressStateDB m,
-    A.Selectable Address AddressState m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
@@ -315,8 +310,7 @@ type VMBase m =
     (N.NibbleString `A.Alters` N.NibbleString) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m,
-    (Keccak256 `A.Alters` BlockSummary) m,
-    Mod.Accessible (Maybe WorldBestBlock) m
+    (Keccak256 `A.Alters` BlockSummary) m
   )
 
 withCurrentBlockHash ::
@@ -363,8 +357,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       let ldbOptions =
             DB.defaultOptions
               { DB.createIfMissing = True,
-                DB.cacheSize = flags_ldbCacheSize,
-                DB.blockSize = flags_ldbBlockSize
+                DB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
+                DB.blockSize = Conf.blockSize (levelDBConfig ethConf)
               }
       let openDB base = DB.open (tmpdir ++ base) ldbOptions
       sdb <- openDB stateDBPath
@@ -436,8 +430,8 @@ initContext dSettings = do
   let ldbOptions =
         DB.defaultOptions
           { DB.createIfMissing = True,
-            DB.cacheSize = flags_ldbCacheSize,
-            DB.blockSize = flags_ldbBlockSize
+            DB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
+            DB.blockSize = Conf.blockSize (levelDBConfig ethConf)
           }
   sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
   hdb <- DB.open (dbDir "h" ++ hashDBPath) ldbOptions

@@ -17,7 +17,7 @@ module Blockchain.CommunicationConduit
 where
 
 import           BlockApps.Logging
-import           Blockchain.Constants                  hiding (ethVersion)
+import           Blockchain.Constants
 import           Blockchain.Context
 import           Blockchain.Data.Control               (P2PCNC (..))
 import           Blockchain.Data.RLP
@@ -28,11 +28,11 @@ import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Model.SyncState
 import           Blockchain.Model.SyncTask
-import           Blockchain.Options
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Options       (computeNetworkID)
+import           Blockchain.EthConf (ethConf, networkConfig, p2pConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.Strato.Model.Util
 import           Blockchain.SyncDB
 import           Blockchain.Threads
@@ -106,7 +106,7 @@ handleMsgClientConduit myId peer = do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               let s = Status
                       { protocolVersion = fromIntegral ethVersion,
-                        networkID = computeNetworkID,
+                        networkID = Conf.networkID (networkConfig ethConf),
                         highestBlockNum = highestBlockNum',
                         latestHash = bHash,
                         genesisHash = genHash
@@ -118,7 +118,7 @@ handleMsgClientConduit myId peer = do
     Just Status {protocolVersion = ver, highestBlockNum = highestBlockNum', genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
       when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-      when (networkID' /= computeNetworkID) $ throwIO NetworkIDMismatch
+      when (networkID' /= Conf.networkID (networkConfig ethConf)) $ throwIO NetworkIDMismatch
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
@@ -133,7 +133,7 @@ handleMsgClientConduit myId peer = do
           $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
           if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
             then do
-              yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
+              yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 Forward
             else do
               $logInfoS "handleMsgClientConduit" $ T.pack $ "sync task chiliad higher than world highest block (#" ++ show highestBlockNum' ++ "), marking the new chiliad as 'NotReady'"
               lift $ setSyncTaskNotReady (pPeerHost peer)
@@ -154,7 +154,7 @@ handleMsgServerConduit myPubkey peer = do
 
   numActivePeers <- liftIO $ fmap length getPeersByThreads
 
-  when (numActivePeers > flags_maxConn) $ do
+  when (numActivePeers > Conf.maxConnections (p2pConfig ethConf)) $ do
     yield $ Right $ Disconnect TooManyPeers
     throwIO CurrentlyTooManyPeers
 
@@ -181,7 +181,7 @@ handleMsgServerConduit myPubkey peer = do
               -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
               let highestBlockNum' = if ver < 63 then theirHighestBlockNum - 8192 else theirHighestBlockNum
               when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-              when (networkID' /= computeNetworkID) $ throwIO NetworkIDMismatch
+              when (networkID' /= Conf.networkID (networkConfig ethConf)) $ throwIO NetworkIDMismatch
 
               updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
               Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
@@ -189,7 +189,7 @@ handleMsgServerConduit myPubkey peer = do
                 Right
                   Status
                     { protocolVersion = fromIntegral ethVersion,
-                      networkID = computeNetworkID,
+                      networkID = Conf.networkID (networkConfig ethConf),
                       highestBlockNum = myHighestBlockNum,
                       latestHash = bHash,
                       genesisHash = genHash
@@ -202,7 +202,7 @@ handleMsgServerConduit myPubkey peer = do
           $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
         Just syncTask -> do
           $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
-          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
+          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 Forward
 
       lift stampActionTimestamp
     other -> assertHandshake other

@@ -34,7 +34,8 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Sequencer.Event (IngestEvent)
 import           Blockchain.Strato.Discovery.Data.Peer (HasPeerDB)
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Options
+import           Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.Strato.Model.Secp256k1
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify       (Accessible, Outputs)
@@ -110,6 +111,6 @@ coreApiServer =
     :<|> QueuedTransactions.server
     :<|> Stats.server
     :<|> Storage.server
-    :<|> Transaction.server flags_txSizeLimit
+    :<|> Transaction.server (Conf.txSizeLimit (networkConfig ethConf))
     :<|> TransactionResult.server
     :<|> TxLast.server

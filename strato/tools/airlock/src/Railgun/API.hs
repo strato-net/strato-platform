@@ -49,7 +49,9 @@ import Strato.Auth (runServantWithAuthEnv, authRequest)
 import Blockchain.EthConf.Model (EthConf(..), ContractsConf(..))
 import Data.Yaml (decodeFileEither)
 import System.Directory (doesFileExist, getHomeDirectory)
+import System.Environment (lookupEnv)
 import System.FilePath ((</>))
+import Data.Maybe (fromMaybe)
 
 import Railgun.Types (ShieldRequest(..), CommitmentPreimage(..), ShieldCiphertext(..), TokenData(..), TokenType(..), integerToHex32, encryptedBundleToHexList)
 import Railgun.Unshield (UnshieldRequest(..), Transaction(..), SnarkProof(..), G1Point(..), G2Point(..), BoundParams(..), UnshieldType(..), CommitmentCiphertext(..))
@@ -451,11 +453,11 @@ getTreeNumber = do
           [(n, "")] -> return n
           _ -> return 0
 
--- | Get the user's Ethereum address from the vault-proxy key endpoint
+-- | Get the user's Ethereum address from the vault key endpoint
 getUserAddress :: IO (Either Text Text)
 getUserAddress = do
-  let url = "http://" ++ defaultHost ++ ":" ++ show defaultPort 
-            ++ "/strato/v2.3/key"
+  vaultUrl <- fromMaybe "https://vault.blockapps.net:8093" <$> lookupEnv "VAULT_URL"
+  let url = vaultUrl ++ "/strato/v2.3/key"
   request <- HTTP.parseRequest url
   let requestWithHeaders = request { HTTP.requestHeaders = [("Accept", "application/json")] }
   response <- authRequest requestWithHeaders

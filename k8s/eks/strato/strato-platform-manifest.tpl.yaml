@@ -557,8 +557,6 @@ spec:
           value: ""
         - name: connectionTimeout
           value: ""
-        - name: debugFail
-          value: ""
         - name: debugPort
           value: ""
         - name: debugWSPort
@@ -624,10 +622,6 @@ spec:
         - name: redisPort
           value: "6379"
         - name: redisBDBNumber
-          value: ""
-        - name: seqEventsBatchSize
-          value: ""
-        - name: seqEventsCostHeuristic
           value: ""
         - name: seqMaxEventsPerIter
           value: ""
