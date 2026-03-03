@@ -535,7 +535,8 @@ contract record MercataBridge is Ownable {
     ) internal view {
         require(targetStratoToken != address(0), "MB: invalid target token");
         AssetInfo a = assets[externalToken][externalChainId];
-        bool isDefaultRoute = targetStratoToken == a.stratoToken;
+        require(a.stratoToken != address(0), "MB: asset missing");
+        bool isDefaultRoute = targetStratoToken == a.stratoToken && a.enabled;
         bool isExplicitRoute = assetRouteEnabled[externalToken][externalChainId][targetStratoToken];
         require(isDefaultRoute || isExplicitRoute, "MB: route not enabled");
     }
@@ -604,7 +605,6 @@ contract record MercataBridge is Ownable {
         require(deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE, "MB: duplicate deposit");
 
         AssetInfo a = assets[externalToken][externalChainId];
-        require(a.enabled, "MB: asset not enabled");
         _requireRouteEnabled(externalToken, externalChainId, targetStratoToken);
         require(TokenFactory(tokenFactory).isTokenActive(targetStratoToken), "MB: inactive token");
 
@@ -863,7 +863,6 @@ contract record MercataBridge is Ownable {
         require(chains[externalChainId].enabled, "MB: chain not enabled");
 
         AssetInfo a = assets[externalToken][externalChainId];
-        require(a.enabled, "MB: asset not enabled");
         _requireRouteEnabled(externalToken, externalChainId, stratoToken);
         require(TokenFactory(tokenFactory).isTokenActive(stratoToken), "MB: inactive token");
 

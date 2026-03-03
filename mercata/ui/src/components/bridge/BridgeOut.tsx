@@ -66,7 +66,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
-      isSaving ? !token.bridgeable : token.bridgeable
+      isSaving ? !token.isDefaultRoute : token.isDefaultRoute
     );
   }, [bridgeableTokens, isSaving]);
 

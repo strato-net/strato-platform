@@ -18,6 +18,7 @@ const router = Router();
  *             type: object
  *             required:
  *               - externalChainId
+ *               - externalToken
  *               - stratoToken
  *               - stratoTokenAmount
  *               - externalRecipient
@@ -28,15 +29,15 @@ const router = Router();
  *               stratoToken:
  *                 type: string
  *                 description: STRATO token contract address to withdraw
+ *               externalToken:
+ *                 type: string
+ *                 description: External chain token contract address (or zero/native address mapping)
  *               stratoTokenAmount:
  *                 type: string
  *                 description: Amount of the STRATO token to withdraw (decimal string)
  *               externalRecipient:
  *                 type: string
  *                 description: Recipient address on the external chain
- *               targetStratoToken:
- *                 type: string
- *                 description: Optional STRATO token address to mint on redemption
  *     responses:
  *       200:
  *         description: Withdrawal transaction submitted
@@ -105,7 +106,7 @@ router.post("/requestAutoSave", authHandler.authorizeRequest(), BridgeController
  * @openapi
  * /bridge/bridgeableTokens/{chainId}:
  *   get:
- *     summary: List tokens that can withdraw to a chain
+ *     summary: List enabled bridge routes for a chain
  *     tags: [Bridge]
  *     parameters:
  *       - name: chainId
@@ -116,7 +117,7 @@ router.post("/requestAutoSave", authHandler.authorizeRequest(), BridgeController
  *           type: string
  *     responses:
  *       200:
- *         description: Available bridgeable assets
+ *         description: Available enabled bridge routes for the chain
  *         content:
  *           application/json:
  *             schema:
@@ -124,6 +125,12 @@ router.post("/requestAutoSave", authHandler.authorizeRequest(), BridgeController
  *               items:
  *                 type: object
  *                 properties:
+ *                   id:
+ *                     type: string
+ *                   isDefaultRoute:
+ *                     type: boolean
+ *                   enabled:
+ *                     type: boolean
  *                   stratoToken:
  *                     type: string
  *                   stratoTokenName:

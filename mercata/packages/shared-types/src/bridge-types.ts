@@ -36,7 +36,8 @@ export interface BridgeToken {
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
-  bridgeable: boolean;           // true if stratoToken !== USDST, false otherwise
+  enabled: boolean;              // effective route enabled state
+  isDefaultRoute: boolean;       // true when route token matches asset default token
 }
 
 // ============================================================================

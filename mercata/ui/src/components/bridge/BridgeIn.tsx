@@ -104,7 +104,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
-      isSaving ? !token.bridgeable : token.bridgeable
+      isSaving ? !token.isDefaultRoute : token.isDefaultRoute
     );
   }, [bridgeableTokens, isSaving]);
 
@@ -425,6 +425,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     try {
       const activeChainId = currentNetwork.chainId;
       const depositRouter = currentNetwork.depositRouter;
+      const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
       
       // Set initial step based on whether it's Easy Savings or Bridge In, and if it needs approval
       if (!isNative) {
@@ -445,6 +446,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         decimals: selectedToken.externalDecimals,
         chainId: activeChainId,
         tokenAddress: isNative ? NATIVE_TOKEN_ADDRESS : ensureHexPrefix(selectedToken.externalToken),
+        targetStratoToken,
       });
 
       if (!validation.isValid) {
@@ -511,6 +513,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         tokenAddress: isNative ? undefined : selectedToken.externalToken,
         amount: depositAmount,
         userAddress,
+        targetStratoToken,
         account: address,
         chainId: activeChainId,
         permitData,
@@ -528,7 +531,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
           address: depositRouter as `0x${string}`,
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "depositETH",
-          args: [ensureHexPrefix(userAddress)],
+          args: [ensureHexPrefix(userAddress), targetStratoToken],
           value: depositAmount,
         chain,
           account: address as `0x${string}`,
@@ -546,6 +549,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
             ensureHexPrefix(selectedToken.externalToken),
             depositAmount,
             ensureHexPrefix(userAddress),
+            targetStratoToken,
             permitData.nonce,
             permitData.deadline,
             permitData.signature as `0x${string}`,

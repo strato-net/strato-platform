@@ -26,10 +26,9 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     <div className="space-y-1.5">
       <Label htmlFor="from-token">Select asset</Label>
       <Select
-        value={selectedToken?.externalSymbol || ""}
+        value={selectedToken?.id || ""}
         onValueChange={(v) => {
-          const token =
-            tokens.find((t) => t.externalSymbol === v) || null;
+          const token = tokens.find((t) => t.id === v) || null;
           onTokenChange(token);
         }}
         disabled={!tokens.length || disabled}
@@ -43,7 +42,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
           {tokens
             .filter((t) => t.externalSymbol)
             .map((t) => (
-              <SelectItem key={t.id} value={String(t.externalSymbol)}>
+              <SelectItem key={t.id} value={t.id}>
                 {t.externalSymbol}
               </SelectItem>
             ))}
@@ -54,4 +53,3 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
 };
 
 export default TokenSelector;
-
