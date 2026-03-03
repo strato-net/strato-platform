@@ -152,9 +152,6 @@ instance {-# OVERLAPPING #-} HasSQL m => m `Mod.Yields` TransactionResult where
 vmBlockHashRootKey :: B.ByteString
 vmBlockHashRootKey = "block_hash_root"
 
-vmGenesisRootKey :: B.ByteString
-vmGenesisRootKey = "genesis_root"
-
 vmBestBlockRootKey :: B.ByteString
 vmBestBlockRootKey = "best_block_root"
 
@@ -165,14 +162,6 @@ instance HasContext m => Mod.Modifiable BlockHashRoot m where
   put _ (BlockHashRoot (MP.StateRoot sr)) = do
     db <- getStateDB
     DB.put db def vmBlockHashRootKey sr
-
-instance HasContext m => Mod.Modifiable GenesisRoot m where
-  get _ = do
-    db <- getStateDB
-    GenesisRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmGenesisRootKey
-  put _ (GenesisRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmGenesisRootKey sr
 
 instance HasContext m => Mod.Modifiable BestBlockRoot m where
   get _ = do
