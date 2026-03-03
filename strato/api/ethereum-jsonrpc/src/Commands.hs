@@ -264,17 +264,147 @@ eth_call = toMethod "eth_call" f (Required "object" :+: Required "blockString" :
 
 -------------------
 
-eth_getBlockTransactionCountByHash :: Method Server
-eth_getBlockTransactionCountByHash = toMethod "eth_getBlockTransactionCountByHash" f ()
+-- Helpers for hex conversion of block numbers in params
+parseBlockNum :: String -> Maybe Integer
+parseBlockNum "latest" = Nothing
+parseBlockNum "earliest" = Just 0
+parseBlockNum "pending" = Nothing
+parseBlockNum ('0':'x':hex) = case reads ("0x" ++ hex) :: [(Integer, String)] of
+  [(n, _)] -> Just n
+  _ -> Nothing
+parseBlockNum s = case reads s :: [(Integer, String)] of
+  [(n, _)] -> Just n
+  _ -> Nothing
+
+-- Fetch a block from the REST API and return the raw JSON
+fetchBlockByNumber :: String -> IO (Maybe JSON.Value)
+fetchBlockByNumber blockParam = do
+  let endpoint = case parseBlockNum blockParam of
+        Nothing -> "block/last/1"
+        Just n  -> "block?number=" ++ show n
+  response <- API.call endpoint
+  case JSON.decode $ BLC.pack response :: Maybe JSON.Value of
+    Just (JSON.Array arr) | not (V.null arr) -> return $ Just (V.head arr)
+    _ -> return Nothing
+
+fetchBlockByHash :: String -> IO (Maybe JSON.Value)
+fetchBlockByHash hashStr = do
+  let h = if take 2 hashStr == "0x" then drop 2 hashStr else hashStr
+  response <- API.call $ "block?hash=" ++ h
+  case JSON.decode $ BLC.pack response :: Maybe JSON.Value of
+    Just (JSON.Array arr) | not (V.null arr) -> return $ Just (V.head arr)
+    _ -> return Nothing
+
+-- Convert STRATO block JSON to Ethereum block JSON
+stratoBlockToEthBlock :: Bool -> JSON.Value -> String
+stratoBlockToEthBlock _fullTxs (JSON.Object blk) =
+  let bd = case KM.lookup "blockData" blk of
+        Just (JSON.Object o) -> o
+        _ -> KM.empty
+      lkp k = KM.lookup (fromString k) bd
+      lkpBlk k = KM.lookup (fromString k) blk
+      hexNum k = case lkp k of
+        Just (JSON.Number n) -> "0x" ++ showHex (round n :: Integer) ""
+        _ -> "0x0"
+      hexStr k = case lkp k of
+        Just (JSON.String s) -> "\"" ++ T.unpack s ++ "\""
+        _ -> "null"
+      blockHash = case lkpBlk "blockHash" of
+        Just (JSON.String s) -> "\"0x" ++ T.unpack s ++ "\""
+        _ -> "null"
+      txHashes = case lkpBlk "receiptTransactions" of
+        Just (JSON.Array txs) -> "[" ++ concatComma (map getTxHash (V.toList txs)) ++ "]"
+        _ -> "[]"
+      getTxHash (JSON.Object tx) = case KM.lookup "hash" tx of
+        Just (JSON.String h) -> "\"0x" ++ T.unpack h ++ "\""
+        _ -> "null"
+      getTxHash _ = "null"
+      concatComma [] = ""
+      concatComma [x] = x
+      concatComma (x:xs) = x ++ "," ++ concatComma xs
+  in "{\"number\":\"" ++ hexNum "number" ++ "\""
+     ++ ",\"hash\":" ++ blockHash
+     ++ ",\"parentHash\":" ++ hexStr "parentHash"
+     ++ ",\"nonce\":\"0x0000000000000000\""
+     ++ ",\"sha3Uncles\":\"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\""
+     ++ ",\"logsBloom\":\"0x" ++ replicate 512 '0' ++ "\""
+     ++ ",\"transactionsRoot\":" ++ hexStr "transactionsRoot"
+     ++ ",\"stateRoot\":" ++ hexStr "stateRoot"
+     ++ ",\"receiptsRoot\":" ++ hexStr "receiptsRoot"
+     ++ ",\"miner\":\"0x0000000000000000000000000000000000000000\""
+     ++ ",\"difficulty\":\"0x0\""
+     ++ ",\"totalDifficulty\":\"0x0\""
+     ++ ",\"extraData\":" ++ hexStr "extraData"
+     ++ ",\"size\":\"0x0\""
+     ++ ",\"gasLimit\":\"0x1c9c380\""
+     ++ ",\"gasUsed\":\"0x0\""
+     ++ ",\"timestamp\":" ++ (case lkp "timestamp" of
+          Just (JSON.String ts) -> "\"0x" ++ showHex (tsToUnix (T.unpack ts)) "" ++ "\""
+          _ -> "\"0x0\"")
+     ++ ",\"transactions\":" ++ txHashes
+     ++ ",\"uncles\":[]"
+     ++ "}"
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getBlockTransactionCountByHash not yet implemented"
+    tsToUnix :: String -> Integer
+    tsToUnix _ = 0
+stratoBlockToEthBlock _ _ = "null"
+
+-- Convert STRATO tx JSON to Ethereum tx JSON
+stratoTxToEthTx :: JSON.Value -> String
+stratoTxToEthTx (JSON.Object tx) =
+  let lkp k = KM.lookup (fromString k) tx
+      hashVal = case lkp "hash" of
+        Just (JSON.String h) -> "0x" ++ T.unpack h
+        _ -> "0x"
+      fromVal = case lkp "from" of
+        Just (JSON.String f) -> "0x" ++ T.unpack f
+        _ -> "0x0000000000000000000000000000000000000000"
+      toVal = case lkp "to" of
+        Just (JSON.String t) -> "\"0x" ++ T.unpack t ++ "\""
+        _ -> "null"
+      nonceVal = case lkp "nonce" of
+        Just (JSON.Number n) -> "0x" ++ showHex (round n :: Integer) ""
+        _ -> "0x0"
+      blkNum = case lkp "blockNumber" of
+        Just (JSON.Number n) -> "0x" ++ showHex (round n :: Integer) ""
+        _ -> "0x0"
+  in "{\"hash\":\"" ++ hashVal ++ "\""
+     ++ ",\"nonce\":\"" ++ nonceVal ++ "\""
+     ++ ",\"blockHash\":\"" ++ hashVal ++ "\""
+     ++ ",\"blockNumber\":\"" ++ blkNum ++ "\""
+     ++ ",\"transactionIndex\":\"0x0\""
+     ++ ",\"from\":\"" ++ fromVal ++ "\""
+     ++ ",\"to\":" ++ toVal
+     ++ ",\"value\":\"0x0\""
+     ++ ",\"gas\":\"0x5208\""
+     ++ ",\"gasPrice\":\"0x0\""
+     ++ ",\"input\":\"0x\""
+     ++ "}"
+stratoTxToEthTx _ = "null"
+
+eth_getBlockTransactionCountByHash :: Method Server
+eth_getBlockTransactionCountByHash = toMethod "eth_getBlockTransactionCountByHash" f (Required "blockHash" :+: ())
+  where
+    f :: String -> RpcResult Server String
+    f blockHash = do
+      mBlk <- liftIO $ fetchBlockByHash blockHash
+      case mBlk of
+        Just (JSON.Object blk) -> case KM.lookup "receiptTransactions" blk of
+          Just (JSON.Array txs) -> return $ "0x" ++ showHex (V.length txs) ""
+          _ -> return "0x0"
+        _ -> return "0x0"
 
 eth_getBlockTransactionCountByNumber :: Method Server
-eth_getBlockTransactionCountByNumber = toMethod "eth_getBlockTransactionCountByNumber" f ()
+eth_getBlockTransactionCountByNumber = toMethod "eth_getBlockTransactionCountByNumber" f (Required "blockNumber" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getBlockTransactionCountByNumber not yet implemented"
+    f :: String -> RpcResult Server String
+    f blockNumber = do
+      mBlk <- liftIO $ fetchBlockByNumber blockNumber
+      case mBlk of
+        Just (JSON.Object blk) -> case KM.lookup "receiptTransactions" blk of
+          Just (JSON.Array txs) -> return $ "0x" ++ showHex (V.length txs) ""
+          _ -> return "0x0"
+        _ -> return "0x0"
 
 eth_getUncleCountByBlockHash :: Method Server
 eth_getUncleCountByBlockHash = toMethod "eth_getUncleCountByBlockHash" f ()
@@ -313,40 +443,112 @@ eth_estimateGas = toMethod "eth_estimateGas" f ()
     f = return "0x5208"
 
 eth_getBlockByHash :: Method Server
-eth_getBlockByHash = toMethod "eth_getBlockByHash" f ()
+eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getBlockByHash not yet implemented"
+    f :: String -> Bool -> RpcResult Server String
+    f blockHash fullTxs = do
+      mBlk <- liftIO $ fetchBlockByHash blockHash
+      case mBlk of
+        Just blk -> return $ stratoBlockToEthBlock fullTxs blk
+        Nothing -> return "null"
 
 eth_getBlockByNumber :: Method Server
-eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f ()
+eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber" :+: Required "fullTransactions" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getBlockByNumber not yet implemented"
+    f :: String -> Bool -> RpcResult Server String
+    f blockNumber fullTxs = do
+      mBlk <- liftIO $ fetchBlockByNumber blockNumber
+      case mBlk of
+        Just blk -> return $ stratoBlockToEthBlock fullTxs blk
+        Nothing -> return "null"
 
+-- TODO: blockHash field in tx response needs the actual block hash, not the tx hash.
+-- STRATO tx JSON doesn't include the block hash, so we'd need an extra lookup.
 eth_getTransactionByHash :: Method Server
-eth_getTransactionByHash = toMethod "eth_getTransactionByHash" f ()
+eth_getTransactionByHash = toMethod "eth_getTransactionByHash" f (Required "txHash" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getTransactionByHash not yet implemented"
+    f :: String -> RpcResult Server String
+    f _txHash = throwError $ rpcError (-32601) "eth_getTransactionByHash not yet implemented - blockHash field needs fix"
 
 eth_getTransactionByBlockHashAndIndex :: Method Server
-eth_getTransactionByBlockHashAndIndex = toMethod "eth_getTransactionByBlockHashAndIndex" f ()
+eth_getTransactionByBlockHashAndIndex = toMethod "eth_getTransactionByBlockHashAndIndex" f (Required "blockHash" :+: Required "index" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getTransactionByBlockHashAndIndex not yet implemented"
+    f :: String -> String -> RpcResult Server String
+    f blockHash indexStr = do
+      let idx = case parseBlockNum indexStr of
+            Just n -> fromIntegral n
+            Nothing -> 0 :: Int
+      mBlk <- liftIO $ fetchBlockByHash blockHash
+      case mBlk of
+        Just (JSON.Object blk) -> case KM.lookup "receiptTransactions" blk of
+          Just (JSON.Array txs) | idx < V.length txs ->
+            return $ stratoTxToEthTx (txs V.! idx)
+          _ -> return "null"
+        _ -> return "null"
 
 eth_getTransactionByBlockNumberAndIndex :: Method Server
-eth_getTransactionByBlockNumberAndIndex = toMethod "eth_getTransactionByBlockNumberAndIndex" f ()
+eth_getTransactionByBlockNumberAndIndex = toMethod "eth_getTransactionByBlockNumberAndIndex" f (Required "blockNumber" :+: Required "index" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getTransactionByBlockNumberAndIndex not yet implemented"
+    f :: String -> String -> RpcResult Server String
+    f blockNumber indexStr = do
+      let idx = case parseBlockNum indexStr of
+            Just n -> fromIntegral n
+            Nothing -> 0 :: Int
+      mBlk <- liftIO $ fetchBlockByNumber blockNumber
+      case mBlk of
+        Just (JSON.Object blk) -> case KM.lookup "receiptTransactions" blk of
+          Just (JSON.Array txs) | idx < V.length txs ->
+            return $ stratoTxToEthTx (txs V.! idx)
+          _ -> return "null"
+        _ -> return "null"
 
 eth_getTransactionReceipt :: Method Server
-eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f ()
+eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "txHash" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getTransactionReceipt not yet implemented"
+    f :: String -> RpcResult Server String
+    f txHash = do
+      let h = if take 2 txHash == "0x" then drop 2 txHash else txHash
+      response <- liftIO $ API.call $ "transactionResult/" ++ h
+      case JSON.decode $ BLC.pack response :: Maybe JSON.Value of
+        Just (JSON.Array arr) | not (V.null arr) ->
+          case V.head arr of
+            JSON.Object tr -> do
+              let lkp k = KM.lookup (fromString k) tr
+                  txHashHex = "0x" ++ h
+                  blkHash = case lkp "blockHash" of
+                    Just (JSON.String s) -> "0x" ++ T.unpack s
+                    _ -> txHashHex
+                  gasUsed = case lkp "gasUsed" of
+                    Just (JSON.Number n) -> "0x" ++ showHex (round n :: Integer) ""
+                    Just (JSON.String s) -> case reads (T.unpack s) :: [(Integer, String)] of
+                      [(n, _)] -> "0x" ++ showHex n ""
+                      _ -> "0x0"
+                    _ -> "0x0"
+                  statusCode = case lkp "status" of
+                    Just (JSON.String "success") -> "0x1"
+                    _ -> "0x0"
+                  contractAddr = case lkp "contractsCreated" of
+                    Just (JSON.Array cs) | not (V.null cs) -> case V.head cs of
+                      JSON.String a -> "\"0x" ++ T.unpack a ++ "\""
+                      _ -> "null"
+                    _ -> "null"
+              return $ "{\"transactionHash\":\"" ++ txHashHex ++ "\""
+                ++ ",\"transactionIndex\":\"0x0\""
+                ++ ",\"blockHash\":\"" ++ blkHash ++ "\""
+                ++ ",\"blockNumber\":\"0x0\""
+                ++ ",\"from\":\"0x0000000000000000000000000000000000000000\""
+                ++ ",\"to\":null"
+                ++ ",\"cumulativeGasUsed\":" ++ "\"" ++ gasUsed ++ "\""
+                ++ ",\"gasUsed\":\"" ++ gasUsed ++ "\""
+                ++ ",\"contractAddress\":" ++ contractAddr
+                ++ ",\"logs\":[]"
+                ++ ",\"logsBloom\":\"0x" ++ replicate 512 '0' ++ "\""
+                ++ ",\"status\":\"" ++ statusCode ++ "\""
+                ++ ",\"effectiveGasPrice\":\"0x0\""
+                ++ ",\"type\":\"0x0\""
+                ++ "}"
+            _ -> return "null"
+        _ -> return "null"
 
 eth_getUncleByBlockHashAndIndex :: Method Server
 eth_getUncleByBlockHashAndIndex = toMethod "eth_getUncleByBlockHashAndIndex" f ()
