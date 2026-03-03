@@ -28,7 +28,7 @@ export class FunctionCallScenario extends BaseScenario {
     const response = responses[0];
 
     if (response.status === "Success") {
-      const address = response.txResult?.contractsCreated || response.hash;
+      const address = response.txResult?.contractsCreated?.[0] || response.hash;
       console.log(`[functionCall] Setup contract deployed: ${address}`);
       return address;
     }
@@ -47,7 +47,7 @@ export class FunctionCallScenario extends BaseScenario {
       );
     }
 
-    const address = result.txResult?.contractsCreated || result.hash;
+    const address = result.txResult?.contractsCreated?.[0] || result.hash;
     console.log(`[functionCall] Setup contract deployed: ${address}`);
     return address;
   }

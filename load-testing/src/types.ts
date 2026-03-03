@@ -105,7 +105,7 @@ export interface BuiltTx {
 export interface TxSubmitResponse {
   hash: string;
   status?: string;
-  txResult?: { message?: string; contractsCreated?: string };
+  txResult?: { message?: string; contractsCreated?: string[] };
   error?: string;
   message?: string;
 }
@@ -115,7 +115,7 @@ export interface TxResultResponse {
   hash: string;
   txResult?: {
     message?: string;
-    contractsCreated?: string;
+    contractsCreated?: string[];
   };
   error?: string;
   message?: string;
