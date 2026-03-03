@@ -209,23 +209,8 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             ++ ", "
             ++ show (length otxs)
             ++ "TXs)."
-        when flags_debug $ do
-          bhr <- Mod.get (Proxy @BlockHashRoot)
-          $logDebugS "addBlock" $ T.pack $ "Old blockhash root: " ++ format bhr
-          mcr <- getChainRoot $ blockHash b
-          case mcr of
-            Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate old chain root. Using emptyTriePtr"
-            Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
         putBlockHeaderInChainDB bd
-
-        when flags_debug $ do
-          bhr' <- Mod.get (Proxy @BlockHashRoot)
-          $logDebugS "addBlock" $ T.pack $ "New blockhash root after inserting header: " ++ format bhr'
-          mcr' <- getChainRoot $ blockHash b
-          case mcr' of
-            Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after inserting header. Using emptyTriePtr"
-            Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr
 
         bSum <- setParentStateRoot b
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
@@ -251,14 +236,6 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             lift $ P.incCounter vmBlocksInvalid
             pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
           _ -> do
-            when flags_debug $ do
-              bhr'' <- Mod.get (Proxy @BlockHashRoot)
-              $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
-              mcr'' <- getChainRoot $ blockHash b
-              case mcr'' of
-                Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
-                Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
-
             lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed

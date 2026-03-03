@@ -14,7 +14,6 @@ module Blockchain.DB.ChainDB
     bootstrapChainDB,
     putBlockHeaderInChainDB,
     migrateBlockHeader,
-    getChainRoot,
     getChainStateRoot,
     putChainStateRoot,
     deleteChainStateRoot,
@@ -31,7 +30,6 @@ import Control.DeepSeq
 import Control.Monad (join)
 import Control.Monad.Change.Alter hiding (lookup)
 import Control.Monad.Change.Modify
-import Data.Foldable (for_)
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
 import Data.Traversable (for)
@@ -141,12 +139,11 @@ bootstrapChainDB ::
     (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   Keccak256 ->
-  [(Maybe Word256, MP.StateRoot)] ->
-  m BlockHashRoot
-bootstrapChainDB genesisHash startingStateRoots = do
+  MP.StateRoot ->
+  m ()
+bootstrapChainDB genesisHash startingStateRoot = do
   putChainBlockHashInfo genesisHash zeroHash MP.emptyTriePtr
-  for_ startingStateRoots $ \(cId, sr) -> putChainStateRoot cId genesisHash sr
-  get (Proxy @BlockHashRoot)
+  putChainStateRoot Nothing genesisHash startingStateRoot
 
 putBlockHeaderInChainDB ::
   ( BlockHeaderLike h,
