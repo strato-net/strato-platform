@@ -50,74 +50,125 @@ prometheus-packager/NOTICE.
 WORK IN PROGRESS:
 -------------------------------------------------------------------------------
 
-Appendix: License Audit Notes (detailed with evidence)
+Appendix: License Audit Notes and Recommendation Matrix (refreshed 2026-03-03)
 
-1. strato/libs/groth16-rapidsnark/vendor/rapidsnark (LGPL-3.0)
-Vendored C++ source is compiled as part of the groth16-rapidsnark Haskell
-package and linked into the Airlock CLI. Evidence:
-strato/libs/groth16-rapidsnark/package.yaml:7
-strato/libs/groth16-rapidsnark/package.yaml:14
-strato/libs/groth16-rapidsnark/package.yaml:74
-strato/tools/airlock/src/Railgun/Prover.hs:25
-strato/tools/airlock/src/Railgun/Prover.hs:26
-strato/tools/airlock/src/Railgun/Prover.hs:111
-strato/tools/airlock/src/Railgun/Prover.hs:118
+Goal for this appendix:
+- Identify components that may be incompatible with Apache-2.0-only
+  distribution posture.
+- Capture mitigation recommendations and implementation priority.
 
-2. legacy/pre-erc20-Jun2025/marketplace/ui node-forge (BSD-3-Clause OR GPL-2.0)
-node-forge is a transitive dependency of listhen and selfsigned (dev HTTPS
-helpers). Evidence:
-legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:16330
-legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:16347
-legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:17051
-legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:17055
-legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:21699
-legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:21706
+1) strato/libs/groth16-rapidsnark/vendor/rapidsnark (LGPL-3.0)
+Status:
+- Vendored C++ source is compiled as part of groth16-rapidsnark and used by
+  Airlock prover path.
+Evidence:
+- strato/libs/groth16-rapidsnark/package.yaml:14
+- strato/libs/groth16-rapidsnark/package.yaml:74
+- strato/tools/airlock/src/Railgun/Prover.hs:25
+- strato/tools/airlock/src/Railgun/Prover.hs:117
+Risk:
+- High (copyleft obligations apply to distributed combined work path).
+Recommendation:
+- Preferred: remove rapidsnark build/use path and rely on non-LGPL prover
+  alternatives for Apache-only distributions.
+- Alternative: keep as explicitly optional external component with separate
+  compliance path.
 
-3. mercata/ethereum solidity-coverage and web3-utils (LGPL-3.0)
-solidity-coverage is pulled in as a peer dependency of
-@nomicfoundation/hardhat-toolbox and brings web3-utils (LGPL-3.0). Evidence:
-mercata/ethereum/package.json:18
-mercata/ethereum/package-lock.json:1765
-mercata/ethereum/package-lock.json:1785
-mercata/ethereum/package-lock.json:7942
-mercata/ethereum/package-lock.json:7968
-mercata/ethereum/package-lock.json:8928
-mercata/ethereum/package-lock.json:8933
+2) mercata/services/bridge and mercata/services/referral rpc-websockets
+   (LGPL-3.0-only) via alchemy-sdk -> @solana/web3.js
+Status:
+- rpc-websockets is present in both service lockfiles with LGPL-3.0-only.
+Evidence:
+- mercata/services/bridge/package-lock.json:1503
+- mercata/services/bridge/package-lock.json:6155
+- mercata/services/referral/package-lock.json:1503
+- mercata/services/referral/package-lock.json:6155
+Risk:
+- High.
+Recommendation:
+- Preferred: remove alchemy-sdk dependency chain and use direct JSON-RPC
+  clients to avoid @solana/web3.js/rpc-websockets pull-in.
 
-4. mercata/services/bridge and mercata/services/referral rpc-websockets
-(LGPL-3.0-only) via @solana/web3.js and alchemy-sdk
-alchemy-sdk is a declared dependency; it depends on @solana/web3.js, which in
-turn depends on rpc-websockets. The bridge service fetches chain data via raw
-JSON-RPC (eth_blockNumber/eth_getLogs). Evidence:
-mercata/services/bridge/package.json:20
-mercata/services/referral/package.json:20
-mercata/services/bridge/package-lock.json:1140
-mercata/services/bridge/package-lock.json:1503
-mercata/services/bridge/package-lock.json:6151
-mercata/services/bridge/package-lock.json:6155
-mercata/services/referral/package-lock.json:1140
-mercata/services/referral/package-lock.json:1503
-mercata/services/referral/package-lock.json:6151
-mercata/services/referral/package-lock.json:6155
-mercata/services/bridge/src/services/rpcService.ts:13
-mercata/services/bridge/src/services/rpcService.ts:35
+3) mercata/ui rpc-websockets (LGPL-3.0-only) via @base-org/account ->
+   @coinbase/cdp-sdk -> @solana/web3.js
+Status:
+- rpc-websockets is present in Mercata UI lockfile.
+Evidence:
+- mercata/ui/package-lock.json:243
+- mercata/ui/package-lock.json:349
+- mercata/ui/package-lock.json:7253
+- mercata/ui/package-lock.json:14865
+Risk:
+- High.
+Recommendation:
+- Preferred: replace SDK path introducing Solana websocket stack for Apache-only
+  distribution profile.
 
-5. mercata/ui rpc-websockets (LGPL-3.0-only) via @coinbase/cdp-sdk and
-@solana/web3.js
-@base-org/account depends on @coinbase/cdp-sdk, which depends on
-@solana/web3.js, which depends on rpc-websockets. Evidence:
-mercata/ui/package-lock.json:243
-mercata/ui/package-lock.json:349
-mercata/ui/package-lock.json:352
-mercata/ui/package-lock.json:358
-mercata/ui/package-lock.json:7253
-mercata/ui/package-lock.json:14861
-mercata/ui/package-lock.json:14865
+4) mercata/ethereum web3-utils (LGPL-3.0) via solidity-coverage
+Status:
+- web3-utils appears as dev dependency path from hardhat-toolbox peer set.
+Evidence:
+- mercata/ethereum/package-lock.json:1785
+- mercata/ethereum/package-lock.json:7968
+- mercata/ethereum/package-lock.json:8933
+Risk:
+- Medium (dev/test scope, but still relevant for distributed source/binaries
+  and SBOM posture).
+Recommendation:
+- Preferred: remove solidity-coverage/hardhat-toolbox aggregate if not required;
+  install only specific hardhat plugins needed.
 
-6. mercata/ui sharp / @img/sharp-* / @img/sharp-libvips-* (LGPL-3.0-or-later)
-Next lists sharp as an optional dependency, and sharp pulls @img/sharp-* and
-@img/sharp-libvips-* platform packages with LGPL-3.0-or-later licenses. Evidence:
-mercata/ui/package-lock.json:12999
-mercata/ui/package-lock.json:1315
-mercata/ui/package-lock.json:1359
-mercata/ui/package-lock.json:1366
+5) mercata/ui sharp/libvips platform packages (LGPL-3.0-or-later)
+Status:
+- sharp optional dependency chain includes LGPL libvips platform packages.
+Evidence:
+- mercata/ui/package-lock.json:12999
+- mercata/ui/package-lock.json:1366
+- mercata/ui/package-lock.json:1478
+- mercata/ui/package-lock.json:15041
+Risk:
+- Medium (optional/platform-dependent install path).
+Recommendation:
+- If Apache-only distribution is required, disable sharp-dependent path or
+  provide separate compliance handling for LGPL components.
+
+6) legacy/pre-erc20-Jun2025/marketplace/ui node-forge
+   (BSD-3-Clause OR GPL-2.0)
+Status:
+- node-forge appears in lockfile as dual-license package, pulled by listhen and
+  selfsigned.
+Evidence:
+- legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:16330
+- legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:17055
+- legacy/pre-erc20-Jun2025/marketplace/ui/package-lock.json:21706
+Risk:
+- Low to Medium. Dual license permits BSD-3-Clause path (Apache-compatible), but
+  item should still be documented.
+Recommendation:
+- Keep only if legacy scope is still distributed.
+
+7) strato/extraFiles license bundle contains GPL texts
+Status:
+- Build copies strato/extraFiles into STRATO image build context.
+Evidence:
+- Makefile:190
+- strato/extraFiles/strato/licenses/solidity:1
+- strato/extraFiles/strato/licenses/Crypto:44
+Risk:
+- Medium to High (needs provenance mapping; may be stale notice bundle or
+  active component notice).
+Recommendation:
+- Audit each file in strato/extraFiles/strato/licenses and keep only those
+  required by actually shipped dependencies; remove stale GPL notice files if
+  no corresponding shipped GPL component exists.
+
+Priority order:
+1. Remove LGPL rpc-websockets paths from bridge/referral/ui.
+2. Decide rapidsnark policy (remove or isolate externally).
+3. Minimize dev-tool LGPL path in mercata/ethereum.
+4. Audit and prune strato/extraFiles license bundle.
+5. Re-generate NOTICE and SBOM after dependency lock updates.
+
+Repository scope note:
+- In this checkout, legacy/ is present. If legacy/ is removed from distributed
+  artifacts in a future revision, remove item (6) and related evidence lines.
