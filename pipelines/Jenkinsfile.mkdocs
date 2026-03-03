@@ -110,7 +110,7 @@ pipeline {
             [$class: 'CloneOption', depth: 0, noTags: false, shallow: false]
           ],
           userRemoteConfigs: [[
-            url: 'https://github.com/blockapps/strato-platform.git',
+            url: 'https://github.com/strato-net/strato-platform.git',
             credentialsId: 'blockapps-cd-github'
           ]]
         ])
@@ -154,7 +154,7 @@ pipeline {
                   export GIT_COMMITTER_EMAIL="sre@blockapps.net"
 
                   # Set up authenticated remote URL
-                  REMOTE_URL="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-platform.git"
+                  REMOTE_URL="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/strato-net/strato-platform.git"
 
                   # Clean up any leftover directories from previous failed runs
                   rm -rf gh-pages-temp staging-backup
@@ -214,7 +214,7 @@ pipeline {
                   export GIT_COMMITTER_EMAIL="sre@blockapps.net"
 
                   # Set up authenticated remote URL
-                  REMOTE_URL="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-platform.git"
+                  REMOTE_URL="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/strato-net/strato-platform.git"
 
                   # Build the docs
                   mkdocs build --clean

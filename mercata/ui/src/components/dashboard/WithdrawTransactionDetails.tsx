@@ -11,6 +11,8 @@ import { ensureHexPrefix } from '@/utils/numberUtils';
 import { usdstAddress } from '@/lib/constants';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+const normalizeStratoAccount = (account?: string) => (account || '').replace(/^0x/i, '');
+
 const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   const isMobile = useIsMobile();
   const [currentPage, setCurrentPage] = useState(1);
@@ -71,8 +73,30 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
       title: 'From (STRATO)',
       key: 'from',
       render: (_: any, record: any) => {
-        const addr = ensureHexPrefix(record?.WithdrawalInfo?.stratoSender) || '';
-        return addr ? renderTruncatedAddressWithCopy(addr, handleCopyToClipboard) : '-';
+        const rawAddr = record?.WithdrawalInfo?.stratoSender || '';
+        const displayAddr = normalizeStratoAccount(rawAddr);
+        const linkAddr = ensureHexPrefix(rawAddr) || '';
+        const chainIdStr = record?.WithdrawalInfo?.externalChainId ? String(record.WithdrawalInfo.externalChainId) : '1';
+        const txUrl = getExplorerUrl(chainIdStr, '0x');
+        const base = txUrl.split('/tx/')[0];
+        const addressUrl = linkAddr ? `${base}/address/${linkAddr}` : '';
+
+        return displayAddr ? (
+          <div className="group relative flex items-center gap-2">
+            <a
+              href={addressUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800"
+            >
+              {`${displayAddr.slice(0, 6)}...${displayAddr.slice(-4)}`}
+            </a>
+            <CopyOutlined
+              className="text-muted-foreground hover:text-blue-500 cursor-pointer transition-colors"
+              onClick={() => handleCopyToClipboard(displayAddr)}
+            />
+          </div>
+        ) : '-';
       },
       width: 100,
     },

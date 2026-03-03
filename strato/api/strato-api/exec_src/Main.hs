@@ -25,12 +25,12 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs
 import Blockchain.EthConf
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Options
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.SyncDB
@@ -38,7 +38,7 @@ import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.SQL
-import Control.Monad.Composable.Vault hiding (httpManager)
+import Control.Monad.Composable.Vault
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
@@ -59,7 +59,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import HFlags
 import qualified Handlers.AccountInfo as Account
-import Handlers.Options
+import Strato.Auth.ClientCredentials (clientCredentialsConfig, discoveryUrl)
 import Instrumentation
 import Network.HTTP.Types.Status
 import Network.Wai
@@ -138,10 +138,14 @@ newtype AccessToken = AccessToken { getAccessToken :: Maybe Text }
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m, Accessible VaultData m) => HasVault (ReaderT AccessToken m) where
   sign msgHash = do
     AccessToken jwtToken <- ask
-    blocVaultWrapper $ postSignature jwtToken (V.MsgHash msgHash)
+    case jwtToken of
+      Nothing -> error "sign: missing user access token"
+      Just token -> blocVaultWrapperWithUserToken token $ postSignature Nothing (V.MsgHash msgHash)
   getPub = do
     AccessToken jwtToken <- ask
-    fmap V.unPubKey . blocVaultWrapper $ getKey jwtToken Nothing
+    case jwtToken of
+      Nothing -> error "getPub: missing user access token"
+      Just token -> fmap V.unPubKey . blocVaultWrapperWithUserToken token $ getKey Nothing Nothing
   getShared _ = error "getShared ReaderT VaultData: unimplemented"
 
 fullServer ::
@@ -166,7 +170,7 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
         . runCirrusM
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
-        . runVaultM ("http://localhost:8013/strato/v2.3")
+        . runVaultM (vaultUrl . urlConfig $ ethConf)
         $ x `catch` handleRuntimeError `catch` handleApiError
       case y of
         Right a -> pure a
@@ -181,22 +185,12 @@ main = do
 
   -- check that all urls are derivable (or else crash and fail in a flaming disaster)
   let urlMap = fromList
-        [ ("vault", flags_vaultUrl),
-          ("oauthDiscovery", flags_oauthDiscoveryUrl),
-          ("notificationServer", flags_notificationServerUrl),
-          ( "fileServer",
-            case (flags_fileServerUrl, flags_network) of
-              ("", "mercata-hydrogen") -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
-              ("", 'h':'e':'l':'i':'u':'m':_) -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", "upquark") -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", "mercata") -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", "uranium") -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", "lithium") -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", _) -> error "File server url was not provided and cannot be derived"
-              (fileServer, _) -> fileServer
-          ),
+        [ ("vault", vaultUrl . urlConfig $ ethConf),
+          ("oauthDiscovery", T.unpack $ discoveryUrl clientCredentialsConfig),
+          ("notificationServer", notificationServerUrl . urlConfig $ ethConf),
+          ("fileServer", fileServerUrl . urlConfig $ ethConf),
           ( "monitor",
-            case flags_network of
+            case network (networkConfig ethConf) of
               "mercata-hydrogen" -> "https://monitor.mercata-testnet2.blockapps.net:18080"
               "mercata" -> "https://monitor.mercata.blockapps.net:18080"
               "helium" -> "https://monitor.testnet.strato.nexus"
@@ -226,20 +220,23 @@ main = do
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
 
   pubKey <- runLoggingT
-          . runVaultM ("http://localhost:8013/strato/v2.3")
+          . runVaultM (vaultUrl . urlConfig $ ethConf)
           . fmap V.unPubKey
           . blocVaultWrapper
           $ getKey Nothing Nothing
 
   let env =
         BlocEnv
-          { txSizeLimit = flags_txSizeLimit,
-            gasLimit = flags_gasLimit,
-            stateFetchLimit = stateFetchLimit',
-            globalNonceCounter = nonceCache,
-            nodePubKey = pubKey
+          { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
+            Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
+            Bloc.Monad.stateFetchLimit = stateFetchLimit',
+            Bloc.Monad.globalNonceCounter = nonceCache,
+            Bloc.Monad.nodePubKey = pubKey
           }
-  runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app env theDoc urlMap
+  let bindHost = ipAddress $ apiConfig ethConf
+      bindPort = 3000 :: Int
+  putStrLn $ "Starting strato-api on " ++ bindHost ++ ":" ++ show bindPort
+  runSettings (setPort bindPort $ setHost (fromString bindHost) defaultSettings) $ app env theDoc urlMap
 
 app :: BlocEnv -> OpenApi -> UrlMap -> Application
 app blocEnv theDoc urlMap =

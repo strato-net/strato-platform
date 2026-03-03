@@ -6,21 +6,14 @@ module Blockchain.Init.EthConf (genEthConf) where
 import Blockchain.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Options (flags_network)
-import Control.Concurrent
+import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
 import Data.Default
-import Network.HTTP.Client (defaultManagerSettings, newManager)
-import Network.HTTP.Types.Status
-import Servant.Client
-import qualified Strato.Strato23.API as VC
-import Strato.Strato23.Client
-import Text.Format
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
 getRailgunProxyForNetwork :: String -> Maybe Address
 getRailgunProxyForNetwork network = case network of
-  "helium"  -> Nothing  -- TODO: Set when deployed
+  "helium"  -> Just 0x84340ae5a421a216339d74173aa39408aab61d74
   "upquark" -> Nothing  -- TODO: Set when deployed
   "lithium" -> Nothing  -- TODO: Set when deployed
   _         -> Nothing
@@ -37,51 +30,17 @@ runtimeConfig = def
       }
   , kafkaConfig = def { kafkaHost = "kafka" }
   , discoveryConfig = def { minAvailablePeers = flags_minPeers }
+  , p2pConfig = def
+      { maxConnections = flags_maxConn
+      , connectionTimeout = flags_connectionTimeout
+      , maxReturnedHeaders = flags_maxReturnedHeaders
+      , averageTxsPerBlock = flags_averageTxsPerBlock
+      , maxHeadersTxsLens = flags_maxHeadersTxsLens
+      }
   , apiConfig = def { ipAddress = flags_apiIPAddress }
   , contractsConfig = getRailgunProxyForNetwork flags_network >>= \addr ->
       Just ContractsConf { railgunProxy = Just addr }
   }
-
-getNodeKey :: IO (VC.PublicKey, Address)
-getNodeKey = do
-  mgr <- newManager defaultManagerSettings
-  vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
-  let clientEnv = mkClientEnv mgr vaultWrapperUrl
-  putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
-  ak <- waitOnVault clientEnv $ runClientM (getKey Nothing Nothing) clientEnv
-  return (VC.unPubKey ak, VC.unAddress ak)
-
-waitOnVault :: ClientEnv -> IO (Either ClientError VC.AddressAndKey) -> IO VC.AddressAndKey
-waitOnVault clientEnv request = do
-  res <- request
-  case res of
-    Left (FailureResponse _ (Response (Status code _) _ _ body)) -> case code of
-      503 -> do
-        -- 503 is thrown when the password is not set
-        putStrLn "vault password is not set. I'll keep trying until it is set"
-        threadDelay 2000000 -- 2 seconds
-        waitOnVault clientEnv request
-      400 ->
-        -- 400 is thrown when the key does not exist
-        if flags_generateKey
-          then do
-            putStrLn "nodekey does not exist -  I'm going to create one"
-            waitOnVault clientEnv $ runClientM (postKey Nothing) clientEnv
-          else do
-            putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
-            threadDelay 5000000 -- 5 seconds
-            waitOnVault clientEnv request
-      _ -> do
-        putStrLn $ "unexpected error thrown by vault-wrapper: " ++ show body
-        putStrLn "will keep retrying anyway"
-        threadDelay 5000000 -- 5 seconds
-        waitOnVault clientEnv request
-    Left err -> do
-      putStrLn $ "unexpected servant error: " ++ show err
-      putStrLn "will keep retrying anyway"
-      threadDelay 5000000 -- 5 seconds
-      waitOnVault clientEnv request
-    Right val -> return val
 
 genEthConf :: IO EthConf
 genEthConf = do
@@ -97,19 +56,13 @@ genEthConf = do
       return "localhost"
     h -> return h
 
-  pgPass <- case flags_password of
-    "" -> error "specify password for postgres user: "
-    p -> return p
+  pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
   kafkaHost' <- case flags_kafkahost of
     "" -> do
       putStrLn "using default kafka host: localhost"
       return "localhost"
     h -> return h
-
-  (pub, addr) <- getNodeKey
-  putStrLn $ "the node's public key: " ++ format pub
-  putStrLn $ "the node's address: " ++ format addr
 
   return runtimeConfig
     { sqlConfig = (sqlConfig runtimeConfig)
@@ -123,12 +76,38 @@ genEthConf = do
         , password = pgPass
         }
     , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = kafkaHost' }
-    , blockConfig = def
-        { blockTime = flags_blockTime
-        , minBlockDifficulty = flags_minBlockDifficulty
+    , levelDBConfig = def
+        { cacheSize = flags_ldbCacheSize
+        , blockSize = flags_ldbBlockSize
         }
     , quarryConfig = def
-        { coinbaseAddress = formatAddressWithoutColor addr
-        , lazyBlocks = flags_lazyblocks
+        { lazyBlocks = flags_lazyblocks
+        , maxTxsPerBlock = flags_maxTxsPerBlock
+        , mempoolLivenessCutoff = flags_mempoolLivenessCutoff
+        }
+    , urlConfig = def
+        { vaultUrl = flags_vaultUrl
+        , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
+        , notificationServerUrl = flags_notificationServerUrl
+        }
+    , networkConfig = def
+        { network = flags_network
+        , networkID = computeNetworkID
+        , txSizeLimit = flags_txSizeLimit
+        , gasLimit = flags_gasLimit
+        , blockPeriodMs = flags_blockstanbul_block_period_ms
+        , roundPeriodS = flags_blockstanbul_round_period_s
         }
     }
+
+-- | Derive file server URL from network if not explicitly provided
+deriveFileServerUrl :: String -> String -> String
+deriveFileServerUrl "" "mercata-hydrogen" = "https://fileserver.mercata-testnet2.blockapps.net/highway"
+deriveFileServerUrl "" network
+  | take 6 network == "helium" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "upquark" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "mercata" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "uranium" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" "lithium" = "https://fileserver.mercata.blockapps.net/highway"
+deriveFileServerUrl "" _ = ""  -- Unknown networks get empty string
+deriveFileServerUrl url _ = url  -- Explicit URL takes precedence

@@ -1,0 +1,14 @@
+name:                strato-vault-client
+version:             0.1.0.0
+synopsis:            Client library for STRATO shared vault
+description:         Provides authenticated access to the shared vault service
+
+dependencies:
+  - base >= 4.7 && < 5
+  - servant-client
+  - strato-auth
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Strato.Vault.Client
