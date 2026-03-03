@@ -83,7 +83,9 @@ createGenesisInfo network = do
 
 createCommandsFile :: IO ()
 createCommandsFile =
-  writeFile "commands.txt" [r|ethereum-discover +RTS -T -RTS
+  writeFile "commands.txt" $ baseCommands ++ jsonrpcCommand
+  where
+    baseCommands = [r|ethereum-discover +RTS -T -RTS
 
 strato-p2p --averageTxsPerBlock=40 --connectionTimeout=3600 --debugFail=true --maxConn=1000 --maxReturnedHeaders=500 --networkID=-1 --sqlPeers=true --minLogLevel=LevelInfo --network=helium +RTS -T -RTS
 
@@ -101,6 +103,10 @@ strato-api --minLogLevel=LevelInfo --networkID=-1 --vaultUrl=https://vault.block
 
 strato-network-monitor
 |]
+    jsonrpcCommand =
+      if flags_jsonrpc
+        then "\nethereum-jsonrpc +RTS -T -RTS\n"
+        else ""
 
 
 

@@ -38,4 +38,5 @@ defineFlag "genesisBlockName" "livenet" "use the alternate stablenet genesis blo
 defineFlag "apiIPAddress" "127.0.0.1" "The IP address that strato-api will bind to"
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
+defineFlag "jsonrpc" (False :: Bool) "Start the Ethereum JSON-RPC server (port 8546) for MetaMask integration"
 $(return [])
