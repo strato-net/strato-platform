@@ -25,11 +25,9 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Init.Options (flags_vaultWrapperUrl)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -40,18 +38,13 @@ import Data.IORef
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
-import Network.HTTP.Client (defaultManagerSettings, newManager)
-import Servant.Client
 import SolidVM.Model.Storable
-import qualified Strato.Strato23.API as VC
-import qualified Strato.Strato23.Client as VC
 
 data SetupDBs = SetupDBs
   { stateDB :: StateDB,
     stateRoots :: IORef (M.Map (Maybe Word256) MP.StateRoot),
     hashDB :: HashDB,
     codeDB :: CodeDB,
-    vaultDB :: ClientEnv,
     localStorageTx :: IORef (M.Map (Address, StoragePath) BasicValue),
     localStorageBlock :: IORef (M.Map (Address, StoragePath) BasicValue),
     localAddressStateTx :: IORef (M.Map Address AddressStateModification),
@@ -70,27 +63,7 @@ runSetupDBM mv = do
   cdb <- CodeDB <$> open codeDBPath
   [m1, m2] <- liftIO . replicateM 2 . newIORef $ M.empty
   [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
-  vdb <- do
-    mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
-    return $ mkClientEnv mgr url
-  runReaderT mv $ SetupDBs sdb srRef hdb cdb vdb m1 m2 m3 m4
-
-waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
-waitOnVault action = do
-  res <- action
-  case res of
-    Left _ -> waitOnVault action
-    Right val -> return val
-
-instance (Monad m, MonadIO m, MonadLogger m, HasDBs m) => HasVault m where
-  getPub = do
-    env <- Mod.access Mod.Proxy
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) $ vaultDB env
-  sign bs = do
-    env <- Mod.access Mod.Proxy
-    waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash bs)) $ vaultDB env
-  getShared _ = error "should not be calling getShared in strato-init"
+  runReaderT mv $ SetupDBs sdb srRef hdb cdb m1 m2 m3 m4
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
   lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< fmap stateRoots (Mod.access Mod.Proxy)

@@ -560,18 +560,3 @@ cradle:
 
     - path: "vault/server/test/"
       component: "blockapps-vault-wrapper-server:test:vault-wrapper-spec"
-
-    - path: "vault-proxy/api/src"
-      component: "blockapps-vault-proxy-api:lib"
-
-    - path: "vault-proxy/server/src"
-      component: "blockapps-vault-proxy-server:lib"
-
-    - path: "vault-proxy/server/app/Main.hs"
-      component: "blockapps-vault-proxy-server:exe:blockapps-vault-proxy-server"
-
-    - path: "vault-proxy/server/app/Options.hs"
-      component: "blockapps-vault-proxy-server:exe:blockapps-vault-proxy-server"
-
-    - path: "vault-proxy/server/test/"
-      component: "blockapps-vault-proxy-server:test:vault-proxy-spec"
