@@ -93,4 +93,22 @@ router.post("/webhook", OnrampController.handleWebhook);
  */
 router.get("/transactions", authHandler.authorizeRequest(), OnrampController.getTransactions);
 
+/**
+ * @openapi
+ * /onramp/deposit-status:
+ *   get:
+ *     summary: Check bridge deposit status by external tx hash
+ *     tags: [Onramp]
+ *     parameters:
+ *       - name: txHash
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Deposit status (pending, initiated, or completed)
+ */
+router.get("/deposit-status", authHandler.authorizeRequest(), OnrampController.depositStatus);
+
 export default router;

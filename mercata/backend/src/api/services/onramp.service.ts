@@ -2,7 +2,8 @@ import Stripe from "stripe";
 import axios from "axios";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/mercataApiHelper";
+import { getServiceToken } from "../../utils/authHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { openIdTokenEndpoint } from "../../config/config";
@@ -260,6 +261,21 @@ export async function handleSessionUpdate(sessionData: any): Promise<void> {
   } else {
     console.log(`[Onramp] Session ${stripeSessionId} → ${status} (user=${userAddress})`);
   }
+}
+
+export async function getDepositStatus(accessToken: string, externalTxHash: string): Promise<{ status: "pending" | "initiated" | "completed" }> {
+
+  const { data: completed } = await cirrus.get(accessToken, `/${MercataBridge}-DepositCompleted`, {
+    params: { externalTxHash: `eq.${externalTxHash}`, limit: "1" },
+  });
+  if (completed?.length > 0) return { status: "completed" };
+
+  const { data: initiated } = await cirrus.get(accessToken, `/${MercataBridge}-DepositInitiated`, {
+    params: { externalTxHash: `eq.${externalTxHash}`, limit: "1" },
+  });
+  if (initiated?.length > 0) return { status: "initiated" };
+
+  return { status: "pending" };
 }
 
 export async function getUserTransactions(userStratoAddress: string): Promise<OnrampTransaction[]> {

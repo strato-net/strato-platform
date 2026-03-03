@@ -4,6 +4,7 @@ import {
   verifyWebhookSignature,
   handleSessionUpdate,
   getUserTransactions,
+  getDepositStatus,
 } from "../services/onramp.service";
 
 class OnrampController {
@@ -76,6 +77,25 @@ class OnrampController {
         res.status(400).json({ error: "Invalid webhook signature" });
         return;
       }
+      next(error);
+    }
+  }
+
+  static async depositStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      const txHash = query.txHash as string;
+      if (!txHash) {
+        res.status(400).json({ error: "txHash query parameter is required" });
+        return;
+      }
+      const result = await getDepositStatus(accessToken, txHash);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
       next(error);
     }
   }
