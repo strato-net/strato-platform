@@ -261,6 +261,9 @@ function cleanupDB {
 
 function doInit {
 
+  mkdir -p secrets
+  echo -n "$pgPass" > secrets/postgres_password
+
   args="--addBootnodes=$addBootnodes \
   --apiIPAddress=0.0.0.0 \
   --generateKey=$generateKey \
@@ -268,7 +271,6 @@ function doInit {
   --lazyblocks=${lazyBlocks:-true} \
   --minPeers=${numMinPeers:-100} \
   --pguser=$pgUser \
-  --password=$pgPass \
   --pghost=$pgHost \
   --redisHost=$redisBDBHost \
   --redisPort=$redisBDBPort \
