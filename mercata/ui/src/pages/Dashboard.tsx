@@ -193,32 +193,6 @@ const Dashboard = () => {
     borrowedCacheRef.current = borrowedHistoryCache;
   }, [netBalanceHistoryCache, rewardsHistoryCache, borrowedHistoryCache]);
 
-  const prefetchOtherRanges = useCallback((primaryRange: TimeRange, tab: TabType) => {
-    const rangesToPrefetch = TIME_RANGES.filter(range => range !== primaryRange);
-    
-    rangesToPrefetch.forEach(range => {
-      (async () => {
-        try {
-          if (tab === 'netBalance') {
-            if (netBalanceCacheRef.current[range]) return;
-            const data = await getBalanceHistory(range, '');
-            setNetBalanceHistoryCache(range, data);
-          } else if (tab === 'rewards') {
-            if (rewardsCacheRef.current[range]) return;
-            const data = await getCataBalanceHistory(range, '');
-            setRewardsHistoryCache(range, data);
-          } else if (tab === 'borrowed') {
-            if (borrowedCacheRef.current[range]) return;
-            const data = await getBorrowingHistory(range, '');
-            setBorrowedHistoryCache(range, data);
-          }
-        } catch (err) {
-          // ignore background errors
-        }
-      })();
-    });
-  }, [getBalanceHistory, getCataBalanceHistory, getBorrowingHistory, setNetBalanceHistoryCache, setRewardsHistoryCache, setBorrowedHistoryCache]);
-
   const tabConfig = useMemo(() => ({
     netBalance: {
       fetchFn: getBalanceHistory,
@@ -254,18 +228,6 @@ const Dashboard = () => {
       
       if (cached && cached.length > 0) {
         setLoadingBalanceHistory(false);
-        prefetchOtherRanges(selectedTimeRange, activeTab);
-        
-        (async () => {
-          try {
-            const data = await config.fetchFn(selectedTimeRange, '');
-            if (isMounted) {
-              config.setCache(selectedTimeRange, data);
-            }
-          } catch (err) {
-            // ignore background errors
-          }
-        })();
         return;
       }
 
@@ -278,7 +240,6 @@ const Dashboard = () => {
       } finally {
         if (isMounted) {
           setLoadingBalanceHistory(false);
-          prefetchOtherRanges(selectedTimeRange, activeTab);
         }
       }
     };
@@ -288,7 +249,7 @@ const Dashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, [selectedTimeRange, activeTab, tabConfig, prefetchOtherRanges, setLoadingBalanceHistory, isLoggedIn]);
+  }, [selectedTimeRange, activeTab, tabConfig, setLoadingBalanceHistory, isLoggedIn]);
 
   const onTimeRangeChange = useCallback((duration: string) => {
     setSelectedTimeRange(duration as TimeRange);
