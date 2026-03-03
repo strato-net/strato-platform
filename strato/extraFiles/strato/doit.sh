@@ -282,6 +282,7 @@ function doInit {
   --redisHost=$redisBDBHost \
   --redisPort=$redisBDBPort \
   --redisDBNumber=${redisBDBNumber:-0} \
+  --vaultUrl=${VAULT_URL}/strato/v2.3 \
   ${networkFlag} \
   ${stratoBootnode}"
 
