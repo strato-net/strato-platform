@@ -11,7 +11,6 @@
 module SolidVM.Solidity.Parse.UnParser where
 
 import Control.Lens hiding (op)
-import Data.Bool (bool)
 import qualified Data.List as List
 import Data.Map ()
 import qualified Data.Map as Map
@@ -49,7 +48,7 @@ unparseSourceUnit (FLContract contract) = unparseContract contract
 unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
 unparseVar :: (SolidString, VariableDecl) -> String
-unparseVar (name, (VariableDecl theType vis maybeExpression _ _ _)) =
+unparseVar (name, (VariableDecl theType vis maybeExpression _ _)) =
   unparseVarType (theType)
     <> " "
     <> maybe "" ((<> " ") . Text.unpack . tShowVisibility) vis
@@ -84,7 +83,6 @@ unparseContract contr =
       AbstractType -> "abstract contract "
       LibraryType -> "library "
   )
-    <> (bool "" "record " $ _isContractRecord contr)
     <> labelToString (contr ^. contractName)
     <> ( case _parents contr of
            [] -> ""

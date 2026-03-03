@@ -113,39 +113,42 @@ generateRapidsnark ProverConfig{..} inputJson = do
   case witnessResult of
     Left err -> return $ Left $ "Witness calculation failed: " <> T.pack (show err)
     Right witnessBytes -> do
-      -- Generate proof using native FFI
       let cfg = Rapidsnark.defaultConfig { Rapidsnark.pcProvingKey = pcProvingKey }
       result <- Rapidsnark.generateProofFromWitness cfg witnessBytes
-      return $ fmap convertRapidsnarkProof result
+      case result of
+        Left err -> return $ Left err
+        Right proof -> return $ Right $ convertRapidsnarkProof proof
 
 -- | Generate proof via native Haskell prover
 generateNative :: ProverConfig -> LBS.ByteString -> IO (Either Text SnarkProof)
 generateNative ProverConfig{..} inputJson = do
-  putStrLn "[Prover] Witness: snarkjs (Node.js) | Proving: groth16-native (Haskell)"
-  putStrLn "WARNING: Native prover is experimental and may produce invalid proofs."
-  -- Load proving key
+  putStrLn "[Prover] Witness: wasm3 (native) | Proving: groth16-native (Haskell)"
+  
+  -- Load proving key from JSON
   pkResult <- Native.loadProvingKeyJSON pcProvingKeyJSON
   case pkResult of
     Left err -> return $ Left $ "Failed to load proving key: " <> err
     Right pk -> do
-      -- Generate witness via snarkjs (native prover only does proving)
-      let cfg = Snarkjs.Config
-            { Snarkjs.cfgCircuitWasm = pcCircuitWasm
-            , Snarkjs.cfgProvingKey  = pcProvingKey
-            , Snarkjs.cfgSnarkjsPath = pcSnarkjsPath
-            }
-      -- Use snarkjs just for witness, then extract and use native prover
-      -- For now, use a simplified approach: call snarkjs for full proof
-      -- but with native key loaded (TODO: proper witness extraction)
-      result <- Snarkjs.generateProof cfg inputJson
-      case result of
-        Left err -> return $ Left err
-        Right _ -> do
-          -- Generate native proof (requires witness file - simplified for now)
-          -- TODO: Extract witness from snarkjs and use Native.prove
-          return $ Left $ "Native prover integration incomplete. " <>
-                         "Proving key loaded: nVars=" <> T.pack (show (Native.pkNVars pk)) <>
-                         ", domainSize=" <> T.pack (show (Native.pkDomainSize pk))
+      putStrLn $ "  Proving key loaded: nVars=" ++ show (Native.pkNVars pk) ++
+                 ", domainSize=" ++ show (Native.pkDomainSize pk)
+      
+      -- Calculate witness using native wasm3 runtime
+      let witnessCfg = Witness.WitnessConfig { Witness.wcCircuitWasm = pcCircuitWasm }
+      witnessResult <- Witness.calculateWitness witnessCfg inputJson
+      
+      case witnessResult of
+        Left err -> return $ Left $ "Witness calculation failed: " <> T.pack (show err)
+        Right witnessBytes -> do
+          -- Parse witness from .wtns binary format
+          case Native.parseWtns (LBS.fromStrict witnessBytes) of
+            Left err -> return $ Left $ "Failed to parse witness: " <> err
+            Right witness -> do
+              -- Generate proof using native Haskell prover
+              putStrLn "  Generating proof..."
+              proof <- Native.prove pk witness
+              
+              -- Convert native proof to SnarkProof
+              return $ Right $ convertNativeProof proof
 
 -- | Convert Snarkjs.Proof to SnarkProof
 convertSnarkjsProof :: Snarkjs.Proof -> SnarkProof
@@ -166,3 +169,13 @@ convertRapidsnarkProof p = SnarkProof
     a = Rapidsnark.proofA p
     b = Rapidsnark.proofB p
     c = Rapidsnark.proofC p
+
+-- | Convert Native.Proof to SnarkProof
+convertNativeProof :: Native.Proof -> SnarkProof
+convertNativeProof proof =
+  let ((ax, ay), ((bx0, bx1), (by0, by1)), (cx, cy)) = Native.proofToIntegers proof
+  in SnarkProof
+    { proofA = G1Point ax ay
+    , proofB = G2Point (bx0, bx1) (by0, by1)
+    , proofC = G1Point cx cy
+    }
