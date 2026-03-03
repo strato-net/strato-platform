@@ -28,10 +28,6 @@ library BytesUtils {
         return dst;
     }
 
-    function substring(bytes b, uint start) internal pure returns (bytes) {
-        return substring(b, start, b.length);
-    }
-
     function substring(bytes b, uint start, uint end) internal pure returns (bytes) {
         require(end > start, "substring: end index must be greater than starting index");
         require(end <= b.length, "substring: end index out of bounds");

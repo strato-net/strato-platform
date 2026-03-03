@@ -610,6 +610,15 @@ argsToValsFromVars vars = do
       _ -> vals
 
 
+-- | Zip struct field definitions with argument values, collecting trailing
+-- args into an SVariadic when the last field has Variadic type.
+zipStructFields :: [(SolidString, CC.FieldType, a)] -> [Value] -> [(SolidString, Value)]
+zipStructFields [] _ = []
+zipStructFields [(name, ft, _)] args
+  | CC.fieldTypeType ft == SVMType.Variadic = [(name, SVariadic args)]
+zipStructFields ((name, _, _) : rest) (v : vs) = (name, v) : zipStructFields rest vs
+zipStructFields _ [] = []
+
 runModifiersAndStatements :: MonadSM m => [[CC.Statement]] -> [CC.Statement] -> m (Maybe Value)
 runModifiersAndStatements []   stmts = runStatementBlock stmts
 runModifiersAndStatements mods stmts = withLocalVars $ go mods
@@ -1495,8 +1504,8 @@ expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
           let isHeliumPreFork = computeNetworkID == 114784819836269 && currentBlockNum < 31000
           if isHeliumPreFork
             then unknownVariable "getVariableOfName" ("bytes32" :: String)
-            else Constant <$> callBuiltin name argVals
-        _ -> Constant <$> callBuiltin name argVals
+            else Constant <$> callBuiltinFunction name argVals
+        _ -> Constant <$> callBuiltinFunction name argVals
 
 -- case to catch a using statement function like _x.add(3)
 
@@ -1611,7 +1620,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                     Just v -> return $ Constant $ v
                     Nothing -> return $ Constant SNULL
                 x -> todo "expToVar'/FunctionCall" x
-            Constant (SFunction name Nothing) -> Constant <$> callBuiltin name argVals
+            Constant (SFunction name Nothing) -> Constant <$> callBuiltinFunction name argVals
             Constant (SFunction funcName (Just contract')) -> do
               ro <- readOnly <$> getCurrentCallInfo
               address <- getCurrentAddress
@@ -1640,12 +1649,12 @@ expToVar' (CC.FunctionCall _ e args) = do
               case M.lookup structName $ contract' ^. CC.structs of
                 Just vals -> do
                   return . Constant . SStruct structName . fmap Constant . M.fromList $
-                    zip (map (\(a, _, _) -> a) vals) argVals
+                    zipStructFields vals argVals
                 Nothing -> do
                   cc <- getCurrentCodeCollection
                   let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs
                   return . Constant . SStruct structName . fmap Constant . M.fromList $
-                    zip (map (\(a, _, _) -> a) vals') argVals
+                    zipStructFields vals' argVals
             Constant (SContractDef contractName') -> do
               decrementGas 500
               case argVals of
@@ -2135,6 +2144,9 @@ addAndAssign lhs rhs = do
     (SString c, SString d) -> do
       deductGasForOp . fromIntegral $ ((+) `on` length) c d
       pure . SString $ c ++ d
+    (SBytes c, SBytes d) -> do
+      deductGasForOp . fromIntegral $ ((+) `on` B.length) c d
+      pure . SBytes $ c <> d
     (SDecimal c, SDecimal d) -> do
       deductGasForOp $ 1 + fromIntegral ((max `on` decimalPlaces) c d) + (max `on` byteWidth) (decimalMantissa c) (decimalMantissa d)
       pure . SDecimal $ c + d
@@ -2211,7 +2223,16 @@ parseBaseInt s n =
             _ -> Left $ "numeric cast - not a hex string " <> s
     _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
+callBuiltinFunction :: MonadSM m => SolidString -> [Value] -> m Value
+callBuiltinFunction n args' = do
+  let args = case reverse args' of
+        SVariadic vs : rest -> reverse rest ++ vs
+        _ -> args'
+  callBuiltin n args
+
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
+callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic vs
+callBuiltin "variadic" vs = pure $ SVariadic vs
 callBuiltin "string" [SString s] = return $ SString s
 callBuiltin "string" [SAddress a _] = return . SString $ show a
 callBuiltin "string" [SInteger i] = return . SString $ show i

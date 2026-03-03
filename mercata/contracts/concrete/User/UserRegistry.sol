@@ -1,7 +1,7 @@
-import "../contracts/abstract/ERC20/access/Authorizable.sol";
-import "../contracts/abstract/ERC20/access/Ownable.sol";
-import "../contracts/abstract/ERC20/utils/StringUtils.sol";
-import "../contracts/concrete/Proxy/Proxy.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
+import "../../abstract/ERC20/utils/StringUtils.sol";
+import "../../concrete/Proxy/Proxy.sol";
 
 /*
 Why do we make UserRegistry and User inherit from Proxy, rather than use the normal Proxy pattern?
@@ -13,7 +13,7 @@ Requirements:
 */
 
 struct UserOperation {
-    uint nonce;
+    uint counter;
     address to;       // 0 = create, 1 = create2, >1 = call
     bool failable;
     variadic callData; // create: [cName, src, ...args]; create2: [salt, cName, src, ...args]; call: [fName, ...args]
@@ -91,7 +91,7 @@ contract record User is Proxy, Authorizable {
 
     address[] public record userAddresses;
     mapping (address => uint) private userAddressMap;
-    uint public nonce;
+    uint public counter;
 
     constructor(string _username) Proxy(address(0), msg.sender) {
         username = _username;
@@ -157,14 +157,15 @@ contract record User is Proxy, Authorizable {
         bytes extraData = _signature.substring(65, _signature.length);
         address signer;
 
+        bytes32 dataHash = keccak256(username, _operations);
         if (curveType == 0) { // secp256k1
             uint8 v = uint8(extraData[0]);
             uint8 protocol = uint8(extraData[1]);
             bytes32 h;
             if (protocol == 0) { // keccak256, SolidVM encoding
-                h = keccak256(_operations);
+                h = dataHash;
             } else if (protocol == 1) { // keccak256, eth_personalSign
-                h = keccak256(bytes(0x19) + bytes("Ethereum Signed Message:\n") + bytes(_operations));
+                h = keccak256(bytes(0x19) + bytes("Ethereum Signed Message:\n") + bytes(dataHash));
             }
             signer = ecrecover(h, v, r, s);
         } else if (curveType == 1) { // secp256r1 (passkey)
@@ -182,7 +183,7 @@ contract record User is Proxy, Authorizable {
                 uint16 clientDataJSONPostLen = uint16(bytes32(rest.substring(clientDataJSONPreEnd, clientDataJSONPreEnd + 2)));
                 uint clientDataJSONPostEnd = clientDataJSONPreEnd + uint(clientDataJSONPostLen) + 2;
                 bytes clientDataJSONPost = rest.substring(clientDataJSONPreEnd + 2, clientDataJSONPostEnd);
-                bytes challenge = bytes(base64urlencode(bytes(_operations)));
+                bytes challenge = bytes(base64urlencode(bytes(dataHash)));
                 bytes clientDataJSON = clientDataJSONPre + challenge + clientDataJSONPost;
                 bytes32 clientDataHash = sha256(clientDataJSON);
                 bytes32 h = sha256(authenticationData + bytes(clientDataHash));
@@ -205,6 +206,8 @@ contract record User is Proxy, Authorizable {
     }
 
     function _executeUserOperation(UserOperation _op) internal returns (variadic) {
+        require(counter == _op.counter, "Incorrect UserOperation counter");
+        counter++;
         if (_op.failable) {
             try {
                 return _unsafeExecuteUserOperation(_op);
@@ -217,8 +220,6 @@ contract record User is Proxy, Authorizable {
     }
 
     function _unsafeExecuteUserOperation(UserOperation _op) internal returns (variadic) {
-        require(nonce == _op.nonce, "Incorrect UserOperation nonce");
-        nonce++;
         if (_op.to == address(0)) { // create
             return create(_op.callData);
         } else if (_op.to == address(1)) { // create2

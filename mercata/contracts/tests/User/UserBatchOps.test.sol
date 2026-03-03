@@ -1,4 +1,4 @@
-import "../../../strato/UserRegistry.sol";
+import "../../concrete/User/UserRegistry.sol";
 
 contract Counter {
     uint public count;
@@ -39,7 +39,7 @@ contract Describe_UserBatchOps {
         require(userAddr != address(0), "User address should not be 0");
 
         User user = User(userAddr);
-        require(user.nonce() == 0, "Initial nonce should be 0");
+        require(user.counter() == 0, "Initial nonce should be 0");
     }
 
     function it_can_execute_single_call_operation() public {
@@ -53,15 +53,15 @@ contract Describe_UserBatchOps {
         // Transfer counter ownership isn't needed since increment is public
         // Execute a single call operation via executeUserOperation
         UserOperation memory op = UserOperation({
-            nonce: 0,
+            counter: 0,
             to: address(counter),
             failable: false,
-            callData: ["increment"]
+            callData: variadic("increment")
         });
         user.executeUserOperation(op);
 
         require(counter.count() == 1, "Counter should be 1 after increment");
-        require(user.nonce() == 1, "Nonce should be 1 after operation");
+        require(user.counter() == 1, "Nonce should be 1 after operation");
     }
 
     function it_can_execute_multiple_operations() public {
@@ -71,46 +71,46 @@ contract Describe_UserBatchOps {
         Counter counter = new Counter();
 
         UserOperation memory op1 = UserOperation({
-            nonce: 0,
+            counter: 0,
             to: address(counter),
             failable: false,
-            callData: ["increment"]
+            callData: variadic("increment")
         });
         UserOperation memory op2 = UserOperation({
-            nonce: 1,
+            counter: 1,
             to: address(counter),
             failable: false,
-            callData: ["add", 5]
+            callData: variadic("add", 5)
         });
 
         user.executeUserOperation(op1);
         user.executeUserOperation(op2);
 
         require(counter.count() == 6, "Counter should be 6 (1 + 5)");
-        require(user.nonce() == 2, "Nonce should be 2 after two operations");
+        require(user.counter() == 2, "Nonce should be 2 after two operations");
     }
 
-    function it_rejects_wrong_nonce() public {
+    function it_rejects_wrong_counter() public {
         address userAddr = registry.createUser("testuser4");
         User user = User(userAddr);
 
         Counter counter = new Counter();
 
-        // Try to execute with wrong nonce (1 instead of 0)
+        // Try to execute with wrong counter (1 instead of 0)
         UserOperation memory op = UserOperation({
-            nonce: 1,
+            counter: 1,
             to: address(counter),
             failable: false,
-            callData: ["increment"]
+            callData: variadic("increment")
         });
 
         try user.executeUserOperation(op)
         {
-            revert("Should have failed with wrong nonce");
+            revert("Should have failed with wrong counter");
         } catch {
         }
 
-        require(user.nonce() == 0, "Nonce should still be 0");
+        require(user.counter() == 0, "Nonce should still be 0");
     }
 
     function it_handles_failable_operations() public {
@@ -121,26 +121,26 @@ contract Describe_UserBatchOps {
 
         // First op: increment (should succeed)
         UserOperation memory op1 = UserOperation({
-            nonce: 0,
+            counter: 0,
             to: address(counter),
             failable: false,
-            callData: ["increment"]
+            callData: variadic("increment")
         });
 
         // Second op: failAlways (failable = true, should not revert the batch)
         UserOperation memory op2 = UserOperation({
-            nonce: 1,
+            counter: 1,
             to: address(counter),
             failable: true,
-            callData: ["failAlways"]
+            callData: variadic("failAlways")
         });
 
         // Third op: increment again
         UserOperation memory op3 = UserOperation({
-            nonce: 2,
+            counter: 2,
             to: address(counter),
             failable: false,
-            callData: ["increment"]
+            callData: variadic("increment")
         });
 
         user.executeUserOperation(op1);
@@ -148,7 +148,7 @@ contract Describe_UserBatchOps {
         user.executeUserOperation(op3);
 
         require(counter.count() == 2, "Counter should be 2 (failed op was failable)");
-        require(user.nonce() == 3, "Nonce should be 3");
+        require(user.counter() == 3, "Nonce should be 3");
     }
 
     function it_reverts_on_non_failable_failure() public {
@@ -159,10 +159,10 @@ contract Describe_UserBatchOps {
 
         // Non-failable op that will fail
         UserOperation memory op = UserOperation({
-            nonce: 0,
+            counter: 0,
             to: address(counter),
             failable: false,
-            callData: ["failAlways"]
+            callData: variadic("failAlways")
         });
 
         try user.executeUserOperation(op)
@@ -171,7 +171,7 @@ contract Describe_UserBatchOps {
         } catch {
         }
 
-        require(user.nonce() == 0, "Nonce should still be 0 after revert");
+        require(user.counter() == 0, "Nonce should still be 0 after revert");
     }
 
     function it_can_create_contract_via_operation() public {
@@ -180,13 +180,13 @@ contract Describe_UserBatchOps {
 
         // Create operation: to = address(0), callData = [contractName, contractSrc, ...args]
         UserOperation memory op = UserOperation({
-            nonce: 0,
+            counter: 0,
             to: address(0),
             failable: false,
-            callData: ["Counter", counterSrc]
+            callData: variadic("Counter", counterSrc)
         });
 
         user.executeUserOperation(op);
-        require(user.nonce() == 1, "Nonce should be 1 after create");
+        require(user.counter() == 1, "Nonce should be 1 after create");
     }
 }
