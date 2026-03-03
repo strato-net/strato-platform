@@ -227,11 +227,11 @@ const OnrampPage = () => {
                     </li>
                     <li className="flex items-center gap-2">
                       <ArrowDown className="h-3.5 w-3.5 shrink-0" />
-                      <span>Stripe delivers the purchased crypto to STRATO on chosen chain</span>
+                      <span>Stripe delivers the purchased crypto to STRATO's receiving address</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Wallet className="h-3.5 w-3.5 shrink-0" />
-                      <span>We credit the equivalent tokens to your STRATO account</span>
+                      <span>Once crypto arrives, we automatically credit the equivalent wrapped tokens to your STRATO account</span>
                     </li>
                   </ol>
                 </div>
