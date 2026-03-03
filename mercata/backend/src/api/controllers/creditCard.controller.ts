@@ -10,6 +10,7 @@ import {
   submitAddCard,
   submitUpdateCard,
   submitRemoveCard,
+  getPendingWithdrawalsForCard,
 } from "../services/creditCard.service";
 import { validateUpsertConfig, validateAddCardBody, validateUpdateCardBody } from "../validators/creditCard.validators";
 import type { CreditCardConfig } from "@mercata/shared-types";
@@ -306,6 +307,32 @@ class CreditCardController {
       }
       const result = await executeTopUpService(accessToken, body);
       res.json({ success: true, data: result });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  /** GET /credit-card/config/:id/pending — pending bridge withdrawals for a card. */
+  static async getPendingTopUps(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const address = req.address as string;
+      const accessToken = req.accessToken as string;
+      const id = req.params.id;
+      if (!address || !accessToken || !id) {
+        res.status(400).json({ error: "Missing id or unauthorized" });
+        return;
+      }
+      const config = await getConfigById(accessToken, address, id);
+      if (!config) {
+        res.status(404).json({ error: "Card not found" });
+        return;
+      }
+      const pending = await getPendingWithdrawalsForCard(accessToken, config.cardWalletAddress);
+      res.json(pending);
     } catch (error: any) {
       next(error);
     }

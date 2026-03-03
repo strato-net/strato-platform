@@ -19,7 +19,7 @@ import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import type { BridgeToken } from "@mercata/shared-types";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
-import { Loader2, CreditCard, DollarSign, Plus, Settings } from "lucide-react";
+import { Loader2, CreditCard, DollarSign, Plus, Settings, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { safeParseUnits } from "@/utils/numberUtils";
 import {
   CARD_PROVIDERS,
@@ -49,6 +49,8 @@ export type OnChainCardConfig = {
   lastTopUpTimestamp?: string;
 };
 
+type PendingTopUp = { amount: string; status: number; timestamp: string };
+
 type CardDisplay = {
   config: OnChainCardConfig;
   providerId: string | null;
@@ -56,6 +58,7 @@ type CardDisplay = {
   networkName: string;
   tokenSymbol: string;
   balance: string | null;
+  pendingTopUps: PendingTopUp[];
 };
 
 const METAMASK_LOGO_URL = "https://images.ctfassets.net/clixtyxoaeas/1ezuBGezqfIeifWdVtwU4c/d970d4cdf13b163efddddd5709164d2e/MetaMask-icon-Fox.svg";
@@ -140,6 +143,7 @@ export default function CreditCardPage() {
   const [manualCard, setManualCard] = useState<OnChainCardConfig | null>(null);
   const [manualAmount, setManualAmount] = useState("");
   const [manualSaving, setManualSaving] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const destinationChainId = selectedNetworkChainId;
   const networksForProvider = selectedProviderId
@@ -201,6 +205,7 @@ export default function CreditCardPage() {
                 networkName,
                 tokenSymbol: symbol,
                 balance: null,
+                pendingTopUps: [],
               };
             });
             setCardDisplays(displays);
@@ -246,6 +251,31 @@ export default function CreditCardPage() {
       cancelled = true;
       window.clearInterval(id);
     };
+  }, [configs, isLoggedIn]);
+
+  // Fetch pending top-ups for each card
+  useEffect(() => {
+    if (!isLoggedIn || configs.length === 0) return;
+    let cancelled = false;
+    const fetchPending = async () => {
+      await Promise.allSettled(
+        configs.map(async (config) => {
+          try {
+            const res = await api.get<PendingTopUp[]>(`/credit-card/config/${config.id}/pending`);
+            if (cancelled) return;
+            const pending = Array.isArray(res.data) ? res.data : [];
+            setCardDisplays((prev) =>
+              prev.map((cd) => (cd.config.id === config.id ? { ...cd, pendingTopUps: pending } : cd))
+            );
+          } catch {
+            // ignore
+          }
+        })
+      );
+    };
+    void fetchPending();
+    const id = window.setInterval(fetchPending, 60_000);
+    return () => { cancelled = true; window.clearInterval(id); };
   }, [configs, isLoggedIn]);
 
   const openModal = (config: OnChainCardConfig | null) => {
@@ -526,6 +556,14 @@ export default function CreditCardPage() {
                       {d.config.nickname?.trim() || d.providerName}
                     </span>
                   </div>
+                  {d.pendingTopUps.length > 0 && (
+                    <div className="mt-1 flex items-center gap-1">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
+                        <Clock className="h-3 w-3" />
+                        {d.pendingTopUps.length} pending
+                      </span>
+                    </div>
+                  )}
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium">{d.networkName}</p>
@@ -621,6 +659,9 @@ export default function CreditCardPage() {
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-muted-foreground">
+                  Select the network your card provider uses. Check your card provider's app or documentation for the correct network.
+                </p>
               </div>
             )}
             {selectedProviderId && selectedNetworkChainId && (
@@ -653,6 +694,9 @@ export default function CreditCardPage() {
                   value={cardWalletAddress}
                   onChange={(e) => setCardWalletAddress(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Enter the wallet address linked to your card. You can find this in your card provider's app under wallet/deposit settings.
+                </p>
               </div>
             )}
             <div className="flex items-center justify-between">
@@ -681,26 +725,36 @@ export default function CreditCardPage() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label>Check frequency (minutes)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={checkFrequencyMinutes}
-                      onChange={(e) => setCheckFrequencyMinutes(Number(e.target.value) || 15)}
-                    />
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowAdvanced((v) => !v)}
+                >
+                  {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  Advanced settings
+                </button>
+                {showAdvanced && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Check frequency (minutes)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={checkFrequencyMinutes}
+                        onChange={(e) => setCheckFrequencyMinutes(Number(e.target.value) || 15)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Cooldown between top-ups (minutes)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={cooldownMinutes}
+                        onChange={(e) => setCooldownMinutes(Number(e.target.value) || 60)}
+                      />
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label>Cooldown between top-ups (minutes)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={cooldownMinutes}
-                      onChange={(e) => setCooldownMinutes(Number(e.target.value) || 60)}
-                    />
-                  </div>
-                </div>
+                )}
               </>
             )}
             <div className="flex items-center justify-between">
@@ -710,6 +764,38 @@ export default function CreditCardPage() {
               </div>
               <Switch checked={false} onCheckedChange={() => {}} disabled />
             </div>
+            {editingConfig && (() => {
+              const display = cardDisplays.find((cd) => cd.config.id === editingConfig.id);
+              const pending = display?.pendingTopUps ?? [];
+              if (pending.length === 0) return null;
+              return (
+                <div className="space-y-2 border rounded-md p-3 bg-amber-500/5">
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                    Pending Top-Ups ({pending.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {pending.map((p, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm">
+                        <span>{formatWeiAmount(p.amount, DECIMALS)} USDST</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            p.status === 1
+                              ? "bg-blue-500/20 text-blue-400"
+                              : "bg-amber-500/20 text-amber-400"
+                          }`}>
+                            {p.status === 1 ? "Initiated" : "Pending Review"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(p.timestamp).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div className="flex flex-wrap gap-2 pt-2 justify-end">
               <Button
                 onClick={handleSave}

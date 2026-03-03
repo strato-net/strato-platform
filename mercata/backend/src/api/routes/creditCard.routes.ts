@@ -53,6 +53,25 @@ router.get("/config/:id/balance", authHandler.authorizeRequest(), CreditCardCont
 
 /**
  * @openapi
+ * /credit-card/config/:id/pending:
+ *   get:
+ *     summary: Get pending bridge withdrawals (top-ups) for a card
+ *     tags: [Credit Card]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Array of { amount, status, timestamp }
+ *       404:
+ *         description: Card not found
+ */
+router.get("/config/:id/pending", authHandler.authorizeRequest(), CreditCardController.getPendingTopUps);
+
+/**
+ * @openapi
  * /credit-card/balance:
  *   get:
  *     summary: Get card wallet token balance by chain/token/wallet (for on-chain cards)
