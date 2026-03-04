@@ -41,6 +41,8 @@ services:
       - ADMIN_REGISTRY=${ADMIN_REGISTRY}
       - MERCATA_BRIDGE=${MERCATA_BRIDGE}
       - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
+      - STRATO_HOSTNAME=${STRATO_HOSTNAME}
+      - STRATO_PORT_API=${STRATO_PORT_API}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -271,6 +273,7 @@ services:
     - STRATO_PORT_API2=${STRATO_PORT_API2}
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
+    - VAULT_URL=${VAULT_URL}/strato/v2.3
     - VM_DEBUGGER=${VM_DEBUGGER}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}

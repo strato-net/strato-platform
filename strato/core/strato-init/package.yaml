@@ -50,6 +50,7 @@ library:
   - redis-monad
   - resourcet
   - servant-client
+  - strato-auth
   - solid-vm
   - solid-vm-compiler
   - solid-vm-model

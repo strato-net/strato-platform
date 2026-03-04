@@ -24,6 +24,7 @@ import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
+import SyncingPage from "./pages/SyncingPage";
 import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
@@ -69,6 +70,7 @@ const App = () => {
   const [creditCardTopUpAddress, setCreditCardTopUpAddress] = useState<string | null>(null);
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [configError, setConfigError] = useState(false);
 
   // Initialize CSRF token on app startup
   useEffect(() => {
@@ -76,19 +78,36 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    let retryTimeout: ReturnType<typeof setTimeout>;
+
     const fetchConfig = async () => {
       try {
         const configData = await getConfig();
-        setProjectId(configData.projectId ?? "PROJECT_ID_UNSET");
-        if (configData.networkId) setNetworkId(String(configData.networkId));
-        if (configData.creditCardTopUpAddress) setCreditCardTopUpAddress(String(configData.creditCardTopUpAddress));
+        if (!cancelled) {
+          setProjectId(configData.projectId ?? "PROJECT_ID_UNSET");
+          if (configData.networkId) setNetworkId(String(configData.networkId));
+          if (configData.creditCardTopUpAddress) setCreditCardTopUpAddress(String(configData.creditCardTopUpAddress));
+          setConfigError(false);
+        }
       } catch (error) {
         console.error("Failed to fetch config:", error);
+        if (!cancelled) {
+          setConfigError(true);
+          retryTimeout = setTimeout(fetchConfig, 15000);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
     fetchConfig();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimeout);
+    };
   }, []);
 
   useEffect(() => {
@@ -134,7 +153,15 @@ const App = () => {
   const networkIdStr = networkId ?? undefined;
   const creditCardTopUpAddressStr = creditCardTopUpAddress ?? undefined;
 
-  if (loading || !wagmiConfig) {
+  if (loading) {
+    return <div>Loading configuration...</div>;
+  }
+
+  if (configError) {
+    return <SyncingPage />;
+  }
+
+  if (!wagmiConfig) {
     return <div>Loading configuration...</div>;
   }
 

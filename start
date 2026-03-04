@@ -44,12 +44,6 @@ export VAULT_URL=https://vault.blockapps.net:8093
 
 ####################################
 
-function cleanup {
-    docker compose -p strato down # -v -t 0 --remove-orphans
-}
-
-trap 'cleanup' INT
-
 # "host.docker.internal" is set up in Windows/Mac (to point to the host's localhost),
 # but for some reason wasn't set up to work in Linux
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -102,4 +96,22 @@ then
 fi
 
 echo "######## convoking"
-convoke
+nohup convoke > logs/convoke.log 2>&1 &
+CONVOKE_PID=$!
+
+echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
+
+# Wait and verify convoke started successfully
+sleep 3
+if ! kill -0 "$CONVOKE_PID" 2>/dev/null; then
+    echo "######## ERROR: convoke crashed shortly after starting"
+    echo "Last 20 lines of logs/convoke.log:"
+    tail -20 logs/convoke.log
+    echo ""
+    echo "Shutting down docker containers..."
+    docker compose -p strato down
+    rm -f .strato.pid
+    exit 1
+fi
+
+echo "######## Strato started (stop with: ./stop $1)"

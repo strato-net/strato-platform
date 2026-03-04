@@ -1,2 +1,0 @@
-#!/usr/bin/env sh
-docker exec -it strato_postgres_1 psql -h localhost -U postgres "$@"

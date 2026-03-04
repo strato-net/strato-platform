@@ -54,7 +54,7 @@ runEthUDPServer minPeers = do
   udpHandshakeServer minPeers
 
 connectMe ::
-  (MonadIO m, MonadFail m, MonadLogger m) =>
+  (MonadIO m, MonadFail m, MonadLogger m, MonadCatch m) =>
   UDPPort ->
   m Socket
 connectMe (UDPPort port') = do
@@ -73,7 +73,8 @@ connectMe (UDPPort port') = do
         Nothing
         (Just (show port'))
   sock <- liftIO $ socket (addrFamily serveraddr) Datagram defaultProtocol
-  liftIO $ bind sock (addrAddress serveraddr)
+  liftIO (bind sock (addrAddress serveraddr)) `catch` \(e :: IOError) ->
+    throwM $ userError $ "Failed to bind UDP port " ++ show port' ++ ": " ++ show e
 
   return sock
 
