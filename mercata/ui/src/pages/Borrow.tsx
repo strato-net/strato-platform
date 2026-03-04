@@ -26,8 +26,10 @@ import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import RepayForm from "@/components/borrow/RepayForm";
 import { CollateralData } from "@/interface";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { api } from "@/lib/axios";
 import {
   calculateAfterBorrowHealthFactor,
   calculateAvailableToBorrowUSD,
@@ -36,9 +38,81 @@ import {
   recommendCollateralToSupply,
 } from "@/utils/lendingUtils";
 
+type RoutePreviewApiResponse = {
+  feasible: boolean;
+  shortfall: string;
+  rates: {
+    lendingApr: number;
+    cdpApr: number;
+    blendedApr: number;
+  };
+  health: {
+    cdpCollateralRatio: number;
+    cdpEffectiveHealthFactor: number;
+    lendingHealthFactor: number;
+    unifiedHealthFactor: number;
+  };
+  position: {
+    projectedLtvPercent: number;
+    liquidationDropPercent: number;
+    liquidationHealthFactor: number;
+    liquidationPriceUSD: number;
+    liquidationAssetSymbol: string;
+  };
+  constraints: {
+    totalCapacity: string;
+  };
+  lendingAllocations: Array<{
+    asset: string;
+    symbol: string;
+    decimals: number;
+    supplyAmount: string;
+    collateralValueUSD: string;
+  }>;
+  cdpAllocations: Array<{
+    asset: string;
+    symbol: string;
+    decimals: number;
+    depositAmount: string;
+    mintAmount: string;
+    apr: number;
+    collateralRatio: number;
+    effectiveHealthFactor: number;
+    collateralValueUSD: string;
+  }>;
+  split: {
+    lendingAmount: string;
+    cdpAmount: string;
+    mechanisms?: number;
+  };
+};
+
+type ExecuteBorrowRouteResponse = {
+  status: "success" | "partial_or_failed";
+  error?: string;
+  steps?: Array<{ step: string; status: "pending" | "completed" | "failed"; error?: string }>;
+  execution?: {
+    lendingBorrowed?: string;
+    cdpMinted?: string;
+    totalBorrowed?: string;
+    failedStep?: string | null;
+  };
+};
+
+type CdpVault = {
+  asset: string;
+  symbol: string;
+  collateralAmount: string;
+  collateralAmountDecimals: number;
+  collateralValueUSD: string;
+  debtAmount: string;
+  collateralizationRatio: number;
+  healthFactor: number;
+};
+
 const Borrow = () => {
   const { userAddress, isLoggedIn } = useUser();
-  const { fetchUsdstBalance } = useTokenContext();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { toast } = useToast();
   const {
     loans,
@@ -46,21 +120,26 @@ const Borrow = () => {
     liquidityInfo,
     refreshLoans,
     refreshCollateral,
-    borrowAsset,
-    borrowMax,
-    supplyCollateral,
+    repayLoan,
+    repayAll,
   } = useLendingContext();
   const { getPrice } = useOracleContext();
 
   const [borrowInput, setBorrowInput] = useState("");
   const [selectedBorrowPreset, setSelectedBorrowPreset] = useState<number | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
+  const [repayLoading, setRepayLoading] = useState(false);
   const [inlineBorrowError, setInlineBorrowError] = useState("");
+  const [inlineRepayError, setInlineRepayError] = useState("");
   const [autoAllocate, setAutoAllocate] = useState(true);
   const [targetHealthFactor, setTargetHealthFactor] = useState(2.1);
   const [showDetails, setShowDetails] = useState(true);
   const [isDraggingHealthBar, setIsDraggingHealthBar] = useState(false);
   const healthBarRef = useRef<HTMLDivElement | null>(null);
+  const [routePreviewData, setRoutePreviewData] = useState<RoutePreviewApiResponse | null>(null);
+  const [routePreviewLoading, setRoutePreviewLoading] = useState(false);
+  const [showRepayPanel, setShowRepayPanel] = useState(false);
+  const [cdpVaults, setCdpVaults] = useState<CdpVault[]>([]);
   const { userRewards } = useRewardsUserInfo();
 
   const guestMode = !isLoggedIn;
@@ -102,10 +181,19 @@ const Borrow = () => {
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) {
+      setCdpVaults([]);
+      return;
+    }
     const refreshData = async () => {
       try {
-        await Promise.all([refreshLoans(), refreshCollateral(), fetchUsdstBalance()]);
+        const [, , , vaultsRes] = await Promise.all([
+          refreshLoans(),
+          refreshCollateral(),
+          fetchUsdstBalance(),
+          api.get<CdpVault[]>("/cdp/vaults"),
+        ]);
+        setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
       } catch (error) {
         console.error("Error refreshing borrow page data:", error);
       }
@@ -299,11 +387,6 @@ const Borrow = () => {
     });
   }, [autoAllocate, recommendedCollateral, potentialCollateral, customCollateralEntries]);
 
-  const afterBorrowHF = useMemo(() => {
-    if (!loans || requestedBorrow <= 0) return null;
-    return calculateAfterBorrowHealthFactor(loans, requestedBorrow, selectedCollateral);
-  }, [loans, requestedBorrow, selectedCollateral]);
-
   const ltvNow = useMemo(() => {
     const debt = Number(formatUnits(BigInt(loans?.totalAmountOwed || "0"), 18));
     const collateral = Number(formatUnits(BigInt(loans?.totalCollateralValueSupplied || "0"), 18));
@@ -311,40 +394,165 @@ const Borrow = () => {
     return (debt / collateral) * 100;
   }, [loans?.totalAmountOwed, loans?.totalCollateralValueSupplied]);
 
-  // TODO: replace with routed mechanism data once backend is available
+  const lendingCollateralPayload = useMemo(() => {
+    if (autoAllocate) return [];
+    return Array.from(selectedCollateral.entries())
+      .filter(([, amount]) => amount > 0n)
+      .map(([asset, amount]) => ({
+        asset: asset.address,
+        amount: amount.toString(),
+      }));
+  }, [autoAllocate, selectedCollateral]);
+
+  useEffect(() => {
+    if (!isLoggedIn || requestedBorrowWei <= 0n) {
+      setRoutePreviewData(null);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchRoutePreview = async () => {
+      try {
+        setRoutePreviewLoading(true);
+        const res = await api.post<RoutePreviewApiResponse>("/borrow-router/preview", {
+          amount: requestedBorrowWei.toString(),
+          targetHealthFactor,
+          lendingCollateral: lendingCollateralPayload,
+        });
+        if (!cancelled) {
+          setRoutePreviewData(res.data);
+        }
+      } catch {
+        if (!cancelled) {
+          setRoutePreviewData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setRoutePreviewLoading(false);
+        }
+      }
+    };
+
+    fetchRoutePreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, requestedBorrowWei, targetHealthFactor, lendingCollateralPayload]);
+
   const routePreview = useMemo(() => {
-    const total = requestedBorrow > 0 ? requestedBorrow : 0;
-    const lendingAmount = Math.round(total * 0.4 * 100) / 100;
-    const cdpAmount = Math.round((total - lendingAmount) * 100) / 100;
+    const fallbackTotal = requestedBorrow > 0 ? requestedBorrow : 0;
+    const fallbackLendingApr = Number(((loans?.interestRate || 0) / 100).toFixed(2));
+    if (!routePreviewData) {
+      return {
+        lendingAmount: fallbackTotal,
+        cdpAmount: 0,
+        mechanisms: fallbackTotal > 0 ? 1 : 0,
+        lendingApr: fallbackLendingApr,
+        cdpApr: 0,
+        blendedApr: fallbackLendingApr,
+        cdpDebt: 0,
+        cdpCollateralUsd: 0,
+        liquidationDropPercent: 0,
+        liquidationHealthFactor: 1,
+        liquidationPriceUSD: 0,
+        liquidationAssetSymbol: "USD",
+        swapPairs: 0,
+        earnApr: 0,
+        cdpCR: 0,
+        unifiedHealthFactor: targetHealthFactor,
+        lendingHF: targetHealthFactor,
+        cdpEffectiveHF: targetHealthFactor,
+        projectedLtvPercent: ltvNow,
+      };
+    }
+
+    const lendingAmount = Number(formatUnits(BigInt(routePreviewData.split.lendingAmount || "0"), 18));
+    const cdpAmount = Number(formatUnits(BigInt(routePreviewData.split.cdpAmount || "0"), 18));
+    const cdpCollateralUsd = routePreviewData.cdpAllocations.reduce((sum, item) => {
+      const value = Number(formatUnits(BigInt(item.collateralValueUSD || "0"), 18));
+      return sum + value;
+    }, 0);
+
     return {
       lendingAmount,
       cdpAmount,
-      lendingApr: Number(((loans?.interestRate || 0) / 100).toFixed(2)),
-      cdpApr: 0,
-      blendedApr: 0,
-      cdpDebt: 0,
-      cdpCollateralUsd: 0,
-      liquidationAtEth: 0,
+      mechanisms: Number(routePreviewData.split.mechanisms || 0),
+      lendingApr: Number(routePreviewData.rates.lendingApr || 0),
+      cdpApr: Number(routePreviewData.rates.cdpApr || 0),
+      blendedApr: Number(routePreviewData.rates.blendedApr || 0),
+      cdpDebt: cdpAmount,
+      cdpCollateralUsd,
+      liquidationDropPercent: Number(routePreviewData.position?.liquidationDropPercent || 0),
+      liquidationHealthFactor: Number(routePreviewData.position?.liquidationHealthFactor || 1),
+      liquidationPriceUSD: Number(routePreviewData.position?.liquidationPriceUSD || 0),
+      liquidationAssetSymbol: routePreviewData.position?.liquidationAssetSymbol || "USD",
       swapPairs: 0,
       earnApr: 0,
-      cdpCR: 0,
+      cdpCR: Number(routePreviewData.health.cdpCollateralRatio || 0),
+      unifiedHealthFactor: Number(routePreviewData.health.unifiedHealthFactor || targetHealthFactor),
+      lendingHF: Number(routePreviewData.health.lendingHealthFactor || targetHealthFactor),
+      cdpEffectiveHF: Number(routePreviewData.health.cdpEffectiveHealthFactor || targetHealthFactor),
+      projectedLtvPercent: Number(routePreviewData.position?.projectedLtvPercent || ltvNow),
     };
-  }, [requestedBorrow, loans?.interestRate]);
+  }, [routePreviewData, requestedBorrow, loans?.interestRate, targetHealthFactor, ltvNow]);
+
+  const maxBorrowableWei = useMemo(() => {
+    if (routePreviewData?.constraints?.totalCapacity) {
+      try {
+        return BigInt(routePreviewData.constraints.totalCapacity);
+      } catch {
+        return availableToBorrow;
+      }
+    }
+    return availableToBorrow;
+  }, [routePreviewData?.constraints?.totalCapacity, availableToBorrow]);
+
+  const lendingRouteCollateralText = useMemo(() => {
+    const allocations = routePreviewData?.lendingAllocations || [];
+    if (allocations.length === 0) return "No additional collateral needed";
+    return allocations
+      .filter((item) => BigInt(item.supplyAmount || "0") > 0n)
+      .map((item) => `${Number(formatUnits(BigInt(item.supplyAmount || "0"), item.decimals || 18)).toFixed(2)} ${item.symbol}`)
+      .join(" + ");
+  }, [routePreviewData?.lendingAllocations]);
+
+  const cdpRouteCollateralText = useMemo(() => {
+    const allocations = routePreviewData?.cdpAllocations || [];
+    if (allocations.length === 0) return "No CDP collateral needed";
+    return allocations
+      .filter((item) => BigInt(item.depositAmount || "0") > 0n)
+      .map((item) => `${Number(formatUnits(BigInt(item.depositAmount || "0"), item.decimals || 18)).toFixed(2)} ${item.symbol}`)
+      .join(" + ");
+  }, [routePreviewData?.cdpAllocations]);
+
+  const totalCdpDebtActual = useMemo(() => {
+    return cdpVaults.reduce((sum, vault) => sum + Number(formatUnits(BigInt(vault.debtAmount || "0"), 18)), 0);
+  }, [cdpVaults]);
 
   const progressValue = useMemo(() => {
-    const min = Number(sliderExtrema.min);
-    const max = Number(sliderExtrema.max);
+    const sourceHealthFactor = routePreviewData?.health?.unifiedHealthFactor && routePreviewData.health.unifiedHealthFactor > 0
+      ? routePreviewData.health.unifiedHealthFactor
+      : targetHealthFactor;
+    const min = 1;
+    const max = Math.max(3, sourceHealthFactor * 1.5, targetHealthFactor * 1.2);
     if (max <= min) return 50;
-    const clamped = Math.max(min, Math.min(max, targetHealthFactor));
+    const clamped = Math.max(min, Math.min(max, sourceHealthFactor));
     return ((clamped - min) / (max - min)) * 100;
-  }, [sliderExtrema, targetHealthFactor]);
+  }, [routePreviewData?.health?.unifiedHealthFactor, targetHealthFactor]);
 
   const displayHealthFactor = useMemo(() => {
-    const min = Number(sliderExtrema.min);
-    const max = Number(sliderExtrema.max);
-    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return targetHealthFactor;
-    return Math.max(min, Math.min(max, targetHealthFactor));
-  }, [sliderExtrema, targetHealthFactor]);
+    if (routePreviewData?.health?.unifiedHealthFactor && routePreviewData.health.unifiedHealthFactor > 0) {
+      return Number(routePreviewData.health.unifiedHealthFactor);
+    }
+    if (loans && requestedBorrow > 0) {
+      const fallbackAfterBorrow = calculateAfterBorrowHealthFactor(loans, requestedBorrow, selectedCollateral);
+      const fallbackNumeric = Number(fallbackAfterBorrow ?? 0);
+      if (Number.isFinite(fallbackNumeric) && fallbackNumeric > 0) {
+        return fallbackNumeric;
+      }
+    }
+    return Number(targetHealthFactor);
+  }, [routePreviewData?.health?.unifiedHealthFactor, loans, requestedBorrow, selectedCollateral, targetHealthFactor]);
 
   const updateTargetHealthFactorFromClientX = (clientX: number) => {
     const barEl = healthBarRef.current;
@@ -397,22 +605,34 @@ const Borrow = () => {
       setInlineBorrowError("Enter a borrow amount greater than zero");
       return;
     }
-    if (requestedBorrowWei > availableToBorrow) {
+    if (requestedBorrowWei > maxBorrowableWei) {
       setInlineBorrowError("Borrow amount exceeds available limit");
+      return;
+    }
+    if (routePreviewData && !routePreviewData.feasible) {
+      const shortfall = Number(formatUnits(BigInt(routePreviewData.shortfall || "0"), 18));
+      setInlineBorrowError(`Insufficient routed capacity. Shortfall: ${shortfall.toFixed(2)} USDST`);
       return;
     }
 
     setInlineBorrowError("");
     try {
       setBorrowLoading(true);
-      for (const [collateral, amount] of selectedCollateral.entries()) {
-        if (amount <= 0n) continue;
-        await supplyCollateral({ asset: collateral.address, amount: amount.toString() });
-      }
-      if (requestedBorrowWei >= availableToBorrow && availableToBorrow > 0n) {
-        await borrowMax();
-      } else {
-        await borrowAsset({ amount: requestedBorrowWei.toString() });
+      const res = await api.post<ExecuteBorrowRouteResponse>("/borrow-router/execute", {
+        amount: requestedBorrowWei.toString(),
+        targetHealthFactor,
+        lendingCollateral: lendingCollateralPayload,
+      });
+      if (res.data?.status !== "success") {
+        const failedStep = res.data?.steps?.find((step) => step.status === "failed");
+        const lendingBorrowed = Number(formatUnits(BigInt(res.data?.execution?.lendingBorrowed || "0"), 18));
+        const cdpMinted = Number(formatUnits(BigInt(res.data?.execution?.cdpMinted || "0"), 18));
+        const fallbackError = res.data?.error || "Borrow partially executed. Please review route details and retry safely.";
+        const partialDetails = lendingBorrowed > 0 || cdpMinted > 0
+          ? ` Executed: Lending ${lendingBorrowed.toFixed(2)} USDST, CDP ${cdpMinted.toFixed(2)} USDST.`
+          : "";
+        setInlineBorrowError(`${failedStep?.error || fallbackError}${partialDetails}`);
+        return;
       }
       toast({
         title: "Borrow Initiated",
@@ -422,13 +642,61 @@ const Borrow = () => {
         })} USDST`,
         variant: "success",
       });
-      await Promise.all([refreshLoans(), refreshCollateral(), fetchUsdstBalance()]);
+      const [, , , vaultsRes] = await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(),
+        api.get<CdpVault[]>("/cdp/vaults"),
+      ]);
+      setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
       setBorrowInput("");
       setSelectedBorrowPreset(null);
-    } catch (error) {
-      // Error toast is handled globally by axios interceptor
+      setRoutePreviewData(null);
+    } catch (error: any) {
+      const responseData = error?.response?.data as ExecuteBorrowRouteResponse | undefined;
+      const failedStep = responseData?.steps?.find((step) => step.status === "failed");
+      const lendingBorrowed = Number(formatUnits(BigInt(responseData?.execution?.lendingBorrowed || "0"), 18));
+      const cdpMinted = Number(formatUnits(BigInt(responseData?.execution?.cdpMinted || "0"), 18));
+      const partialDetails = lendingBorrowed > 0 || cdpMinted > 0
+        ? ` Executed: Lending ${lendingBorrowed.toFixed(2)} USDST, CDP ${cdpMinted.toFixed(2)} USDST.`
+        : "";
+      setInlineBorrowError(
+        (failedStep?.error ||
+          responseData?.error ||
+          error?.message ||
+          "Borrow execution failed. Please try again.") + partialDetails
+      );
     } finally {
       setBorrowLoading(false);
+    }
+  };
+
+  const handleRepayNow = async (amount: string) => {
+    if (guestMode) return;
+    try {
+      setInlineRepayError("");
+      setRepayLoading(true);
+      if (amount === "ALL") {
+        await repayAll();
+      } else {
+        await repayLoan({ amount });
+      }
+      toast({
+        title: "Repay Submitted",
+        description: amount === "ALL" ? "Repay all transaction submitted." : "Repay transaction submitted.",
+        variant: "success",
+      });
+      const [, , , vaultsRes] = await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(),
+        api.get<CdpVault[]>("/cdp/vaults"),
+      ]);
+      setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
+    } catch (error: any) {
+      setInlineRepayError(error?.message || "Repay failed");
+    } finally {
+      setRepayLoading(false);
     }
   };
 
@@ -486,9 +754,9 @@ const Borrow = () => {
                           ? "bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:text-primary-foreground"
                           : "bg-transparent hover:bg-muted/70 dark:bg-[#1e274e] dark:hover:bg-[#2b376a]"
                       }`}
-                      disabled={guestMode || availableToBorrow <= 0n}
+                      disabled={guestMode || maxBorrowableWei <= 0n}
                       onClick={() => {
-                        const percentAmount = Number(formatUnits(availableToBorrow, 18)) * (percent / 100);
+                        const percentAmount = Number(formatUnits(maxBorrowableWei, 18)) * (percent / 100);
                         setBorrowInput(percentAmount.toFixed(2));
                         setSelectedBorrowPreset(percent);
                       }}
@@ -504,9 +772,9 @@ const Borrow = () => {
                         ? "bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:text-primary-foreground"
                         : "bg-transparent hover:bg-muted/70 dark:bg-[#1e274e] dark:hover:bg-[#2b376a]"
                     }`}
-                    disabled={guestMode || availableToBorrow <= 0n}
+                    disabled={guestMode || maxBorrowableWei <= 0n}
                     onClick={() => {
-                      setBorrowInput(Number(formatUnits(availableToBorrow, 18)).toFixed(2));
+                      setBorrowInput(Number(formatUnits(maxBorrowableWei, 18)).toFixed(2));
                       setSelectedBorrowPreset(100);
                     }}
                   >
@@ -614,7 +882,7 @@ const Borrow = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium inline-flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                    {getRiskLabel(targetHealthFactor)}
+                    {getRiskLabel(displayHealthFactor)}
                   </span>
                   <span className="font-semibold">Health Factor: {displayHealthFactor.toFixed(1)}x</span>
                 </div>
@@ -649,7 +917,7 @@ const Borrow = () => {
                 <div className="grid grid-cols-3 gap-3 text-sm">
                   <div className="rounded-lg border p-3">
                     <p className="text-muted-foreground text-xs">LTV</p>
-                    <p className="font-semibold">{ltvNow.toFixed(1)}%</p>
+                    <p className="font-semibold">{routePreview.projectedLtvPercent.toFixed(1)}%</p>
                   </div>
                   <div className="rounded-lg border p-3">
                     <p className="text-muted-foreground text-xs">Blended Rate</p>
@@ -657,7 +925,9 @@ const Borrow = () => {
                   </div>
                   <div className="rounded-lg border p-3">
                     <p className="text-muted-foreground text-xs">Liquidation At</p>
-                    <p className="font-semibold">${routePreview.liquidationAtEth.toLocaleString()} ETH</p>
+                    <p className="font-semibold">
+                      ${routePreview.liquidationPriceUSD.toFixed(2)} {routePreview.liquidationAssetSymbol} ({routePreview.liquidationDropPercent.toFixed(1)}% drop)
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -665,7 +935,7 @@ const Borrow = () => {
 
             <Button
               className="w-full h-12 text-base"
-              disabled={guestMode || borrowLoading || requestedBorrowWei <= 0n || requestedBorrowWei > availableToBorrow}
+              disabled={guestMode || borrowLoading || routePreviewLoading || requestedBorrowWei <= 0n || requestedBorrowWei > maxBorrowableWei}
               onClick={handleBorrowNow}
             >
               {borrowLoading ? "Processing..." : `Borrow ${(requestedBorrow || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST`}
@@ -691,7 +961,9 @@ const Borrow = () => {
               <div className="space-y-4">
                 <div className="flex items-center gap-3 px-1 pt-2">
                   <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">4</span>
-                  <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">BORROW ROUTED ACROSS 2 MECHANISMS</p>
+                  <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">
+                    {`BORROW ROUTED ACROSS ${Math.max(1, routePreview.mechanisms)} MECHANISM${Math.max(1, routePreview.mechanisms) > 1 ? "S" : ""}`}
+                  </p>
                 </div>
                 <Card className="border-0 shadow-none bg-transparent">
                   <CardContent className="p-4 md:p-5 space-y-0 rounded-xl border border-border/70 bg-card dark:bg-[#1f274f]">
@@ -705,7 +977,8 @@ const Borrow = () => {
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">{routePreview.lendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST</p>
-                        <p className="text-xs text-emerald-500">{(afterBorrowHF ?? loans?.healthFactor ?? 2.6).toFixed(1)}x</p>
+                        <p className="text-xs text-emerald-500">{routePreview.lendingHF.toFixed(1)}x</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">{lendingRouteCollateralText}</p>
                       </div>
                     </div>
                     <div className="py-3 min-h-[86px] flex items-center justify-between">
@@ -718,7 +991,8 @@ const Borrow = () => {
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">{routePreview.cdpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST</p>
-                        <p className="text-xs text-emerald-500">CR {routePreview.cdpCR}%</p>
+                        <p className="text-xs text-emerald-500">CR {routePreview.cdpCR.toFixed(1)}% · HF {routePreview.cdpEffectiveHF.toFixed(2)}x</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">{cdpRouteCollateralText}</p>
                       </div>
                     </div>
                     <div className="pt-3 border-t border-border/60">
@@ -775,26 +1049,49 @@ const Borrow = () => {
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">{formatBalance(loans?.totalAmountOwed || "0", "USDST", 18, 2, 2)}</p>
-                        <Button variant="outline" size="sm" className="mt-2">Repay</Button>
+                        <Button variant="outline" size="sm" className="mt-2" onClick={() => setShowRepayPanel((prev) => !prev)}>Repay</Button>
                       </div>
                     </div>
-                    <div className="rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] p-3 min-h-[94px] flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">CDP Vault - GOLDST</p>
-                        <p className="text-xs text-muted-foreground">Collateral ${routePreview.cdpCollateralUsd.toLocaleString()}</p>
+                    {showRepayPanel ? (
+                      <div className="rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] p-3">
+                        <RepayForm
+                          loans={loans || null}
+                          repayLoading={repayLoading}
+                          onRepay={handleRepayNow}
+                          usdstBalance={usdstBalance}
+                          voucherBalance={voucherBalance}
+                          guestMode={guestMode}
+                        />
+                        {inlineRepayError ? <p className="text-sm text-red-600 mt-2">{inlineRepayError}</p> : null}
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{routePreview.cdpDebt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST</p>
-                        <Button variant="outline" size="sm" className="mt-2">Repay</Button>
+                    ) : null}
+                    {cdpVaults.length > 0 ? (
+                      cdpVaults.map((vault) => (
+                        <div key={vault.asset} className="rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] p-3 min-h-[94px] flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">CDP Vault - {vault.symbol}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Collateral {formatBalance(vault.collateralValueUSD || "0", undefined, 18, 2, 2, true)} · CR {Number(vault.collateralizationRatio || 0).toFixed(1)}%
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">{formatBalance(vault.debtAmount || "0", "USDST", 18, 2, 2)}</p>
+                            <Button variant="outline" size="sm" className="mt-2" disabled>Repay</Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] p-3 text-sm text-muted-foreground">
+                        No CDP positions found
                       </div>
-                    </div>
+                    )}
                     <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] px-3 py-2 text-sm">
                       <span className="text-muted-foreground inline-flex items-center gap-2">
                         <CirclePlus className="h-4 w-4" />
                         Total debt across all positions
                       </span>
                       <span className="font-semibold">
-                        {(Number(formatUnits(BigInt(loans?.totalAmountOwed || "0"), 18)) + routePreview.cdpDebt).toLocaleString(undefined, {
+                        {(Number(formatUnits(BigInt(loans?.totalAmountOwed || "0"), 18)) + totalCdpDebtActual).toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })} USDST
