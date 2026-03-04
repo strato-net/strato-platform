@@ -26,6 +26,7 @@ STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
+VAULT_URL=${VAULT_URL:-https://vault.blockapps.net:8093/strato/v2.3}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -111,6 +112,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__STRATO_PORT_API__/$STRATO_PORT_API/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf
+  sed -i "s|__VAULT_URL__|$VAULT_URL|g" /tmp/nginx.conf
   
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf
