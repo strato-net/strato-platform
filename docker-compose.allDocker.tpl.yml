@@ -41,6 +41,8 @@ services:
       - ADMIN_REGISTRY=${ADMIN_REGISTRY}
       - MERCATA_BRIDGE=${MERCATA_BRIDGE}
       - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
+      - STRATO_HOSTNAME=${STRATO_HOSTNAME}
+      - STRATO_PORT_API=${STRATO_PORT_API}
     restart: unless-stopped
     logging:
       driver: "json-file"

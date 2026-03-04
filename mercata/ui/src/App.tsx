@@ -23,6 +23,7 @@ import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
+import SyncingPage from "./pages/SyncingPage";
 import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
@@ -65,6 +66,7 @@ const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [configError, setConfigError] = useState(false);
 
   // Initialize CSRF token on app startup
   useEffect(() => {
@@ -72,18 +74,35 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    let retryTimeout: ReturnType<typeof setTimeout>;
+
     const fetchConfig = async () => {
       try {
         const configData = await getConfig();
-        setProjectId(configData.projectId);
+        if (!cancelled) {
+          setProjectId(configData.projectId);
+          setConfigError(false);
+        }
       } catch (error) {
         console.error("Failed to fetch config:", error);
+        if (!cancelled) {
+          setConfigError(true);
+          retryTimeout = setTimeout(fetchConfig, 15000);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchConfig();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimeout);
+    };
   }, []);
 
   useEffect(() => {
@@ -115,7 +134,15 @@ const App = () => {
     }
   }, [projectId, loading]);
 
-  if (loading || !wagmiConfig) {
+  if (loading) {
+    return <div>Loading configuration...</div>;
+  }
+
+  if (configError) {
+    return <SyncingPage />;
+  }
+
+  if (!wagmiConfig) {
     return <div>Loading configuration...</div>;
   }
 
