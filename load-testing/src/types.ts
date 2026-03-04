@@ -26,11 +26,14 @@ export interface PollingConfig {
   timeout: number;
 }
 
+export type SubmitMode = "sequential" | "pipeline";
+
 export interface ContractDeployScenarioConfig {
   enabled: boolean;
   batchSize: number;
   batchCount: number;
   batchDelay: number;
+  submitMode: SubmitMode;
   contractSource: string;
   contractName: string;
   contractArgs: Record<string, any>;
@@ -41,6 +44,7 @@ export interface FunctionCallScenarioConfig {
   batchSize: number;
   batchCount: number;
   batchDelay: number;
+  submitMode: SubmitMode;
   setupContract: string;
   contractName: string;
   method: string;
@@ -52,6 +56,7 @@ export interface MixedWorkloadScenarioConfig {
   deployRatio: number;
   totalTxCount: number;
   batchSize: number;
+  submitMode: SubmitMode;
 }
 
 export interface MultiNodeConfig {

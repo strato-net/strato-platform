@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
-import { LoadTestConfig } from "./types";
+import { LoadTestConfig, SubmitMode } from "./types";
 
 const DEFAULTS: Partial<LoadTestConfig> = {
   gas: { limit: 32100000000, price: 1 },
@@ -46,6 +46,7 @@ export function loadConfig(configPath: string): LoadTestConfig {
         batchSize: 10,
         batchCount: 5,
         batchDelay: 0,
+        submitMode: "sequential",
         contractSource: "contracts/SimpleStorage.sol",
         contractName: "SimpleStorage",
         contractArgs: { _value: "42" },
@@ -56,6 +57,7 @@ export function loadConfig(configPath: string): LoadTestConfig {
         batchSize: 20,
         batchCount: 10,
         batchDelay: 0,
+        submitMode: "sequential",
         setupContract: "contracts/SimpleIncrement.sol",
         contractName: "SimpleIncrement",
         method: "increment",
@@ -67,6 +69,7 @@ export function loadConfig(configPath: string): LoadTestConfig {
         deployRatio: 0.3,
         totalTxCount: 100,
         batchSize: 10,
+        submitMode: "sequential",
         ...raw.scenarios?.mixedWorkload,
       },
       multiNode: {
@@ -88,6 +91,7 @@ export function applyCliOverrides(
     scenario?: string;
     nodes?: string[];
     reportDir?: string;
+    submitMode?: SubmitMode;
   },
 ): LoadTestConfig {
   if (overrides.batchSize !== undefined) {
@@ -120,6 +124,11 @@ export function applyCliOverrides(
   }
   if (overrides.reportDir) {
     config.report.outputDir = overrides.reportDir;
+  }
+  if (overrides.submitMode) {
+    config.scenarios.contractDeploy.submitMode = overrides.submitMode;
+    config.scenarios.functionCall.submitMode = overrides.submitMode;
+    config.scenarios.mixedWorkload.submitMode = overrides.submitMode;
   }
   return config;
 }

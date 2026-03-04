@@ -54,37 +54,43 @@ export class FunctionCallScenario extends BaseScenario {
 
   async run(clients: NodeClients): Promise<ScenarioResult> {
     const cfg = this.config.scenarios.functionCall;
-    const allTxMetrics: TxMetric[] = [];
-    const allBatchMetrics: BatchMetric[] = [];
 
     // Deploy setup contract first
     const contractAddress = await this.deploySetupContract(clients);
 
     console.log(
-      `[functionCall] Starting: ${cfg.batchCount} batches x ${cfg.batchSize} calls on ${clients.nodeName}`,
+      `[functionCall] Starting: ${cfg.batchCount} batches x ${cfg.batchSize} calls on ${clients.nodeName} (${cfg.submitMode} mode)`,
     );
 
-    for (let i = 0; i < cfg.batchCount; i++) {
-      const builtTx = buildFunctionCallBatch(
+    // Build all batches upfront
+    const builtTxs = Array.from({ length: cfg.batchCount }, () =>
+      buildFunctionCallBatch(
         cfg.contractName,
         contractAddress,
         cfg.method,
         cfg.args,
         cfg.batchSize,
         this.config.gas,
-      );
+      ),
+    );
 
-      const { txMetrics, batchMetric } = await this.submitAndTrack(
-        clients,
-        builtTx,
-        i,
-      );
+    let allTxMetrics: TxMetric[];
+    let allBatchMetrics: BatchMetric[];
 
-      allTxMetrics.push(...txMetrics);
-      allBatchMetrics.push(batchMetric);
-
-      if (cfg.batchDelay > 0 && i < cfg.batchCount - 1) {
-        await new Promise((r) => setTimeout(r, cfg.batchDelay));
+    if (cfg.submitMode === "pipeline") {
+      const result = await this.submitAllThenTrack(clients, builtTxs, cfg.batchDelay);
+      allTxMetrics = result.txMetrics;
+      allBatchMetrics = result.batchMetrics;
+    } else {
+      allTxMetrics = [];
+      allBatchMetrics = [];
+      for (let i = 0; i < builtTxs.length; i++) {
+        const { txMetrics, batchMetric } = await this.submitAndTrack(clients, builtTxs[i], i);
+        allTxMetrics.push(...txMetrics);
+        allBatchMetrics.push(batchMetric);
+        if (cfg.batchDelay > 0 && i < builtTxs.length - 1) {
+          await new Promise((r) => setTimeout(r, cfg.batchDelay));
+        }
       }
     }
 

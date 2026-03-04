@@ -3,7 +3,7 @@ import { NodeClients } from "../api/client";
 import { buildContractDeployBatch, buildFunctionCallBatch } from "../tx/builders";
 import { submitBatch } from "../tx/submitter";
 import { pollForResults } from "../tx/poller";
-import { ScenarioResult, TxMetric, BatchMetric } from "../types";
+import { ScenarioResult } from "../types";
 
 export class MixedWorkloadScenario extends BaseScenario {
   name(): string {
@@ -54,19 +54,18 @@ export class MixedWorkloadScenario extends BaseScenario {
     const cfg = this.config.scenarios.mixedWorkload;
     const deployCfg = this.config.scenarios.contractDeploy;
     const callCfg = this.config.scenarios.functionCall;
-    const allTxMetrics: TxMetric[] = [];
-    const allBatchMetrics: BatchMetric[] = [];
 
     // Deploy a contract for function calls
     const contractAddress = await this.deploySetupContract(clients);
 
     const totalBatches = Math.ceil(cfg.totalTxCount / cfg.batchSize);
     console.log(
-      `[mixedWorkload] Starting: ${totalBatches} batches, ${Math.round(cfg.deployRatio * 100)}% deploys on ${clients.nodeName}`,
+      `[mixedWorkload] Starting: ${totalBatches} batches, ${Math.round(cfg.deployRatio * 100)}% deploys on ${clients.nodeName} (${cfg.submitMode} mode)`,
     );
 
+    // Build all batches upfront
+    const allBuiltTxs: import("../types").BuiltTx[] = [];
     let txSent = 0;
-    let batchIndex = 0;
 
     while (txSent < cfg.totalTxCount) {
       const remaining = cfg.totalTxCount - txSent;
@@ -74,47 +73,48 @@ export class MixedWorkloadScenario extends BaseScenario {
       const deployCount = Math.round(batchSize * cfg.deployRatio);
       const callCount = batchSize - deployCount;
 
-      // Submit deploy batch if any
       if (deployCount > 0) {
-        const deployBatch = buildContractDeployBatch(
-          deployCfg.contractSource,
-          deployCfg.contractName,
-          deployCfg.contractArgs,
-          deployCount,
-          this.config.gas,
+        allBuiltTxs.push(
+          buildContractDeployBatch(
+            deployCfg.contractSource,
+            deployCfg.contractName,
+            deployCfg.contractArgs,
+            deployCount,
+            this.config.gas,
+          ),
         );
-
-        const { txMetrics, batchMetric } = await this.submitAndTrack(
-          clients,
-          deployBatch,
-          batchIndex,
-        );
-        allTxMetrics.push(...txMetrics);
-        allBatchMetrics.push(batchMetric);
       }
-
-      // Submit call batch if any
       if (callCount > 0) {
-        const callBatch = buildFunctionCallBatch(
-          callCfg.contractName,
-          contractAddress,
-          callCfg.method,
-          callCfg.args,
-          callCount,
-          this.config.gas,
+        allBuiltTxs.push(
+          buildFunctionCallBatch(
+            callCfg.contractName,
+            contractAddress,
+            callCfg.method,
+            callCfg.args,
+            callCount,
+            this.config.gas,
+          ),
         );
-
-        const { txMetrics, batchMetric } = await this.submitAndTrack(
-          clients,
-          callBatch,
-          batchIndex,
-        );
-        allTxMetrics.push(...txMetrics);
-        allBatchMetrics.push(batchMetric);
       }
 
       txSent += batchSize;
-      batchIndex++;
+    }
+
+    let allTxMetrics: import("../types").TxMetric[];
+    let allBatchMetrics: import("../types").BatchMetric[];
+
+    if (cfg.submitMode === "pipeline") {
+      const result = await this.submitAllThenTrack(clients, allBuiltTxs);
+      allTxMetrics = result.txMetrics;
+      allBatchMetrics = result.batchMetrics;
+    } else {
+      allTxMetrics = [];
+      allBatchMetrics = [];
+      for (let i = 0; i < allBuiltTxs.length; i++) {
+        const { txMetrics, batchMetric } = await this.submitAndTrack(clients, allBuiltTxs[i], i);
+        allTxMetrics.push(...txMetrics);
+        allBatchMetrics.push(batchMetric);
+      }
     }
 
     console.log(

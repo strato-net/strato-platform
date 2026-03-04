@@ -10,33 +10,39 @@ export class ContractDeployScenario extends BaseScenario {
 
   async run(clients: NodeClients): Promise<ScenarioResult> {
     const cfg = this.config.scenarios.contractDeploy;
-    const allTxMetrics: TxMetric[] = [];
-    const allBatchMetrics: BatchMetric[] = [];
 
     console.log(
-      `[contractDeploy] Starting: ${cfg.batchCount} batches x ${cfg.batchSize} deploys on ${clients.nodeName}`,
+      `[contractDeploy] Starting: ${cfg.batchCount} batches x ${cfg.batchSize} deploys on ${clients.nodeName} (${cfg.submitMode} mode)`,
     );
 
-    for (let i = 0; i < cfg.batchCount; i++) {
-      const builtTx = buildContractDeployBatch(
+    // Build all batches upfront
+    const builtTxs = Array.from({ length: cfg.batchCount }, () =>
+      buildContractDeployBatch(
         cfg.contractSource,
         cfg.contractName,
         cfg.contractArgs,
         cfg.batchSize,
         this.config.gas,
-      );
+      ),
+    );
 
-      const { txMetrics, batchMetric } = await this.submitAndTrack(
-        clients,
-        builtTx,
-        i,
-      );
+    let allTxMetrics: TxMetric[];
+    let allBatchMetrics: BatchMetric[];
 
-      allTxMetrics.push(...txMetrics);
-      allBatchMetrics.push(batchMetric);
-
-      if (cfg.batchDelay > 0 && i < cfg.batchCount - 1) {
-        await new Promise((r) => setTimeout(r, cfg.batchDelay));
+    if (cfg.submitMode === "pipeline") {
+      const result = await this.submitAllThenTrack(clients, builtTxs, cfg.batchDelay);
+      allTxMetrics = result.txMetrics;
+      allBatchMetrics = result.batchMetrics;
+    } else {
+      allTxMetrics = [];
+      allBatchMetrics = [];
+      for (let i = 0; i < builtTxs.length; i++) {
+        const { txMetrics, batchMetric } = await this.submitAndTrack(clients, builtTxs[i], i);
+        allTxMetrics.push(...txMetrics);
+        allBatchMetrics.push(batchMetric);
+        if (cfg.batchDelay > 0 && i < builtTxs.length - 1) {
+          await new Promise((r) => setTimeout(r, cfg.batchDelay));
+        }
       }
     }
 

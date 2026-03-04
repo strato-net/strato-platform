@@ -8,6 +8,7 @@ import {
   TxMetric,
   BatchMetric,
   ScenarioResult,
+  TxSubmitResponse,
 } from "../types";
 
 export abstract class BaseScenario {
@@ -119,5 +120,134 @@ export abstract class BaseScenario {
     this.collector.recordBatch(batchMetric);
 
     return { txMetrics, batchMetric };
+  }
+
+  /**
+   * Pipeline mode: submit all batches back-to-back without waiting for
+   * confirmation, then poll for all results. This fills the mempool and
+   * reveals how confirmation latency grows with mempool depth.
+   */
+  protected async submitAllThenTrack(
+    clients: NodeClients,
+    builtTxs: BuiltTx[],
+    batchDelay: number = 0,
+  ): Promise<{ txMetrics: TxMetric[]; batchMetrics: BatchMetric[] }> {
+    const scenario = this.name();
+    const nodeName = clients.nodeName;
+
+    // Phase 1: Submit all batches, collecting hashes and timing
+    interface SubmittedBatch {
+      batchIndex: number;
+      txCount: number;
+      submitStart: number;
+      submitEnd: number;
+      submitDuration: number;
+      responses: TxSubmitResponse[];
+    }
+
+    const submitted: SubmittedBatch[] = [];
+
+    console.log(`[${scenario}] Pipeline mode: submitting ${builtTxs.length} batches...`);
+
+    for (let i = 0; i < builtTxs.length; i++) {
+      const builtTx = builtTxs[i];
+      const txCount = builtTx.txs.length;
+
+      const submitStart = Date.now();
+      const responses = await submitBatch(clients.strato, builtTx, false);
+      const submitEnd = Date.now();
+      const submitDuration = submitEnd - submitStart;
+
+      submitted.push({ batchIndex: i, txCount, submitStart, submitEnd, submitDuration, responses });
+
+      this.log(`Batch ${i}: submitted ${txCount} txs in ${submitDuration}ms`);
+
+      if (batchDelay > 0 && i < builtTxs.length - 1) {
+        await new Promise((r) => setTimeout(r, batchDelay));
+      }
+    }
+
+    const totalSubmitted = submitted.reduce((sum, b) => sum + b.txCount, 0);
+    console.log(`[${scenario}] All ${totalSubmitted} txs submitted. Polling for results...`);
+
+    // Phase 2: Poll for all hashes at once
+    const allHashes = submitted.flatMap((b) => b.responses.map((r) => r.hash));
+    const pollStart = Date.now();
+    const allResults = await pollForResults(clients.bloc, allHashes, this.config.polling);
+    const pollEnd = Date.now();
+
+    console.log(`[${scenario}] All results received in ${pollEnd - pollStart}ms`);
+
+    // Phase 3: Map results back to batches and build metrics
+    const txMetrics: TxMetric[] = [];
+    const batchMetrics: BatchMetric[] = [];
+    let resultOffset = 0;
+
+    for (const batch of submitted) {
+      const batchResults = allResults.slice(resultOffset, resultOffset + batch.txCount);
+      resultOffset += batch.txCount;
+
+      let successCount = 0;
+      let failureCount = 0;
+      let timeoutCount = 0;
+
+      for (const [i, result] of batchResults.entries()) {
+        const hash = batch.responses[i].hash;
+        const confirmDuration = pollEnd - batch.submitStart;
+
+        const metric: TxMetric = {
+          txHash: hash,
+          nodeName,
+          scenario,
+          batchIndex: batch.batchIndex,
+          submitTime: batch.submitStart,
+          submitDuration: batch.submitDuration,
+          confirmTime: pollEnd,
+          confirmDuration: pollEnd - batch.submitEnd,
+          totalDuration: confirmDuration,
+          status: "submitted",
+        };
+
+        if (result.status === "Success") {
+          metric.status = "confirmed";
+          successCount++;
+        } else if (result.status === "Failure") {
+          metric.status = "failed";
+          metric.error = result.txResult?.message || result.error || result.message || "Transaction failed";
+          failureCount++;
+        } else {
+          metric.status = "timeout";
+          metric.error = "Polling timeout";
+          timeoutCount++;
+        }
+
+        this.collector.recordTx(metric);
+        txMetrics.push(metric);
+      }
+
+      const batchMetric: BatchMetric = {
+        batchIndex: batch.batchIndex,
+        nodeName,
+        scenario,
+        txCount: batch.txCount,
+        submitStart: batch.submitStart,
+        submitEnd: batch.submitEnd,
+        submitDuration: batch.submitDuration,
+        confirmEnd: pollEnd,
+        confirmDuration: pollEnd - batch.submitEnd,
+        totalDuration: pollEnd - batch.submitStart,
+        successCount,
+        failureCount,
+        timeoutCount,
+      };
+      this.collector.recordBatch(batchMetric);
+      batchMetrics.push(batchMetric);
+
+      this.log(
+        `Batch ${batch.batchIndex}: ${successCount} confirmed, ${failureCount} failed, ${timeoutCount} timeout (total ${pollEnd - batch.submitStart}ms)`,
+      );
+    }
+
+    return { txMetrics, batchMetrics };
   }
 }

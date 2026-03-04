@@ -30,6 +30,7 @@ scenarios:
     batchSize: 10
     batchCount: 5
     batchDelay: 0
+    submitMode: sequential  # "sequential" (submit+confirm each batch) or "pipeline" (submit all, then confirm)
     contractSource: "contracts/SimpleStorage.sol"
     contractName: "SimpleStorage"
     contractArgs:
@@ -39,6 +40,7 @@ scenarios:
     batchSize: 20
     batchCount: 10
     batchDelay: 0
+    submitMode: sequential  # "pipeline" mode shows how latency grows as the mempool fills
     setupContract: "contracts/SimpleIncrement.sol"
     contractName: "SimpleIncrement"
     method: "increment"
@@ -48,6 +50,7 @@ scenarios:
     deployRatio: 0.3
     totalTxCount: 100
     batchSize: 10
+    submitMode: sequential
   multiNode:
     enabled: true     # run scenarios against all nodes simultaneously
 

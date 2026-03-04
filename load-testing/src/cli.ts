@@ -22,6 +22,7 @@ program
   .option("--batch-count <n>", "Override batch count", parseInt)
   .option("--nodes <names>", "Comma-separated node names to target", (v) => v.split(","))
   .option("--report-dir <path>", "Output directory for reports")
+  .option("--submit-mode <mode>", "Submit mode: sequential (default) or pipeline (submit all batches before confirming)")
   .option("-v, --verbose", "Enable verbose logging", false);
 
 async function runScenarioOnNodes(
@@ -52,6 +53,7 @@ async function main(): Promise<void> {
       scenario: opts.scenario,
       nodes: opts.nodes,
       reportDir: opts.reportDir,
+      submitMode: opts.submitMode,
     });
   } catch (err: any) {
     console.error(`Configuration error: ${err.message}`);
