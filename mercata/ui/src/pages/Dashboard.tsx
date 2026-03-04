@@ -186,6 +186,7 @@ const Dashboard = () => {
   const netBalanceCacheRef = useRef(netBalanceHistoryCache);
   const rewardsCacheRef = useRef(rewardsHistoryCache);
   const borrowedCacheRef = useRef(borrowedHistoryCache);
+  const cacheTimestampsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     netBalanceCacheRef.current = netBalanceHistoryCache;
@@ -219,14 +220,17 @@ const Dashboard = () => {
 
     const loadRange = async () => {
       const config = tabConfig[activeTab];
-      const cache = activeTab === 'netBalance' 
-        ? netBalanceCacheRef.current 
-        : activeTab === 'rewards' 
-        ? rewardsCacheRef.current 
+      const cache = activeTab === 'netBalance'
+        ? netBalanceCacheRef.current
+        : activeTab === 'rewards'
+        ? rewardsCacheRef.current
         : borrowedCacheRef.current;
+      const cacheKey = `${activeTab}:${selectedTimeRange}`;
       const cached = cache[selectedTimeRange];
-      
-      if (cached && cached.length > 0) {
+      const cachedAt = cacheTimestampsRef.current[cacheKey] || 0;
+      const isFresh = Date.now() - cachedAt < 10_000;
+
+      if (cached && cached.length > 0 && isFresh) {
         setLoadingBalanceHistory(false);
         return;
       }
@@ -236,6 +240,7 @@ const Dashboard = () => {
         const data = await config.fetchFn(selectedTimeRange, '');
         if (!isMounted) return;
         config.setCache(selectedTimeRange, data);
+        cacheTimestampsRef.current[cacheKey] = Date.now();
       } catch (err) {
       } finally {
         if (isMounted) {
