@@ -11,6 +11,7 @@ class ConfigController {
           projectId: process.env.WAGMI_PROJECT_ID || 'PROJECT_ID_UNSET',
           networkId: networkId,
           creditCardTopUpAddress: creditCardTopUp || undefined,
+          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
         }
       });
     } catch (error) {

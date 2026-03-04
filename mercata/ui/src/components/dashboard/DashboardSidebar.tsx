@@ -31,6 +31,7 @@ interface NavItem {
 
 const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+  { icon: CreditCard, label: 'Buy Crypto', path: '/dashboard/onramp' },
   { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
