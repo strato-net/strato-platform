@@ -3,9 +3,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.DB.ChainDB
@@ -95,9 +92,6 @@ newtype BlockHashRoot = BlockHashRoot {unBlockHashRoot :: MP.StateRoot}
   deriving newtype (Format, NFData)
 
 newtype ChainStateInfo = ChainStateInfo (Maybe Word256, Maybe Keccak256, MP.StateRoot)
-
-instance Format ChainStateInfo where
-  format (ChainStateInfo x) = format x
 
 instance RLPSerializable ChainStateInfo where
   rlpEncode (ChainStateInfo (cId, Just bHash, sRoot)) = RLPArray [rlpEncode cId, rlpEncode bHash, rlpEncode sRoot]
