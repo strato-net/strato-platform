@@ -68,10 +68,10 @@ export blocHost=$STRATO_HOSTNAME:3000
 
 # Pre-create directories so they're owned by current user (not root)
 mkdir -p $1
+cp docker-compose.yml $1
 cd $1
 mkdir -p postgres redis kafka prometheus
 
-cp ../docker-compose.yml .
 DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d
 
 sleep 10
