@@ -89,7 +89,6 @@ type MonadCoreAPI m =
     Accessible Metadata.UrlMap m,
     Accessible (Maybe BestSequencedBlock) m,
     Accessible (Maybe SyncStatus) m,
-    Accessible IdentityData m,
     Accessible [RawTransaction] m,
     Accessible Stats.TransactionCount m,
     Accessible V.PublicKey m,
