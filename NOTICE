@@ -881,8 +881,8 @@ See mercata/ui/package-lock.json:2195.
 https://www.npmjs.com/package/@metamask/safe-event-emitter
 
 @metamask/sdk
-Upstream authors (npm metadata): danfinlay <dan@danfinlay.com>, kumavis <aaron@kumavis.me>, metamaskbot <metamask-npm@consensys.net>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Copyright ConsenSys Software Inc. 2022. All rights reserved.
+Licensed under a custom ConsenSys Software Inc. license with Non-Commercial Use restrictions (per npm package LICENSE).
 See mercata/ui/package-lock.json:2204.
 https://www.npmjs.com/package/@metamask/sdk
 
@@ -893,14 +893,14 @@ See mercata/ui/package-lock.json:2231.
 https://www.npmjs.com/package/@metamask/sdk-analytics
 
 @metamask/sdk-communication-layer
-Upstream authors (npm metadata): danfinlay <dan@danfinlay.com>, kumavis <aaron@kumavis.me>, mcmire <elliot.winkler@gmail.com> (and others).
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Copyright ConsenSys Software Inc. 2022. All rights reserved.
+Licensed under a custom ConsenSys Software Inc. license with Non-Commercial Use restrictions (per npm package LICENSE).
 See mercata/ui/package-lock.json:2240.
 https://www.npmjs.com/package/@metamask/sdk-communication-layer
 
 @metamask/sdk-install-modal-web
-Upstream author (npm metadata): MetaMask.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Copyright ConsenSys Software Inc. 2022. All rights reserved.
+Licensed under a custom ConsenSys Software Inc. license with Non-Commercial Use restrictions (per npm package LICENSE).
 See mercata/ui/package-lock.json:2299.
 https://www.npmjs.com/package/@metamask/sdk-install-modal-web
 
@@ -3762,7 +3762,7 @@ https://www.npmjs.com/package/bech32
 
 better-assert
 Upstream authors (npm metadata): TJ Holowaychuk <tj@vision-media.ca>, TonyHe <coolhzb@163.com>, ForbesLindesay.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Licensed under the MIT License (per npm package page metadata).
 See apex/api/package-lock.json:285.
 https://www.npmjs.com/package/better-assert
 
@@ -4110,7 +4110,7 @@ https://www.npmjs.com/package/caller-path
 
 callsite
 Upstream author (npm metadata): TJ Holowaychuk <tj@vision-media.ca>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Licensed under the MIT License (per npm package page metadata).
 See apex/api/package-lock.json:398.
 https://www.npmjs.com/package/callsite
 
@@ -4494,19 +4494,19 @@ https://www.npmjs.com/package/compare-versions
 
 component-bind
 Upstream author (npm metadata): tootallnate <nathan@tootallnate.net>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Licensed under the MIT License (per npm package page metadata).
 See apex/api/package-lock.json:574.
 https://www.npmjs.com/package/component-bind
 
 component-emitter
-Copyright information is provided by the upstream package authors.
+Copyright (c) 2014 Component contributors <dev@component.io>.
 Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:579.
 https://www.npmjs.com/package/component-emitter
 
 component-inherit
 Upstream author (npm metadata): coreh <thecoreh@gmail.com>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Licensed under the MIT License (per npm package metadata).
 See apex/api/package-lock.json:584.
 https://www.npmjs.com/package/component-inherit
 
@@ -4901,8 +4901,8 @@ See smd-ui/package-lock.json:3527.
 https://www.npmjs.com/package/currently-unhandled
 
 cycle
-Upstream author (npm metadata): dscape <nunojobpinto@gmail.com>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Upstream project metadata lists Douglas Crockford and Nuno Job as contributors.
+Licensed under Public-Domain terms (per upstream package.json metadata).
 See apex/api/package-lock.json:728.
 https://www.npmjs.com/package/cycle
 
@@ -7098,7 +7098,7 @@ https://www.npmjs.com/package/indexes-of
 
 indexof
 Upstream author (npm metadata): tjholowaychuk <tj@vision-media.ca>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Licensed under the MIT License (per npm package page metadata).
 See apex/api/package-lock.json:2131.
 https://www.npmjs.com/package/indexof
 
@@ -8969,8 +8969,8 @@ See apex/api/package-lock.json:2754.
 https://www.npmjs.com/package/nodemailer
 
 nomnom
-Upstream author (npm metadata): Heather Arthur <fayearthur@gmail.com>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Copyright (c) 2010 Heather Arthur.
+Licensed under the MIT License (per upstream LICENSE file).
 See smd-ui/package-lock.json:9511.
 https://www.npmjs.com/package/nomnom
 
@@ -9090,7 +9090,7 @@ https://www.npmjs.com/package/object-assign
 
 object-component
 Upstream author (npm metadata): tjholowaychuk <tj@vision-media.ca>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Licensed under the MIT License (per npm package page metadata).
 See apex/api/package-lock.json:2878.
 https://www.npmjs.com/package/object-component
 
@@ -12155,8 +12155,8 @@ See strato/extraFiles/strato/licenses/text.
 https://hackage.haskell.org/package/text
 
 text-encoding-utf-8
-Upstream authors (npm metadata): Erik Arvidsson <erik.arvidsson@gmail.com>, Rick Eyre <rick.eyre@outlook.com>, Joshua Bell <inexorabletash@gmail.com>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+In jurisdictions that recognize copyright laws, the author or authors.
+Licensed under The Unlicense / public-domain dedication (per npm package LICENSE.md).
 See mercata/services/bridge/package-lock.json:6450.
 https://www.npmjs.com/package/text-encoding-utf-8
 
@@ -12738,7 +12738,7 @@ https://www.npmjs.com/package/util-deprecate
 
 util-inspect
 Upstream author (npm metadata): rauchg <rauchg@gmail.com>.
-License not declared in package-lock metadata; consult upstream package LICENSE/NOTICE.
+Licensed under the MIT License (per npm package page metadata).
 See smd-ui/package-lock.json:14423.
 https://www.npmjs.com/package/util-inspect
 
