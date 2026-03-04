@@ -30,6 +30,7 @@ import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
+import OnrampPage from "./pages/OnrampPage";
 
 // Import dashboard components
 
@@ -304,6 +305,15 @@ const App = () => {
                                               <GuestAccessibleRoute>
                                                 <ReferralsManagement />
                                               </GuestAccessibleRoute>
+                                            }
+                                          />
+
+                                          <Route
+                                            path="/dashboard/onramp"
+                                            element={
+                                              <ProtectedRoute>
+                                                <OnrampPage />
+                                              </ProtectedRoute>
                                             }
                                           />
 
