@@ -215,7 +215,7 @@ export default function CreditCardPage() {
   }, [configs]);
 
   useEffect(() => {
-    if (!isLoggedIn || configs.length === 0) return;
+    if (!isLoggedIn || cardDisplays.length === 0) return;
 
     let cancelled = false;
 
@@ -251,11 +251,11 @@ export default function CreditCardPage() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [configs, isLoggedIn]);
+  }, [cardDisplays.length, configs, isLoggedIn]);
 
   // Fetch pending top-ups for each card
   useEffect(() => {
-    if (!isLoggedIn || configs.length === 0) return;
+    if (!isLoggedIn || cardDisplays.length === 0) return;
     let cancelled = false;
     const fetchPending = async () => {
       await Promise.allSettled(
@@ -276,7 +276,7 @@ export default function CreditCardPage() {
     void fetchPending();
     const id = window.setInterval(fetchPending, 60_000);
     return () => { cancelled = true; window.clearInterval(id); };
-  }, [configs, isLoggedIn]);
+  }, [cardDisplays.length, configs, isLoggedIn]);
 
   const openModal = (config: OnChainCardConfig | null) => {
     setEditingConfig(config);
