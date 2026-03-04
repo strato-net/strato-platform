@@ -1,6 +1,5 @@
 #strato-version:<VERSION>
 #strato-getting-started-min-version:4.4.0
-version: "3"
 services:
   mercata-backend:
     depends_on:
@@ -13,16 +12,16 @@ services:
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - NODE_URL=http://nginx  # no TLS required within the docker network
       - BASE_URL=https://${NODE_HOST}  # todo: protocol to depend on ssl=true|false
-      - RPC_URL_MAINNET=${RPC_URL_MAINNET}
-      - RPC_URL_MAINNET_FALLBACK=${RPC_URL_MAINNET_FALLBACK}
-      - RPC_URL_SEPOLIA=${RPC_URL_SEPOLIA}
-      - RPC_URL_SEPOLIA_FALLBACK=${RPC_URL_SEPOLIA_FALLBACK}
-      - POOL_FACTORY=${POOL_FACTORY}
-      - LENDING_REGISTRY=${LENDING_REGISTRY}
-      - TOKEN_FACTORY=${TOKEN_FACTORY}
-      - ADMIN_REGISTRY=${ADMIN_REGISTRY}
-      - MERCATA_BRIDGE=${MERCATA_BRIDGE}
-      - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
+      - RPC_URL_MAINNET=${RPC_URL_MAINNET:-}
+      - RPC_URL_MAINNET_FALLBACK=${RPC_URL_MAINNET_FALLBACK:-}
+      - RPC_URL_SEPOLIA=${RPC_URL_SEPOLIA:-}
+      - RPC_URL_SEPOLIA_FALLBACK=${RPC_URL_SEPOLIA_FALLBACK:-}
+      - POOL_FACTORY=${POOL_FACTORY:-}
+      - LENDING_REGISTRY=${LENDING_REGISTRY:-}
+      - TOKEN_FACTORY=${TOKEN_FACTORY:-}
+      - ADMIN_REGISTRY=${ADMIN_REGISTRY:-}
+      - MERCATA_BRIDGE=${MERCATA_BRIDGE:-}
+      - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID:-}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -35,8 +34,8 @@ services:
     build: ./mercata/ui
     image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
     environment:
-      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID}
-      - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID}
+      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID:-}
+      - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID:-}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -64,17 +63,17 @@ services:
     - postgres
     - prometheus
     environment:
-    - ADMIN_EMAIL=${ADMIN_EMAIL}
+    - ADMIN_EMAIL=${ADMIN_EMAIL:-}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
-    - PROMETHEUS_HOST=${PROMETHEUS_HOST}
-    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    - PROMETHEUS_HOST=${PROMETHEUS_HOST:-}
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
     - STRATO_HOSTNAME=${STRATO_HOSTNAME:-172.17.0.1}
     - STRATO_PORT_API=${STRATO_PORT_API:-3000}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
-    - MONITOR_URL=${MONITOR_URL}
+    - MONITOR_URL=${MONITOR_URL:-}
     - vaultUrl=http://nginx
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
@@ -148,31 +147,31 @@ services:
     - mercata-backend
     - mercata-ui
     environment:
-    - APEX_HOST=${APEX_HOST}
-    - blockTime=${blockTime}
-    - debugPort=${debugPort}
-    - debugWSPort=${debugWSPort}
-    - DOCS_HOST=${DOCS_HOST}
-    - NGINX_TRUST_PROXY_CIDRS=${NGINX_TRUST_PROXY_CIDRS}
+    - APEX_HOST=${APEX_HOST:-}
+    - blockTime=${blockTime:-}
+    - debugPort=${debugPort:-}
+    - debugWSPort=${debugWSPort:-}
+    - DOCS_HOST=${DOCS_HOST:-}
+    - NGINX_TRUST_PROXY_CIDRS=${NGINX_TRUST_PROXY_CIDRS:-}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_SCOPE=${OAUTH_SCOPE}
-    - POSTGREST_HOST=${POSTGREST_HOST}
-    - PROMETHEUS_HOST=${PROMETHEUS_HOST}
-    - SERVE_LOGS=${SERVE_LOGS}
-    - SMD_DEV_MODE=${SMD_DEV_MODE}
-    - SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP}
-    - SMD_HOST=${SMD_HOST}
-    - ssl=${ssl}
-    - sslCertFileType=${sslCertFileType}
-    - STATS_ENABLED=${STATS_ENABLED}
+    - OAUTH_SCOPE=${OAUTH_SCOPE:-}
+    - POSTGREST_HOST=${POSTGREST_HOST:-}
+    - PROMETHEUS_HOST=${PROMETHEUS_HOST:-}
+    - SERVE_LOGS=${SERVE_LOGS:-}
+    - SMD_DEV_MODE=${SMD_DEV_MODE:-}
+    - SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-}
+    - SMD_HOST=${SMD_HOST:-}
+    - ssl=${ssl:-}
+    - sslCertFileType=${sslCertFileType:-}
+    - STATS_ENABLED=${STATS_ENABLED:-}
     - STRATO_HOSTNAME=${STRATO_HOSTNAME:-172.17.0.1}
     - STRATO_PORT_API=${STRATO_PORT_API:-3000}
-    - STRATO_PORT_API2=${STRATO_PORT_API2}
-    - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
+    - STRATO_PORT_API2=${STRATO_PORT_API2:-}
+    - STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - VAULT_URL=${VAULT_URL}/strato/v2.3
-    - VM_DEBUGGER=${VM_DEBUGGER}
+    - VM_DEBUGGER=${VM_DEBUGGER:-}
     build: .
     extra_hosts:
     - "host.docker.internal:host-gateway"
