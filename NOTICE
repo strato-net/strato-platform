@@ -11,40 +11,1110 @@ subject to BlockApps' trademark policy and does not imply endorsement.
 
 Third-Party Notices
 
-json-rpc-server
-Copyright (c) 2013 Kristen Kozak
-Licensed under the MIT License. See strato/libs/json-rpc-server/LICENSE.
+aeson
+Copyright (c) 2011, MailRank, Inc.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/aeson.
+
+aeson-casing
+Copyright (c) 2015 Andrew Rademacher
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/aeson-casing.
+
+aeson-extra
+Copyright (c) 2015, Oleg Grenrus
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/aeson-extra.
+
+aeson-pretty
+Copyright (c)2011, Falko Peters
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/aeson-pretty.
+
+ansi-wl-pprint
+Copyright 2008, Daan Leijen and Max Bolingbroke. All rights reserved.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/ansi-wl-pprint.
+
+arithmoi
+Copyright (c) 2011 Daniel Fischer, 2016-2017 Andrew Lelechenko, Carter Schonwald, Google Inc.
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/arithmoi.
+
+array
+Copyright 2004, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/array.
+
+base16-bytestring
+Copyright (c) 2011 MailRank, Inc.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/base16-bytestring.
+
+bcrypt
+Copyright (c) 2010 Nicholas Campbell
+Licensed under the MIT License.
+See apex/api/licenses/bcrypt.
+
+big-integer
+In jurisdictions that recognize copyright laws, the author or authors
+Licensed under terms in the referenced file.
+See apex/api/licenses/big-integer.
+
+bignumber.js
+Copyright (c) 2018 Michael Mclaughlin
+Licensed under the MIT License.
+See smd-ui/licenses/bignumber.js.
+
+bimap
+Copyright Stuart Cook and contributors 2008
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/bimap.
+
+binary
+Copyright (c) Lennart Kolmodin
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/binary.
+
+blaze-builder
+Copyright Jasper Van der Jeugt 2010, Simon Meier 2010 & 2011
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/blaze-builder.
+
+blaze-html
+Copyright Jasper Van der Jeugt 2010
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/blaze-html.
+
+blaze-markup
+Copyright Jasper Van der Jeugt 2010
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/blaze-markup.
+
+bloomfilter
+Copyright 2008 Bryan O'Sullivan <bos@serpentine.com>.
+Licensed under the BSD License.
+See strato/libs/bloomfilter/LICENSE.
+
+blueprintjs
+"Licensor" shall mean the copyright owner or entity authorized by
+Licensed under the Apache License, Version 2.0.
+See smd-ui/licenses/blueprintjs.
+
+body-parser
+Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>
+Licensed under the MIT License.
+See apex/api/licenses/body-parser.
+
+byteable
+Copyright (c) 2013 Vincent Hanquez <vincent@snarc.org>
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/byteable.
+
+bytestring
+Copyright (c) Don Stewart 2005-2009
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/bytestring.
+
+bytestring-arbitrary
+Copyright (c) 2014, jay groven
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/bytestring-arbitrary.
+
+cereal
+Copyright (c) Lennart Kolmodin, Galois, Inc.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/cereal.
+
+chai
+Copyright (c) 2017 Chai.js Assertion Library
+Licensed under the MIT License.
+See apex/api/licenses/chai.
+
+chai-http
+Copyright (c) Jake Luer jake@alogicalparadox.com
+Licensed under the MIT License.
+See apex/api/licenses/chai-http.
+
+cipher-aes
+Copyright (c) 2008-2013 Vincent Hanquez <vincent@snarc.org>
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/cipher-aes.
+
+classy-prelude
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/classy-prelude.
+
+classy-prelude-yesod
+Copyright (c) 2013 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/classy-prelude-yesod.
+
+cmdargs
+Copyright Neil Mitchell 2009-2018.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/cmdargs.
+
+co
+Copyright (c) 2014 TJ Holowaychuk &lt;tj@vision-media.ca&gt;
+Licensed under the MIT License.
+See apex/api/licenses/co.
+
+co-mocha
+Copyright (c) 2014 Blake Embrey (hello@blakeembrey.com)
+Licensed under the MIT License.
+See apex/api/licenses/co-mocha.
+
+conduit
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/conduit.
+
+conduit-combinators
+Copyright (c) 2014 FP Complete
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/conduit-combinators.
+
+conduit-extra
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/conduit-extra.
+
+containers
+Copyright 2004, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/containers.
+
+contravariant
+Copyright 2007-2015 Edward Kmett
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/contravariant.
+
+cookie-parser
+Copyright (c) 2014 TJ Holowaychuk <tj@vision-media.ca>
+Licensed under the MIT License.
+See apex/api/licenses/cookie-parser.
+
+cors
+Copyright (c) 2013 Troy Goode <troygoode@gmail.com>
+Licensed under the MIT License.
+See apex/api/licenses/cors.
+
+Crypto
+Codec.Binary.BubbleBabble & John Meacham & Copyright © 2008, All rights
+Licensed under the GNU General Public License.
+See strato/extraFiles/strato/licenses/Crypto.
+
+crypto-pubkey
+Copyright (c) 2010-2012 Vincent Hanquez <vincent@snarc.org>
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/crypto-pubkey.
+
+crypto-pubkey-types
+<th>Copyright</th>
+Licensed under terms in the referenced file.
+See strato/extraFiles/strato/licenses/crypto-pubkey-types.
+
+crypto-random
+Copyright (c) 2013 Vincent Hanquez <vincent@snarc.org>
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/crypto-random.
+
+cryptohash
+Copyright (c) 2010-2014 Vincent Hanquez <vincent@snarc.org>
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/cryptohash.
+
+cryptonite
+Copyright (c) 2006-2015 Vincent Hanquez <vincent@snarc.org>
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/cryptonite.
+
+csv
+Copyright (c) Jaap Weel 2007.  Permission is hereby granted, free
+Licensed under terms in the referenced file.
+See strato/extraFiles/strato/licenses/csv.
+
+data-default
+Copyright (c) 2013 Lukas Mai
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/data-default.
+
+debug
+Copyright (c) 2014 TJ Holowaychuk <tj@vision-media.ca>
+Licensed under the MIT License.
+See apex/api/licenses/debug.
+
+deepseq
+Copyright 2001-2009, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/deepseq.
+
+dequeue
+Copyright (c) 2009, Henry Bucklow
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/dequeue.
+
+derive
+Copyright Neil Mitchell 2006-2017.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/derive.
+
+diagrams-contrib
+Copyright (c) 2011-2015, various (see headers of individual source files)
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/diagrams-contrib.
+
+diagrams-html5
+Copyright (c) 2014-2016 diagrams-html5 team:
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/diagrams-html5.
+
+diagrams-lib
+Copyright (c) 2011-2016 diagrams-lib team:
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/diagrams-lib.
+
+digest
+Copyright (c) 2008-2009, Eugene Kirpichov
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/digest.
+
+directory
+Copyright 2004, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/directory.
+
+dns
+Copyright (c) 2009, IIJ Innovation Institute Inc.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/dns.
+
+either
+Copyright 2008-2014 Edward Kmett
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/either.
+
+entropy
+Copyright (c) Thomas DuBuisson
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/entropy.
+
+enzyme-adapter-react-15
+Copyright (c) 2015 Airbnb, Inc.
+Licensed under the MIT License.
+See smd-ui/licenses/enzyme-adapter-react-15.
+
+errors
+Copyright (c) 2012, 2013, Gabriel Gonzalez
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/errors.
+
+esqueleto
+Copyright (c) 2012, Felipe Lessa
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/esqueleto.
+
+ether
+Copyright (c) 2017, Vladislav Zavialov
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/ether.
+
+ethereum-rlp
+Copyright 2016 BlockApps, Inc
+Licensed under the Apache License, Version 2.0.
+See strato/extraFiles/strato/licenses/ethereum-rlp.
+
+exceptions
+Copyright 2013-2015 Edward Kmett
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/exceptions.
+
+expect
+Copyright (c) 2014-present, Facebook, Inc.
+Licensed under the MIT License.
+See apex/api/licenses/expect.
+
+express
+Copyright (c) 2009-2014 TJ Holowaychuk <tj@vision-media.ca>
+Licensed under the MIT License.
+See apex/api/licenses/express.
+
+extra
+Copyright Neil Mitchell 2014-2018.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/extra.
+
+fast-logger
+Copyright (c) 2009, IIJ Innovation Institute Inc.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/fast-logger.
+
+file-embed
+Copyright 2008, Michael Snoyman. All rights reserved.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/file-embed.
+
+filepath
+Copyright Neil Mitchell 2005-2018.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/filepath.
+
+fs-extra
+Copyright (c) 2011-2017 JP Richardson
+Licensed under the MIT License.
+See apex/api/licenses/fs-extra.
+
+generic-random
+Copyright (c) 2016 Li-yao Xia
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/generic-random.
+
+gitrev
+Copyright (c) 2015, Adam C. Foltzer
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/gitrev.
+
+hashable
+Copyright Milan Straka 2010
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/hashable.
+
+hedis
+Copyright (c)2011, Falko Peters
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/hedis.
+
+hflags
+"Licensor" shall mean the copyright owner or entity authorized by
+Licensed under the Apache License, Version 2.0.
+See strato/extraFiles/strato/licenses/hflags.
+
+hjsmin
+Copyright (c)2010, Alan Zimmerman
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/hjsmin.
+
+http-api-data
+Copyright 2015, Nickolay Kudasov. All rights reserved.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/http-api-data.
+
+http-client
+Copyright (c) 2013 Michael Snoyman
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/http-client.
+
+http-media
+Copyright (c) 2012-2015 Timothy Jones
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/http-media.
+
+http-types
+Copyright (c) 2011, Aristid Breitkreuz
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/http-types.
+
+insert-ordered-containers
+Copyright (c) 2015, Oleg Grenrus
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/insert-ordered-containers.
+
+iproute
+Copyright (c) 2009, IIJ Innovation Institute Inc.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/iproute.
+
+is-reachable
+Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)
+Licensed under the MIT License.
+See apex/api/licenses/is-reachable.
 
 json-rpc-client
 Copyright (c) 2014 Kristen Kozak
-Licensed under the MIT License. See strato/libs/json-rpc-client/LICENSE.
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/json-rpc-client.
 
-bloomfilter
-Copyright 2008 Bryan O'Sullivan
-Licensed under the BSD 3-Clause License. See strato/libs/bloomfilter/LICENSE.
+json-rpc-server
+Copyright (c) 2013 Kristen Kozak
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/json-rpc-server.
 
-milena (Kafka client)
+json-stream
+Copyright (c) 2015, Ondrej Palkovsky
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/json-stream.
+
+largeint
+Copyright Eitan Chatav (c) 2017
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/largeint.
+
+largeword
+Copyright information in referenced file
+Licensed under terms in the referenced file.
+See strato/extraFiles/strato/licenses/largeword.
+
+lens
+Copyright 2012-2016 Edward Kmett
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/lens.
+
+lens-family
+Copyright 2012,2013,2014 Russell O'Connor
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/lens-family.
+
+lens-family-th
+Copyright (c) 2012, Dan Burton
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/lens-family-th.
+
+leveldb-haskell
+Copyright (c) 2011, Kim Altintop
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/leveldb-haskell.
+
+lifted-async
+Copyright (c) 2012-2017, Mitsutoshi Aoe
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/lifted-async.
+
+lifted-base
+Copyright © 2010-2012, Bas van Dijk, Anders Kaseorg
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/lifted-base.
+
+logging-effect
+Copyright (c) 2016, Ollie Charles
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/logging-effect.
+
+lua-resty-jwt
+"Licensor" shall mean the copyright owner or entity authorized by
+Licensed under the Apache License, Version 2.0.
+See nginx-packager/licenses/lua-resty-jwt.
+
+lua-resty-openidc
+"Licensor" shall mean the copyright owner or entity authorized by
+Licensed under the Apache License, Version 2.0.
+See nginx-packager/licenses/lua-resty-openidc.
+
+memory
+Copyright (c) 2015 Vincent Hanquez <vincent@snarc.org>
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/memory.
+
+merkle-patricia-db
+Copyright 2016 BlockApps, Inc
+Licensed under the Apache License, Version 2.0.
+See strato/extraFiles/strato/licenses/merkle-patricia-db.
+
+milena
 Copyright (c)2014, Tyler Holien
-Licensed under the BSD 3-Clause License. See strato/libs/kafka/milena/LICENSE.
+Licensed under the BSD License.
+See strato/libs/kafka/milena/LICENSE.
+
+mime-mail
+Copyright (c) 2014 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/mime-mail.
+
+mixpanel-browser
+Copyright 2015 Mixpanel, Inc.
+Licensed under the Apache License, Version 2.0.
+See smd-ui/licenses/mixpanel-browser.
+
+mmap
+Copyright (c) Gracjan Polak
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/mmap.
+
+mocha
+Copyright (c) 2011-2018 JS Foundation and contributors, https://js.foundation
+Licensed under the MIT License.
+See apex/api/licenses/mocha.
+
+moment
+Copyright (c) JS Foundation and other contributors
+Licensed under the MIT License.
+See apex/api/licenses/moment.
+
+moment-timezone
+Copyright (c) JS Foundation and other contributors
+Licensed under the MIT License.
+See smd-ui/licenses/moment-timezone.
+
+monaco-editor-vs-code
+Copyright (c) 2015 - present Microsoft Corporation
+Licensed under the MIT License.
+See smd-ui/public/vs/LICENSE.txt.
+
+monad-control
+Copyright © 2010, Bas van Dijk, Anders Kaseorg
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/monad-control.
+
+monad-logger
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/monad-logger.
+
+monadIO
+Copyright (c) 2008-2010, Galois, Inc.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/monadIO.
+
+morgan
+Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>
+Licensed under the MIT License.
+See apex/api/licenses/morgan.
+
+mtl
+Copyright 2004, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/mtl.
+
+murmur-hash
+Copyright (c) 2010, Thomas Schilling
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/murmur-hash.
+
+murmur3
+In jurisdictions that recognize copyright laws, the author or authors
+Licensed under terms in the referenced file.
+See strato/extraFiles/strato/licenses/murmur3.
+
+network
+Copyright (c) 2002-2010, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/network.
+
+network-uri
+Copyright (c) 2002-2010, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/network-uri.
+
+nibblestring
+Copyright (c) 2014, Jamshid
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/nibblestring.
+
+normaldistribution
+Copyright (c) 2011, Bjorn Buckwalter.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/normaldistribution.
+
+opaleye
+Copyright (c) 2014-2018 Purely Agile Limited
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/opaleye.
+
+optparse-applicative
+Copyright (c) 2012, Paolo Capriotti
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/optparse-applicative.
+
+ordered-containers
+Copyright (c) 2016, Daniel Wagner
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/ordered-containers.
+
+parsec
+Copyright 1999-2000, Daan Leijen; 2007, Paolo Martini. All rights reserved.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/parsec.
+
+parsec3-numbers
+Copyright information in referenced file
+Licensed under terms in the referenced file.
+See strato/extraFiles/strato/licenses/parsec3-numbers.
+
+path
+Copyright (c) 2014 Hage Yaapa <[http://www.hacksparrow.com](http://www.hacksparrow.com)>
+Licensed under the MIT License.
+See apex/api/licenses/path.
+
+path-pieces
+Copyright 2009, Michael Snoyman. All rights reserved.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/path-pieces.
+
+pbkdf
+Copyright 2001-2005, Chris Dornan
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/pbkdf.
+
+persistent
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/persistent.
+
+persistent-postgresql
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/persistent-postgresql.
+
+persistent-template
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/persistent-template.
+
+pg
+Copyright (c) 2010 - 2018 Brian Carlson
+Licensed under the MIT License.
+See apex/api/licenses/pg.
+
+pg-hstore
+Copyright (c) 2014 Hage Yaapa <[http://www.hacksparrow.com](http://www.hacksparrow.com)>
+Licensed under the MIT License.
+See apex/api/licenses/pg-hstore.
+
+pgtools
+Copyright (c) 2010 - 2018 Brian Carlson
+Licensed under the MIT License.
+See apex/api/licenses/pgtools.
+
+plottable
+Copyright (c) 2014-2015 Palantir Technologies, Inc.
+Licensed under the MIT License.
+See smd-ui/licenses/plottable.
+
+postgresql-simple
+Copyright (c) 2011, Leon P Smith
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/postgresql-simple.
+
+postgrest
+Copyright (c) 2014 Joe Nelson
+Licensed under the MIT License.
+See postgrest-packager/licenses/postgrest.
+
+process
+Copyright 2004, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/process.
+
+product-profunctors
+Copyright (c) 2013, Karamaan Group LLC; 2014-2018 Purely Agile Limited
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/product-profunctors.
+
+profunctors
+Copyright 2011-2015 Edward Kmett
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/profunctors.
+
+prometheus-packager
+Copyright 2012-2015 The Prometheus Authors
+Licensed under the Apache License, Version 2.0.
+See prometheus-packager/NOTICE.
+
+query-string
+Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com)
+Licensed under the MIT License.
+See smd-ui/licenses/query-string.
+
+QuickCheck
+Copyright (c) 2000-2017, Koen Claessen
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/QuickCheck.
+
+quickcheck-instances
+Copyright (c)2012, Antoine Latter
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/quickcheck-instances.
+
+random
+Copyright 2004, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/random.
 
 rapidsnark
-Copyright iden3
-Licensed under the GNU Lesser General Public License v3. See
-strato/libs/groth16-rapidsnark/vendor/rapidsnark/COPYING.
+Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+Licensed under the GNU Lesser General Public License.
+See strato/libs/groth16-rapidsnark/vendor/rapidsnark/COPYING.
+
+raw-strings-qq
+Copyright (c) 2013, Mikhail Glushenkov
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/raw-strings-qq.
+
+react
+Copyright (c) 2013-present, Facebook, Inc.
+Licensed under the MIT License.
+See smd-ui/licenses/react.
+
+react-addons-css-transition-group
+Copyright (c) 2013-present, Facebook, Inc.
+Licensed under the MIT License.
+See smd-ui/licenses/react-addons-css-transition-group.
+
+react-copy-to-clipboard
+Copyright (c) 2016 Nik Butenko
+Licensed under the MIT License.
+See smd-ui/licenses/react-copy-to-clipboard.
+
+react-dom
+Copyright (c) 2013-present, Facebook, Inc.
+Licensed under the MIT License.
+See smd-ui/licenses/react-dom.
+
+react-dropzone
+Copyright (c) 2014 Param Aggarwal
+Licensed under the MIT License.
+See smd-ui/licenses/react-dropzone.
+
+react-joyride
+Copyright (c) 2015, Gil Barbara
+Licensed under the MIT License.
+See smd-ui/licenses/react-joyride.
+
+react-loading
+Copyright information in referenced file
+Licensed under terms in the referenced file.
+See smd-ui/licenses/react-loading.
+
+react-monaco-editor
+Copyright (c) 2016-present Leon Shi
+Licensed under the MIT License.
+See smd-ui/licenses/react-monaco-editor.
+
+react-redux
+Copyright (c) 2015-present Dan Abramov
+Licensed under the MIT License.
+See smd-ui/licenses/react-redux.
+
+react-router-dom
+Copyright (c) React Training 2016-2018
+Licensed under the MIT License.
+See smd-ui/licenses/react-router-dom.
+
+react-router-redux
+Copyright (c) 2015-present James Long
+Licensed under the MIT License.
+See smd-ui/licenses/react-router-redux.
+
+redux
+Copyright (c) 2015-present Dan Abramov
+Licensed under the MIT License.
+See smd-ui/licenses/redux.
+
+redux-form
+Copyright (c) 2015 Erik Rasmussen
+Licensed under the MIT License.
+See smd-ui/licenses/redux-form.
+
+redux-saga
+Copyright (c) 2015 Yassine Elouafi
+Licensed under the MIT License.
+See smd-ui/licenses/redux-saga.
+
+redux-saga-test-plan
+Copyright (c) 2016 Jeremy Fairbank
+Licensed under the MIT License.
+See smd-ui/licenses/redux-saga-test-plan.
+
+redux-saga-testing
+Copyright (c) 2016 Antoine Jaussoin
+Licensed under the MIT License.
+See smd-ui/licenses/redux-saga-testing.
+
+relapse
+Copyright (c) 2016 Ilya Ostrovskiy
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/relapse.
+
+request
+"Licensor" shall mean the copyright owner or entity authorized by the copyright owner that is granting the License.
+Licensed under terms in the referenced file.
+See apex/api/licenses/request.
+
+request-promise
+Copyright (c) 2017, Nicolai Kamenzky, Ty Abonil, and contributors
+Licensed under the ISC License.
+See apex/api/licenses/request-promise.
+
+reselect
+Copyright (c) 2015-2018 Reselect Contributors
+Licensed under the MIT License.
+See smd-ui/licenses/reselect.
+
+resource-pool
+Copyright (c) 2011, MailRank, Inc.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/resource-pool.
+
+resourcet
+Copyright (c)2011, Michael Snoyman
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/resourcet.
+
+route-parser
+Copyright (c) 2014 Ryan Sorensen
+Licensed under the MIT License.
+See apex/api/licenses/route-parser.
+
+SafeSemaphore
+Copyright (c)2011, Chris Kuklewicz
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/SafeSemaphore.
+
+saltine
+Copyright (c) 2013 Joseph Abrahamson
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/saltine.
+
+scientific
+Copyright (c) 2013, Bas van Dijk
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/scientific.
+
+secp256k1
+In jurisdictions that recognize copyright laws, the author or authors
+Licensed under terms in the referenced file.
+See strato/extraFiles/strato/licenses/secp256k1.
+
+sequelize
+Copyright (c) 2014-present Sequelize contributors
+Licensed under the MIT License.
+See apex/api/licenses/sequelize.
+
+sequelize-cli
+Copyright (c) 2017 sequelize
+Licensed under the MIT License.
+See apex/api/licenses/sequelize-cli.
+
+servant
+Copyright (c) 2014-2016, Zalora South East Asia Pte Ltd, Servant Contributors
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/servant.
+
+servant-client
+Copyright (c) 2014-2016, Zalora South East Asia Pte Ltd, Servant Contributors
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/servant-client.
+
+servant-docs
+Copyright (c) 2014-2016, Zalora South East Asia Pte Ltd, Servant Contributors
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/servant-docs.
+
+servant-mock
+Copyright (c) 2015-2016, Servant Contributors
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/servant-mock.
+
+servant-options
+Copyright 2017 Lyndon Maydwell
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/servant-options.
+
+servant-server
+Copyright (c) 2014-2016, Zalora South East Asia Pte Ltd, Servant Contributors
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/servant-server.
+
+servant-swagger
+Copyright (c) 2015-2016, Servant contributors
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/servant-swagger.
+
+servant-swagger-ui
+Copyright (c) 2016, Oleg Grenrus
+Licensed under the Apache License, Version 2.0.
+See strato/extraFiles/strato/licenses/servant-swagger-ui.
+
+serve
+Copyright (c) 2018 ZEIT, Inc.
+Licensed under the MIT License.
+See smd-ui/licenses/serve.
+
+serve-favicon
+Copyright (c) 2010 Sencha Inc.
+Licensed under the MIT License.
+See apex/api/licenses/serve-favicon.
+
+shakespeare
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/shakespeare.
+
+socket.io
+Copyright (c) 2014-2018 Automattic <dev@cloudup.com>
+Licensed under the MIT License.
+See apex/api/licenses/socket.io.
+
+socket.io-client
+Copyright (c) 2014 Guillermo Rauch
+Licensed under the MIT License.
+See smd-ui/licenses/socket.io-client.
+
+solidity
+Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
+Licensed under the GNU Lesser General Public License.
+See strato/extraFiles/strato/licenses/solidity.
+
+stm
+Copyright 2004, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/stm.
+
+stm-conduit
+Copyright (c)2012, Clark Gaebel
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/stm-conduit.
+
+streaming-commons
+Copyright (c) 2014 FP Complete
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/streaming-commons.
+
+swagger2
+Copyright (c) 2015-2017, GetShopTV
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/swagger2.
+
+sync-request
+Copyright (c) 2014 Forbes Lindesay
+Licensed under the MIT License.
+See apex/api/licenses/sync-request.
+
+template-haskell
+Copyright 2002-2007, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/template-haskell.
+
+temporary
+Copyright
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/temporary.
+
+text
+Copyright (c) 2008-2009, Tom Harper
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/text.
+
+time
+TimeLib is Copyright (c) Ashley Yakeley, 2004-2014. All rights reserved.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/time.
+
+transformers
+Copyright 2004, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/transformers.
+
+transformers-base
+Copyright (c) 2011, Mikhail Vorozhtsov, Bas van Dijk
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/transformers-base.
+
+transformers-lift
+Copyright (c) 2015, Vladislav Zavialov
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/transformers-lift.
+
+underscore
+Copyright (c) 2009-2018 Jeremy Ashkenas, DocumentCloud and Investigative
+Licensed under the MIT License.
+See apex/api/licenses/underscore.
+
+unix
+Copyright 2004, The University Court of the University of Glasgow.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/unix.
+
+unordered-containers
+Copyright (c) 2010, Johan Tibell
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/unordered-containers.
+
+utf8-string
+* Copyright (c) 2007, Galois Inc.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/utf8-string.
+
+vector
+Copyright (c) 2008-2012, Roman Leshchinskiy
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/vector.
+
+vscode
+Copyright (c) 2015 - present Microsoft Corporation
+Licensed under the MIT License.
+See smd-ui/licenses/vscode.
+
+wai
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/wai.
+
+wai-cors
+Copyright (c) 2015 Lars Kuhtz <lakuhtz@gmail.com>
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/wai-cors.
+
+wai-extra
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/wai-extra.
+
+warp
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/warp.
+
+warp-tls
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/warp-tls.
 
 wasm3
 Copyright (c) 2019 Steven Massey, Volodymyr Shymanskyy
-Licensed under the MIT License. See
-strato/libs/groth16-rapidsnark/vendor/wasm3/LICENSE.
+Licensed under the MIT License.
+See strato/libs/groth16-rapidsnark/vendor/wasm3/LICENSE.
 
-Monaco Editor (VS Code)
-Copyright (c) 2015-present Microsoft Corporation
-Licensed under the MIT License. See smd-ui/public/vs/LICENSE.txt.
+winston-color
+Copyright (c) 2016 Arturo Arevalo
+Licensed under the MIT License.
+See apex/api/licenses/winston-color.
 
-Prometheus Packager
-Contains additional third-party components and notices. See
-prometheus-packager/NOTICE.
+wl-pprint-text
+Copyright (c)2010, Ivan Lazar Miljenovic
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/wl-pprint-text.
 
+yaml
+Copyright 2008, Michael Snoyman. All rights reserved.
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/yaml.
+
+yesod
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/yesod.
+
+yesod-core
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/yesod-core.
+
+yesod-raml
+Copyright (c) 2015 Junji Hashimoto
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/yesod-raml.
+
+yesod-static
+Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
+Licensed under the MIT License.
+See strato/extraFiles/strato/licenses/yesod-static.
+
+zlib
+Copyright (c) 2006-2016, Duncan Coutts
+Licensed under the BSD License.
+See strato/extraFiles/strato/licenses/zlib.
 
 -------------------------------------------------------------------------------
 WORK IN PROGRESS:
