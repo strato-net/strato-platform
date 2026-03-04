@@ -7,7 +7,14 @@ import Blockchain.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
+import Control.Concurrent
 import Data.Default
+import Network.HTTP.Types.Status
+import Servant.Client
+import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
+import qualified Strato.Strato23.API.Types as VC
+import Strato.Strato23.Client
+import Text.Format
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -42,6 +49,43 @@ runtimeConfig = def
       Just ContractsConf { railgunProxy = Just addr }
   }
 
+getNodeKey :: IO (VC.PublicKey, Address)
+getNodeKey = do
+  env <- newAuthEnv flags_vaultUrl
+  putStrLn "asking vault for the node's key, or to create one if it does not exist"
+  ak <- waitOnVault env $ runWithAuth env (getKey Nothing Nothing)
+  return (VC.unPubKey ak, VC.unAddress ak)
+
+waitOnVault :: AuthEnv -> IO (Either ClientError VC.AddressAndKey) -> IO VC.AddressAndKey
+waitOnVault env request = do
+  res <- request
+  case res of
+    Left (FailureResponse _ (Response (Status code _) _ _ body)) -> case code of
+      503 -> do
+        putStrLn "vault password is not set. I'll keep trying until it is set"
+        threadDelay 2000000
+        waitOnVault env request
+      400 ->
+        if flags_generateKey
+          then do
+            putStrLn "nodekey does not exist - I'm going to create one"
+            waitOnVault env $ runWithAuth env (postKey Nothing)
+          else do
+            putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
+            threadDelay 5000000
+            waitOnVault env request
+      _ -> do
+        putStrLn $ "unexpected error thrown by vault: " ++ show body
+        putStrLn "will keep retrying anyway"
+        threadDelay 5000000
+        waitOnVault env request
+    Left err -> do
+      putStrLn $ "unexpected servant error: " ++ show err
+      putStrLn "will keep retrying anyway"
+      threadDelay 5000000
+      waitOnVault env request
+    Right val -> return val
+
 genEthConf :: IO EthConf
 genEthConf = do
   pgUser <- case flags_pguser of
@@ -63,6 +107,9 @@ genEthConf = do
       putStrLn "using default kafka host: localhost"
       return "localhost"
     h -> return h
+
+  (pub, _addr) <- getNodeKey
+  putStrLn $ "the node's public key: " ++ format pub
 
   return runtimeConfig
     { sqlConfig = (sqlConfig runtimeConfig)
