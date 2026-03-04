@@ -149,7 +149,7 @@ createMemoryNode dir' network' privKeyFile name tcpPort udpPort myHost valBehav 
     flip runReaderT c $ do
       Lite.runMigration DataDefs.migrateAuto
       -- Lite.runMigration DataDefs.indexAll
-    setupSQL Nothing c
+    setupSQL [] c
   sdb <- atomically $ newTVar M.empty
   hdb <- atomically $ newTVar M.empty
   cdb <- atomically $ newTVar M.empty

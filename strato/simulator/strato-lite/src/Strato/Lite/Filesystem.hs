@@ -46,8 +46,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Database.LevelDB as LDB
 import qualified Database.Persist.Sqlite as Lite
-import Blockchain.EthConf (ethConf, levelDBConfig)
-import qualified Blockchain.EthConf.Model as Conf
+import Executable.EVMFlags
 import Executable.EthDiscoverySetup (setupSQL)
 import GHC.Conc (retry)
 import Network.Socket as S
@@ -157,12 +156,12 @@ createFilesystemNode dir' network' privKeyFile name tcpPort udpPort myHost valBe
     flip runReaderT c $ do
       Lite.runMigration DataDefs.migrateAuto
       -- Lite.runMigration DataDefs.indexAll
-    setupSQL Nothing c
+    setupSQL [] c
   let ldbOptions =
         LDB.defaultOptions
           { LDB.createIfMissing = True,
-            LDB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
-            LDB.blockSize = Conf.blockSize (levelDBConfig ethConf)
+            LDB.cacheSize = flags_ldbCacheSize,
+            LDB.blockSize = flags_ldbBlockSize
           }
   let openDB base = LDB.open base ldbOptions
   sdb <- openDB "state"

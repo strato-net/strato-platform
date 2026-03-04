@@ -471,10 +471,6 @@ instance {-# OVERLAPPING #-} MonadBase m => Mod.Modifiable BlockHashRoot (CoreT 
   get p = lift $ Mod.get p
   put p = lift . Mod.put p
 
-instance {-# OVERLAPPING #-} MonadBase m => Mod.Modifiable GenesisRoot (CoreT m) where
-  get p = lift $ Mod.get p
-  put p = lift . Mod.put p
-
 instance {-# OVERLAPPING #-} MonadBase m => Mod.Modifiable BestBlockRoot (CoreT m) where
   get p = lift $ Mod.get p
   put p = lift . Mod.put p
@@ -813,9 +809,8 @@ corePeerSetup = do
                 obReceiptTransactions = [],
                 obBlockUncles = []
               }
-      (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot genHeader)]
+      bootstrapChainDB genHash $ stateRoot genHeader
       putContextBestBlockInfo $ ContextBestBlockInfo genHash genHeader 0
-      Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
       processNewBestBlock genHash genHeader [] -- bootstrap Bagger with genesis block
       A.insert (A.Proxy @OutputBlock) genHash genesisOutputBlock
       A.insert (A.Proxy @(API OutputBlock)) genHash $ API genesisOutputBlock

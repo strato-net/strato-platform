@@ -325,9 +325,8 @@ runTestWithTimeout timeout f = do
       setStateDBStateRoot Nothing $ stateRoot $ blockBlockData $ blockCreated
       writeBlockSummary outputBlock
       let genHash = rlpHash $ (blockCreated)
-      bhr <- bootstrapChainDB genHash [(Nothing, (stateRoot $ blockBlockData $ blockCreated))]
+      bootstrapChainDB genHash . stateRoot $ blockBlockData blockCreated
       putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0
-      Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
       processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
       withCurrentBlockHash genHash $ do
         let certKey addr = (addr,) . encodeUtf8

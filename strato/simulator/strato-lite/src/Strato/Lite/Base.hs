@@ -81,7 +81,6 @@ type MonadBase m = ( MonadFail m
                    )
 
 type MonadBaseVM m = ( Mod.Modifiable BlockHashRoot m
-                     , Mod.Modifiable GenesisRoot m
                      , Mod.Modifiable BestBlockRoot m
                      , (MP.StateRoot `A.Alters` MP.NodeData) m
                      , HasCodeDB m

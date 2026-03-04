@@ -32,7 +32,7 @@ import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
-import Blockchain.MemVMContext (MemContextDBs(..), blockSummaryDB, stateDB, hashDB, codeDB, blockHashRoot, genesisRoot, bestBlockRoot)
+import Blockchain.MemVMContext (MemContextDBs(..), blockSummaryDB, stateDB, hashDB, codeDB, blockHashRoot, bestBlockRoot)
 import Blockchain.Model.SyncState
 import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
@@ -436,10 +436,6 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BlockHashRoot (MonadSim
   get _ = dbsGets $ Lens.view blockHashRoot
   put _ bhr = dbsModify' $ blockHashRoot .~ bhr
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable GenesisRoot (MonadSimulator m) where
-  get _ = dbsGets $ Lens.view genesisRoot
-  put _ gr = dbsModify' $ genesisRoot .~ gr
-
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestBlockRoot (MonadSimulator m) where
   get _ = dbsGets $ Lens.view bestBlockRoot
   put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
@@ -522,7 +518,8 @@ createSimulatorPeer ::
   [Host] ->
   IO SimulatorPeer
 createSimulatorPeer privKey inet ipAsText tcpPort udpPort bootNodes = do
-  memPeerDBEnv <- createMemPeerDBEnv ipAsText $ map (\ip -> buildPeer (Nothing, ip, 30303)) bootNodes
+  peers <- traverse (\ip -> mkPeer Nothing ip Nothing (UDPPort 30303) (TCPPort 30303)) bootNodes
+  memPeerDBEnv <- createMemPeerDBEnv ipAsText peers
   (u, c) <- atomically $ do
     tcpVSock <- newTQueue
     udpVSock <- newTQueue

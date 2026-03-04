@@ -21,6 +21,7 @@ module Strato.Lite.Simulator where
 
 import BlockApps.Logging
 import Blockchain.Data.BlockDB ()
+import Blockchain.Data.PubKey (secPubKeyToPoint)
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
 import Blockchain.Sequencer.Event
@@ -37,8 +38,6 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
 import Data.Conduit.TMChan
 import Data.Conduit.TQueue hiding (newTQueueIO)
 import Data.Default
@@ -138,19 +137,19 @@ createSimulatorConnectionWithModifications server'' client'' modifyServerMsgs mo
   clientCtx <- newIORef (def :: P2PContext)
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  let pubkeystr s = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False (derivePublicKey $ s ^. simulatorPeerPrivKey)
-      serverPPeer =
-        buildPeer
-          ( Just $ pubkeystr ss,
-            ss ^. simulatorPeerIPAddress,
-            30303
-          )
-      clientPPeer =
-        buildPeer
-          ( Just $ pubkeystr cs,
-            ss ^. simulatorPeerIPAddress,
-            30303
-          )
+  let pubkey s = secPubKeyToPoint . derivePublicKey $ s ^. simulatorPeerPrivKey
+  serverPPeer <- mkPeer
+    (Just $ pubkey ss)
+    (ss ^. simulatorPeerIPAddress)
+    Nothing
+    (UDPPort 30303)
+    (TCPPort 30303)
+  clientPPeer <- mkPeer
+    (Just $ pubkey cs)
+    (cs ^. simulatorPeerIPAddress)
+    Nothing
+    (UDPPort 30303)
+    (TCPPort 30303)
   let rServer = runEthServerConduit
                   clientPPeer
                   (sourceTQueue clientToServerTQueue)
@@ -188,16 +187,17 @@ createGermophobicSimulatorConnection server'' client'' = do
   clientCtx <- newIORef (def :: P2PContext)
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  let pubkeystr s = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False (derivePublicKey $ s ^. simulatorPeerPrivKey)
-      serverPPeer ss =
-        buildPeer
-          ( Just $ pubkeystr ss,
-            ss ^. simulatorPeerIPAddress,
-            30303
-          )
+  let pubkey s = secPubKeyToPoint . derivePublicKey $ s ^. simulatorPeerPrivKey
+      ss = fst server''
+  serverPPeer <- mkPeer
+    (Just $ pubkey ss)
+    (ss ^. simulatorPeerIPAddress)
+    Nothing
+    (UDPPort 30303)
+    (TCPPort 30303)
   let rServer = pure Nothing -- server is germophobic; will not conduct handshake
   let rClient = runEthClientConduit
-                  (serverPPeer $ fst server'')
+                  serverPPeer
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
                   (sourceTMChan clientSeqSource)

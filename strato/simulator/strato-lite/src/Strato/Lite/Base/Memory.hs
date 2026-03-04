@@ -187,7 +187,8 @@ createMemoryPeerIO ::
   MemoryDBs ->
   IO MemoryPeer
 createMemoryPeerIO p t u s h bs d = do
-  m <- createMemPeerDBEnv h (buildPeer . (\b -> (Nothing, b, 30303)) <$> bs)
+  peers <- traverse (\b -> mkPeer Nothing b Nothing (UDPPort 30303) (TCPPort 30303)) bs
+  m <- createMemPeerDBEnv h peers
   atomically $ createMemoryPeer p t u s m d
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TCPPort (MemoryT m) where
@@ -397,10 +398,6 @@ instance {-# OVERLAPPING #-} MonadIO m => HasSyncDB (MemoryT m) where
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BlockHashRoot (MemoryT m) where
   get _ = BlockHashRoot . maybe def (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "block_hash_root")
   put _ = insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "block_hash_root") . BL.toStrict . encode . unBlockHashRoot
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable GenesisRoot (MemoryT m) where
-  get _ = GenesisRoot . maybe def (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "genesis_root")
-  put _ = insertMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "genesis_root") . BL.toStrict . encode . unGenesisRoot
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestBlockRoot (MemoryT m) where
   get _ = BestBlockRoot . maybe def (decode . BL.fromStrict) <$> lookupMemDB (_memKVDB . _memoryDBs) (encodeUtf8 "best_block_root")
