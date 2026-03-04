@@ -10,7 +10,6 @@
 
 module Blockchain.DB.ChainDB
   ( BlockHashRoot (..),
-    BestBlockRoot (..),
     bootstrapChainDB,
     putBlockHeaderInChainDB,
     migrateBlockHeader,
@@ -92,10 +91,6 @@ import Text.Format
 -}
 
 newtype BlockHashRoot = BlockHashRoot {unBlockHashRoot :: MP.StateRoot}
-  deriving (Eq, Ord, Show, Generic)
-  deriving newtype (Format, NFData)
-
-newtype BestBlockRoot = BestBlockRoot {unBestBlockRoot :: MP.StateRoot}
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (Format, NFData)
 

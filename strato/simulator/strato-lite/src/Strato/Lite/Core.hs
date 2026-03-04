@@ -475,10 +475,6 @@ instance {-# OVERLAPPING #-} MonadBase m => Mod.Modifiable GenesisRoot (CoreT m)
   get p = lift $ Mod.get p
   put p = lift . Mod.put p
 
-instance {-# OVERLAPPING #-} MonadBase m => Mod.Modifiable BestBlockRoot (CoreT m) where
-  get p = lift $ Mod.get p
-  put p = lift . Mod.put p
-
 instance {-# OVERLAPPING #-} MonadBase m => (MP.StateRoot `A.Alters` MP.NodeData) (CoreT m) where
   lookupWithDefault p k = lift $ A.lookupWithDefault p k
   lookup p k = lift (A.lookup p k) >>= \case

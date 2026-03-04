@@ -32,7 +32,7 @@ import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
-import Blockchain.MemVMContext (MemContextDBs(..), blockSummaryDB, stateDB, hashDB, codeDB, blockHashRoot, genesisRoot, bestBlockRoot)
+import Blockchain.MemVMContext (MemContextDBs(..), blockSummaryDB, stateDB, hashDB, codeDB, blockHashRoot, genesisRoot)
 import Blockchain.Model.SyncState
 import Blockchain.Model.SyncTask
 import Blockchain.Model.WrappedBlock
@@ -439,10 +439,6 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BlockHashRoot (MonadSim
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable GenesisRoot (MonadSimulator m) where
   get _ = dbsGets $ Lens.view genesisRoot
   put _ gr = dbsModify' $ genesisRoot .~ gr
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestBlockRoot (MonadSimulator m) where
-  get _ = dbsGets $ Lens.view bestBlockRoot
-  put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
 
 instance {-# OVERLAPPING #-} MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MonadSimulator m) where
   lookup _ sr = dbsGets $ Lens.view (stateDB . at sr)

@@ -465,10 +465,6 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable GenesisRoot (Filesystem
   get _ = GenesisRoot . fromMaybe def <$> lookupLDB (_kvDB . _filesystemDBs) (encodeUtf8 "genesis_root")
   put _ = insertLDB (_kvDB . _filesystemDBs) (encodeUtf8 "genesis_root") . unGenesisRoot
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Modifiable BestBlockRoot (FilesystemT m) where
-  get _ = BestBlockRoot . fromMaybe def <$> lookupLDB (_kvDB . _filesystemDBs) (encodeUtf8 "best_block_root")
-  put _ = insertLDB (_kvDB . _filesystemDBs) (encodeUtf8 "best_block_root") . unBestBlockRoot
-
 instance {-# OVERLAPPING #-} MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (FilesystemT m) where
   lookup _ = MP.genericLookupDB . asks $ MP.unStateDB . _stateDB . _filesystemDBs
   insert _ = MP.genericInsertDB . asks $ MP.unStateDB . _stateDB . _filesystemDBs
