@@ -12,12 +12,8 @@
     "node": ">=22.12 <23.0"
   },
   "dependencies": {
-    "@safe-global/api-kit": "^4.0.0",
-    "@safe-global/protocol-kit": "^6.1.1",
-    "@safe-global/types-kit": "^3.0.0",
     "@sendgrid/mail": "^8.1.5",
     "@types/jsonwebtoken": "^9.0.10",
-    "alchemy-sdk": "^3.6.0",
     "axios": "^1.6.2",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
