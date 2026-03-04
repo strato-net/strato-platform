@@ -23,7 +23,8 @@ RUN apt -y update && apt install -y \
   && apt autoremove \
   && rm -rf /var/lib/apt/lists/* \
   && apt clean \
-  && ln -s /lib/x86_64-linux-gnu/libleveldb.so.1.23.0 /lib/x86_64-linux-gnu/libleveldb.so.1 \
+  && LEVELDB_REAL="$(ls -1 /lib/*/libleveldb.so.* /usr/lib/*/libleveldb.so.* 2>/dev/null | head -n 1)" \
+  && if [ -n "$LEVELDB_REAL" ]; then ln -sf "$LEVELDB_REAL" "$(dirname "$LEVELDB_REAL")/libleveldb.so.1"; fi \
   && locale-gen en_US.UTF-8 \
   && ldconfig
 

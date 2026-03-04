@@ -38,13 +38,11 @@ import Railgun.Types (RailgunAddress(..), RailgunKeys(..), TokenType(..))
 import Railgun.Balance (scanShieldedBalance, TokenBalance(..))
 import qualified Railgun.Balance as Bal
 import Railgun.Merkle (fetchMerkleTreeData, computeMerkleProof, MerkleTreeData(..))
-import Railgun.Crypto (poseidonHash, computeNullifier)
-import qualified Railgun.Crypto
+import Railgun.Crypto (poseidonHash, computeNullifier, randomBytes)
 import Railgun.Witness (SpendableNote(..), buildUnshieldWitness, buildTransferWitness)
 import Railgun.Transfer (parseRecipientAddress, createTransferRequest, TransferNote(..), encryptNoteForRecipient, createCommitmentCiphertext)
 import qualified Railgun.Transfer
 import qualified Railgun.Unshield
-import Railgun.Unshield (CommitmentCiphertext(..))
 import Railgun.Prover (generateProof, getProverConfig)
 import Railgun.Signing (deriveSigningKey, signTransactionData, computeSignatureMessage, RailgunSignature(..))
 
@@ -831,17 +829,18 @@ runUnshield uopts = do
           tokenId = hexToInteger (Bal.snTokenAddress noteToSpend)
           recipientInt = hexToInteger (T.pack $ uoRecipient uopts)
           
-      -- Get bound params hash from contract (SolidVM has different ABI encoding)
-      -- For unshield with 2 commitments (change + unshield), we need 1 ciphertext entry
-      -- Using dummy ciphertext for unshield (change note - recipient gets unshielded tokens)
-      let dummyCiphertext = CommitmentCiphertext
-            { ccCiphertext = [BS.replicate 32 0, BS.replicate 32 0, BS.replicate 32 0, BS.replicate 32 0]
-            , ccBlindedSenderViewingKey = BS.replicate 32 0
-            , ccBlindedReceiverViewingKey = BS.replicate 32 0
-            , ccAnnotationData = BS.empty
-            , ccMemo = BS.empty
-            }
-      boundParamsHashResult <- getBoundParamsHash (fromIntegral treeNum) chainId [dummyCiphertext] True -- True = unshield
+      -- Create real encrypted ciphertext for the change note so the wallet can recover it
+      let changeValue = Bal.snValue noteToSpend - actualAmount
+          changeRandom = Bal.snRandom noteToSpend
+      changeCiphertext <- createCommitmentCiphertext
+                            (viewingPrivateKey keys)
+                            (viewingPublicKey keys)
+                            npkInt
+                            (T.pack $ uoTokenAddress uopts)
+                            changeValue
+                            changeRandom
+
+      boundParamsHashResult <- getBoundParamsHash (fromIntegral treeNum) chainId [changeCiphertext] True -- True = unshield
       boundParamsHash <- case boundParamsHashResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to get boundParamsHash: " <> err
@@ -852,8 +851,6 @@ runUnshield uopts = do
           
       let -- Compute output commitments
           unshieldCommitment = poseidonHash [recipientInt, tokenId, actualAmount]
-          changeValue = Bal.snValue noteToSpend - actualAmount
-          -- Always use our NPK for change commitment (even if value is 0)
           changeCommitment = poseidonHash [npkInt, tokenId, changeValue]
           
           -- Compute the message to sign
@@ -920,6 +917,7 @@ runUnshield uopts = do
                           (T.pack $ uoRecipient uopts)
                           chainId
                           (fromIntegral treeNum)
+                          [changeCiphertext]
       
       TIO.putStrLn "\nSending unshield transaction..."
       unshieldResult <- callTransact unshieldReq
@@ -1130,7 +1128,7 @@ runTransfer topts = do
       let recipientMasterPublicKey = bytesToIntegerBE recipientMasterPk
       
       -- Generate random for recipient's note
-      recipientRandom <- Railgun.Crypto.randomBytes 16
+      recipientRandom <- randomBytes 16
       let recipientRandomInt = bytesToIntegerBE recipientRandom
           -- Compute recipient's NPK using same formula as Shield
           recipientNpk = poseidonHash [recipientMasterPublicKey, recipientRandomInt]
