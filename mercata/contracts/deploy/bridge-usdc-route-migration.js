@@ -1,13 +1,10 @@
 /**
- * One-time MercataBridge USDC route migration helper.
+ * One-time MercataBridge stable route migration helper.
  *
  * Purpose:
  * 1) Set USDC default route to USDCST via setAsset(...)
- * 2) Enable USDC -> USDST alternate route via setAssetRoute(...)
- *
- * Scope is intentionally fixed for buildtest migration:
- * - 11155111 USDC: 0x94a9d9ac8a22534e3faca9f4e7f2e2cf85d5e4c8
- * - 84532 USDC:   0x036cbd53842c5426634e7929541ec2318f3dcf7e
+ * 2) Set USDT default route to USDTST via setAsset(...)
+ * 3) Enable USDC/USDT -> USDST alternate routes via setAssetRoute(...)
  *
  * Dry-run by default. Use --apply to execute transactions.
  *
@@ -123,7 +120,10 @@ async function searchTable(tokenObj, name, query) {
   return Array.isArray(rows) ? rows : [];
 }
 
-async function resolveUsdcTargets(tokenObj, bridgeAddress, envProfile) {
+async function resolveTargetsBySymbol(tokenObj, bridgeAddress, envProfile, symbol) {
+  const normalizedSymbol = String(symbol || "").toUpperCase();
+  if (!normalizedSymbol) return [];
+
   const chainIds = PROFILE_CHAIN_IDS[envProfile] || PROFILE_CHAIN_IDS.testnet;
   const chainCsv = chainIds.join(",");
 
@@ -163,8 +163,8 @@ async function resolveUsdcTargets(tokenObj, bridgeAddress, envProfile) {
   const targets = [];
   for (const { row } of latestByPair.values()) {
     const value = row.value || {};
-    const symbol = String(value.externalSymbol || "").toUpperCase();
-    if (symbol !== "USDC") continue;
+    const rowSymbol = String(value.externalSymbol || "").toUpperCase();
+    if (rowSymbol !== normalizedSymbol) continue;
 
     const externalChainId = Number(row.key2 ?? value.externalChainId ?? 0);
     const externalToken = normalizeAddress(row.key || value.externalToken);
@@ -175,8 +175,8 @@ async function resolveUsdcTargets(tokenObj, bridgeAddress, envProfile) {
       externalChainId,
       externalToken,
       externalDecimals,
-      externalName: String(value.externalName || "USDC"),
-      externalSymbol: String(value.externalSymbol || "USDC"),
+      externalName: String(value.externalName || normalizedSymbol),
+      externalSymbol: String(value.externalSymbol || normalizedSymbol),
       enabled: parseBool(value.enabled),
       maxPerWithdrawal: String(value.maxPerWithdrawal || ZERO_UINT256),
     });
@@ -257,7 +257,8 @@ function buildSetAssetRouteCall(bridgeAddress, target, usdstToken) {
 async function main() {
   const args = parseArgs();
   const bridgeAddress = normalizeAddress(DEFAULT_BRIDGE_ADDRESS);
-  let usdcstToken = "";
+  const targetSymbols = ["USDC", "USDT"];
+  const defaultRouteTokenBySymbol = {};
   const usdstToken = normalizeAddress(DEFAULT_USDST_ADDRESS);
   const apply = !!args.apply;
 
@@ -266,35 +267,52 @@ async function main() {
 
   const tokenObj = await getTokenObj();
 
-  if (!usdcstToken) {
-    usdcstToken = await resolveActiveTokenBySymbol(tokenObj, "USDCST");
-  }
-  if (!usdcstToken) {
-    throw new Error("USDCST not found as active token in Cirrus. Create/activate token first.");
+  for (const symbol of targetSymbols) {
+    const routeTokenSymbol = `${symbol}ST`;
+    const tokenAddress = await resolveActiveTokenBySymbol(tokenObj, routeTokenSymbol);
+    if (!tokenAddress) {
+      throw new Error(
+        `${routeTokenSymbol} not found as active token in Cirrus. Create/activate token first.`,
+      );
+    }
+    defaultRouteTokenBySymbol[symbol] = tokenAddress;
   }
 
-  const usdcTargets = await resolveUsdcTargets(tokenObj, bridgeAddress, ENV_PROFILE);
-  if (!usdcTargets.length) {
-    throw new Error(`No USDC bridge assets found for env ${ENV_PROFILE}`);
+  const targetsBySymbol = {};
+  for (const symbol of targetSymbols) {
+    targetsBySymbol[symbol] = await resolveTargetsBySymbol(
+      tokenObj,
+      bridgeAddress,
+      ENV_PROFILE,
+      symbol,
+    );
+    if (!targetsBySymbol[symbol].length) {
+      throw new Error(`No ${symbol} bridge assets found for env ${ENV_PROFILE}`);
+    }
   }
 
   const plannedCalls = [];
-  for (const target of usdcTargets) {
-    plannedCalls.push(buildSetAssetCall(bridgeAddress, target, usdcstToken));
-    plannedCalls.push(buildSetAssetRouteCall(bridgeAddress, target, usdstToken));
+  for (const symbol of targetSymbols) {
+    const routeToken = defaultRouteTokenBySymbol[symbol];
+    for (const target of targetsBySymbol[symbol]) {
+      plannedCalls.push(buildSetAssetCall(bridgeAddress, target, routeToken));
+      if (target.enabled) {
+        plannedCalls.push(buildSetAssetRouteCall(bridgeAddress, target, usdstToken));
+      }
+    }
   }
 
-  console.log("=== MercataBridge USDC Migration Plan ===");
+  console.log("=== MercataBridge USDC/USDT Migration Plan ===");
   console.log(
     JSON.stringify(
       {
         nodeUrl: config.nodes?.[0]?.url || null,
         env: ENV_PROFILE,
         bridgeAddress,
-        usdcstToken,
+        defaultRouteTokenBySymbol,
         usdstToken,
         apply,
-        targets: usdcTargets,
+        targetsBySymbol,
         plannedCallCount: plannedCalls.length,
       },
       null,

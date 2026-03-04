@@ -188,29 +188,38 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     [selectedToken?.externalDecimals]
   );
 
-  const isButtonDisabled = useMemo(
-    () =>
-      guestMode ||
-      isLoading ||
-      !hasValidAmount ||
-      !selectedToken ||
-      !isConnected ||
-      !currentNetwork ||
-      !isCorrectNetwork ||
-      isBalanceLoading ||
-      !isTokenPermitted,
-    [
-      guestMode,
-      isLoading,
-      hasValidAmount,
-      selectedToken,
-      isConnected,
-      currentNetwork,
-      isCorrectNetwork,
-      isBalanceLoading,
-      isTokenPermitted,
-    ]
-  );
+  const disabledReasons = useMemo(() => {
+    const reasons: string[] = [];
+    if (guestMode) reasons.push("guestMode");
+    if (isLoading) reasons.push("isLoading");
+    if (!hasValidAmount) {
+      reasons.push(amountError ? `amountError:${amountError}` : "emptyOrInvalidAmount");
+    }
+    if (!selectedToken) reasons.push("noSelectedToken");
+    if (!isConnected) reasons.push("walletNotConnected");
+    if (!currentNetwork) reasons.push("noCurrentNetwork");
+    if (!isCorrectNetwork) {
+      reasons.push(`wrongNetwork(active:${chainId ?? "n/a"}, expected:${expectedChainId ?? "n/a"})`);
+    }
+    if (isBalanceLoading) reasons.push("balanceLoading");
+    if (!isTokenPermitted) reasons.push("tokenNotPermitted");
+    return reasons;
+  }, [
+    guestMode,
+    isLoading,
+    hasValidAmount,
+    amountError,
+    selectedToken,
+    isConnected,
+    currentNetwork,
+    isCorrectNetwork,
+    isBalanceLoading,
+    isTokenPermitted,
+    chainId,
+    expectedChainId,
+  ]);
+
+  const isButtonDisabled = disabledReasons.length > 0;
 
   // Effects
   useEffect(() => {
@@ -272,6 +281,39 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     };
     handleNetworkSwitch();
   }, [chainId, isConnected, selectedNetwork, expectedChainId, switchChain]);
+
+  useEffect(() => {
+    if (!amount) return;
+    console.log("[BridgeIn] Deposit button state", {
+      disabled: isButtonDisabled,
+      reasons: disabledReasons,
+      amount,
+      amountError,
+      selectedTokenId: selectedToken?.id,
+      externalToken: selectedToken?.externalToken,
+      stratoToken: selectedToken?.stratoToken,
+      isTokenPermitted,
+      isBalanceLoading,
+      isConnected,
+      isCorrectNetwork,
+      activeChainId: chainId,
+      expectedChainId,
+      selectedNetwork,
+    });
+  }, [
+    amount,
+    amountError,
+    isButtonDisabled,
+    disabledReasons,
+    selectedToken,
+    isTokenPermitted,
+    isBalanceLoading,
+    isConnected,
+    isCorrectNetwork,
+    chainId,
+    expectedChainId,
+    selectedNetwork,
+  ]);
 
   // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
@@ -643,6 +685,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         selectedToken={selectedToken}
         tokens={currentTokens}
         onTokenChange={setSelectedToken}
+        direction="in"
         disabled={guestMode || isLoading}
       />
 

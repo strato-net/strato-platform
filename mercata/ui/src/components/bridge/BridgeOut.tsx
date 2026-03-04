@@ -323,6 +323,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         selectedToken={selectedToken}
         tokens={currentTokens}
         onTokenChange={setSelectedToken}
+        direction="out"
         disabled={guestMode || isLoading}
       />
 

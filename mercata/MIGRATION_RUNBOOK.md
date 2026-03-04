@@ -68,7 +68,35 @@ Update `/Users/ariya/Documents/BlockApps/strato-platform/mercata/ethereum/.env`:
 - `ROUTER_IMPL_ETH=<ethereum implementation address>`
 - `ROUTER_IMPL_BASE=<base implementation address>`
 
-## 4) Run MercataBridge Migration
+## 4) Upgrade MercataBridge Proxy First
+
+Run this before any bridge route config calls.
+
+### Testnet
+```bash
+cd /Users/ariya/Documents/BlockApps/strato-platform/mercata/contracts
+npm run upgrade -- \
+  --proxy-address 1008 \
+  --contract-file BaseCodeCollection.sol \
+  --contract-name MercataBridge \
+  --constructor-args '{"_owner":"deadbeef"}' \
+  +OVERRIDE-CHECKS
+```
+
+### Prod
+```bash
+cd /Users/ariya/Documents/BlockApps/strato-platform/mercata/contracts
+npm run upgrade -- \
+  --proxy-address 1008 \
+  --contract-file BaseCodeCollection.sol \
+  --contract-name MercataBridge \
+  --constructor-args '{"_owner":"deadbeef"}' \
+  +OVERRIDE-CHECKS
+```
+
+If this returns a governance vote issue, approve/finalize it before continuing.
+
+## 5) Run MercataBridge Migration
 
 ### Testnet
 ```bash
@@ -84,7 +112,7 @@ npm run bridge:ops:prod
 npm run bridge:ops:prod -- --apply
 ```
 
-## 5) Run DepositRouter Safe Proposals (Upgrade + Setters)
+## 6) Run DepositRouter Safe Proposals (Upgrade + Setters)
 
 ### Testnet
 ```bash

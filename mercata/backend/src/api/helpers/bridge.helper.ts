@@ -162,13 +162,23 @@ export function enrichAssetsWithTokenData(
   assets: BridgeableAssetRoute[],
   tokenMap: Map<string, { name?: string; symbol?: string }>
 ): BridgeToken[] {
-  return assets.map(({ AssetInfo, isDefaultRoute, id }) => ({
-    ...AssetInfo,
-    stratoTokenName: tokenMap.get(AssetInfo.stratoToken)?.name || "",
-    stratoTokenSymbol: tokenMap.get(AssetInfo.stratoToken)?.symbol || "",
-    isDefaultRoute,
-    id
-  }));
+  const enriched: BridgeToken[] = new Array(assets.length);
+  for (let i = 0; i < assets.length; i++) {
+    const route = assets[i];
+    const assetInfo = route.AssetInfo;
+    const lower = assetInfo.stratoToken.toLowerCase();
+    const tokenKey = lower.startsWith("0x") ? lower.slice(2) : lower;
+    const tokenMeta = tokenMap.get(tokenKey);
+
+    enriched[i] = {
+      ...assetInfo,
+      stratoTokenName: tokenMeta?.name ?? "",
+      stratoTokenSymbol: tokenMeta?.symbol ?? "",
+      isDefaultRoute: route.isDefaultRoute,
+      id: route.id
+    };
+  }
+  return enriched;
 }
 
 const toBridgeAssetInfo = (value: unknown, externalToken: string, externalChainId: string): BridgeAssetInfo | null => {

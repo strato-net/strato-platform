@@ -33,11 +33,13 @@ const MAPPINGS_TABLE = "BlockApps-MercataBridge-mappings";
 const CHAINS_TABLE = "BlockApps-MercataBridge-chains";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const DEFAULT_BRIDGE_ADDRESS = "0x0000000000000000000000000000000000001008";
+const ERC1967_IMPLEMENTATION_SLOT =
+  "0x360894A13BA1A3210667C828492DB98DCA3E2076CC3735A920A3CA505D382BBC";
 
 function parseArgs() {
   const argv = process.argv.slice(2);
   const args = { apply: false };
-  const allowedWithValue = new Set(["env"]);
+  const allowedWithValue = new Set(["env", "chains"]);
 
   for (let i = 0; i < argv.length; i++) {
     const item = argv[i];
@@ -54,19 +56,42 @@ function parseArgs() {
     if (!next || next.startsWith("--")) {
       throw new Error(`Missing value for --${key}`);
     }
+    args[key] = next;
     i++;
   }
 
   return args;
 }
 
-function parseChains() {
-  const value = envProfile.defaultChainsCsv;
+const CHAIN_NAME_TO_ID = {
+  mainnet: 1,
+  ethereum: 1,
+  eth: 1,
+  sepolia: 11155111,
+  base: 8453,
+  base_mainnet: 8453,
+  base_main: 8453,
+  base_sepolia: 84532,
+  "base-sepolia": 84532,
+  basesepolia: 84532,
+};
+
+function parseChains(args) {
+  const value = args.chains || envProfile.defaultChainsCsv;
   if (!value) return [];
-  return String(value)
+  const chainIds = String(value)
     .split(",")
-    .map((v) => Number(v.trim()))
+    .map((v) => {
+      const raw = String(v || "").trim().toLowerCase();
+      if (!raw) return NaN;
+      if (/^\d+$/.test(raw)) return Number(raw);
+      return CHAIN_NAME_TO_ID[raw] || NaN;
+    })
     .filter((v) => Number.isInteger(v) && CHAIN_CONFIG[v]);
+  if (!chainIds.length) {
+    throw new Error(`No valid chains in --chains ${String(value)}`);
+  }
+  return chainIds;
 }
 
 function getImplementationForChain(chainId) {
@@ -329,9 +354,24 @@ async function getProxyState(chainId, proxyAddress) {
   };
 }
 
+async function getCurrentImplementation(chainId, proxyAddress) {
+  const provider = new ethers.JsonRpcProvider(getRpcUrl(chainId));
+  const raw = await provider.getStorage(
+    ethers.getAddress(proxyAddress),
+    ERC1967_IMPLEMENTATION_SLOT,
+  );
+  return ethers.getAddress(`0x${raw.slice(-40)}`);
+}
+
+async function hasCodeAt(chainId, address) {
+  const provider = new ethers.JsonRpcProvider(getRpcUrl(chainId));
+  const code = await provider.getCode(ethers.getAddress(address));
+  return code && code !== "0x";
+}
+
 async function main() {
   const args = parseArgs();
-  const chains = parseChains();
+  const chains = parseChains(args);
   if (!chains.length) throw new Error("No valid chains selected");
 
   const apply = !!args.apply;
@@ -372,6 +412,16 @@ async function main() {
     if (!implementationAddress) {
       throw new Error(`Chain ${chainId}: no implementation mapping`);
     }
+    const implementationHasCode = await hasCodeAt(chainId, implementationAddress);
+    if (!implementationHasCode) {
+      throw new Error(
+        `Chain ${chainId}: implementation ${implementationAddress} has no bytecode on ${cfg.name}. Deploy implementation first and retry.`,
+      );
+    }
+    const currentImplementation = await getCurrentImplementation(chainId, proxyAddress);
+    const alreadyUpToDate =
+      normalizeAddress(currentImplementation) === normalizeAddress(implementationAddress);
+
     const chainOp = {
       chainId,
       chainName: cfg.name,
@@ -381,12 +431,26 @@ async function main() {
       ownerIsSafe,
       version: state.version,
       paused: state.paused,
+      currentImplementation,
       implementationAddress,
+      implementationHasCode,
+      alreadyUpToDate,
       proposedUpgrade: false,
       safeTxHash: null,
       nonce: null,
       warning: ownerIsSafe ? null : "Proxy owner is not the Safe address",
     };
+
+    if (alreadyUpToDate) {
+      chainOp.warning = "Proxy already points to target implementation";
+      chainOp.verification = {
+        attempted: false,
+        ok: true,
+        reason: "already-up-to-date",
+      };
+      summary.operations.push(chainOp);
+      continue;
+    }
 
     const upgradeData = encodeCall("upgradeToAndCall", [
       ethers.getAddress(implementationAddress),

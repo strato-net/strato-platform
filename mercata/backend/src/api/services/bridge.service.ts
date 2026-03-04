@@ -113,11 +113,11 @@ export const getBridgeTransactions = async (
 
 export const getBridgeableTokens = async (accessToken: string, chainId?: string): Promise<BridgeToken[]> => {
   const params: Record<string, string> = {
-    select: "collection_name,externalToken:key,externalChainId:key2,targetStratoToken:key3,mappingValue:value",
+    select: "collection_name,externalToken:key->>key,externalChainId:key->>key2,targetStratoToken:key->>key3,mappingValue:value",
     collection_name: "in.(assets,assetRouteEnabled)",
     address: `eq.${mercataBridge}`
   };
-  if (chainId) params.key2 = `eq.${chainId}`;
+  if (chainId) params["key->>key2"] = `eq.${chainId}`;
 
   const { data: mappings } = await cirrus.get(accessToken, "/mapping", { params });
   if (!Array.isArray(mappings) || !mappings.length) return [];
@@ -125,10 +125,14 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
   const routes = parseBridgeRouteMappings(mappings as BridgeMappingRow[]);
   if (!routes.length) return [];
 
-  const tokenAddresses = Array.from(
-    new Set(routes.map((route) => route.AssetInfo?.stratoToken).filter(Boolean))
-  ) as string[];
-  const tokenMap = await getTokenMetadata(accessToken, tokenAddresses);
+  const tokenAddressSet = new Set<string>();
+  for (const { AssetInfo } of routes) {
+    const token = AssetInfo?.stratoToken;
+    if (!token) continue;
+    const lower = token.toLowerCase();
+    tokenAddressSet.add(lower.startsWith("0x") ? lower.slice(2) : lower);
+  }
+  const tokenMap = await getTokenMetadata(accessToken, [...tokenAddressSet]);
 
   return enrichAssetsWithTokenData(routes, tokenMap);
 };

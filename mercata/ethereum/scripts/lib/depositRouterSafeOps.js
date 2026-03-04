@@ -60,8 +60,15 @@ const CHAIN_CONFIG = {
 
 function normalizeAddress(value) {
   if (!value) return "";
-  const lower = String(value).toLowerCase();
-  return lower.startsWith("0x") ? lower : `0x${lower}`;
+  const raw = String(value).trim();
+  if (!raw) return "";
+  const withPrefix = raw.startsWith("0x") ? raw : `0x${raw}`;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(withPrefix)) return "";
+  try {
+    return ethers.getAddress(withPrefix);
+  } catch {
+    return "";
+  }
 }
 
 function normalizePrivateKey(value) {
@@ -108,8 +115,14 @@ function getSafeApiKey() {
 
 function getSafeProposerAddress() {
   const configured =
-    bridgeConfig?.safe?.safeProposerAddress || process.env.SAFE_PROPOSER_ADDRESS;
-  if (configured) return configured;
+    process.env.SAFE_PROPOSER_ADDRESS || bridgeConfig?.safe?.safeProposerAddress;
+  if (configured) {
+    const normalized = normalizeAddress(configured);
+    if (!normalized) {
+      throw new Error("Invalid SAFE_PROPOSER_ADDRESS");
+    }
+    return normalized;
+  }
   const bridgePk = bridgeConfig?.safe?.safeProposerPrivateKey;
   if (bridgePk) {
     return new ethers.Wallet(normalizePrivateKey(bridgePk)).address;
@@ -123,6 +136,21 @@ function encodeCall(method, args) {
   return iface.encodeFunctionData(method, args);
 }
 
+function resolveSafeTxGas(parsedOptions, txCount) {
+  const raw =
+    parsedOptions?.safeTxGas ??
+    parsedOptions?.safeTxGasLimit ??
+    process.env.SAFE_TX_GAS;
+
+  const parsed = Number(raw);
+  if (Number.isInteger(parsed) && parsed > 0) {
+    return parsed;
+  }
+
+  const count = Number.isInteger(txCount) && txCount > 0 ? txCount : 1;
+  return Math.max(120000, count * 120000);
+}
+
 async function proposeBatch(chainId, transactions, options) {
   const parsedOptions =
     options && typeof options === "object" && !Array.isArray(options)
@@ -130,6 +158,7 @@ async function proposeBatch(chainId, transactions, options) {
       : {};
   const safeAddress = normalizeAddress(parsedOptions.safeAddress);
   const nonceValue = parsedOptions.nonce;
+  const safeTxGas = resolveSafeTxGas(parsedOptions, transactions?.length || 1);
 
   if (!safeAddress) {
     throw new Error("Missing safeAddress for Safe proposal");
@@ -152,7 +181,10 @@ async function proposeBatch(chainId, transactions, options) {
 
   const safeTx = await protocolKit.createTransaction({
     transactions,
-    options: { nonce },
+    options: {
+      nonce,
+      safeTxGas: String(safeTxGas),
+    },
   });
   const safeTxHash = await protocolKit.getTransactionHash(safeTx);
   const signature = await protocolKit.signHash(safeTxHash);

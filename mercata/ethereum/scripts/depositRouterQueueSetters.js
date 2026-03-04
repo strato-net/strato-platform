@@ -37,7 +37,7 @@ const DEFAULT_BRIDGE_ADDRESS = "0x0000000000000000000000000000000000001008";
 function parseArgs() {
   const argv = process.argv.slice(2);
   const args = { apply: false };
-  const allowedWithValue = new Set(["env"]);
+  const allowedWithValue = new Set(["env", "chains"]);
 
   for (let i = 0; i < argv.length; i++) {
     const item = argv[i];
@@ -54,19 +54,42 @@ function parseArgs() {
     if (!next || next.startsWith("--")) {
       throw new Error(`Missing value for --${key}`);
     }
+    args[key] = next;
     i++;
   }
 
   return args;
 }
 
-function parseChains() {
-  const value = envProfile.defaultChainsCsv;
+const CHAIN_NAME_TO_ID = {
+  mainnet: 1,
+  ethereum: 1,
+  eth: 1,
+  sepolia: 11155111,
+  base: 8453,
+  base_mainnet: 8453,
+  base_main: 8453,
+  base_sepolia: 84532,
+  "base-sepolia": 84532,
+  basesepolia: 84532,
+};
+
+function parseChains(args) {
+  const value = args.chains || envProfile.defaultChainsCsv;
   if (!value) return [];
-  return String(value)
+  const chainIds = String(value)
     .split(",")
-    .map((v) => Number(v.trim()))
+    .map((v) => {
+      const raw = String(v || "").trim().toLowerCase();
+      if (!raw) return NaN;
+      if (/^\d+$/.test(raw)) return Number(raw);
+      return CHAIN_NAME_TO_ID[raw] || NaN;
+    })
     .filter((v) => Number.isInteger(v) && CHAIN_CONFIG[v]);
+  if (!chainIds.length) {
+    throw new Error(`No valid chains in --chains ${String(value)}`);
+  }
+  return chainIds;
 }
 
 function normalizeHexAddress(value, { zeroIfEmpty = false } = {}) {
@@ -157,7 +180,7 @@ async function fetchBridgeMappingsFallback(nodeUrl, token, chains, bridgeAddress
     explicit = await cirrusSearch(nodeUrl, token, "BlockApps-MercataBridge-assetRouteEnabled", {
       address: `eq.${bridgeAddressNo0x}`,
       key2: `in.(${chainCsv})`,
-      select: "key,key2,key3,value,mappingValue,block_number",
+      select: "key,key2,key3,value,block_number",
       order: "block_number.asc",
       limit: "20000",
     });
@@ -305,7 +328,7 @@ async function fetchBridgeMappings(nodeUrl, token, chains, bridgeAddress) {
       address: `eq.${bridgeAddressNo0x}`,
       collection_name: "in.(assets,assetRouteEnabled)",
       key2: `in.(${chainCsv})`,
-      select: "collection_name,key,key2,key3,value,mappingValue,block_number",
+      select: "collection_name,key,key2,key3,value,block_number",
       order: "block_number.asc",
       limit: "20000",
     });
@@ -318,7 +341,6 @@ async function fetchBridgeMappings(nodeUrl, token, chains, bridgeAddress) {
 
 function buildSetterConfigFromMappings(rows, selectedChains) {
   const selected = new Set(selectedChains.map(Number));
-
   const latestAssetsByPair = new Map();
   const latestExplicitByRoute = new Map();
 
@@ -378,7 +400,6 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
   }
 
   const routes = new Map();
-
   for (const asset of latestAssetsByPair.values()) {
     const key = routeKey(asset.chainId, asset.externalToken, asset.stratoToken);
     routes.set(key, {
@@ -386,48 +407,41 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
       externalToken: asset.externalToken,
       targetStratoToken: asset.stratoToken,
       enabled: asset.enabled,
-      source: "default",
     });
   }
 
   for (const explicitRoute of latestExplicitByRoute.values()) {
     const pKey = pairKey(explicitRoute.chainId, explicitRoute.externalToken);
     const asset = latestAssetsByPair.get(pKey);
+    if (!asset) continue;
     const isDefaultRoute =
-      !!asset &&
       asset.stratoToken.toLowerCase() ===
         explicitRoute.targetStratoToken.toLowerCase();
 
     const enabled = isDefaultRoute ? asset.enabled : explicitRoute.enabled;
-
     const key = routeKey(
       explicitRoute.chainId,
       explicitRoute.externalToken,
       explicitRoute.targetStratoToken,
     );
+
     routes.set(key, {
       chainId: explicitRoute.chainId,
       externalToken: explicitRoute.externalToken,
       targetStratoToken: explicitRoute.targetStratoToken,
       enabled,
-      source: isDefaultRoute ? "default" : "explicit",
     });
   }
 
   const byChain = {};
   for (const chainId of selectedChains) {
     byChain[chainId] = {
-      setPermitted: [],
       setRoutePermitted: [],
     };
   }
 
-  const tokenEnabledByChain = new Map();
   for (const route of routes.values()) {
-    const tokenKey = pairKey(route.chainId, route.externalToken);
-    const prev = tokenEnabledByChain.get(tokenKey) || false;
-    tokenEnabledByChain.set(tokenKey, prev || route.enabled);
-
+    if (!route.enabled) continue;
     byChain[route.chainId].setRoutePermitted.push({
       token: route.externalToken,
       target: route.targetStratoToken,
@@ -435,19 +449,7 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
     });
   }
 
-  for (const [tokenKey, enabled] of tokenEnabledByChain.entries()) {
-    const [chainIdRaw, externalToken] = tokenKey.split(":");
-    const chainId = Number(chainIdRaw);
-    byChain[chainId].setPermitted.push({
-      token: externalToken,
-      enabled,
-    });
-  }
-
   for (const chainId of selectedChains) {
-    byChain[chainId].setPermitted.sort((a, b) =>
-      a.token.localeCompare(b.token),
-    );
     byChain[chainId].setRoutePermitted.sort((a, b) => {
       const tokenCmp = a.token.localeCompare(b.token);
       if (tokenCmp !== 0) return tokenCmp;
@@ -460,23 +462,6 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
 
 function buildTransactions(proxyAddress, chainConfig) {
   const txs = [];
-
-  for (const row of chainConfig.setPermitted || []) {
-    txs.push({
-      to: ethers.getAddress(proxyAddress),
-      value: "0",
-      data: encodeCall("setPermitted", [
-        ethers.getAddress(row.token),
-        !!row.enabled,
-      ]),
-      operation: 0,
-      meta: {
-        method: "setPermitted",
-        token: row.token,
-        enabled: !!row.enabled,
-      },
-    });
-  }
 
   for (const row of chainConfig.setRoutePermitted || []) {
     txs.push({
@@ -502,7 +487,7 @@ function buildTransactions(proxyAddress, chainConfig) {
 
 async function main() {
   const args = parseArgs();
-  const chains = parseChains();
+  const chains = parseChains(args);
   if (!chains.length) throw new Error("No valid chains selected");
 
   const apply = !!args.apply;
@@ -568,7 +553,6 @@ async function main() {
       owner,
       ownerIsSafe,
       routeCount: chainConfig.setRoutePermitted.length,
-      tokenCount: chainConfig.setPermitted.length,
       queuedCallCount: txs.length,
       proposals: [],
       warning: ownerIsSafe ? null : "Proxy owner is not the Safe address",
