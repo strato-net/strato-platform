@@ -48,7 +48,7 @@ library:
     - seqevents
     - servant-client
     - servant-server
-    - servant-swagger
+    - servant-openapi3
     - solid-vm-compiler
     - solid-vm-model
     - solid-vm-parser
@@ -56,11 +56,12 @@ library:
     - sql-monad
     - strato-model
     - strato-redis-blockdb
-    - swagger2
+    - openapi3
     - text
     - time
     - transformers
     - unliftio
+    - strato-auth
     - vault-monad
     - vector
 

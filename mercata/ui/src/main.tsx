@@ -25,8 +25,9 @@ if (gaId && gaId.trim() !== '') {
 
   // Initialize dataLayer and gtag (expose gtag globally for custom event tracking)
   (window as any).dataLayer = (window as any).dataLayer || [];
-  (window as any).gtag = function (...args: any[]) {
-    (window as any).dataLayer.push(args);
+  // Must use 'arguments' object (not rest params) for gtag.js compatibility
+  (window as any).gtag = function () {
+    (window as any).dataLayer.push(arguments);
   };
   (window as any).gtag('js', new Date());
   (window as any).gtag('config', gaId);

@@ -165,7 +165,7 @@ parseEvents = concatMap parseEvent
 
 getCollectionsFromContract :: ContractF () -> [(T.Text, [SVMType.Type], SVMType.Type)] -- (collection name, key type(s), value type)
 getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . _storageDefs
-  where filterAndExtract name vd = if not (_isRecord vd) then Nothing else case extractKeys (_varType vd) of
+  where filterAndExtract name vd = case extractKeys (_varType vd) of
           ([], _) -> Nothing
           (ks, v) -> Just (T.pack name, ks, v)
         extractKeys (SVMType.Array entry _)     = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
@@ -198,11 +198,11 @@ processTheMessages messages = do
     $logInfoS "processTheMessages" $ "CodeCollection Added"
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
-    fmap concat . forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
+    fmap concat . forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do
       -- Here we will get the storageDefs attribute of the contract (c)
       -- and iterate through the Map of (Text, VariableDecl) and look for
-      -- VariableDecls that have the last attribute (isRecord) true and
-      -- thetype are mappings We will then create a table for each of
+      -- VariableDecls that have type are mapping or array.
+      -- We will then create a table for each of
       -- these collections and add a foreign key to the main table
 
       let collectionNamesAndTypes = getCollectionsFromContract c

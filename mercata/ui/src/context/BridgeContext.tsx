@@ -34,9 +34,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const [withdrawalSummary, setWithdrawalSummary] = useState<WithdrawalSummaryResponse | null>(null);
   const [loadingWithdrawalSummary, setLoadingWithdrawalSummary] = useState(false);
   const [depositRefreshKey, setDepositRefreshKey] = useState(0);
+  const [withdrawalRefreshKey, setWithdrawalRefreshKey] = useState(0);
 
   const triggerDepositRefresh = useCallback(() => {
     setDepositRefreshKey(prev => prev + 1);
+  }, []);
+
+  const triggerWithdrawalRefresh = useCallback(() => {
+    setWithdrawalRefreshKey(prev => prev + 1);
   }, []);
 
   // ========== REFS ==========
@@ -362,6 +367,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         fetchWithdrawalSummary,
         depositRefreshKey,
         triggerDepositRefresh,
+        withdrawalRefreshKey,
+        triggerWithdrawalRefresh,
       }}
     >
       {children}

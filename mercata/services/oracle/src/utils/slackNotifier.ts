@@ -13,7 +13,7 @@ function getSlackClient(): WebClient | null {
     if (token) {
         slackClient = new WebClient(token);
         const channel = process.env.SLACK_WARNING_CHANNEL || '#ops-monitoring';
-        console.log(`[SlackNotifier] Initialized - warnings will be sent to ${channel}`);
+        console.log(`[SlackNotifier] Initialized - warnings and errors will be sent to ${channel}`);
     } else {
         console.log('[SlackNotifier] SLACK_BOT_TOKEN not set - Slack notifications disabled');
     }
@@ -42,4 +42,19 @@ export async function sendWarningToSlack(context: string, message: string, times
     });
 
     logInfo('SlackNotifier', `Warning sent to ${channel}`);
+}
+
+export async function sendErrorToSlack(context: string, message: string, timestamp: string): Promise<void> {
+    const client = getSlackClient();
+    if (!client) return;
+
+    const channel = process.env.SLACK_WARNING_CHANNEL || '#ops-monitoring';
+    const oracleName = process.env.ORACLE_NAME || 'Dev Oracle';
+
+    await client.chat.postMessage({
+        channel,
+        text: `:rotating_light: *${oracleName}* [ERROR] [${context}] ${message}`,
+    });
+
+    logInfo('SlackNotifier', `Error sent to ${channel}`);
 }

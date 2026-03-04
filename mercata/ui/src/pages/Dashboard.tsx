@@ -6,10 +6,11 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, UserPlus, Send, Book, ArrowRightLeft } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, Send, Book, ArrowRightLeft } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { usePendingRewards } from "@/hooks/usePendingRewards";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useNetBalance } from "@/hooks/useNetBalance";
@@ -22,12 +23,27 @@ import { api } from "@/lib/axios";
 import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
 
 type TabType = 'netBalance' | 'rewards' | 'borrowed';
+
+const getEstimatedApyPercent = (emissionRate?: string, totalStakeUsd?: string | null): number => {
+  try {
+    if (!emissionRate || !totalStakeUsd) return 0;
+    const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
+    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) return 0;
+    const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
+    if (!Number.isFinite(annualCata) || annualCata <= 0) return 0;
+    return (annualCata * 0.25 / tvlUsd) * 100;
+  } catch {
+    return 0;
+  }
+};
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -72,8 +88,16 @@ const Dashboard = () => {
   });
 
   const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
+  const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
   const [isClaiming, setIsClaiming] = useState(false);
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
+  const highestIncentiveApy = useMemo(() => {
+    if (!rewardsActivities.length) return 0;
+    return rewardsActivities.reduce((maxApy, activity) => {
+      const apy = getEstimatedApyPercent(activity.emissionRate, activity.totalStakeUsd ?? null);
+      return apy > maxApy ? apy : maxApy;
+    }, 0);
+  }, [rewardsActivities]);
 
   // Extract CATA token from inactive tokens by address
   const cataToken = useMemo(() => 
@@ -162,38 +186,13 @@ const Dashboard = () => {
   const netBalanceCacheRef = useRef(netBalanceHistoryCache);
   const rewardsCacheRef = useRef(rewardsHistoryCache);
   const borrowedCacheRef = useRef(borrowedHistoryCache);
+  const cacheTimestampsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     netBalanceCacheRef.current = netBalanceHistoryCache;
     rewardsCacheRef.current = rewardsHistoryCache;
     borrowedCacheRef.current = borrowedHistoryCache;
   }, [netBalanceHistoryCache, rewardsHistoryCache, borrowedHistoryCache]);
-
-  const prefetchOtherRanges = useCallback((primaryRange: TimeRange, tab: TabType) => {
-    const rangesToPrefetch = TIME_RANGES.filter(range => range !== primaryRange);
-    
-    rangesToPrefetch.forEach(range => {
-      (async () => {
-        try {
-          if (tab === 'netBalance') {
-            if (netBalanceCacheRef.current[range]) return;
-            const data = await getBalanceHistory(range, '');
-            setNetBalanceHistoryCache(range, data);
-          } else if (tab === 'rewards') {
-            if (rewardsCacheRef.current[range]) return;
-            const data = await getCataBalanceHistory(range, '');
-            setRewardsHistoryCache(range, data);
-          } else if (tab === 'borrowed') {
-            if (borrowedCacheRef.current[range]) return;
-            const data = await getBorrowingHistory(range, '');
-            setBorrowedHistoryCache(range, data);
-          }
-        } catch (err) {
-          // ignore background errors
-        }
-      })();
-    });
-  }, [getBalanceHistory, getCataBalanceHistory, getBorrowingHistory, setNetBalanceHistoryCache, setRewardsHistoryCache, setBorrowedHistoryCache]);
 
   const tabConfig = useMemo(() => ({
     netBalance: {
@@ -221,27 +220,18 @@ const Dashboard = () => {
 
     const loadRange = async () => {
       const config = tabConfig[activeTab];
-      const cache = activeTab === 'netBalance' 
-        ? netBalanceCacheRef.current 
-        : activeTab === 'rewards' 
-        ? rewardsCacheRef.current 
+      const cache = activeTab === 'netBalance'
+        ? netBalanceCacheRef.current
+        : activeTab === 'rewards'
+        ? rewardsCacheRef.current
         : borrowedCacheRef.current;
+      const cacheKey = `${activeTab}:${selectedTimeRange}`;
       const cached = cache[selectedTimeRange];
-      
-      if (cached && cached.length > 0) {
+      const cachedAt = cacheTimestampsRef.current[cacheKey] || 0;
+      const isFresh = Date.now() - cachedAt < 10_000;
+
+      if (cached && cached.length > 0 && isFresh) {
         setLoadingBalanceHistory(false);
-        prefetchOtherRanges(selectedTimeRange, activeTab);
-        
-        (async () => {
-          try {
-            const data = await config.fetchFn(selectedTimeRange, '');
-            if (isMounted) {
-              config.setCache(selectedTimeRange, data);
-            }
-          } catch (err) {
-            // ignore background errors
-          }
-        })();
         return;
       }
 
@@ -250,11 +240,11 @@ const Dashboard = () => {
         const data = await config.fetchFn(selectedTimeRange, '');
         if (!isMounted) return;
         config.setCache(selectedTimeRange, data);
+        cacheTimestampsRef.current[cacheKey] = Date.now();
       } catch (err) {
       } finally {
         if (isMounted) {
           setLoadingBalanceHistory(false);
-          prefetchOtherRanges(selectedTimeRange, activeTab);
         }
       }
     };
@@ -264,7 +254,7 @@ const Dashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, [selectedTimeRange, activeTab, tabConfig, prefetchOtherRanges, setLoadingBalanceHistory, isLoggedIn]);
+  }, [selectedTimeRange, activeTab, tabConfig, setLoadingBalanceHistory, isLoggedIn]);
 
   const onTimeRangeChange = useCallback((duration: string) => {
     setSelectedTimeRange(duration as TimeRange);
@@ -321,6 +311,7 @@ const Dashboard = () => {
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to view your portfolio, track rewards, and manage your assets" />
           )}
+          {isLoggedIn && <LiquidationAlertBanner />}
           <div className={`grid grid-cols-1 ${rewardsEnabled && isLoggedIn ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
             <AssetSummary
               title="Net Balance"
@@ -398,35 +389,31 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* Refer a Friend Section */}
+          {/* Rewards Section */}
           <div className="mb-4 md:mb-8">
             <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 md:p-3 bg-blue-500 rounded-lg shrink-0">
-                    <UserPlus className="text-white" size={20} />
+                    <Coins className="text-white" size={20} />
                   </div>
                   <div>
-                    <h3 className="text-base md:text-lg font-semibold">Refer a Friend</h3>
-                    <p className="text-xs md:text-sm text-muted-foreground">
-                      Send tokens to friends who haven't signed up yet
-                    </p>
+                    <h3 className="text-base md:text-lg font-semibold">Rewards</h3>
+                    <div className="text-xs md:text-sm text-muted-foreground">
+                      {rewardsActivitiesLoading ? (
+                        <Skeleton className="h-4 w-36 mt-1" />
+                      ) : (
+                        <>Earn up to {highestIncentiveApy.toFixed(2)}% APY</>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <Button
-                  onClick={() => {
-                    // For non-logged-in users, redirect to My Referrals page (guest accessible)
-                    // For logged-in users, redirect to Refer Friend page
-                    if (!isLoggedIn) {
-                      navigate("/dashboard/referrals");
-                    } else {
-                      navigate("/dashboard/refer");
-                    }
-                  }}
+                  onClick={() => navigate("/dashboard/rewards?tab=activities")}
                   className="w-full md:w-auto flex items-center justify-center gap-2"
                 >
-                  <UserPlus className="h-4 w-4" />
-                  Get Started
+                  <Coins className="h-4 w-4" />
+                  Earn Rewards
                 </Button>
               </div>
             </div>

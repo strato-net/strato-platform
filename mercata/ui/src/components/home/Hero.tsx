@@ -11,6 +11,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import { redirectToLogin } from '@/lib/auth';
 import heroBackground from '../../assets/home/hero-background.png';
 import darkThemeBackground from '../../assets/home/darktheme-hero-bg.png';
 
@@ -24,8 +25,7 @@ const Hero = () => {
     if (isLoggedIn) {
       navigate('/dashboard');
     } else {
-      const theme = localStorage.getItem('theme') || 'light';
-      window.location.href = `/login?theme=${theme}`;
+      redirectToLogin();
     }
   };
 
@@ -75,10 +75,10 @@ const Hero = () => {
                   <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
                 </button>
                 <Link
-                  to="/dashboard/stats"
+                  to="/dashboard/rewards"
                   className="inline-flex items-center justify-center gap-2 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-foreground px-6 py-3 rounded-lg font-medium border border-border transition-all duration-300"
                 >
-                  Explore Stats
+                  Earn Rewards
             </Link>
           </div>
         </div>

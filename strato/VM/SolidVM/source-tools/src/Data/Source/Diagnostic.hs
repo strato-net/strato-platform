@@ -15,8 +15,8 @@ import Control.DeepSeq
 import Control.Lens hiding ((.=))
 import Data.Aeson hiding (Error)
 import Data.Data
+import Data.OpenApi
 import Data.Source.Severity
-import Data.Swagger
 import Data.Text (Text)
 import GHC.Generics
 import Test.QuickCheck
@@ -39,7 +39,7 @@ instance ToSchema SourceDiagnostic where
       NamedSchema
         (Just "SourceDiagnostic")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ toJSON (SourceDiagnostic Error "Unknown identifier: centralization")
             & description ?~ "SourceDiagnostic"
         )

@@ -7,28 +7,16 @@ module Blockchain.Slipstream.SQL where
 
 import           BlockApps.Logging
 import           Blockchain.Slipstream.Data.CirrusTables
-import           Blockchain.Slipstream.Options
 import           Blockchain.Slipstream.PostgresqlTypedShim
 import           Blockchain.Stream.Action                  (Delegatecall(..))
 import           Conduit
 import           Control.Monad
-import           Data.ByteString                           (ByteString)
-import qualified Data.ByteString.Char8                     as BC
 import           Data.Text                                 (Text)
 import           Data.Text.Encoding                        (encodeUtf8)
 import qualified Database.Esqueleto                        as E
 import           Database.Persist                          (insert_)
 import           Prelude                                   hiding (lookup)
 import           UnliftIO
-
-cirrusConnStr :: ByteString
-cirrusConnStr =
-    BC.pack $
-        "host="     ++ flags_pghost     ++ " " ++
-        "port="     ++ show flags_pgport ++ " " ++
-        "user="     ++ flags_pguser     ++ " " ++
-        "password=" ++ flags_password ++ " " ++
-        "dbname="   ++ flags_database
 
 insertDelegatecallPostgres :: (MonadUnliftIO m, MonadLogger m) => PGConnection -> Delegatecall -> m ()
 insertDelegatecallPostgres conn (Delegatecall storageAddr codeAddress Nothing contractName) = do

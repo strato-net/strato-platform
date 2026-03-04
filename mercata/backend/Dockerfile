@@ -30,6 +30,7 @@ RUN npm ci
 
 COPY --from=builder /build/dist ./dist
 COPY --from=builder /build/src/public ./src/public
+COPY backend/docker-run.sh ./
 
 EXPOSE 3001
 
@@ -42,4 +43,4 @@ HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
   CMD lsof -i :3001 || \
     exit 1
 
-CMD ["node", "dist/app.js"] 
+CMD ["sh", "docker-run.sh"]

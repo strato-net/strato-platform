@@ -10,7 +10,11 @@ import {
   removeLiquidity,
   swap,
   getSwapHistory,
-  setPoolRates
+  setPoolRates,
+  pausePool,
+  unpausePool,
+  disablePool,
+  enablePool
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -25,6 +29,8 @@ import {
   validateQueryParams,
   validateSwapHistoryArgs,
   validateSetPoolRatesArgs,
+  validateTogglePauseArgs,
+  validateToggleDisableArgs,
 } from "../validators/swapping.validator";
 import { validateAddressField } from "../validators/common.validators";
 
@@ -268,6 +274,42 @@ class SwappingController {
       validateSetPoolRatesArgs(body);
 
       const result = await setPoolRates(accessToken, body, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async togglePause(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateTogglePauseArgs(body);
+
+      const result = body.isPaused
+        ? await pausePool(accessToken, body.poolAddress, userAddress as string)
+        : await unpausePool(accessToken, body.poolAddress, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async toggleDisable(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateToggleDisableArgs(body);
+
+      const result = body.isDisabled
+        ? await disablePool(accessToken, body.poolAddress, userAddress as string)
+        : await enablePool(accessToken, body.poolAddress, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
