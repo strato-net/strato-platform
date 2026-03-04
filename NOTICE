@@ -10,6 +10,7 @@ BlockApps and STRATO are trademarks of BlockApps, Inc. Use of these trademarks i
 subject to BlockApps' trademark policy and does not imply endorsement.
 
 Third-Party Notices
+
 @adraffy/ens-normalize
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -3814,6 +3815,12 @@ Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:304.
 https://www.npmjs.com/package/bintrees
 
+bitwise
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/stack.yaml:101.
+https://hackage.haskell.org/package/bitwise
+
 blaze-builder
 Copyright Jasper Van der Jeugt 2010, Simon Meier 2010 & 2011
 Licensed under the BSD License.
@@ -4480,6 +4487,12 @@ Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:569.
 https://www.npmjs.com/package/commander
 
+common
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:12.
+https://hackage.haskell.org/package/common
+
 commondir
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -4623,6 +4636,12 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:3127.
 https://www.npmjs.com/package/content-type-parser
+
+contra-tracer
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/stack.yaml:103.
+https://hackage.haskell.org/package/contra-tracer
 
 contravariant
 Copyright 2007-2015 Edward Kmett
@@ -5140,6 +5159,12 @@ Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:763.
 https://www.npmjs.com/package/decamelize
 
+decimal
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/stack.yaml:105.
+https://hackage.haskell.org/package/decimal
+
 decimal.js-light
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -5265,6 +5290,12 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:802.
 https://www.npmjs.com/package/depd
+
+dependent-sum
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:30.
+https://hackage.haskell.org/package/dependent-sum
 
 dequeue
 Copyright (c) 2009, Henry Bucklow
@@ -5427,6 +5458,12 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:10944.
 https://www.npmjs.com/package/dom-helpers
+
+dom-lt
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/stack.yaml:106.
+https://hackage.haskell.org/package/dom-lt
 
 dom-serializer
 Copyright information is provided by the upstream package authors.
@@ -6412,6 +6449,12 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:5131.
 https://www.npmjs.com/package/fragment-cache
 
+free
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:14.
+https://hackage.haskell.org/package/free
+
 fresh
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -6573,6 +6616,30 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:1940.
 https://www.npmjs.com/package/getpass
+
+ghc-debug-client
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/stack.yaml:107.
+https://hackage.haskell.org/package/ghc-debug-client
+
+ghc-debug-common
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/stack.yaml:108.
+https://hackage.haskell.org/package/ghc-debug-common
+
+ghc-debug-convention
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/stack.yaml:109.
+https://hackage.haskell.org/package/ghc-debug-convention
+
+ghcjs-dom
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:15.
+https://hackage.haskell.org/package/ghcjs-dom
 
 gitrev
 Copyright (c) 2015, Adam C. Foltzer
@@ -6886,6 +6953,12 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:12121.
 https://www.npmjs.com/package/hono
 
+hoogle
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/stack.yaml:112.
+https://hackage.haskell.org/package/hoogle
+
 hosted-git-info
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
@@ -6897,6 +6970,12 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:6556.
 https://www.npmjs.com/package/hpack.js
+
+hspec
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/libs/secp256k1-haskell/blockapps-secp256k1-haskell.cabal:89.
+https://hackage.haskell.org/package/hspec
 
 html-comment-regex
 Copyright information is provided by the upstream package authors.
@@ -7023,6 +7102,12 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/services/bridge/package-lock.json:2640.
 https://www.npmjs.com/package/humanize-ms
+
+hunit
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/libs/json-rpc-server/json-rpc-server.cabal:78.
+https://hackage.haskell.org/package/hunit
 
 iconv-lite
 Copyright information is provided by the upstream package authors.
@@ -7858,6 +7943,12 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/backend/package-lock.json:1461.
 https://www.npmjs.com/package/js-yaml
 
+jsaddle
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:19.
+https://hackage.haskell.org/package/jsaddle
+
 jsbn
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -8061,6 +8152,12 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/backend/package-lock.json:1482.
 https://www.npmjs.com/package/kuler
+
+labeled-error
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/libs/secp256k1-haskell/blockapps-secp256k1-haskell.cabal:90.
+https://hackage.haskell.org/package/labeled-error
 
 largeint
 Copyright Eitan Chatav (c) 2017
@@ -8716,6 +8813,12 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:12918.
 https://www.npmjs.com/package/modern-ahocorasick
 
+modern-uri
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:27.
+https://hackage.haskell.org/package/modern-uri
+
 moment
 Copyright (c) JS Foundation and other contributors
 Licensed under the MIT License.
@@ -9075,6 +9178,30 @@ Copyright information is provided by the upstream package authors.
 Licensed under the Apache-2.0 License (per npm registry metadata).
 See apex/api/package-lock.json:2862.
 https://www.npmjs.com/package/oauth-sign
+
+obelisk-executable-config-lookup
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:23.
+https://hackage.haskell.org/package/obelisk-executable-config-lookup
+
+obelisk-frontend
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:17.
+https://hackage.haskell.org/package/obelisk-frontend
+
+obelisk-generated-static
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:24.
+https://hackage.haskell.org/package/obelisk-generated-static
+
+obelisk-route
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:18.
+https://hackage.haskell.org/package/obelisk-route
 
 obj-multiplex
 Copyright information is provided by the upstream package authors.
@@ -10882,6 +11009,18 @@ Licensed under the MIT License.
 See smd-ui/licenses/redux-saga-testing.
 https://www.npmjs.com/package/redux-saga-testing
 
+reflex
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:20.
+https://hackage.haskell.org/package/reflex
+
+reflex-dom
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:21.
+https://hackage.haskell.org/package/reflex-dom
+
 regenerate
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -11205,6 +11344,12 @@ Copyright information is provided by the upstream package authors.
 Licensed under the Apache License, Version 2.0 License (per npm registry metadata).
 See smd-ui/package-lock.json:12239.
 https://www.npmjs.com/package/rx-lite-aggregates
+
+safe
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/stack.yaml:117.
+https://hackage.haskell.org/package/safe
 
 safe-buffer
 Copyright information is provided by the upstream package authors.
@@ -11854,6 +11999,12 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:15204.
 https://www.npmjs.com/package/strict-uri-encode
 
+string-conversions
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/libs/secp256k1-haskell/blockapps-secp256k1-haskell.cabal:64.
+https://hackage.haskell.org/package/string-conversions
+
 string-convert
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -12141,6 +12292,24 @@ Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per npm registry metadata).
 See smd-ui/package-lock.json:1290.
 https://www.npmjs.com/package/test-exclude
+
+test-framework
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/libs/json-rpc-server/json-rpc-server.cabal:79.
+https://hackage.haskell.org/package/test-framework
+
+test-framework-hunit
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/libs/json-rpc-server/json-rpc-server.cabal:80.
+https://hackage.haskell.org/package/test-framework-hunit
+
+test-framework-quickcheck2
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/libs/bloomfilter/bloomfilter.cabal:62.
+https://hackage.haskell.org/package/test-framework-quickcheck2
 
 tether
 Copyright information is provided by the upstream package authors.
@@ -12580,6 +12749,12 @@ Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:4216.
 https://www.npmjs.com/package/universalify
 
+universe
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:32.
+https://hackage.haskell.org/package/universe
+
 unix
 Copyright 2004, The University Court of the University of Glasgow.
 Licensed under the BSD License.
@@ -12807,6 +12982,12 @@ Copyright (c) 2008-2012, Roman Leshchinskiy
 Licensed under the BSD License.
 See strato/extraFiles/strato/licenses/vector.
 https://hackage.haskell.org/package/vector
+
+vector-algorithms
+Copyright information is provided by the upstream package authors.
+Licensed under terms in the referenced package metadata.
+See strato/libs/json-rpc-client/json-rpc-client.cabal:51.
+https://hackage.haskell.org/package/vector-algorithms
 
 vendors
 Copyright information is provided by the upstream package authors.
