@@ -11,6 +11,8 @@ import { ensureHexPrefix } from '@/utils/numberUtils';
 import { usdstAddress } from '@/lib/constants';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+const normalizeStratoAccount = (account?: string) => (account || '').replace(/^0x/i, '');
+
 const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   const isMobile = useIsMobile();
   const [currentPage, setCurrentPage] = useState(1);
@@ -20,35 +22,37 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   const [selectedType, setSelectedType] = useState<'bridge' | 'convert' | ''>('');
   const [transactions, setTransactions] = useState<any[]>([]);
 
+  const [isLoading, setIsLoading] = useState(false);
   const {
-    loading: isLoading,
     fetchWithdrawTransactions,
     availableNetworks,
+    withdrawalRefreshKey,
   } = useBridgeContext();
 
   useEffect(() => {
     const loadTransactions = async () => {
+      setIsLoading(true);
       try {
         const params: Record<string, string> = {
           limit: ITEMS_PER_PAGE.toString(),
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
           order: 'block_timestamp.desc',
         };
-        
+
         if (selectedType === 'convert') {
           (params as any)["value->>stratoToken"] = `eq.${usdstAddress}`;
         } else if (selectedType === 'bridge') {
           (params as any)["value->>stratoToken"] = `neq.${usdstAddress}`;
         }
-        
+
         if (withdrawalStatus !== 0) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
         }
-        
+
         if (selectedChainId !== 0) {
           (params as any)["value->>externalChainId"] = `eq.${selectedChainId}`;
         }
-        
+
         const result = await fetchWithdrawTransactions(params, context);
         setTransactions(result.data);
         setTotalCount(result.totalCount);
@@ -56,19 +60,43 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         console.error('Error loading transactions:', error);
         setTransactions([]);
         setTotalCount(0);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadTransactions();
-  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType]);
+  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType, withdrawalRefreshKey]);
 
   const columns = [
     {
       title: 'From (STRATO)',
       key: 'from',
       render: (_: any, record: any) => {
-        const addr = ensureHexPrefix(record?.WithdrawalInfo?.stratoSender) || '';
-        return addr ? renderTruncatedAddressWithCopy(addr, handleCopyToClipboard) : '-';
+        const rawAddr = record?.WithdrawalInfo?.stratoSender || '';
+        const displayAddr = normalizeStratoAccount(rawAddr);
+        const linkAddr = ensureHexPrefix(rawAddr) || '';
+        const chainIdStr = record?.WithdrawalInfo?.externalChainId ? String(record.WithdrawalInfo.externalChainId) : '1';
+        const txUrl = getExplorerUrl(chainIdStr, '0x');
+        const base = txUrl.split('/tx/')[0];
+        const addressUrl = linkAddr ? `${base}/address/${linkAddr}` : '';
+
+        return displayAddr ? (
+          <div className="group relative flex items-center gap-2">
+            <a
+              href={addressUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800"
+            >
+              {`${displayAddr.slice(0, 6)}...${displayAddr.slice(-4)}`}
+            </a>
+            <CopyOutlined
+              className="text-muted-foreground hover:text-blue-500 cursor-pointer transition-colors"
+              onClick={() => handleCopyToClipboard(displayAddr)}
+            />
+          </div>
+        ) : '-';
       },
       width: 100,
     },

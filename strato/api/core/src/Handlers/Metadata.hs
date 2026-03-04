@@ -17,7 +17,7 @@
 module Handlers.Metadata
   ( API,
     getMetaDataClient,
-    MetadataResponse,
+    MetadataResponse(..),
     server,
     UrlMap,
   )
@@ -26,7 +26,8 @@ where
 import BlockApps.Logging
 import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Options (computeNetworkID)
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
@@ -38,7 +39,7 @@ import Data.Aeson hiding (Success)
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Map (Map, fromList)
 import Data.Maybe (fromJust, fromMaybe)
-import Data.Swagger hiding (url)
+import Data.OpenApi hiding (url, server)
 import GHC.Generics
 import qualified LabeledError
 import Servant
@@ -94,12 +95,8 @@ exMetadataRespone =
 -- | The model's field modifiers will match the JSON instances
 metadataSchemaOptions :: SchemaOptions
 metadataSchemaOptions =
-  SchemaOptions
-    { fieldLabelModifier = camelCase . dropFPrefix,
-      constructorTagModifier = id,
-      datatypeNameModifier = id,
-      allNullaryToStringTag = True,
-      unwrapUnaryRecords = True
+  defaultSchemaOptions
+    { Data.OpenApi.fieldLabelModifier = camelCase . dropFPrefix
     }
 
 getMetaData ::
@@ -115,7 +112,7 @@ getMetaData =
     isSynced <- checkIsSynced
     V.AddressAndKey a k <- getPubKeyAndAddress
     urlMap <- access (Proxy @UrlMap)
-    pure $ MetadataResponse k a validators isSynced True (show computeNetworkID) urlMap
+    pure $ MetadataResponse k a validators isSynced True (show $ Conf.networkID (networkConfig ethConf)) urlMap
 
 getPubKeyAndAddress :: (MonadLogger m, Accessible V.PublicKey m) => m V.AddressAndKey
 getPubKeyAndAddress = do

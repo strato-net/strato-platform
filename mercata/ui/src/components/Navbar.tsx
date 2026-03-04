@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { useUser } from '@/context/UserContext';
 import { useNetwork } from '@/context/NetworkContext';
+import { redirectToLogin } from '@/lib/auth';
 import { ModeToggle } from './mode-toggle';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
@@ -21,8 +22,7 @@ const Navbar = () => {
     if (isLoggedIn) {
       logout();
     } else {
-      const theme = resolvedTheme || 'light';
-      window.location.href = `/login?theme=${theme}`;
+      redirectToLogin();
     }
   };
 

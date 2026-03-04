@@ -42,9 +42,9 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Lazy as BL
 import Data.Ix
+import Data.OpenApi hiding (Format, format)
+import Data.OpenApi.Internal.Schema (named)
 import qualified Data.Primitive.ByteArray as PBA
-import Data.Swagger hiding (Format, format)
-import Data.Swagger.Internal.Schema (named)
 import qualified Data.Text as T
 import Foreign.ForeignPtr
 import Foreign.Ptr
@@ -202,13 +202,13 @@ instance ToSchema Word256 where
       NamedSchema
         (Just "Word256")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
             & description ?~ "Fixed-size words of 256 bits"
         )
 
 instance ToParamSchema Word256 where
-  toParamSchema _ = mempty & type_ ?~ SwaggerString
+  toParamSchema _ = mempty & type_ ?~ OpenApiString
 
 instance ToHttpApiData Word256 where
   toUrlPiece = T.pack . ("0x" ++) . flip showHex ""

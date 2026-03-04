@@ -9,7 +9,7 @@ import Blockchain.Data.RLP
 import Control.DeepSeq (NFData)
 import Control.Lens.Operators
 import Data.Aeson hiding (Array, String)
-import Data.Swagger
+import Data.OpenApi
 import GHC.Generics
 import Test.QuickCheck hiding ((.&.))
 
@@ -34,7 +34,7 @@ instance FromJSON Gas where
 instance ToParamSchema Gas where
   toParamSchema _ =
     mempty
-      & type_ ?~ SwaggerInteger
+      & type_ ?~ OpenApiInteger
       & minimum_ ?~ 0
       & maximum_ ?~ (2 ^ (256 :: Integer) - 1)
       & format ?~ "hex string"
@@ -45,7 +45,7 @@ instance ToSchema Gas where
       NamedSchema
         (Just "Gas")
         ( mempty
-            & type_ ?~ SwaggerInteger
+            & type_ ?~ OpenApiInteger
             & example ?~ toJSON (Gas 1000)
             & description ?~ "Number of Gas units"
         )

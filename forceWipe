@@ -14,4 +14,4 @@ do
 	docker volume rm $volume
 done
 
-killall strato-api strato-p2p strato-sequencer blockapps-vault-proxy-server
+killall strato-api strato-p2p strato-sequencer

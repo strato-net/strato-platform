@@ -117,7 +117,7 @@ const SwapPoolsSection = () => {
 
 
   const filteredPools = pools.filter(pool => 
-    pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
+    !pool.isDisabled && pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const formatYourLiquidityValue = (pool: Pool): string => {
@@ -163,7 +163,7 @@ const SwapPoolsSection = () => {
           filteredPools.map((pool, id) => (
             <Card key={id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 gap-4">
                   <div className="flex items-center">
                     <div className="flex items-center -space-x-2 mr-3">
                       {pool.tokenA?.images?.[0]?.value ? (
@@ -220,24 +220,30 @@ const SwapPoolsSection = () => {
                       )}
                     </div>
                   </div>
+                  {pool.isPaused && (
+                    <div className="flex flex-1 items-center justify-center">
+                      <span className="text-xs text-muted-foreground">Pool is paused by admin at this time.</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
                     <div className="text-left sm:text-right">
                       <div className="text-sm text-muted-foreground">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
                
-                    <div className="flex space-x-2">
-                      <Button
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex space-x-2">
+                        <Button
                         size="sm"
-                        className="bg-strato-blue hover:bg-strato-blue/90"
+                        className="bg-strato-blue hover:bg-strato-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => handleOpenDepositModal(pool)}
-                        disabled={!isLoggedIn}
+                        disabled={!isLoggedIn || pool.isPaused}
                       >
                         <CircleArrowDown className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Deposit</span>
                         <span className="sm:hidden">+</span>
-                      </Button>
-                      <Button
+                        </Button>
+                        <Button
                         size="sm"
                         variant="outline"
                         className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
@@ -248,7 +254,8 @@ const SwapPoolsSection = () => {
                         <CircleArrowUp className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Withdraw</span>
                         <span className="sm:hidden">-</span>
-                      </Button>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>

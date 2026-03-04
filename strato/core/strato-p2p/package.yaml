@@ -23,8 +23,10 @@ executables:
       - lifted-async
       - ordered-containers
       - process-monitor
+      - strato-conf
       - strato-model
       - strato-p2p
+      - vault-monad
       - vm-tools
       - wai-middleware-prometheus
       - warp
@@ -37,8 +39,6 @@ library:
     - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-vault-wrapper-api
-    - blockapps-vault-wrapper-client
     - blockDB
     - blockstanbul
     - bytestring
@@ -83,6 +83,7 @@ library:
     - time
     - unliftio-core
     - unliftio
+    - vault-monad
     - warp
 
 #removing p2p tests for now, it is more work to keep updating this than the reward it is giving

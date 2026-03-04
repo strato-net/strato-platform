@@ -26,8 +26,8 @@ import qualified Data.ByteString.Lazy as BSL
 import Data.Decimal
 import Data.Either
 import qualified Data.Map.Strict as Map
+import Data.OpenApi hiding (value)
 import Data.Scientific
-import Data.Swagger
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text

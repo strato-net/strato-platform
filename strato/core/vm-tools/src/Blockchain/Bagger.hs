@@ -39,7 +39,8 @@ import Blockchain.Timing
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
-import Blockchain.VMOptions
+import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.Verification as V
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -58,7 +59,6 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
-import Executable.EVMFlags (flags_maxTxsPerBlock)
 import Text.Format
 
 {-# NOINLINE baggerBlockHash #-}
@@ -296,7 +296,7 @@ makeNewBlock mineTransactions mSelfAddress = do
           let lastSR = B.lastExecutedStateRoot cache
           let lastSHA = B.bestBlockSHA cache
           let lastHead = B.bestBlockHeader cache
-          let promoted = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
+          let promoted = take ((fromInteger (Conf.maxTxsPerBlock (quarryConfig ethConf))) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
           let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty
           let remGas = B.remainingGas cache
@@ -546,9 +546,9 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
       txn = TD.transactionNonce bt
       txFee = B.calculateIntrinsicTxFee state t
       txSize = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt
-  when (intrinsicGas >= flags_gasLimit)
+  when (intrinsicGas >= Conf.gasLimit (networkConfig ethConf))
     . throwE
-    $ GasLimitExceeded Validation Incoming intrinsicGas flags_gasLimit t
+    $ GasLimitExceeded Validation Incoming intrinsicGas (Conf.gasLimit (networkConfig ethConf)) t
   (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
   when (addressNonce > txn)
     . throwE
@@ -556,9 +556,9 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   when (addressBalance < txFee)
     . throwE
     $ BalanceTooLow Validation Incoming txFee addressBalance t
-  when (txSize >= toInteger flags_txSizeLimit)
+  when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
     . throwE
-    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger flags_txSizeLimit) t
+    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
   when (otHash t `S.member` knownFailedTxs) $ do
     liftIO $ putStrLn $ "################################ otHash = " ++ format (otHash t)
     throwE $ KnownFailedTX Validation Incoming t

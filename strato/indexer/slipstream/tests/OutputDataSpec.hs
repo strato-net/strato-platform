@@ -70,8 +70,7 @@ createDummyContract v =
         _varVisibility= Just Public,
         _varInitialVal=Nothing,
         _varContext=error "varContext undefined",
-        _isImmutable = False,
-        _isRecord = True
+        _isImmutable = False
         }
   in
     Contract{
@@ -90,7 +89,6 @@ createDummyContract v =
       _usings=undefined,
       _contractType=undefined,
       _importedFrom=undefined,
-      _isContractRecord=undefined,
       _contractContext=undefined
     }
 

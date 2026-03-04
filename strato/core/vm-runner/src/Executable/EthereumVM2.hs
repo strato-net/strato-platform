@@ -25,7 +25,6 @@ import Blockchain.BlockChain
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.BlockSummaryDB
-import Blockchain.DB.ChainDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
@@ -41,6 +40,8 @@ import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.VMContext
 import Blockchain.VMMetrics
+import Blockchain.EthConf (ethConf, quarryConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Conduit hiding (Flush)
 import Control.Arrow ((&&&), (***))
 import Control.Monad
@@ -51,7 +52,6 @@ import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Traversable (for)
-import Executable.EVMFlags
 import Prometheus
 import qualified Text.Colors as CL
 import Text.Format (format)
@@ -59,7 +59,7 @@ import Text.Printf
 import Text.Tools
 
 microtimeCutoff :: Microtime
-microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
+microtimeCutoff = secondsToMicrotime (Conf.mempoolLivenessCutoff (quarryConfig ethConf))
 {-# NOINLINE microtimeCutoff #-}
 
 handleVmEvents ::
@@ -74,15 +74,13 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   lift . for_ mpNodesResps $ A.insertMany (A.Proxy @MP.NodeData) . M.fromList . map (toSR &&& id)
 
   rpcResps <- lift $ do
-    bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
-    resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
+    resps <- traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
   yieldMany $! uncurry OutJSONRPC <$> rpcResps
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   processBlocks blocks
-
 
   mPreDec <- lift $ do
     case preprepareBlock of

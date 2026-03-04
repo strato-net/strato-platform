@@ -11,7 +11,7 @@ import Data.Aeson
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as KeyMap
 import Data.Int (Int32)
-import Data.Swagger
+import Data.OpenApi hiding (value)
 import Data.Text (Text)
 import GHC.Generics
 import qualified Generic.Random as GR
@@ -47,7 +47,7 @@ instance Arbitrary Type where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Type where
   declareNamedSchema proxy =
-    genericDeclareNamedSchemaUnrestricted defaultSchemaOptions proxy
+    genericDeclareNamedSchema defaultSchemaOptions proxy
       & mapped . name ?~ "Solidity type"
       & mapped . schema . description ?~ "Represents a soldity type"
       & mapped . schema . example ?~ toJSON Address

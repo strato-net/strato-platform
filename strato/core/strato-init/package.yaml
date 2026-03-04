@@ -19,6 +19,7 @@ library:
   - aeson
   - base16-bytestring
   - blockapps-data
+  - data-default
   - blockapps-datadefs
   - blockapps-mpdbs
   - blockapps-vault-wrapper-api
@@ -29,7 +30,6 @@ library:
   - conduit
   - containers
   - directory
-  - ethereum-discovery
   - ethereum-rlp
   - evm-solidity
   - exceptions
@@ -50,6 +50,7 @@ library:
   - redis-monad
   - resourcet
   - servant-client
+  - strato-auth
   - solid-vm
   - solid-vm-compiler
   - solid-vm-model
@@ -58,7 +59,6 @@ library:
   - strato-genesis
   - strato-index
   - strato-model
-  - strato-networks
   - strato-sequencer
   - strato-statediff
   # - strato-p2p

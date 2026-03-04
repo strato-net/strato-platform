@@ -13,6 +13,7 @@ import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
+import { redirectToLogin } from '@/lib/auth';
 import MintProgressModal, { type ProgressStep } from '../../../MintProgressModal';
 import LoanForm from './LoanForm';
 import VaultBreakdown from './VaultBreakdown';
@@ -820,10 +821,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
           {/* Confirm Button / Sign In Button */}
           {guestMode ? (
             <Button
-              onClick={() => {
-                const theme = localStorage.getItem('theme') || 'light';
-                window.location.href = `/login?theme=${theme}`;
-              }}
+              onClick={() => redirectToLogin()}
               className="w-full"
             >
               Sign in to mint USDST

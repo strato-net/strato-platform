@@ -29,8 +29,6 @@ library:
     - binary
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-vault-wrapper-api #Will need to be changed
-    - blockapps-vault-wrapper-client
     - blockDB
     - bytestring
     - common-log
@@ -39,6 +37,7 @@ library:
     - containers
     - cpu
     - crypto-pubkey-types
+    - data-default
     - either
     - entropy
     - errors
@@ -60,9 +59,9 @@ library:
     - persistent-postgresql
     - prometheus-client
     - random
-    - servant-client
     - split
     - strato-conf
+    - vault-monad
     - strato-model
     - strato-redis-blockdb
     - text
@@ -80,11 +79,13 @@ executables:
       - ethereum-discovery
       - format
       - hflags
-      - monad-alter
+      - monad-logger
       - mtl
       - process-monitor
       - resourcet
       - strato-conf
+      - strato-networks
+      - vault-monad
       - text
       - unliftio
   strato-network-monitor:

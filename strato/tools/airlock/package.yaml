@@ -10,6 +10,10 @@ description: |
   Supports shielding, unshielding, and managing private token balances.
 license: Apache-2.0
 
+data-files:
+  - circuits/01x02/*
+  - data/english.txt
+
 dependencies:
   - base
 
@@ -21,6 +25,7 @@ library:
     - Railgun.Unshield
     - Railgun.Transfer
     - Railgun.Crypto
+    - Railgun.BIP39
     - Railgun.Types
     - Railgun.API
     - Railgun.Scan
@@ -37,6 +42,8 @@ library:
     - base64-bytestring
     - bloc2api
     - bloc2client
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
     - bytestring
     - containers
     - cryptonite
@@ -48,9 +55,13 @@ library:
     - process
     - servant-client
     - servant-client-core
+    - core-api2
+    - strato-auth
+    - strato-conf
     - strato-model
     - temporary
     - text
+    - yaml
     - transformers
     - vector
     - directory
@@ -64,12 +75,17 @@ executables:
     source-dirs: exec_src/
     main: Main.hs
     other-modules: []
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
     dependencies:
       - aeson
       - airlock
       - base16-bytestring
       - bloc2api
       - bytestring
+      - core-api2
       - directory
       - filepath
       - http-client
@@ -77,6 +93,10 @@ executables:
       - http-types
       - network-uri
       - optparse-applicative
+      - servant-client
+      - strato-auth
+      - strato-conf
       - strato-model
       - text
       - time
+      - yaml
