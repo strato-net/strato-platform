@@ -28,7 +28,7 @@ while true; do
     });
   " 2>/dev/null || echo "false")
 
-  if [ "${IS_SYsudo docker exec -it NCED}" = "true" ]; then
+  if [ "${IS_SYNCED}" = "true" ]; then
     echo "STRATO node is fully synced!"
     break
   fi
