@@ -146,8 +146,7 @@ eth_coinbase :: Method Server
 eth_coinbase = toMethod "eth_coinbase" f ()
   where
     f :: RpcResult Server String
-    f = do
-      return "0x0000000000000000000000000000000000000000"
+    f = return "0x0000000000000000000000000000000000000000"
 
 eth_mining :: Method Server
 eth_mining = toMethod "eth_mining" f ()

@@ -1,5 +1,8 @@
 {- ORMOLU_DISABLE -}
 {-# OPTIONS -fno-warn-unused-imports              #-}
+{-# OPTIONS_GHC -fno-warn-orphans                 #-}
+{-# LANGUAGE FlexibleInstances                    #-}
+{-# LANGUAGE MultiParamTypeClasses                #-}
 {-# LANGUAGE OverloadedStrings                    #-}
 {-# LANGUAGE RecordWildCards                      #-}
 {-# LANGUAGE ScopedTypeVariables                  #-}
@@ -104,19 +107,25 @@ dedupWindow = 100
 myPriv :: PrivateKey
 myPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "myPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
-runTestM :: SequencerM a -> IO ()
+-- Test-only HasVault instance that uses the test private key
+instance {-# OVERLAPPING #-} HasVault IO where
+  sign mesg = return $ signMsg myPriv mesg
+  getPub = error "called getPub in test, but this should never happen"
+  getShared _ = error "called getShared in test, but this should never happen"
+
+runTestM :: SequencerMTest a -> IO ()
 runTestM m = do
   gb <- makeGenesisBlock
   void $ withTemporaryDepBlockDB gb m
 
-runTestMWithGenesis :: (Keccak256 -> SequencerM a) -> IO ()
+runTestMWithGenesis :: (Keccak256 -> SequencerMTest a) -> IO ()
 runTestMWithGenesis m = do
   gb <- makeGenesisBlock
   let hsh = blockHash . ingestBlockToBlock $ gb
   void $ withTemporaryDepBlockDB gb (m hsh)
 
 
-withTemporaryDepBlockDB :: IngestBlock -> SequencerM a -> IO a
+withTemporaryDepBlockDB :: IngestBlock -> SequencerMTest a -> IO a
 withTemporaryDepBlockDB genesisBlock m = do
     cwd          <- getCurrentDirectory
     randomSuffix <- generate $ (arbitrary :: Gen Integer) `suchThat` (>1000)
@@ -131,14 +140,12 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
                                , seenTransactionDBSize = dedupWindow
-                               , syncWrites            = False
                                , blockstanbulBlockPeriod = BlockPeriod 0
                                , blockstanbulRoundPeriod = RoundPeriod 10000000
                                , blockstanbulTimeouts = tch
                                , cablePackage = pkg
                                , maxUsPerIter = 200
                                , maxEventsPerIter = 10
-                               , vaultClient = Nothing
                                , kafkaClientId = "dummyClientId"
                                , redisConn = error "withTemporaryDepBlockDB: redisConn"
                                }
@@ -154,7 +161,7 @@ withTemporaryDepBlockDB genesisBlock m = do
           bootstrapGenesisBlock hsh difficulty
           A.insert (A.Proxy @X509CertInfoState) myAddr $ cmpsToXcis myAddr myCM
           A.insert (A.Proxy @EmittedBlock) hsh alreadyEmittedBlock
-    runNoLoggingT (runSequencerM cfg ctx (boot >> m))
+    runNoLoggingT (runSequencerMTest cfg ctx (boot >> m))
       `finally`
       (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
@@ -166,7 +173,7 @@ feedBackOutputsToInput = map rebox
           unboxTx (OutputTx origin _ _ base _) = IngestTx origin base
           unboxBlockTx (OutputTx _ _ _ base _) = base
 
-mkBlk :: Keccak256 -> Integer -> SequencerM Block
+mkBlk :: Keccak256 -> Integer -> SequencerMTest Block
 mkBlk parent num = do
   ctx <- getBlockstanbulContext
   let blk0 = makeBlock 2 1
@@ -352,7 +359,7 @@ spec = do
       it "should sequence blocks out of order in blockstanbul" . runTestMWithGenesis $ \h -> do
         ctx <- getBlockstanbulContext
         let ieBlk = IEBlock . blockToIngestBlock TO.Morphism
-            mkBlkChn :: Int -> Keccak256 -> Integer -> SequencerM [Block]
+            mkBlkChn :: Int -> Keccak256 -> Integer -> SequencerMTest [Block]
             mkBlkChn 0 _ _ = return []
             mkBlkChn n p i = do
               b <- mkBlk p i

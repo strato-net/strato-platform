@@ -39,9 +39,9 @@ $(info )
 
 all: mercata
 
-docker: build_all_docker docker-compose eks
+docker: build_all_docker docker-compose
 
-all_develop: build_develop docker-compose eks
+all_develop: build_develop docker-compose
 
 mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
 
@@ -49,7 +49,7 @@ build_all_docker: build_common_docker strato_docker apex highway highway-nginx n
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend bridge bridge-nginx oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions
+.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose highway highway-nginx mercata mercata-backend bridge bridge-nginx oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions
 
 apex:
 	@echo Now building apex...
@@ -103,12 +103,6 @@ oracle:
 	# TODO: #dcpush - replace with proper docker compose push flow
 	#echo "${REPO_URL}oracle:${VERSION}" > oracle_image_tag
 	#echo "${REPO_AWS_ECR_URL}oracle:${VERSION}" > oracle_image_tag_ecr
-
-eks:
-	@echo Now generating eks manifest files
-	cd k8s/eks/strato && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' strato-platform-manifest.tpl.yaml > strato-platform-manifest.yaml
-	cd k8s/eks/vault && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-vault-deployment.tpl.yaml > eks-vault-deployment.yaml
-	#TODO: create eks manifests for highway server, etc...
 
 build_formatter:
 	@echo building code formatter...

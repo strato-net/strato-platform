@@ -644,7 +644,12 @@ runShield sopts = do
           Left err -> do
             TIO.hPutStrLn stderr $ "Approval failed: " <> err
             exitFailure
-          Right results -> TIO.putStrLn $ "Approval successful: " <> T.pack (show $ length results) <> " transaction(s)"
+          Right results -> do
+            TIO.putStrLn $ "Approval response: " <> T.pack (show $ length results) <> " transaction(s)"
+            mapM_ printTxResult results
+            when (any ((== Bloc.Failure) . blocTransactionStatus) results) $ do
+              TIO.hPutStrLn stderr "Approval transaction failed on-chain"
+              exitFailure
       
       -- Send shield transaction
       TIO.putStrLn "Sending shield transaction..."
