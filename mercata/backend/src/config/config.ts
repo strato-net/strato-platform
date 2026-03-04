@@ -83,6 +83,7 @@ export const defaultVaultFactoryFor: Record<string, string> = {
 
 export const defaultCreditCardTopUpFor: Record<string, string> = {
   "114784819836269": "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6", // Helium testnet
+  "33056204878082667": "656139504763b2fab4e158ddb1f4ca8eb878305d" // Upquark mainnet
 };
 
 export let bridgeUrl: string | undefined;
