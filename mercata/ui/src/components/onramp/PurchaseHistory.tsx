@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 const ITEMS_PER_PAGE = 8;
 
-const PurchaseHistory = () => {
+const PurchaseHistory = ({ refreshKey }: { refreshKey?: number }) => {
   const [page, setPage] = useState(1);
   const [transactions, setTransactions] = useState<OnrampTransaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -52,7 +52,7 @@ const PurchaseHistory = () => {
       }
     };
     load();
-  }, [page]);
+  }, [page, refreshKey]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
 

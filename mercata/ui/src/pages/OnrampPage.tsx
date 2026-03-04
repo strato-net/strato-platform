@@ -10,7 +10,7 @@ import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
 import { getConfig } from "@/lib/config";
-import { Loader2, AlertCircle, CheckCircle2, Info, CreditCard, ArrowDown, Wallet } from "lucide-react";
+import { Loader2, AlertCircle, Info, CreditCard, ArrowDown, Wallet } from "lucide-react";
 
 type SessionStatus =
   | "idle"
@@ -32,7 +32,7 @@ const OnrampPage = () => {
   const [onrampTxHash, setOnrampTxHash] = useState<string | null>(null);
   const [onrampCurrency, setOnrampCurrency] = useState<string | null>(null);
   const [onrampAmount, setOnrampAmount] = useState<string | null>(null);
-  const [creditedSummary, setCreditedSummary] = useState<string | null>(null);
+  const [purchaseRefreshKey, setPurchaseRefreshKey] = useState(0);
   const onrampContainerRef = useRef<HTMLDivElement>(null);
 
   const initOnramp = useCallback(async () => {
@@ -76,10 +76,6 @@ const OnrampPage = () => {
           const currency = session.quote?.destination_currency?.asset_code || session.transaction_details?.destination_currency || null;
           setOnrampCurrency(currency);
           setOnrampAmount(amount);
-          const stratoToken = currency === "eth" ? "ETHST" : currency === "usdc" ? "USDST" : currency?.toUpperCase();
-          if (amount && stratoToken) {
-            setCreditedSummary(`${Number(amount).toFixed(6)} ${stratoToken}`);
-          }
           console.log(`[OnrampPage] fulfillment_complete — txHash=${txHash}`);
           setOnrampTxHash(txHash || null);
           setShowProgressModal(true);
@@ -110,13 +106,12 @@ const OnrampPage = () => {
         return null;
       case "fulfillment_complete":
         return (
-          <div className="flex items-start gap-2 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg text-sm">
-            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>
-              Purchase complete! Your STRATO account has been credited{" "}
-              {creditedSummary ? <strong>{creditedSummary}</strong> : "tokens"}.
-            </span>
-          </div>
+          <button
+            onClick={initOnramp}
+            className="w-full py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            Make Another Purchase
+          </button>
         );
       case "rejected":
         return (
@@ -212,7 +207,7 @@ const OnrampPage = () => {
                   </ol>
                 </div>
 
-                <PurchaseHistory />
+                <PurchaseHistory refreshKey={purchaseRefreshKey} />
               </div>
             )}
           </div>
@@ -225,7 +220,7 @@ const OnrampPage = () => {
         externalTxHash={onrampTxHash}
         currency={onrampCurrency}
         amount={onrampAmount}
-        onClose={() => setShowProgressModal(false)}
+        onClose={() => { setShowProgressModal(false); setPurchaseRefreshKey((k) => k + 1); }}
       />
     </div>
   );

@@ -77,7 +77,7 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
   const getStepIcon = (idx: number) => {
     if (idx < activeStepIndex) return <CheckCircle2 className="w-5 h-5 text-green-500" />;
     if (idx === activeStepIndex) {
-      if (isDone) return <Clock className="w-5 h-5 text-yellow-500" />;
+      if (isDone) return <CheckCircle2 className="w-5 h-5 text-green-500" />;
       return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
     }
     return <Clock className="w-5 h-5 text-muted-foreground" />;
@@ -146,16 +146,12 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
             const isCompleted = status === "completed";
             const isCurrentStep = index === activeStepIndex;
             const isCollapsed = collapsedSteps.has(index);
-            const isCreditedStep = step.key === "credited" && isCurrentStep;
-
             return (
               <div
                 key={step.key}
                 className={`rounded-lg transition-all ${
                   isActive
                     ? "bg-blue-500/10 border-2 border-blue-500/30"
-                    : isCompleted && isCreditedStep
-                    ? "bg-yellow-500/10 border border-yellow-500/30"
                     : isCompleted
                     ? "bg-green-500/10 border border-green-500/30"
                     : "bg-muted/30 border border-border"
@@ -164,7 +160,7 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
                 {isCollapsed ? (
                   <div
                     className={`flex items-center gap-3 px-4 py-2 transition-colors cursor-pointer ${
-                      isCreditedStep ? "hover:bg-yellow-500/20" : isCompleted ? "hover:bg-green-500/20" : "hover:bg-muted/50"
+                      isCompleted ? "hover:bg-green-500/20" : "hover:bg-muted/50"
                     }`}
                     onClick={() => setCollapsedSteps((prev) => {
                       const next = new Set(prev);
@@ -175,11 +171,11 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
                     <div className="flex-shrink-0">{getStepIcon(index)}</div>
                     <div className="flex-1 min-w-0">
                       <h4 className={`font-medium text-sm ${
-                        isCreditedStep ? "text-yellow-500" : isCompleted ? "text-green-500" : "text-muted-foreground"
+                        isCompleted ? "text-green-500" : "text-muted-foreground"
                       }`}>{step.label}</h4>
                     </div>
                     <span className={`text-xs ${
-                      isCreditedStep ? "text-yellow-500" : isCompleted ? "text-green-500" : "text-muted-foreground"
+                      isCompleted ? "text-green-500" : "text-muted-foreground"
                     }`}>Click to expand</span>
                   </div>
                 ) : (
@@ -191,8 +187,6 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
                           className={`font-medium ${
                             isActive
                               ? "text-blue-500"
-                              : isCompleted && isCreditedStep
-                              ? "text-yellow-500"
                               : isCompleted
                               ? "text-green-500"
                               : "text-muted-foreground"
@@ -207,9 +201,7 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
                           <button
                             onClick={() => setCollapsedSteps((prev) => new Set(prev).add(index))}
                             className={`text-xs underline ${
-                              isCreditedStep
-                                ? "text-yellow-500 hover:text-yellow-600"
-                                : isCompleted
+                              isCompleted
                                 ? "text-green-500 hover:text-green-600"
                                 : "text-muted-foreground hover:text-foreground"
                             }`}
@@ -222,8 +214,6 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
                         className={`text-sm mt-1 ${
                           isActive
                             ? "text-blue-500/80"
-                            : isCompleted && isCreditedStep
-                            ? "text-yellow-500/80"
                             : isCompleted
                             ? "text-green-500/80"
                             : "text-muted-foreground"
