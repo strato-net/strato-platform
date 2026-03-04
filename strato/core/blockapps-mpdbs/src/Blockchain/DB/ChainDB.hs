@@ -21,7 +21,7 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
-import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToByteString, zeroHash)
+import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToByteString)
 import Control.DeepSeq
 import Control.Monad (join)
 import Control.Monad.Change.Alter hiding (lookup)
@@ -91,15 +91,6 @@ newtype BlockHashRoot = BlockHashRoot {unBlockHashRoot :: MP.StateRoot}
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (Format, NFData)
 
-newtype ChainStateInfo = ChainStateInfo (Maybe Word256, Maybe Keccak256, MP.StateRoot)
-
-instance RLPSerializable ChainStateInfo where
-  rlpEncode (ChainStateInfo (cId, Just bHash, sRoot)) = RLPArray [rlpEncode cId, rlpEncode bHash, rlpEncode sRoot]
-  rlpEncode (ChainStateInfo (cId, Nothing, sRoot)) = RLPArray [rlpEncode cId, rlpEncode sRoot]
-  rlpDecode (RLPArray [cId, bHash, sRoot]) = ChainStateInfo (rlpDecode cId, Just (rlpDecode bHash), rlpDecode sRoot)
-  rlpDecode (RLPArray [cId, sRoot]) = ChainStateInfo (rlpDecode cId, Nothing, rlpDecode sRoot)
-  rlpDecode o = error ("Error in rlpDecode for ChainStateInfo: bad RLPObject: " ++ show o)
-
 word256ToMPKey :: Maybe Word256 -> N.NibbleString
 word256ToMPKey Nothing = N.EvenNibbleString ""
 word256ToMPKey (Just cid) = N.EvenNibbleString $ word256ToBytes cid
@@ -131,7 +122,7 @@ bootstrapChainDB ::
   MP.StateRoot ->
   m ()
 bootstrapChainDB genesisHash startingStateRoot = do
-  putChainBlockHashInfo genesisHash zeroHash MP.emptyTriePtr
+  putChainRoot genesisHash MP.emptyTriePtr
   putChainStateRoot Nothing genesisHash startingStateRoot
 
 putBlockHeaderInChainDB ::
@@ -154,7 +145,7 @@ putBlockHashInChainDB ::
   Keccak256 ->
   m ()
 putBlockHashInChainDB p h =
-  putChainBlockHashInfo h p =<< fromMaybe MP.emptyTriePtr <$> getChainRoot p
+  putChainRoot h =<< fromMaybe MP.emptyTriePtr <$> getChainRoot p
 
 migrateBlockHeader ::
   ( BlockHeaderLike h,
@@ -166,11 +157,10 @@ migrateBlockHeader ::
   m ()
 migrateBlockHeader oldBD newH = do
   let oldH = blockHeaderHash oldBD
-      oldP = blockHeaderParentHash oldBD
   mExistingChainRoot <- getChainRoot oldH
   case mExistingChainRoot of
     Nothing -> putBlockHeaderInChainDB oldBD >> migrateBlockHeader oldBD newH
-    Just cr -> putChainBlockHashInfo newH oldP cr
+    Just cr -> putChainRoot newH cr
 
 getChainRoot ::
   ( Modifiable BlockHashRoot m,
@@ -178,29 +168,20 @@ getChainRoot ::
   ) =>
   Keccak256 ->
   m (Maybe MP.StateRoot)
-getChainRoot = fmap (fmap snd) . getChainBlockHashInfo
-
-getChainBlockHashInfo ::
-  ( Modifiable BlockHashRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Keccak256 ->
-  m (Maybe (Keccak256, MP.StateRoot))
-getChainBlockHashInfo h = do
+getChainRoot h = do
   bhr <- unBlockHashRoot <$> get Proxy
   getkv bhr (N.EvenNibbleString $ keccak256ToByteString h)
 
-putChainBlockHashInfo ::
+putChainRoot ::
   ( Modifiable BlockHashRoot m,
     (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   Keccak256 ->
-  Keccak256 ->
   MP.StateRoot ->
   m ()
-putChainBlockHashInfo h parentHash sr = do
+putChainRoot h sr = do
   bhr <- unBlockHashRoot <$> get Proxy
-  newBlockHashRoot <- putkv bhr (N.EvenNibbleString $ keccak256ToByteString h) (parentHash, sr)
+  newBlockHashRoot <- putkv bhr (N.EvenNibbleString $ keccak256ToByteString h) sr
   put Proxy $ BlockHashRoot newBlockHashRoot
 
 getChainStateRoot ::
@@ -212,10 +193,9 @@ getChainStateRoot ::
   Keccak256 ->
   m (Maybe MP.StateRoot)
 getChainStateRoot chainId bh = do
-    mChainRoot <- getChainBlockHashInfo bh
-    fmap join . for mChainRoot $ \(_parentHash, chainRoot) -> do
-      mStateRoot <- getkv chainRoot (word256ToMPKey chainId)
-      return $ fmap (\(ChainStateInfo (_, _, sr)) -> sr) mStateRoot
+    mChainRoot <- getChainRoot bh
+    fmap join . for mChainRoot $ \chainRoot ->
+      getkv chainRoot (word256ToMPKey chainId)
 
 putChainStateRoot ::
   ( Modifiable BlockHashRoot m,
@@ -226,12 +206,12 @@ putChainStateRoot ::
   MP.StateRoot ->
   m ()
 putChainStateRoot chainId bHash stateRoot = do
-  mChainRoot <- getChainBlockHashInfo bHash
+  mChainRoot <- getChainRoot bHash
   case mChainRoot of
     Nothing -> pure ()
-    Just (parentHash, chainRoot) -> do
-      newChainRoot <- putkv chainRoot (word256ToMPKey chainId) $ ChainStateInfo (chainId, Just bHash, stateRoot)
-      putChainBlockHashInfo bHash parentHash newChainRoot
+    Just chainRoot -> do
+      newChainRoot <- putkv chainRoot (word256ToMPKey chainId) stateRoot
+      putChainRoot bHash newChainRoot
 
 deleteChainStateRoot ::
   ( Modifiable BlockHashRoot m,
@@ -241,9 +221,9 @@ deleteChainStateRoot ::
   Keccak256 ->
   m ()
 deleteChainStateRoot chainId bHash = do
-  mChainRoot <- getChainBlockHashInfo bHash
+  mChainRoot <- getChainRoot bHash
   case mChainRoot of
     Nothing -> pure ()
-    Just (parentHash, chainRoot) -> do
+    Just chainRoot -> do
       newChainRoot <- MP.deleteKey chainRoot (word256ToMPKey chainId)
-      putChainBlockHashInfo bHash parentHash newChainRoot
+      putChainRoot bHash newChainRoot
