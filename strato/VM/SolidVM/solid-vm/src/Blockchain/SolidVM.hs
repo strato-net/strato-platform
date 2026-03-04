@@ -1261,6 +1261,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (Constant . SInteger . BlockHeader.gasLimit . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "chainid") ->
       return $ Constant $ SInteger (Conf.networkID (networkConfig ethConf))
+    (SBuiltinVariable "abi", "encode") -> return $ Constant $ SFunction "abiEncode" Nothing
+    (SBuiltinVariable "abi", "decode") -> return $ Constant $ SFunction "abiDecode" Nothing
+    (SBuiltinVariable "abi", "encodePacked") -> return $ Constant $ SFunction "abiEncodePacked" Nothing
     (SBuiltinVariable "super", method) -> do
       ctract <- getCurrentContract
       (_, cc) <- getCurrentCodeCollection
@@ -2481,6 +2484,11 @@ callBuiltin "fastForward" [secs] = do
       Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
         pure $ env { Env.blockHeader = updatedBlockHeader }
       return SNULL
+
+callBuiltin "abiEncode" args = SBytes <$> Builtins.abiEncode args
+callBuiltin "abiEncodePacked" args = SBytes <$> Builtins.abiEncodePacked args
+callBuiltin "abiDecode" (SBytes bs : typeArgs) = return $ Builtins.abiDecode bs typeArgs
+callBuiltin "abiDecode" args = invalidArguments "abi.decode expects (bytes, types...)" args
 
 callBuiltin x args = unknownFunction (formatBuiltinError x args) x
 

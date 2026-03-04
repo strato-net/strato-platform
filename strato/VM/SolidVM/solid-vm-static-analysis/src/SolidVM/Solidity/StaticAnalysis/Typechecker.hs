@@ -849,6 +849,9 @@ typecheckMember (Static (SVMType.UnknownLabel "block") x) "difficulty" = pure $ 
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "chainid" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "proposer" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encode" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
+typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encodePacked" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
+typecheckMember (Static (SVMType.UnknownLabel "abi") x) "decode" = pure $ Function (bytesType' x) (Static SVMType.Variadic x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "type") x) "name" = pure $ (Static (SVMType.String Nothing) x)
 typecheckMember (Static (SVMType.UnknownLabel "type") x) "creationCode" = pure $ (Static (SVMType.String Nothing) x)
 typecheckMember (Static (SVMType.UnknownLabel "type") x) "runtimeCode" = pure $ (Static (SVMType.String Nothing) x)
@@ -1643,6 +1646,7 @@ getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util") ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg") ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx") ctx
 getVarType' "block" ctx = pure $ Static (SVMType.UnknownLabel "block") ctx
+getVarType' "abi" ctx = pure $ Static (SVMType.UnknownLabel "abi") ctx
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super") ctx
 getVarType' name ctx = do
   c <- asks contract
