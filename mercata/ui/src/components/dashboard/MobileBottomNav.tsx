@@ -15,6 +15,7 @@ import {
   Shield,
   UserPlus,
   Vault,
+  CreditCard,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -30,6 +31,7 @@ const PRIMARY_NAV_ITEMS = [
 
 // Items shown in "More" drawer
 const MORE_ITEMS = [
+  { icon: CreditCard, label: 'Buy Crypto', path: '/dashboard/onramp' },
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },

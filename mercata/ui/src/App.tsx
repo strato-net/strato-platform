@@ -31,6 +31,7 @@ import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
+import OnrampPage from "./pages/OnrampPage";
 
 // Import dashboard components
 
@@ -313,6 +314,15 @@ const App = () => {
                                             element={
                                               <ProtectedRoute>
                                                 <PriceTracking />
+                                              </ProtectedRoute>
+                                            }
+                                          />
+
+                                          <Route
+                                            path="/dashboard/onramp"
+                                            element={
+                                              <ProtectedRoute>
+                                                <OnrampPage />
                                               </ProtectedRoute>
                                             }
                                           />
