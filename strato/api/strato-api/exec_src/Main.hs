@@ -27,7 +27,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Model.JsonBlock
-import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
+import Blockchain.Model.SyncState (BestBlock, BestSequencedBlock, WorldBestBlock(..))
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
@@ -123,10 +123,13 @@ instance {-# OVERLAPPING #-} (Monad m, Accessible V.PublicKey m) => Accessible V
   access = lift . access
 
 instance {-# OVERLAPPING #-} Accessible (Maybe SyncStatus) IO where
-  access _ = fmap SyncStatus <$> runStratoRedisIO getSyncStatus
+  access _ = fmap SyncStatus <$> runStratoRedisIO getSyncStatusNow
 
 instance {-# OVERLAPPING #-} Accessible (Maybe BestBlock) IO where
   access _ = runStratoRedisIO getBestBlockInfo
+
+instance {-# OVERLAPPING #-} Accessible (Maybe BestSequencedBlock) IO where
+  access _ = runStratoRedisIO getBestSequencedBlockInfo
 
 instance {-# OVERLAPPING #-} Accessible (Maybe WorldBestBlock) IO where
   access _ = fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo

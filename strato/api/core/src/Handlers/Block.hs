@@ -188,7 +188,9 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable BlocksFilterParams [B
 
             E.limit $ appFetchLimit
 
-            E.distinctOnOrderBy [sortToOrderBy qbSortby $ bdRef E.^. BlockDataRefNumber] (return bdRef)
+            E.orderBy [sortToOrderBy qbSortby $ bdRef E.^. BlockDataRefNumber]
+
+            return bdRef
 
       let blockIds = fst <$> blks
           buildList' f g = Map.fromListWith (flip (++)) . map (f &&& g)

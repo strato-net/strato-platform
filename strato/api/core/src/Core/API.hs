@@ -31,12 +31,14 @@ module Core.API
 import           BlockApps.Logging
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
+import           Blockchain.Model.SyncState
 import           Blockchain.Sequencer.Event (IngestEvent)
 import           Blockchain.Strato.Discovery.Data.Peer (HasPeerDB)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.SyncDB (SyncStatus(..))
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify       (Accessible, Outputs)
 import           Data.Source.Map
@@ -85,6 +87,9 @@ type MonadCoreAPI m =
     MonadLogger m,
     HasPeerDB m,
     Accessible Metadata.UrlMap m,
+    Accessible (Maybe BestSequencedBlock) m,
+    Accessible (Maybe SyncStatus) m,
+    Accessible IdentityData m,
     Accessible [RawTransaction] m,
     Accessible Stats.TransactionCount m,
     Accessible V.PublicKey m,
