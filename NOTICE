@@ -4046,26 +4046,8 @@ https://www.npmjs.com/package/aes-js
 aeson
 Copyright (c) 2011, MailRank, Inc.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/aeson.
+See strato/libs/json-rpc-client/json-rpc-client.cabal:45.
 https://hackage.haskell.org/package/aeson
-
-aeson-casing
-Copyright (c) 2015 Andrew Rademacher
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/aeson-casing.
-https://hackage.haskell.org/package/aeson-casing
-
-aeson-extra
-Copyright (c) 2015, Oleg Grenrus
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/aeson-extra.
-https://hackage.haskell.org/package/aeson-extra
-
-aeson-pretty
-Copyright (c)2011, Falko Peters
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/aeson-pretty.
-https://hackage.haskell.org/package/aeson-pretty
 
 after
 Copyright information is provided by the upstream package authors.
@@ -4175,12 +4157,6 @@ Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:127.
 https://www.npmjs.com/package/ansi-styles
 
-ansi-wl-pprint
-Copyright 2008, Daan Leijen and Max Bolingbroke. All rights reserved.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/ansi-wl-pprint.
-https://hackage.haskell.org/package/ansi-wl-pprint
-
 antd
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -4253,12 +4229,6 @@ Licensed under the Apache-2.0 License (per npm registry metadata).
 See smd-ui/package-lock.json:597.
 https://www.npmjs.com/package/aria-query
 
-arithmoi
-Copyright (c) 2011 Daniel Fischer, 2016-2017 Andrew Lelechenko, Carter Schonwald, Google Inc.
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/arithmoi.
-https://hackage.haskell.org/package/arithmoi
-
 arr-diff
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -4280,7 +4250,7 @@ https://www.npmjs.com/package/arr-union
 array
 Copyright 2004, The University Court of the University of Glasgow.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/array.
+See strato/libs/bloomfilter/bloomfilter.cabal:33.
 https://hackage.haskell.org/package/array
 
 array-back
@@ -5084,7 +5054,7 @@ https://www.npmjs.com/package/base-x
 base16-bytestring
 Copyright (c) 2011 MailRank, Inc.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/base16-bytestring.
+See strato/libs/secp256k1-haskell/blockapps-secp256k1-haskell.cabal:58.
 https://hackage.haskell.org/package/base16-bytestring
 
 base64-arraybuffer
@@ -5126,7 +5096,7 @@ https://www.npmjs.com/package/batch
 bcrypt
 Copyright (c) 2010 Nicholas Campbell
 Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/bcrypt.
+See apex/api/licenses/bcrypt.
 https://www.npmjs.com/package/bcrypt
 
 bcrypt-pbkdf
@@ -5165,12 +5135,6 @@ Licensed under the MIT License.
 See smd-ui/licenses/bignumber.js.
 https://www.npmjs.com/package/bignumber.js
 
-bimap
-Copyright Stuart Cook and contributors 2008
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/bimap.
-https://hackage.haskell.org/package/bimap
-
 bin-links
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
@@ -5180,7 +5144,7 @@ https://www.npmjs.com/package/bin-links
 binary
 Copyright (c) Lennart Kolmodin
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/binary.
+See strato-vscode/package-lock.json:831.
 https://hackage.haskell.org/package/binary
 
 binary-extensions
@@ -5212,24 +5176,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:3545.
 https://www.npmjs.com/package/blakejs
-
-blaze-builder
-Copyright Jasper Van der Jeugt 2010, Simon Meier 2010 & 2011
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/blaze-builder.
-https://hackage.haskell.org/package/blaze-builder
-
-blaze-html
-Copyright Jasper Van der Jeugt 2010
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/blaze-html.
-https://hackage.haskell.org/package/blaze-html
-
-blaze-markup
-Copyright Jasper Van der Jeugt 2010
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/blaze-markup.
-https://hackage.haskell.org/package/blaze-markup
 
 blob
 Copyright information is provided by the upstream package authors.
@@ -5477,12 +5423,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:2467.
 https://www.npmjs.com/package/builtin-status-codes
 
-byteable
-Copyright (c) 2013 Vincent Hanquez <vincent@snarc.org>
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/byteable.
-https://hackage.haskell.org/package/byteable
-
 bytes
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -5492,14 +5432,8 @@ https://www.npmjs.com/package/bytes
 bytestring
 Copyright (c) Don Stewart 2005-2009
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/bytestring.
+See strato/libs/bloomfilter/bloomfilter.cabal:35.
 https://hackage.haskell.org/package/bytestring
-
-bytestring-arbitrary
-Copyright (c) 2014, jay groven
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/bytestring-arbitrary.
-https://hackage.haskell.org/package/bytestring-arbitrary
 
 cacache
 Copyright information is provided by the upstream package authors.
@@ -5636,7 +5570,7 @@ https://www.npmjs.com/package/center-align
 cereal
 Copyright (c) Lennart Kolmodin, Galois, Inc.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/cereal.
+See strato/libs/secp256k1-haskell/blockapps-secp256k1-haskell.cabal:60.
 https://hackage.haskell.org/package/cereal
 
 chai
@@ -5729,12 +5663,6 @@ Licensed under the BSD-2-Clause License (per package-lock metadata).
 See mercata/services/bridge/package-lock.json:2890.
 https://www.npmjs.com/package/cidr-regex
 
-cipher-aes
-Copyright (c) 2008-2013 Vincent Hanquez <vincent@snarc.org>
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/cipher-aes.
-https://hackage.haskell.org/package/cipher-aes
-
 cipher-base
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -5770,18 +5698,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:10418.
 https://www.npmjs.com/package/classnames
-
-classy-prelude
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/classy-prelude.
-https://hackage.haskell.org/package/classy-prelude
-
-classy-prelude-yesod
-Copyright (c) 2013 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/classy-prelude-yesod.
-https://hackage.haskell.org/package/classy-prelude-yesod
 
 clean-css
 Copyright information is provided by the upstream package authors.
@@ -5866,12 +5782,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
 See mercata/services/bridge/package-lock.json:2915.
 https://www.npmjs.com/package/cmd-shim
-
-cmdargs
-Copyright Neil Mitchell 2009-2018.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/cmdargs.
-https://hackage.haskell.org/package/cmdargs
 
 cmdk
 Copyright information is provided by the upstream package authors.
@@ -6053,24 +5963,6 @@ Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:594.
 https://www.npmjs.com/package/concat-stream
 
-conduit
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/conduit.
-https://hackage.haskell.org/package/conduit
-
-conduit-combinators
-Copyright (c) 2014 FP Complete
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/conduit-combinators.
-https://hackage.haskell.org/package/conduit-combinators
-
-conduit-extra
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/conduit-extra.
-https://hackage.haskell.org/package/conduit-extra
-
 config-chain
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -6110,7 +6002,7 @@ https://www.npmjs.com/package/constants-browserify
 containers
 Copyright 2004, The University Court of the University of Glasgow.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/containers.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:13.
 https://hackage.haskell.org/package/containers
 
 contains-path
@@ -6142,12 +6034,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under terms in the referenced package metadata.
 See strato/stack.yaml:103.
 https://hackage.haskell.org/package/contra-tracer
-
-contravariant
-Copyright 2007-2015 Edward Kmett
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/contravariant.
-https://hackage.haskell.org/package/contravariant
 
 convert-source-map
 Copyright information is provided by the upstream package authors.
@@ -6296,7 +6182,7 @@ https://www.npmjs.com/package/cryptiles
 Crypto
 Codec.Binary.BubbleBabble & John Meacham & Copyright © 2008, All rights
 Licensed under the GNU General Public License.
-See strato/extraFiles/strato/licenses/Crypto.
+See strato/stack.yaml:104.
 https://hackage.haskell.org/package/Crypto
 
 crypto-browserify
@@ -6305,41 +6191,11 @@ Licensed under terms in the referenced package metadata.
 See smd-ui/package-lock.json:3294.
 https://www.npmjs.com/package/crypto-browserify
 
-crypto-pubkey
-Copyright (c) 2010-2012 Vincent Hanquez <vincent@snarc.org>
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/crypto-pubkey.
-https://hackage.haskell.org/package/crypto-pubkey
-
-crypto-pubkey-types
-<th>Copyright</th>
-Licensed under terms in the referenced file.
-See strato/extraFiles/strato/licenses/crypto-pubkey-types.
-https://hackage.haskell.org/package/crypto-pubkey-types
-
-crypto-random
-Copyright (c) 2013 Vincent Hanquez <vincent@snarc.org>
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/crypto-random.
-https://hackage.haskell.org/package/crypto-random
-
 crypto-random-string
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:3313.
 https://www.npmjs.com/package/crypto-random-string
-
-cryptohash
-Copyright (c) 2010-2014 Vincent Hanquez <vincent@snarc.org>
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/cryptohash.
-https://hackage.haskell.org/package/cryptohash
-
-cryptonite
-Copyright (c) 2006-2015 Vincent Hanquez <vincent@snarc.org>
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/cryptonite.
-https://hackage.haskell.org/package/cryptonite
 
 css-color-names
 Copyright information is provided by the upstream package authors.
@@ -6406,12 +6262,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:10617.
 https://www.npmjs.com/package/csstype
-
-csv
-Copyright (c) Jaap Weel 2007.  Permission is hereby granted, free
-Licensed under terms in the referenced file.
-See strato/extraFiles/strato/licenses/csv.
-https://hackage.haskell.org/package/csv
 
 cuer
 Copyright information is provided by the upstream package authors.
@@ -6635,12 +6485,6 @@ Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:744.
 https://www.npmjs.com/package/dashdash
 
-data-default
-Copyright (c) 2013 Lukas Mai
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/data-default.
-https://hackage.haskell.org/package/data-default
-
 date-fns
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -6734,7 +6578,7 @@ https://www.npmjs.com/package/deepmerge
 deepseq
 Copyright 2001-2009, The University Court of the University of Glasgow.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/deepseq.
+See strato/libs/bloomfilter/bloomfilter.cabal:36.
 https://hackage.haskell.org/package/deepseq
 
 default-require-extensions
@@ -6809,18 +6653,6 @@ Licensed under terms in the referenced package metadata.
 See strato/simulator/strato-obelisk/frontend/frontend.cabal:30.
 https://hackage.haskell.org/package/dependent-sum
 
-dequeue
-Copyright (c) 2009, Henry Bucklow
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/dequeue.
-https://hackage.haskell.org/package/dequeue
-
-derive
-Copyright Neil Mitchell 2006-2017.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/derive.
-https://hackage.haskell.org/package/derive
-
 derive-valtio
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -6881,24 +6713,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:12198.
 https://www.npmjs.com/package/detect-port-alt
 
-diagrams-contrib
-Copyright (c) 2011-2015, various (see headers of individual source files)
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/diagrams-contrib.
-https://hackage.haskell.org/package/diagrams-contrib
-
-diagrams-html5
-Copyright (c) 2014-2016 diagrams-html5 team:
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/diagrams-html5.
-https://hackage.haskell.org/package/diagrams-html5
-
-diagrams-lib
-Copyright (c) 2011-2016 diagrams-lib team:
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/diagrams-lib.
-https://hackage.haskell.org/package/diagrams-lib
-
 didyoumean
 Copyright information is provided by the upstream package authors.
 Licensed under the Apache-2.0 License (per package-lock metadata).
@@ -6923,12 +6737,6 @@ Licensed under terms in the referenced metadata.
 See mercata/ethereum/package-lock.json:4427.
 https://www.npmjs.com/package/difflib
 
-digest
-Copyright (c) 2008-2009, Eugene Kirpichov
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/digest.
-https://hackage.haskell.org/package/digest
-
 dijkstrajs
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -6941,12 +6749,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:4440.
 https://www.npmjs.com/package/dir-glob
 
-directory
-Copyright 2004, The University Court of the University of Glasgow.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/directory.
-https://hackage.haskell.org/package/directory
-
 discontinuous-range
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -6958,12 +6760,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:10955.
 https://www.npmjs.com/package/dlv
-
-dns
-Copyright (c) 2009, IIJ Innovation Institute Inc.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/dns.
-https://hackage.haskell.org/package/dns
 
 doctrine
 Copyright information is provided by the upstream package authors.
@@ -7139,12 +6935,6 @@ Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:849.
 https://www.npmjs.com/package/ee-first
 
-either
-Copyright 2008-2014 Edward Kmett
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/either.
-https://hackage.haskell.org/package/either
-
 electron-to-chromium
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
@@ -7256,7 +7046,7 @@ https://www.npmjs.com/package/entities
 entropy
 Copyright (c) Thomas DuBuisson
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/entropy.
+See strato/libs/secp256k1-haskell/blockapps-secp256k1-haskell.cabal:62.
 https://hackage.haskell.org/package/entropy
 
 env-paths
@@ -7312,12 +7102,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:913.
 https://www.npmjs.com/package/error-ex
-
-errors
-Copyright (c) 2012, 2013, Gabriel Gonzalez
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/errors.
-https://hackage.haskell.org/package/errors
 
 es-abstract
 Copyright information is provided by the upstream package authors.
@@ -7553,12 +7337,6 @@ Licensed under the BSD-2-Clause License (per package-lock metadata).
 See mercata/contracts/package-lock.json:626.
 https://www.npmjs.com/package/esprima
 
-esqueleto
-Copyright (c) 2012, Felipe Lessa
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/esqueleto.
-https://hackage.haskell.org/package/esqueleto
-
 esquery
 Copyright information is provided by the upstream package authors.
 Licensed under the BSD-3-Clause License (per package-lock metadata).
@@ -7619,12 +7397,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:11540.
 https://www.npmjs.com/package/eth-rpc-errors
 
-ether
-Copyright (c) 2017, Vladislav Zavialov
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/ether.
-https://hackage.haskell.org/package/ether
-
 ethereum-bloom-filters
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -7636,12 +7408,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:748.
 https://www.npmjs.com/package/ethereum-cryptography
-
-ethereum-rlp
-Copyright 2016 BlockApps, Inc
-Licensed under the Apache License, Version 2.0.
-See strato/extraFiles/strato/licenses/ethereum-rlp.
-https://hackage.haskell.org/package/ethereum-rlp
 
 ethereumjs-util
 Copyright information is provided by the upstream package authors.
@@ -7702,12 +7468,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:4953.
 https://www.npmjs.com/package/evp_bytestokey
-
-exceptions
-Copyright 2013-2015 Edward Kmett
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/exceptions.
-https://hackage.haskell.org/package/exceptions
 
 exec-sh
 Copyright information is provided by the upstream package authors.
@@ -7799,12 +7559,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:5121.
 https://www.npmjs.com/package/extglob
 
-extra
-Copyright Neil Mitchell 2014-2018.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/extra.
-https://hackage.haskell.org/package/extra
-
 extract-text-webpack-plugin
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -7858,12 +7612,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:4995.
 https://www.npmjs.com/package/fast-levenshtein
-
-fast-logger
-Copyright (c) 2009, IIJ Innovation Institute Inc.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/fast-logger.
-https://hackage.haskell.org/package/fast-logger
 
 fast-redact
 Copyright information is provided by the upstream package authors.
@@ -7955,12 +7703,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:5272.
 https://www.npmjs.com/package/figures
 
-file-embed
-Copyright 2008, Michael Snoyman. All rights reserved.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/file-embed.
-https://hackage.haskell.org/package/file-embed
-
 file-entry-cache
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -7984,12 +7726,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:5308.
 https://www.npmjs.com/package/filename-regex
-
-filepath
-Copyright Neil Mitchell 2005-2018.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/filepath.
-https://hackage.haskell.org/package/filepath
 
 fileset
 Copyright information is provided by the upstream package authors.
@@ -8267,12 +8003,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:11959.
 https://www.npmjs.com/package/generator-function
 
-generic-random
-Copyright (c) 2016 Li-yao Xia
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/generic-random.
-https://hackage.haskell.org/package/generic-random
-
 get-caller-file
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
@@ -8362,12 +8092,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:5280.
 https://www.npmjs.com/package/ghost-testrpc
-
-gitrev
-Copyright (c) 2015, Adam C. Foltzer
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/gitrev.
-https://hackage.haskell.org/package/gitrev
 
 glob
 Copyright information is provided by the upstream package authors.
@@ -8606,7 +8330,7 @@ https://www.npmjs.com/package/hash.js
 hashable
 Copyright Milan Straka 2010
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/hashable.
+See strato/libs/secp256k1-haskell/blockapps-secp256k1-haskell.cabal:63.
 https://hackage.haskell.org/package/hashable
 
 hasown
@@ -8633,29 +8357,11 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:5875.
 https://www.npmjs.com/package/heap
 
-hedis
-Copyright (c)2011, Falko Peters
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/hedis.
-https://hackage.haskell.org/package/hedis
-
-hflags
-"Licensor" shall mean the copyright owner or entity authorized by
-Licensed under the Apache License, Version 2.0.
-See strato/extraFiles/strato/licenses/hflags.
-https://hackage.haskell.org/package/hflags
-
 history
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:6496.
 https://www.npmjs.com/package/history
-
-hjsmin
-Copyright (c)2010, Alan Zimmerman
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/hjsmin.
-https://hackage.haskell.org/package/hjsmin
 
 hmac-drbg
 Copyright information is provided by the upstream package authors.
@@ -8753,12 +8459,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:2664.
 https://www.npmjs.com/package/htmlparser2
 
-http-api-data
-Copyright 2015, Nickolay Kudasov. All rights reserved.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/http-api-data.
-https://hackage.haskell.org/package/http-api-data
-
 http-basic
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -8771,12 +8471,6 @@ Licensed under the BSD-2-Clause License (per package-lock metadata).
 See mercata/services/bridge/package-lock.json:3133.
 https://www.npmjs.com/package/http-cache-semantics
 
-http-client
-Copyright (c) 2013 Michael Snoyman
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/http-client.
-https://hackage.haskell.org/package/http-client
-
 http-deceiver
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -8788,12 +8482,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:2082.
 https://www.npmjs.com/package/http-errors
-
-http-media
-Copyright (c) 2012-2015 Timothy Jones
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/http-media.
-https://hackage.haskell.org/package/http-media
 
 http-parser-js
 Copyright information is provided by the upstream package authors.
@@ -8836,12 +8524,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/backend/package-lock.json:1323.
 https://www.npmjs.com/package/http-status-codes
-
-http-types
-Copyright (c) 2011, Aristid Breitkreuz
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/http-types.
-https://hackage.haskell.org/package/http-types
 
 https
 Copyright information is provided by the upstream package authors.
@@ -9005,12 +8687,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:4511.
 https://www.npmjs.com/package/inquirer
 
-insert-ordered-containers
-Copyright (c) 2015, Oleg Grenrus
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/insert-ordered-containers.
-https://hackage.haskell.org/package/insert-ordered-containers
-
 internmap
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
@@ -9064,12 +8740,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:2183.
 https://www.npmjs.com/package/ipaddr.js
-
-iproute
-Copyright (c) 2009, IIJ Innovation Institute Inc.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/iproute.
-https://hackage.haskell.org/package/iproute
 
 iron-webcrypto
 Copyright information is provided by the upstream package authors.
@@ -9893,12 +9563,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:12616.
 https://www.npmjs.com/package/json-stable-stringify-without-jsonify
 
-json-stream
-Copyright (c) 2015, Ondrej Palkovsky
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/json-stream.
-https://hackage.haskell.org/package/json-stream
-
 json-stream-stringify
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -10073,18 +9737,6 @@ Licensed under terms in the referenced package metadata.
 See strato/libs/secp256k1-haskell/blockapps-secp256k1-haskell.cabal:90.
 https://hackage.haskell.org/package/labeled-error
 
-largeint
-Copyright Eitan Chatav (c) 2017
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/largeint.
-https://hackage.haskell.org/package/largeint
-
-largeword
-Copyright information in referenced file
-Licensed under terms in the referenced file.
-See strato/extraFiles/strato/licenses/largeword.
-https://hackage.haskell.org/package/largeword
-
 latest-version
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -10106,26 +9758,8 @@ https://www.npmjs.com/package/lcid
 lens
 Copyright 2012-2016 Edward Kmett
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/lens.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:16.
 https://hackage.haskell.org/package/lens
-
-lens-family
-Copyright 2012,2013,2014 Russell O'Connor
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/lens-family.
-https://hackage.haskell.org/package/lens-family
-
-lens-family-th
-Copyright (c) 2012, Dan Burton
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/lens-family-th.
-https://hackage.haskell.org/package/lens-family-th
-
-leveldb-haskell
-Copyright (c) 2011, Kim Altintop
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/leveldb-haskell.
-https://hackage.haskell.org/package/leveldb-haskell
 
 leven
 Copyright information is provided by the upstream package authors.
@@ -10198,18 +9832,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
 See mercata/services/bridge/package-lock.json:3476.
 https://www.npmjs.com/package/libnpmversion
-
-lifted-async
-Copyright (c) 2012-2017, Mitsutoshi Aoe
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/lifted-async.
-https://hackage.haskell.org/package/lifted-async
-
-lifted-base
-Copyright © 2010-2012, Bas van Dijk, Anders Kaseorg
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/lifted-base.
-https://hackage.haskell.org/package/lifted-base
 
 lilconfig
 Copyright information is provided by the upstream package authors.
@@ -10445,12 +10067,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/backend/package-lock.json:1509.
 https://www.npmjs.com/package/logform
 
-logging-effect
-Copyright (c) 2016, Ollie Charles
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/logging-effect.
-https://hackage.haskell.org/package/logging-effect
-
 longest
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -10631,12 +10247,6 @@ Licensed under the ISC License (per npm registry metadata).
 See apex/api/package-lock.json:2482.
 https://www.npmjs.com/package/memoizee
 
-memory
-Copyright (c) 2015 Vincent Hanquez <vincent@snarc.org>
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/memory.
-https://hackage.haskell.org/package/memory
-
 memory-fs
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -10691,12 +10301,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:6434.
 https://www.npmjs.com/package/merge2
 
-merkle-patricia-db
-Copyright 2016 BlockApps, Inc
-Licensed under the Apache License, Version 2.0.
-See strato/extraFiles/strato/licenses/merkle-patricia-db.
-https://hackage.haskell.org/package/merkle-patricia-db
-
 methods
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -10750,12 +10354,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:2561.
 https://www.npmjs.com/package/mime-db
-
-mime-mail
-Copyright (c) 2014 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/mime-mail.
-https://hackage.haskell.org/package/mime-mail
 
 mime-types
 Copyright information is provided by the upstream package authors.
@@ -10865,12 +10463,6 @@ Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:1568.
 https://www.npmjs.com/package/mkdirp
 
-mmap
-Copyright (c) Gracjan Polak
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/mmap.
-https://hackage.haskell.org/package/mmap
-
 mnemonist
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -10919,24 +10511,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:9456.
 https://www.npmjs.com/package/monaco-editor
 
-monad-control
-Copyright © 2010, Bas van Dijk, Anders Kaseorg
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/monad-control.
-https://hackage.haskell.org/package/monad-control
-
-monad-logger
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/monad-logger.
-https://hackage.haskell.org/package/monad-logger
-
-monadIO
-Copyright (c) 2008-2010, Galois, Inc.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/monadIO.
-https://hackage.haskell.org/package/monadIO
-
 morgan
 Copyright (c) 2014 Jonathan Ong <me@jongleberry.com>
 Licensed under the MIT License.
@@ -10952,7 +10526,7 @@ https://www.npmjs.com/package/ms
 mtl
 Copyright 2004, The University Court of the University of Glasgow.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/mtl.
+See strato/libs/json-rpc-client/json-rpc-client.cabal:47.
 https://hackage.haskell.org/package/mtl
 
 multiformats
@@ -10960,18 +10534,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the (Apache-2.0 AND MIT) License (per package-lock metadata).
 See mercata/ui/package-lock.json:12947.
 https://www.npmjs.com/package/multiformats
-
-murmur-hash
-Copyright (c) 2010, Thomas Schilling
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/murmur-hash.
-https://hackage.haskell.org/package/murmur-hash
-
-murmur3
-In jurisdictions that recognize copyright laws, the author or authors
-Licensed under terms in the referenced file.
-See strato/extraFiles/strato/licenses/murmur3.
-https://hackage.haskell.org/package/murmur3
 
 mute-stream
 Copyright information is provided by the upstream package authors.
@@ -11039,16 +10601,10 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:9529.
 https://www.npmjs.com/package/nested-property
 
-network
-Copyright (c) 2002-2010, The University Court of the University of Glasgow.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/network.
-https://hackage.haskell.org/package/network
-
 network-uri
 Copyright (c) 2002-2010, The University Court of the University of Glasgow.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/network-uri.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:28.
 https://hackage.haskell.org/package/network-uri
 
 next
@@ -11068,12 +10624,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under terms in the referenced package metadata.
 See apex/api/package-lock.json:2749.
 https://www.npmjs.com/package/next-tick
-
-nibblestring
-Copyright (c) 2014, Jamshid
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/nibblestring.
-https://hackage.haskell.org/package/nibblestring
 
 no-case
 Copyright information is provided by the upstream package authors.
@@ -11188,12 +10738,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
 See apex/api/package-lock.json:1624.
 https://www.npmjs.com/package/nopt
-
-normaldistribution
-Copyright (c) 2011, Bjorn Buckwalter.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/normaldistribution.
-https://hackage.haskell.org/package/normaldistribution
 
 normalize-package-data
 Copyright information is provided by the upstream package authors.
@@ -11507,12 +11051,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:9933.
 https://www.npmjs.com/package/onetime
 
-opaleye
-Copyright (c) 2014-2018 Purely Agile Limited
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/opaleye.
-https://hackage.haskell.org/package/opaleye
-
 open
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -11560,18 +11098,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:6854.
 https://www.npmjs.com/package/optionator
-
-optparse-applicative
-Copyright (c) 2012, Paolo Capriotti
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/optparse-applicative.
-https://hackage.haskell.org/package/optparse-applicative
-
-ordered-containers
-Copyright (c) 2016, Daniel Wagner
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/ordered-containers.
-https://hackage.haskell.org/package/ordered-containers
 
 ordinal
 Copyright information is provided by the upstream package authors.
@@ -11759,18 +11285,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:2666.
 https://www.npmjs.com/package/parse5
 
-parsec
-Copyright 1999-2000, Daan Leijen; 2007, Paolo Martini. All rights reserved.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/parsec.
-https://hackage.haskell.org/package/parsec
-
-parsec3-numbers
-Copyright information in referenced file
-Licensed under terms in the referenced file.
-See strato/extraFiles/strato/licenses/parsec3-numbers.
-https://hackage.haskell.org/package/parsec3-numbers
-
 parseqs
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -11843,12 +11357,6 @@ Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:3026.
 https://www.npmjs.com/package/path-parse
 
-path-pieces
-Copyright 2009, Michael Snoyman. All rights reserved.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/path-pieces.
-https://hackage.haskell.org/package/path-pieces
-
 path-scurry
 Copyright information is provided by the upstream package authors.
 Licensed under the BlueOak-1.0.0 License (per package-lock metadata).
@@ -11879,12 +11387,6 @@ Licensed under the MIT OR Apache2 License (per npm registry metadata).
 See apex/api/package-lock.json:3044.
 https://www.npmjs.com/package/pause-stream
 
-pbkdf
-Copyright 2001-2005, Chris Dornan
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/pbkdf.
-https://hackage.haskell.org/package/pbkdf
-
 pbkdf2
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -11896,24 +11398,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:3052.
 https://www.npmjs.com/package/performance-now
-
-persistent
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/persistent.
-https://hackage.haskell.org/package/persistent
-
-persistent-postgresql
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/persistent-postgresql.
-https://hackage.haskell.org/package/persistent-postgresql
-
-persistent-template
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/persistent-template.
-https://hackage.haskell.org/package/persistent-template
 
 pg
 Copyright (c) 2010 - 2018 Brian Carlson
@@ -12371,12 +11855,6 @@ Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:3321.
 https://www.npmjs.com/package/postgres-interval
 
-postgresql-simple
-Copyright (c) 2011, Leon P Smith
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/postgresql-simple.
-https://hackage.haskell.org/package/postgresql-simple
-
 preact
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -12440,7 +11918,7 @@ https://www.npmjs.com/package/proc-log
 process
 Copyright 2004, The University Court of the University of Glasgow.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/process.
+See apex/api/package-lock.json:3332.
 https://hackage.haskell.org/package/process
 
 process-nextick-args
@@ -12454,18 +11932,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:13722.
 https://www.npmjs.com/package/process-warning
-
-product-profunctors
-Copyright (c) 2013, Karamaan Group LLC; 2014-2018 Purely Agile Limited
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/product-profunctors.
-https://hackage.haskell.org/package/product-profunctors
-
-profunctors
-Copyright 2011-2015 Edward Kmett
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/profunctors.
-https://hackage.haskell.org/package/profunctors
 
 proggy
 Copyright information is provided by the upstream package authors.
@@ -12680,14 +12146,8 @@ https://www.npmjs.com/package/quick-format-unescaped
 QuickCheck
 Copyright (c) 2000-2017, Koen Claessen
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/QuickCheck.
+See strato/libs/bloomfilter/bloomfilter.cabal:56.
 https://hackage.haskell.org/package/QuickCheck
-
-quickcheck-instances
-Copyright (c)2012, Antoine Latter
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/quickcheck-instances.
-https://hackage.haskell.org/package/quickcheck-instances
 
 radix3
 Copyright information is provided by the upstream package authors.
@@ -12722,7 +12182,7 @@ https://www.npmjs.com/package/randexp
 random
 Copyright 2004, The University Court of the University of Glasgow.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/random.
+See strato/libs/bloomfilter/bloomfilter.cabal:60.
 https://hackage.haskell.org/package/random
 
 randomatic
@@ -12760,12 +12220,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:3428.
 https://www.npmjs.com/package/raw-body
-
-raw-strings-qq
-Copyright (c) 2013, Mikhail Glushenkov
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/raw-strings-qq.
-https://hackage.haskell.org/package/raw-strings-qq
 
 rc
 Copyright information is provided by the upstream package authors.
@@ -13391,12 +12845,6 @@ Licensed under the BSD-2-Clause License (per npm registry metadata).
 See smd-ui/package-lock.json:14507.
 https://www.npmjs.com/package/regjsparser
 
-relapse
-Copyright (c) 2016 Ilya Ostrovskiy
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/relapse.
-https://hackage.haskell.org/package/relapse
-
 relateurl
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -13540,18 +12988,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:14777.
 https://www.npmjs.com/package/resolve-url
-
-resource-pool
-Copyright (c) 2011, MailRank, Inc.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/resource-pool.
-https://hackage.haskell.org/package/resource-pool
-
-resourcet
-Copyright (c)2011, Michael Snoyman
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/resourcet.
-https://hackage.haskell.org/package/resourcet
 
 restore-cursor
 Copyright information is provided by the upstream package authors.
@@ -13721,16 +13157,10 @@ Licensed under the MIT License (per package-lock metadata).
 See apex/api/package-lock.json:1789.
 https://www.npmjs.com/package/safer-buffer
 
-SafeSemaphore
-Copyright (c)2011, Chris Kuklewicz
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/SafeSemaphore.
-https://hackage.haskell.org/package/SafeSemaphore
-
 saltine
 Copyright (c) 2013 Joseph Abrahamson
 Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/saltine.
+See strato/stack.yaml:118.
 https://hackage.haskell.org/package/saltine
 
 sane
@@ -13769,12 +13199,6 @@ Licensed under terms in the referenced package metadata.
 See smd-ui/package-lock.json:10872.
 https://www.npmjs.com/package/schema-utils
 
-scientific
-Copyright (c) 2013, Bas van Dijk
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/scientific.
-https://hackage.haskell.org/package/scientific
-
 scroll
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -13796,7 +13220,7 @@ https://www.npmjs.com/package/scrypt-js
 secp256k1
 In jurisdictions that recognize copyright laws, the author or authors
 Licensed under terms in the referenced file.
-See strato/extraFiles/strato/licenses/secp256k1.
+See mercata/ethereum/package-lock.json:7619.
 https://hackage.haskell.org/package/secp256k1
 
 select-hose
@@ -13846,54 +13270,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the BSD-3-Clause License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:7649.
 https://www.npmjs.com/package/serialize-javascript
-
-servant
-Copyright (c) 2014-2016, Zalora South East Asia Pte Ltd, Servant Contributors
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/servant.
-https://hackage.haskell.org/package/servant
-
-servant-client
-Copyright (c) 2014-2016, Zalora South East Asia Pte Ltd, Servant Contributors
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/servant-client.
-https://hackage.haskell.org/package/servant-client
-
-servant-docs
-Copyright (c) 2014-2016, Zalora South East Asia Pte Ltd, Servant Contributors
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/servant-docs.
-https://hackage.haskell.org/package/servant-docs
-
-servant-mock
-Copyright (c) 2015-2016, Servant Contributors
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/servant-mock.
-https://hackage.haskell.org/package/servant-mock
-
-servant-options
-Copyright 2017 Lyndon Maydwell
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/servant-options.
-https://hackage.haskell.org/package/servant-options
-
-servant-server
-Copyright (c) 2014-2016, Zalora South East Asia Pte Ltd, Servant Contributors
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/servant-server.
-https://hackage.haskell.org/package/servant-server
-
-servant-swagger
-Copyright (c) 2015-2016, Servant contributors
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/servant-swagger.
-https://hackage.haskell.org/package/servant-swagger
-
-servant-swagger-ui
-Copyright (c) 2016, Oleg Grenrus
-Licensed under the Apache License, Version 2.0.
-See strato/extraFiles/strato/licenses/servant-swagger-ui.
-https://hackage.haskell.org/package/servant-swagger-ui
 
 serve
 Copyright (c) 2018 ZEIT, Inc.
@@ -13978,12 +13354,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/contracts/package-lock.json:1462.
 https://www.npmjs.com/package/sha3
-
-shakespeare
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/shakespeare.
-https://hackage.haskell.org/package/shakespeare
 
 sharp
 Copyright information is provided by the upstream package authors.
@@ -14183,12 +13553,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:7906.
 https://www.npmjs.com/package/solc
 
-solidity
-Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-Licensed under the GNU Lesser General Public License.
-See strato/extraFiles/strato/licenses/solidity.
-https://hackage.haskell.org/package/solidity
-
 solidity-ast
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -14363,18 +13727,6 @@ Licensed under the ISC License (per npm registry metadata).
 See apex/api/package-lock.json:3935.
 https://www.npmjs.com/package/stealthy-require
 
-stm
-Copyright 2004, The University Court of the University of Glasgow.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/stm.
-https://hackage.haskell.org/package/stm
-
-stm-conduit
-Copyright (c)2012, Clark Gaebel
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/stm-conduit.
-https://hackage.haskell.org/package/stm-conduit
-
 stream-browserify
 Copyright information is provided by the upstream package authors.
 Licensed under terms in the referenced package metadata.
@@ -14410,12 +13762,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:15215.
 https://www.npmjs.com/package/stream-shift
-
-streaming-commons
-Copyright (c) 2014 FP Complete
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/streaming-commons.
-https://hackage.haskell.org/package/streaming-commons
 
 strict-uri-encode
 Copyright information is provided by the upstream package authors.
@@ -14639,12 +13985,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/backend/package-lock.json:2204.
 https://www.npmjs.com/package/swagger-ui-express
 
-swagger2
-Copyright (c) 2015-2017, GetShopTV
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/swagger2.
-https://hackage.haskell.org/package/swagger2
-
 symbol-observable
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -14735,18 +14075,6 @@ Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:4088.
 https://www.npmjs.com/package/tdigest
 
-template-haskell
-Copyright 2002-2007, The University Court of the University of Glasgow.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/template-haskell.
-https://hackage.haskell.org/package/template-haskell
-
-temporary
-Copyright
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/temporary.
-https://hackage.haskell.org/package/temporary
-
 term-size
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
@@ -14786,7 +14114,7 @@ https://www.npmjs.com/package/tether
 text
 Copyright (c) 2008-2009, Tom Harper
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/text.
+See strato/libs/json-rpc-client/json-rpc-client.cabal:48.
 https://hackage.haskell.org/package/text
 
 text-encoding-utf-8
@@ -14852,7 +14180,7 @@ https://www.npmjs.com/package/through
 time
 TimeLib is Copyright (c) Ashley Yakeley, 2004-2014. All rights reserved.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/time.
+See strato/simulator/strato-obelisk/frontend/frontend.cabal:26.
 https://hackage.haskell.org/package/time
 
 time-stamp
@@ -15008,20 +14336,8 @@ https://www.npmjs.com/package/tr46
 transformers
 Copyright 2004, The University Court of the University of Glasgow.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/transformers.
+See strato/libs/json-rpc-client/json-rpc-client.cabal:49.
 https://hackage.haskell.org/package/transformers
-
-transformers-base
-Copyright (c) 2011, Mikhail Vorozhtsov, Bas van Dijk
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/transformers-base.
-https://hackage.haskell.org/package/transformers-base
-
-transformers-lift
-Copyright (c) 2015, Vladislav Zavialov
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/transformers-lift.
-https://hackage.haskell.org/package/transformers-lift
 
 traverse
 Copyright information is provided by the upstream package authors.
@@ -15365,12 +14681,6 @@ Licensed under terms in the referenced package metadata.
 See strato/simulator/strato-obelisk/frontend/frontend.cabal:32.
 https://hackage.haskell.org/package/universe
 
-unix
-Copyright 2004, The University Court of the University of Glasgow.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/unix.
-https://hackage.haskell.org/package/unix
-
 unix-time
 Copyright information is provided by the upstream package authors.
 Licensed under terms in the referenced metadata.
@@ -15380,7 +14690,7 @@ https://www.npmjs.com/package/unix-time
 unordered-containers
 Copyright (c) 2010, Johan Tibell
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/unordered-containers.
+See strato/libs/json-rpc-server/json-rpc-server.cabal:47.
 https://hackage.haskell.org/package/unordered-containers
 
 unpipe
@@ -15527,12 +14837,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:8893.
 https://www.npmjs.com/package/utf8
 
-utf8-string
-* Copyright (c) 2007, Galois Inc.
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/utf8-string.
-https://hackage.haskell.org/package/utf8-string
-
 util
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -15632,7 +14936,7 @@ https://www.npmjs.com/package/vaul
 vector
 Copyright (c) 2008-2012, Roman Leshchinskiy
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/vector.
+See strato/libs/json-rpc-client/json-rpc-client.cabal:50.
 https://hackage.haskell.org/package/vector
 
 vector-algorithms
@@ -15695,24 +14999,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ui/package-lock.json:16485.
 https://www.npmjs.com/package/wagmi
 
-wai
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/wai.
-https://hackage.haskell.org/package/wai
-
-wai-cors
-Copyright (c) 2015 Lars Kuhtz <lakuhtz@gmail.com>
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/wai-cors.
-https://hackage.haskell.org/package/wai-cors
-
-wai-extra
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/wai-extra.
-https://hackage.haskell.org/package/wai-extra
-
 walk-up-path
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
@@ -15730,18 +15016,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:120.
 https://www.npmjs.com/package/warning
-
-warp
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/warp.
-https://hackage.haskell.org/package/warp
-
-warp-tls
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/warp-tls.
-https://hackage.haskell.org/package/warp-tls
 
 wasm3
 Copyright (c) 2019 Steven Massey, Volodymyr Shymanskyy
@@ -15923,12 +15197,6 @@ Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:4361.
 https://www.npmjs.com/package/wkx
 
-wl-pprint-text
-Copyright (c)2010, Ivan Lazar Miljenovic
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/wl-pprint-text.
-https://hackage.haskell.org/package/wl-pprint-text
-
 word-wrap
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -16046,7 +15314,7 @@ https://www.npmjs.com/package/yallist
 yaml
 Copyright 2008, Michael Snoyman. All rights reserved.
 Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/yaml.
+See mercata/backend/package-lock.json:2485.
 https://hackage.haskell.org/package/yaml
 
 yargs
@@ -16073,30 +15341,6 @@ Licensed under the MIT License (per npm registry metadata).
 See apex/api/package-lock.json:4592.
 https://www.npmjs.com/package/yeast
 
-yesod
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/yesod.
-https://hackage.haskell.org/package/yesod
-
-yesod-core
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/yesod-core.
-https://hackage.haskell.org/package/yesod-core
-
-yesod-raml
-Copyright (c) 2015 Junji Hashimoto
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/yesod-raml.
-https://hackage.haskell.org/package/yesod-raml
-
-yesod-static
-Copyright (c) 2012 Michael Snoyman, http://www.yesodweb.com/
-Licensed under the MIT License.
-See strato/extraFiles/strato/licenses/yesod-static.
-https://hackage.haskell.org/package/yesod-static
-
 yn
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -16114,12 +15358,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/backend/package-lock.json:2504.
 https://www.npmjs.com/package/z-schema
-
-zlib
-Copyright (c) 2006-2016, Duncan Coutts
-Licensed under the BSD License.
-See strato/extraFiles/strato/licenses/zlib.
-https://hackage.haskell.org/package/zlib
 
 zod
 Copyright information is provided by the upstream package authors.
@@ -16203,24 +15441,8 @@ Recommendation:
 - If Apache-only distribution is required, disable sharp-dependent path or
   provide separate compliance handling for LGPL components.
 
-5) strato/extraFiles license bundle contains GPL texts
-Status:
-- Build copies strato/extraFiles into STRATO image build context.
-Evidence:
-- Makefile:190
-- strato/extraFiles/strato/licenses/solidity:1
-- strato/extraFiles/strato/licenses/Crypto:44
-Risk:
-- Medium to High (needs provenance mapping; may be stale notice bundle or
-  active component notice).
-Recommendation:
-- Audit each file in strato/extraFiles/strato/licenses and keep only those
-  required by actually shipped dependencies; remove stale GPL notice files if
-  no corresponding shipped GPL component exists.
-
 Priority order:
 1. Remove LGPL rpc-websockets paths from mercata/ui dependency chain.
 2. Decide rapidsnark policy (remove or isolate externally).
 3. Minimize dev-tool LGPL path in mercata/ethereum.
-4. Audit and prune strato/extraFiles license bundle.
-5. Re-generate NOTICE and SBOM after dependency lock updates.
+4. Re-generate NOTICE and SBOM after dependency lock updates.
