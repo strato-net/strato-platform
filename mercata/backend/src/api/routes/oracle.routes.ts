@@ -75,6 +75,18 @@ router.post("/price", authHandler.authorizeRequest(), OracleController.setPrice)
  *         in: path
  *         required: true
  *         schema: { type: string }
+ *       - name: duration
+ *         in: query
+ *         required: false
+ *         description: Time duration (1d, 7d, 1m, 3m, 6m, 1y, all). Defaults to 1m.
+ *         schema:
+ *           type: string
+ *       - name: end
+ *         in: query
+ *         required: false
+ *         description: End timestamp (ISO string). Defaults to now.
+ *         schema:
+ *           type: string
  *       - name: order
  *         in: query
  *         required: false
