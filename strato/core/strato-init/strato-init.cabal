@@ -1,0 +1,113 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-init
+version:        0.0.1
+synopsis:       A tool to setup the DBs for a Strato instance
+description:    A tool to setup the DBs for a Strato instance
+category:       Data Structures
+author:         Jamshid
+maintainer:     jamshidnh@gmail.com
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.GenesisBlock
+      Blockchain.Init.EthConf
+      Blockchain.Init.Generator
+      Blockchain.Init.Monad
+      Blockchain.Init.Options
+  other-modules:
+      Paths_strato_init
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2 -threaded
+  build-depends:
+      aeson
+    , base
+    , base16-bytestring
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-mpdbs
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-client
+    , bytestring
+    , common-log
+    , conduit
+    , containers
+    , data-default
+    , directory
+    , ethereum-rlp
+    , evm-solidity
+    , exceptions
+    , file-embed
+    , filepath
+    , format
+    , hflags
+    , http-client
+    , http-types
+    , kafka-monad
+    , lens
+    , leveldb-haskell
+    , merkle-patricia-db
+    , monad-alter
+    , nibblestring
+    , ordered-containers
+    , persistent-postgresql
+    , raw-strings-qq
+    , redis-monad
+    , resourcet
+    , servant-client
+    , solid-vm
+    , solid-vm-compiler
+    , solid-vm-model
+    , sql-monad
+    , strato-auth
+    , strato-conf
+    , strato-genesis
+    , strato-index
+    , strato-model
+    , strato-sequencer
+    , strato-statediff
+    , text
+    , transformers
+    , turtle
+    , unliftio
+    , vm-tools
+    , yaml
+  default-language: Haskell2010
+
+executable genesis-builder
+  main-is: GenesisBuilder.hs
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -O2 -threaded
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , data-default
+    , strato-genesis
+    , strato-init
+    , strato-model
+    , text
+  default-language: Haskell2010
+
+executable strato-setup
+  main-is: Main.hs
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -O2 -threaded
+  build-depends:
+      base
+    , common-log
+    , hflags
+    , kafka-monad
+    , strato-init
+    , strato-model
+  default-language: Haskell2010

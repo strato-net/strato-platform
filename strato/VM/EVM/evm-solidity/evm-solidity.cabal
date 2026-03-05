@@ -1,0 +1,84 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           evm-solidity
+version:        0.1.0.0
+synopsis:       Solidity datatypes
+description:    Solidity datatypes
+category:       Web
+author:         Eitan Chatav
+maintainer:     eitan@blockapps.net
+copyright:      2016 BlockApps
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      BlockApps.Solidity.ArgValue
+      BlockApps.Solidity.Contract
+      BlockApps.Solidity.Parse.Declarations
+      BlockApps.Solidity.Parse.Expression
+      BlockApps.Solidity.Parse.File
+      BlockApps.Solidity.Parse.Imports
+      BlockApps.Solidity.Parse.Lexer
+      BlockApps.Solidity.Parse.Parser
+      BlockApps.Solidity.Parse.ParserTypes
+      BlockApps.Solidity.Parse.Pragmas
+      BlockApps.Solidity.Parse.Selector
+      BlockApps.Solidity.Parse.Types
+      BlockApps.Solidity.Parse.UnParser
+      BlockApps.Solidity.SolidityValue
+      BlockApps.Solidity.Storage
+      BlockApps.Solidity.Struct
+      BlockApps.Solidity.Type
+      BlockApps.Solidity.TypeDefs
+      BlockApps.Solidity.Value
+      BlockApps.Solidity.Xabi
+      BlockApps.Solidity.Xabi.Def
+      BlockApps.Solidity.Xabi.Type
+      BlockApps.Solidity.XabiContract
+      BlockApps.SolidityVarReader
+      BlockApps.SolidVMStorageDecoder
+      BlockApps.Storage
+      BlockApps.XAbiConverter
+  other-modules:
+      Paths_evm_solidity
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -Werror
+  build-depends:
+      Decimal
+    , QuickCheck
+    , aeson
+    , aeson-casing
+    , base
+    , base16-bytestring
+    , bimap
+    , binary
+    , bytestring
+    , containers
+    , cryptonite
+    , deepseq
+    , extra
+    , generic-random
+    , hashable
+    , lens
+    , memory
+    , monad-alter
+    , mtl
+    , openapi3
+    , ordered-containers
+    , parsec
+    , quickcheck-instances
+    , scientific
+    , semver-range
+    , solid-vm-model
+    , strato-model
+    , text
+    , transformers
+    , unordered-containers
+    , vector
+  default-language: Haskell2010
