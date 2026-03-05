@@ -29,9 +29,14 @@ export interface OnrampTransaction {
 
 const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
 
-const EXTERNAL_TOKEN: Record<string, string> = {
+const EXTERNAL_TOKEN_MAINNET: Record<string, string> = {
   eth: ZERO_ADDRESS,
   usdc: "a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+};
+
+const EXTERNAL_TOKEN_TESTNET: Record<string, string> = {
+  eth: ZERO_ADDRESS,
+  usdc: "1c7d4b196cb0c7b01d743fbc6116a902379c7238",
 };
 
 const EXTERNAL_DECIMALS: Record<string, number> = {
@@ -225,7 +230,8 @@ export async function handleSessionUpdate(sessionData: any): Promise<void> {
       return;
     }
 
-    const externalToken = EXTERNAL_TOKEN[currency];
+    const tokenMap = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ? EXTERNAL_TOKEN_TESTNET : EXTERNAL_TOKEN_MAINNET;
+    const externalToken = tokenMap[currency];
     const decimals = EXTERNAL_DECIMALS[currency];
     const chainId = BRIDGE_CHAIN_ID[network];
 
