@@ -593,6 +593,7 @@ getVariableOfName name = do
                        "byte",
                        "bytes",
                        "string",
+                       "variadic",
                        "log",
                        "keccak256",
                        "ripemd160",
@@ -613,6 +614,8 @@ getVariableOfName name = do
                        "sha256",
                        "ecrecover",
                        "verifyP256",
+                       "base64encode",
+                       "base64urlencode",
                        "blockhash",
                        "addmod",
                        "mulmod",
@@ -628,7 +631,7 @@ getVariableOfName name = do
 
       maybeBuiltinVariable :: Maybe Variable
       maybeBuiltinVariable =
-        toMaybe (name `elem` ["msg", "block", "tx", "super", "now"]) $
+        toMaybe (name `elem` ["msg", "block", "tx", "super", "now", "abi"]) $
           t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
