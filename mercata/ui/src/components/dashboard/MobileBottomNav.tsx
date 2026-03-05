@@ -10,13 +10,13 @@ import {
   Gift, 
   Activity, 
   CreditCard,
+  MessageSquare,
   Download, 
   BarChart3, 
   Droplets, 
   Shield,
   UserPlus,
   Vault,
-  CreditCard,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -37,6 +37,7 @@ const MORE_ITEMS = [
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+  { icon: MessageSquare, label: 'AI Assistant', path: '/dashboard/assistant' },
   { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
   { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },

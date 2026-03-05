@@ -33,6 +33,7 @@ import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
 import OnrampPage from "./pages/OnrampPage";
 import CreditCardPage from "./pages/CreditCard";
+import AssistantPage from "./pages/Assistant";
 
 // Import dashboard components
 
@@ -268,6 +269,14 @@ const App = () => {
                                               <GuestAccessibleRoute>
                                                 <Transfer />
                                               </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/assistant"
+                                            element={
+                                              <ProtectedRoute>
+                                                <AssistantPage />
+                                              </ProtectedRoute>
                                             }
                                           />
                                           <Route
