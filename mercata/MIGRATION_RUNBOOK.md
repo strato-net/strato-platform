@@ -112,20 +112,46 @@ npm run bridge:ops:prod
 npm run bridge:ops:prod -- --apply
 ```
 
-## 6) Run DepositRouter Safe Proposals (Upgrade + Setters)
+## 6) DepositRouter Upgrade (Phase 1)
+
+Run router upgrade proposals first. Do not queue setters in the same run.
 
 ### Testnet
 ```bash
 cd /Users/ariya/Documents/BlockApps/strato-platform/mercata/ethereum
-npm run router:ops:testnet -- --step all
-npm run router:ops:testnet -- --step all --apply
+npm run router:ops:testnet -- --step upgrade
+npm run router:ops:testnet -- --step upgrade --apply
 ```
 
 ### Prod
 ```bash
 cd /Users/ariya/Documents/BlockApps/strato-platform/mercata/ethereum
-npm run router:ops:prod -- --step all
-npm run router:ops:prod -- --step all --apply
+npm run router:ops:prod -- --step upgrade
+npm run router:ops:prod -- --step upgrade --apply
+```
+
+Approve and execute all queued upgrade proposals in Safe before continuing.
+
+## 7) DepositRouter Route Setters (Phase 2)
+
+Queue route setters only after:
+1) MercataBridge migration is executed, and
+2) DepositRouter upgrade proposals are executed.
+
+`depositRouterQueueSetters` reads MercataBridge `assets` + `assetRouteEnabled` mappings to build `setRoutePermitted`, so execution order matters.
+
+### Testnet
+```bash
+cd /Users/ariya/Documents/BlockApps/strato-platform/mercata/ethereum
+npm run router:ops:testnet -- --step setters
+npm run router:ops:testnet -- --step setters --apply
+```
+
+### Prod
+```bash
+cd /Users/ariya/Documents/BlockApps/strato-platform/mercata/ethereum
+npm run router:ops:prod -- --step setters
+npm run router:ops:prod -- --step setters --apply
 ```
 
 Implementation verification is attempted automatically during router upgrade propose and will not block the flow if verification fails.

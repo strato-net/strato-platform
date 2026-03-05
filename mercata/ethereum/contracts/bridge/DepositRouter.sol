@@ -219,20 +219,26 @@ contract DepositRouter is
     function batchUpdateTokens(
         address[] calldata tokens,
         uint96[] calldata minAmounts,
-        bool[] calldata isPermitteds
+        bool[] calldata isPermitteds,
+        address[] calldata targetStratoTokens
     ) external onlyOwner {
         uint256 len = tokens.length;
         if (len != minAmounts.length) revert ArrayLengthMismatch();
         if (len != isPermitteds.length) revert ArrayLengthMismatch();
+        if (len != targetStratoTokens.length) revert ArrayLengthMismatch();
 
         for (uint256 i; i < len; ) {
             address t = tokens[i];
             uint96 m = minAmounts[i];
             bool p = isPermitteds[i];
+            address targetStratoToken = targetStratoTokens[i];
+            if (targetStratoToken == address(0)) revert InvalidAddress();
             TokenConfig storage c = tokenConfig[t];
             c.min = m;
             c.isPermitted = p;
+            routePermitted[t][targetStratoToken] = p;
             emit TokenConfigUpdated(t, m, p);
+            emit RoutePermittedUpdated(t, targetStratoToken, p);
             unchecked {
                 ++i;
             }
