@@ -14,6 +14,7 @@ import {
   Droplets,
   Shield,
   UserPlus,
+  HandCoins,
   Vault,
   X
 } from 'lucide-react';
@@ -32,6 +33,7 @@ const PRIMARY_NAV_ITEMS = [
 const MORE_ITEMS = [
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
+  { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
