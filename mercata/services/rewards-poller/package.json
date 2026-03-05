@@ -22,6 +22,7 @@
     "jwk-to-pem": "^2.0.7",
     "jwks-rsa": "^3.2.0",
     "jwt-decode": "^4.0.0",
+    "node-cron": "^4.2.1",
     "simple-oauth2": "^5.1.0"
   },
   "devDependencies": {
@@ -30,6 +31,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/jwk-to-pem": "^2.0.3",
     "@types/node": "^20.10.0",
+    "@types/node-cron": "^3.0.11",
     "@types/simple-oauth2": "^5.0.7",
     "nodemon": "^3.0.1",
     "ts-node": "^10.9.1",
