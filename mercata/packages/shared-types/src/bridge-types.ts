@@ -115,3 +115,41 @@ export interface WithdrawalSummaryResponse {
   pendingWithdrawals: string;      // Pending withdrawals in wei (string format)
   availableToWithdraw: string;     // Available balance to withdraw in wei (string format)
 }
+
+// ============================================================================
+// CRYPTO CREDIT CARD CONFIG
+// ============================================================================
+
+/**
+ * Per-card crypto credit card configuration (stored by backend, used by balance watcher).
+ * A user can have multiple cards (multiple configs).
+ */
+export interface CreditCardConfig {
+  id: string;                      // Unique card id (set by backend on create)
+  userAddress: string;            // STRATO address
+  nickname?: string;              // User-defined nickname for the card (displayed on card)
+  providerId?: string;            // Card provider id (e.g. "metamask-card", "etherfi-card") for correct logo
+  destinationChainId: string;      // External chain id (numeric string)
+  cardWalletAddress: string;       // Card wallet on destination chain
+  externalToken: string;           // External token address on destination chain (e.g. USDC)
+  thresholdAmount: string;         // Top up when balance below this (wei string)
+  topUpAmount: string;            // Amount to bridge per top-up (wei string)
+  useBorrow: boolean;              // If true, borrow USDST against collateral then bridge (v1 may be no-op)
+  checkFrequencyMinutes: number;  // How often to check balance
+  cooldownMinutes: number;        // Min minutes between top-ups
+  enabled: boolean;
+  lastTopUpAt?: string;           // ISO timestamp
+  lastCheckedAt?: string;
+  lastError?: string;
+}
+
+/**
+ * Params for executing a single top-up (operator-only).
+ */
+export interface CreditCardTopUpExecuteParams {
+  userAddress: string;
+  stratoTokenAmount: string;
+  externalChainId: string;
+  externalRecipient: string;
+  externalToken: string;
+}

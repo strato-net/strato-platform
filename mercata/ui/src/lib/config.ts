@@ -2,6 +2,8 @@ import { api } from "./axios";
 
 export interface ConfigData {
   projectId: string;
+  networkId?: string;
+  creditCardTopUpAddress?: string;
   stripePublishableKey: string | null;
 }
 

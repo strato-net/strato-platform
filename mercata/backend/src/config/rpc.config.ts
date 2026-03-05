@@ -19,6 +19,13 @@ const rpcUpstreams: RpcMapping = {
   [baseSepoliaChainId]: process.env.RPC_URL_BASE_SEPOLIA || fallbackRpcUpstreams[baseSepoliaChainId],
 };
 
-export function getRpcUpstream(chainId: string): {upstream: string | undefined, fallback: string | undefined} {
-  return {upstream: rpcUpstreams[chainId], fallback: fallbackRpcUpstreams[chainId]};
+export function getRpcUpstream(chainId: string): { upstream: string | undefined; fallback: string | undefined } {
+  // STRATO/Cirrus chain: use node URL + JSON-RPC path (set at runtime after initNetworkConfig)
+  const { nodeUrl, networkId } = require("./config");
+  if (networkId && String(chainId) === String(networkId)) {
+    const base = (nodeUrl || "").replace(/\/$/, "");
+    const url = base ? `${base}/strato-api/eth/v1.2` : undefined;
+    return url ? { upstream: url, fallback: url } : { upstream: undefined, fallback: undefined };
+  }
+  return { upstream: rpcUpstreams[chainId], fallback: fallbackRpcUpstreams[chainId] };
 }

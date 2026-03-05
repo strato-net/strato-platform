@@ -39,6 +39,7 @@ strato/hpc
 *~
 bridge_image_tag*
 
+contract_source
 docker-compose.bridge.ecr.yml
 docker-compose.bridge.push.ecr.yml
 docker-compose.bridge.push.yml

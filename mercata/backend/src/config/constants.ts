@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher, creditCardTopUp } from "./config";
 import * as config from "./config";
 import {
   SWAP_CONTRACTS,
@@ -29,6 +29,7 @@ export const constants = (() => {
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
+  const CreditCardTopUp = `${CONTRACT_PREFIX}CreditCardTopUp`;
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
@@ -137,6 +138,7 @@ export const constants = (() => {
     PoolConfigurator,
     AdminRegistry,
     MercataBridge,
+    CreditCardTopUp,
     CDPEngine,
     CDPVault,
     CDPRegistry,
@@ -147,6 +149,7 @@ export const constants = (() => {
     VaultFactory,
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
     mercataBridge,
+    creditCardTopUp,
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,
