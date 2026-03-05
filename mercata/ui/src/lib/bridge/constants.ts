@@ -76,7 +76,10 @@ export const ERC20_ABI = [
 export const DEPOSIT_ROUTER_ABI = [
   // Functions
   {
-    inputs: [{ name: 'stratoAddress', type: 'address' }],
+    inputs: [
+      { name: 'stratoAddress', type: 'address' },
+      { name: 'targetStratoToken', type: 'address' }
+    ],
     name: 'depositETH',
     outputs: [],
     stateMutability: 'payable',
@@ -87,6 +90,7 @@ export const DEPOSIT_ROUTER_ABI = [
       { name: 'token', type: 'address' },
       { name: 'amount', type: 'uint256' },
       { name: 'stratoAddress', type: 'address' },
+      { name: 'targetStratoToken', type: 'address' },
       { name: 'nonce', type: 'uint256' },
       { name: 'deadline', type: 'uint256' },
       { name: 'signature', type: 'bytes' }
@@ -99,7 +103,8 @@ export const DEPOSIT_ROUTER_ABI = [
   {
     inputs: [
       { name: 'token', type: 'address' },
-      { name: 'amount', type: 'uint256' }
+      { name: 'amount', type: 'uint256' },
+      { name: 'targetStratoToken', type: 'address' }
     ],
     name: 'canDeposit',
     outputs: [{ name: '', type: 'bool' }],
