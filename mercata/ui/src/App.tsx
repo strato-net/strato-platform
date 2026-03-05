@@ -32,6 +32,7 @@ import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
 import EarnVault from "./pages/EarnVault";
+import OnrampPage from "./pages/OnrampPage";
 
 // Import dashboard components
 
@@ -322,6 +323,15 @@ const App = () => {
                                               <GuestAccessibleRoute>
                                                 <ReferralsManagement />
                                               </GuestAccessibleRoute>
+                                            }
+                                          />
+
+                                          <Route
+                                            path="/dashboard/onramp"
+                                            element={
+                                              <ProtectedRoute>
+                                                <OnrampPage />
+                                              </ProtectedRoute>
                                             }
                                           />
 

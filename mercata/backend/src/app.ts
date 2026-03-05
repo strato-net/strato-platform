@@ -8,7 +8,15 @@ const PORT = process.env.PORT || 3001;
 
 const app = express();
 
-app.use(cors(), express.json(), express.urlencoded({ extended: true }));
+app.use(
+  cors(),
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+  express.urlencoded({ extended: true })
+);
 
 app.use("/api", routes);
 
