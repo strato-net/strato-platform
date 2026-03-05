@@ -25,7 +25,7 @@ import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
 import SyncingPage from "./pages/SyncingPage";
 import StratoStats from "./pages/StratoStats";
-// import Rewards from "./pages/Rewards";
+import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
@@ -281,14 +281,14 @@ const App = () => {
                                             }
                                           />
 
-                                          {/* <Route
+                                          <Route
                                             path="/dashboard/rewards"
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Rewards />
                                               </GuestAccessibleRoute>
                                             }
-                                          /> */}
+                                          />
 
                                           <Route
                                             path="/dashboard/refer"
