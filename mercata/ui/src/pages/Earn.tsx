@@ -471,25 +471,40 @@ const Earn = () => {
           <section className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <h2 className="text-lg font-semibold">All Opportunities</h2>
-              <div className="inline-flex gap-2">
+              <div className="inline-flex items-center gap-2">
                 <Button
                   size="sm"
-                  variant={activeFilter === "all" ? "default" : "outline"}
+                  variant="ghost"
                   onClick={() => setActiveFilter("all")}
+                  className={`h-9 rounded-full px-6 text-base font-medium transition-all ${
+                    activeFilter === "all"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
+                      : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                  }`}
                 >
                   All
                 </Button>
                 <Button
                   size="sm"
-                  variant={activeFilter === "vaults" ? "default" : "outline"}
+                  variant="ghost"
                   onClick={() => setActiveFilter("vaults")}
+                  className={`h-9 rounded-full px-6 text-base font-medium transition-all ${
+                    activeFilter === "vaults"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
+                      : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                  }`}
                 >
                   Vaults
                 </Button>
                 <Button
                   size="sm"
-                  variant={activeFilter === "pools" ? "default" : "outline"}
+                  variant="ghost"
                   onClick={() => setActiveFilter("pools")}
+                  className={`h-9 rounded-full px-6 text-base font-medium transition-all ${
+                    activeFilter === "pools"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
+                      : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                  }`}
                 >
                   Pools
                 </Button>
