@@ -1,0 +1,24 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-vault-client
+version:        0.1.0.0
+synopsis:       Client library for STRATO shared vault
+description:    Provides authenticated access to the shared vault service
+build-type:     Simple
+
+library
+  exposed-modules:
+      Strato.Vault.Client
+  other-modules:
+      Paths_strato_vault_client
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , servant-client
+    , strato-auth
+  default-language: Haskell2010
