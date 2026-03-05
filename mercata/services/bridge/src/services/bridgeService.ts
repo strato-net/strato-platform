@@ -1,10 +1,12 @@
-import { config } from "../config";
+import { ethers } from "ethers";
+import { config, getChainRpcUrl, ERC20_ABI, ZERO_ADDRESS } from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
 import { NonEmptyArray, WithdrawalInfo, DepositArgs, ConfirmDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
+import { ensureHexPrefix } from "../utils/utils";
 
 export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
   const externalChainIds = depositArgs.map((deposit) => deposit.externalChainId);
@@ -216,6 +218,99 @@ export const finaliseWithdrawalBatch = async (
     
     // Re-throw other errors
     throw error;
+  }
+};
+
+/**
+ * Send ERC20 tokens directly from the hot wallet EOA on the destination chain.
+ * Returns the transaction hash on success.
+ */
+export const sendDirectTransfer = async (
+  withdrawal: WithdrawalInfo,
+): Promise<string> => {
+  const privateKey = config.hotWallet.privateKey;
+  if (!privateKey) throw new Error("HOT_WALLET_PRIVATE_KEY not configured");
+
+  const chainId = Number(withdrawal.externalChainId);
+  const rpcUrl = getChainRpcUrl(chainId);
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const wallet = new ethers.Wallet(privateKey, provider);
+
+  const externalToken = ensureHexPrefix(withdrawal.externalToken);
+  const recipient = ensureHexPrefix(withdrawal.externalRecipient);
+
+  if (externalToken === ZERO_ADDRESS) {
+    // Native ETH transfer
+    const tx = await wallet.sendTransaction({
+      to: recipient,
+      value: BigInt(withdrawal.externalTokenAmount),
+    });
+    const receipt = await tx.wait();
+    logInfo("BridgeService", `Hot wallet ETH transfer: ${receipt!.hash} to ${recipient} on chain ${chainId}`);
+    return receipt!.hash;
+  }
+
+  // ERC20 transfer
+  const erc20 = new ethers.Contract(externalToken, ERC20_ABI, wallet);
+  const tx = await erc20.transfer(recipient, BigInt(withdrawal.externalTokenAmount));
+  const receipt = await tx.wait();
+  logInfo("BridgeService", `Hot wallet ERC20 transfer: ${receipt!.hash} to ${recipient} on chain ${chainId}`);
+  return receipt!.hash;
+};
+
+/**
+ * Process withdrawals below the hot wallet threshold by sending directly
+ * from the hot wallet and immediately confirming + finalizing on-chain.
+ */
+export const confirmWithdrawalBatchHotWallet = async (
+  withdrawals: NonEmptyArray<WithdrawalInfo>,
+) => {
+  for (const withdrawal of withdrawals) {
+    try {
+      const txHash = await sendDirectTransfer(withdrawal);
+
+      // Confirm the withdrawal on-chain with the direct tx hash
+      try {
+        await execute({
+          contractName: "MercataBridge",
+          contractAddress: config.bridge.address!,
+          method: "confirmWithdrawalBatch",
+          args: {
+            ids: [withdrawal.withdrawalId],
+            custodyTxHashes: [txHash],
+          },
+        });
+      } catch (err) {
+        if ((err as Error).message?.includes("MB: bad state")) {
+          logInfo("BridgeService", `Hot wallet withdrawal ${withdrawal.withdrawalId} already confirmed`);
+        } else {
+          throw err;
+        }
+      }
+
+      // Immediately finalize
+      try {
+        await execute({
+          contractName: "MercataBridge",
+          contractAddress: config.bridge.address!,
+          method: "finaliseWithdrawalBatch",
+          args: { ids: [withdrawal.withdrawalId] },
+        });
+      } catch (err) {
+        if ((err as Error).message?.includes("MB: bad state")) {
+          logInfo("BridgeService", `Hot wallet withdrawal ${withdrawal.withdrawalId} already finalized`);
+        } else {
+          throw err;
+        }
+      }
+
+      logInfo("BridgeService", `Hot wallet: withdrawal ${withdrawal.withdrawalId} confirmed+finalized (tx: ${txHash})`);
+    } catch (err) {
+      logError("BridgeService", err as Error, {
+        operation: "confirmWithdrawalBatchHotWallet",
+        withdrawalId: withdrawal.withdrawalId,
+      });
+    }
   }
 };
 

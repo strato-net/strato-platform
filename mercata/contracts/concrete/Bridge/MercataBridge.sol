@@ -43,6 +43,9 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when an asset's enabled state is toggled
     event AssetToggled(bool enabled, uint256 externalChainId, address externalToken);
 
+    /// @notice Emitted when the hot withdrawal threshold is updated
+    event HotWithdrawalThresholdUpdated(uint256 newThreshold, uint256 oldThreshold);
+
     // ───────────── Deposit & withdrawal related events ─────────────
     /// @notice Emitted when a deposit is aborted by the owner
     event DepositAborted(uint256 srcChainId, string srcTxHash);
@@ -152,6 +155,10 @@ contract record MercataBridge is Ownable {
     /// @notice Time delay before users can abort stuck withdrawals
     /// @dev Default: 172800 seconds (48 hours)
     uint256 public WITHDRAWAL_ABORT_DELAY = 172800;
+
+    /// @notice Threshold below which withdrawals bypass SAFE multi-sig and use hot wallet
+    /// @dev Default: 100 * 10^18 ($100 in USDST wei). Set to 0 to disable hot wallet path.
+    uint256 public hotWithdrawalThreshold = 100 * (10 ** 18);
 
     // ───────────── Deposit & withdrawal related state variables ─────────────
     /// @notice Registry of deposit transactions with replay protection
@@ -470,6 +477,17 @@ contract record MercataBridge is Ownable {
             require(TokenFactory(tokenFactory).isTokenActive(targetStratoToken), "MB: inactive token");
         }
         assetRouteEnabled[externalToken][externalChainId][targetStratoToken] = enabled;
+    }
+
+    /**
+     * @dev Sets the hot withdrawal threshold
+     * @notice Withdrawals with stratoTokenAmount below this threshold can bypass SAFE multi-sig
+     * @notice Set to 0 to disable the hot wallet path (all withdrawals go through SAFE)
+     * @param newThreshold The new threshold in wei (e.g. 100e18 for $100)
+     */
+    function setHotWithdrawalThreshold(uint256 newThreshold) external onlyOwner {
+        emit HotWithdrawalThresholdUpdated(newThreshold, hotWithdrawalThreshold);
+        hotWithdrawalThreshold = newThreshold;
     }
 
     // ───────────── Escrow related functions ─────────────
