@@ -23,5 +23,7 @@ library:
     - hedis
     - kafka-monad
     - postgresql-simple
+    - servant-client
     - strato-model
+    - text
     - yaml

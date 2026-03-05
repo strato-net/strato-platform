@@ -57,7 +57,6 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.Stream.Action hiding (blockHash)
 import qualified Blockchain.Stream.Action as Action
@@ -69,6 +68,8 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Conduit
 import Control.Applicative ((<|>))
@@ -208,27 +209,12 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             ++ ", "
             ++ show (length otxs)
             ++ "TXs)."
-        when flags_debug $ do
-          bhr <- Mod.get (Proxy @BlockHashRoot)
-          $logDebugS "addBlock" $ T.pack $ "Old blockhash root: " ++ format bhr
-          mcr <- getChainRoot $ blockHash b
-          case mcr of
-            Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate old chain root. Using emptyTriePtr"
-            Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
         putBlockHeaderInChainDB bd
 
-        when flags_debug $ do
-          bhr' <- Mod.get (Proxy @BlockHashRoot)
-          $logDebugS "addBlock" $ T.pack $ "New blockhash root after inserting header: " ++ format bhr'
-          mcr' <- getChainRoot $ blockHash b
-          case mcr' of
-            Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after inserting header. Using emptyTriePtr"
-            Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr
-
         bSum <- setParentStateRoot b
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
-        when (computeNetworkID == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
+        when (Conf.networkID (networkConfig ethConf) == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
 
         let pHash = proposalHash bd
             mSig = getProposerSeal bd  -- Signature is Maybe type
@@ -250,14 +236,6 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             lift $ P.incCounter vmBlocksInvalid
             pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
           _ -> do
-            when flags_debug $ do
-              bhr'' <- Mod.get (Proxy @BlockHashRoot)
-              $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
-              mcr'' <- getChainRoot $ blockHash b
-              case mcr'' of
-                Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
-                Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
-
             lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
@@ -428,9 +406,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
-  when (txSize >= toInteger flags_txSizeLimit)
+  when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
     . throwE
-    $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
+    $ TFTXSizeLimitExceeded txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
 
   let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
@@ -781,7 +759,6 @@ completeDiff ::
     HasHashDB m,
     Mod.Modifiable MemDBs m,
     Mod.Modifiable CurrentBlockHash m,
-    Mod.Modifiable BestBlockRoot m,
     HasMemAddressStateDB m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
@@ -799,3 +776,4 @@ completeDiff src' dst hsh num = withCurrentBlockHash hsh $ do
   runConduit $
     SD.stateDiff Nothing num hsh src' dst
       .| mapM_C (yield . OutStateDiff)
+

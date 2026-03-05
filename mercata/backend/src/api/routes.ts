@@ -23,6 +23,7 @@ import rpcRoutes from "./routes/rpc.routes";
 import referRoutes from "./routes/refer.routes";
 import vaultRoutes from "./routes/vault.routes";
 import borrowRouterRoutes from "./routes/borrowRouter.routes";
+import onrampRoutes from "./routes/onramp.routes";
 
 const router = Router();
 
@@ -94,6 +95,8 @@ router.use("/vault", vaultRoutes);
 
 // ----- Borrow Router Routes -----
 router.use("/borrow-router", borrowRouterRoutes);
+// ----- Onramp Routes -----
+router.use("/onramp", onrampRoutes);
 
 // ----- Documentation Routes -----
 // Serve static files for Swagger customizations

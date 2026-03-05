@@ -43,7 +43,7 @@ library:
     - strato-conf
     - strato-model
     - strato-redis-blockdb
-    - servant-client
+    - vault-monad
     - text
     - time
     - classy-prelude
@@ -61,19 +61,15 @@ executables:
       - async
       - blockapps-data
       - blockapps-init
-      - blockapps-vault-wrapper-api
-      - blockapps-vault-wrapper-client
       - blockDB
       - blockstanbul
       - common-log
       - format
       - hedis
       - hflags
-      - http-client
       - process-monitor
       - prometheus-client
       - seqevents
-      - servant-client
       - stm
       - stm-chans
       - strato-conf
@@ -81,6 +77,7 @@ executables:
       - strato-redis-blockdb
       - strato-sequencer
       - text
+      - vault-monad
       - wai-middleware-prometheus
       - warp
     other-modules: []
