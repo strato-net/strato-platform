@@ -139,7 +139,7 @@ initializeBestBlock = do
   case maybeRedisBestBlock of
     Nothing -> error "no best block in redisdb"
     Just redisBestBlock -> do
-      _ <- bootstrapChainDB (blockHeaderHash $ obBlockData redisBestBlock) [(Nothing, stateRoot $ obBlockData redisBestBlock)]
+      bootstrapChainDB (blockHeaderHash $ obBlockData redisBestBlock) (stateRoot $ obBlockData redisBestBlock)
       putContextBestBlockInfo $ outputBlockToContextBestBlockInfo redisBestBlock
 
       Bagger.processNewBestBlock (blockHeaderHash $ obBlockData redisBestBlock) (obBlockData redisBestBlock) [] -- bootstrap Bagger with genesis block

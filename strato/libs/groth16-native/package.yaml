@@ -28,15 +28,23 @@ library:
     - groups
     # Utilities
     - random
+    - deepseq
+    - parallel
 
 ghc-options:
   - -Wall
   - -Werror
+  - -O2
 
 executables:
   bench-groth16-native:
     source-dirs: bench
     main: Main.hs
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -O2
     dependencies:
       - base
       - groth16-native

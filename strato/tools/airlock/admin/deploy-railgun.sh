@@ -24,8 +24,8 @@ fi
 echo "Getting user address..."
 strato-auth
 TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
-HOST=${STRATO_HOST:-localhost:8081}
-USER_ADDR=$(curl -s -H "Authorization: Bearer $TOKEN" "http://$HOST/strato/v2.3/key" | jq -r '.address')
+VAULT_URL=${VAULT_URL:-https://vault.blockapps.net:8093}
+USER_ADDR=$(curl -s -H "Authorization: Bearer $TOKEN" "$VAULT_URL/strato/v2.3/key" | jq -r '.address')
 
 if [ -z "$USER_ADDR" ] || [ "$USER_ADDR" = "null" ]; then
     echo "Error: Could not get user address"

@@ -5,6 +5,7 @@ import { pushAssetPrices } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
 import { fetchPreviousPrices } from './utils/priceReader';
 import { withTimeout } from './utils/apiClient';
+import { oauthClient } from './utils/oauth';
 import { ConfigLoader } from './utils/configLoader';
 import { SourceResult, AggregatedPrice, SourceConfig } from './types';
 import { TIMEOUTS, ORACLE_CONFIG } from './utils/constants';
@@ -231,6 +232,9 @@ function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: Confi
 // ============================================================================
 
 async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
+    // Pre-warm OAuth cache before parallel fan-out: one token fetch, one address fetch
+    await oauthClient().validateToken();
+
     const [, previousPrices] = await Promise.all([
         checkBalances(),
         fetchPreviousPrices()

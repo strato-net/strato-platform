@@ -61,6 +61,7 @@ library:
     - time
     - transformers
     - unliftio
+    - strato-auth
     - vault-monad
     - vector
 
