@@ -19,9 +19,6 @@ import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
-import Blockchain.Init.Options
-import qualified Blockchain.Network as Net
-import Blockchain.Strato.Model.Options (flags_network)
 import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Monad
@@ -39,7 +36,6 @@ import qualified Text.Colors as CL
 import qualified Data.Map as M
 import qualified Data.Yaml as YAML
 import Database.Persist.Postgresql
-import qualified Executable.EthDiscoverySetup as EthDiscovery
 import System.FilePath ((</>))
 import Text.RawString.QQ
 import Turtle (chmod, roo)
@@ -85,19 +81,19 @@ createCommandsFile :: IO ()
 createCommandsFile =
   writeFile "commands.txt" [r|ethereum-discover +RTS -T -RTS
 
-strato-p2p --averageTxsPerBlock=40 --connectionTimeout=3600 --debugFail=true --maxConn=1000 --maxReturnedHeaders=500 --networkID=-1 --sqlPeers=true --minLogLevel=LevelInfo --network=helium +RTS -T -RTS
+strato-p2p +RTS -T -RTS
 
-strato-sequencer --blockstanbul_block_period_ms=1000 --blockstanbul_round_period_s=120 --minLogLevel=LevelInfo --seq_max_events_per_iter=500 --seq_max_us_per_iter=50000 --validatorBehavior=true --test_mode_bypass_blockstanbul=false --network=helium +RTS -T -RTS +RTS -N1
+strato-sequencer +RTS -T -N1 -RTS
 
-vm-runner --debug=false --debugEnabled=false --debugPort=8051 --debugWSHost=strato --debugWSPort=8052 --diffPublish=true --maxTxsPerBlock=500 --minLogLevel=LevelInfo --networkID=-1 --seqEventsBatchSize=-1 --seqEventsCostHeuristic=20000 --sqlDiff=true --svmDev=false --svmTrace=false --network=helium +RTS -T -RTS +RTS -I2 -N1
+vm-runner --debugWSHost=strato --diffPublish=true +RTS -T -I2 -N1 -RTS
 
 strato-p2p-indexer
 
 strato-api-indexer
 
-slipstream --database=cirrus --kafkahost=localhost --kafkaport=9092 --minLogLevel=LevelInfo --pghost=localhost --pgport=5432 --pguser=postgres --password=api --stratourl=http://localhost:3000/eth/v1.2 +RTS -T -RTS
+slipstream +RTS -T -RTS
 
-strato-api --minLogLevel=LevelInfo --networkID=-1 --vaultUrl=https://vault.blockapps.net:8093 --oauthDiscoveryUrl=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration --network=helium +RTS -T -RTS +RTS -N1
+strato-api +RTS -T -N1 -RTS
 
 strato-network-monitor
 |]
@@ -168,15 +164,6 @@ mkAll network = do
 
   let uniqueTopicMap = M.fromList $ map (\x -> (x, x)) topics
   liftIO $ YAML.encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
-
-  bootnodes <- case (flags_addBootnodes, flags_stratoBootnode) of
-    (False, _) -> return Nothing
-    (True, []) -> liftIO $ fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
-    (True, _) -> return $ Just flags_stratoBootnode
-
-  $logInfoS "ethconf/bootnodes" . T.pack $ CL.yellow ">>>> Inserting bootnodes"
-  $logInfoLS "ethconf/bootnodes" bootnodes
-  EthDiscovery.setup bootnodes
 
   liftIO createCommandsFile
 

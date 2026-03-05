@@ -11,8 +11,6 @@ executables:
   strato-api:
     main:                Main.hs
     source-dirs:         exec_src
-    other-modules:
-    - Options
     dependencies:
     - aeson
     - bloc2api
@@ -43,6 +41,7 @@ executables:
     - servant-openapi3
     - servant-swagger-ui
     - solid-vm-model
+    - strato-auth
     - strato-conf
     - sql-monad
     - strato-model

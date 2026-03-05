@@ -10,6 +10,7 @@ class ConfigController {
         data: {
           projectId: process.env.WAGMI_PROJECT_ID || 'PROJECT_ID_UNSET',
           networkId: networkId,
+          stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
         }
       });
     } catch (error) {
