@@ -169,4 +169,4 @@ done
 echo 'apex is available'
 
 echo  'nginx is now running. See the logs below...'
-openresty -g "daemon off;"
+exec openresty -g "daemon off;"

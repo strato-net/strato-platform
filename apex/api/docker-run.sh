@@ -42,4 +42,4 @@ do
 done
 echo 'postgres is available'
 
-npm run start:prod
+exec npm run start:prod

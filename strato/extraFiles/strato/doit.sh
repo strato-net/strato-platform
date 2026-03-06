@@ -13,6 +13,27 @@ echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
+
+# Handle SIGTERM gracefully - forward to all monitored processes
+cleanup() {
+  echo "Received shutdown signal, stopping all processes..."
+  for pid in "${!MONITORED_PIDS[@]}"; do
+    if ps -p $pid > /dev/null 2>&1; then
+      echo "Sending SIGTERM to ${MONITORED_PIDS[$pid]} (pid: $pid)"
+      kill -TERM $pid 2>/dev/null || true
+    fi
+  done
+  sleep 2
+  for pid in "${!MONITORED_PIDS[@]}"; do
+    if ps -p $pid > /dev/null 2>&1; then
+      echo "Sending SIGKILL to ${MONITORED_PIDS[$pid]} (pid: $pid)"
+      kill -KILL $pid 2>/dev/null || true
+    fi
+  done
+  echo "Shutdown complete"
+  exit 0
+}
+trap cleanup SIGTERM SIGINT
 PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
 
 echo 'Waiting for Postgres to be available...'
