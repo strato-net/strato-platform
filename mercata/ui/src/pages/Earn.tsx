@@ -6,6 +6,7 @@ import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useVaultContext } from "@/context/VaultContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { useTokenContext } from "@/context/TokenContext";
@@ -14,6 +15,7 @@ import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidityDepositModal from "@/components/dashboard/LiquidityDepositModal";
 import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModal";
+import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
 import { ChevronDown, ChevronUp, CircleArrowDown, CircleArrowUp, Star, Vault as VaultIcon } from "lucide-react";
@@ -209,12 +211,13 @@ const Earn = () => {
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [isPoolDepositModalOpen, setIsPoolDepositModalOpen] = useState(false);
   const [isPoolWithdrawModalOpen, setIsPoolWithdrawModalOpen] = useState(false);
+  const [isVaultDepositModalOpen, setIsVaultDepositModalOpen] = useState(false);
   const operationInProgressRef = useRef(false);
 
   const { vaultState, refreshVault } = useVaultContext();
   const { pools, fetchPools, poolsLoading } = useSwapContext();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
-  const { activities: rewardsActivities } = useRewardsActivities();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance } = useTokenContext();
+  const { activities: rewardsActivities, loading: rewardsLoading } = useRewardsActivities();
   const { isLoggedIn } = useUser();
   const guestMode = !isLoggedIn;
   const navigate = useNavigate();
@@ -264,6 +267,18 @@ const Earn = () => {
       refreshVault(false),
       isLoggedIn ? fetchUsdstBalance() : Promise.resolve(),
     ]);
+  };
+
+  const handleVaultDepositClick = () => {
+    if (!isLoggedIn) return;
+    setIsVaultDepositModalOpen(true);
+  };
+
+  const handleVaultDepositSuccess = () => {
+    refreshVault(false);
+    if (isLoggedIn) {
+      fetchUsdstBalance();
+    }
   };
 
   const sortedPools = useMemo(() => {
@@ -337,6 +352,51 @@ const Earn = () => {
   };
 
   const vaultRewardMeta = getRewardMeta(vaultState.shareTokenAddress);
+
+  const pageLoading =
+    vaultState.loading ||
+    (isLoggedIn && vaultState.loadingUser) ||
+    poolsLoading ||
+    rewardsLoading ||
+    (isLoggedIn && loadingUsdstBalance);
+
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <DashboardSidebar />
+        <MobileSidebar
+          isOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
+        />
+
+        <div
+          className="transition-all duration-300 md:pl-64"
+          style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
+        >
+          <DashboardHeader title="Vault Opportunities" />
+
+          <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-6">
+            <Skeleton className="h-7 w-44" />
+            <div className="space-y-3">
+              <Skeleton className="h-6 w-32" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <Skeleton className="h-28 w-full rounded-lg" />
+                <Skeleton className="h-28 w-full rounded-lg" />
+                <Skeleton className="h-28 w-full rounded-lg" />
+              </div>
+            </div>
+            <Skeleton className="h-40 w-full rounded-lg" />
+            <div className="space-y-3">
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-72 w-full rounded-lg" />
+            </div>
+          </main>
+        </div>
+
+        <MobileBottomNav />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -477,7 +537,7 @@ const Earn = () => {
                   variant="default"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate("/dashboard/earn-vault?open=deposit");
+                    handleVaultDepositClick();
                   }}
                 >
                   Deposit
@@ -572,7 +632,7 @@ const Earn = () => {
                                   )}
                                 </div>
                               )}
-                              <Button className="h-9 min-w-[108px]" size="sm" onClick={() => navigate("/dashboard/earn-vault?open=deposit")}>
+                              <Button className="h-9 min-w-[108px]" size="sm" onClick={handleVaultDepositClick}>
                                 Deposit
                               </Button>
                             </div>
@@ -739,6 +799,12 @@ const Earn = () => {
         operationInProgressRef={operationInProgressRef}
         usdstBalance={usdstBalance}
         voucherBalance={voucherBalance}
+      />
+
+      <VaultDepositModal
+        isOpen={isVaultDepositModalOpen}
+        onClose={() => setIsVaultDepositModalOpen(false)}
+        onSuccess={handleVaultDepositSuccess}
       />
     </div>
   );
