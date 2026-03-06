@@ -20,6 +20,11 @@ contract record MetalForge is Ownable {
 
     event Initialized(address oracle, address treasury, address feeCollector, address usdst);
 
+    event OracleUpdated(address newOracle);
+    event TreasuryUpdated(address newTreasury);
+    event FeeCollectorUpdated(address newFeeCollector);
+    event UsdstUpdated(address newUsdst);
+
     event MetalMinted(
         address buyer,
         address metalToken,
@@ -56,6 +61,8 @@ contract record MetalForge is Ownable {
         address payToken,
         bool isPaused
     );
+
+
 
     // ====================================================
     // ===================  STORAGE  ======================
@@ -174,34 +181,28 @@ contract record MetalForge is Ownable {
         }
     }
 
-    function setOracle(
-        address oracle
-    ) external onlyOwner {
-        require(oracle != address(0), "MetalForge: invalid oracle address");
-        oracle = PriceOracle(oracle);
-        emit OracleUpdated(oracle);
-    }
-    function setTreasury(
-        address treasury
-    ) external onlyOwner {
-        require(treasury != address(0), "MetalForge: invalid treasury address");
-        treasury = MetalTreasury(treasury);
-        emit TreasuryUpdated(treasury);
-    }
-    function setFeeCollector(
-        address feeCollector
-    ) external onlyOwner {
-        require(feeCollector != address(0), "MetalForge: invalid fee collector address");
-        feeCollector = FeeCollector(feeCollector);
-        emit FeeCollectorUpdated(feeCollector);
+    function setOracle(address _oracle) external onlyOwner {
+        require(_oracle != address(0), "MetalForge: invalid oracle address");
+        oracle = PriceOracle(_oracle);
+        emit OracleUpdated(_oracle);
     }
 
-    function setUsdst(
-        address usdst
-    ) external onlyOwner {
-        require(usdst != address(0), "MetalForge: invalid usdst address");
-        usdst = Token(usdst);
-        emit UsdstUpdated(usdst);
+    function setTreasury(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "MetalForge: invalid treasury address");
+        treasury = MetalTreasury(_treasury);
+        emit TreasuryUpdated(_treasury);
+    }
+
+    function setFeeCollector(address _feeCollector) external onlyOwner {
+        require(_feeCollector != address(0), "MetalForge: invalid fee collector address");
+        feeCollector = FeeCollector(_feeCollector);
+        emit FeeCollectorUpdated(_feeCollector);
+    }
+
+    function setUsdst(address _usdst) external onlyOwner {
+        require(_usdst != address(0), "MetalForge: invalid usdst address");
+        usdst = Token(_usdst);
+        emit UsdstUpdated(_usdst);
     }
 
     function setMintCap(
