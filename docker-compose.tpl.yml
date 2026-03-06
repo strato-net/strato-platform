@@ -6,6 +6,7 @@ services:
       - postgrest
     build: ./mercata/backend
     image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>}
+    init: true
     environment:
       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
@@ -178,6 +179,7 @@ services:
     - NGINX_TRUST_PROXY_CIDRS=${NGINX_TRUST_PROXY_CIDRS:-}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_SCOPE=${OAUTH_SCOPE:-}
     - POSTGREST_HOST=${POSTGREST_HOST:-}
     - PROMETHEUS_HOST=${PROMETHEUS_HOST:-}
