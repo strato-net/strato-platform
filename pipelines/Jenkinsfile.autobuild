@@ -305,7 +305,12 @@ pipeline {
                 dir("bootstrap-docker"){
                   withCredentials([usernamePassword(credentialsId: 'testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID'),
                                    string(credentialsId: 'buildtest-rpc-url-sepolia', variable: 'BUILDTEST_RPC_URL_SEPOLIA'),
-                                   string(credentialsId: 'buildtest-rpc-url-sepolia-fallback', variable: 'BUILDTEST_RPC_URL_SEPOLIA_FALLBACK')
+                                   string(credentialsId: 'buildtest-rpc-url-sepolia-fallback', variable: 'BUILDTEST_RPC_URL_SEPOLIA_FALLBACK'),
+                                   string(credentialsId: 'buildtest-stripe-secret-key', variable: 'BUILDTEST_STRIPE_SECRET_KEY'),
+                                   string(credentialsId: 'buildtest-stripe-publishable-key', variable: 'BUILDTEST_STRIPE_PUBLISHABLE_KEY'),
+                                   string(credentialsId: 'buildtest-stripe-webhook-secret', variable: 'BUILDTEST_STRIPE_WEBHOOK_SECRET'),
+                                   string(credentialsId: 'buildtest-onramp-hot-wallet-address', variable: 'BUILDTEST_ONRAMP_HOT_WALLET_ADDRESS'),
+                                   usernamePassword(credentialsId: 'buildtest-bridge-admin', passwordVariable: 'BUILDTEST_BA_PASSWORD', usernameVariable: 'BUILDTEST_BA_USERNAME'),
                                    ]) {
                     writeFile file: "strato-run.sh", text: """#!/bin/bash
                         NODE_HOST='buildtest.testnet.strato.nexus' \\
@@ -314,6 +319,12 @@ pipeline {
                           OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
                           RPC_URL_SEPOLIA='$BUILDTEST_RPC_URL_SEPOLIA' \\
                           RPC_URL_SEPOLIA_FALLBACK='$BUILDTEST_RPC_URL_SEPOLIA_FALLBACK' \\
+                          STRIPE_SECRET_KEY='$BUILDTEST_STRIPE_SECRET_KEY' \\
+                          STRIPE_PUBLISHABLE_KEY='$BUILDTEST_STRIPE_PUBLISHABLE_KEY' \\
+                          STRIPE_WEBHOOK_SECRET='$BUILDTEST_STRIPE_WEBHOOK_SECRET' \\
+                          ONRAMP_HOT_WALLET_ADDRESS='$BUILDTEST_ONRAMP_HOT_WALLET_ADDRESS' \\
+                          BA_USERNAME='$BUILDTEST_BA_USERNAME' \\
+                          BA_PASSWORD='$BUILDTEST_BA_PASSWORD' \\
                           ssl='true' \\
                           ./strato
                     """

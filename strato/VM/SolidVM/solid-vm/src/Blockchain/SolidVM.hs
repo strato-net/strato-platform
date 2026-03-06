@@ -83,6 +83,8 @@ import Data.Bits
 import Data.Bool (bool)
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
 import Data.Char (isDigit)
@@ -608,6 +610,15 @@ argsToValsFromVars vars = do
       SVariadic vs : rest -> reverse rest ++ vs
       _ -> vals
 
+
+-- | Zip struct field definitions with argument values, collecting trailing
+-- args into an SVariadic when the last field has Variadic type.
+zipStructFields :: [(SolidString, CC.FieldType, a)] -> [Value] -> [(SolidString, Value)]
+zipStructFields [] _ = []
+zipStructFields [(name, ft, _)] args
+  | CC.fieldTypeType ft == SVMType.Variadic = [(name, SVariadic args)]
+zipStructFields ((name, _, _) : rest) (v : vs) = (name, v) : zipStructFields rest vs
+zipStructFields _ [] = []
 
 runModifiersAndStatements :: MonadSM m => [[CC.Statement]] -> [CC.Statement] -> m (Maybe Value)
 runModifiersAndStatements []   stmts = runStatementBlock stmts
@@ -1250,6 +1261,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (Constant . SInteger . BlockHeader.gasLimit . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "chainid") ->
       return $ Constant $ SInteger (Conf.networkID (networkConfig ethConf))
+    (SBuiltinVariable "abi", "encode") -> return $ Constant $ SFunction "abiEncode" Nothing
+    (SBuiltinVariable "abi", "decode") -> return $ Constant $ SFunction "abiDecode" Nothing
+    (SBuiltinVariable "abi", "encodePacked") -> return $ Constant $ SFunction "abiEncodePacked" Nothing
     (SBuiltinVariable "super", method) -> do
       ctract <- getCurrentContract
       (_, cc) <- getCurrentCodeCollection
@@ -1494,8 +1508,8 @@ expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
           let isHeliumPreFork = Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < 31000
           if isHeliumPreFork
             then unknownVariable "getVariableOfName" ("bytes32" :: String)
-            else Constant <$> callBuiltin name argVals
-        _ -> Constant <$> callBuiltin name argVals
+            else Constant <$> callBuiltinFunction name argVals
+        _ -> Constant <$> callBuiltinFunction name argVals
 
 -- case to catch a using statement function like _x.add(3)
 
@@ -1610,7 +1624,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                     Just v -> return $ Constant $ v
                     Nothing -> return $ Constant SNULL
                 x -> todo "expToVar'/FunctionCall" x
-            Constant (SFunction name Nothing) -> Constant <$> callBuiltin name argVals
+            Constant (SFunction name Nothing) -> Constant <$> callBuiltinFunction name argVals
             Constant (SFunction funcName (Just contract')) -> do
               ro <- readOnly <$> getCurrentCallInfo
               address <- getCurrentAddress
@@ -1639,12 +1653,12 @@ expToVar' (CC.FunctionCall _ e args) = do
               case M.lookup structName $ contract' ^. CC.structs of
                 Just vals -> do
                   return . Constant . SStruct structName . fmap Constant . M.fromList $
-                    zip (map (\(a, _, _) -> a) vals) argVals
+                    zipStructFields vals argVals
                 Nothing -> do
                   cc <- getCurrentCodeCollection
                   let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs
                   return . Constant . SStruct structName . fmap Constant . M.fromList $
-                    zip (map (\(a, _, _) -> a) vals') argVals
+                    zipStructFields vals' argVals
             Constant (SContractDef contractName') -> do
               decrementGas 500
               case argVals of
@@ -2134,6 +2148,9 @@ addAndAssign lhs rhs = do
     (SString c, SString d) -> do
       deductGasForOp . fromIntegral $ ((+) `on` length) c d
       pure . SString $ c ++ d
+    (SBytes c, SBytes d) -> do
+      deductGasForOp . fromIntegral $ ((+) `on` B.length) c d
+      pure . SBytes $ c <> d
     (SDecimal c, SDecimal d) -> do
       deductGasForOp $ 1 + fromIntegral ((max `on` decimalPlaces) c d) + (max `on` byteWidth) (decimalMantissa c) (decimalMantissa d)
       pure . SDecimal $ c + d
@@ -2210,7 +2227,16 @@ parseBaseInt s n =
             _ -> Left $ "numeric cast - not a hex string " <> s
     _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
+callBuiltinFunction :: MonadSM m => SolidString -> [Value] -> m Value
+callBuiltinFunction n args' = do
+  let args = case reverse args' of
+        SVariadic vs : rest -> reverse rest ++ vs
+        _ -> args'
+  callBuiltin n args
+
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
+callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic vs
+callBuiltin "variadic" vs = pure $ SVariadic vs
 callBuiltin "string" [SString s] = return $ SString s
 callBuiltin "string" [SAddress a _] = return . SString $ show a
 callBuiltin "string" [SInteger i] = return . SString $ show i
@@ -2289,19 +2315,21 @@ callBuiltin name args
   | "int" `isPrefixOf` name && all isDigit (drop 3 name) = return $ intBuiltin True (Just $ read $ drop 3 name) args
 -- Handle sized bytes type casts (bytes1, bytes2, ..., bytes32)
 -- bytes32(integer) - convert to bytes representation, padded to correct size
-callBuiltin name [SInteger i]
+callBuiltin name [arg]
   | "bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name) =
-      let size = read (drop 5 name) :: Int
-          sizeMask = (2 ^ (8 * size)) - 1
-          maskedInt = i .&. sizeMask
-          bytes = integer2Bytes maskedInt
-          -- Pad with leading zeros to ensure correct size (e.g., bytes32 = 32 bytes)
-          paddedBytes = B.replicate (size - B.length bytes) 0 <> bytes
-      in return $ SBytes paddedBytes
-callBuiltin name [SString s]
-  | "bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name) =
-      -- Convert string to bytes representation
-      return $ SBytes $ BC.pack s
+      let mSize = readMaybe (drop 5 name) :: Maybe Int
+       in case arg of
+            SInteger i ->
+              let size = fromMaybe 32 mSize
+                  sizeMask = (2 ^ (8 * size)) - 1
+                  maskedInt = i .&. sizeMask
+                  bytes = integer2Bytes maskedInt
+                  -- Pad with leading zeros to ensure correct size (e.g., bytes32 = 32 bytes)
+                  paddedBytes = B.replicate (size - B.length bytes) 0 <> bytes
+              in return $ SBytes paddedBytes
+            SString s -> return $ SBytes $ DT.encodeUtf8 $ T.pack $ maybe s (flip take s) mSize
+            SBytes s -> return $ SBytes $ maybe s (flip B.take s) mSize
+            _ -> invalidArguments ("Could not convert to " ++ name) arg
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
@@ -2358,6 +2386,10 @@ callBuiltin "sha256" [SBytes bs] = pure . SBytes $ SHA256.hash bs
 callBuiltin "sha256" args = pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "ripemd160" [SBytes bs] = pure . SBytes $ RIPEMD160.hash bs
 callBuiltin "ripemd160" args = pure . SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "base64encode" [SBytes bs] = pure . SBytes $ B64.encode bs
+callBuiltin "base64encode" [SString s] = pure . SString . BC.unpack . B64.encode . DT.encodeUtf8 $ T.pack s
+callBuiltin "base64urlencode" [SBytes bs] = pure . SBytes . BC.takeWhile (/= '=') $ B64URL.encode bs
+callBuiltin "base64urlencode" [SString s] = pure . SString . BC.unpack . BC.takeWhile (/= '=') . B64URL.encode . DT.encodeUtf8 $ T.pack s
 callBuiltin "modExp" [b, e, m] = SInteger <$> (Builtins.modExp <$> int b <*> int e <*> int m)
 callBuiltin "ecAdd" [a, b, c, d] = do
   (x1, y1, x2, y2) <- (,,,) <$> int a <*> int b <*> int c <*> int d
@@ -2452,6 +2484,11 @@ callBuiltin "fastForward" [secs] = do
       Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
         pure $ env { Env.blockHeader = updatedBlockHeader }
       return SNULL
+
+callBuiltin "abiEncode" args = SBytes <$> Builtins.abiEncode args
+callBuiltin "abiEncodePacked" args = SBytes <$> Builtins.abiEncodePacked args
+callBuiltin "abiDecode" (SBytes bs : typeArgs) = return $ Builtins.abiDecode bs typeArgs
+callBuiltin "abiDecode" args = invalidArguments "abi.decode expects (bytes, types...)" args
 
 callBuiltin x args = unknownFunction (formatBuiltinError x args) x
 

@@ -10,6 +10,7 @@ import {
   RainbowKitProvider,
 } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
+import { defineChain } from "viem";
 import "@rainbow-me/rainbowkit/styles.css";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
@@ -33,6 +34,7 @@ import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
 import EarnVault from "./pages/EarnVault";
 import OnrampPage from "./pages/OnrampPage";
+import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
 
@@ -67,6 +69,8 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
+  const [networkId, setNetworkId] = useState<string | null>(null);
+  const [creditCardTopUpAddress, setCreditCardTopUpAddress] = useState<string | null>(null);
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
@@ -84,7 +88,9 @@ const App = () => {
       try {
         const configData = await getConfig();
         if (!cancelled) {
-          setProjectId(configData.projectId);
+          setProjectId(configData.projectId ?? "PROJECT_ID_UNSET");
+          if (configData.networkId) setNetworkId(String(configData.networkId));
+          if (configData.creditCardTopUpAddress) setCreditCardTopUpAddress(String(configData.creditCardTopUpAddress));
           setConfigError(false);
         }
       } catch (error) {
@@ -99,7 +105,6 @@ const App = () => {
         }
       }
     };
-
     fetchConfig();
 
     return () => {
@@ -111,7 +116,18 @@ const App = () => {
   useEffect(() => {
     if (!loading) {
       const appName = "Mercata";
-      const chains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
+      const stratoChainId = networkId ? Number(networkId) : null;
+      const stratoChain =
+        stratoChainId != null && !Number.isNaN(stratoChainId)
+          ? defineChain({
+              id: stratoChainId,
+              name: "STRATO",
+              nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
+              rpcUrls: { default: { http: [typeof window !== "undefined" ? `${window.location.origin}/api/rpc/${networkId}` : ""] } },
+            })
+          : null;
+      const baseChains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
+      const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
         chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
       );
@@ -128,14 +144,17 @@ const App = () => {
 
       const config = createConfig({
         connectors,
-        chains,
+        chains: chains as unknown as readonly [typeof mainnet, ...(typeof baseChains)],
         transports,
         ssr: true,
       });
 
       setWagmiConfig(config);
     }
-  }, [projectId, loading]);
+  }, [projectId, loading, networkId]);
+
+  const networkIdStr = networkId ?? undefined;
+  const creditCardTopUpAddressStr = creditCardTopUpAddress ?? undefined;
 
   if (loading) {
     return <div>Loading configuration...</div>;
@@ -151,7 +170,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NetworkProvider>
+      <NetworkProvider initialNetworkId={networkIdStr} initialCreditCardTopUpAddress={creditCardTopUpAddressStr}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <WagmiProvider config={wagmiConfig}>
             <RainbowKitProvider>
@@ -242,6 +261,14 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Earn />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/credit-card"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <CreditCardPage />
                                               </GuestAccessibleRoute>
                                             }
                                           />
