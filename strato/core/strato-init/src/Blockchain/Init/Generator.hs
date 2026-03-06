@@ -43,6 +43,7 @@ import System.Random (randomRIO)
 import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
+import UnliftIO.Exception (catch, SomeException)
 
 createGenesisInfo :: MonadIO m => String -> m ()
 createGenesisInfo network = do
@@ -160,14 +161,18 @@ mkDatabases = do
   $logInfoLS "mkDatabases/Create Database" rawConn
   let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
 
-  withPostgresqlConn rawConn (runReaderT (rawExecute query []))
+  catch
+    (withPostgresqlConn rawConn (runReaderT (rawExecute query [])))
+    (\(_ :: SomeException) -> $logInfoS "mkDatabases/Create Database" "Database already exists, skipping")
 
   -- Create cirrus database
   let cirrusConf = EC.cirrusConfig ethconf
       cirrusDb = EC.database cirrusConf
   $logInfoS "mkDatabases/Create Database" . T.pack $ CL.yellow cirrusDb
   let cirrusQuery = T.pack $ "CREATE DATABASE " ++ show cirrusDb ++ ";"
-  withPostgresqlConn rawConn (runReaderT (rawExecute cirrusQuery []))
+  catch
+    (withPostgresqlConn rawConn (runReaderT (rawExecute cirrusQuery [])))
+    (\(_ :: SomeException) -> $logInfoS "mkDatabases/Create Database" "Database already exists, skipping")
 
   withPostgresqlConn localConn $
     runReaderT $ do
