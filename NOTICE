@@ -13559,12 +13559,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:7936.
 https://www.npmjs.com/package/solidity-ast
 
-solidity-coverage
-Copyright information is provided by the upstream package authors.
-Licensed under the ISC License (per package-lock metadata).
-See mercata/ethereum/package-lock.json:7942.
-https://www.npmjs.com/package/solidity-coverage
-
 sonic-boom
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -15047,12 +15041,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:6565.
 https://www.npmjs.com/package/wbuf
 
-web3-utils
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0 License (per package-lock metadata).
-See mercata/ethereum/package-lock.json:8928.
-https://www.npmjs.com/package/web3-utils
-
 webextension-polyfill
 Copyright information is provided by the upstream package authors.
 Licensed under the MPL-2.0 License (per package-lock metadata).
@@ -15406,10 +15394,10 @@ Status:
 - Upstream migration request filed with Coinbase CDP SDK maintainers:
   https://github.com/coinbase/cdp-sdk/issues/620
 Evidence:
-- mercata/ui/package-lock.json:243
-- mercata/ui/package-lock.json:349
-- mercata/ui/package-lock.json:7253
-- mercata/ui/package-lock.json:14865
+- mercata/ui/package-lock.json:239
+- mercata/ui/package-lock.json:351
+- mercata/ui/package-lock.json:7236
+- mercata/ui/package-lock.json:14878
 Risk:
 - High.
 Recommendation:
@@ -15418,27 +15406,13 @@ Recommendation:
 - Track upstream response on Coinbase CDP SDK Solana migration plan:
   https://github.com/coinbase/cdp-sdk/issues/620
 
-3) mercata/ethereum web3-utils (LGPL-3.0) via solidity-coverage
-Status:
-- web3-utils appears as dev dependency path from hardhat-toolbox peer set.
-Evidence:
-- mercata/ethereum/package-lock.json:1785
-- mercata/ethereum/package-lock.json:7968
-- mercata/ethereum/package-lock.json:8933
-Risk:
-- Medium (dev/test scope, but still relevant for distributed source/binaries
-  and SBOM posture).
-Recommendation:
-- Preferred: remove solidity-coverage/hardhat-toolbox aggregate if not required;
-  install only specific hardhat plugins needed.
-
-4) mercata/ui sharp/libvips platform packages (LGPL-3.0-or-later)
+3) mercata/ui sharp/libvips platform packages (LGPL-3.0-or-later)
 Status:
 - sharp optional dependency chain includes LGPL libvips platform packages.
 Evidence:
-- mercata/ui/package-lock.json:1366
-- mercata/ui/package-lock.json:12999
-- mercata/ui/package-lock.json:14865
+- mercata/ui/package-lock.json:13016
+- mercata/ui/package-lock.json:1361
+- mercata/ui/package-lock.json:15058
 Risk:
 - Medium (optional/platform-dependent install path).
 Recommendation:
@@ -15448,5 +15422,5 @@ Recommendation:
 Priority order:
 1. Remove LGPL rpc-websockets paths from mercata/ui dependency chain.
 2. Decide rapidsnark policy (remove or isolate externally).
-3. Minimize dev-tool LGPL path in mercata/ethereum.
+3. Decide policy for sharp/libvips optional path in mercata/ui builds.
 4. Re-generate NOTICE and SBOM after dependency lock updates.

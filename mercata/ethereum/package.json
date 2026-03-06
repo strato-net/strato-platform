@@ -15,7 +15,9 @@
     "scan:mainnet": "npx hardhat run scripts/scanTokenConfig.js --network mainnet"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.1.0",
+    "@nomicfoundation/hardhat-verify": "^2.1.1",
+    "ethers": "^6.14.0",
     "hardhat": "^2.19.0"
   },
   "dependencies": {
