@@ -97,9 +97,9 @@ sudo apt install -y \
 ```bash
 brew install --quiet \
   leveldb \
-  postgresql \
+  libpq \
   libsodium \
-  pkg-config \
+  pkgconf \
   secp256k1 \
   xz
 ```
@@ -520,4 +520,3 @@ Now that you have STRATO running locally:
 - **Documentation:** [docs.strato.nexus](https://docs.strato.nexus)
 - **Support:** [support.blockapps.net](https://support.blockapps.net)
 - **Telegram:** [t.me/strato_net](https://t.me/strato_net)
-

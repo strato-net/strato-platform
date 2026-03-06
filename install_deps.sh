@@ -178,6 +178,9 @@ Darwin)
     # Install Haskell Stack
     brew install --quiet haskell-stack
 
+    # Install Node.js and npm
+    brew install --quiet node
+
     # Install STRATO dependencies
     brew install --quiet \
         leveldb \
@@ -348,12 +351,17 @@ Linux)
                 libgmp-dev \
                 zlib1g-dev
             curl -sSL https://get.haskellstack.org/ | sh -s - -f
+
+            # Install Node.js and npm (LTS 22.x)
+            curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+            sudo apt install -qy --no-install-recommends nodejs
             
             # Install STRATO dependencies
             sudo apt install -qy --no-install-recommends \
                 libleveldb-dev \
                 liblzma-dev \
                 libpq-dev \
+                pkg-config \
                 libsecp256k1-dev \
                 libsodium-dev \
                 postgresql-client

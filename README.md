@@ -27,9 +27,9 @@
       ```
       brew install --quiet \
         leveldb \
-        postgresql \
+        libpq \
         libsodium \
-        pkg-config \
+        pkgconf \
         secp256k1 \
         xz
       ```
