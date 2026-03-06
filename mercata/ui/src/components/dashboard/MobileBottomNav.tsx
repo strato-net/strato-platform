@@ -15,8 +15,8 @@ import {
   Droplets, 
   Shield,
   UserPlus,
+  HandCoins,
   Vault,
-  CreditCard,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -35,6 +35,7 @@ const MORE_ITEMS = [
   { icon: CreditCard, label: 'Buy Crypto', path: '/dashboard/onramp' },
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
+  { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
   { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },

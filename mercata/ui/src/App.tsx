@@ -31,6 +31,8 @@ import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
+import Earn from "./pages/Earn";
+import EarnVault from "./pages/EarnVault";
 import OnrampPage from "./pages/OnrampPage";
 import CreditCardPage from "./pages/CreditCard";
 
@@ -243,6 +245,22 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Vault />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-vault"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnVault />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <Earn />
                                               </GuestAccessibleRoute>
                                             }
                                           />
