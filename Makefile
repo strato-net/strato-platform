@@ -28,8 +28,12 @@ ifndef VERSION
   ifeq ($(REPO),public)
     VERSION = `cat VERSION`
     $(info Using version tag from VERSION file)
-  else
+  else ifeq ($(REPO),private)
     VERSION = `cat VERSION`-`git rev-parse --short=7 HEAD`
+    $(info Using version tag with commit hash for registry)
+  else
+    # Local dev - use simple version (no commit hash) for stable image tags
+    VERSION = `cat VERSION`
   endif
 else
   $(info VERSION is "${VERSION}" (overriden with env var))
