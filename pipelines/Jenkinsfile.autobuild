@@ -39,6 +39,7 @@ pipeline {
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
+        sh 'make clean-docker-sentinels'
         sh 'REPO=private make docker'
       }
     }
