@@ -15403,6 +15403,8 @@ Recommendation:
    @coinbase/cdp-sdk -> @solana/web3.js
 Status:
 - rpc-websockets is present in Mercata UI lockfile.
+- Upstream migration request filed with Coinbase CDP SDK maintainers:
+  https://github.com/coinbase/cdp-sdk/issues/620
 Evidence:
 - mercata/ui/package-lock.json:243
 - mercata/ui/package-lock.json:349
@@ -15413,6 +15415,8 @@ Risk:
 Recommendation:
 - Preferred: replace SDK path introducing Solana websocket stack for Apache-only
   distribution profile.
+- Track upstream response on Coinbase CDP SDK Solana migration plan:
+  https://github.com/coinbase/cdp-sdk/issues/620
 
 3) mercata/ethereum web3-utils (LGPL-3.0) via solidity-coverage
 Status:
