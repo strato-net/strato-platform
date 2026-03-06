@@ -148,6 +148,52 @@ contract record MetalForge is Ownable {
         emit ConfigUpdated(metalToken, payToken, isPaused, feeBps, mintCap);
     }
 
+    function setConfigBatch(
+        address[] calldata metalTokens,
+        address[] calldata payTokens,
+        bool[] calldata isPausedArr,
+        uint[] calldata feeBpsArr,
+        uint[] calldata mintCapArr
+    ) external onlyOwner {
+        uint len = metalTokens.length;
+        require(len > 0, "MetalForge: empty batch");
+        require(payTokens.length == len && isPausedArr.length == len && feeBpsArr.length == len && mintCapArr.length == len, "MetalForge: array length mismatch");
+        for (uint i = 0; i < len; i++) {
+            configs[metalTokens[i]][payTokens[i]] = Config(isPausedArr[i], feeBpsArr[i], mintCapArr[i]);
+            emit ConfigUpdated(metalTokens[i], payTokens[i], isPausedArr[i], feeBpsArr[i], mintCapArr[i]);
+        }
+    }
+
+    function setOracle(
+        address oracle
+    ) external onlyOwner {
+        require(oracle != address(0), "MetalForge: invalid oracle address");
+        oracle = PriceOracle(oracle);
+        emit OracleUpdated(oracle);
+    }
+    function setTreasury(
+        address treasury
+    ) external onlyOwner {
+        require(treasury != address(0), "MetalForge: invalid treasury address");
+        treasury = MetalTreasury(treasury);
+        emit TreasuryUpdated(treasury);
+    }
+    function setFeeCollector(
+        address feeCollector
+    ) external onlyOwner {
+        require(feeCollector != address(0), "MetalForge: invalid fee collector address");
+        feeCollector = FeeCollector(feeCollector);
+        emit FeeCollectorUpdated(feeCollector);
+    }
+
+    function setUsdst(
+        address usdst
+    ) external onlyOwner {
+        require(usdst != address(0), "MetalForge: invalid usdst address");
+        usdst = Token(usdst);
+        emit UsdstUpdated(usdst);
+    }
+
     function setMintCap(
         address metalToken,
         address payToken,
