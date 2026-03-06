@@ -29,17 +29,22 @@ fi
 if [ "$CONVOKE_RUNNING" = true ]; then
     BAROMETER=$(cd "$STRATO_DIR" && strato-barometer syncstats 2>/dev/null)
     if [ -n "$BAROMETER" ]; then
-        # Get Best Block number (first bestBlockNumber in output)
+        # Get local Best Block number (first bestBlockNumber)
         BLOCK_NUM=$(echo "$BAROMETER" | grep "bestBlockNumber:" | head -1 | awk '{print $2}')
+        # Get World Best Block number (highest known block)
+        WORLD_BLOCK=$(echo "$BAROMETER" | sed -n '/^World Best Block:/,/bestBlockNumber:/p' | grep "bestBlockNumber:" | awk '{print $2}')
         # Get Sync Status (True/False)
         SYNC_STATUS=$(echo "$BAROMETER" | grep -A2 "^Sync Status:$" | tail -1)
         
-        if [ -n "$BLOCK_NUM" ]; then
+        if [ -n "$BLOCK_NUM" ] && [ -n "$WORLD_BLOCK" ]; then
             if [ "$SYNC_STATUS" = "True" ]; then
                 echo "Sync: block $BLOCK_NUM (synced)"
             else
-                echo "Sync: block $BLOCK_NUM (syncing)"
+                PERCENT=$(awk "BEGIN {printf \"%.1f\", ($BLOCK_NUM / $WORLD_BLOCK) * 100}")
+                echo "Sync: block $BLOCK_NUM / $WORLD_BLOCK ($PERCENT% syncing)"
             fi
+        elif [ -n "$BLOCK_NUM" ]; then
+            echo "Sync: block $BLOCK_NUM"
         fi
     fi
 fi
