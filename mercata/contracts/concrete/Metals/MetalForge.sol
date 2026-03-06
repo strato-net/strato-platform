@@ -1,4 +1,3 @@
-import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../Lending/PriceOracle.sol";
@@ -43,8 +42,19 @@ contract record MetalForge is Ownable {
     event MintCapUpdated(
         address metalToken,
         address payToken,
-        uint oldCap,
         uint newCap
+    );
+
+    event FeeBpsUpdated(
+        address metalToken,
+        address payToken,
+        uint newBps
+    );
+
+    event isPausedToggled(
+        address metalToken,
+        address payToken,
+        bool isPaused
     );
 
     // ====================================================
@@ -199,9 +209,8 @@ contract record MetalForge is Ownable {
         address payToken,
         uint mintCap
     ) external onlyOwner {
-        uint oldCap = configs[metalToken][payToken].mintCap;
         configs[metalToken][payToken].mintCap = mintCap;
-        emit MintCapUpdated(metalToken, payToken, oldCap, mintCap);
+        emit MintCapUpdated(metalToken, payToken, mintCap);
     }
 
     function setFeeBps(
@@ -210,7 +219,7 @@ contract record MetalForge is Ownable {
         uint feeBps
     ) external onlyOwner {
         configs[metalToken][payToken].feeBps = feeBps;
-        emit ConfigUpdated(metalToken, payToken, configs[metalToken][payToken].isPaused, feeBps, configs[metalToken][payToken].mintCap);
+        emit FeeBpsUpdated(metalToken, payToken, feeBps);
     }
 
     function setIsPaused(
@@ -219,7 +228,7 @@ contract record MetalForge is Ownable {
         bool isPaused
     ) external onlyOwner {
         configs[metalToken][payToken].isPaused = isPaused;
-        emit ConfigUpdated(metalToken, payToken, isPaused, configs[metalToken][payToken].feeBps, configs[metalToken][payToken].mintCap);
+        emit isPausedToggled(metalToken, payToken, isPaused);
     }
 
 }
