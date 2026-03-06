@@ -1,343 +1,1109 @@
-import { useEffect, useState } from "react";
-import { safeParseUnits } from "@/utils/numberUtils";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatUnits } from "ethers";
+import {
+  ArrowLeftRight,
+  CheckCircle2,
+  ChevronDown,
+  CircleDollarSign,
+  CirclePlus,
+  Coins,
+  HandCoins,
+  Landmark,
+  Send,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
+import { useLendingContext } from "@/context/LendingContext";
+import { useOracleContext } from "@/context/OracleContext";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CollateralData } from "@/interface";
-import PositionSection from "@/components/Positions";
-import CollateralModal from "@/components/borrow/CollateralModal";
-import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
-import BorrowForm from "@/components/borrow/BorrowForm";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import RepayForm from "@/components/borrow/RepayForm";
-import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
-import { useSmartPolling } from "@/hooks/useSmartPolling";
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
-import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
-import { useSearchParams } from 'react-router-dom';
-import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
+import { CollateralData } from "@/interface";
+import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { api } from "@/lib/axios";
+import {
+  calculateAfterBorrowHealthFactor,
+  calculateAvailableToBorrowUSD,
+  calculateHFSliderExtrema,
+  getRiskLabel,
+  recommendCollateralToSupply,
+} from "@/utils/lendingUtils";
+
+type RoutePreviewApiResponse = {
+  feasible: boolean;
+  shortfall: string;
+  rates: {
+    lendingApr: number;
+    cdpApr: number;
+    blendedApr: number;
+  };
+  health: {
+    cdpCollateralRatio: number;
+    cdpEffectiveHealthFactor: number;
+    lendingHealthFactor: number;
+    unifiedHealthFactor: number;
+  };
+  position: {
+    projectedLtvPercent: number;
+    liquidationDropPercent: number;
+    liquidationHealthFactor: number;
+    liquidationPriceUSD: number;
+    liquidationAssetSymbol: string;
+  };
+  constraints: {
+    totalCapacity: string;
+  };
+  lendingAllocations: Array<{
+    asset: string;
+    symbol: string;
+    decimals: number;
+    supplyAmount: string;
+    collateralValueUSD: string;
+  }>;
+  cdpAllocations: Array<{
+    asset: string;
+    symbol: string;
+    decimals: number;
+    depositAmount: string;
+    mintAmount: string;
+    apr: number;
+    collateralRatio: number;
+    effectiveHealthFactor: number;
+    collateralValueUSD: string;
+  }>;
+  split: {
+    lendingAmount: string;
+    cdpAmount: string;
+    mechanisms?: number;
+  };
+};
+
+type ExecuteBorrowRouteResponse = {
+  status: "success" | "partial_or_failed";
+  error?: string;
+  steps?: Array<{ step: string; status: "pending" | "completed" | "failed"; error?: string }>;
+  execution?: {
+    lendingBorrowed?: string;
+    cdpMinted?: string;
+    totalBorrowed?: string;
+    failedStep?: string | null;
+  };
+};
+
+type CdpVault = {
+  asset: string;
+  symbol: string;
+  collateralAmount: string;
+  collateralAmountDecimals: number;
+  collateralValueUSD: string;
+  debtAmount: string;
+  collateralizationRatio: number;
+  healthFactor: number;
+};
 
 const Borrow = () => {
   const { userAddress, isLoggedIn } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
-  const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
-  const [borrowLoading, setBorrowLoading] = useState(false);
-  const [modalState, setModalState] = useState<{
-    isOpen: boolean;
-    type: "supply" | "withdraw" | null;
-  }>({ isOpen: false, type: null });
-  const [modalLoading, setModalLoading] = useState(false);
-  const [repayLoading, setRepayLoading] = useState(false);
-  const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
-  const [searchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') === 'repay' ? 'repay' : 'borrow') as "borrow" | "repay";
-  const [activeTab, setActiveTab] = useState<"borrow" | "repay">(initialTab);
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
-
-  // Update active tab when URL query param changes
-  useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'repay' || tabParam === 'borrow') {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams]);
-
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { toast } = useToast();
   const {
-    refreshLoans,
     loans,
-    borrowAsset: borrowAssetFn,
     collateralInfo,
-    loadingCollateral,
+    liquidityInfo,
+    refreshLoans,
     refreshCollateral,
-    supplyCollateral,
-    withdrawCollateral,
-    repayLoan: repayLoanFn,
+    repayLoan,
     repayAll,
-    withdrawCollateralMax,
-    borrowMax
   } = useLendingContext();
+  const { getPrice } = useOracleContext();
 
-  // Use the new smart polling hook for balance updates
-  const { startPolling, stopPolling } = useSmartPolling({
-    fetchFn: fetchUsdstBalance,
-    shouldPoll: () => isLoggedIn,
-    interval: 10000,
-    onError: (error) => console.error("Balance polling error:", error)
-  });
+  const [borrowInput, setBorrowInput] = useState("");
+  const [selectedBorrowPreset, setSelectedBorrowPreset] = useState<number | null>(null);
+  const [borrowLoading, setBorrowLoading] = useState(false);
+  const [repayLoading, setRepayLoading] = useState(false);
+  const [inlineBorrowError, setInlineBorrowError] = useState("");
+  const [inlineRepayError, setInlineRepayError] = useState("");
+  const [autoAllocate, setAutoAllocate] = useState(true);
+  const [targetHealthFactor, setTargetHealthFactor] = useState(2.1);
+  const [showDetails, setShowDetails] = useState(true);
+  const [isDraggingHealthBar, setIsDraggingHealthBar] = useState(false);
+  const healthBarRef = useRef<HTMLDivElement | null>(null);
+  const [routePreviewData, setRoutePreviewData] = useState<RoutePreviewApiResponse | null>(null);
+  const [routePreviewLoading, setRoutePreviewLoading] = useState(false);
+  const [showRepayPanel, setShowRepayPanel] = useState(false);
+  const [cdpVaults, setCdpVaults] = useState<CdpVault[]>([]);
+  const { userRewards } = useRewardsUserInfo();
 
+  const guestMode = !isLoggedIn;
+  type CustomCollateralEntry = { source: "wei"; wei: bigint } | { source: "usd"; usd: string };
+  const normalizedBorrowInput = borrowInput.replace(/,/g, "").trim();
+  const requestedBorrow = Number(normalizedBorrowInput || "0");
+  const requestedBorrowWei = safeParseUnits(normalizedBorrowInput || "0", 18);
+  const requestedBorrowUsdDisplay = useMemo(() => {
+    if (requestedBorrowWei <= 0n) return "0.00";
+
+    const borrowableAssetAddress = liquidityInfo?.supplyable?.address;
+    const oraclePrice = borrowableAssetAddress ? getPrice(borrowableAssetAddress) : null;
+    const fallbackTokenPrice = liquidityInfo?.supplyable?.price?.toString();
+    const priceRaw = oraclePrice ?? fallbackTokenPrice ?? "1000000000000000000";
+
+    let priceWei: bigint;
+    try {
+      priceWei = BigInt(priceRaw);
+      if (priceWei <= 0n) priceWei = 10n ** 18n;
+    } catch {
+      priceWei = 10n ** 18n;
+    }
+
+    const usdValueWei = (requestedBorrowWei * priceWei) / (10n ** 18n);
+    const usdValue = Number(formatUnits(usdValueWei, 18));
+
+    return usdValue.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }, [
+    requestedBorrowWei,
+    liquidityInfo?.supplyable?.address,
+    liquidityInfo?.supplyable?.price,
+    getPrice,
+  ]);
   useEffect(() => {
     document.title = "Borrow Assets | STRATO";
   }, []);
 
-
-  // Refresh data when page loads - only for logged-in users
   useEffect(() => {
-    if (!isLoggedIn) return;
-    
+    if (!isLoggedIn) {
+      setCdpVaults([]);
+      return;
+    }
     const refreshData = async () => {
       try {
-        await Promise.all([
+        const [, , , vaultsRes] = await Promise.all([
           refreshLoans(),
           refreshCollateral(),
           fetchUsdstBalance(),
+          api.get<CdpVault[]>("/cdp/vaults"),
         ]);
+        setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
       } catch (error) {
-        console.error("Error refreshing data:", error);
+        console.error("Error refreshing borrow page data:", error);
       }
     };
     refreshData();
   }, [userAddress, isLoggedIn, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
-    useEffect(() => {
-    if (collateralInfo && Array.isArray(collateralInfo)) {
-      // Only show assets that have a balance > 0
-      const eligibleWithBalance = collateralInfo.filter((item) => 
-        BigInt(item.userBalance || 0) > 0n
-      );
-      setEligibleCollateral(eligibleWithBalance);
+  const potentialCollateral = useMemo(() => {
+    const map = new Map<CollateralData, bigint>();
+    if (!collateralInfo) return map;
+    for (const collateral of collateralInfo) {
+      const balance = BigInt(collateral.userBalance || "0");
+      if (balance > 0n) map.set(collateral, balance);
     }
+    return map;
   }, [collateralInfo]);
 
-  const handleSupply = (asset: CollateralData) => {
-    setSelectedAsset(asset);
-    setModalState({ isOpen: true, type: "supply" });
-  };
+  const [customCollateralEntries, setCustomCollateralEntries] = useState<Map<string, CustomCollateralEntry>>(new Map());
+  const [manualCollateralInputErrors, setManualCollateralInputErrors] = useState<Map<string, string>>(new Map());
 
-  const handleWithdraw = (asset: CollateralData) => {
-    setSelectedAsset(asset);
-    setModalState({ isOpen: true, type: "withdraw" });
-  };
+  const sliderExtrema = useMemo(() => {
+    return calculateHFSliderExtrema(loans, collateralInfo);
+  }, [loans, collateralInfo]);
 
-  const closeModal = () => {
-    setSelectedAsset(null);
-    setModalState({ isOpen: false, type: null });
-  };
+  const availableToBorrow = useMemo(() => {
+    if (!loans || !collateralInfo || collateralInfo.length === 0) return 0n;
+    return calculateAvailableToBorrowUSD(loans, targetHealthFactor, potentialCollateral);
+  }, [loans, collateralInfo, targetHealthFactor, potentialCollateral]);
 
-  const executeSupply = async (asset: CollateralData, amount: string) => {
-    try {
-      setModalLoading(true);
-      await supplyCollateral({
-        asset: asset.address,
-        amount: safeParseUnits(amount).toString(),
-      });
-      toast({
-        title: "Supply Initiated",
-        description: `You supplied ${amount} ${asset._symbol}`,
-        variant: "success",
-      });
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
-      // Refresh all data after successful supply
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(),
-      ]);
-    } catch (error) {
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
+  const recommendedCollateral = useMemo(() => {
+    if (!loans || !collateralInfo || requestedBorrow <= 0) {
+      return new Map<CollateralData, bigint>();
     }
+    return recommendCollateralToSupply(loans, targetHealthFactor, requestedBorrow, [...collateralInfo]);
+  }, [loans, collateralInfo, requestedBorrow, targetHealthFactor]);
+
+  const getManualCollateralAmount = (asset: CollateralData, entry?: CustomCollateralEntry): bigint => {
+    if (!entry) return 0n;
+    const balance = BigInt(asset.userBalance || "0");
+    if (entry.source === "wei") {
+      return entry.wei > balance ? balance : entry.wei;
+    }
+    const usdInput = entry.usd.trim();
+    if (!usdInput) return 0n;
+    const price = BigInt(asset.assetPrice || "0");
+    if (price <= 0n) return 0n;
+    const decimals = BigInt(asset.customDecimals ?? 18);
+    const usdWei = safeParseUnits(usdInput, 18);
+    if (usdWei <= 0n) return 0n;
+    const computedAmount = (usdWei * (10n ** decimals)) / price;
+    return computedAmount > balance ? balance : computedAmount;
   };
 
-  const executeWithdraw = async (asset: CollateralData, amount: string) => {
-    try {
-      setModalLoading(true);
-      if (amount === 'ALL') {
-        await withdrawCollateralMax({ asset: asset.address });
-      } else {
-        await withdrawCollateral({
-          asset: asset.address,
-          amount: safeParseUnits(amount).toString(),
-        });
+  const manualCollateral = useMemo(() => {
+    const map = new Map<CollateralData, bigint>();
+    if (autoAllocate) return map;
+    for (const collateral of potentialCollateral.keys()) {
+      const entry = customCollateralEntries.get(collateral.address);
+      const amount = getManualCollateralAmount(collateral, entry);
+      if (amount > 0n) {
+        map.set(collateral, amount);
       }
-      toast({
-        title: "Withdraw Initiated",
-        description: `Withdrawal submitted: ${amount === 'ALL' ? 'max available' : amount} ${asset._symbol}`,
-        variant: "success",
-      });
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
-      // Refresh all data after successful withdraw
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(),
-      ]);
-    } catch (error) {
-      console.log(error, "error");
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
-      // Error toast is now handled globally by axios interceptor
     }
+    return map;
+  }, [autoAllocate, potentialCollateral, customCollateralEntries]);
+
+  const selectedCollateral = useMemo(() => {
+    return autoAllocate ? recommendedCollateral : manualCollateral;
+  }, [autoAllocate, recommendedCollateral, manualCollateral]);
+
+  const totalCollateralUsedWei = useMemo(() => {
+    return Array.from(selectedCollateral.entries()).reduce((sum, [asset, amount]) => {
+      const decimals = BigInt(asset.customDecimals ?? 18);
+      const price = BigInt(asset.assetPrice || "0");
+      return sum + (amount * price) / (10n ** decimals);
+    }, 0n);
+  }, [selectedCollateral]);
+
+  const handleAutoAllocateToggle = () => {
+    setAutoAllocate((prev) => {
+      const next = !prev;
+      if (!next) {
+        const initialEntries = new Map<string, CustomCollateralEntry>();
+        for (const collateral of potentialCollateral.keys()) {
+          const recommendedAmount = recommendedCollateral.get(collateral);
+          if (recommendedAmount && recommendedAmount > 0n) {
+            initialEntries.set(collateral.address, { source: "wei", wei: recommendedAmount });
+          } else {
+            initialEntries.set(collateral.address, { source: "usd", usd: "0.00" });
+          }
+        }
+        setCustomCollateralEntries(initialEntries);
+        setManualCollateralInputErrors(new Map());
+      } else {
+        setCustomCollateralEntries(new Map());
+        setManualCollateralInputErrors(new Map());
+      }
+      return next;
+    });
   };
 
+  const handleCustomCollateralValueChange = (address: string, value: string) => {
+    if (!/^\d*\.?\d*$/.test(value)) return;
+    const asset = Array.from(potentialCollateral.keys()).find((item) => item.address === address);
+    const maxUsd = asset ? Number(formatUnits(BigInt(asset.userBalanceValue || "0"), 18)) : 0;
+    let nextValue = value;
+    let errorText = "";
+    if (value !== "") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed) && parsed > maxUsd) {
+        nextValue = maxUsd.toFixed(2);
+        errorText = `Max available is $${maxUsd.toFixed(2)}`;
+      }
+    }
+    setCustomCollateralEntries((prev) => {
+      const next = new Map(prev);
+      next.set(address, { source: "usd", usd: nextValue });
+      return next;
+    });
+    setManualCollateralInputErrors((prev) => {
+      const next = new Map(prev);
+      if (errorText) {
+        next.set(address, errorText);
+      } else {
+        next.delete(address);
+      }
+      return next;
+    });
+  };
 
-  const executeEmbeddedBorrow = async (amount: string) => {
+  const handleFillMaxCollateral = (asset: CollateralData) => {
+    setCustomCollateralEntries((prev) => {
+      const next = new Map(prev);
+      next.set(asset.address, { source: "wei", wei: BigInt(asset.userBalance || "0") });
+      return next;
+    });
+    setManualCollateralInputErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(asset.address);
+      return next;
+    });
+  };
+
+  const collateralRows = useMemo(() => {
+    const rowsFromAmounts = (entries: Array<[CollateralData, bigint]>) => {
+      return entries
+        .filter(([, amount]) => amount > 0n)
+        .slice(0, 3)
+        .map(([asset, amount]) => {
+          const decimals = asset.customDecimals ?? 18;
+          const tokenAmount = Number(formatUnits(amount, decimals));
+          const usdValue = Number((amount * BigInt(asset.assetPrice || "0")) / (10n ** BigInt(decimals))) / 1e18;
+          return {
+            address: asset.address,
+            symbol: asset._symbol,
+            balanceText: `Balance: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
+            amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
+            usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
+            muted: false,
+            manual: false,
+            inputValue: "",
+            availableText: "",
+            asset,
+          };
+        });
+    };
+
+    if (autoAllocate) {
+      return rowsFromAmounts(Array.from(recommendedCollateral.entries()));
+    }
+
+    return Array.from(potentialCollateral.keys()).map((asset) => {
+      const decimals = asset.customDecimals ?? 18;
+      const entry = customCollateralEntries.get(asset.address);
+      const amount = getManualCollateralAmount(asset, entry);
+      const tokenAmount = Number(formatUnits(amount, decimals));
+      const usdValue = Number((amount * BigInt(asset.assetPrice || "0")) / (10n ** BigInt(decimals))) / 1e18;
+      const inputValue = entry?.source === "usd" ? entry.usd : usdValue.toFixed(2);
+      return {
+        address: asset.address,
+        symbol: asset._symbol,
+        balanceText: `Balance: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
+        amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
+        usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
+        muted: false,
+        manual: true,
+        inputValue,
+        availableText: formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true),
+        asset,
+      };
+    });
+  }, [autoAllocate, recommendedCollateral, potentialCollateral, customCollateralEntries]);
+
+  const ltvNow = useMemo(() => {
+    const debt = Number(formatUnits(BigInt(loans?.totalAmountOwed || "0"), 18));
+    const collateral = Number(formatUnits(BigInt(loans?.totalCollateralValueSupplied || "0"), 18));
+    if (!collateral) return 0;
+    return (debt / collateral) * 100;
+  }, [loans?.totalAmountOwed, loans?.totalCollateralValueSupplied]);
+
+  const lendingCollateralPayload = useMemo(() => {
+    if (autoAllocate) return [];
+    return Array.from(selectedCollateral.entries())
+      .filter(([, amount]) => amount > 0n)
+      .map(([asset, amount]) => ({
+        asset: asset.address,
+        amount: amount.toString(),
+      }));
+  }, [autoAllocate, selectedCollateral]);
+
+  useEffect(() => {
+    if (!isLoggedIn || requestedBorrowWei <= 0n) {
+      setRoutePreviewData(null);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchRoutePreview = async () => {
+      try {
+        setRoutePreviewLoading(true);
+        const res = await api.post<RoutePreviewApiResponse>("/borrow-router/preview", {
+          amount: requestedBorrowWei.toString(),
+          targetHealthFactor,
+          lendingCollateral: lendingCollateralPayload,
+        });
+        if (!cancelled) {
+          setRoutePreviewData(res.data);
+        }
+      } catch {
+        if (!cancelled) {
+          setRoutePreviewData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setRoutePreviewLoading(false);
+        }
+      }
+    };
+
+    fetchRoutePreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, requestedBorrowWei, targetHealthFactor, lendingCollateralPayload]);
+
+  const routePreview = useMemo(() => {
+    const fallbackTotal = requestedBorrow > 0 ? requestedBorrow : 0;
+    const fallbackLendingApr = Number(((loans?.interestRate || 0) / 100).toFixed(2));
+    if (!routePreviewData) {
+      return {
+        lendingAmount: fallbackTotal,
+        cdpAmount: 0,
+        mechanisms: fallbackTotal > 0 ? 1 : 0,
+        lendingApr: fallbackLendingApr,
+        cdpApr: 0,
+        blendedApr: fallbackLendingApr,
+        cdpDebt: 0,
+        cdpCollateralUsd: 0,
+        liquidationDropPercent: 0,
+        liquidationHealthFactor: 1,
+        liquidationPriceUSD: 0,
+        liquidationAssetSymbol: "USD",
+        swapPairs: 0,
+        earnApr: 0,
+        cdpCR: 0,
+        unifiedHealthFactor: targetHealthFactor,
+        lendingHF: targetHealthFactor,
+        cdpEffectiveHF: targetHealthFactor,
+        projectedLtvPercent: ltvNow,
+      };
+    }
+
+    const lendingAmount = Number(formatUnits(BigInt(routePreviewData.split.lendingAmount || "0"), 18));
+    const cdpAmount = Number(formatUnits(BigInt(routePreviewData.split.cdpAmount || "0"), 18));
+    const cdpCollateralUsd = routePreviewData.cdpAllocations.reduce((sum, item) => {
+      const value = Number(formatUnits(BigInt(item.collateralValueUSD || "0"), 18));
+      return sum + value;
+    }, 0);
+
+    return {
+      lendingAmount,
+      cdpAmount,
+      mechanisms: Number(routePreviewData.split.mechanisms || 0),
+      lendingApr: Number(routePreviewData.rates.lendingApr || 0),
+      cdpApr: Number(routePreviewData.rates.cdpApr || 0),
+      blendedApr: Number(routePreviewData.rates.blendedApr || 0),
+      cdpDebt: cdpAmount,
+      cdpCollateralUsd,
+      liquidationDropPercent: Number(routePreviewData.position?.liquidationDropPercent || 0),
+      liquidationHealthFactor: Number(routePreviewData.position?.liquidationHealthFactor || 1),
+      liquidationPriceUSD: Number(routePreviewData.position?.liquidationPriceUSD || 0),
+      liquidationAssetSymbol: routePreviewData.position?.liquidationAssetSymbol || "USD",
+      swapPairs: 0,
+      earnApr: 0,
+      cdpCR: Number(routePreviewData.health.cdpCollateralRatio || 0),
+      unifiedHealthFactor: Number(routePreviewData.health.unifiedHealthFactor || targetHealthFactor),
+      lendingHF: Number(routePreviewData.health.lendingHealthFactor || targetHealthFactor),
+      cdpEffectiveHF: Number(routePreviewData.health.cdpEffectiveHealthFactor || targetHealthFactor),
+      projectedLtvPercent: Number(routePreviewData.position?.projectedLtvPercent || ltvNow),
+    };
+  }, [routePreviewData, requestedBorrow, loans?.interestRate, targetHealthFactor, ltvNow]);
+
+  const maxBorrowableWei = useMemo(() => {
+    if (routePreviewData?.constraints?.totalCapacity) {
+      try {
+        return BigInt(routePreviewData.constraints.totalCapacity);
+      } catch {
+        return availableToBorrow;
+      }
+    }
+    return availableToBorrow;
+  }, [routePreviewData?.constraints?.totalCapacity, availableToBorrow]);
+
+  const lendingRouteCollateralText = useMemo(() => {
+    const allocations = routePreviewData?.lendingAllocations || [];
+    if (allocations.length === 0) return "No additional collateral needed";
+    return allocations
+      .filter((item) => BigInt(item.supplyAmount || "0") > 0n)
+      .map((item) => `${Number(formatUnits(BigInt(item.supplyAmount || "0"), item.decimals || 18)).toFixed(2)} ${item.symbol}`)
+      .join(" + ");
+  }, [routePreviewData?.lendingAllocations]);
+
+  const cdpRouteCollateralText = useMemo(() => {
+    const allocations = routePreviewData?.cdpAllocations || [];
+    if (allocations.length === 0) return "No CDP collateral needed";
+    return allocations
+      .filter((item) => BigInt(item.depositAmount || "0") > 0n)
+      .map((item) => `${Number(formatUnits(BigInt(item.depositAmount || "0"), item.decimals || 18)).toFixed(2)} ${item.symbol}`)
+      .join(" + ");
+  }, [routePreviewData?.cdpAllocations]);
+
+  const totalCdpDebtActual = useMemo(() => {
+    return cdpVaults.reduce((sum, vault) => sum + Number(formatUnits(BigInt(vault.debtAmount || "0"), 18)), 0);
+  }, [cdpVaults]);
+
+  const progressValue = useMemo(() => {
+    const sourceHealthFactor = routePreviewData?.health?.unifiedHealthFactor && routePreviewData.health.unifiedHealthFactor > 0
+      ? routePreviewData.health.unifiedHealthFactor
+      : targetHealthFactor;
+    const min = 1;
+    const max = Math.max(3, sourceHealthFactor * 1.5, targetHealthFactor * 1.2);
+    if (max <= min) return 50;
+    const clamped = Math.max(min, Math.min(max, sourceHealthFactor));
+    return ((clamped - min) / (max - min)) * 100;
+  }, [routePreviewData?.health?.unifiedHealthFactor, targetHealthFactor]);
+
+  const displayHealthFactor = useMemo(() => {
+    if (routePreviewData?.health?.unifiedHealthFactor && routePreviewData.health.unifiedHealthFactor > 0) {
+      return Number(routePreviewData.health.unifiedHealthFactor);
+    }
+    if (loans && requestedBorrow > 0) {
+      const fallbackAfterBorrow = calculateAfterBorrowHealthFactor(loans, requestedBorrow, selectedCollateral);
+      const fallbackNumeric = Number(fallbackAfterBorrow ?? 0);
+      if (Number.isFinite(fallbackNumeric) && fallbackNumeric > 0) {
+        return fallbackNumeric;
+      }
+    }
+    return Number(targetHealthFactor);
+  }, [routePreviewData?.health?.unifiedHealthFactor, loans, requestedBorrow, selectedCollateral, targetHealthFactor]);
+
+  const updateTargetHealthFactorFromClientX = (clientX: number) => {
+    const barEl = healthBarRef.current;
+    if (!barEl) return;
+    const rect = barEl.getBoundingClientRect();
+    if (rect.width <= 0) return;
+
+    const min = Number(sliderExtrema.min);
+    const max = Number(sliderExtrema.max);
+    if (max <= min) return;
+
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const next = min + ratio * (max - min);
+    setTargetHealthFactor(Number(next.toFixed(2)));
+  };
+
+  useEffect(() => {
+    if (!isDraggingHealthBar) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      updateTargetHealthFactorFromClientX(event.clientX);
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      updateTargetHealthFactorFromClientX(touch.clientX);
+    };
+
+    const stopDragging = () => {
+      setIsDraggingHealthBar(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", stopDragging);
+    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("touchend", stopDragging);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", stopDragging);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", stopDragging);
+    };
+  }, [isDraggingHealthBar, sliderExtrema]);
+
+  const handleBorrowNow = async () => {
+    if (guestMode) return;
+    if (requestedBorrowWei <= 0n) {
+      setInlineBorrowError("Enter a borrow amount greater than zero");
+      return;
+    }
+    if (requestedBorrowWei > maxBorrowableWei) {
+      setInlineBorrowError("Borrow amount exceeds available limit");
+      return;
+    }
+    if (routePreviewData && !routePreviewData.feasible) {
+      const shortfall = Number(formatUnits(BigInt(routePreviewData.shortfall || "0"), 18));
+      setInlineBorrowError(`Insufficient routed capacity. Shortfall: ${shortfall.toFixed(2)} USDST`);
+      return;
+    }
+
+    setInlineBorrowError("");
     try {
       setBorrowLoading(true);
-      if (amount === 'ALL') {
-        await borrowMax();
-        toast({
-          title: "Borrow Initiated",
-          description: `Borrowed max available USDST`,
-          variant: "success",
-        });
-      } else {
-        await borrowAssetFn({ amount: safeParseUnits(amount).toString() });
-        toast({
-          title: "Borrow Initiated",
-          description: `You borrowed ${amount} USDST`,
-          variant: "success",
-        });
+      const res = await api.post<ExecuteBorrowRouteResponse>("/borrow-router/execute", {
+        amount: requestedBorrowWei.toString(),
+        targetHealthFactor,
+        lendingCollateral: lendingCollateralPayload,
+      });
+      if (res.data?.status !== "success") {
+        const failedStep = res.data?.steps?.find((step) => step.status === "failed");
+        const lendingBorrowed = Number(formatUnits(BigInt(res.data?.execution?.lendingBorrowed || "0"), 18));
+        const cdpMinted = Number(formatUnits(BigInt(res.data?.execution?.cdpMinted || "0"), 18));
+        const fallbackError = res.data?.error || "Borrow partially executed. Please review route details and retry safely.";
+        const partialDetails = lendingBorrowed > 0 || cdpMinted > 0
+          ? ` Executed: Lending ${lendingBorrowed.toFixed(2)} USDST, CDP ${cdpMinted.toFixed(2)} USDST.`
+          : "";
+        setInlineBorrowError(`${failedStep?.error || fallbackError}${partialDetails}`);
+        return;
       }
-      setBorrowLoading(false);
-      await Promise.all([
+      toast({
+        title: "Borrow Initiated",
+        description: `You borrowed ${requestedBorrow.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })} USDST`,
+        variant: "success",
+      });
+      const [, , , vaultsRes] = await Promise.all([
         refreshLoans(),
         refreshCollateral(),
         fetchUsdstBalance(),
+        api.get<CdpVault[]>("/cdp/vaults"),
       ]);
-    } catch (error) {
+      setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
+      setBorrowInput("");
+      setSelectedBorrowPreset(null);
+      setRoutePreviewData(null);
+    } catch (error: any) {
+      const responseData = error?.response?.data as ExecuteBorrowRouteResponse | undefined;
+      const failedStep = responseData?.steps?.find((step) => step.status === "failed");
+      const lendingBorrowed = Number(formatUnits(BigInt(responseData?.execution?.lendingBorrowed || "0"), 18));
+      const cdpMinted = Number(formatUnits(BigInt(responseData?.execution?.cdpMinted || "0"), 18));
+      const partialDetails = lendingBorrowed > 0 || cdpMinted > 0
+        ? ` Executed: Lending ${lendingBorrowed.toFixed(2)} USDST, CDP ${cdpMinted.toFixed(2)} USDST.`
+        : "";
+      setInlineBorrowError(
+        (failedStep?.error ||
+          responseData?.error ||
+          error?.message ||
+          "Borrow execution failed. Please try again.") + partialDetails
+      );
+    } finally {
       setBorrowLoading(false);
-      throw error;
     }
   };
 
-  const executeEmbeddedRepay = async (amount: string) => {
+  const handleRepayNow = async (amount: string) => {
+    if (guestMode) return;
     try {
+      setInlineRepayError("");
       setRepayLoading(true);
-      if (amount === 'ALL') {
-        const res = await repayAll();
-        const sent = res?.estimatedDebtAtRead ? formatUnits(BigInt(res.estimatedDebtAtRead)) : 'all';
-        toast({
-          title: "Success",
-          description: `Successfully repaid ${sent} USDST`,
-          variant: "success",
-        });
+      if (amount === "ALL") {
+        await repayAll();
       } else {
-        const res = await repayLoanFn({ amount: safeParseUnits(amount).toString() } as any);
-        const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent)) : amount;
-        toast({
-          title: "Success",
-          description: `Successfully repaid ${sent} USDST`,
-          variant: "success",
-        });
+        await repayLoan({ amount });
       }
-      setRepayLoading(false);
-      await Promise.all([
+      toast({
+        title: "Repay Submitted",
+        description: amount === "ALL" ? "Repay all transaction submitted." : "Repay transaction submitted.",
+        variant: "success",
+      });
+      const [, , , vaultsRes] = await Promise.all([
         refreshLoans(),
         refreshCollateral(),
         fetchUsdstBalance(),
+        api.get<CdpVault[]>("/cdp/vaults"),
       ]);
-    } catch (error) {
-      console.error("Error repaying loan:", error);
+      setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
+    } catch (error: any) {
+      setInlineRepayError(error?.message || "Repay failed");
+    } finally {
       setRepayLoading(false);
     }
   };
-
-  const guestMode = !isLoggedIn;
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-
-      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+      <div className="transition-all duration-300" style={{ paddingLeft: "var(--sidebar-width, 0px)" }}>
         <DashboardHeader title="Borrow" />
-
         <main className="p-4 md:p-6">
-          {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to borrow USDST" />
-          )}
+          {!isLoggedIn && <GuestSignInBanner message="Sign in to borrow USDST" />}
           {isLoggedIn && <LiquidationAlertBanner />}
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* Left Column - Borrow/Repay Tabbed Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Borrow & Repay</CardTitle>
+          <p className="max-w-5xl mx-auto text-sm text-muted-foreground mb-4">Use your assets as collateral to borrow.</p>
+
+          <div className="max-w-5xl mx-auto space-y-4">
+            <div className="flex items-center gap-3 px-1">
+              <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">1</span>
+              <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">I WANT TO BORROW</p>
+            </div>
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardContent className="p-4 md:p-5 space-y-4 rounded-xl border border-border/70 bg-card dark:bg-[#1f274f]">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-background/60 dark:border-[#2d3765] dark:bg-[#232d57] px-4 py-3 text-sm w-fit mt-1">
+                    <CircleDollarSign className="h-5 w-5 text-blue-400" />
+                    <span className="font-semibold text-base text-foreground">USDST</span>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground ml-1" />
+                  </div>
+                  <div className="flex-1 max-w-[220px] ml-auto">
+                    <Input
+                      placeholder="0.00"
+                      value={borrowInput}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/,/g, "");
+                        if (/^\d*\.?\d*$/.test(value)) {
+                          setBorrowInput(value);
+                          setSelectedBorrowPreset(null);
+                        }
+                      }}
+                      disabled={guestMode}
+                      className="text-right text-4xl font-semibold h-14 border-none bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
+                    />
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "borrow" | "repay")} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="borrow">Borrow</TabsTrigger>
-                    <TabsTrigger value="repay">Repay</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="borrow">
-                    <BorrowForm
-                      loans={loans}
-                      borrowLoading={borrowLoading}
-                      onBorrow={executeEmbeddedBorrow}
-                      usdstBalance={usdstBalance}
-                      voucherBalance={voucherBalance}
-                      collateralInfo={collateralInfo}
-                      startPolling={startPolling}
-                      stopPolling={stopPolling}
-                      userRewards={userRewards}
-                      rewardsLoading={rewardsLoading}
-                      guestMode={guestMode}
-                    />
-                  </TabsContent>
-                  <TabsContent value="repay">
-                    <RepayForm
-                      loans={loans}
-                      repayLoading={repayLoading}
-                      onRepay={executeEmbeddedRepay}
-                      usdstBalance={usdstBalance}
-                      voucherBalance={voucherBalance}
-                      guestMode={guestMode}
-                    />
-                  </TabsContent>
-                </Tabs>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-2xl text-muted-foreground">
+                    ≈ ${requestedBorrowUsdDisplay}
+                  </p>
+                  <div className="flex items-center gap-2">
+                  {[25, 50, 75].map((percent) => (
+                    <Button
+                      key={percent}
+                      variant="outline"
+                      size="sm"
+                      className={`h-9 px-4 rounded-lg border-border dark:border-[#394472] ${
+                        selectedBorrowPreset === percent
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:text-primary-foreground"
+                          : "bg-transparent hover:bg-muted/70 dark:bg-[#1e274e] dark:hover:bg-[#2b376a]"
+                      }`}
+                      disabled={guestMode || maxBorrowableWei <= 0n}
+                      onClick={() => {
+                        const percentAmount = Number(formatUnits(maxBorrowableWei, 18)) * (percent / 100);
+                        setBorrowInput(percentAmount.toFixed(2));
+                        setSelectedBorrowPreset(percent);
+                      }}
+                    >
+                      {percent}%
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`h-9 px-4 rounded-lg border-border dark:border-[#394472] ${
+                      selectedBorrowPreset === 100
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:text-primary-foreground"
+                        : "bg-transparent hover:bg-muted/70 dark:bg-[#1e274e] dark:hover:bg-[#2b376a]"
+                    }`}
+                    disabled={guestMode || maxBorrowableWei <= 0n}
+                    onClick={() => {
+                      setBorrowInput(Number(formatUnits(maxBorrowableWei, 18)).toFixed(2));
+                      setSelectedBorrowPreset(100);
+                    }}
+                  >
+                    Max
+                  </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Right Column - Your Position (hidden for guests) and Collateral Management */}
-            <div className="space-y-6">
-              {!guestMode && (
-                <PositionSection loanData={loans} userCollaterals={collateralInfo} />
-              )}
-              <CollateralManagementTable
-                collateralInfo={collateralInfo}
-                loadingCollateral={loadingCollateral}
-                loans={loans}
-                onSupply={handleSupply}
-                onWithdraw={handleWithdraw}
-                guestMode={guestMode}
-              />
+            <div className="flex items-center gap-3 px-1 pt-2">
+              <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">2</span>
+              <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">YOUR COLLATERAL</p>
             </div>
-          </div>
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardContent className="p-0 space-y-2">
+                <div className="rounded-lg border border-border/70 overflow-hidden bg-card dark:bg-[#1f274f]">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    <p className="text-sm font-medium">Auto-allocate</p>
+                    <p className="text-xs text-muted-foreground">- optimal mix for best rate</p>
+                  </div>
+                  <button
+                    className="inline-flex items-center"
+                    onClick={handleAutoAllocateToggle}
+                    disabled={guestMode}
+                  >
+                    <span className={`w-12 h-6 rounded-full transition ${autoAllocate ? "bg-primary" : "bg-muted"} relative`}>
+                      <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${autoAllocate ? "left-7" : "left-1"}`} />
+                    </span>
+                  </button>
+                </div>
+                {collateralRows.length > 0 ? (
+                  collateralRows.map((row) => {
+                    const iconBg = row.symbol === "ETHST" ? "bg-slate-500/50" : row.symbol === "GOLDST" ? "bg-amber-500/60" : "bg-orange-600/50";
+                    return (
+                      <div key={row.symbol} className="flex items-center justify-between px-4 py-4 border-t border-border/50">
+                        <div className="flex items-center gap-3">
+                          <span className={`w-10 h-10 rounded-full ${iconBg} inline-flex items-center justify-center text-sm font-semibold`}>
+                            {row.symbol.slice(0, 1)}
+                          </span>
+                          <div>
+                          <p className={`font-medium ${row.muted ? "text-muted-foreground/70" : ""}`}>{row.symbol}</p>
+                          <p className={`text-xs text-muted-foreground ${row.muted ? "opacity-70" : ""}`}>{row.balanceText}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {row.manual ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-xs text-muted-foreground">$</span>
+                                <Input
+                                  value={row.inputValue}
+                                  onChange={(e) => handleCustomCollateralValueChange(row.address, e.target.value)}
+                                  disabled={guestMode}
+                                  className={`h-7 w-24 px-2 text-right text-xs ${manualCollateralInputErrors.get(row.address) ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                                />
+                              </div>
+                              {manualCollateralInputErrors.get(row.address) ? (
+                                <p className="text-[10px] text-red-500">{manualCollateralInputErrors.get(row.address)}</p>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => handleFillMaxCollateral(row.asset)}
+                                className="text-xs text-muted-foreground underline"
+                                disabled={guestMode}
+                              >
+                                {row.availableText}
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              {row.amountText ? (
+                                <p className="font-semibold">{row.amountText}</p>
+                              ) : null}
+                              <p className={`text-xs text-muted-foreground ${row.muted ? "opacity-70" : ""}`}>{row.usedText}</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="px-4 py-6 border-t border-border/50 text-sm text-muted-foreground text-center">
+                    No data found
+                  </div>
+                )}
+                <div className="flex justify-between text-sm px-4 py-4 border-t border-border/50">
+                  <span className="text-muted-foreground">Total collateral used</span>
+                  <span className="font-semibold">
+                    ${(Number(totalCollateralUsedWei) / 1e18).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                </div>
+              </CardContent>
+            </Card>
 
-          {!guestMode && modalState.isOpen && modalState.type && selectedAsset && (
-            <CollateralModal 
-                type={modalState.type}
-                loading={modalLoading}
-                asset={selectedAsset}
-                loanData={loans}
-                isOpen={modalState.isOpen}
-                onClose={closeModal}
-                onAction={(amount) => {
-                  if (modalState.type === "supply") {
-                    executeSupply(selectedAsset, amount);
-                  } else if (modalState.type === "withdraw") {
-                    executeWithdraw(selectedAsset, amount);
-                  }
-                }}
-                usdstBalance={usdstBalance}
-                voucherBalance={voucherBalance}
-                transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
+            <div className="flex items-center gap-3 px-1 pt-2">
+              <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">3</span>
+              <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">POSITION HEALTH</p>
+            </div>
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardContent className="p-4 md:p-5 space-y-3 rounded-xl border border-border/70 bg-card dark:bg-[#1f274f]">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium inline-flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                    {getRiskLabel(displayHealthFactor)}
+                  </span>
+                  <span className="font-semibold">Health Factor: {displayHealthFactor.toFixed(1)}x</span>
+                </div>
+                <div
+                  ref={healthBarRef}
+                  className={`relative h-3 rounded-full overflow-hidden bg-muted/30 ${guestMode ? "cursor-not-allowed" : "cursor-pointer"}`}
+                  onMouseDown={(event) => {
+                    if (guestMode) return;
+                    setIsDraggingHealthBar(true);
+                    updateTargetHealthFactorFromClientX(event.clientX);
+                  }}
+                  onTouchStart={(event) => {
+                    if (guestMode) return;
+                    const touch = event.touches[0];
+                    if (!touch) return;
+                    setIsDraggingHealthBar(true);
+                    updateTargetHealthFactorFromClientX(touch.clientX);
+                  }}
+                >
+                  <div className="h-full w-full bg-gradient-to-r from-red-500 via-yellow-400 to-emerald-500" />
+                  <span
+                    className="absolute top-1/2 -translate-y-1/2 w-1 h-5 rounded-full bg-white shadow-sm pointer-events-none"
+                    style={{ left: `${Math.max(2, Math.min(98, progressValue))}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] text-muted-foreground">
+                  <span>Liquidation</span>
+                  <span>Risky</span>
+                  <span>Healthy</span>
+                  <span>Safe</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-muted-foreground text-xs">LTV</p>
+                    <p className="font-semibold">{routePreview.projectedLtvPercent.toFixed(1)}%</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-muted-foreground text-xs">Blended Rate</p>
+                    <p className="font-semibold">{routePreview.blendedApr.toFixed(2)}% APR</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-muted-foreground text-xs">Liquidation At</p>
+                    <p className="font-semibold">
+                      ${routePreview.liquidationPriceUSD.toFixed(2)} {routePreview.liquidationAssetSymbol} ({routePreview.liquidationDropPercent.toFixed(1)}% drop)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Button
+              className="w-full h-12 text-base"
+              disabled={guestMode || borrowLoading || routePreviewLoading || requestedBorrowWei <= 0n || requestedBorrowWei > maxBorrowableWei}
+              onClick={handleBorrowNow}
+            >
+              {borrowLoading ? "Processing..." : `Borrow ${(requestedBorrow || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST`}
+            </Button>
+            {inlineBorrowError && <p className="text-sm text-red-600">{inlineBorrowError}</p>}
+
+            <RewardsWidget
+              userRewards={userRewards}
+              activityName="Lending Pool Borrow"
+              inputAmount={normalizedBorrowInput || "0"}
+              actionLabel="Borrow"
             />
-          )}
+
+            <button
+              className="w-full text-sm text-muted-foreground inline-flex items-center justify-center gap-1.5"
+              onClick={() => setShowDetails((prev) => !prev)}
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
+              View route details
+            </button>
+
+            {showDetails && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 px-1 pt-2">
+                  <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">4</span>
+                  <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">
+                    {`BORROW ROUTED ACROSS ${Math.max(1, routePreview.mechanisms)} MECHANISM${Math.max(1, routePreview.mechanisms) > 1 ? "S" : ""}`}
+                  </p>
+                </div>
+                <Card className="border-0 shadow-none bg-transparent">
+                  <CardContent className="p-4 md:p-5 space-y-0 rounded-xl border border-border/70 bg-card dark:bg-[#1f274f]">
+                    <div className="py-3 min-h-[86px] flex items-center justify-between border-b border-border/60">
+                      <div className="flex items-center gap-2">
+                        <Landmark className="h-4 w-4 text-primary" />
+                        <div>
+                        <p className="font-medium">Lending Pool</p>
+                        <p className="text-xs text-muted-foreground">{routePreview.lendingApr.toFixed(2)}% APR</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{routePreview.lendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST</p>
+                        <p className="text-xs text-emerald-500">{routePreview.lendingHF.toFixed(1)}x</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">{lendingRouteCollateralText}</p>
+                      </div>
+                    </div>
+                    <div className="py-3 min-h-[86px] flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Coins className="h-4 w-4 text-primary" />
+                        <div>
+                        <p className="font-medium">CDP Mint</p>
+                        <p className="text-xs text-muted-foreground">{routePreview.cdpApr.toFixed(2)}% fee</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{routePreview.cdpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST</p>
+                        <p className="text-xs text-emerald-500">CR {routePreview.cdpCR.toFixed(1)}% · HF {routePreview.cdpEffectiveHF.toFixed(2)}x</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">{cdpRouteCollateralText}</p>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t border-border/60">
+                      <p className="text-right text-sm font-semibold text-emerald-500">Blended rate (weighted): {routePreview.blendedApr.toFixed(2)}% APR</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="flex items-center gap-3 px-1 pt-2">
+                  <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 inline-flex items-center justify-center">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </span>
+                  <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">WHAT YOU CAN DO WITH BORROWED USDST</p>
+                </div>
+                <Card className="border-0 shadow-none bg-transparent">
+                  <CardContent className="p-2 md:p-0 grid grid-cols-1 md:grid-cols-3 gap-4 bg-transparent border-0">
+                    <div className="rounded-2xl border border-border bg-card p-4 min-h-[160px] dark:border-[#2f3b6c] dark:bg-[#212a52]">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-muted mb-3 dark:bg-[#2a3567]">
+                        <ArrowLeftRight className="h-4 w-4 text-primary dark:text-[#98A4FF]" />
+                      </span>
+                      <p className="font-semibold text-3xl leading-8">Swap</p>
+                      <p className="text-base text-muted-foreground mt-2 leading-6 dark:text-[#9DA7C5]">Trade for ETHST, GOLDST, etc.</p>
+                      <p className="text-3xl mt-3 font-semibold text-violet-500 leading-8 dark:text-violet-400">{routePreview.swapPairs} pairs available</p>
+                    </div>
+                    <div className="rounded-2xl border border-border bg-card p-4 min-h-[160px] dark:border-[#2f3b6c] dark:bg-[#212a52]">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 mb-3 dark:bg-[#1f4d5b]">
+                        <HandCoins className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                      </span>
+                      <p className="font-semibold text-3xl leading-8">Earn</p>
+                      <p className="text-base text-muted-foreground mt-2 leading-6 dark:text-[#9DA7C5]">Lend or provide liquidity</p>
+                      <p className="text-3xl mt-3 font-semibold text-emerald-600 leading-8 dark:text-emerald-400">up to {routePreview.earnApr.toFixed(1)}% APR</p>
+                    </div>
+                    <div className="rounded-2xl border border-border bg-card p-4 min-h-[160px] dark:border-[#2f3b6c] dark:bg-[#212a52]">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 mb-3 dark:bg-[#203765]">
+                        <Send className="h-4 w-4 text-blue-600 dark:text-[#68A2FF]" />
+                      </span>
+                      <p className="font-semibold text-3xl leading-8">Transfer</p>
+                      <p className="text-base text-muted-foreground mt-2 leading-6 dark:text-[#9DA7C5]">Send to another address</p>
+                      <p className="text-3xl mt-3 font-semibold text-blue-600 leading-8 dark:text-blue-400">Instant on STRATO</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="flex items-center gap-3 px-1 pt-2">
+                  <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">6</span>
+                  <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">YOUR ACTIVE POSITIONS</p>
+                </div>
+                <Card className="border-0 shadow-none bg-transparent">
+                  <CardContent className="p-4 md:p-5 space-y-3 rounded-xl border border-border/70 bg-card dark:bg-[#1f274f]">
+                    <div className="rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] p-3 min-h-[94px] flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Lending Pool</p>
+                        <p className="text-xs text-muted-foreground">Collateral {formatBalance(loans?.totalCollateralValueSupplied || "0", undefined, 18, 2, 2, true)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{formatBalance(loans?.totalAmountOwed || "0", "USDST", 18, 2, 2)}</p>
+                        <Button variant="outline" size="sm" className="mt-2" onClick={() => setShowRepayPanel((prev) => !prev)}>Repay</Button>
+                      </div>
+                    </div>
+                    {showRepayPanel ? (
+                      <div className="rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] p-3">
+                        <RepayForm
+                          loans={loans || null}
+                          repayLoading={repayLoading}
+                          onRepay={handleRepayNow}
+                          usdstBalance={usdstBalance}
+                          voucherBalance={voucherBalance}
+                          guestMode={guestMode}
+                        />
+                        {inlineRepayError ? <p className="text-sm text-red-600 mt-2">{inlineRepayError}</p> : null}
+                      </div>
+                    ) : null}
+                    {cdpVaults.length > 0 ? (
+                      cdpVaults.map((vault) => (
+                        <div key={vault.asset} className="rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] p-3 min-h-[94px] flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">CDP Vault - {vault.symbol}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Collateral {formatBalance(vault.collateralValueUSD || "0", undefined, 18, 2, 2, true)} · CR {Number(vault.collateralizationRatio || 0).toFixed(1)}%
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">{formatBalance(vault.debtAmount || "0", "USDST", 18, 2, 2)}</p>
+                            <Button variant="outline" size="sm" className="mt-2" disabled>Repay</Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] p-3 text-sm text-muted-foreground">
+                        No CDP positions found
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background/40 dark:bg-[#1f274f] px-3 py-2 text-sm">
+                      <span className="text-muted-foreground inline-flex items-center gap-2">
+                        <CirclePlus className="h-4 w-4" />
+                        Total debt across all positions
+                      </span>
+                      <span className="font-semibold">
+                        {(Number(formatUnits(BigInt(loans?.totalAmountOwed || "0"), 18)) + totalCdpDebtActual).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })} USDST
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
         </main>
       </div>
-
       <MobileBottomNav />
     </div>
   );
