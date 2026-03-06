@@ -13,6 +13,7 @@ contract record MetalForge is Ownable {
     MetalTreasury public treasury;
     FeeCollector public feeCollector;
     Token public usdst;
+    uint public WAD;
 
     // ====================================================
     // ====================  EVENTS  ======================
@@ -97,6 +98,7 @@ contract record MetalForge is Ownable {
         treasury = MetalTreasury(_treasury);
         feeCollector = FeeCollector(_feeCollector);
         usdst = Token(_usdst);
+        WAD = 1e18;
 
         emit Initialized(_oracle, _treasury, _feeCollector, _usdst);
     }
@@ -123,11 +125,11 @@ contract record MetalForge is Ownable {
             fundsUSD = principal;
         } else {
             uint payPrice = oracle.getAssetPrice(payToken);
-            fundsUSD = (principal * payPrice) / 1e18;
+            fundsUSD = (principal * payPrice) / WAD;
         }
 
         uint metalPrice = oracle.getAssetPrice(metalToken);
-        uint metalAmount = (fundsUSD * 1e18) / metalPrice;
+        uint metalAmount = (fundsUSD * WAD) / metalPrice;
 
         require(metalAmount >= minMetalOut, "MetalForge: slippage limit exceeded");
         require(states[metalToken][payToken].totalMinted + metalAmount <= config.mintCap, "MetalForge: mintCap exceeded");
