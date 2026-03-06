@@ -5,13 +5,6 @@ STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_API_URL="http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2"
 
-echo "Waiting for STRATO node API to be available at ${STRATO_API_URL}..."
-until wget -qO /dev/null --timeout=5 "${STRATO_API_URL}/stats/totaltx" 2>/dev/null; do
-  echo "  STRATO not available yet. Retrying in 5s... ($(date))"
-  sleep 5
-done
-echo "STRATO node API is available."
-
 echo "Waiting for STRATO node to finish syncing (checking ${STRATO_API_URL}/metadata for isSynced=true)..."
 echo "  This may take a long time if the node is catching up with the network."
 while true; do

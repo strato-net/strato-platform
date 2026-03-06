@@ -37,18 +37,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     echo 'OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required for OAuth. Exit'
     exit 4
   fi
-  # get oauth discovery url from strato api
-  echo "Waiting for Strato api to be available..."
-  ETH_ENDPOINT=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
-  until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx
-  do
-    echo "  Check at $(date)"
-    sleep 1
-  done
-  echo "Strato api is available"
-  OAUTH_DISCOVERY_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.oauthDiscovery)
+  # validate oauth discovery url
   if [ -z "${OAUTH_DISCOVERY_URL}" ]; then
-    echo "Could not get OAuth discovery url from strato api, but it is a required value"
+    echo "OAUTH_DISCOVERY_URL is required but not set"
     exit 5
   fi
   if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
