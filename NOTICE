@@ -15207,12 +15207,15 @@ https://www.npmjs.com/package/zustand
 WORK IN PROGRESS:
 -------------------------------------------------------------------------------
 
-Appendix: License Audit Notes and Recommendation Matrix (refreshed 2026-03-03)
+Appendix: License Audit Notes and Recommendation Matrix (refreshed 2026-03-05)
 
 Goal for this appendix:
 - Identify components that may be incompatible with Apache-2.0-only
   distribution posture.
 - Capture mitigation recommendations and implementation priority.
+- Current scope after latest dependency cleanup: two remaining high-risk items
+  (rapidsnark in Airlock prover path, rpc-websockets via Coinbase CDP/Solana
+  path).
 
 1) strato/libs/groth16-rapidsnark/vendor/rapidsnark (LGPL-3.0)
 Status:
