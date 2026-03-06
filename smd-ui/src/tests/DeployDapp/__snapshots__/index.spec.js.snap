@@ -100,7 +100,7 @@ exports[`DeployDapp: index render component with empty values 1`] = `
             </label>
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[undefined]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
+            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[undefined]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function (anonymous)]} required={true} />
           </div>
         </div>
         <div className=\\"row\\">
@@ -170,7 +170,7 @@ exports[`DeployDapp: index render component with empty values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button type=\\"submit\\" onClick={[Function]} disabled={true} text=\\"Deploy DApp\\" />
+          <Blueprint.Button type=\\"submit\\" onClick={[Function (anonymous)]} disabled={true} text=\\"Deploy DApp\\" />
         </div>
       </div>
     </Blueprint.Dialog>
@@ -202,7 +202,7 @@ exports[`DeployDapp: index render component with values 1`] = `
             </label>
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[undefined]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function]} required={true} />
+            <Field id=\\"input-b\\" className=\\"form-width pt-input\\" name=\\"contract\\" component={[undefined]} dir=\\"auto\\" title=\\"Contract Source\\" validate={[Function (anonymous)]} required={true} />
           </div>
         </div>
         <div className=\\"row\\">
@@ -272,7 +272,7 @@ exports[`DeployDapp: index render component with values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button type=\\"submit\\" onClick={[Function]} disabled={true} text=\\"Deploy DApp\\" />
+          <Blueprint.Button type=\\"submit\\" onClick={[Function (anonymous)]} disabled={true} text=\\"Deploy DApp\\" />
         </div>
       </div>
     </Blueprint.Dialog>
