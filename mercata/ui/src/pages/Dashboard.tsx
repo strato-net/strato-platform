@@ -186,38 +186,13 @@ const Dashboard = () => {
   const netBalanceCacheRef = useRef(netBalanceHistoryCache);
   const rewardsCacheRef = useRef(rewardsHistoryCache);
   const borrowedCacheRef = useRef(borrowedHistoryCache);
+  const cacheTimestampsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     netBalanceCacheRef.current = netBalanceHistoryCache;
     rewardsCacheRef.current = rewardsHistoryCache;
     borrowedCacheRef.current = borrowedHistoryCache;
   }, [netBalanceHistoryCache, rewardsHistoryCache, borrowedHistoryCache]);
-
-  const prefetchOtherRanges = useCallback((primaryRange: TimeRange, tab: TabType) => {
-    const rangesToPrefetch = TIME_RANGES.filter(range => range !== primaryRange);
-    
-    rangesToPrefetch.forEach(range => {
-      (async () => {
-        try {
-          if (tab === 'netBalance') {
-            if (netBalanceCacheRef.current[range]) return;
-            const data = await getBalanceHistory(range, '');
-            setNetBalanceHistoryCache(range, data);
-          } else if (tab === 'rewards') {
-            if (rewardsCacheRef.current[range]) return;
-            const data = await getCataBalanceHistory(range, '');
-            setRewardsHistoryCache(range, data);
-          } else if (tab === 'borrowed') {
-            if (borrowedCacheRef.current[range]) return;
-            const data = await getBorrowingHistory(range, '');
-            setBorrowedHistoryCache(range, data);
-          }
-        } catch (err) {
-          // ignore background errors
-        }
-      })();
-    });
-  }, [getBalanceHistory, getCataBalanceHistory, getBorrowingHistory, setNetBalanceHistoryCache, setRewardsHistoryCache, setBorrowedHistoryCache]);
 
   const tabConfig = useMemo(() => ({
     netBalance: {
@@ -245,27 +220,18 @@ const Dashboard = () => {
 
     const loadRange = async () => {
       const config = tabConfig[activeTab];
-      const cache = activeTab === 'netBalance' 
-        ? netBalanceCacheRef.current 
-        : activeTab === 'rewards' 
-        ? rewardsCacheRef.current 
+      const cache = activeTab === 'netBalance'
+        ? netBalanceCacheRef.current
+        : activeTab === 'rewards'
+        ? rewardsCacheRef.current
         : borrowedCacheRef.current;
+      const cacheKey = `${activeTab}:${selectedTimeRange}`;
       const cached = cache[selectedTimeRange];
-      
-      if (cached && cached.length > 0) {
+      const cachedAt = cacheTimestampsRef.current[cacheKey] || 0;
+      const isFresh = Date.now() - cachedAt < 10_000;
+
+      if (cached && cached.length > 0 && isFresh) {
         setLoadingBalanceHistory(false);
-        prefetchOtherRanges(selectedTimeRange, activeTab);
-        
-        (async () => {
-          try {
-            const data = await config.fetchFn(selectedTimeRange, '');
-            if (isMounted) {
-              config.setCache(selectedTimeRange, data);
-            }
-          } catch (err) {
-            // ignore background errors
-          }
-        })();
         return;
       }
 
@@ -274,11 +240,11 @@ const Dashboard = () => {
         const data = await config.fetchFn(selectedTimeRange, '');
         if (!isMounted) return;
         config.setCache(selectedTimeRange, data);
+        cacheTimestampsRef.current[cacheKey] = Date.now();
       } catch (err) {
       } finally {
         if (isMounted) {
           setLoadingBalanceHistory(false);
-          prefetchOtherRanges(selectedTimeRange, activeTab);
         }
       }
     };
@@ -288,7 +254,7 @@ const Dashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, [selectedTimeRange, activeTab, tabConfig, prefetchOtherRanges, setLoadingBalanceHistory, isLoggedIn]);
+  }, [selectedTimeRange, activeTab, tabConfig, setLoadingBalanceHistory, isLoggedIn]);
 
   const onTimeRangeChange = useCallback((duration: string) => {
     setSelectedTimeRange(duration as TimeRange);
@@ -424,7 +390,7 @@ const Dashboard = () => {
           </div>
 
           {/* Rewards Section */}
-          <div className="mb-4 md:mb-8">
+          {/* <div className="mb-4 md:mb-8">
             <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -451,7 +417,7 @@ const Dashboard = () => {
                 </Button>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Portfolio Value Chart - hidden on mobile and for guests */}
           {isLoggedIn && (

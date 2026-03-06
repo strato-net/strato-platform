@@ -5,5 +5,6 @@ declare module "express-serve-static-core" {
     address: string;
     accessToken: string;
     userName?: string;
+    rawBody?: Buffer;
   }
 }

@@ -48,6 +48,7 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
+export let creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS || "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6";
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
@@ -78,6 +79,11 @@ export const defaultReferralServiceFor: Record<string, string> = {
 export const defaultVaultFactoryFor: Record<string, string> = {
   "114784819836269": "37b446ec53607a0cdae38c820b838baf240a8b74", // Helium testnet
   "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
+};
+
+export const defaultCreditCardTopUpFor: Record<string, string> = {
+  "114784819836269": "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6", // Helium testnet
+  "33056204878082667": "656139504763b2fab4e158ddb1f4ca8eb878305d" // Upquark mainnet
 };
 
 export let bridgeUrl: string | undefined;
@@ -124,6 +130,14 @@ function setVaultFactoryConfig(networkId: string) {
   }
 }
 
+export function setCreditCardTopUpConfig(networkId: string) {
+  if (process.env.CREDIT_CARD_TOP_UP_ADDRESS) {
+    creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS;
+  } else {
+    creditCardTopUp = defaultCreditCardTopUpFor[networkId] || "";
+  }
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -137,6 +151,7 @@ export async function initNetworkConfig() {
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
+  setCreditCardTopUpConfig(networkId);
 }
 
 // Addresses of internal protocol contracts whose Token:Transfer events should

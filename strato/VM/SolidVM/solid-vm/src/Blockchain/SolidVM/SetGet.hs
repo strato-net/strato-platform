@@ -343,7 +343,7 @@ showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
 showSM (SContractFunction address functionName) = do
   contractName <- CC._contractName <$> getCurrentContract
   return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
-showSM (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse showSM xs
+showSM (SVariadic xs) = ("variadic(" ++) . (++ ")") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x
 
 jsonSM :: MonadSM m => Value -> m String

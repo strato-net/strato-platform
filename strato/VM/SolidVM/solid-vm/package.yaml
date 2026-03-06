@@ -13,6 +13,7 @@ library:
   ghc-options: -Wall -O2
   dependencies:
   - base16-bytestring
+  - base64-bytestring
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin

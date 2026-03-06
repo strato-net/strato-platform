@@ -16,12 +16,14 @@ import swapRoutes from "./routes/swap.routes";
 import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
+import creditCardRoutes from "./routes/creditCard.routes";
 import cdpRoutes from "./routes/cdp.routes";
 import rewardsRoutes from "./routes/rewards.routes";
 import protocolFeeRoutes from "./routes/protocolFee.routes";
 import rpcRoutes from "./routes/rpc.routes";
 import referRoutes from "./routes/refer.routes";
 import vaultRoutes from "./routes/vault.routes";
+import onrampRoutes from "./routes/onramp.routes";
 
 const router = Router();
 
@@ -76,6 +78,9 @@ router.use("/events", eventsRoutes);
 // ----- Bridge Routes -----
 router.use("/bridge", bridgeRoutes);
 
+// ----- Crypto Credit Card Routes -----
+router.use("/credit-card", creditCardRoutes);
+
 // ----- CDP Routes -----
 router.use("/cdp", cdpRoutes);
 
@@ -90,6 +95,9 @@ router.use("/refer", referRoutes);
 
 // ----- Vault Routes -----
 router.use("/vault", vaultRoutes);
+
+// ----- Onramp Routes -----
+router.use("/onramp", onrampRoutes);
 
 // ----- Documentation Routes -----
 // Serve static files for Swagger customizations

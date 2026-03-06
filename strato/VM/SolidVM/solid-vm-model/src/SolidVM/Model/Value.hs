@@ -37,6 +37,8 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, listToMaybe)
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word
@@ -166,6 +168,8 @@ instance Eq Value where
   (SBytes b1) == SNULL = B.null b1
   SReference{} == (SBytes b2) = B.null b2
   (SBytes b1) == SReference{} = B.null b1
+  (SString b1) == (SBytes b2) = encodeUtf8 (T.pack b1) == b2
+  (SBytes b1) == (SString b2) = b1 == encodeUtf8 (T.pack b2)
   x == y = todo "Value/Eq" (x, y)
 
 instance Ord Value where

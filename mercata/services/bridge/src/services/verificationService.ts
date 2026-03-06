@@ -48,6 +48,10 @@ const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string) =>
 const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null => {
   const to = receipt.to ? normalizeAddress(receipt.to) : "";
   
+  if (to === ctx.safe) {
+    return null;
+  }
+
   if (to !== ctx.depositRouter) {
     return new Error(`ETH receiver mismatch. Expected: ${ctx.depositRouter}, Got: ${to || "null"}`);
   }

@@ -26,7 +26,7 @@ STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
-VAULT_URL=${VAULT_URL:-https://vault.blockapps.net:8093/strato/v2.3}
+VAULT_URL=${VAULT_URL:-https://vault.blockapps.net:8093}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then

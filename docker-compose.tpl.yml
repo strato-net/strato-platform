@@ -12,16 +12,28 @@ services:
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - NODE_URL=http://nginx  # no TLS required within the docker network
       - BASE_URL=https://${NODE_HOST}  # todo: protocol to depend on ssl=true|false
-      - RPC_URL_MAINNET=${RPC_URL_MAINNET:-}
-      - RPC_URL_MAINNET_FALLBACK=${RPC_URL_MAINNET_FALLBACK:-}
-      - RPC_URL_SEPOLIA=${RPC_URL_SEPOLIA:-}
-      - RPC_URL_SEPOLIA_FALLBACK=${RPC_URL_SEPOLIA_FALLBACK:-}
-      - POOL_FACTORY=${POOL_FACTORY:-}
-      - LENDING_REGISTRY=${LENDING_REGISTRY:-}
-      - TOKEN_FACTORY=${TOKEN_FACTORY:-}
-      - ADMIN_REGISTRY=${ADMIN_REGISTRY:-}
-      - MERCATA_BRIDGE=${MERCATA_BRIDGE:-}
-      - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID:-}
+      - RPC_URL_MAINNET=${RPC_URL_MAINNET}
+      - RPC_URL_MAINNET_FALLBACK=${RPC_URL_MAINNET_FALLBACK}
+      - RPC_URL_SEPOLIA=${RPC_URL_SEPOLIA}
+      - RPC_URL_SEPOLIA_FALLBACK=${RPC_URL_SEPOLIA_FALLBACK}
+      - RPC_URL_BASE=${RPC_URL_BASE}
+      - RPC_URL_BASE_FALLBACK=${RPC_URL_BASE_FALLBACK}
+      - RPC_URL_BASE_SEPOLIA=${RPC_URL_BASE_SEPOLIA}
+      - RPC_URL_BASE_SEPOLIA_FALLBACK=${RPC_URL_BASE_SEPOLIA_FALLBACK}
+      - POOL_FACTORY=${POOL_FACTORY}
+      - LENDING_REGISTRY=${LENDING_REGISTRY}
+      - TOKEN_FACTORY=${TOKEN_FACTORY}
+      - ADMIN_REGISTRY=${ADMIN_REGISTRY}
+      - MERCATA_BRIDGE=${MERCATA_BRIDGE}
+      - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
+      - STRATO_HOSTNAME=${STRATO_HOSTNAME}
+      - STRATO_PORT_API=${STRATO_PORT_API}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - ONRAMP_HOT_WALLET_ADDRESS=${ONRAMP_HOT_WALLET_ADDRESS}
+      - BA_USERNAME=${BA_USERNAME}
+      - BA_PASSWORD=${BA_PASSWORD}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -88,6 +100,11 @@ services:
     image: redis:3.2
     user: "${DOCKER_UID}:${DOCKER_GID}"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
     logging:
       driver: "json-file"
       options:
@@ -130,6 +147,11 @@ services:
       - "-c"
       - "shared_buffers=512MB"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
     logging:
       driver: "json-file"
       options:
@@ -170,8 +192,8 @@ services:
     - STRATO_PORT_API2=${STRATO_PORT_API2:-}
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
-    - VAULT_URL=${VAULT_URL}/strato/v2.3
-    - VM_DEBUGGER=${VM_DEBUGGER:-}
+    - VAULT_URL=${VAULT_URL}
+    - VM_DEBUGGER=${VM_DEBUGGER}
     build: .
     extra_hosts:
     - "host.docker.internal:host-gateway"
@@ -219,6 +241,11 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     image: apache/kafka:3.9.2
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
     volumes:
     - ./kafka:/kafka
     logging:

@@ -10,6 +10,7 @@ import {
   RainbowKitProvider,
 } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
+import { defineChain } from "viem";
 import "@rainbow-me/rainbowkit/styles.css";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
@@ -23,12 +24,15 @@ import AssetDetail from "./pages/AssetDetail";
 import Advanced from "./pages/Advanced";
 import ActivityFeed from "./pages/ActivityFeed";
 import NotFound from "./pages/NotFound";
+import SyncingPage from "./pages/SyncingPage";
 import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
+import OnrampPage from "./pages/OnrampPage";
+import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
 
@@ -63,8 +67,11 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
+  const [networkId, setNetworkId] = useState<string | null>(null);
+  const [creditCardTopUpAddress, setCreditCardTopUpAddress] = useState<string | null>(null);
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [configError, setConfigError] = useState(false);
 
   // Initialize CSRF token on app startup
   useEffect(() => {
@@ -72,24 +79,53 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    let retryTimeout: ReturnType<typeof setTimeout>;
+
     const fetchConfig = async () => {
       try {
         const configData = await getConfig();
-        setProjectId(configData.projectId);
+        if (!cancelled) {
+          setProjectId(configData.projectId ?? "PROJECT_ID_UNSET");
+          if (configData.networkId) setNetworkId(String(configData.networkId));
+          if (configData.creditCardTopUpAddress) setCreditCardTopUpAddress(String(configData.creditCardTopUpAddress));
+          setConfigError(false);
+        }
       } catch (error) {
         console.error("Failed to fetch config:", error);
+        if (!cancelled) {
+          setConfigError(true);
+          retryTimeout = setTimeout(fetchConfig, 15000);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
-
     fetchConfig();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimeout);
+    };
   }, []);
 
   useEffect(() => {
     if (!loading) {
       const appName = "Mercata";
-      const chains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
+      const stratoChainId = networkId ? Number(networkId) : null;
+      const stratoChain =
+        stratoChainId != null && !Number.isNaN(stratoChainId)
+          ? defineChain({
+              id: stratoChainId,
+              name: "STRATO",
+              nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
+              rpcUrls: { default: { http: [typeof window !== "undefined" ? `${window.location.origin}/api/rpc/${networkId}` : ""] } },
+            })
+          : null;
+      const baseChains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
+      const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
         chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
       );
@@ -106,22 +142,33 @@ const App = () => {
 
       const config = createConfig({
         connectors,
-        chains,
+        chains: chains as unknown as readonly [typeof mainnet, ...(typeof baseChains)],
         transports,
         ssr: true,
       });
 
       setWagmiConfig(config);
     }
-  }, [projectId, loading]);
+  }, [projectId, loading, networkId]);
 
-  if (loading || !wagmiConfig) {
+  const networkIdStr = networkId ?? undefined;
+  const creditCardTopUpAddressStr = creditCardTopUpAddress ?? undefined;
+
+  if (loading) {
+    return <div>Loading configuration...</div>;
+  }
+
+  if (configError) {
+    return <SyncingPage />;
+  }
+
+  if (!wagmiConfig) {
     return <div>Loading configuration...</div>;
   }
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NetworkProvider>
+      <NetworkProvider initialNetworkId={networkIdStr} initialCreditCardTopUpAddress={creditCardTopUpAddressStr}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <WagmiProvider config={wagmiConfig}>
             <RainbowKitProvider>
@@ -196,6 +243,14 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Vault />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/credit-card"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <CreditCardPage />
                                               </GuestAccessibleRoute>
                                             }
                                           />
@@ -277,6 +332,15 @@ const App = () => {
                                               <GuestAccessibleRoute>
                                                 <ReferralsManagement />
                                               </GuestAccessibleRoute>
+                                            }
+                                          />
+
+                                          <Route
+                                            path="/dashboard/onramp"
+                                            element={
+                                              <ProtectedRoute>
+                                                <OnrampPage />
+                                              </ProtectedRoute>
                                             }
                                           />
 
