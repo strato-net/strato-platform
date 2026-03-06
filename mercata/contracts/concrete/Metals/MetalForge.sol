@@ -13,12 +13,13 @@ contract record MetalForge is Ownable {
     PriceOracle public oracle;
     MetalTreasury public treasury;
     FeeCollector public feeCollector;
+    Token public usdst;
 
     // ====================================================
     // ====================  EVENTS  ======================
     // ====================================================
 
-    event Initialized(address oracle, address treasury, address feeCollector);
+    event Initialized(address oracle, address treasury, address feeCollector, address usdst);
 
     event MetalMinted(
         address buyer,
@@ -35,7 +36,6 @@ contract record MetalForge is Ownable {
         address metalToken,
         address payToken,
         bool isPaused,
-        bool isStable,
         uint feeBps,
         uint mintCap
     );
@@ -53,7 +53,6 @@ contract record MetalForge is Ownable {
 
     struct Config {
         bool isPaused;
-        bool isStable;
         uint feeBps;
         uint mintCap;
     }
@@ -71,16 +70,18 @@ contract record MetalForge is Ownable {
 
     constructor(address _owner) Ownable(_owner) {}
 
-    function initialize(address _oracle, address _treasury, address _feeCollector) external onlyOwner {
-        require(_oracle != address(0), "MetalForge: invalid oracle");
-        require(_treasury != address(0), "MetalForge: invalid treasury");
-        require(_feeCollector != address(0), "MetalForge: invalid fee collector");
+    function initialize(address _oracle, address _treasury, address _feeCollector, address _usdst) external onlyOwner {
+        require(_oracle != address(0), "MetalForge: invalid oracle address");
+        require(_treasury != address(0), "MetalForge: invalid treasury address");
+        require(_feeCollector != address(0), "MetalForge: invalid fee collector address");
+        require(_usdst != address(0), "MetalForge: invalid usdst address");
 
         oracle = PriceOracle(_oracle);
         treasury = MetalTreasury(_treasury);
         feeCollector = FeeCollector(_feeCollector);
+        usdst = Token(_usdst);
 
-        emit Initialized(_oracle, _treasury, _feeCollector);
+        emit Initialized(_oracle, _treasury, _feeCollector, _usdst);
     }
 
     // ====================================================
@@ -101,7 +102,7 @@ contract record MetalForge is Ownable {
         uint principal = payAmount - feeAmount;
 
         uint fundsUSD;
-        if (config.isStable) {
+        if (payToken == address(usdst)) {
             fundsUSD = principal;
         } else {
             uint payPrice = oracle.getAssetPrice(payToken);
@@ -140,12 +141,11 @@ contract record MetalForge is Ownable {
         address metalToken,
         address payToken,
         bool isPaused,
-        bool isStable,
         uint feeBps,
         uint mintCap
     ) external onlyOwner {
-        configs[metalToken][payToken] = Config(isPaused, isStable, feeBps, mintCap);
-        emit ConfigUpdated(metalToken, payToken, isPaused, isStable, feeBps, mintCap);
+        configs[metalToken][payToken] = Config(isPaused, feeBps, mintCap);
+        emit ConfigUpdated(metalToken, payToken, isPaused, feeBps, mintCap);
     }
 
     function setMintCap(
@@ -164,7 +164,7 @@ contract record MetalForge is Ownable {
         uint feeBps
     ) external onlyOwner {
         configs[metalToken][payToken].feeBps = feeBps;
-        emit ConfigUpdated(metalToken, payToken, configs[metalToken][payToken].isPaused, configs[metalToken][payToken].isStable, feeBps, configs[metalToken][payToken].mintCap);
+        emit ConfigUpdated(metalToken, payToken, configs[metalToken][payToken].isPaused, feeBps, configs[metalToken][payToken].mintCap);
     }
 
     function setIsPaused(
@@ -173,15 +173,7 @@ contract record MetalForge is Ownable {
         bool isPaused
     ) external onlyOwner {
         configs[metalToken][payToken].isPaused = isPaused;
-        emit ConfigUpdated(metalToken, payToken, isPaused, configs[metalToken][payToken].isStable, configs[metalToken][payToken].feeBps, configs[metalToken][payToken].mintCap);
+        emit ConfigUpdated(metalToken, payToken, isPaused, configs[metalToken][payToken].feeBps, configs[metalToken][payToken].mintCap);
     }
 
-    function setIsStable(
-        address metalToken,
-        address payToken,
-        bool isStable
-    ) external onlyOwner {
-        configs[metalToken][payToken].isStable = isStable;
-        emit ConfigUpdated(metalToken, payToken, configs[metalToken][payToken].isPaused, isStable, configs[metalToken][payToken].feeBps, configs[metalToken][payToken].mintCap);
-    }
 }
