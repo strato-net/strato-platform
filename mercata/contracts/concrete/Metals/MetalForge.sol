@@ -26,6 +26,14 @@ contract record MetalForge is Ownable {
     event FeeCollectorUpdated(address newFeeCollector);
     event UsdstUpdated(address newUsdst);
 
+    event MetalConfigUpdated(address metalToken, bool isEnabled, uint mintCap);
+    event MintCapUpdated(address metalToken, uint newCap);
+    event MetalToggled(address metalToken, bool isEnabled);
+
+    event PayTokenConfigUpdated(address payToken, bool isEnabled, uint feeBps);
+    event FeeBpsUpdated(address payToken, uint newBps);
+    event PayTokenToggled(address payToken, bool isEnabled);
+
     event MetalMinted(
         address buyer,
         address metalToken,
@@ -37,50 +45,24 @@ contract record MetalForge is Ownable {
         uint totalMinted
     );
 
-    event ConfigUpdated(
-        address metalToken,
-        address payToken,
-        bool isPaused,
-        uint feeBps,
-        uint mintCap
-    );
-
-    event MintCapUpdated(
-        address metalToken,
-        address payToken,
-        uint newCap
-    );
-
-    event FeeBpsUpdated(
-        address metalToken,
-        address payToken,
-        uint newBps
-    );
-
-    event isPausedToggled(
-        address metalToken,
-        address payToken,
-        bool isPaused
-    );
-
-
-
     // ====================================================
     // ===================  STORAGE  ======================
     // ====================================================
 
-    struct Config {
-        bool isPaused;
-        uint feeBps;
+    struct MetalConfig {
+        bool isEnabled;
         uint mintCap;
     }
 
-    struct State {
-        uint totalMinted;
+    struct PayTokenConfig {
+        bool isEnabled;
+        uint feeBps;
     }
 
-    mapping(address => mapping(address => Config)) public record configs;
-    mapping(address => mapping(address => State)) public record states;
+    mapping(address => MetalConfig) public record metalConfigs;
+    mapping(address => PayTokenConfig) public record payTokenConfigs;
+    mapping(address => uint) public record totalMinted;
+
 
     // ====================================================
     // ================  INITIALIZATION  ==================
@@ -113,11 +95,13 @@ contract record MetalForge is Ownable {
         uint payAmount,
         uint minMetalOut
     ) external {
-        Config config = configs[metalToken][payToken];
-        require(!config.isPaused, "MetalForge: paused");
+        MetalConfig metalConfig = metalConfigs[metalToken];
+        PayTokenConfig payTokenConfig = payTokenConfigs[payToken];
+        require(metalConfig.isEnabled, "MetalForge: metal is disabled");
+        require(payTokenConfig.isEnabled, "MetalForge: pay token is disabled");
         require(payAmount > 0, "MetalForge: zero amount");
 
-        uint feeAmount = (payAmount * config.feeBps) / 10000;
+        uint feeAmount = (payAmount * payTokenConfig.feeBps) / 10000;
         uint principal = payAmount - feeAmount;
 
         uint fundsUSD;
@@ -132,9 +116,9 @@ contract record MetalForge is Ownable {
         uint metalAmount = (fundsUSD * WAD) / metalPrice;
 
         require(metalAmount >= minMetalOut, "MetalForge: slippage limit exceeded");
-        require(states[metalToken][payToken].totalMinted + metalAmount <= config.mintCap, "MetalForge: mintCap exceeded");
+        require(totalMinted[metalToken] + metalAmount <= metalConfig.mintCap, "MetalForge: mintCap exceeded");
 
-        states[metalToken][payToken].totalMinted += metalAmount;
+        totalMinted[metalToken] += metalAmount;
 
         IERC20(payToken).transferFrom(msg.sender, address(treasury), principal);
         IERC20(payToken).transferFrom(msg.sender, address(feeCollector), feeAmount);
@@ -148,40 +132,13 @@ contract record MetalForge is Ownable {
             metalAmount,
             metalPrice,
             feeAmount,
-            states[metalToken][payToken].totalMinted
+            totalMinted[metalToken]
         );
     }
 
     // =================================================
     // ================ ADMIN FUNCTIONS ================
     // =================================================
-
-    function setConfig(
-        address metalToken,
-        address payToken,
-        bool isPaused,
-        uint feeBps,
-        uint mintCap
-    ) external onlyOwner {
-        configs[metalToken][payToken] = Config(isPaused, feeBps, mintCap);
-        emit ConfigUpdated(metalToken, payToken, isPaused, feeBps, mintCap);
-    }
-
-    function setConfigBatch(
-        address[] calldata metalTokens,
-        address[] calldata payTokens,
-        bool[] calldata isPausedArr,
-        uint[] calldata feeBpsArr,
-        uint[] calldata mintCapArr
-    ) external onlyOwner {
-        uint len = metalTokens.length;
-        require(len > 0, "MetalForge: empty batch");
-        require(payTokens.length == len && isPausedArr.length == len && feeBpsArr.length == len && mintCapArr.length == len, "MetalForge: array length mismatch");
-        for (uint i = 0; i < len; i++) {
-            configs[metalTokens[i]][payTokens[i]] = Config(isPausedArr[i], feeBpsArr[i], mintCapArr[i]);
-            emit ConfigUpdated(metalTokens[i], payTokens[i], isPausedArr[i], feeBpsArr[i], mintCapArr[i]);
-        }
-    }
 
     function setOracle(address _oracle) external onlyOwner {
         require(_oracle != address(0), "MetalForge: invalid oracle address");
@@ -207,31 +164,44 @@ contract record MetalForge is Ownable {
         emit UsdstUpdated(_usdst);
     }
 
-    function setMintCap(
-        address metalToken,
-        address payToken,
-        uint mintCap
+    function setMetalConfig(
+        address _metalToken,
+        bool _isEnabled,
+        uint _mintCap
     ) external onlyOwner {
-        configs[metalToken][payToken].mintCap = mintCap;
-        emit MintCapUpdated(metalToken, payToken, mintCap);
+        metalConfigs[_metalToken].isEnabled = _isEnabled;
+        metalConfigs[_metalToken].mintCap = _mintCap;
+        emit MetalConfigUpdated(_metalToken, _isEnabled, _mintCap);
     }
 
-    function setFeeBps(
-        address metalToken,
-        address payToken,
-        uint feeBps
+    function setPayTokenConfig(
+        address _payToken,
+        bool _isEnabled,
+        uint _feeBps
     ) external onlyOwner {
-        configs[metalToken][payToken].feeBps = feeBps;
-        emit FeeBpsUpdated(metalToken, payToken, feeBps);
+        payTokenConfigs[_payToken].isEnabled = _isEnabled;
+        payTokenConfigs[_payToken].feeBps = _feeBps;
+        emit PayTokenConfigUpdated(_payToken, _isEnabled, _feeBps);
     }
 
-    function setIsPaused(
-        address metalToken,
-        address payToken,
-        bool isPaused
-    ) external onlyOwner {
-        configs[metalToken][payToken].isPaused = isPaused;
-        emit isPausedToggled(metalToken, payToken, isPaused);
+    function setMintCap(address _metalToken, uint _mintCap) external onlyOwner {
+        metalConfigs[_metalToken].mintCap = _mintCap;
+        emit MintCapUpdated(_metalToken, _mintCap);
+    }
+
+    function setFeeBps(address _payToken, uint _feeBps) external onlyOwner {
+        payTokenConfigs[_payToken].feeBps = _feeBps;
+        emit FeeBpsUpdated(_payToken, _feeBps);
+    }
+
+    function setMetalEnabled(address _metalToken, bool _isEnabled) external onlyOwner {
+        metalConfigs[_metalToken].isEnabled = _isEnabled;
+        emit MetalToggled(_metalToken, _isEnabled);
+    }
+
+    function setPayTokenEnabled(address _payToken, bool _isEnabled) external onlyOwner {
+        payTokenConfigs[_payToken].isEnabled = _isEnabled;
+        emit PayTokenToggled(_payToken, _isEnabled);
     }
 
 }
