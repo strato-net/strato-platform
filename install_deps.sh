@@ -19,10 +19,28 @@
 
 set -e
 
+# Enable Nix-based build prerequisites when NIX=true (or USE_NIX_BUILD=true).
+USE_NIX_BUILD=false
+if [ "${NIX:-}" = "true" ] || [ "${USE_NIX_BUILD:-}" = "true" ]; then
+    USE_NIX_BUILD=true
+fi
+
 # Function to handle unsupported platforms
 unsupported_platform() {
     echo "STRATO Mercata is not supported on $1."
     exit 1
+}
+
+# Install Nix package manager if not already available.
+install_nix_if_needed() {
+    if command -v nix > /dev/null 2>&1; then
+        echo "Nix is already installed."
+        return
+    fi
+
+    echo "Installing Nix package manager..."
+    curl -fsSL https://nixos.org/nix/install | sh -s -- --daemon
+    echo "Nix install complete. Restart your shell session to use 'nix' immediately."
 }
 
 # Function to get package version for the current distro
@@ -151,6 +169,9 @@ Darwin)
     fi
     
     echo "Installing STRATO Mercata dependencies on macOS Sequoia $MACOS_VERSION."
+    if [ "$USE_NIX_BUILD" = "true" ]; then
+        echo "NIX build mode enabled: system STRATO libraries will be skipped."
+    fi
     
     # Install Homebrew if not already installed (non-interactive, safe to run repeatedly)
     if ! command -v brew > /dev/null 2>&1; then
@@ -181,14 +202,18 @@ Darwin)
     # Install Node.js and npm
     brew install --quiet node
 
-    # Install STRATO dependencies
-    brew install --quiet \
-        leveldb \
-        libpq \
-        libsodium \
-        pkgconf \
-        secp256k1 \
-        xz
+    if [ "$USE_NIX_BUILD" = "true" ]; then
+        install_nix_if_needed
+    else
+        # Install STRATO dependencies
+        brew install --quiet \
+            leveldb \
+            libpq \
+            libsodium \
+            pkgconf \
+            secp256k1 \
+            xz
+    fi
     ;;
 
 Linux)
@@ -202,6 +227,9 @@ Linux)
             case $AMAZON_VERSION in
                 2023|2023.*)
                     echo "Installing STRATO Mercata dependencies on Amazon Linux $AMAZON_VERSION."
+                    if [ "$USE_NIX_BUILD" = "true" ]; then
+                        echo "NIX build mode enabled: system STRATO libraries will be skipped."
+                    fi
                     ;;
                 *)
                     echo "ERROR - STRATO Mercata only supports Amazon Linux 2023 (initial release or point releases)."
@@ -233,44 +261,48 @@ Linux)
                 zlib-devel
             curl -sSL https://get.haskellstack.org/ | sh -s - -f
             
-            # Install STRATO dependencies
-            sudo dnf install -q -y \
-                libsodium-devel \
-                postgresql15 \
-                postgresql-devel \
-                xz-devel
-            
-            # Build leveldb (not available in Amazon Linux 2023 repositories)
-            sudo dnf install -q -y snappy-devel
-            git clone --branch v1.20 --recurse-submodules https://github.com/google/leveldb.git
-            cd leveldb
-            make
-            sudo mkdir -p /usr/local/include/leveldb
-            sudo cp -r include/leveldb/* /usr/local/include/leveldb/
-            sudo cp out-shared/libleveldb.* /usr/local/lib/
-            sudo cp out-static/libleveldb.a /usr/local/lib/
-            sudo cp /usr/local/lib/libleveldb.so.1 /lib64
-            cd ..
-            rm -rf leveldb
-            
-            # Build secp256k1 (not available in Amazon Linux 2023 repositories)
-            sudo dnf install -y autoconf libtool make
-            git clone --branch v0.7.0 https://github.com/bitcoin-core/secp256k1.git
-            cd secp256k1
-            ./autogen.sh
-            ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
-            make
-            sudo make install
-            # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
-            # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
-            # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
-            sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
-            sudo cp /usr/local/lib/libsecp256k1.so.6 /lib64
-            cd ..
-            rm -rf secp256k1
+            if [ "$USE_NIX_BUILD" = "true" ]; then
+                install_nix_if_needed
+            else
+                # Install STRATO dependencies
+                sudo dnf install -q -y \
+                    libsodium-devel \
+                    postgresql15 \
+                    postgresql-devel \
+                    xz-devel
+                
+                # Build leveldb (not available in Amazon Linux 2023 repositories)
+                sudo dnf install -q -y snappy-devel
+                git clone --branch v1.20 --recurse-submodules https://github.com/google/leveldb.git
+                cd leveldb
+                make
+                sudo mkdir -p /usr/local/include/leveldb
+                sudo cp -r include/leveldb/* /usr/local/include/leveldb/
+                sudo cp out-shared/libleveldb.* /usr/local/lib/
+                sudo cp out-static/libleveldb.a /usr/local/lib/
+                sudo cp /usr/local/lib/libleveldb.so.1 /lib64
+                cd ..
+                rm -rf leveldb
+                
+                # Build secp256k1 (not available in Amazon Linux 2023 repositories)
+                sudo dnf install -y autoconf libtool make
+                git clone --branch v0.7.0 https://github.com/bitcoin-core/secp256k1.git
+                cd secp256k1
+                ./autogen.sh
+                ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
+                make
+                sudo make install
+                # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
+                # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
+                # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
+                sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
+                sudo cp /usr/local/lib/libsecp256k1.so.6 /lib64
+                cd ..
+                rm -rf secp256k1
 
-            # Update library cache
-            sudo ldconfig
+                # Update library cache
+                sudo ldconfig
+            fi
             
             ;;
 
@@ -282,6 +314,9 @@ Linux)
                 case $UBUNTU_VERSION in
                     24.04|24.04.*)
                         echo "Installing STRATO Mercata dependencies on Ubuntu $UBUNTU_VERSION LTS \"$UBUNTU_CODENAME\"."
+                        if [ "$USE_NIX_BUILD" = "true" ]; then
+                            echo "NIX build mode enabled: system STRATO libraries will be skipped."
+                        fi
                         ;;
                     *)
                         echo "ERROR - STRATO Mercata only supports Ubuntu 24.04 LTS \"Noble Numbat\" (initial release or point releases)."
@@ -295,6 +330,9 @@ Linux)
                 MINT_CODENAME=$(lsb_release -cs)
                 if [ "$MINT_VERSION" = "22.1" ] && [ "$MINT_CODENAME" = "xia" ]; then
                     echo "Installing STRATO Mercata dependencies on Linux Mint $MINT_VERSION \"Xia\"."
+                    if [ "$USE_NIX_BUILD" = "true" ]; then
+                        echo "NIX build mode enabled: system STRATO libraries will be skipped."
+                    fi
                 else
                     echo "ERROR - STRATO Mercata only supports Linux Mint 22.1 \"Xia\"."
                     echo "Your Linux Mint version: $MINT_VERSION \"$MINT_CODENAME\""
@@ -356,15 +394,19 @@ Linux)
             curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
             sudo apt install -qy --no-install-recommends nodejs
             
-            # Install STRATO dependencies
-            sudo apt install -qy --no-install-recommends \
-                libleveldb-dev \
-                liblzma-dev \
-                libpq-dev \
-                pkg-config \
-                libsecp256k1-dev \
-                libsodium-dev \
-                postgresql-client
+            if [ "$USE_NIX_BUILD" = "true" ]; then
+                install_nix_if_needed
+            else
+                # Install STRATO dependencies
+                sudo apt install -qy --no-install-recommends \
+                    libleveldb-dev \
+                    liblzma-dev \
+                    libpq-dev \
+                    pkg-config \
+                    libsecp256k1-dev \
+                    libsodium-dev \
+                    postgresql-client
+            fi
             ;;
 
         *)
@@ -383,23 +425,25 @@ Linux)
 
 esac
 
-# Lock the specific package versions for Ubuntu or Mint Linux
-check_package_version "ubuntu-or-mint" "build-essential" "12.10ubuntu1"
-check_package_version "ubuntu-or-mint" "ca-certificates" "20240203"
-check_package_version "ubuntu-or-mint" "containerd.io" "2.2.1-1~ubuntu.24.04~noble"
-check_package_version "ubuntu-or-mint" "curl" "8.5.0-2ubuntu10.7"
-check_package_version "ubuntu-or-mint" "docker-buildx-plugin" "0.31.1-1~ubuntu.24.04~noble"
-check_package_version "ubuntu-or-mint" "docker-ce" "5:29.3.0-1~ubuntu.24.04~noble"
-check_package_version "ubuntu-or-mint" "docker-ce-cli" "5:29.3.0-1~ubuntu.24.04~noble"
-check_package_version "ubuntu-or-mint" "docker-compose-plugin" "5.1.0-1~ubuntu.24.04~noble"
-check_package_version "ubuntu-or-mint" "git" "1:2.43.0-1ubuntu7.3"
-check_package_version "ubuntu-or-mint" "gnupg" "2.4.4-2ubuntu17.4"
-check_package_version "ubuntu-or-mint" "libgmp-dev" "2:6.3.0+dfsg-2ubuntu6.1"
-check_package_version "ubuntu-or-mint" "libleveldb-dev" "1.23-5build1"
-check_package_version "ubuntu-or-mint" "liblzma-dev" "5.6.1+really5.4.5-1ubuntu0.2"
-check_package_version "ubuntu-or-mint" "libpq-dev" "16.13-0ubuntu0.24.04.1"
-check_package_version "ubuntu-or-mint" "libsecp256k1-dev" "0.2.0-2"
-check_package_version "ubuntu-or-mint" "libsodium-dev" "1.0.18-1ubuntu0.24.04.1"
-check_package_version "ubuntu-or-mint" "lsb-release" "12.0-2"
-check_package_version "ubuntu-or-mint" "postgresql-client" "16+257build1.1"
-check_package_version "ubuntu-or-mint" "zlib1g-dev" "1:1.3.dfsg-3.1ubuntu2.1"
+if [ "$USE_NIX_BUILD" != "true" ]; then
+    # Lock the specific package versions for Ubuntu or Mint Linux
+    check_package_version "ubuntu-or-mint" "build-essential" "12.10ubuntu1"
+    check_package_version "ubuntu-or-mint" "ca-certificates" "20240203"
+    check_package_version "ubuntu-or-mint" "containerd.io" "2.2.1-1~ubuntu.24.04~noble"
+    check_package_version "ubuntu-or-mint" "curl" "8.5.0-2ubuntu10.7"
+    check_package_version "ubuntu-or-mint" "docker-buildx-plugin" "0.31.1-1~ubuntu.24.04~noble"
+    check_package_version "ubuntu-or-mint" "docker-ce" "5:29.3.0-1~ubuntu.24.04~noble"
+    check_package_version "ubuntu-or-mint" "docker-ce-cli" "5:29.3.0-1~ubuntu.24.04~noble"
+    check_package_version "ubuntu-or-mint" "docker-compose-plugin" "5.1.0-1~ubuntu.24.04~noble"
+    check_package_version "ubuntu-or-mint" "git" "1:2.43.0-1ubuntu7.3"
+    check_package_version "ubuntu-or-mint" "gnupg" "2.4.4-2ubuntu17.4"
+    check_package_version "ubuntu-or-mint" "libgmp-dev" "2:6.3.0+dfsg-2ubuntu6.1"
+    check_package_version "ubuntu-or-mint" "libleveldb-dev" "1.23-5build1"
+    check_package_version "ubuntu-or-mint" "liblzma-dev" "5.6.1+really5.4.5-1ubuntu0.2"
+    check_package_version "ubuntu-or-mint" "libpq-dev" "16.13-0ubuntu0.24.04.1"
+    check_package_version "ubuntu-or-mint" "libsecp256k1-dev" "0.2.0-2"
+    check_package_version "ubuntu-or-mint" "libsodium-dev" "1.0.18-1ubuntu0.24.04.1"
+    check_package_version "ubuntu-or-mint" "lsb-release" "12.0-2"
+    check_package_version "ubuntu-or-mint" "postgresql-client" "16+257build1.1"
+    check_package_version "ubuntu-or-mint" "zlib1g-dev" "1:1.3.dfsg-3.1ubuntu2.1"
+fi
