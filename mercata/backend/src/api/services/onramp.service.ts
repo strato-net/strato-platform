@@ -48,19 +48,27 @@ const BRIDGE_CHAIN_ID: Record<string, number> = {
 // Stripe SDK setup
 // ————————————————————————————————————————————————————————————————
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+let stripe: Stripe | null = null;
+let OnrampSessionResource: any = null;
 
-const StripeResourceClass = (Stripe as any).StripeResource;
-const OnrampSessionResource = StripeResourceClass.extend({
-  create: StripeResourceClass.method({
-    method: "POST",
-    path: "crypto/onramp_sessions",
-  }),
-  list: StripeResourceClass.method({
-    method: "GET",
-    path: "crypto/onramp_sessions",
-  }),
-});
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const StripeResourceClass = (Stripe as any).StripeResource;
+  OnrampSessionResource = StripeResourceClass.extend({
+    create: StripeResourceClass.method({
+      method: "POST",
+      path: "crypto/onramp_sessions",
+    }),
+    list: StripeResourceClass.method({
+      method: "GET",
+      path: "crypto/onramp_sessions",
+    }),
+  });
+}
+
+export function isOnrampEnabled(): boolean {
+  return !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_PUBLISHABLE_KEY;
+}
 
 // ————————————————————————————————————————————————————————————————
 // Bridge admin token (Resource Owner Password Credentials grant)
@@ -161,6 +169,9 @@ export async function createOnrampSession(
   userStratoAddress: string,
   clientIp: string
 ): Promise<{ clientSecret: string }> {
+  if (!stripe || !OnrampSessionResource) {
+    throw new Error("Stripe onramp is not configured on this node");
+  }
   const hotWallet = process.env.ONRAMP_HOT_WALLET_ADDRESS;
   if (!hotWallet) {
     throw new Error("ONRAMP_HOT_WALLET_ADDRESS is not configured");
@@ -189,6 +200,9 @@ export function verifyWebhookSignature(
   rawBody: Buffer,
   signature: string
 ): Stripe.Event {
+  if (!stripe) {
+    throw new Error("Stripe onramp is not configured on this node");
+  }
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     throw new Error("STRIPE_WEBHOOK_SECRET is not configured");
