@@ -464,7 +464,7 @@ export async function getPendingWithdrawalsForCard(
   accessToken: string,
   cardWalletAddress: string
 ): Promise<Array<{ amount: string; status: number; timestamp: string }>> {
-  const bridgeAddress = process.env.BRIDGE_ADDRESS;
+  const bridgeAddress = process.env.BRIDGE_ADDRESS || '0000000000000000000000000000000000001008';
   if (!bridgeAddress) return [];
   const normalizedWallet = normalizeAddress(cardWalletAddress);
   if (!normalizedWallet) return [];
