@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { ArrowLeft } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -55,6 +55,7 @@ const EarnVault = () => {
   const { refreshVault, vaultState } = useVaultContext();
   const { isLoggedIn } = useUser();
   const navigate = useNavigate();
+  const location = useLocation();
   const guestMode = !isLoggedIn;
 
   const {
@@ -104,6 +105,18 @@ const EarnVault = () => {
     document.title = "STRATO Earn Vault | STRATO";
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const openModal = params.get("open");
+    if (openModal !== "deposit") return;
+
+    if (isLoggedIn) {
+      setIsDepositModalOpen(true);
+    }
+
+    navigate("/dashboard/earn-vault", { replace: true });
+  }, [location.search, isLoggedIn, navigate]);
 
   const handleDepositSuccess = () => {
     refreshVault(false);

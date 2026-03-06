@@ -18,6 +18,7 @@ import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
 import { ChevronDown, ChevronUp, CircleArrowDown, CircleArrowUp, Star, Vault as VaultIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import stratoVaultLogo from "@/assets/strato-vault-logo.png";
 
 const WAD = BigInt(10) ** BigInt(18);
 
@@ -425,22 +426,37 @@ const Earn = () => {
 
           {/* Top Opportunity */}
           <section className="space-y-2">
-            <Card className="border border-blue-500/40 dark:border-blue-400/35 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a] shadow-sm">
+            <Card
+              className="border border-blue-500/40 dark:border-blue-400/35 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a] shadow-sm cursor-pointer"
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate("/dashboard/earn-vault")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate("/dashboard/earn-vault");
+                }
+              }}
+            >
               <CardContent className="pt-3 pb-3 px-4 md:px-5 space-y-3">
                 <Badge variant="secondary" className="text-[10px] px-2 py-0.5 w-fit rounded-md bg-background/70 dark:bg-white/10">
                   Top Opportunity
                 </Badge>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
-                        <VaultIcon className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={stratoVaultLogo}
+                        alt="STRATO Vault"
+                        className="w-16 h-16 rounded-full object-cover shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="text-[30px] leading-none font-semibold tracking-tight">STRATO Vault</h3>
+                        <p className="mt-1 text-xs md:text-sm text-muted-foreground">
+                          Diversified real assets: gold, silver, ETH, BTC, stables - actively managed
+                        </p>
                       </div>
-                      <h3 className="text-[30px] leading-none font-semibold tracking-tight">STRATO Vault</h3>
                     </div>
-                    <p className="mt-1 text-xs md:text-sm text-muted-foreground">
-                      Diversified real assets: gold, silver, ETH, BTC, stables - actively managed
-                    </p>
                   </div>
                   <div className="text-left md:text-right shrink-0">
                     <p className="text-3xl md:text-[40px] leading-none font-semibold text-foreground">
@@ -459,7 +475,10 @@ const Earn = () => {
                 <Button
                   className="w-full h-9 rounded-lg bg-blue-600 hover:bg-blue-600 text-white font-medium"
                   variant="default"
-                  onClick={() => navigate("/dashboard/earn-vault")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/dashboard/earn-vault?open=deposit");
+                  }}
                 >
                   Deposit
                 </Button>
@@ -520,9 +539,11 @@ const Earn = () => {
                         <tr className="border-b border-border/50">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
-                                <VaultIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                              </div>
+                              <img
+                                src={stratoVaultLogo}
+                                alt="STRATO Vault"
+                                className="w-8 h-8 rounded-full object-cover shrink-0"
+                              />
                               <p className="font-medium truncate">STRATO Vault</p>
                               <Badge variant="secondary" className="text-[10px]">Vault</Badge>
                             </div>
@@ -551,7 +572,7 @@ const Earn = () => {
                                   )}
                                 </div>
                               )}
-                              <Button className="h-9 min-w-[108px]" size="sm" onClick={() => navigate("/dashboard/earn-vault")}>
+                              <Button className="h-9 min-w-[108px]" size="sm" onClick={() => navigate("/dashboard/earn-vault?open=deposit")}>
                                 Deposit
                               </Button>
                             </div>
