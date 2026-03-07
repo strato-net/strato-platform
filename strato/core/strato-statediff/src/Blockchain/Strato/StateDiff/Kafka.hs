@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Strato.StateDiff.Kafka
   (
@@ -5,11 +6,10 @@ module Blockchain.Strato.StateDiff.Kafka
   )
 where
 
-import Blockchain.KafkaTopics (lookupTopic)
 import Control.Monad.Composable.Kafka
 
 stateDiffTopicName :: TopicName
-stateDiffTopicName = lookupTopic "statediff"
+stateDiffTopicName = "statediff"
 
 assertStateDiffTopicCreation :: HasKafka k => k ()
 assertStateDiffTopicCreation = createTopic stateDiffTopicName

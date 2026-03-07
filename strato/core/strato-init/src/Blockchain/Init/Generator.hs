@@ -35,7 +35,6 @@ import qualified Data.ByteString.Lazy as BL
 import Data.String
 import qualified Data.Text as T
 import qualified Text.Colors as CL
-import qualified Data.Map as M
 import qualified Data.Yaml as YAML
 import Database.Persist.Postgresql
 import System.FilePath ((</>))
@@ -195,9 +194,6 @@ mkDatabases = do
         ]
 
   forM_ topics $ createTopic . fromString
-
-  let uniqueTopicMap = M.fromList $ map (\x -> (x, x)) topics
-  liftIO $ YAML.encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
 
   runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
     $logInfoS "mkDatabases" "Adding empty code"
