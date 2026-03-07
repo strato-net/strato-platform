@@ -73,6 +73,7 @@ executables:
       - stm
       - stm-chans
       - strato-conf
+      - strato-genesis
       - strato-model
       - strato-redis-blockdb
       - strato-sequencer

@@ -9,12 +9,15 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Blockstanbul.Options ()
+import Blockchain.Data.GenesisInfo (getGenesisInfo)
 import Blockchain.EthConf
+import Blockchain.Generation (readValidatorsFromGenesisInfo)
 import Blockchain.Model.SyncState
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address (fromPublicKey)
+import Blockchain.Strato.Model.Keccak256 (zeroHash)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Secp256k1 (getPub)
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
@@ -24,7 +27,6 @@ import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
 import Control.Monad.Composable.Vault (runVaultM)
-import Data.Maybe
 import Data.String
 import qualified Database.Redis as Redis
 import Flags
@@ -42,7 +44,17 @@ main = do
 
   conn <- Redis.checkedConnect lookupRedisBlockDBConfig
 
-  bestSequencedBlock <- fmap (fromMaybe (error "no BestSequencedBlock in database")) $ Redis.runRedis conn getBestSequencedBlockInfo
+  maybeBestSequencedBlock <- Redis.runRedis conn getBestSequencedBlockInfo
+  bestSequencedBlock <- case maybeBestSequencedBlock of
+    Just bsb -> return bsb
+    Nothing -> do
+      putStrLn "No BestSequencedBlock found in Redis, bootstrapping from genesis.json..."
+      genesisInfo <- getGenesisInfo
+      let validators = readValidatorsFromGenesisInfo genesisInfo
+          bsb = BestSequencedBlock zeroHash 0 validators
+      _ <- Redis.runRedis conn $ putBestSequencedBlockInfo bsb
+      putStrLn $ "Bootstrapped BestSequencedBlock with " ++ show (length validators) ++ " validators"
+      return bsb
   let validators = bestSequencedBlockValidators bestSequencedBlock
 
   exportFlagsAsMetrics
