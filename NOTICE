@@ -953,156 +953,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:114.
 https://www.npmjs.com/package/@hypnosphi/create-react-context
 
-@img/colour
-Copyright information is provided by the upstream package authors.
-Licensed under the MIT License (per package-lock metadata).
-See mercata/ui/package-lock.json:1307.
-https://www.npmjs.com/package/@img/colour
-
-@img/sharp-darwin-arm64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1317.
-https://www.npmjs.com/package/@img/sharp-darwin-arm64
-
-@img/sharp-darwin-x64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1339.
-https://www.npmjs.com/package/@img/sharp-darwin-x64
-
-@img/sharp-libvips-darwin-arm64
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1361.
-https://www.npmjs.com/package/@img/sharp-libvips-darwin-arm64
-
-@img/sharp-libvips-darwin-x64
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1377.
-https://www.npmjs.com/package/@img/sharp-libvips-darwin-x64
-
-@img/sharp-libvips-linux-arm
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1393.
-https://www.npmjs.com/package/@img/sharp-libvips-linux-arm
-
-@img/sharp-libvips-linux-arm64
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1409.
-https://www.npmjs.com/package/@img/sharp-libvips-linux-arm64
-
-@img/sharp-libvips-linux-ppc64
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1425.
-https://www.npmjs.com/package/@img/sharp-libvips-linux-ppc64
-
-@img/sharp-libvips-linux-riscv64
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1441.
-https://www.npmjs.com/package/@img/sharp-libvips-linux-riscv64
-
-@img/sharp-libvips-linux-s390x
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1457.
-https://www.npmjs.com/package/@img/sharp-libvips-linux-s390x
-
-@img/sharp-libvips-linux-x64
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1473.
-https://www.npmjs.com/package/@img/sharp-libvips-linux-x64
-
-@img/sharp-libvips-linuxmusl-arm64
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1489.
-https://www.npmjs.com/package/@img/sharp-libvips-linuxmusl-arm64
-
-@img/sharp-libvips-linuxmusl-x64
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1505.
-https://www.npmjs.com/package/@img/sharp-libvips-linuxmusl-x64
-
-@img/sharp-linux-arm
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1521.
-https://www.npmjs.com/package/@img/sharp-linux-arm
-
-@img/sharp-linux-arm64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1543.
-https://www.npmjs.com/package/@img/sharp-linux-arm64
-
-@img/sharp-linux-ppc64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1565.
-https://www.npmjs.com/package/@img/sharp-linux-ppc64
-
-@img/sharp-linux-riscv64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1587.
-https://www.npmjs.com/package/@img/sharp-linux-riscv64
-
-@img/sharp-linux-s390x
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1609.
-https://www.npmjs.com/package/@img/sharp-linux-s390x
-
-@img/sharp-linux-x64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1631.
-https://www.npmjs.com/package/@img/sharp-linux-x64
-
-@img/sharp-linuxmusl-arm64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1653.
-https://www.npmjs.com/package/@img/sharp-linuxmusl-arm64
-
-@img/sharp-linuxmusl-x64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:1675.
-https://www.npmjs.com/package/@img/sharp-linuxmusl-x64
-
-@img/sharp-wasm32
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 AND LGPL-3.0-or-later AND MIT License (per package-lock metadata).
-See mercata/ui/package-lock.json:1697.
-https://www.npmjs.com/package/@img/sharp-wasm32
-
-@img/sharp-win32-arm64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 AND LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1716.
-https://www.npmjs.com/package/@img/sharp-win32-arm64
-
-@img/sharp-win32-ia32
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 AND LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1735.
-https://www.npmjs.com/package/@img/sharp-win32-ia32
-
-@img/sharp-win32-x64
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 AND LGPL-3.0-or-later License (per package-lock metadata).
-See mercata/ui/package-lock.json:1754.
-https://www.npmjs.com/package/@img/sharp-win32-x64
-
 @isaacs/cliui
 Copyright information is provided by the upstream package authors.
 Licensed under the ISC License (per package-lock metadata).
@@ -13355,12 +13205,6 @@ Licensed under the MIT License (per package-lock metadata).
 See mercata/contracts/package-lock.json:1462.
 https://www.npmjs.com/package/sha3
 
-sharp
-Copyright information is provided by the upstream package authors.
-Licensed under the Apache-2.0 License (per package-lock metadata).
-See mercata/ui/package-lock.json:15058.
-https://www.npmjs.com/package/sharp
-
 shebang-command
 Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
@@ -13558,12 +13402,6 @@ Copyright information is provided by the upstream package authors.
 Licensed under the MIT License (per package-lock metadata).
 See mercata/ethereum/package-lock.json:7936.
 https://www.npmjs.com/package/solidity-ast
-
-solidity-coverage
-Copyright information is provided by the upstream package authors.
-Licensed under the ISC License (per package-lock metadata).
-See mercata/ethereum/package-lock.json:7942.
-https://www.npmjs.com/package/solidity-coverage
 
 sonic-boom
 Copyright information is provided by the upstream package authors.
@@ -15047,12 +14885,6 @@ Licensed under the MIT License (per npm registry metadata).
 See smd-ui/package-lock.json:6565.
 https://www.npmjs.com/package/wbuf
 
-web3-utils
-Copyright information is provided by the upstream package authors.
-Licensed under the LGPL-3.0 License (per package-lock metadata).
-See mercata/ethereum/package-lock.json:8928.
-https://www.npmjs.com/package/web3-utils
-
 webextension-polyfill
 Copyright information is provided by the upstream package authors.
 Licensed under the MPL-2.0 License (per package-lock metadata).
@@ -15375,12 +15207,15 @@ https://www.npmjs.com/package/zustand
 WORK IN PROGRESS:
 -------------------------------------------------------------------------------
 
-Appendix: License Audit Notes and Recommendation Matrix (refreshed 2026-03-03)
+Appendix: License Audit Notes and Recommendation Matrix (refreshed 2026-03-05)
 
 Goal for this appendix:
 - Identify components that may be incompatible with Apache-2.0-only
   distribution posture.
 - Capture mitigation recommendations and implementation priority.
+- Current scope after latest dependency cleanup: two remaining high-risk items
+  (rapidsnark in Airlock prover path, rpc-websockets via Coinbase CDP/Solana
+  path).
 
 1) strato/libs/groth16-rapidsnark/vendor/rapidsnark (LGPL-3.0)
 Status:
@@ -15403,46 +15238,22 @@ Recommendation:
    @coinbase/cdp-sdk -> @solana/web3.js
 Status:
 - rpc-websockets is present in Mercata UI lockfile.
+- Upstream migration request filed with Coinbase CDP SDK maintainers:
+  https://github.com/coinbase/cdp-sdk/issues/620
 Evidence:
-- mercata/ui/package-lock.json:243
-- mercata/ui/package-lock.json:349
-- mercata/ui/package-lock.json:7253
-- mercata/ui/package-lock.json:14865
+- mercata/ui/package-lock.json:238
+- mercata/ui/package-lock.json:350
+- mercata/ui/package-lock.json:6630
+- mercata/ui/package-lock.json:14193
 Risk:
 - High.
 Recommendation:
-- Preferred: replace SDK path introducing Solana websocket stack for Apache-only
-  distribution profile.
-
-3) mercata/ethereum web3-utils (LGPL-3.0) via solidity-coverage
-Status:
-- web3-utils appears as dev dependency path from hardhat-toolbox peer set.
-Evidence:
-- mercata/ethereum/package-lock.json:1785
-- mercata/ethereum/package-lock.json:7968
-- mercata/ethereum/package-lock.json:8933
-Risk:
-- Medium (dev/test scope, but still relevant for distributed source/binaries
-  and SBOM posture).
-Recommendation:
-- Preferred: remove solidity-coverage/hardhat-toolbox aggregate if not required;
-  install only specific hardhat plugins needed.
-
-4) mercata/ui sharp/libvips platform packages (LGPL-3.0-or-later)
-Status:
-- sharp optional dependency chain includes LGPL libvips platform packages.
-Evidence:
-- mercata/ui/package-lock.json:1366
-- mercata/ui/package-lock.json:12999
-- mercata/ui/package-lock.json:14865
-Risk:
-- Medium (optional/platform-dependent install path).
-Recommendation:
-- If Apache-only distribution is required, disable sharp-dependent path or
-  provide separate compliance handling for LGPL components.
+- Current action: wait for Coinbase CDP SDK to migrate off the legacy Solana
+  SDK path that introduces rpc-websockets (LGPL-3.0-only).
+- Track upstream migration status and adopt once available:
+  https://github.com/coinbase/cdp-sdk/issues/620
 
 Priority order:
-1. Remove LGPL rpc-websockets paths from mercata/ui dependency chain.
-2. Decide rapidsnark policy (remove or isolate externally).
-3. Minimize dev-tool LGPL path in mercata/ethereum.
-4. Re-generate NOTICE and SBOM after dependency lock updates.
+1. Decide rapidsnark policy (remove or isolate externally).
+2. Track Coinbase CDP SDK migration to a licensing-compliant Solana SDK path.
+3. Re-generate NOTICE and SBOM after dependency lock updates.
