@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -26,12 +26,26 @@ type JsonRpcResponse = {
   error?: { message?: string };
 };
 
+type AgentResponse = {
+  answer?: string;
+  toolName?: string;
+};
+
+const MAX_RENDERED_MESSAGE_CHARS = 6000;
+const MAX_HISTORY_MESSAGES = 8;
+const MAX_HISTORY_MESSAGE_CHARS = 1200;
+
+const truncateText = (text: string, maxChars: number): string => {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars).trimEnd()}\n\n[truncated]`;
+};
+
 const AssistantPage = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "assistant",
-      text: "Connected to Griphook via your active login. Ask about balances, rewards, swaps, bridge, vault, or lending.\n\nCommands: /tools, /call <tool> <json-args>, /help",
+      text: "I’m Griphook, your Mercata execution agent. I can inspect live balances, rewards, swaps, bridge paths, vault positions, and lending data, then run tool calls on request.\n\nAgent commands: /tools, /call <tool> <json-args>, /help",
     },
   ]);
   const [input, setInput] = useState("");
@@ -43,7 +57,7 @@ const AssistantPage = () => {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    document.title = "AI Assistant | STRATO";
+    document.title = "Griphook Agent | STRATO";
   }, []);
 
   useEffect(() => {
@@ -51,12 +65,13 @@ const AssistantPage = () => {
   }, [messages]);
 
   const addMessage = (role: ChatRole, text: string) => {
+    const normalizedText = truncateText(text, MAX_RENDERED_MESSAGE_CHARS);
     setMessages((prev) => [
       ...prev,
       {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         role,
-        text,
+        text: normalizedText,
       },
     ]);
   };
@@ -80,6 +95,24 @@ const AssistantPage = () => {
       method,
       ...(params ? { params } : {}),
     });
+  };
+
+  const agentPost = async (message: string): Promise<AgentResponse> => {
+    const history = messages
+      .filter((item) => item.role === "user" || item.role === "assistant")
+      .slice(-MAX_HISTORY_MESSAGES)
+      .map((item) => ({ role: item.role, text: truncateText(item.text, MAX_HISTORY_MESSAGE_CHARS) }));
+
+    const response = await api.post(
+      "/chat/agent",
+      { message, history },
+      { headers: sessionId ? { "mcp-session-id": sessionId } : undefined }
+    );
+    const nextSessionId = response.headers["mcp-session-id"] as string | undefined;
+    if (nextSessionId && nextSessionId !== sessionId) {
+      setSessionId(nextSessionId);
+    }
+    return response.data as AgentResponse;
   };
 
   const initializeMcp = async () => {
@@ -174,16 +207,16 @@ const AssistantPage = () => {
     setIsWorking(true);
 
     try {
-      await initializeMcp();
-
       if (text === "/help") {
         addMessage(
           "assistant",
-          "Use /tools to list available MCP tools, or /call <tool> <json-args> for explicit calls.\nWithout commands, I map your message to a read-only STRATO snapshot tool."
+          "Use /tools to list available MCP tools, or /call <tool> <json-args> for explicit calls.\nWithout commands, your prompt goes through the GPT-backed agent."
         );
       } else if (text === "/tools") {
+        await initializeMcp();
         addMessage("assistant", toolsSummary);
       } else if (text.startsWith("/call ")) {
+        await initializeMcp();
         const match = text.match(/^\/call\s+([^\s]+)(?:\s+([\s\S]+))?$/);
         if (!match) {
           addMessage("assistant", "Invalid call syntax. Use: /call <tool> <json-args>");
@@ -194,9 +227,12 @@ const AssistantPage = () => {
           await runTool(toolName, args);
         }
       } else {
-        const selected = pickReadOnlyTool(text);
-        addMessage("assistant", `Running ${selected.name}...`);
-        await runTool(selected.name, selected.args);
+        const response = await agentPost(text);
+        const answer =
+          typeof response.answer === "string" && response.answer.trim()
+            ? response.answer
+            : "No assistant response.";
+        addMessage("assistant", answer);
       }
     } catch (error: any) {
       addMessage("assistant", `Request failed: ${error?.message || "Unknown error"}`);
@@ -205,22 +241,31 @@ const AssistantPage = () => {
     }
   };
 
+  const handleInputKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  };
+
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: "var(--sidebar-width, 0px)" }}>
-        <DashboardHeader title="AI Assistant" />
+        <DashboardHeader title="Griphook Agent" />
         <main className="p-4 md:p-6">
           <div className="mx-auto max-w-5xl">
             <Card className="border border-border shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Bot className="h-5 w-5" />
-                  Griphook Assistant
+                  Griphook Agent
                 </CardTitle>
                 <CardDescription>
-                  Uses your active STRATO login and calls the Griphook MCP endpoint through the backend proxy.
+                  Uses your active STRATO login, MCP tool data, and GPT for natural-language responses.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -246,12 +291,13 @@ const AssistantPage = () => {
                   <Textarea
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
+                    onKeyDown={handleInputKeyDown}
                     placeholder="Ask about balances, rewards, swaps, bridge, vault, lending, or use /call..."
                     className="min-h-[96px]"
                   />
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
-                      Commands: /tools, /call &lt;tool&gt; &lt;json-args&gt;, /help
+                      Commands: /tools, /call &lt;tool&gt; &lt;json-args&gt;, /help. Enter sends, Shift+Enter new line.
                     </p>
                     <Button type="submit" disabled={isWorking || !input.trim()}>
                       <Send className="mr-2 h-4 w-4" />

@@ -11,6 +11,7 @@ const app = express();
 app.use(
   cors(),
   express.json({
+    limit: "1mb",
     verify: (req: any, _res, buf) => {
       req.rawBody = buf;
     },

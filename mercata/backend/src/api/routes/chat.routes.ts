@@ -18,4 +18,18 @@ const router = Router();
  */
 router.post("/mcp", authHandler.authorizeRequest(), ChatController.proxyMcp);
 
+/**
+ * @openapi
+ * /chat/agent:
+ *   post:
+ *     summary: Ask the GPT-backed assistant (uses MCP tools and returns a natural-language answer)
+ *     tags: [Chat]
+ *     responses:
+ *       200:
+ *         description: Assistant response payload
+ *       401:
+ *         description: Unauthorized
+ */
+router.post("/agent", authHandler.authorizeRequest(), ChatController.agentReply);
+
 export default router;

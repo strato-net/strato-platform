@@ -1,6 +1,13 @@
 #!/bin/sh
 set -e
 
+# External-node mode: when NODE_URL is provided, skip local STRATO availability/sync checks.
+if [ -n "${NODE_URL}" ]; then
+  echo "NODE_URL is set (${NODE_URL}). Skipping local STRATO wait/sync checks."
+  echo "Starting app-backend..."
+  exec node dist/app.js
+fi
+
 STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_API_URL="http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2"
