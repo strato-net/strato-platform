@@ -79,6 +79,7 @@ executables:
       - strato-conf
       - text
       - transformers
+      - unliftio
       - wai-middleware-prometheus
       - warp
 

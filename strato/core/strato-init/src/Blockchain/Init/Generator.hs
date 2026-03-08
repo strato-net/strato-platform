@@ -164,15 +164,6 @@ mkDatabases = do
     (withPostgresqlConn rawConn (runReaderT (rawExecute query [])))
     (\(_ :: SomeException) -> $logInfoS "mkDatabases/Create Database" "Database already exists, skipping")
 
-  -- Create cirrus database
-  let cirrusConf = EC.cirrusConfig ethconf
-      cirrusDb = EC.database cirrusConf
-  $logInfoS "mkDatabases/Create Database" . T.pack $ CL.yellow cirrusDb
-  let cirrusQuery = T.pack $ "CREATE DATABASE " ++ show cirrusDb ++ ";"
-  catch
-    (withPostgresqlConn rawConn (runReaderT (rawExecute cirrusQuery [])))
-    (\(_ :: SomeException) -> $logInfoS "mkDatabases/Create Database" "Database already exists, skipping")
-
   withPostgresqlConn localConn $
     runReaderT $ do
       $logInfoS "mkDatabases/migrate" . T.pack $ CL.yellow ">>>> Migrating eth"
