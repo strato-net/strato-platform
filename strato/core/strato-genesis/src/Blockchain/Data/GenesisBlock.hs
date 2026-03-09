@@ -12,6 +12,7 @@ module Blockchain.Data.GenesisBlock
     initializeStateDB,
     genesisInfoToGenesisBlock,
     genesisInfoToBlock,
+    populateMPTAndWriteGenesis
   )
 where
 
@@ -30,13 +31,21 @@ import Blockchain.Data.GenesisInfo (GenesisInfo)
 import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Address hiding (parseHex)
+import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Control.Monad.Change.Alter as A
+import Control.Monad.Change.Alter (Alters)
 import Control.Monad.Change.Modify
+import Control.Monad.IO.Class
 import Crypto.Util (i2bs_unsized)
+import qualified Data.Aeson as JSON
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Numeric
 import SolidVM.Model.Storable
+import Text.Format
 
 initializeBlankStateDB ::
   ( (Maybe Word256 `A.Alters` StateRoot) m,
@@ -188,3 +197,29 @@ genesisInfoToBlock gi =
     , blockReceiptTransactions = []
     , blockBlockUncles = []
     }
+
+-- | Populate the Merkle Patricia Trie and write genesis.json with computed stateRoot.
+-- This is called by strato-setup (before docker containers are running).
+-- Only requires LevelDB access, not Redis/Kafka/PostgreSQL.
+populateMPTAndWriteGenesis ::
+  ( HasCodeDB m,
+    HasHashDB m,
+    Mem.HasMemAddressStateDB m,
+    HasStateDB m,
+    HasStorageDB m,
+    HasMemStorageDB m,
+    MonadIO m,
+    MonadLogger m,
+    (Address `Alters` AddressState) m
+  ) =>
+  GenesisInfo ->
+  m ()
+populateMPTAndWriteGenesis genesisInfo = do
+  $logInfoS "strato-setup" "Populating Merkle Patricia Trie from genesis allocations"
+  genesisBlock <- genesisInfoToGenesisBlock genesisInfo
+  let computedStateRoot = stateRoot $ blockBlockData genesisBlock
+      updatedGenesisInfo = genesisInfo { GI.stateRoot = computedStateRoot }
+  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode updatedGenesisInfo
+  $logInfoS "strato-setup" $ T.pack $ "Wrote genesis.json with stateRoot: " ++ format computedStateRoot
+  $logInfoS "strato-setup" $ T.pack $ "  genesis hash: " ++ format (blockHash genesisBlock)
+

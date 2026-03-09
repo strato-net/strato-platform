@@ -14,11 +14,13 @@ module Blockchain.Init.Generator (
 
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
+import Blockchain.Data.GenesisInfo (GenesisInfo)
 import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
-import Blockchain.GenesisBlock (populateMPTAndWriteGenesis, seedDatabases)
+import Blockchain.GenesisBlock (seedDatabases)
+import Blockchain.Data.GenesisBlock
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -31,8 +33,7 @@ import Control.Monad.Composable.Redis
 import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Reader
 import qualified Data.Aeson as JSON
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
+import Data.Maybe
 import Data.String
 import qualified Data.Text as T
 import qualified Text.Colors as CL
@@ -144,14 +145,10 @@ mkFilesAndGenesis network = do
       liftIO createCommandsFile
     else do
       $logInfoS "strato-setup" "Creating genesis info from network template"
-      let templateInfo = createGenesisInfo network
-      -- Write template, then re-read after JSON round-trip.
-      -- This is intentional: the JSON encode/decode normalizes certain fields
-      -- (e.g., BasicValue strings) to match how other nodes parse genesis.json.
-      liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode templateInfo
-      genesisInfo <- liftIO GI.getGenesisInfo
 
       liftIO createCommandsFile
+
+      let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
 
       -- Populate MPT and write genesis.json with computed stateRoot
       runResourceT . runSetupDBM $ do
@@ -159,6 +156,11 @@ mkFilesAndGenesis network = do
         populateMPTAndWriteGenesis genesisInfo
 
   $logInfoS "strato-setup" "Setup complete"
+
+-- We have to normalize the information held in GenesisInfo, unfortunalely we have some characters that done encode and decode back from JSON the same
+-- If we don't do this, the stateroot created from the raw data won't match that if created from the data read from genesis.json
+normalizeGenesisInfo :: GenesisInfo -> GenesisInfo
+normalizeGenesisInfo = fromMaybe (error "Internal Error in normalizeGenesisInfo: this shouldn't happen") . JSON.decode . JSON.encode
 
 -- | Seed databases (Redis, Kafka, PostgreSQL) with genesis block data.
 -- Called by seed-genesis after docker containers are running.

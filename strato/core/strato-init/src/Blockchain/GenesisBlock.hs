@@ -9,8 +9,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.GenesisBlock
-  ( populateMPTAndWriteGenesis
-  , seedDatabases
+  ( seedDatabases
   )
 where
 
@@ -18,10 +17,8 @@ import BlockApps.Logging
 import Blockchain.BlockDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
-import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.SQLDB
 import Blockchain.DB.StateDB (HasStateDB, getStateRoot, setStateDBStateRoot)
-import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -53,14 +50,11 @@ import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import Control.Monad
-import Control.Monad.Change.Alter (Alters, Selectable)
+import Control.Monad.Change.Alter (Selectable)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka (getKafkaEnv, runKafkaMUsingEnv)
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
-import qualified Data.Aeson as JSON
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
@@ -70,31 +64,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Traversable (for)
 import Text.Format
-
--- | Populate the Merkle Patricia Trie and write genesis.json with computed stateRoot.
--- This is called by strato-setup (before docker containers are running).
--- Only requires LevelDB access, not Redis/Kafka/PostgreSQL.
-populateMPTAndWriteGenesis ::
-  ( HasCodeDB m,
-    HasHashDB m,
-    Mem.HasMemAddressStateDB m,
-    HasStateDB m,
-    HasStorageDB m,
-    HasMemStorageDB m,
-    MonadIO m,
-    MonadLogger m,
-    (Ad.Address `Alters` AddressState) m
-  ) =>
-  GenesisInfo ->
-  m ()
-populateMPTAndWriteGenesis genesisInfo = do
-  $logInfoS "strato-setup" "Populating Merkle Patricia Trie from genesis allocations"
-  genesisBlock <- genesisInfoToGenesisBlock genesisInfo
-  let computedStateRoot = stateRoot $ blockBlockData genesisBlock
-      updatedGenesisInfo = genesisInfo { GI.stateRoot = computedStateRoot }
-  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode updatedGenesisInfo
-  $logInfoS "strato-setup" $ T.pack $ "Wrote genesis.json with stateRoot: " ++ format computedStateRoot
-  $logInfoS "strato-setup" $ T.pack $ "  genesis hash: " ++ format (blockHash genesisBlock)
 
 -- | Seed databases (Redis, Kafka, PostgreSQL) with genesis block data.
 -- This is called by seed-genesis (after docker containers are running).
