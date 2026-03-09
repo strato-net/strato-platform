@@ -8,7 +8,7 @@ import { extractContractName } from "../../utils/utils";
 import type { CreditCardConfig, CreditCardTopUpExecuteParams } from "@mercata/shared-types";
 import type { TransactionResponse } from "@mercata/shared-types";
 
-const { CreditCardTopUp, creditCardTopUp, Token, USDST } = constants;
+const { CreditCardTopUp, Token, USDST } = constants;
 
 /** ERC20 balanceOf selector */
 const BALANCE_OF_SELECTOR = "0x70a08231";
@@ -117,7 +117,7 @@ export async function getCardsFromCirrus(
   topUpAmount?: string;
   lastTopUpTimestamp?: string;
 }>> {
-  if (!creditCardTopUp) {
+  if (!constants.creditCardTopUp) {
     return [];
   }
   const normalizedUser = normalizeAddress(userAddress);
@@ -125,7 +125,7 @@ export async function getCardsFromCirrus(
     const { data } = await cirrus.get(accessToken, `/${CreditCardTopUp}-userCards`, {
       params: {
         select: "key2,value",
-        address: `eq.${creditCardTopUp}`,
+        address: `eq.${constants.creditCardTopUp}`,
         key: `eq.${normalizedUser}`,
         order: "key2.asc",
       },
@@ -156,12 +156,12 @@ export async function getCardsFromCirrus(
  * Get all cards from Cirrus (all users) for the watcher. Query without key filter.
  */
 export async function getAllCardsFromCirrus(accessToken: string): Promise<CreditCardConfig[]> {
-  if (!creditCardTopUp) return [];
+  if (!constants.creditCardTopUp) return [];
   try {
     const { data } = await cirrus.get(accessToken, `/${CreditCardTopUp}-userCards`, {
       params: {
         select: "key,key2,value",
-        address: `eq.${creditCardTopUp}`,
+        address: `eq.${constants.creditCardTopUp}`,
         order: "key.asc,key2.asc",
       },
     });
@@ -183,11 +183,11 @@ export async function getAllCardsFromCirrus(accessToken: string): Promise<Credit
  * when the API supports it; always filters in memory so behavior is correct.
  */
 export async function getConfigsForWatcher(accessToken: string): Promise<CreditCardConfig[]> {
-  if (!creditCardTopUp) return [];
+  if (!constants.creditCardTopUp) return [];
   try {
     const params: Record<string, string> = {
       select: "key,key2,value",
-      address: `eq.${creditCardTopUp}`,
+      address: `eq.${constants.creditCardTopUp}`,
       order: "key.asc,key2.asc",
       or: "(thresholdAmount.gt.0,topUpAmount.gt.0)",
     };
@@ -240,14 +240,14 @@ export async function executeTopUp(
   accessToken: string,
   params: CreditCardTopUpExecuteParams
 ): Promise<TransactionResponse> {
-  if (!creditCardTopUp) {
+  if (!constants.creditCardTopUp) {
     throw new Error("CREDIT_CARD_TOP_UP_ADDRESS is not configured");
   }
   const tx = await buildFunctionTx(
     [
       {
         contractName: extractContractName(CreditCardTopUp),
-        contractAddress: creditCardTopUp,
+        contractAddress: constants.creditCardTopUp,
         method: "topUpCard",
         args: {
           user: params.userAddress,
@@ -285,7 +285,7 @@ export async function submitAddCard(
     topUpAmount: string;
   }
 ): Promise<{ status: string; hash: string }> {
-  if (!creditCardTopUp) {
+  if (!constants.creditCardTopUp) {
     throw new Error("CREDIT_CARD_TOP_UP_ADDRESS is not configured");
   }
   const externalToken = (body.externalToken || "").replace(/^0x/i, "").toLowerCase();
@@ -296,7 +296,7 @@ export async function submitAddCard(
   const tx = await buildFunctionTx(
     {
       contractName: extractContractName(CreditCardTopUp),
-      contractAddress: creditCardTopUp,
+      contractAddress: constants.creditCardTopUp,
       method: "addCard",
       args: {
         nickname: body.nickname || "",
@@ -335,7 +335,7 @@ export async function submitUpdateCard(
     topUpAmount: string;
   }
 ): Promise<{ status: string; hash: string }> {
-  if (!creditCardTopUp) {
+  if (!constants.creditCardTopUp) {
     throw new Error("CREDIT_CARD_TOP_UP_ADDRESS is not configured");
   }
   const externalToken = (body.externalToken || "").replace(/^0x/i, "").toLowerCase();
@@ -346,7 +346,7 @@ export async function submitUpdateCard(
   const tx = await buildFunctionTx(
     {
       contractName: extractContractName(CreditCardTopUp),
-      contractAddress: creditCardTopUp,
+      contractAddress: constants.creditCardTopUp,
       method: "updateCard",
       args: {
         index: body.index,
@@ -376,13 +376,13 @@ export async function submitRemoveCard(
   userAddress: string,
   index: number
 ): Promise<{ status: string; hash: string }> {
-  if (!creditCardTopUp) {
+  if (!constants.creditCardTopUp) {
     throw new Error("CREDIT_CARD_TOP_UP_ADDRESS is not configured");
   }
   const tx = await buildFunctionTx(
     {
       contractName: extractContractName(CreditCardTopUp),
-      contractAddress: creditCardTopUp,
+      contractAddress: constants.creditCardTopUp,
       method: "removeCard",
       args: { index },
     },
@@ -402,7 +402,7 @@ export async function submitApproval(
   userAddress: string,
   amount: string
 ): Promise<TransactionResponse> {
-  if (!creditCardTopUp) {
+  if (!constants.creditCardTopUp) {
     throw new Error("CREDIT_CARD_TOP_UP_ADDRESS is not configured");
   }
   const tx = await buildFunctionTx(
@@ -411,7 +411,7 @@ export async function submitApproval(
         contractName: extractContractName(Token),
         contractAddress: USDST,
         method: "approve",
-        args: { spender: creditCardTopUp, value: amount },
+        args: { spender: constants.creditCardTopUp, value: amount },
       },
     ],
     userAddress,
@@ -429,7 +429,7 @@ export async function submitApproval(
  */
 export async function runBalanceWatcher(operatorAccessToken: string): Promise<void> {
   if (!operatorAccessToken) return;
-  if (!creditCardTopUp) return;
+  if (!constants.creditCardTopUp) return;
   const rpcUrls = getExternalChainRpcUrls();
   const configs = await getConfigsForWatcher(operatorAccessToken);
   for (const c of configs) {
