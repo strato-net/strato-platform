@@ -2,19 +2,22 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Blockchain.GenesisBlock
-  ( seedDatabases
-  )
-where
+module Blockchain.SeedDatabases
+  ( mkDatabases
+  ) where
 
 import BlockApps.Logging
 import Blockchain.BlockDB
+import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.SQLDB
@@ -28,8 +31,10 @@ import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo hiding (stateRoot, number)
 import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
+import Blockchain.Init.Monad (runSetupDBM)
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.EthConf
+import qualified Blockchain.EthConf as UEC
+import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
@@ -49,21 +54,75 @@ import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
+import Conduit
 import Control.Monad
 import Control.Monad.Change.Alter (Selectable)
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.Kafka (getKafkaEnv, runKafkaMUsingEnv)
+import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.Redis
-import Control.Monad.IO.Class
+import Control.Monad.Composable.SQL
+import Control.Monad.Trans.Reader
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import qualified Data.Sequence as S
+import Data.String
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Traversable (for)
+import Database.Persist.Postgresql
 import Text.Format
+import qualified Text.Colors as CL
+import UnliftIO.Exception (catch, SomeException)
+
+-- | Seed databases (Redis, Kafka, PostgreSQL) with genesis block data.
+-- Called by seed-genesis after docker containers are running.
+-- Reads genesis.json which must already exist (created by strato-setup).
+mkDatabases :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
+               m ()
+mkDatabases = do
+  -- Read ethconf from file (created by strato-setup)
+  let ethconf = UEC.ethConf
+
+  let pgconf = EC.sqlConfig ethconf
+      rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
+      localConn = EC.postgreSQLConnectionString pgconf
+      db = EC.database pgconf
+  $logInfoS "seed-genesis" . T.pack $ CL.yellow $ "Creating database: " ++ db
+  $logInfoLS "seed-genesis" rawConn
+  let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
+
+  catch
+    (withPostgresqlConn rawConn (runReaderT (rawExecute query [])))
+    (\(_ :: SomeException) -> $logInfoS "seed-genesis" "Database already exists, skipping")
+
+  withPostgresqlConn localConn $
+    runReaderT $ do
+      $logInfoS "seed-genesis" . T.pack $ CL.yellow ">>>> Migrating eth"
+      $logInfoLS "seed-genesis" localConn
+      runMigration DataDefs.migrateAll
+      $logInfoS "seed-genesis" . T.pack $ CL.yellow ">>>> Indexing eth"
+      runMigration DataDefs.indexAll
+
+  let topics :: [String] =
+        [
+        "statediff",
+        "seq_vm_events",
+        "seq_p2p_events",
+        "unseqevents",
+        "jsonrpcresponse",
+        "indexevents",
+        "vmevents",
+        "solidvmevents"
+        ]
+
+  forM_ topics $ createTopic . fromString
+
+  runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
+    $logInfoS "seed-genesis" "Seeding databases from genesis.json"
+    seedDatabases
+    $logInfoS "seed-genesis" "Database seeding complete"
 
 -- | Seed databases (Redis, Kafka, PostgreSQL) with genesis block data.
 -- This is called by seed-genesis (after docker containers are running).
@@ -111,51 +170,6 @@ seedDatabases = do
   populateStorageDBs genesisInfo genesisBlock genesisChainId
   $logInfoS "seed-genesis" "Database seeding complete"
 
-
-
-  -- | Populate storage databases with genesis block state and generate
-  -- corresponding events
-  --
-  -- This function performs several critical initialization tasks for the
-  -- genesis block:
-  --
-  -- 1. **State Root Management**: Retrieves current state root and temporarily
-  --    replaces it during processing to ensure consistent state handling
-  --
-  -- 2. **Kafka Topic Setup**: Ensures StateDiff topic exists in Kafka for event
-  -- streaming
-  --
-  -- 3. **Address Processing**: Iterates through all genesis account addresses
-  -- and:
-  --
-  --    - Fetches full address state from the state database
-  --    - Applies special filtering for Vitu vehicle manager contract (0x7000...0000)
-  --      to prevent performance issues with large arrays
-  --
-  -- 4. **State Diff Generation**: Creates SQL database diffs representing
-  --    account creation events for the genesis block, including:
-  --
-  --    - Block metadata (chain ID, block number, block hash, state root)
-  --    - Account state changes (all accounts are marked as "created")
-  --
-  -- 5. **VM Event Production**: Generates and publishes VM events to Kafka,
-  -- including:
-  --
-  --    - Contract deployment events for SolidVM contracts
-  --    - Action events with transaction metadata
-  --    - Code collection information and storage diffs
-  --    - Creator and origin address tracking
-  --
-  -- 6. **Contract Metadata Processing**: For SolidVM contracts, extracts and
-  -- processes:
-  --
-  --    - Abstract parent contracts
-  --    - Contract mappings and arrays
-  --    - Source code and contract names from metadata
-  --
-  -- The function ensures that both the SQL database and Kafka event stream are
-  -- properly initialized with the genesis block state, enabling proper
-  -- blockchain operation.
 populateStorageDBs ::
   ( MonadLogger m,
     HasSQLDB m,
@@ -169,11 +183,9 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs genesisInfo genesisBlock genesisChainId = do
-  -- Step 1: State Root Management - Retrieve current state root and temporarily replace it
   sr <- getStateRoot genesisChainId
 
-  -- Step 2: Kafka Topic Setup - Ensure StateDiff topic exists for event streaming
-  liftIO . runKafkaMConfigured "strato-init" $ do
+  liftIO . UEC.runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
   kafkaEnv <- runKafkaVMEvents getKafkaEnv
   let pub sd vmes = do
@@ -199,7 +211,6 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
 
-  -- Step 3: Address Processing - Iterate through all genesis account addresses
   let addresses = GI.addrInfoAddress <$> GI.addressInfo genesisInfo
       events' = GI.events genesisInfo
       delegatecalls' = GI.delegatecalls genesisInfo
@@ -212,7 +223,6 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
   pub Nothing ccas
 
   for_ addresses $ \address -> do
-    -- Fetch full address state from the state database
     addressState <- A.selectWithDefault (A.Proxy @AddressState) address
 
     $logInfoS "initgen" $ T.pack $
@@ -221,9 +231,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
     let addrStateMap = Map.fromList [(address, addressState)]
         squashMap f = mapM (uncurry f) . Map.toList
 
-    -- Step 4: State Diff Generation - Create SQL database diffs for account creation
     accountDiffs <- mapM eventualAccountState addrStateMap
-    -- Step 5: VM Event Production - Generate and publish VM events to Kafka
     let addressEvents = Map.findWithDefault S.empty address  events'
         dc = case addressStateCodeHash addressState of
           ExternallyOwned{} -> S.empty
@@ -260,7 +268,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
       -> Ad.Address
       -> AccountDiff 'Eventual
       -> m VMEvent
-    toAction addressEvents delegatecalls' a d = do
+    toAction addressEvents delegatecalls'' a d = do
       pure . NewAction $ A.Action
             { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
               A._blockTimestamp =
@@ -272,7 +280,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
                 OMap.singleton (a, A.ActionData storageDiff),
               A._newCodeCollections = OMap.empty,
               A._events = addressEvents,
-              A._delegatecalls = delegatecalls'
+              A._delegatecalls = delegatecalls''
             }
       where
 
@@ -288,7 +296,7 @@ bootstrapIndexer obGB = do
   let clientId = fst ApiIndexer.kafkaClientIds
   putStrLn "About to bootstrap index events"
   res <-
-    runKafkaMConfigured clientId $
+    UEC.runKafkaMConfigured clientId $
     IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
 
   print res

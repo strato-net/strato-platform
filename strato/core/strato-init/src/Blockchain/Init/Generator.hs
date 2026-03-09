@@ -7,19 +7,13 @@
 
 module Blockchain.Init.Generator (
   createGenesisInfo,
-  mkAll,
-  mkFilesAndGenesis,
-  mkDatabases
+  mkFilesAndGenesis
   ) where
 
 import BlockApps.Logging
-import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.GenesisInfo (GenesisInfo)
 import qualified Blockchain.Data.GenesisInfo as GI
-import qualified Blockchain.EthConf as UEC
-import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
-import Blockchain.GenesisBlock (seedDatabases)
 import Blockchain.Data.GenesisBlock
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
@@ -28,23 +22,14 @@ import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Monad
 import Control.Monad.Change.Alter ()
-import Control.Monad.Composable.Kafka
-import Control.Monad.Composable.Redis
-import Control.Monad.Composable.SQL
-import Control.Monad.Trans.Reader
 import qualified Data.Aeson as JSON
 import Data.Maybe
-import Data.String
-import qualified Data.Text as T
-import qualified Text.Colors as CL
 import qualified Data.Yaml as YAML
-import Database.Persist.Postgresql
 import System.FilePath ((</>))
 import System.Random (randomRIO)
 import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
-import UnliftIO.Exception (catch, SomeException)
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
 -- The stateRoot in the returned GenesisInfo is a placeholder - the real
@@ -161,60 +146,6 @@ mkFilesAndGenesis network = do
 -- If we don't do this, the stateroot created from the raw data won't match that if created from the data read from genesis.json
 normalizeGenesisInfo :: GenesisInfo -> GenesisInfo
 normalizeGenesisInfo = fromMaybe (error "Internal Error in normalizeGenesisInfo: this shouldn't happen") . JSON.decode . JSON.encode
-
--- | Seed databases (Redis, Kafka, PostgreSQL) with genesis block data.
--- Called by seed-genesis after docker containers are running.
--- Reads genesis.json which must already exist (created by strato-setup).
-mkDatabases :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
-               m ()
-mkDatabases = do
-  -- Read ethconf from file (created by strato-setup)
-  let ethconf = UEC.ethConf
-
-  let pgconf = EC.sqlConfig ethconf
-      rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
-      localConn = EC.postgreSQLConnectionString pgconf
-      db = EC.database pgconf
-  $logInfoS "seed-genesis" . T.pack $ CL.yellow $ "Creating database: " ++ db
-  $logInfoLS "seed-genesis" rawConn
-  let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
-
-  catch
-    (withPostgresqlConn rawConn (runReaderT (rawExecute query [])))
-    (\(_ :: SomeException) -> $logInfoS "seed-genesis" "Database already exists, skipping")
-
-  withPostgresqlConn localConn $
-    runReaderT $ do
-      $logInfoS "seed-genesis" . T.pack $ CL.yellow ">>>> Migrating eth"
-      $logInfoLS "seed-genesis" localConn
-      runMigration DataDefs.migrateAll
-      $logInfoS "seed-genesis" . T.pack $ CL.yellow ">>>> Indexing eth"
-      runMigration DataDefs.indexAll
-
-  let topics :: [String] =
-        [
-        "statediff",
-        "seq_vm_events",
-        "seq_p2p_events",
-        "unseqevents",
-        "jsonrpcresponse",
-        "indexevents",
-        "vmevents",
-        "solidvmevents"
-        ]
-
-  forM_ topics $ createTopic . fromString
-
-  runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
-    $logInfoS "seed-genesis" "Seeding databases from genesis.json"
-    seedDatabases
-    $logInfoS "seed-genesis" "Database seeding complete"
-
-mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
-         String -> m ()
-mkAll network = do
-  mkFilesAndGenesis network
-  mkDatabases
 
 makeReadOnly :: FilePath -> IO ()
 makeReadOnly = void . chmod roo

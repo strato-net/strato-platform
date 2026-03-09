@@ -3,7 +3,7 @@
 
 import BlockApps.Logging
 import Blockchain.EthConf (runKafkaMConfigured)
-import Blockchain.Init.Generator
+import Blockchain.SeedDatabases
 import HFlags
 
 main :: IO ()
