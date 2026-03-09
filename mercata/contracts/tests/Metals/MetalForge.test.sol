@@ -16,7 +16,7 @@ contract Describe_MetalForge is Authorizable {
 
     MetalForge forge;
     PriceOracle oracle;
-    MetalTreasury treasury;
+    address treasurer;
     FeeCollector collector;
 
     address usdstAddr;
@@ -57,7 +57,7 @@ contract Describe_MetalForge is Authorizable {
     function beforeEach() {
         oracle = new PriceOracle(address(this));
         oracle.initialize();
-        treasury = new MetalTreasury(address(this));
+        treasurer = address(0xDEAD);
         collector = new FeeCollector(address(this));
 
         usdstAddr = m.tokenFactory().createToken("USDST", "USD Stablecoin", emptyArray, emptyArray, emptyArray, "USDST", 0, 18);
@@ -71,7 +71,7 @@ contract Describe_MetalForge is Authorizable {
         Token(altPayAddr).setStatus(2);
 
         forge = new MetalForge(address(this));
-        forge.initialize(address(oracle), address(treasury), address(collector), usdstAddr);
+        forge.initialize(address(oracle), treasurer, address(collector), usdstAddr);
 
         oracle.setAssetPrice(goldAddr, GOLD_PRICE);
         oracle.setAssetPrice(silverAddr, SILVER_PRICE);
@@ -103,7 +103,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_initializes_with_correct_dependencies() {
         require(address(forge.oracle()) == address(oracle), "Oracle mismatch");
-        require(address(forge.treasury()) == address(treasury), "Treasury mismatch");
+        require(address(forge.treasurer()) == treasurer, "Treasury mismatch");
         require(address(forge.feeCollector()) == address(collector), "FeeCollector mismatch");
         require(address(forge.usdst()) == usdstAddr, "USDST mismatch");
         require(forge.WAD() == 1e18, "WAD mismatch");
@@ -114,19 +114,19 @@ contract Describe_MetalForge is Authorizable {
         bool reverted;
 
         reverted = false;
-        try { f.initialize(address(0), address(treasury), address(collector), usdstAddr); } catch { reverted = true; }
+        try { f.initialize(address(0), treasurer, address(collector), usdstAddr); } catch { reverted = true; }
         require(reverted, "Should revert with zero oracle");
 
         reverted = false;
         try { f.initialize(address(oracle), address(0), address(collector), usdstAddr); } catch { reverted = true; }
-        require(reverted, "Should revert with zero treasury");
+        require(reverted, "Should revert with zero treasurer");
 
         reverted = false;
-        try { f.initialize(address(oracle), address(treasury), address(0), usdstAddr); } catch { reverted = true; }
+        try { f.initialize(address(oracle), treasurer, address(0), usdstAddr); } catch { reverted = true; }
         require(reverted, "Should revert with zero feeCollector");
 
         reverted = false;
-        try { f.initialize(address(oracle), address(treasury), address(collector), address(0)); } catch { reverted = true; }
+        try { f.initialize(address(oracle), treasurer, address(collector), address(0)); } catch { reverted = true; }
         require(reverted, "Should revert with zero usdst");
     }
 
@@ -134,7 +134,7 @@ contract Describe_MetalForge is Authorizable {
         MetalForge f = new MetalForge(address(this));
         bool reverted = false;
         try {
-            buyer1.do(address(f), "initialize", address(oracle), address(treasury), address(collector), usdstAddr);
+            buyer1.do(address(f), "initialize", address(oracle), treasurer, address(collector), usdstAddr);
         } catch {
             reverted = true;
         }
@@ -227,26 +227,26 @@ contract Describe_MetalForge is Authorizable {
         uint expectedFee = (payAmount * USDST_FEE_BPS) / 10000;
         uint expectedPrincipal = payAmount - expectedFee;
 
-        uint treasuryBefore = ERC20(usdstAddr).balanceOf(address(treasury));
+        uint treasurerBefore = ERC20(usdstAddr).balanceOf(treasurer);
         uint collectorBefore = ERC20(usdstAddr).balanceOf(address(collector));
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
 
-        uint treasuryAfter = ERC20(usdstAddr).balanceOf(address(treasury));
+        uint treasurerAfter = ERC20(usdstAddr).balanceOf(treasurer);
         uint collectorAfter = ERC20(usdstAddr).balanceOf(address(collector));
 
-        require(treasuryAfter - treasuryBefore == expectedPrincipal, "Treasury did not receive principal");
+        require(treasurerAfter - treasurerBefore == expectedPrincipal, "Treasury did not receive principal");
         require(collectorAfter - collectorBefore == expectedFee, "Collector did not receive fee");
     }
 
-    function it_forge_distributes_payment_to_treasury_and_fee_collector() {
+    function it_forge_distributes_payment_to_treasurer_and_fee_collector() {
         uint payAmount = 5000e18;
         uint expectedFee = (payAmount * USDST_FEE_BPS) / 10000;
         uint expectedPrincipal = payAmount - expectedFee;
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
 
-        require(ERC20(usdstAddr).balanceOf(address(treasury)) == expectedPrincipal, "Treasury balance wrong");
+        require(ERC20(usdstAddr).balanceOf(treasurer) == expectedPrincipal, "Treasury balance wrong");
         require(ERC20(usdstAddr).balanceOf(address(collector)) == expectedFee, "Collector balance wrong");
     }
 
@@ -256,8 +256,8 @@ contract Describe_MetalForge is Authorizable {
         for (uint i = 0; i < 3; i++) {
             MetalForge f = new MetalForge(address(this));
             FeeCollector c = new FeeCollector(address(this));
-            MetalTreasury t = new MetalTreasury(address(this));
-            f.initialize(address(oracle), address(t), address(c), usdstAddr);
+            address t = address(uint(0xBEEF) + i);
+            f.initialize(address(oracle), t, address(c), usdstAddr);
             f.setMetalConfig(goldAddr, true, GOLD_CAP);
             f.setPayTokenConfig(usdstAddr, true, USDST_FEE_BPS);
             AdminRegistry adminReg = m.adminRegistry();
@@ -269,11 +269,11 @@ contract Describe_MetalForge is Authorizable {
             buyer1.do(address(f), "mintMetal", goldAddr, usdstAddr, amounts[i], 0);
             uint buyerAfter = ERC20(usdstAddr).balanceOf(address(buyer1));
 
-            uint treasuryGot = ERC20(usdstAddr).balanceOf(address(t));
+            uint treasurerGot = ERC20(usdstAddr).balanceOf(t);
             uint collectorGot = ERC20(usdstAddr).balanceOf(address(c));
 
             require(buyerBefore - buyerAfter == amounts[i], "Buyer spent wrong amount");
-            require(treasuryGot + collectorGot == amounts[i], "principal + fee != payAmount");
+            require(treasurerGot + collectorGot == amounts[i], "principal + fee != payAmount");
         }
     }
 
@@ -287,17 +287,17 @@ contract Describe_MetalForge is Authorizable {
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
 
-        require(ERC20(usdstAddr).balanceOf(address(treasury)) == payAmount, "All dust should go to treasury");
+        require(ERC20(usdstAddr).balanceOf(treasurer) == payAmount, "All dust should go to treasurer");
         require(ERC20(usdstAddr).balanceOf(address(collector)) == 0, "Collector should get nothing from dust");
     }
 
-    function it_forge_zero_fee_sends_all_to_treasury() {
+    function it_forge_zero_fee_sends_all_to_treasurer() {
         forge.setPayTokenConfig(usdstAddr, true, 0);
         uint payAmount = 5000e18;
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
 
-        require(ERC20(usdstAddr).balanceOf(address(treasury)) == payAmount, "Treasury should receive all");
+        require(ERC20(usdstAddr).balanceOf(treasurer) == payAmount, "Treasury should receive all");
         require(ERC20(usdstAddr).balanceOf(address(collector)) == 0, "Collector should receive nothing");
     }
 
@@ -490,7 +490,7 @@ contract Describe_MetalForge is Authorizable {
 
         require(ERC20(goldAddr).balanceOf(address(buyer1)) == 0, "Should mint 0 metal at 100% fee");
         require(ERC20(usdstAddr).balanceOf(address(collector)) == payAmount, "All payment to fee collector");
-        require(ERC20(usdstAddr).balanceOf(address(treasury)) == 0, "Nothing to treasury");
+        require(ERC20(usdstAddr).balanceOf(treasurer) == 0, "Nothing to treasurer");
     }
 
     function it_forge_reverts_when_fee_bps_exceeds_10000() {
@@ -612,7 +612,7 @@ contract Describe_MetalForge is Authorizable {
 
         uint buyerPayBefore = ERC20(usdstAddr).balanceOf(address(buyer1));
         uint buyerGoldBefore = ERC20(goldAddr).balanceOf(address(buyer1));
-        uint treasuryBefore = ERC20(usdstAddr).balanceOf(address(treasury));
+        uint treasurerBefore = ERC20(usdstAddr).balanceOf(treasurer);
         uint collectorBefore = ERC20(usdstAddr).balanceOf(address(collector));
         uint goldSupplyBefore = ERC20(goldAddr).totalSupply();
 
@@ -620,7 +620,7 @@ contract Describe_MetalForge is Authorizable {
 
         require(buyerPayBefore - ERC20(usdstAddr).balanceOf(address(buyer1)) == payAmount, "Buyer pay delta");
         require(ERC20(goldAddr).balanceOf(address(buyer1)) - buyerGoldBefore == expectedGold, "Buyer gold delta");
-        require(ERC20(usdstAddr).balanceOf(address(treasury)) - treasuryBefore == principal, "Treasury delta");
+        require(ERC20(usdstAddr).balanceOf(treasurer) - treasurerBefore == principal, "Treasury delta");
         require(ERC20(usdstAddr).balanceOf(address(collector)) - collectorBefore == fee, "Collector delta");
         require(ERC20(goldAddr).totalSupply() - goldSupplyBefore == expectedGold, "Gold supply delta");
     }
@@ -645,7 +645,7 @@ contract Describe_MetalForge is Authorizable {
         }
 
         require(ERC20(goldAddr).balanceOf(address(buyer1)) == totalGold, "Cumulative gold balance wrong");
-        require(ERC20(usdstAddr).balanceOf(address(treasury)) == totalPaid, "Cumulative treasury balance wrong");
+        require(ERC20(usdstAddr).balanceOf(treasurer) == totalPaid, "Cumulative treasurer balance wrong");
         require(forge.totalMinted(goldAddr) == totalGold, "Cumulative totalMinted wrong");
     }
 }

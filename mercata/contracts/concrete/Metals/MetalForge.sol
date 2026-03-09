@@ -3,14 +3,12 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../Lending/PriceOracle.sol";
 import "../Tokens/Token.sol";
 import "../Admin/FeeCollector.sol";
-import "./MetalTreasury.sol";
-
 // TODO at the end: add reentrancy protection
 
 contract record MetalForge is Ownable {
 
     PriceOracle public oracle;
-    MetalTreasury public treasury;
+    address public treasurer;
     FeeCollector public feeCollector;
     Token public usdst;
     uint public WAD;
@@ -19,10 +17,10 @@ contract record MetalForge is Ownable {
     // ====================  EVENTS  ======================
     // ====================================================
 
-    event Initialized(address oracle, address treasury, address feeCollector, address usdst);
+    event Initialized(address oracle, address treasurer, address feeCollector, address usdst);
 
     event OracleUpdated(address newOracle);
-    event TreasuryUpdated(address newTreasury);
+    event TreasurerUpdated(address newTreasurer);
     event FeeCollectorUpdated(address newFeeCollector);
     event UsdstUpdated(address newUsdst);
 
@@ -70,19 +68,19 @@ contract record MetalForge is Ownable {
 
     constructor(address _owner) Ownable(_owner) {}
 
-    function initialize(address _oracle, address _treasury, address _feeCollector, address _usdst) external onlyOwner {
+    function initialize(address _oracle, address _treasurer, address _feeCollector, address _usdst) external onlyOwner {
         require(_oracle != address(0), "MetalForge: invalid oracle address");
-        require(_treasury != address(0), "MetalForge: invalid treasury address");
+        require(_treasurer != address(0), "MetalForge: invalid treasurer address");
         require(_feeCollector != address(0), "MetalForge: invalid fee collector address");
         require(_usdst != address(0), "MetalForge: invalid usdst address");
 
         oracle = PriceOracle(_oracle);
-        treasury = MetalTreasury(_treasury);
+        treasurer = _treasurer;
         feeCollector = FeeCollector(_feeCollector);
         usdst = Token(_usdst);
         WAD = 1e18;
 
-        emit Initialized(_oracle, _treasury, _feeCollector, _usdst);
+        emit Initialized(_oracle, _treasurer, _feeCollector, _usdst);
     }
 
     // ====================================================
@@ -120,7 +118,7 @@ contract record MetalForge is Ownable {
 
         totalMinted[metalToken] += metalAmount;
 
-        IERC20(payToken).transferFrom(msg.sender, address(treasury), principal);
+        IERC20(payToken).transferFrom(msg.sender, treasurer, principal);
         IERC20(payToken).transferFrom(msg.sender, address(feeCollector), feeAmount);
         Token(metalToken).mint(msg.sender, metalAmount);
 
@@ -146,10 +144,10 @@ contract record MetalForge is Ownable {
         emit OracleUpdated(_oracle);
     }
 
-    function setTreasury(address _treasury) external onlyOwner {
-        require(_treasury != address(0), "MetalForge: invalid treasury address");
-        treasury = MetalTreasury(_treasury);
-        emit TreasuryUpdated(_treasury);
+    function setTreasurer(address _treasurer) external onlyOwner {
+        require(_treasurer != address(0), "MetalForge: invalid treasurer address");
+        treasurer = _treasurer;
+        emit TreasurerUpdated(_treasurer);
     }
 
     function setFeeCollector(address _feeCollector) external onlyOwner {
