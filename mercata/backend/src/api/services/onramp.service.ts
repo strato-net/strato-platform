@@ -31,6 +31,7 @@ const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
 
 const CHAIN_ID_ETHEREUM = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ? 11155111 : 1;
 const CHAIN_ID_BASE = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ? 84532 : 8453;
+const CHAIN_ID_LINEA = 59144;
 
 const EXTERNAL_TOKEN_BY_CHAIN: Record<number, Record<string, string>> = {
   1: {
@@ -49,6 +50,10 @@ const EXTERNAL_TOKEN_BY_CHAIN: Record<number, Record<string, string>> = {
     eth: ZERO_ADDRESS,
     usdc: "036cbd53842c5426634e7929541ec2318f3dcf7e",
   },
+  59144: {
+    eth: ZERO_ADDRESS,
+    usdc: "176211869ca2b568f2a7d4ee941e073a821ee1ff",
+  },
 };
 
 const TARGET_STRATO_TOKEN: Record<string, string> = {
@@ -64,6 +69,7 @@ const EXTERNAL_DECIMALS: Record<string, number> = {
 const BRIDGE_CHAIN_ID: Record<string, number> = {
   ethereum: CHAIN_ID_ETHEREUM,
   base: CHAIN_ID_BASE,
+  linea: CHAIN_ID_LINEA,
 };
 
 // ————————————————————————————————————————————————————————————————

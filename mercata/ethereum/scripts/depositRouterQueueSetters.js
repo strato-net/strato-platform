@@ -72,6 +72,9 @@ const CHAIN_NAME_TO_ID = {
   base_sepolia: 84532,
   "base-sepolia": 84532,
   basesepolia: 84532,
+  linea: 59144,
+  linea_mainnet: 59144,
+  "linea-mainnet": 59144,
 };
 
 function parseChains(args) {
