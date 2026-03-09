@@ -32,6 +32,7 @@ import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
 import OnrampPage from "./pages/OnrampPage";
+import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
 
@@ -249,7 +250,7 @@ const App = () => {
                                             path="/dashboard/credit-card"
                                             element={
                                               <GuestAccessibleRoute>
-                                                <CreditCard />
+                                                <CreditCardPage />
                                               </GuestAccessibleRoute>
                                             }
                                           />
