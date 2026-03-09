@@ -9,15 +9,15 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Blockstanbul.Options ()
-import Blockchain.Data.GenesisInfo (getGenesisInfo)
+import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
+import Blockchain.Strato.Model.Class (blockHash)
+import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.EthConf
-import Blockchain.Generation (readValidatorsFromGenesisInfo)
 import Blockchain.Model.SyncState
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address (fromPublicKey)
-import Blockchain.Strato.Model.Keccak256 (zeroHash)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Secp256k1 (getPub)
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
@@ -49,11 +49,10 @@ main = do
     Just bsb -> return bsb
     Nothing -> do
       putStrLn "No BestSequencedBlock found in Redis, bootstrapping from genesis.json..."
-      genesisInfo <- getGenesisInfo
-      let validators = readValidatorsFromGenesisInfo genesisInfo
-          bsb = BestSequencedBlock zeroHash 0 validators
+      genesisInfo <- GI.getGenesisInfo
+      let bsb = BestSequencedBlock (blockHash $ genesisInfoToBlock genesisInfo) 0 (GI.validators genesisInfo)
       _ <- Redis.runRedis conn $ putBestSequencedBlockInfo bsb
-      putStrLn $ "Bootstrapped BestSequencedBlock with " ++ show (length validators) ++ " validators"
+      putStrLn $ "Bootstrapped BestSequencedBlock from genesis.json: " ++ format bsb
       return bsb
   let validators = bestSequencedBlockValidators bestSequencedBlock
 

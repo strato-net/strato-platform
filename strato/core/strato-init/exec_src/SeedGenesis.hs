@@ -10,5 +10,5 @@ main :: IO ()
 main = do
   _ <- $initHFlags "seed-genesis"
   runLoggingT $
-    runKafkaMConfigured "seed-genesis" $
+    runKafkaMConfigured "seed-genesis"
     mkDatabases

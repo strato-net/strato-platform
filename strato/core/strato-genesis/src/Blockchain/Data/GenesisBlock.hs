@@ -12,6 +12,7 @@ module Blockchain.Data.GenesisBlock
   ( parseHex,
     initializeStateDB,
     genesisInfoToGenesisBlock,
+    genesisInfoToBlock,
   )
 where
 
@@ -168,3 +169,25 @@ genesisInfoToGenesisBlock validators gi = do
           blockReceiptTransactions = [],
           blockBlockUncles = []
         }
+
+genesisInfoToBlock :: GenesisInfo -> Block
+genesisInfoToBlock gi =
+  Block
+    { blockBlockData = BlockHeaderV2
+        { parentHash = GI.parentHash gi
+        , stateRoot = GI.stateRoot gi
+        , transactionsRoot = GI.transactionsRoot gi
+        , receiptsRoot = GI.receiptsRoot gi
+        , logsBloom = GI.logBloom gi
+        , number = GI.number gi
+        , timestamp = GI.timestamp gi
+        , extraData = i2bs_unsized $ GI.extraData gi
+        , currentValidators = GI.validators gi
+        , newValidators = []
+        , removedValidators = []
+        , proposalSignature = Nothing
+        , signatures = []
+        }
+    , blockReceiptTransactions = []
+    , blockBlockUncles = []
+    }

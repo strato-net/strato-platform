@@ -8,16 +8,17 @@
 module Blockchain.Init.Generator (
   createGenesisInfo,
   mkAll,
-  mkFiles,
+  mkFilesAndGenesis,
   mkDatabases
   ) where
 
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
+import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
-import Blockchain.GenesisBlock
+import Blockchain.GenesisBlock (populateMPTAndWriteGenesis, seedDatabases)
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -44,41 +45,41 @@ import Turtle (chmod, roo)
 import UnliftIO.Directory
 import UnliftIO.Exception (catch, SomeException)
 
-createGenesisInfo :: MonadIO m => String -> m ()
-createGenesisInfo network = do
-  let genesisInfo =
-        case network of
-          "upquark" -> HELIUM.genesisBlockTemplate config
-            where config = HELIUM.HeliumGenesisBlockConfig
-                    upquarkValidators
-                    upquarkAdmins
-                    HELIUM.blockappsProdAddress
-                    []
-                    []
-                    upquarkBridgeRelayer
-                    upquarkOracleRelayers
-                  upquarkValidators = -- TODO: move this to a more logical place
-                    [ Validator 0x2e8462e383a1d516cfbf13d7cf4826ce77b4b91e
-                    , Validator 0x3e7b7d721cf9a4ec9f7c87a6c02572bb7ef1bbf4
-                    , Validator 0x4d8cb07af178cb10db093abea710b73179a5dd16
-                    , Validator 0x4dd4bb6125cefd36d5adfbb303d8f00787b7ea0c
-                    ]
-                  upquarkAdmins =
-                    [ 0x7630b673862a2807583834908f10192e00c58b00 --Kieren
-                    , 0x292dd9591f506845ef05a9f3b8116e641cbcb4bb --Victor
-                    , 0xf1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14 --Jamshid
-                    ]
-                  upquarkBridgeRelayer =
-                    (0x882f3d3a7b97ea24ab5aeae6996a695b26ea9089, 100_000 * HELIUM.oneE18)
-                  upquarkOracleRelayers =
-                    [ (0x96714c4a2163a3ee55356e20bc23fe8ea5e7aaf0, 100_000 * HELIUM.oneE18)
-                    , (0x523fef378674d39363aa8b6ac5122e301c528432, 100_000 * HELIUM.oneE18)
-                    ]
-          "lithium" -> HELIUM.lithiumGenesisBlock
-          _ -> HELIUM.genesisBlock
-
-  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
-  liftIO $ putStrLn $ "Done. Output genesis block info was written"
+-- | Create a GenesisInfo from network name. Does NOT write to file.
+-- The stateRoot in the returned GenesisInfo is a placeholder - the real
+-- stateRoot is computed when the merkle patricia trie is populated,
+-- and genesis.json is written at that point with the correct value.
+createGenesisInfo :: String -> GI.GenesisInfo
+createGenesisInfo network =
+  case network of
+    "upquark" -> HELIUM.genesisBlockTemplate config
+      where config = HELIUM.HeliumGenesisBlockConfig
+              upquarkValidators
+              upquarkAdmins
+              HELIUM.blockappsProdAddress
+              []
+              []
+              upquarkBridgeRelayer
+              upquarkOracleRelayers
+            upquarkValidators = -- TODO: move this to a more logical place
+              [ Validator 0x2e8462e383a1d516cfbf13d7cf4826ce77b4b91e
+              , Validator 0x3e7b7d721cf9a4ec9f7c87a6c02572bb7ef1bbf4
+              , Validator 0x4d8cb07af178cb10db093abea710b73179a5dd16
+              , Validator 0x4dd4bb6125cefd36d5adfbb303d8f00787b7ea0c
+              ]
+            upquarkAdmins =
+              [ 0x7630b673862a2807583834908f10192e00c58b00 --Kieren
+              , 0x292dd9591f506845ef05a9f3b8116e641cbcb4bb --Victor
+              , 0xf1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14 --Jamshid
+              ]
+            upquarkBridgeRelayer =
+              (0x882f3d3a7b97ea24ab5aeae6996a695b26ea9089, 100_000 * HELIUM.oneE18)
+            upquarkOracleRelayers =
+              [ (0x96714c4a2163a3ee55356e20bc23fe8ea5e7aaf0, 100_000 * HELIUM.oneE18)
+              , (0x523fef378674d39363aa8b6ac5122e301c528432, 100_000 * HELIUM.oneE18)
+              ]
+    "lithium" -> HELIUM.lithiumGenesisBlock
+    _ -> HELIUM.genesisBlock
 
 createCommandsFile :: IO ()
 createCommandsFile =
@@ -103,9 +104,11 @@ strato-network-monitor
 
 
 
-mkFiles :: (MonadLoggerIO m, MonadFail m) =>
-           String -> m ()
-mkFiles network = do
+-- | Create files AND populate Merkle Patricia Trie, write genesis.json with computed stateRoot.
+-- This is called by strato-setup before docker containers are running.
+mkFilesAndGenesis :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m) =>
+                     String -> m ()
+mkFilesAndGenesis network = do
   -- Create node directories first (needed before genEthConf reads postgres_password)
   liftIO $ mapM_ (createDirectoryIfMissing True)
     ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
@@ -137,15 +140,29 @@ mkFiles network = do
 
   if genesisExists
     then do
-      $logInfoS "mkFiles" "Using provided 'genesis.json'"
-      return ()
+      $logInfoS "strato-setup" "Using provided 'genesis.json' - skipping MPT population"
+      liftIO createCommandsFile
     else do
-      $logInfoS "mkFiles" "Creating 'genesis.json' using network name"
-      createGenesisInfo network
+      $logInfoS "strato-setup" "Creating genesis info from network template"
+      let templateInfo = createGenesisInfo network
+      -- Write template, then re-read after JSON round-trip.
+      -- This is intentional: the JSON encode/decode normalizes certain fields
+      -- (e.g., BasicValue strings) to match how other nodes parse genesis.json.
+      liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode templateInfo
+      genesisInfo <- liftIO GI.getGenesisInfo
 
-  liftIO createCommandsFile
-  $logInfoS "mkFiles" "File setup complete"
+      liftIO createCommandsFile
 
+      -- Populate MPT and write genesis.json with computed stateRoot
+      runResourceT . runSetupDBM $ do
+        void $ addCode mempty
+        populateMPTAndWriteGenesis genesisInfo
+
+  $logInfoS "strato-setup" "Setup complete"
+
+-- | Seed databases (Redis, Kafka, PostgreSQL) with genesis block data.
+-- Called by seed-genesis after docker containers are running.
+-- Reads genesis.json which must already exist (created by strato-setup).
 mkDatabases :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
                m ()
 mkDatabases = do
@@ -156,20 +173,20 @@ mkDatabases = do
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
       localConn = EC.postgreSQLConnectionString pgconf
       db = EC.database pgconf
-  $logInfoS "mkDatabases/Create Database" . T.pack $ CL.yellow db
-  $logInfoLS "mkDatabases/Create Database" rawConn
+  $logInfoS "seed-genesis" . T.pack $ CL.yellow $ "Creating database: " ++ db
+  $logInfoLS "seed-genesis" rawConn
   let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
 
   catch
     (withPostgresqlConn rawConn (runReaderT (rawExecute query [])))
-    (\(_ :: SomeException) -> $logInfoS "mkDatabases/Create Database" "Database already exists, skipping")
+    (\(_ :: SomeException) -> $logInfoS "seed-genesis" "Database already exists, skipping")
 
   withPostgresqlConn localConn $
     runReaderT $ do
-      $logInfoS "mkDatabases/migrate" . T.pack $ CL.yellow ">>>> Migrating eth"
-      $logInfoLS "mkDatabases/migrateconn" localConn
+      $logInfoS "seed-genesis" . T.pack $ CL.yellow ">>>> Migrating eth"
+      $logInfoLS "seed-genesis" localConn
       runMigration DataDefs.migrateAll
-      $logInfoS "mkDatabases/migrate" . T.pack $ CL.yellow ">>>> Indexing eth"
+      $logInfoS "seed-genesis" . T.pack $ CL.yellow ">>>> Indexing eth"
       runMigration DataDefs.indexAll
 
   let topics :: [String] =
@@ -187,16 +204,14 @@ mkDatabases = do
   forM_ topics $ createTopic . fromString
 
   runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
-    $logInfoS "mkDatabases" "Adding empty code"
-    void $ addCode mempty
-    $logInfoS "mkDatabases" "Processing genesis block"
-    initializeGenesisBlock
-    $logInfoS "mkDatabases" "Database setup complete"
+    $logInfoS "seed-genesis" "Seeding databases from genesis.json"
+    seedDatabases
+    $logInfoS "seed-genesis" "Database seeding complete"
 
 mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
          String -> m ()
 mkAll network = do
-  mkFiles network
+  mkFilesAndGenesis network
   mkDatabases
 
 makeReadOnly :: FilePath -> IO ()

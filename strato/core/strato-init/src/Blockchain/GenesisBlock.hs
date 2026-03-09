@@ -10,6 +10,8 @@
 
 module Blockchain.GenesisBlock
   ( initializeGenesisBlock
+  , populateMPTAndWriteGenesis
+  , seedDatabases
   , populateStorageDBs'
   )
 where
@@ -20,7 +22,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.SQLDB
-import Blockchain.DB.StateDB
+import Blockchain.DB.StateDB (HasStateDB, getStateRoot, setStateDBStateRoot)
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
@@ -60,6 +62,9 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka (getKafkaEnv, runKafkaMUsingEnv)
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
+import qualified Data.Aeson as JSON
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
@@ -81,13 +86,89 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasMemStorageDB m,
     (Ad.Address `Alters` AddressState) m
   ) =>
-  m ([Validator], GenesisInfo, Block)
-getGenesisBlockAndPopulateInitialMPs = do
-  genesisInfo <- GI.getGenesisInfo
+  GenesisInfo ->
+  m ([Validator], Block)
+getGenesisBlockAndPopulateInitialMPs genesisInfo = do
   let validators = readValidatorsFromGenesisInfo genesisInfo
+  (validators,) <$> genesisInfoToGenesisBlock validators genesisInfo
 
-  (validators, genesisInfo,) <$> genesisInfoToGenesisBlock validators genesisInfo
+-- | Populate the Merkle Patricia Trie and write genesis.json with computed stateRoot.
+-- This is called by strato-setup (before docker containers are running).
+-- Only requires LevelDB access, not Redis/Kafka/PostgreSQL.
+populateMPTAndWriteGenesis ::
+  ( HasCodeDB m,
+    HasHashDB m,
+    Mem.HasMemAddressStateDB m,
+    HasStateDB m,
+    HasStorageDB m,
+    HasMemStorageDB m,
+    MonadIO m,
+    MonadLogger m,
+    (Ad.Address `Alters` AddressState) m
+  ) =>
+  GenesisInfo ->
+  m ()
+populateMPTAndWriteGenesis genesisInfo = do
+  $logInfoS "strato-setup" "Populating Merkle Patricia Trie from genesis allocations"
+  (validators, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs genesisInfo
+  let computedStateRoot = stateRoot $ blockBlockData genesisBlock
+      updatedGenesisInfo = genesisInfo
+        { GI.stateRoot = computedStateRoot
+        , GI.validators = validators
+        }
+  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode updatedGenesisInfo
+  $logInfoS "strato-setup" $ T.pack $ "Wrote genesis.json with stateRoot: " ++ format computedStateRoot
+  $logInfoS "strato-setup" $ T.pack $ "  validators: " ++ show (length validators)
+  $logInfoS "strato-setup" $ T.pack $ "  genesis hash: " ++ format (blockHash genesisBlock)
 
+-- | Seed databases (Redis, Kafka, PostgreSQL) with genesis block data.
+-- This is called by seed-genesis (after docker containers are running).
+-- Reads genesis.json which must already exist with correct stateRoot and validators.
+seedDatabases ::
+  ( HasCodeDB m,
+    HasHashDB m,
+    HasRedis m,
+    HasSQLDB m,
+    HasStateDB m,
+    MonadLogger m,
+    Selectable Ad.Address AddressState m
+  ) =>
+  m ()
+seedDatabases = do
+  $logInfoS "seed-genesis" "Reading genesis.json"
+  genesisInfo <- liftIO GI.getGenesisInfo
+  let genesisBlock = genesisInfoToBlock genesisInfo
+      validators = GI.validators genesisInfo
+  $logInfoS "seed-genesis" $ T.pack $ "Genesis hash: " ++ format (blockHash genesisBlock)
+  $logInfoS "seed-genesis" $ T.pack $ "Validators: " ++ show (length validators)
+
+  obGB <- liftIO $ bootstrapSequencer genesisBlock
+  putGenesisHash $ blockHash genesisBlock
+  void $ putBlocks [genesisBlock] False
+
+  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock (blockHash genesisBlock) 0 validators
+
+  let genesisChainId = Nothing
+  void . execRedis $ do
+    forceBestBlockInfo
+      (blockHash genesisBlock)
+      (number . blockBlockData $ genesisBlock)
+
+  void . execRedis $
+    putBlock OutputBlock
+    { obOrigin = Origin.Direct,
+      obBlockData = blockBlockData genesisBlock,
+      obReceiptTransactions = [],
+      obBlockUncles = []
+    }
+
+  liftIO $ bootstrapIndexer obGB
+  setStateDBStateRoot genesisChainId (GI.stateRoot genesisInfo)
+  populateStorageDBs genesisInfo genesisBlock genesisChainId
+  $logInfoS "seed-genesis" "Database seeding complete"
+
+-- | Full initialization - populates MPT and seeds all databases.
+-- This is the original combined function for backwards compatibility.
 initializeGenesisBlock ::
   ( HasCodeDB m,
     HasHashDB m,
@@ -101,10 +182,16 @@ initializeGenesisBlock ::
     (Ad.Address `Alters` AddressState) m,
     Selectable Ad.Address AddressState m
   ) =>
+  GenesisInfo ->
   m ()
-initializeGenesisBlock = do
+initializeGenesisBlock genesisInfo = do
   $logInfoS "initgen" "Begin of initgen"
-  (validators, genesisInfo, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs
+  (validators, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs genesisInfo
+  -- Write genesis.json with the computed stateRoot
+  let computedStateRoot = stateRoot $ blockBlockData genesisBlock
+      updatedGenesisInfo = genesisInfo { GI.stateRoot = computedStateRoot }
+  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode updatedGenesisInfo
+  $logInfoS "initgen" $ T.pack $ "Wrote genesis.json with stateRoot: " ++ format computedStateRoot
   obGB <- liftIO $ bootstrapSequencer genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"

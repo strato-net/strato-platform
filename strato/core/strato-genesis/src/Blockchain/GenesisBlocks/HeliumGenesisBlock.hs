@@ -447,7 +447,7 @@ usdt = BridgeAssetInfo
 
 heliumConfig :: HeliumGenesisBlockConfig
 heliumConfig = HeliumGenesisBlockConfig
-  validators
+  heliumValidators
   admins
   blockappsTestAddress
   [sepolia]
@@ -1340,8 +1340,8 @@ silvstLpToken = SolidVMContractWithStorage silvstLpTokenAddress 0 proxy $ toPath
 --      , ("_balances[" <> addrBS blockappsAddress <> "]", BInteger $ 200_000 * oneE18)
 --      ]
 
-validators :: [Validator]
-validators = [
+heliumValidators :: [Validator]
+heliumValidators = [
   Validator 0x0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82, --Node1
   Validator 0xbdd3fe1b9a87a88cff8259528c0a4d6464625713, --Node2
   Validator 0xebcd85c4212e53a2546cbcea765c1de531b14fb1, --Node3
