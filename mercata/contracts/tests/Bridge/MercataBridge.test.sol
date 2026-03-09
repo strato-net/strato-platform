@@ -339,7 +339,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0xabcdef123456";
 
         // Just call the function without any assertions to see if it works
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount,  txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount,  txHash, recipient, address(testToken));
     }
 
     function it_bridge_can_initiate_deposit_with_usdst_minting() {
@@ -348,7 +348,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0xabcdef123457";
 
         // Call deposit function directly as relayer
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
 
         // Check that deposit was created
         (,,,,, address stratoToken,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
@@ -361,7 +361,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0xabcdef123458";
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Then confirm it
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
@@ -377,7 +377,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0xabcdef123459";
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Then mark for review
         relayer.do(address(bridge), "reviewDeposit", externalChainId, txHash);
@@ -393,6 +393,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256[] memory amounts = new uint256[](2);
         address[] memory recipients = new address[](2);
         address[] memory senders = new address[](2);
+        address[] memory targetStratoTokens = new address[](2);
 
         chainIds[0] = externalChainId;
         chainIds[1] = externalChainId;
@@ -406,8 +407,10 @@ contract Describe_MercataBridge is Authorizable {
         recipients[1] = address(0x2222);
         senders[0] = address(0x3333);
         senders[1] = address(0x4444);
+        targetStratoTokens[0] = address(testToken);
+        targetStratoTokens[1] = address(usdstToken);
 
-        relayer.do(address(bridge), "depositBatch", chainIds, senders, tokens, amounts, txHashes, recipients);
+        relayer.do(address(bridge), "depositBatch", chainIds, senders, tokens, amounts, txHashes, recipients, targetStratoTokens);
 
         (,,,,, address stratoToken1,,) = bridge.deposits(externalChainId, txHashes[0].normalizeHex());
         (,,,,, address stratoToken2,,) = bridge.deposits(externalChainId, txHashes[1].normalizeHex());
@@ -421,7 +424,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0xc0af1b123456";
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Batch confirm
         uint256[] memory chainIds = new uint256[](1);
@@ -441,7 +444,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0xe3113a123456";
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Batch review
         uint256[] memory chainIds = new uint256[](1);
@@ -458,7 +461,7 @@ contract Describe_MercataBridge is Authorizable {
     function it_bridge_reverts_deposit_by_non_relayer() {
         bool reverted = false;
         try {
-            user1.do(address(bridge), "deposit", externalChainId, externalSender, address(testToken), 1000e18, address(0x1111), false);
+            user1.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, externalTxHash, address(0x1111), address(testToken));
         } catch {
             reverted = true;
         }
@@ -470,7 +473,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, externalTxHash, address(testToken), 1000e18, address(0x1111), false);
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, externalTxHash, address(0x1111), address(testToken));
         } catch {
             reverted = true;
         }
@@ -478,11 +481,11 @@ contract Describe_MercataBridge is Authorizable {
     }
 
     function it_bridge_reverts_deposit_with_duplicate_key() {
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, externalTxHash, address(0x1111));
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, externalTxHash, address(0x1111), address(testToken));
 
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 2000e18, externalTxHash, address(0x2222));
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 2000e18, externalTxHash, address(0x2222), address(testToken));
         } catch {
             reverted = true;
         }
@@ -492,7 +495,7 @@ contract Describe_MercataBridge is Authorizable {
     function it_bridge_reverts_deposit_with_zero_amount() {
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, externalTxHash, address(testToken), 0, address(0x1111), false);
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 0, externalTxHash, address(0x1111), address(testToken));
         } catch {
             reverted = true;
         }
@@ -504,7 +507,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, externalTxHash, address(testToken), 1000e18, address(0x1111), false);
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, externalTxHash, address(0x1111), address(testToken));
         } catch {
             reverted = true;
         }
@@ -512,16 +515,16 @@ contract Describe_MercataBridge is Authorizable {
     }
 
     function it_bridge_reverts_deposit_without_permission() {
-        // Set asset with no permissions
+        // Non-default route should fail until explicitly enabled
         bridge.setAsset(true, externalChainId, 18, "Test", "TEST", address(0x5555), 1000000e18, address(testToken));
 
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, externalTxHash, address(testToken), 1000e18, address(0x1111), false);
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, externalTxHash, address(0x1111), address(usdstToken));
         } catch {
             reverted = true;
         }
-        require(reverted, "Should revert deposit without permission");
+        require(reverted, "Should revert when route is not enabled");
     }
 
     // ============ WITHDRAWAL FLOW TESTS ============
@@ -548,7 +551,7 @@ contract Describe_MercataBridge is Authorizable {
             address(withdrawalToken) // strato token
         );
 
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x6666), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x6666), address(withdrawalToken), amount);
         require(withdrawalId == 1, "Withdrawal ID should be 1");
         require(bridge.withdrawalCounter() == 1, "Withdrawal counter should be 1");
 
@@ -565,7 +568,7 @@ contract Describe_MercataBridge is Authorizable {
         Token(address(usdstToken)).mint(address(user1), amount);
         user1.do(address(usdstToken), "approve", address(bridge), amount);
 
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x6666), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x6666), address(usdstToken), amount);
         require(withdrawalId == 1, "Withdrawal ID should be 1");
 
         (,,,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
@@ -580,7 +583,7 @@ contract Describe_MercataBridge is Authorizable {
         // Setup withdrawal
         Token(address(testToken)).mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), amount);
 
         // Confirm withdrawal
         bridge.confirmWithdrawal(withdrawalId, custodyTxHash);
@@ -597,7 +600,7 @@ contract Describe_MercataBridge is Authorizable {
         // Setup withdrawal
         Token(address(testToken)).mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), amount);
 
         // Confirm and finalise
         bridge.confirmWithdrawal(withdrawalId, custodyTxHash);
@@ -614,7 +617,7 @@ contract Describe_MercataBridge is Authorizable {
         // Setup withdrawal
         Token(address(testToken)).mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), amount);
 
         // Abort by user (should fail due to 48h wait period)
         bool reverted = false;
@@ -636,7 +639,7 @@ contract Describe_MercataBridge is Authorizable {
         // Setup withdrawal
         Token(address(testToken)).mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), amount);
 
         // Abort by relayer (should succeed)
         relayer.do(address(bridge), "abortWithdrawal", withdrawalId);
@@ -653,12 +656,12 @@ contract Describe_MercataBridge is Authorizable {
         // Setup first withdrawal with testToken
         Token(address(testToken)).mint(address(user1), amount1);
         user1.do(address(testToken), "approve", address(bridge), amount1);
-        uint256 withdrawalId1 = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), amount1);
+        uint256 withdrawalId1 = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(testToken), amount1);
 
         // Setup second withdrawal with usdstToken
         Token(address(usdstToken)).mint(address(user2), amount2);
         user2.do(address(usdstToken), "approve", address(bridge), amount2);
-        uint256 withdrawalId2 = user2.do(address(bridge), "requestWithdrawal", externalChainId, address(0x2222), address(0x6666), amount2);
+        uint256 withdrawalId2 = user2.do(address(bridge), "requestWithdrawal", externalChainId, address(0x2222), address(0x6666), address(usdstToken), amount2);
 
         // Batch confirm
         uint256[] memory ids = new uint256[](2);
@@ -684,7 +687,7 @@ contract Describe_MercataBridge is Authorizable {
         // Setup withdrawal
         Token(address(testToken)).mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), amount);
 
         // Confirm first
         bridge.confirmWithdrawal(withdrawalId, custodyTxHash);
@@ -708,12 +711,12 @@ contract Describe_MercataBridge is Authorizable {
         // Setup first withdrawal
         Token(address(testToken)).mint(address(user1), amount1);
         user1.do(address(testToken), "approve", address(bridge), amount1);
-        uint256 withdrawalId1 = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), amount1);
+        uint256 withdrawalId1 = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(testToken), amount1);
 
         // Setup second withdrawal
         Token(address(testToken)).mint(address(user2), amount2);
         user2.do(address(testToken), "approve", address(bridge), amount2);
-        uint256 withdrawalId2 = user2.do(address(bridge), "requestWithdrawal", externalChainId, address(0x2222), address(0x5555), amount2);
+        uint256 withdrawalId2 = user2.do(address(bridge), "requestWithdrawal", externalChainId, address(0x2222), address(0x5555), address(testToken), amount2);
 
         // Batch abort by relayer
         uint256[] memory ids = new uint256[](2);
@@ -736,7 +739,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted = false;
         try {
-            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), 1000e18);
+            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(testToken), 1000e18);
         } catch {
             reverted = true;
         }
@@ -746,7 +749,7 @@ contract Describe_MercataBridge is Authorizable {
     function it_bridge_reverts_withdrawal_with_zero_amount() {
         bool reverted = false;
         try {
-            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), 0);
+            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(testToken), 0);
         } catch {
             reverted = true;
         }
@@ -761,7 +764,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted = false;
         try {
-            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), amount);
+            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(testToken), amount);
         } catch {
             reverted = true;
         }
@@ -776,7 +779,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted = false;
         try {
-            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), 1000e18);
+            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(testToken), 1000e18);
         } catch {
             reverted = true;
         }
@@ -792,7 +795,7 @@ contract Describe_MercataBridge is Authorizable {
         testToken.mint(address(user1), largeAmount);
         user1.do(address(testToken), "approve", address(bridge), largeAmount);
 
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), largeAmount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), largeAmount);
         require(withdrawalId == 1, "Should handle large amounts");
     }
 
@@ -802,12 +805,12 @@ contract Describe_MercataBridge is Authorizable {
         // First withdrawal
         testToken.mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId1 = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), amount);
+        uint256 withdrawalId1 = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(testToken), amount);
 
         // Second withdrawal
         testToken.mint(address(user2), amount);
         user2.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId2 = user2.do(address(bridge), "requestWithdrawal", externalChainId, address(0x2222), address(0x5555), amount);
+        uint256 withdrawalId2 = user2.do(address(bridge), "requestWithdrawal", externalChainId, address(0x2222), address(0x5555), address(testToken), amount);
 
         require(withdrawalId1 == 1, "First withdrawal ID should be 1");
         require(withdrawalId2 == 2, "Second withdrawal ID should be 2");
@@ -823,8 +826,8 @@ contract Describe_MercataBridge is Authorizable {
         bridge.setAsset(true, chainId2, 18, "Polygon Test", "PTEST", address(0x8888), 1000000e18, address(testToken));
 
         // Test deposits on both chains
-        relayer.do(address(bridge), "deposit", chainId1, externalSender, address(0x5555), 1000e18, "0x1a2b3c4d5e6f", address(0x1111));
-        relayer.do(address(bridge), "deposit", chainId2, externalSender, address(0x8888), 2000e18, "0xf6e5d4c3b2a1", address(0x2222));
+        relayer.do(address(bridge), "deposit", chainId1, externalSender, address(0x5555), 1000e18, "0x1a2b3c4d5e6f", address(0x1111), address(testToken));
+        relayer.do(address(bridge), "deposit", chainId2, externalSender, address(0x8888), 2000e18, "0xf6e5d4c3b2a1", address(0x2222), address(testToken));
 
         (BridgeStatus bridgeStatus1,,,,,,,) = bridge.deposits(chainId1, "0x1a2b3c4d5e6f".normalizeHex());
         (BridgeStatus bridgeStatus2,,,,,,,) = bridge.deposits(chainId2, "0xf6e5d4c3b2a1".normalizeHex());
@@ -832,28 +835,119 @@ contract Describe_MercataBridge is Authorizable {
         require(bridgeStatus2 == BridgeStatus.INITIATED, "Second chain deposit should be INITIATED");
     }
 
-    function it_bridge_handles_different_permission_levels() {
-        // Test WRAP only permission
-        bridge.setAsset(true, externalChainId, 18, "Test", "TEST", address(0x5555), 1000000e18, address(testToken));
+    function it_bridge_default_route_deposit_works_without_explicit_route_enable() {
+        string memory txHash = "0xdecaf001";
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, txHash, address(0x1111), address(testToken));
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.INITIATED, "Default route deposit should succeed");
+    }
 
-        testToken.mint(address(user1), 1000e18);
-        user1.do(address(testToken), "approve", address(bridge), 1000e18);
-
-        // Should work for WRAP (mintUSDST = false)
-        uint256 withdrawalId1 = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), 1000e18);
-        require(withdrawalId1 == 1, "Should work with WRAP permission");
-
-        // Should fail for MINT (mintUSDST = true)
-        usdstToken.mint(address(user1), 1000e18);
-        user1.do(address(usdstToken), "approve", address(bridge), 1000e18);
-
+    function it_bridge_non_default_route_deposit_requires_explicit_route_enable() {
+        string memory txHash = "0xdecaf002";
         bool reverted = false;
         try {
-            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), 1000e18);
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, txHash, address(0x1111), address(usdstToken));
         } catch {
             reverted = true;
         }
-        require(reverted, "Should fail with MINT permission when only WRAP is allowed");
+        require(reverted, "Non-default route should revert before enabling");
+
+        bridge.setAssetRoute(address(0x5555), externalChainId, address(usdstToken), true);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, txHash, address(0x1111), address(usdstToken));
+        (,,,,, address stratoToken,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(stratoToken == address(usdstToken), "Route should mint enabled non-default token");
+    }
+
+    function it_bridge_non_default_route_disable_blocks_deposit_again() {
+        string memory txHash = "0xdecaf003";
+        bridge.setAssetRoute(address(0x5555), externalChainId, address(usdstToken), true);
+        bridge.setAssetRoute(address(0x5555), externalChainId, address(usdstToken), false);
+
+        bool reverted = false;
+        try {
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1000e18, txHash, address(0x1111), address(usdstToken));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Disabled explicit route should be blocked");
+    }
+
+    function it_bridge_batch_deposit_with_mixed_route_targets_records_selected_strato_token() {
+        bridge.setAssetRoute(address(0x5555), externalChainId, address(usdstToken), true);
+
+        uint256[] memory chainIds = new uint256[](2);
+        address[] memory senders = new address[](2);
+        address[] memory tokens = new address[](2);
+        uint256[] memory amounts = new uint256[](2);
+        string[] memory txHashes = new string[](2);
+        address[] memory recipients = new address[](2);
+        address[] memory targetStratoTokens = new address[](2);
+
+        chainIds[0] = externalChainId;
+        chainIds[1] = externalChainId;
+        senders[0] = externalSender;
+        senders[1] = externalSender;
+        tokens[0] = address(0x5555);
+        tokens[1] = address(0x5555);
+        amounts[0] = 1000e18;
+        amounts[1] = 2000e18;
+        txHashes[0] = "0xdecaf004";
+        txHashes[1] = "0xdecaf005";
+        recipients[0] = address(0x1111);
+        recipients[1] = address(0x2222);
+        targetStratoTokens[0] = address(testToken);
+        targetStratoTokens[1] = address(usdstToken);
+
+        relayer.do(address(bridge), "depositBatch", chainIds, senders, tokens, amounts, txHashes, recipients, targetStratoTokens);
+
+        (,,,,, address stratoToken1,,) = bridge.deposits(externalChainId, txHashes[0].normalizeHex());
+        (,,,,, address stratoToken2,,) = bridge.deposits(externalChainId, txHashes[1].normalizeHex());
+        require(stratoToken1 == address(testToken), "First route should use default token");
+        require(stratoToken2 == address(usdstToken), "Second route should use explicit token");
+    }
+
+    function it_bridge_default_route_withdrawal_works_without_explicit_route_enable() {
+        uint256 amount = 1000e18;
+        testToken.mint(address(user1), amount);
+        user1.do(address(testToken), "approve", address(bridge), amount);
+
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(testToken), amount);
+        require(withdrawalId == 1, "Default route withdrawal should succeed");
+    }
+
+    function it_bridge_non_default_route_withdrawal_requires_explicit_route_enable() {
+        uint256 amount = 1000e18;
+        usdstToken.mint(address(user1), amount);
+        user1.do(address(usdstToken), "approve", address(bridge), amount);
+
+        bool reverted = false;
+        try {
+            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(usdstToken), amount);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Non-default route withdrawal should revert before enabling");
+
+        bridge.setAssetRoute(address(0x5555), externalChainId, address(usdstToken), true);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(usdstToken), amount);
+        require(withdrawalId == 1, "Enabled non-default route withdrawal should succeed");
+    }
+
+    function it_bridge_non_default_route_withdrawal_is_blocked_after_disable() {
+        uint256 amount = 1000e18;
+        usdstToken.mint(address(user1), amount);
+        user1.do(address(usdstToken), "approve", address(bridge), amount);
+
+        bridge.setAssetRoute(address(0x5555), externalChainId, address(usdstToken), true);
+        bridge.setAssetRoute(address(0x5555), externalChainId, address(usdstToken), false);
+
+        bool reverted = false;
+        try {
+            user1.do(address(bridge), "requestWithdrawal", externalChainId, address(0x1111), address(0x5555), address(usdstToken), amount);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Disabled non-default withdrawal route should be blocked");
     }
 
     function it_bridge_handles_zero_max_per_tx() {
@@ -866,7 +960,7 @@ contract Describe_MercataBridge is Authorizable {
         testToken.mint(address(user1), largeAmount);
         user1.do(address(testToken), "approve", address(bridge), largeAmount);
 
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), largeAmount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), largeAmount);
         require(withdrawalId == 1, "Should handle unlimited amounts with zero max per tx");
     }
 
@@ -899,7 +993,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x7777), 1000e18, "1n4ct1v3", address(0x1111));
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x7777), 1000e18, "1n4ct1v3", address(0x1111), address(inactiveToken));
         } catch {
             reverted = true;
         }
@@ -913,11 +1007,12 @@ contract Describe_MercataBridge is Authorizable {
         string[] memory txHashes = new string[](0);
         address[] memory recipients = new address[](0);
         uint256[] memory amounts = new uint256[](0);
+        address[] memory targetStratoTokens = new address[](0);
 
         // Empty batch should succeed (no-op)
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "depositBatch", chainIds, senders, tokens, amounts, txHashes, recipients);
+            relayer.do(address(bridge), "depositBatch", chainIds, senders, tokens, amounts, txHashes, recipients, targetStratoTokens);
         } catch {
             reverted = true;
         }
@@ -944,7 +1039,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0xab0cdefa1e3f";
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Try to confirm twice (should fail on second attempt)
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
@@ -965,7 +1060,7 @@ contract Describe_MercataBridge is Authorizable {
         // Setup withdrawal
         Token(address(testToken)).mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), amount);
 
         // Try to finalise without confirming first
         bool reverted = false;
@@ -984,7 +1079,7 @@ contract Describe_MercataBridge is Authorizable {
         // Setup withdrawal
         Token(address(testToken)).mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), amount);
 
         // Confirm and finalise withdrawal
         relayer.do(address(bridge), "confirmWithdrawal", withdrawalId, "deadbeef");
@@ -1007,7 +1102,7 @@ contract Describe_MercataBridge is Authorizable {
         // Setup withdrawal with user1
         Token(address(testToken)).mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);
-        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), amount);
+        uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x5555), address(testToken), amount);
 
         // Try to abort with different user
         bool reverted = false;
@@ -1088,7 +1183,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, address(0));
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, address(0), address(testToken));
         } catch {
             reverted = true;
         }
@@ -1101,7 +1196,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0x1a11d3ec1e13";
 
         // Should succeed with valid recipient
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Verify deposit was created
         (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
@@ -1115,12 +1210,12 @@ contract Describe_MercataBridge is Authorizable {
         address recipient = address(0xCCCC);
 
         // First deposit with lowercase hash
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, "0xabcdef1234", recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, "0xabcdef1234", recipient, address(testToken));
 
         // Attempt replay with uppercase hash (should fail)
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, "0xABCDEF1234", recipient);
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, "0xABCDEF1234", recipient, address(testToken));
         } catch {
             reverted = true;
         }
@@ -1132,7 +1227,7 @@ contract Describe_MercataBridge is Authorizable {
         address recipient = address(0xCCCC);
 
         // Deposit with mixed case hash
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, "0xAbCdEf1234", recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, "0xAbCdEf1234", recipient, address(testToken));
 
         // Verify stored as lowercase
         (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, "0xabcdef1234".normalizeHex());
@@ -1148,13 +1243,13 @@ contract Describe_MercataBridge is Authorizable {
         string memory variant4 = "0xaBc123";
 
         // First deposit should succeed
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), depositAmount, variant1, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), depositAmount, variant1, recipient, address(testToken));
         relayer.do(address(bridge), "confirmDeposit", externalChainId, variant1);
 
         // Subsequent deposits with case variations should fail due to normalization
         bool reverted2 = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), depositAmount, variant2, recipient);
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), depositAmount, variant2, recipient, address(testToken));
         } catch {
             reverted2 = true;
         }
@@ -1162,7 +1257,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted3 = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), depositAmount, variant3, recipient);
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), depositAmount, variant3, recipient, address(testToken));
         } catch {
             reverted3 = true;
         }
@@ -1170,7 +1265,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted4 = false;
         try {
-            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), depositAmount, variant4, recipient);
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), depositAmount, variant4, recipient, address(testToken));
         } catch {
             reverted4 = true;
         }
@@ -1195,7 +1290,8 @@ contract Describe_MercataBridge is Authorizable {
             address(0x5555),
             depositAmount,
             txHashLower,
-            victim
+            victim,
+            address(testToken)
         );
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHashLower);
 
@@ -1210,7 +1306,8 @@ contract Describe_MercataBridge is Authorizable {
                 address(0x5555),
                 depositAmount,
                 txHashUpper,
-                victim
+                victim,
+                address(testToken)
             );
         } catch {
             reverted = true;
@@ -1236,7 +1333,8 @@ contract Describe_MercataBridge is Authorizable {
             address(0x5555),
             depositAmount,
             hashWith0x,
-            recipient
+            recipient,
+            address(testToken)
         );
         relayer.do(address(bridge), "confirmDeposit", externalChainId, hashWith0x);
 
@@ -1251,7 +1349,8 @@ contract Describe_MercataBridge is Authorizable {
                 address(0x5555),
                 depositAmount,
                 hashWithout0x,
-                recipient
+                recipient,
+                address(testToken)
             );
         } catch {
             reverted = true;
@@ -1272,7 +1371,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0x1234567890abcdef";
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Mark for review
         relayer.do(address(bridge), "reviewDeposit", externalChainId, txHash);
@@ -1292,7 +1391,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0xabcdef1234567890";
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Mark for review
         relayer.do(address(bridge), "reviewDeposit", externalChainId, txHash);
@@ -1312,7 +1411,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0xfedcba0987654321";
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Mark for review
         relayer.do(address(bridge), "reviewDeposit", externalChainId, txHash);
@@ -1333,7 +1432,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = "0x9876543210fedcba";
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash, recipient, address(testToken));
 
         // Try to abort deposit in INITIATED state (should fail)
         bool reverted = false;
@@ -1353,8 +1452,8 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash2 = "0x2222222222222222";
 
         // First initiate deposits
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash1, recipient1);
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash2, recipient2);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash1, recipient1, address(testToken));
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), amount, txHash2, recipient2, address(testToken));
 
         // Mark both for review
         relayer.do(address(bridge), "reviewDeposit", externalChainId, txHash1);
@@ -1397,7 +1496,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 externalTokenAmount = 1e6; // 1 USDC in 6-decimal format
         uint256 expectedStratoAmount = 1e18; // 1 STRATO token in 18-decimal format
 
-        relayer.do(address(bridge), "deposit", externalChainId, address(0x2222), usdcToken, externalTokenAmount, "0x123", address(0x3333));
+        relayer.do(address(bridge), "deposit", externalChainId, address(0x2222), usdcToken, externalTokenAmount, "0x123", address(0x3333), usdcStratoToken);
 
         // Check the deposit was recorded with correct conversion
         (,,,,,, uint256 recordedStratoAmount,) = bridge.deposits(externalChainId, "0x123".normalizeHex());
@@ -1407,7 +1506,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 externalTokenAmount2 = 25e5; // 2.5 USDC in 6-decimal format
         uint256 expectedStratoAmount2 = 25e17; // 2.5 STRATO tokens in 18-decimal format
 
-        relayer.do(address(bridge), "deposit", externalChainId, address(0x4444), usdcToken, externalTokenAmount2, "0x456", address(0x5555));
+        relayer.do(address(bridge), "deposit", externalChainId, address(0x4444), usdcToken, externalTokenAmount2, "0x456", address(0x5555), usdcStratoToken);
 
         // Check the second deposit was recorded with correct conversion
         (,,,,,, uint256 recordedStratoAmount2,) = bridge.deposits(externalChainId, "0x456".normalizeHex());
@@ -1432,7 +1531,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 externalTokenAmount = 1e18; // 1 ETH in 18-decimal format
         uint256 expectedStratoAmount = 1e18; // 1 STRATO token in 18-decimal format
 
-        relayer.do(address(bridge), "deposit", externalChainId, address(0x3333), ethToken, externalTokenAmount, "0x789", address(0x4444));
+        relayer.do(address(bridge), "deposit", externalChainId, address(0x3333), ethToken, externalTokenAmount, "0x789", address(0x4444), ethStratoToken);
 
         // Check the deposit was recorded with correct conversion (1:1 ratio)
         (,,,,,, uint256 recordedStratoAmount,) = bridge.deposits(externalChainId, "0x789".normalizeHex());
@@ -1442,7 +1541,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 externalTokenAmount2 = 25e17; // 2.5 ETH in 18-decimal format
         uint256 expectedStratoAmount2 = 25e17; // 2.5 STRATO tokens in 18-decimal format
 
-        relayer.do(address(bridge), "deposit", externalChainId, address(0x5555), ethToken, externalTokenAmount2, "0xabc", address(0x6666));
+        relayer.do(address(bridge), "deposit", externalChainId, address(0x5555), ethToken, externalTokenAmount2, "0xabc", address(0x6666), ethStratoToken);
 
         // Check the second deposit was recorded with correct conversion (1:1 ratio)
         (,,,,,, uint256 recordedStratoAmount2,) = bridge.deposits(externalChainId, "0xabc".normalizeHex());
@@ -1452,7 +1551,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 externalTokenAmount3 = 1e17; // 0.1 ETH in 18-decimal format
         uint256 expectedStratoAmount3 = 1e17; // 0.1 STRATO tokens in 18-decimal format
 
-        relayer.do(address(bridge), "deposit", externalChainId, address(0x7777), ethToken, externalTokenAmount3, "0xdef", address(0x8888));
+        relayer.do(address(bridge), "deposit", externalChainId, address(0x7777), ethToken, externalTokenAmount3, "0xdef", address(0x8888), ethStratoToken);
 
         // Check the third deposit was recorded with correct conversion (1:1 ratio)
         (,,,,,, uint256 recordedStratoAmount3,) = bridge.deposits(externalChainId, "0xdef".normalizeHex());
@@ -1480,7 +1579,7 @@ contract Describe_MercataBridge is Authorizable {
         testToken.mint(address(this), stratoTokenAmount);
         testToken.approve(address(bridge), stratoTokenAmount);
 
-        uint256 withdrawalId = bridge.requestWithdrawal(externalChainId, address(0x7777), usdcToken, stratoTokenAmount);
+        uint256 withdrawalId = bridge.requestWithdrawal(externalChainId, address(0x7777), usdcToken, usdcStratoToken, stratoTokenAmount);
 
         // Check the withdrawal was recorded with correct conversion
         (,,,,, uint256 recordedExternalAmount,,,,,) = bridge.withdrawals(withdrawalId);
@@ -1494,7 +1593,7 @@ contract Describe_MercataBridge is Authorizable {
         testToken.mint(address(this), stratoTokenAmount2);
         testToken.approve(address(bridge), stratoTokenAmount2);
 
-        uint256 withdrawalId2 = bridge.requestWithdrawal(externalChainId, address(0x8888), usdcToken, stratoTokenAmount2);
+        uint256 withdrawalId2 = bridge.requestWithdrawal(externalChainId, address(0x8888), usdcToken, usdcStratoToken, stratoTokenAmount2);
 
         // Check the second withdrawal was recorded with correct conversion (should round down)
         (,,,,, uint256 recordedExternalAmount2,,,,,) = bridge.withdrawals(withdrawalId2);
@@ -1510,7 +1609,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bool reverted = false;
         try {
-            uint256 withdrawalId3 = bridge.requestWithdrawal(externalChainId, address(0x9999), usdcToken, tinyStratoAmount);
+            uint256 withdrawalId3 = bridge.requestWithdrawal(externalChainId, address(0x9999), usdcToken, usdcStratoToken, tinyStratoAmount);
         } catch {
             reverted = true;
         }
@@ -1524,7 +1623,7 @@ contract Describe_MercataBridge is Authorizable {
         testToken.mint(address(this), stratoTokenAmount4);
         testToken.approve(address(bridge), stratoTokenAmount4);
 
-        uint256 withdrawalId4 = bridge.requestWithdrawal(externalChainId, address(0xaaaa), usdcToken, stratoTokenAmount4);
+        uint256 withdrawalId4 = bridge.requestWithdrawal(externalChainId, address(0xaaaa), usdcToken, usdcStratoToken, stratoTokenAmount4);
 
         // Check the fourth withdrawal was recorded with correct conversion (should round down)
         (,,,,, uint256 recordedExternalAmount4,,,,,) = bridge.withdrawals(withdrawalId4);
@@ -1537,7 +1636,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = keccak256("example transaction hash");
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
 
 
         relayer.do(address(bridge), "requestAutoSave", recipient, externalChainId, txHash);
@@ -1564,7 +1663,7 @@ contract Describe_MercataBridge is Authorizable {
         relayer.do(address(bridge), "requestAutoSave", recipient, externalChainId, txHash);
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
 
 
         // Confirm the deposit with auto save
@@ -1585,7 +1684,7 @@ contract Describe_MercataBridge is Authorizable {
         string memory txHash = keccak256("example transaction hash");
 
         // First initiate deposit
-        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient);
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
 
         relayer.do(address(bridge), "requestAutoSave", recipient, externalChainId, txHash);
 

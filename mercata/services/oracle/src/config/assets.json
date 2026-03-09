@@ -19,6 +19,12 @@
     "SYRUPUSDC": {
       "targetAssetAddress": "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca"
     },
+    "USDC": {
+      "targetAssetAddress": "6aeacaa19c68e53035bf495d15e0a328fc600ba8"
+    },
+    "USDT": {
+      "targetAssetAddress": "5ed0bdfb378ac0d06249d70759536d7a41906216"
+    },
     "USDST": {
       "targetAssetAddress": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
       "constantPrice": 1000000000000000000
