@@ -19,6 +19,7 @@ import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
 import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
+import Blockchain.Init.Options (flags_jsonrpc)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Strato.Model.Validator

@@ -5,28 +5,40 @@ module Server
   )
 where
 
---import Control.Monad.IO.Class
 import Blaze.ByteString.Builder (copyByteString)
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
-import Network.HTTP.Types (status200)
+import qualified Data.CaseInsensitive as CI
+import Network.HTTP.Types (status200, status204)
 import Network.Wai
 import Network.Wai.Handler.Warp
---import Data.Monoid
 
 import RPC
 
 startServer :: IO ()
 startServer = do
-  let port = 8546
+  let port = 8545
   putStrLn $ "Listening on port " ++ show port
   run port app
 
+corsHeaders :: [(CI.CI BS.ByteString, BS.ByteString)]
+corsHeaders =
+  [ ("Access-Control-Allow-Origin", "*")
+  , ("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+  , ("Access-Control-Allow-Headers", "Content-Type")
+  , ("Content-Type", "application/json")
+  ]
+
 app :: Request -> (Response -> IO ResponseReceived) -> IO ResponseReceived
-app req respond = do
-  theRequest <- getRequestBodyChunk req
-  putStrLn $ show (remoteHost req) ++ " >>> " ++ show theRequest
+app req respond
+  | requestMethod req == "OPTIONS" = 
+      respond $ responseLBS status204 corsHeaders ""
+  | otherwise = do
+      body <- strictRequestBody req
+      putStrLn $ show (remoteHost req) ++ " >>> " ++ show body
 
-  response <- doRPC $ BL.fromStrict theRequest
+      response <- doRPC body
 
-  respond $
-    responseBuilder status200 [("Content-Type", "text/plain")] $ copyByteString $ BL.toStrict response
+      putStrLn $ show (remoteHost req) ++ " <<< " ++ show response
+      respond $
+        responseBuilder status200 corsHeaders $ copyByteString $ BL.toStrict response

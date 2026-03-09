@@ -7,7 +7,7 @@ where
 
 import qualified APIProxy as API
 import Binary
-import Blockchain.Constants
+import Blockchain.Constants (stratoVersionString)
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Control.Monad.IO.Class
 import Control.Monad.Except
@@ -25,6 +25,11 @@ import Numeric (showHex)
 import Prelude hiding (id)
 
 type Server = IO
+
+-- Chain ID for Ethereum JSON-RPC (matches strato-p2p ethVersion)
+-- TODO: Make this configurable via environment variable
+ethVersion :: Integer
+ethVersion = 63
 
 methods :: [Method Server]
 methods =

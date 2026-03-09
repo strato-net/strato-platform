@@ -17,6 +17,7 @@ executables:
       - blaze-builder
       - blockapps-data
       - bytestring
+      - case-insensitive
       - containers
       - http-client
       - http-types
