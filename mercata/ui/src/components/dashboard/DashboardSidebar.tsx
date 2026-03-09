@@ -1,17 +1,17 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { 
-  LayoutDashboard, 
-  ArrowUpDown, 
-  Send, 
-  Landmark, 
-  ArrowLeftRight, 
-  Gift, 
-  Activity, 
-  Download, 
-  BarChart3, 
-  Droplets, 
+import {
+  LayoutDashboard,
+  ArrowUpDown,
+  Send,
+  Landmark,
+  ArrowLeftRight,
+  Gift,
+  Activity,
+  Download,
+  BarChart3,
+  Droplets,
   Shield,
   UserPlus,
   LucideIcon,
@@ -31,7 +31,6 @@ interface NavItem {
 
 const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
-  { icon: CreditCard, label: 'Buy Crypto', path: '/dashboard/onramp' },
   { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
@@ -64,7 +63,7 @@ const DashboardSidebar = () => {
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
-  const isActive = (path: string) => 
+  const isActive = (path: string) =>
     path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(path);
 
   const renderNavItem = ({ icon: Icon, label, path }: NavItem) => {
@@ -73,11 +72,10 @@ const DashboardSidebar = () => {
       <li key={path}>
         <Link
           to={path}
-          className={`relative flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
-            active
-              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'
-          }`}
+          className={`relative flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${active
+            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+            }`}
         >
           {/* Left border accent for active state */}
           {active && (
