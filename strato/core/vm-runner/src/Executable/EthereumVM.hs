@@ -25,6 +25,7 @@ import qualified Blockchain.Bagger.Transactions as Flush
 --import Blockchain.BlockChain
 import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
+import Blockchain.DB.StateDB (HasStateDB, setStateDBStateRoot)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
@@ -128,7 +129,7 @@ ethereumVM d = runResourceT $ do
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
-initializeBestBlock :: (HasContext m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
+initializeBestBlock :: (HasContext m, HasStateDB m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
 initializeBestBlock = do
   maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
   maybeRedisBestBlock <-
@@ -139,7 +140,9 @@ initializeBestBlock = do
   case maybeRedisBestBlock of
     Nothing -> error "no best block in redisdb"
     Just redisBestBlock -> do
-      bootstrapChainDB (blockHeaderHash $ obBlockData redisBestBlock) (stateRoot $ obBlockData redisBestBlock)
+      let sr = stateRoot $ obBlockData redisBestBlock
+      bootstrapChainDB (blockHeaderHash $ obBlockData redisBestBlock) sr
+      setStateDBStateRoot Nothing sr
       putContextBestBlockInfo $ outputBlockToContextBestBlockInfo redisBestBlock
 
       Bagger.processNewBestBlock (blockHeaderHash $ obBlockData redisBestBlock) (obBlockData redisBestBlock) [] -- bootstrap Bagger with genesis block

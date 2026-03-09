@@ -21,7 +21,7 @@ import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.SQLDB
-import Blockchain.DB.StateDB (HasStateDB, getStateRoot, setStateDBStateRoot)
+import Blockchain.DB.StateDB (HasStateDB)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -166,7 +166,6 @@ seedDatabases = do
     }
 
   liftIO $ bootstrapIndexer obGB
-  setStateDBStateRoot genesisChainId (GI.stateRoot genesisInfo)
   populateStorageDBs genesisInfo genesisBlock genesisChainId
   $logInfoS "seed-genesis" "Database seeding complete"
 
@@ -183,15 +182,13 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs genesisInfo genesisBlock genesisChainId = do
-  sr <- getStateRoot genesisChainId
-
   liftIO . UEC.runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
   kafkaEnv <- runKafkaVMEvents getKafkaEnv
   let pub sd vmes = do
         traverse_ commitSqlDiffs sd
         void . runKafkaMUsingEnv kafkaEnv $ produceVMEvents' vmes
-  populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub
+  populateStorageDBs' genesisInfo genesisBlock genesisChainId (GI.stateRoot genesisInfo) pub
 
 populateStorageDBs' ::
   ( MonadIO m,
