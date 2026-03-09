@@ -11,4 +11,4 @@ sed -i "s|__IS_SSL__|$ssl|g" build/scripts/config.js
 sed -i "s|__STRATO_VERSION__|$STRATO_VERSION|g" build/scripts/config.js
 sed -i "s|__POLLING_FREQUENCY__|$POLLING_FREQUENCY|g" build/scripts/config.js
 
-NO_UPDATE_CHECK=1 serve --single -l 3002 build
+exec env NO_UPDATE_CHECK=1 serve --single -l 3002 build

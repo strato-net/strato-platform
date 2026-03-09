@@ -13,6 +13,27 @@ echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
+
+# Handle SIGTERM gracefully - forward to all monitored processes
+cleanup() {
+  echo "Received shutdown signal, stopping all processes..."
+  for pid in "${!MONITORED_PIDS[@]}"; do
+    if ps -p $pid > /dev/null 2>&1; then
+      echo "Sending SIGTERM to ${MONITORED_PIDS[$pid]} (pid: $pid)"
+      kill -TERM $pid 2>/dev/null || true
+    fi
+  done
+  sleep 2
+  for pid in "${!MONITORED_PIDS[@]}"; do
+    if ps -p $pid > /dev/null 2>&1; then
+      echo "Sending SIGKILL to ${MONITORED_PIDS[$pid]} (pid: $pid)"
+      kill -KILL $pid 2>/dev/null || true
+    fi
+  done
+  echo "Shutdown complete"
+  exit 0
+}
+trap cleanup SIGTERM SIGINT
 PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
 
 echo 'Waiting for Postgres to be available...'
@@ -293,6 +314,13 @@ function doInit {
   $cmd 2>&1 | tee logs/strato-setup
   if [ ${PIPESTATUS[0]} -ne 0 ]; then
     echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+    tail -f /dev/null
+  fi
+
+  echo "Running seed-genesis to create databases and topics..."
+  seed-genesis 2>&1 | tee logs/seed-genesis
+  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    echo "SEED-GENESIS FAILED: see /var/lib/strato/logs/seed-genesis for details"
     tail -f /dev/null
   fi
 

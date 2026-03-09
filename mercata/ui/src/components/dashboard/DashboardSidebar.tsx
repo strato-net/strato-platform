@@ -15,7 +15,8 @@ import {
   Shield,
   UserPlus,
   LucideIcon,
-  Vault
+  Vault,
+  CreditCard
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -30,6 +31,7 @@ interface NavItem {
 
 const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+  { icon: CreditCard, label: 'Buy Crypto', path: '/dashboard/onramp' },
   { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
@@ -37,6 +39,7 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+  { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
   { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
   { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },

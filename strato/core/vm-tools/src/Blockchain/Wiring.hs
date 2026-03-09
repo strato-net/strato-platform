@@ -152,9 +152,6 @@ instance {-# OVERLAPPING #-} HasSQL m => m `Mod.Yields` TransactionResult where
 vmBlockHashRootKey :: B.ByteString
 vmBlockHashRootKey = "block_hash_root"
 
-vmBestBlockRootKey :: B.ByteString
-vmBestBlockRootKey = "best_block_root"
-
 instance HasContext m => Mod.Modifiable BlockHashRoot m where
   get _ = do
     db <- getStateDB
@@ -162,14 +159,6 @@ instance HasContext m => Mod.Modifiable BlockHashRoot m where
   put _ (BlockHashRoot (MP.StateRoot sr)) = do
     db <- getStateDB
     DB.put db def vmBlockHashRootKey sr
-
-instance HasContext m => Mod.Modifiable BestBlockRoot m where
-  get _ = do
-    db <- getStateDB
-    BestBlockRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBestBlockRootKey
-  put _ (BestBlockRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmBestBlockRootKey sr
 
 instance HasContext m => Mod.Modifiable CurrentBlockHash m where
   get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock

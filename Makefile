@@ -28,14 +28,80 @@ ifndef VERSION
   ifeq ($(REPO),public)
     VERSION = `cat VERSION`
     $(info Using version tag from VERSION file)
-  else
+  else ifeq ($(REPO),private)
     VERSION = `cat VERSION`-`git rev-parse --short=7 HEAD`
+    $(info Using version tag with commit hash for registry)
+  else
+    # Local dev - use simple version (no commit hash) for stable image tags
+    VERSION = `cat VERSION`
   endif
 else
   $(info VERSION is "${VERSION}" (overriden with env var))
 endif
 
 $(info )
+
+.DEFAULT_GOAL := all
+
+# Smart docker builds - only rebuild if source files changed
+# Sentinel files track last successful build time
+DOCKER_SENTINELS = .docker-built
+
+$(DOCKER_SENTINELS):
+	@mkdir -p $@
+
+$(DOCKER_SENTINELS)/postgrest: postgrest-packager/Dockerfile postgrest-packager/doit.sh postgrest-packager/postgrest.conf.tpl | $(DOCKER_SENTINELS)
+	@echo "Building postgrest (sources changed)..."
+	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}postgrest:${VERSION} make --directory=postgrest-packager/
+	@touch $@
+
+$(DOCKER_SENTINELS)/nginx: nginx-packager/Dockerfile nginx-packager/docker-run.sh nginx-packager/nginx.tpl.conf nginx-packager/*.lua | $(DOCKER_SENTINELS)
+	@echo "Building nginx (sources changed)..."
+	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}nginx:${VERSION} make --directory=nginx-packager/
+	@touch $@
+
+$(DOCKER_SENTINELS)/apex: apex/api/Dockerfile apex/api/docker-run.sh apex/api/package*.json $(wildcard apex/api/src/**/*.js) $(wildcard apex/api/lib/**/*.js) | $(DOCKER_SENTINELS)
+	@echo "Building apex (sources changed)..."
+	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}apex:${VERSION} STRATO_VERSION=${VERSION} make --directory=apex/
+	@touch $@
+
+$(DOCKER_SENTINELS)/mercata-backend: mercata/backend/Dockerfile mercata/backend/docker-run.sh mercata/backend/package*.json $(wildcard mercata/backend/src/**/*.ts) | $(DOCKER_SENTINELS)
+	@echo "Building mercata-backend (sources changed)..."
+	docker build -t ${REPO_URL}mercata-backend:${VERSION} -f ./mercata/backend/Dockerfile ./mercata
+	docker tag ${REPO_URL}mercata-backend:${VERSION} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}
+	@touch $@
+
+$(DOCKER_SENTINELS)/mercata-ui: mercata/ui/Dockerfile mercata/ui/package*.json $(wildcard mercata/ui/src/**/*) | $(DOCKER_SENTINELS)
+	@echo "Building mercata-ui (sources changed)..."
+	docker build -t ${REPO_URL}mercata-ui:${VERSION} -f ./mercata/ui/Dockerfile ./mercata
+	docker tag ${REPO_URL}mercata-ui:${VERSION} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}
+	@touch $@
+
+$(DOCKER_SENTINELS)/prometheus: prometheus-packager/Dockerfile prometheus-packager/strato_prometheus.yml | $(DOCKER_SENTINELS)
+	@echo "Building prometheus (sources changed)..."
+	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}prometheus:${VERSION} make --directory=prometheus-packager/
+	@touch $@
+
+$(DOCKER_SENTINELS)/smd: smd-ui/Dockerfile smd-ui/package*.json $(wildcard smd-ui/src/**/*) | $(DOCKER_SENTINELS)
+	@echo "Building smd (sources changed)..."
+	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
+	@touch $@
+
+$(DOCKER_SENTINELS)/bridge: mercata/services/bridge/Dockerfile mercata/services/bridge/package*.json $(wildcard mercata/services/bridge/src/**/*) | $(DOCKER_SENTINELS)
+	@echo "Building bridge (sources changed)..."
+	docker build -t ${REPO_URL}bridge:${VERSION} ./mercata/services/bridge
+	docker tag ${REPO_URL}bridge:${VERSION} ${REPO_AWS_ECR_URL}bridge:${VERSION}
+	@touch $@
+
+$(DOCKER_SENTINELS)/bridge-nginx: mercata/services/bridge/nginx/Dockerfile mercata/services/bridge/nginx/docker-run.sh mercata/services/bridge/nginx/nginx.tpl.conf | $(DOCKER_SENTINELS)
+	@echo "Building bridge-nginx (sources changed)..."
+	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION} ./mercata/services/bridge/nginx
+	docker tag ${REPO_URL}bridge-nginx:${VERSION} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}
+	@touch $@
+
+# Clean sentinel files to force full rebuild
+clean-docker-sentinels:
+	rm -rf $(DOCKER_SENTINELS)
 
 all: mercata
 
@@ -49,50 +115,67 @@ build_all_docker: build_common_docker strato_docker apex highway highway-nginx n
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose highway highway-nginx mercata mercata-backend bridge bridge-nginx oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions
+.PHONY: all_develop build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose highway highway-nginx mercata oracle strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels
 
-apex:
+apex: $(DOCKER_SENTINELS)/apex
+nginx: $(DOCKER_SENTINELS)/nginx
+postgrest: $(DOCKER_SENTINELS)/postgrest
+prometheus: $(DOCKER_SENTINELS)/prometheus
+smd: $(DOCKER_SENTINELS)/smd
+mercata-backend: $(DOCKER_SENTINELS)/mercata-backend
+mercata-ui: $(DOCKER_SENTINELS)/mercata-ui
+bridge: $(DOCKER_SENTINELS)/bridge
+bridge-nginx: $(DOCKER_SENTINELS)/bridge-nginx
+
+# Force rebuild targets (ignore sentinel files)
+apex-force:
 	@echo Now building apex...
 	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}apex:${VERSION} STRATO_VERSION=${VERSION} make --directory=apex/
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/apex
 
-nginx:
+nginx-force:
 	@echo Now building nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}nginx:${VERSION} make --directory=nginx-packager/
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/nginx
 
-postgrest:
+postgrest-force:
 	@echo Now building postgrest...
 	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}postgrest:${VERSION} make --directory=postgrest-packager/
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/postgrest
 
-prometheus:
+prometheus-force:
 	@echo Now building prometheus...
 	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}prometheus:${VERSION} make --directory=prometheus-packager/
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/prometheus
 
-smd:
+smd-force:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/smd
 
-mercata-backend:
+mercata-backend-force:
 	@echo Now building mercata-backend...
 	docker build -t ${REPO_URL}mercata-backend:${VERSION} -f ./mercata/backend/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-backend:${VERSION} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}
-    	
-mercata-ui:
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-backend
+
+mercata-ui-force:
 	@echo Now building mercata-ui...
 	docker build -t ${REPO_URL}mercata-ui:${VERSION} -f ./mercata/ui/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-ui:${VERSION} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-ui
 
-bridge:
+bridge-force:
 	@echo Now building bridge...
 	docker build -t ${REPO_URL}bridge:${VERSION} ./mercata/services/bridge
-	docker tag ${REPO_URL}bridge:${VERSION} ${REPO_AWS_ECR_URL}bridge:${VERSION}	
-#	# TODO: #dcpush - replace with proper docker compose push flow
-#	echo "${REPO_URL}bridge:${VERSION}" > bridge_image_tag
-#	echo "${REPO_AWS_ECR_URL}bridge:${VERSION}" > bridge_image_tag_ecr
+	docker tag ${REPO_URL}bridge:${VERSION} ${REPO_AWS_ECR_URL}bridge:${VERSION}
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/bridge
 
-bridge-nginx:
+bridge-nginx-force:
 	@echo Now building bridge-nginx...
 	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION} ./mercata/services/bridge/nginx
 	docker tag ${REPO_URL}bridge-nginx:${VERSION} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/bridge-nginx
 
 oracle:
 	@echo Now building oracle... 

@@ -88,7 +88,6 @@ data MemContextDBs = MemContextDBs
     _codeDB :: M.Map Keccak256 DBCode,
     _blockSummaryDB :: M.Map Keccak256 BlockSummary,
     _blockHashRoot :: BlockHashRoot,
-    _bestBlockRoot :: BestBlockRoot,
     _worldBestBlock :: Maybe WorldBestBlock
   }
   deriving (Generic)
@@ -103,7 +102,6 @@ instance Default MemContextDBs where
         _codeDB = M.empty,
         _blockSummaryDB = M.empty,
         _blockHashRoot = BlockHashRoot MP.emptyTriePtr,
-        _bestBlockRoot = BestBlockRoot MP.emptyTriePtr,
         _worldBestBlock = Nothing
       }
 
@@ -114,7 +112,6 @@ instance NFData MemContextDBs where
       `seq` rnf _codeDB
       `seq` _blockSummaryDB
       `seq` rnf _blockHashRoot
-      `seq` rnf _bestBlockRoot
       `seq` _worldBestBlock
       `seq` ()
 
@@ -221,16 +218,9 @@ instance MonadIO m => Mod.Modifiable MemDBs (MemContextM m) where
 vmBlockHashRootKey :: B.ByteString
 vmBlockHashRootKey = "block_hash_root"
 
-vmBestBlockRootKey :: B.ByteString
-vmBestBlockRootKey = "best_block_root"
-
 instance MonadIO m => Mod.Modifiable BlockHashRoot (MemContextM m) where
   get _ = dbsGets $ view blockHashRoot
   put _ bhr = dbsModify' $ blockHashRoot .~ bhr
-
-instance MonadIO m => Mod.Modifiable BestBlockRoot (MemContextM m) where
-  get _ = dbsGets $ view bestBlockRoot
-  put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
 
 instance MonadIO m => Mod.Modifiable CurrentBlockHash (MemContextM m) where
   get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
