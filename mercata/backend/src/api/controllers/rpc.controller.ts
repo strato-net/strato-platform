@@ -36,6 +36,13 @@ class RpcController {
       catch (error) {
         console.log("RPC error; using fallback.");
         const fallbackRes = await fetch(fallback, requestPayload);
+        const contentType = fallbackRes.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          const text = await fallbackRes.text();
+          console.error("RPC fallback returned non-JSON:", text.slice(0, 200));
+          res.status(502).json({ error: "RPC upstream returned non-JSON response" });
+          return;
+        }
         res.status(fallbackRes.status).json(await fallbackRes.json());
       }
     } catch (error) {

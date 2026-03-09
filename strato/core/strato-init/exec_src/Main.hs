@@ -3,19 +3,11 @@
 
 import BlockApps.Logging
 import Blockchain.Init.Generator
-import Blockchain.Init.Options
-import Blockchain.Strato.Model.Options
-import Control.Monad.Composable.Kafka
-import Data.String
+import Blockchain.Init.Options ()
+import Blockchain.Strato.Model.Options (flags_network)
 import HFlags
 
 main :: IO ()
 main = do
   _ <- $initHFlags "strato-setup"
-  let kaddr = case flags_kafkahost of
-        "" -> ("kafka", 9092)
-        _ -> (fromString flags_kafkahost, 9092)
-
-  runLoggingT $
-    runKafkaM "generator" kaddr $
-    mkAll flags_network
+  runLoggingT $ mkFiles flags_network

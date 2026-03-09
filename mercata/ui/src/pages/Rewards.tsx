@@ -17,7 +17,7 @@ import { useUser } from "@/context/UserContext";
 import { redirectToLogin } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LogIn, Gift } from "lucide-react";
+import { Clock3, LogIn, Gift } from "lucide-react";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const Rewards = () => {
@@ -112,6 +112,21 @@ const Rewards = () => {
     </Card>
   );
 
+  const ActivitiesComingSoon = () => (
+    <div className="md:min-h-[430px] flex items-center justify-center">
+      <Card className="w-full max-w-3xl border-dashed md:border-2 bg-gradient-to-br from-background via-background to-indigo-50/40 dark:to-indigo-900/10 shadow-sm md:shadow-md">
+        <CardHeader className="text-center py-8 md:py-14 px-6 md:px-12">
+          <div className="mx-auto w-20 h-20 md:w-28 md:h-28 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center mb-5 md:mb-7 ring-8 ring-indigo-100/60 dark:ring-indigo-900/20">
+            <Clock3 className="w-10 h-10 md:w-14 md:h-14 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <CardTitle className="text-2xl md:text-4xl font-semibold tracking-tight mb-2">
+         Coming Back Soon
+          </CardTitle>
+        </CardHeader>
+      </Card>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
@@ -163,10 +178,15 @@ const Rewards = () => {
               />
             </TabsContent>
             <TabsContent value="activities">
-              <ActivitiesTable
-                activities={activities}
-                loading={activitiesLoading}
-              />
+              {/* Activities table temporarily disabled for now. */}
+          
+                {/* <ActivitiesTable
+                  activities={activities}
+                  loading={activitiesLoading}
+                /> */}
+            
+                <ActivitiesComingSoon />
+            
             </TabsContent>
           </Tabs>
         </main>

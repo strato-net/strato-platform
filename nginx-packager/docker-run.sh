@@ -26,7 +26,7 @@ STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
-VAULT_URL=${VAULT_URL:-https://vault.blockapps.net:8093/strato/v2.3}
+VAULT_URL=${VAULT_URL:-https://vault.blockapps.net:8093}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -37,18 +37,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     echo 'OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required for OAuth. Exit'
     exit 4
   fi
-  # get oauth discovery url from strato api
-  echo "Waiting for Strato api to be available..."
-  ETH_ENDPOINT=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
-  until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx
-  do
-    echo "  Check at $(date)"
-    sleep 1
-  done
-  echo "Strato api is available"
-  OAUTH_DISCOVERY_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.oauthDiscovery)
+  # validate oauth discovery url
   if [ -z "${OAUTH_DISCOVERY_URL}" ]; then
-    echo "Could not get OAuth discovery url from strato api, but it is a required value"
+    echo "OAUTH_DISCOVERY_URL is required but not set"
     exit 5
   fi
   if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
@@ -169,4 +160,4 @@ done
 echo 'apex is available'
 
 echo  'nginx is now running. See the logs below...'
-openresty -g "daemon off;"
+exec openresty -g "daemon off;"

@@ -390,7 +390,7 @@ const Dashboard = () => {
           </div>
 
           {/* Rewards Section */}
-          <div className="mb-4 md:mb-8">
+          {/* <div className="mb-4 md:mb-8">
             <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -417,7 +417,7 @@ const Dashboard = () => {
                 </Button>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Portfolio Value Chart - hidden on mobile and for guests */}
           {isLoggedIn && (

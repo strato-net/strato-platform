@@ -26,14 +26,6 @@ sed -i -e 's|__strato_postgres_password__|'"${postgres_password}"'|g' models/str
 sed -i -e 's|__strato_postgres_host__|'"${postgres_host}"'|g' models/strato/eth/config.js
 sed -i -e 's|__strato_postgres_port__|'"${postgres_port}"'|g' models/strato/eth/config.js
 
-echo 'Waiting for strato to be available...'
-until wget --quiet --spider "${stratoRoot}/stats/totaltx"
-do
-  echo "Check at $(date)"
-  sleep 1
-done
-echo 'strato is available'
-
 echo 'Waiting for postgres to be available...'
 until pg_isready -h ${postgres_host} -p ${postgres_port}
 do
@@ -42,4 +34,4 @@ do
 done
 echo 'postgres is available'
 
-npm run start:prod
+exec npm run start:prod

@@ -31,13 +31,6 @@ export OAUTH_DISCOVERY_URL
 export OAUTH_CLIENT_ID
 export OAUTH_CLIENT_SECRET
 
-# Write postgres password to secrets file (hardcoded for now)
-mkdir -p $1/secrets
-if [ ! -f $1/secrets/postgres_password ]; then
-    echo -n "api" > $1/secrets/postgres_password
-    chmod 600 $1/secrets/postgres_password
-fi
-
 export network=${network:-helium}
 export svmTrace=${svmTrace:-false}
 export VAULT_URL=https://vault.blockapps.net:8093
@@ -62,19 +55,12 @@ export blocHost=$STRATO_HOSTNAME:3000
 
 # Pre-create directories so they're owned by current user (not root)
 mkdir -p $1
+cp docker-compose.yml $1
 cd $1
-mkdir -p postgres redis kafka prometheus
+mkdir -p secrets
 
-cp ../docker-compose.yml .
-DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d
-
-sleep 10
-
-mkdir -p logs
-
-# Create YAML oauth credentials for services
+# Create YAML oauth credentials (needed by strato-setup for vault access)
 if [ ! -f secrets/oauth_credentials.yaml ]; then
-    mkdir -p secrets
     cat > secrets/oauth_credentials.yaml << EOF
 discoveryUrl: "$OAUTH_DISCOVERY_URL"
 clientId: "$OAUTH_CLIENT_ID"
@@ -83,15 +69,29 @@ EOF
     chmod 600 secrets/oauth_credentials.yaml
 fi
 
+# Run strato-setup before Docker (creates config files only, no DB connections)
+FIRST_RUN=false
 if [ ! -e .ethereumH/ethconf.yaml ]
 then
-    echo "######## running first time setup"
-    PGPASSWORD=$(cat secrets/postgres_password) createdb -h localhost -U postgres cirrus
-
-    echo "Running setup"
-    strato-setup -K localhost --network=$network --apiIPAddress=$STRATO_IP > logs/strato-setup 2>&1
-    sed -i.bak "s|--network=helium|--network=$network|g" commands.txt && rm commands.txt.bak
+    FIRST_RUN=true
+    echo "######## running strato-setup (config files)"
+    strato-setup --network=$network --apiIPAddress=$STRATO_IP
     sed -i.bak "s|--svmTrace=false|--svmTrace=$svmTrace|g" commands.txt && rm commands.txt.bak
+    cp ../docker-compose.yml .
+fi
+
+# Export postgres password for docker-compose
+export postgres_password=$(cat secrets/postgres_password)
+
+# Start containers (--wait blocks until healthchecked services are ready)
+echo "Starting Docker containers..."
+DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d --wait
+
+# Run seed-genesis after Docker (needs PostgreSQL, Redis, Kafka)
+if [ "$FIRST_RUN" = true ]
+then
+    echo "######## running seed-genesis (databases)"
+    seed-genesis > logs/seed-genesis 2>&1
     echo "Setup complete"
 fi
 
