@@ -587,7 +587,8 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
              , (goldstLpTokenAddress, Delegatecall goldstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
              , (silvstPoolAddress, Delegatecall silvstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
              , (silvstLpTokenAddress, Delegatecall silvstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
-             ]
+             ],
+         validators = hgbc_validators
         }
 
 ownedByBlockApps :: [(B.ByteString, BasicValue)]

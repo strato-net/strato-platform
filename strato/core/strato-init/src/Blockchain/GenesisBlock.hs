@@ -9,10 +9,8 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.GenesisBlock
-  ( initializeGenesisBlock
-  , populateMPTAndWriteGenesis
+  ( populateMPTAndWriteGenesis
   , seedDatabases
-  , populateStorageDBs'
   )
 where
 
@@ -30,12 +28,11 @@ import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
-import Blockchain.Data.GenesisInfo (GenesisInfo)
+import Blockchain.Data.GenesisInfo hiding (stateRoot, number)
 import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
-import Blockchain.Generation (readValidatorsFromGenesisInfo)
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
@@ -48,7 +45,6 @@ import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
 import Blockchain.Strato.StateDiff.Database
@@ -75,23 +71,6 @@ import qualified Data.Text.Encoding as T
 import Data.Traversable (for)
 import Text.Format
 
-getGenesisBlockAndPopulateInitialMPs ::
-  ( MonadIO m,
-    MonadLogger m,
-    HasCodeDB m,
-    HasHashDB m,
-    Mem.HasMemAddressStateDB m,
-    HasStateDB m,
-    HasStorageDB m,
-    HasMemStorageDB m,
-    (Ad.Address `Alters` AddressState) m
-  ) =>
-  GenesisInfo ->
-  m ([Validator], Block)
-getGenesisBlockAndPopulateInitialMPs genesisInfo = do
-  let validators = readValidatorsFromGenesisInfo genesisInfo
-  (validators,) <$> genesisInfoToGenesisBlock validators genesisInfo
-
 -- | Populate the Merkle Patricia Trie and write genesis.json with computed stateRoot.
 -- This is called by strato-setup (before docker containers are running).
 -- Only requires LevelDB access, not Redis/Kafka/PostgreSQL.
@@ -110,15 +89,11 @@ populateMPTAndWriteGenesis ::
   m ()
 populateMPTAndWriteGenesis genesisInfo = do
   $logInfoS "strato-setup" "Populating Merkle Patricia Trie from genesis allocations"
-  (validators, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs genesisInfo
+  genesisBlock <- genesisInfoToGenesisBlock genesisInfo
   let computedStateRoot = stateRoot $ blockBlockData genesisBlock
-      updatedGenesisInfo = genesisInfo
-        { GI.stateRoot = computedStateRoot
-        , GI.validators = validators
-        }
+      updatedGenesisInfo = genesisInfo { GI.stateRoot = computedStateRoot }
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode updatedGenesisInfo
   $logInfoS "strato-setup" $ T.pack $ "Wrote genesis.json with stateRoot: " ++ format computedStateRoot
-  $logInfoS "strato-setup" $ T.pack $ "  validators: " ++ show (length validators)
   $logInfoS "strato-setup" $ T.pack $ "  genesis hash: " ++ format (blockHash genesisBlock)
 
 -- | Seed databases (Redis, Kafka, PostgreSQL) with genesis block data.
@@ -138,15 +113,15 @@ seedDatabases = do
   $logInfoS "seed-genesis" "Reading genesis.json"
   genesisInfo <- liftIO GI.getGenesisInfo
   let genesisBlock = genesisInfoToBlock genesisInfo
-      validators = GI.validators genesisInfo
+      validators' = GI.validators genesisInfo
   $logInfoS "seed-genesis" $ T.pack $ "Genesis hash: " ++ format (blockHash genesisBlock)
-  $logInfoS "seed-genesis" $ T.pack $ "Validators: " ++ show (length validators)
+  $logInfoS "seed-genesis" $ T.pack $ "Validators: " ++ show (length validators')
 
   obGB <- liftIO $ bootstrapSequencer genesisBlock
   putGenesisHash $ blockHash genesisBlock
   void $ putBlocks [genesisBlock] False
 
-  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock (blockHash genesisBlock) 0 validators
+  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock (blockHash genesisBlock) 0 validators'
 
   let genesisChainId = Nothing
   void . execRedis $ do
@@ -167,60 +142,6 @@ seedDatabases = do
   populateStorageDBs genesisInfo genesisBlock genesisChainId
   $logInfoS "seed-genesis" "Database seeding complete"
 
--- | Full initialization - populates MPT and seeds all databases.
--- This is the original combined function for backwards compatibility.
-initializeGenesisBlock ::
-  ( HasCodeDB m,
-    HasHashDB m,
-    Mem.HasMemAddressStateDB m,
-    HasRedis m,
-    HasSQLDB m,
-    HasStateDB m,
-    HasStorageDB m,
-    HasMemStorageDB m,
-    MonadLogger m,
-    (Ad.Address `Alters` AddressState) m,
-    Selectable Ad.Address AddressState m
-  ) =>
-  GenesisInfo ->
-  m ()
-initializeGenesisBlock genesisInfo = do
-  $logInfoS "initgen" "Begin of initgen"
-  (validators, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs genesisInfo
-  -- Write genesis.json with the computed stateRoot
-  let computedStateRoot = stateRoot $ blockBlockData genesisBlock
-      updatedGenesisInfo = genesisInfo { GI.stateRoot = computedStateRoot }
-  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode updatedGenesisInfo
-  $logInfoS "initgen" $ T.pack $ "Wrote genesis.json with stateRoot: " ++ format computedStateRoot
-  obGB <- liftIO $ bootstrapSequencer genesisBlock
-  putGenesisHash $ blockHash genesisBlock
-  $logInfoS "initgen" "Initial merkle patricia tries successfully created"
-  void $ putBlocks [genesisBlock] False
-  $logInfoS "initgen" "Genesis Block put"
-  $logInfoS "initgen" "State diff has been generated"
-
-  _ <- execRedis $ putBestSequencedBlockInfo $ BestSequencedBlock (blockHash genesisBlock) 0 validators
-
-  let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
-  $logInfoS "initgen" "Beginning to write to redis"
-  void . execRedis $ do
-    forceBestBlockInfo
-      (blockHash genesisBlock)
-      (number . blockBlockData $ genesisBlock)
-
-  void . execRedis $
-    putBlock OutputBlock
-    { obOrigin = Origin.Direct,
-      obBlockData = blockBlockData genesisBlock,
-      obReceiptTransactions = [],
-      obBlockUncles = []
-    }
-
-  $logInfoS "initgen" "best block info inserted"
-  liftIO $ bootstrapIndexer obGB
-  $logInfoS "initgen" "indexer has been bootstrapped"
-  populateStorageDBs genesisInfo genesisBlock genesisChainId
-  $logInfoS "initgen" "populateStorageDBs is done"
 
 
   -- | Populate storage databases with genesis block state and generate
@@ -311,8 +232,8 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
 
   -- Step 3: Address Processing - Iterate through all genesis account addresses
   let addresses = GI.addrInfoAddress <$> GI.addressInfo genesisInfo
-      events = GI.events genesisInfo
-      delegatecalls = GI.delegatecalls genesisInfo
+      events' = GI.events genesisInfo
+      delegatecalls' = GI.delegatecalls genesisInfo
 
   ccas <- fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
     let srcHash = hash $ T.encodeUtf8 src
@@ -334,7 +255,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
     -- Step 4: State Diff Generation - Create SQL database diffs for account creation
     accountDiffs <- mapM eventualAccountState addrStateMap
     -- Step 5: VM Event Production - Generate and publish VM events to Kafka
-    let addressEvents = Map.findWithDefault S.empty address  events
+    let addressEvents = Map.findWithDefault S.empty address  events'
         dc = case addressStateCodeHash addressState of
           ExternallyOwned{} -> S.empty
           SolidVMCode name _ -> S.singleton $ A.Delegatecall
@@ -343,7 +264,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
             , A._delegatecallOrganization = Just "BlockApps"
             , A._delegatecallContractName = T.pack name
             }
-    let addressDelegatecalls = dc S.>< Map.findWithDefault S.empty address delegatecalls
+    let addressDelegatecalls = dc S.>< Map.findWithDefault S.empty address delegatecalls'
     vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) accountDiffs
     pub (Just $ mkStateDiff accountDiffs) vmEvents
 
@@ -370,7 +291,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
       -> Ad.Address
       -> AccountDiff 'Eventual
       -> m VMEvent
-    toAction addressEvents delegatecalls a d = do
+    toAction addressEvents delegatecalls' a d = do
       pure . NewAction $ A.Action
             { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
               A._blockTimestamp =
@@ -382,7 +303,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
                 OMap.singleton (a, A.ActionData storageDiff),
               A._newCodeCollections = OMap.empty,
               A._events = addressEvents,
-              A._delegatecalls = delegatecalls
+              A._delegatecalls = delegatecalls'
             }
       where
 

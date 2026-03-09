@@ -2,7 +2,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
@@ -32,7 +31,6 @@ import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Validator
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Crypto.Util (i2bs_unsized)
@@ -138,10 +136,9 @@ genesisInfoToGenesisBlock ::
     HasMemStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
-  [Validator] ->
   GenesisInfo ->
   m Block
-genesisInfoToGenesisBlock validators gi = do
+genesisInfoToGenesisBlock gi = do
   let codes = GI.codeInfo gi
   let accounts = GI.addressInfo gi
   initializeCodeDB "SolidVM" codes
@@ -157,7 +154,7 @@ genesisInfoToGenesisBlock validators gi = do
             number = GI.number gi,
             timestamp = GI.timestamp gi,
             extraData = i2bs_unsized $ GI.extraData gi,
-            currentValidators=validators,
+            currentValidators=GI.validators gi,
             newValidators=[],
             removedValidators=[],
             proposalSignature=Nothing,
