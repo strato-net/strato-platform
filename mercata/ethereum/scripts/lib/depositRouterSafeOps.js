@@ -136,19 +136,22 @@ function encodeCall(method, args) {
   return iface.encodeFunctionData(method, args);
 }
 
-function resolveSafeTxGas(parsedOptions, txCount) {
+function resolveSafeTxGasOverride(parsedOptions) {
   const raw =
     parsedOptions?.safeTxGas ??
     parsedOptions?.safeTxGasLimit ??
     process.env.SAFE_TX_GAS;
 
+  if (raw === undefined || raw === null || String(raw).trim() === "") {
+    return undefined;
+  }
+
   const parsed = Number(raw);
-  if (Number.isInteger(parsed) && parsed > 0) {
+  if (Number.isInteger(parsed) && parsed >= 0) {
     return parsed;
   }
 
-  const count = Number.isInteger(txCount) && txCount > 0 ? txCount : 1;
-  return Math.max(120000, count * 120000);
+  throw new Error(`Invalid safeTxGas override: ${String(raw)}`);
 }
 
 async function proposeBatch(chainId, transactions, options) {
@@ -158,7 +161,7 @@ async function proposeBatch(chainId, transactions, options) {
       : {};
   const safeAddress = normalizeAddress(parsedOptions.safeAddress);
   const nonceValue = parsedOptions.nonce;
-  const safeTxGas = resolveSafeTxGas(parsedOptions, transactions?.length || 1);
+  const safeTxGas = resolveSafeTxGasOverride(parsedOptions);
 
   if (!safeAddress) {
     throw new Error("Missing safeAddress for Safe proposal");
@@ -179,12 +182,14 @@ async function proposeBatch(chainId, transactions, options) {
     ? nonceValue
     : Number(await apiKit.getNextNonce(safeAddress));
 
+  const txOptions = { nonce };
+  if (safeTxGas !== undefined) {
+    txOptions.safeTxGas = String(safeTxGas);
+  }
+
   const safeTx = await protocolKit.createTransaction({
     transactions,
-    options: {
-      nonce,
-      safeTxGas: String(safeTxGas),
-    },
+    options: txOptions,
   });
   const safeTxHash = await protocolKit.getTransactionHash(safeTx);
   const signature = await protocolKit.signHash(safeTxHash);

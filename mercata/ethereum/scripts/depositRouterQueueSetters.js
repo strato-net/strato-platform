@@ -436,21 +436,22 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
   const byChain = {};
   for (const chainId of selectedChains) {
     byChain[chainId] = {
-      setRoutePermitted: [],
+      tokenUpdates: [],
     };
   }
 
   for (const route of routes.values()) {
     if (!route.enabled) continue;
-    byChain[route.chainId].setRoutePermitted.push({
+    byChain[route.chainId].tokenUpdates.push({
       token: route.externalToken,
       target: route.targetStratoToken,
-      enabled: route.enabled,
+      minAmount: 0,
+      isPermitted: true,
     });
   }
 
   for (const chainId of selectedChains) {
-    byChain[chainId].setRoutePermitted.sort((a, b) => {
+    byChain[chainId].tokenUpdates.sort((a, b) => {
       const tokenCmp = a.token.localeCompare(b.token);
       if (tokenCmp !== 0) return tokenCmp;
       return a.target.localeCompare(b.target);
@@ -460,29 +461,30 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
   return byChain;
 }
 
-function buildTransactions(proxyAddress, chainConfig) {
-  const txs = [];
+function buildTransactions(proxyAddress, chainConfig, chunkSize) {
+  const batches = chunkArray(chainConfig.tokenUpdates || [], chunkSize);
 
-  for (const row of chainConfig.setRoutePermitted || []) {
-    txs.push({
-      to: ethers.getAddress(proxyAddress),
-      value: "0",
-      data: encodeCall("setRoutePermitted", [
-        ethers.getAddress(row.token),
-        ethers.getAddress(row.target),
-        !!row.enabled,
-      ]),
-      operation: 0,
-      meta: {
-        method: "setRoutePermitted",
+  return batches.map((rows) => ({
+    to: ethers.getAddress(proxyAddress),
+    value: "0",
+    data: encodeCall("batchUpdateTokens", [
+      rows.map((row) => ethers.getAddress(row.token)),
+      rows.map((row) => row.minAmount),
+      rows.map((row) => !!row.isPermitted),
+      rows.map((row) => ethers.getAddress(row.target)),
+    ]),
+    operation: 0,
+    meta: {
+      method: "batchUpdateTokens",
+      itemCount: rows.length,
+      items: rows.map((row) => ({
         token: row.token,
         target: row.target,
-        enabled: !!row.enabled,
-      },
-    });
-  }
-
-  return txs;
+        minAmount: row.minAmount,
+        isPermitted: !!row.isPermitted,
+      })),
+    },
+  }));
 }
 
 async function main() {
@@ -542,8 +544,7 @@ async function main() {
     const owner = await router.owner();
     const ownerIsSafe = normalizeAddress(owner) === normalizeAddress(safeAddress);
 
-    const txs = buildTransactions(proxyAddress, chainConfig);
-    const chunks = chunkArray(txs, chunkSize);
+    const txs = buildTransactions(proxyAddress, chainConfig, chunkSize);
 
     const chainResult = {
       chainId,
@@ -552,7 +553,7 @@ async function main() {
       safeAddress,
       owner,
       ownerIsSafe,
-      routeCount: chainConfig.setRoutePermitted.length,
+      routeCount: chainConfig.tokenUpdates.length,
       queuedCallCount: txs.length,
       proposals: [],
       warning: ownerIsSafe ? null : "Proxy owner is not the Safe address",
@@ -566,17 +567,16 @@ async function main() {
       }
 
       let nonceCursor = null;
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i].map((tx) => ({
-          to: tx.to,
-          value: tx.value,
-          data: tx.data,
-          operation: tx.operation,
-        }));
-
+      for (let i = 0; i < txs.length; i++) {
+        const tx = txs[i];
         const proposal = await proposeBatch(
           chainId,
-          chunk,
+          [{
+            to: tx.to,
+            value: tx.value,
+            data: tx.data,
+            operation: tx.operation,
+          }],
           {
             safeAddress,
             nonce: Number.isInteger(nonceCursor) ? nonceCursor : undefined,
@@ -587,16 +587,18 @@ async function main() {
 
         chainResult.proposals.push({
           batchIndex: i,
-          txCount: chunk.length,
+          txCount: 1,
+          itemCount: tx.meta.itemCount,
           nonce: proposal.nonce,
           safeTxHash: proposal.safeTxHash,
         });
       }
     } else {
-      chainResult.preview = chunks.map((chunk, idx) => ({
+      chainResult.preview = txs.map((tx, idx) => ({
         batchIndex: idx,
-        txCount: chunk.length,
-        calls: chunk.map((tx) => tx.meta),
+        txCount: 1,
+        itemCount: tx.meta.itemCount,
+        calls: [tx.meta],
       }));
     }
 
