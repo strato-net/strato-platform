@@ -36,6 +36,8 @@ export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
 export const baseUrl = process.env.BASE_URL || "http://localhost";
+export const griphookMcpUrl = process.env.GRIPHOOK_MCP_URL || "https://griphook.strato.nexus/mcp";
+export const griphookMcpTimeoutMs = Number(process.env.GRIPHOOK_MCP_TIMEOUT_MS || 30000);
 
 // Smart contract addresses
 export const burnAddress = process.env.BURN_ADDRESS || "0000000000000000000000000000000000000000";
