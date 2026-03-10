@@ -36,6 +36,12 @@ export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
 export const baseUrl = process.env.BASE_URL || "http://localhost";
+export const griphookMcpUrl = process.env.GRIPHOOK_MCP_URL || "https://griphook.strato.nexus/mcp";
+export const griphookMcpTimeoutMs = Number(process.env.GRIPHOOK_MCP_TIMEOUT_MS || 30000);
+export const gptApiKey = process.env.OPENAI_API_KEY || process.env.GPT_TOKEN || process.env.GPT_API_KEY || "";
+export const gptModel = process.env.OPENAI_MODEL || process.env.GPT_MODEL || "gpt-4.1-mini";
+export const gptApiBase = process.env.OPENAI_API_BASE || "https://api.openai.com/v1";
+export const gptTimeoutMs = Number(process.env.OPENAI_TIMEOUT_MS || 30000);
 
 // Smart contract addresses
 export const burnAddress = process.env.BURN_ADDRESS || "0000000000000000000000000000000000000000";

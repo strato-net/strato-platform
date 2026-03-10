@@ -16,7 +16,8 @@ import {
   UserPlus,
   LucideIcon,
   Vault,
-  CreditCard
+  CreditCard,
+  MessageSquare
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -39,6 +40,7 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+  { icon: MessageSquare, label: 'AI Assistant', path: '/dashboard/assistant' },
   { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
   { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
