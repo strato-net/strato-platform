@@ -80,12 +80,18 @@ export const defaultVaultFactoryFor: Record<string, string> = {
   "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
 };
 
+export const defaultMetalForgeFor: Record<string, string> = {
+  "114784819836269": "c5ed981b816a626981a5747d125e0e7296b2c7c6", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet — TODO: set after deployment
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
 export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
+export let metalForge: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -124,6 +130,14 @@ function setVaultFactoryConfig(networkId: string) {
   }
 }
 
+function setMetalForgeConfig(networkId: string) {
+  if (process.env.METAL_FORGE) {
+    metalForge = process.env.METAL_FORGE;
+  } else {
+    metalForge = defaultMetalForgeFor[networkId];
+  }
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -137,6 +151,7 @@ export async function initNetworkConfig() {
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
+  setMetalForgeConfig(networkId);
 }
 
 // Addresses of internal protocol contracts whose Token:Transfer events should
