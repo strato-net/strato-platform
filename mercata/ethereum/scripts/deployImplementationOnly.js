@@ -1,12 +1,38 @@
-const { ethers } = require("hardhat");
+const hre = require("hardhat");
+const { ethers } = hre;
+const { Wallet } = require("ethers");
 const fs = require("fs");
 const path = require("path");
 
+function isRemoteNetwork(networkName) {
+  return networkName !== "hardhat" && networkName !== "localhost";
+}
+
+async function getDeploymentFactory(contractName) {
+  const networkName = hre.network.name;
+
+  if (
+    isRemoteNetwork(networkName) &&
+    typeof hre.network.config.url === "string" &&
+    process.env.PRIVATE_KEY
+  ) {
+    const provider = new ethers.JsonRpcProvider(hre.network.config.url);
+    const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
+    const factory = await ethers.getContractFactory(contractName, wallet);
+
+    return { factory, deployer: wallet, provider };
+  }
+
+  const [deployer] = await ethers.getSigners();
+  const factory = await ethers.getContractFactory(contractName, deployer);
+  return { factory, deployer, provider: ethers.provider };
+}
+
 async function main() {
   const contractName = process.env.CONTRACT_NAME || "DepositRouter";
-  const network = await ethers.provider.getNetwork();
-  const networkName = network.name || "unknown";
-  const [deployer] = await ethers.getSigners();
+  const { factory, deployer, provider } = await getDeploymentFactory(contractName);
+  const network = await provider.getNetwork();
+  const networkName = hre.network.name || network.name || "unknown";
 
   console.log("=".repeat(60));
   console.log("IMPLEMENTATION-ONLY DEPLOYMENT");
@@ -15,7 +41,6 @@ async function main() {
   console.log("Network:", networkName, `(${network.chainId})`);
   console.log("Deployer:", deployer.address);
 
-  const factory = await ethers.getContractFactory(contractName);
   const implementation = await factory.deploy();
   await implementation.waitForDeployment();
   const implementationAddress = await implementation.getAddress();
@@ -59,4 +84,3 @@ main().catch((error) => {
   console.error("Implementation deployment failed:", error.message);
   process.exit(1);
 });
-
