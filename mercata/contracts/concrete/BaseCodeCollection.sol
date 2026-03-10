@@ -16,6 +16,9 @@ import "./Pools/Pool.sol";
 import "./Pools/PoolFactory.sol";
 import "./Pools/StablePool.sol";
 
+//Metals
+import "./Metals/MetalForge.sol";
+
 //Admin
 // import "Admin/FeeCollector.sol";
 
@@ -74,6 +77,7 @@ contract record Mercata is Authorizable {
     Rewards public rewards;
     Token public cataToken;
     Escrow public escrow;
+    MetalForge public metalForge;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
@@ -194,6 +198,16 @@ contract record Mercata is Authorizable {
         address escrowImpl = address(new Escrow(implOwnerIgnored));
         escrow = Escrow(address(new Proxy(escrowImpl, this)));
         Ownable(escrow).transferOwnership(address(adminRegistry));
+
+        address metalForgeImpl = address(new MetalForge(implOwnerIgnored));
+        metalForge = MetalForge(address(new Proxy(metalForgeImpl, this)));
+        metalForge.initialize(
+            address(0x0000000000000000000000000000000000001002),
+            address(0xe4f080a6d6e442a8f256cb76b51f3ea4c49659e0),
+            address(0x000000000000000000000000000000000000100d),
+            address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010)
+        );
+        Ownable(metalForge).transferOwnership(address(0x000000000000000000000000000000000000100c));
 
         adminRegistry.swapAdmin(this, msg.sender);
     }
