@@ -48,6 +48,7 @@ library:
   - solid-vm-model
   - sql-monad
   - strato-conf
+  - strato-genesis
   - strato-index
   - strato-model
   - strato-redis-blockdb

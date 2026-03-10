@@ -17,20 +17,19 @@ module Executable.EthereumVM
   )
 where
 
---import           Data.List.Split                       (chunksOf)
-
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.Transactions as Flush
---import Blockchain.BlockChain
 import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
-import Blockchain.DB.StateDB (HasStateDB, setStateDBStateRoot)
+import Blockchain.DB.StateDB (setStateDBStateRoot)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
-import Blockchain.Data.BlockHeader
+import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
+import Blockchain.Data.GenesisInfo (stateRoot, getGenesisInfo)
 import qualified Blockchain.Data.TXOrigin as TO
+import Blockchain.Database.MerklePatricia.NodeData
 import Blockchain.EthConf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
@@ -42,6 +41,7 @@ import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
@@ -54,6 +54,7 @@ import Blockchain.VMOptions
 import Blockchain.Wiring
 import Conduit hiding (Flush)
 import Control.Monad
+import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
@@ -67,19 +68,20 @@ import Debugger
 import Executable.EthereumVM2
 import Text.Format (format)
 
-
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
   void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
 --    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
+    bootstrapIfFirstRun
+
     initializeBestBlock
 
     failures <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
 
         let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
-        $logInfoLS "ethereumVM/maybeSelfAddress" (format maybeSelfAddress)
+        $logInfoS "ethereumVM/maybeSelfAddress" $ T.pack $ format maybeSelfAddress
         case maybeSelfAddress of
           Just x -> contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = x}
           Nothing -> pure ()
@@ -129,7 +131,19 @@ ethereumVM d = runResourceT $ do
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
-initializeBestBlock :: (HasContext m, HasStateDB m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
+bootstrapIfFirstRun :: (MonadLogger m, (StateRoot `Alters` NodeData) m, HasContext m) => m ()
+bootstrapIfFirstRun = do
+  genesisInfo <- getGenesisInfo
+  let genesisHash = blockHash (genesisInfoToBlock genesisInfo)
+  maybeGenesisStateRoot <- getChainStateRoot Nothing genesisHash
+  case maybeGenesisStateRoot of -- If first run, then bootstrap
+    Nothing -> do
+      $logInfoS "bootstrap" "Bootstrapping"
+      bootstrapChainDB genesisHash $ stateRoot genesisInfo
+      setStateDBStateRoot Nothing  $ stateRoot genesisInfo
+    Just _ -> $logInfoS "bootstrap" "Bootstrapping not needed"
+
+initializeBestBlock :: (HasContext m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
 initializeBestBlock = do
   maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
   maybeRedisBestBlock <-
@@ -140,9 +154,6 @@ initializeBestBlock = do
   case maybeRedisBestBlock of
     Nothing -> error "no best block in redisdb"
     Just redisBestBlock -> do
-      let sr = stateRoot $ obBlockData redisBestBlock
-      bootstrapChainDB (blockHeaderHash $ obBlockData redisBestBlock) sr
-      setStateDBStateRoot Nothing sr
       putContextBestBlockInfo $ outputBlockToContextBestBlockInfo redisBestBlock
 
       Bagger.processNewBestBlock (blockHeaderHash $ obBlockData redisBestBlock) (obBlockData redisBestBlock) [] -- bootstrap Bagger with genesis block
