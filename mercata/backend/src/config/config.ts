@@ -82,7 +82,7 @@ export const defaultVaultFactoryFor: Record<string, string> = {
 
 export const defaultMetalForgeFor: Record<string, string> = {
   "114784819836269": "c5ed981b816a626981a5747d125e0e7296b2c7c6", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet — TODO: set after deployment
+  "33056204878082667": "1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113", // Upquark mainnet
 };
 
 export const defaultCreditCardTopUpFor: Record<string, string> = {
