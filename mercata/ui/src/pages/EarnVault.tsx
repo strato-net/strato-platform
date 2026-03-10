@@ -251,7 +251,7 @@ const EarnVault = () => {
                   </div>
                 </section>
 
-                <section className="space-y-3">
+                {/* <section className="space-y-3">
                   <h2 className="text-xl font-semibold">Fees</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
                     <div className="rounded-xl border border-border bg-muted/30 p-4">
@@ -267,7 +267,7 @@ const EarnVault = () => {
                       <p className="text-2xl font-semibold mt-1">~24h</p>
                     </div>
                   </div>
-                </section>
+                </section> */}
 
                 <section className="space-y-3">
                   <h2 className="text-xl font-semibold">Your Position</h2>
