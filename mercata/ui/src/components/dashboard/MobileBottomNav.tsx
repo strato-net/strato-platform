@@ -1,21 +1,22 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ArrowUpDown, 
-  Landmark, 
-  ArrowLeftRight, 
-  Menu, 
-  Send, 
-  Gift, 
-  Activity, 
+import {
+  LayoutDashboard,
+  ArrowUpDown,
+  Landmark,
+  ArrowLeftRight,
+  Menu,
+  Send,
+  Gift,
+  Activity,
   CreditCard,
-  Download, 
-  BarChart3, 
-  Droplets, 
+  Download,
+  BarChart3,
+  Droplets,
   Shield,
   UserPlus,
   Vault,
+  Gem,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -31,7 +32,7 @@ const PRIMARY_NAV_ITEMS = [
 
 // Items shown in "More" drawer
 const MORE_ITEMS = [
-  { icon: CreditCard, label: 'Buy Crypto', path: '/dashboard/onramp' },
+  { icon: Gem, label: 'Buy Metals', path: '/dashboard/buy-metals' },
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
@@ -50,7 +51,7 @@ const MobileBottomNav = () => {
   const navigate = useNavigate();
   const { isAdmin } = useUser();
 
-  const isActive = (path: string) => 
+  const isActive = (path: string) =>
     path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(path);
 
   const isMoreActive = MORE_ITEMS.some(item => isActive(item.path));
@@ -71,25 +72,23 @@ const MobileBottomNav = () => {
             <Link
               key={path}
               to={path}
-              className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${
-                isActive(path) 
-                  ? 'text-blue-600 dark:text-blue-400' 
+              className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${isActive(path)
+                  ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-500 dark:text-gray-400'
-              }`}
+                }`}
             >
               <Icon size={20} />
               <span className="text-xs font-medium">{label}</span>
             </Link>
           ))}
-          
+
           {/* More Button */}
           <button
             onClick={() => setIsMoreOpen(true)}
-            className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${
-              isMoreActive 
-                ? 'text-blue-600 dark:text-blue-400' 
+            className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${isMoreActive
+                ? 'text-blue-600 dark:text-blue-400'
                 : 'text-gray-500 dark:text-gray-400'
-            }`}
+              }`}
           >
             <Menu size={20} />
             <span className="text-xs font-medium">More</span>
@@ -108,18 +107,17 @@ const MobileBottomNav = () => {
               </button>
             </DrawerClose>
           </div>
-          
+
           {/* Menu Items */}
           <div className="px-3 pb-4">
             {filteredMoreItems.map(({ icon: Icon, label, path }) => (
               <button
                 key={path}
                 onClick={() => handleMoreItemClick(path)}
-                className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${
-                  isActive(path)
+                className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${isActive(path)
                     ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                     : 'text-foreground hover:bg-muted'
-                }`}
+                  }`}
               >
                 <Icon size={20} />
                 <span className="text-sm font-medium">{label}</span>
