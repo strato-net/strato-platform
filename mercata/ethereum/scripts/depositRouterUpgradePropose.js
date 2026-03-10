@@ -74,6 +74,9 @@ const CHAIN_NAME_TO_ID = {
   base_sepolia: 84532,
   "base-sepolia": 84532,
   basesepolia: 84532,
+  linea: 59144,
+  linea_mainnet: 59144,
+  "linea-mainnet": 59144,
 };
 
 function parseChains(args) {
@@ -97,8 +100,10 @@ function parseChains(args) {
 function getImplementationForChain(chainId) {
   const implEth = normalizeAddress(process.env.ROUTER_IMPL_ETH);
   const implBase = normalizeAddress(process.env.ROUTER_IMPL_BASE);
+  const implLinea = normalizeAddress(process.env.ROUTER_IMPL_LINEA);
   if (chainId === 1 || chainId === 11155111) return implEth;
   if (chainId === 8453 || chainId === 84532) return implBase;
+  if (chainId === 59144) return implLinea;
   return "";
 }
 
@@ -117,6 +122,7 @@ function getHardhatNetwork(chainId) {
   if (chainId === 8453) return "base";
   if (chainId === 11155111) return "sepolia";
   if (chainId === 84532) return "baseSepolia";
+  if (chainId === 59144) return "linea";
   return "";
 }
 
@@ -379,8 +385,10 @@ async function main() {
   if (!nodeUrl) throw new Error("NODE_URL missing after env profile application");
   const implEth = normalizeAddress(process.env.ROUTER_IMPL_ETH);
   const implBase = normalizeAddress(process.env.ROUTER_IMPL_BASE);
+  const implLinea = normalizeAddress(process.env.ROUTER_IMPL_LINEA);
   if (!implEth) throw new Error("Missing ROUTER_IMPL_ETH in .env");
   if (!implBase) throw new Error("Missing ROUTER_IMPL_BASE in .env");
+  if (chains.includes(59144) && !implLinea) throw new Error("Missing ROUTER_IMPL_LINEA in .env");
   const token = await getCirrusAccessToken();
   const topology = await fetchBridgeTopology(
     nodeUrl,
