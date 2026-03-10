@@ -29,6 +29,7 @@ export const constants = (() => {
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
+  const CreditCardTopUp = `${CONTRACT_PREFIX}CreditCardTopUp`;
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
@@ -138,6 +139,7 @@ export const constants = (() => {
     PoolConfigurator,
     AdminRegistry,
     MercataBridge,
+    CreditCardTopUp,
     CDPEngine,
     CDPVault,
     CDPRegistry,
@@ -150,6 +152,7 @@ export const constants = (() => {
     get metalForge() { return config.metalForge; },
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
     mercataBridge,
+    get creditCardTopUp() { return config.creditCardTopUp; },  // Use getter to get current value after init
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,

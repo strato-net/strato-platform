@@ -14,7 +14,7 @@ import {
 import { logError, logInfo } from "../utils/logger";
 import { normalizeAddress } from "../utils/utils";
 
-// DepositInitiated(uint256,string,address,uint256,address) keccak256 hash
+// DepositRouted(address,uint256,address,address,address,uint96) keccak256 hash
 import { DEPOSIT_EVENT_SIGNATURE } from "../config";
 
 const parseDepositEvents = async (logs: any[], externalChainId: number): Promise<DepositArgs[]> => {
@@ -22,9 +22,11 @@ const parseDepositEvents = async (logs: any[], externalChainId: number): Promise
     const externalToken = normalizeAddress(log.topics[1]);
     const externalSender = normalizeAddress(log.topics[2]);
     const stratoRecipient = normalizeAddress(log.topics[3]);
-    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId)
-    // Data layout: [amount(32 bytes)][depositId(32 bytes)]
+    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)
+    // Data layout: [amount(32 bytes)][targetStratoToken(32 bytes)][depositId(32 bytes)]
     const externalTokenAmount = BigInt("0x" + log.data.substring(2, 66)).toString();
+    const targetStratoTokenWord = log.data.substring(66, 130);
+    const targetStratoToken = normalizeAddress("0x" + targetStratoTokenWord.slice(-40));
 
     return {
       externalChainId,
@@ -32,7 +34,8 @@ const parseDepositEvents = async (logs: any[], externalChainId: number): Promise
       externalToken,
       externalTokenAmount,
       externalTxHash: log.transactionHash,
-      stratoRecipient
+      stratoRecipient,
+      targetStratoToken,
     };
   });
 };

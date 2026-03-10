@@ -43,6 +43,9 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when an asset's enabled state is toggled
     event AssetToggled(bool enabled, uint256 externalChainId, address externalToken);
 
+    /// @notice Emitted when the hot withdrawal threshold is updated
+    event HotWithdrawalThresholdUpdated(uint256 newThreshold, uint256 oldThreshold);
+
     // ───────────── Deposit & withdrawal related events ─────────────
     /// @notice Emitted when a deposit is aborted by the owner
     event DepositAborted(uint256 srcChainId, string srcTxHash);
@@ -153,6 +156,10 @@ contract record MercataBridge is Ownable {
     /// @dev Default: 172800 seconds (48 hours)
     uint256 public WITHDRAWAL_ABORT_DELAY = 172800;
 
+    /// @notice Threshold below which withdrawals bypass SAFE multi-sig and use hot wallet
+    /// @dev Default: 100 * 10^18 ($100 in USDST wei). Set to 0 to disable hot wallet path.
+    uint256 public hotWithdrawalThreshold = 100 * (10 ** 18);
+
     // ───────────── Deposit & withdrawal related state variables ─────────────
     /// @notice Registry of deposit transactions with replay protection
     /// @dev Maps external chain ID and transaction hash to deposit information
@@ -190,6 +197,10 @@ contract record MercataBridge is Ownable {
     /// @dev Used to configure token mappings between external chains and STRATO
     /// @dev Includes decimal conversion information for each token pair
     mapping(address => mapping(uint256 => AssetInfo)) public record assets;
+
+    /// @notice Route allowlist for one-to-many external->STRATO mappings
+    /// @dev Key: (externalToken, externalChainId, targetStratoToken) -> enabled
+    mapping(address => mapping(uint256 => mapping(address => bool))) public record assetRouteEnabled;
 
 
     /* ===================================================================== */
@@ -445,6 +456,40 @@ contract record MercataBridge is Ownable {
         emit AssetToggled(enabled, externalChainId, externalToken);
     }
 
+    /**
+     * @dev Enables/disables an external asset route to a target STRATO token
+     * @notice Supports one-to-many mappings such as XAUT -> XAUTST and XAUT -> GOLDST
+     * @param externalToken The external token address
+     * @param externalChainId The external chain identifier
+     * @param targetStratoToken The STRATO token that can be minted/burned for this route
+     * @param enabled Whether route should be enabled
+     */
+    function setAssetRoute(
+        address externalToken,
+        uint256 externalChainId,
+        address targetStratoToken,
+        bool enabled
+    ) external onlyOwner {
+        require(externalChainId > 0, "MB: invalid chain id");
+        require(targetStratoToken != address(0), "MB: invalid target token");
+        require(assets[externalToken][externalChainId].externalChainId == externalChainId, "MB: asset not found");
+        if (enabled) {
+            require(TokenFactory(tokenFactory).isTokenActive(targetStratoToken), "MB: inactive token");
+        }
+        assetRouteEnabled[externalToken][externalChainId][targetStratoToken] = enabled;
+    }
+
+    /**
+     * @dev Sets the hot withdrawal threshold
+     * @notice Withdrawals with stratoTokenAmount below this threshold can bypass SAFE multi-sig
+     * @notice Set to 0 to disable the hot wallet path (all withdrawals go through SAFE)
+     * @param newThreshold The new threshold in wei (e.g. 100e18 for $100)
+     */
+    function setHotWithdrawalThreshold(uint256 newThreshold) external onlyOwner {
+        emit HotWithdrawalThresholdUpdated(newThreshold, hotWithdrawalThreshold);
+        hotWithdrawalThreshold = newThreshold;
+    }
+
     // ───────────── Escrow related functions ─────────────
     /**
      * @dev Burns tokens from the escrow contract
@@ -501,6 +546,19 @@ contract record MercataBridge is Ownable {
         require(actualAmount > 0, "MB: no tokens sent");
     }
 
+    function _requireRouteEnabled(
+        address externalToken,
+        uint256 externalChainId,
+        address targetStratoToken
+    ) internal view {
+        require(targetStratoToken != address(0), "MB: invalid target token");
+        AssetInfo a = assets[externalToken][externalChainId];
+        require(a.stratoToken != address(0), "MB: asset missing");
+        bool isDefaultRoute = targetStratoToken == a.stratoToken && a.enabled;
+        bool isExplicitRoute = assetRouteEnabled[externalToken][externalChainId][targetStratoToken];
+        require(isDefaultRoute || isExplicitRoute, "MB: route not enabled");
+    }
+
     function _autoSave(DepositInfo d, uint256 externalChainId, string normalizedTxHash) internal {
         // Autosaving is disabled if lendingRegistry is null
         require(lendingRegistry != address(0), "MB: lending registry not set");
@@ -541,9 +599,16 @@ contract record MercataBridge is Ownable {
      * @param externalTokenAmount The amount of external tokens to deposit (in external token decimals)
      * @param externalTxHash The transaction hash on the external chain
      * @param stratoRecipient The STRATO address to receive the minted tokens
+     * @param targetStratoToken The selected STRATO token route target
      */
     function deposit(
-        uint256 externalChainId, address externalSender, address externalToken, uint256 externalTokenAmount, string externalTxHash, address stratoRecipient
+        uint256 externalChainId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address targetStratoToken
     ) public onlyOwner whenDepositsOpen {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(externalSender != address(0), "MB: invalid external sender");
@@ -558,18 +623,18 @@ contract record MercataBridge is Ownable {
         require(deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE, "MB: duplicate deposit");
 
         AssetInfo a = assets[externalToken][externalChainId];
-        require(a.enabled, "MB: asset not enabled");
-        require(TokenFactory(tokenFactory).isTokenActive(a.stratoToken), "MB: inactive token");
+        _requireRouteEnabled(externalToken, externalChainId, targetStratoToken);
+        require(TokenFactory(tokenFactory).isTokenActive(targetStratoToken), "MB: inactive token");
 
         // Example: 1e6 USDC * 10^(18-6) = 1e6 * 10^12 = 1e18 USDCST tokens
         uint256 stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
         require(stratoTokenAmount > 0, "MB: invalid strato token amount");
 
         deposits[externalChainId][normalizedTxHash] = DepositInfo(
-            BridgeStatus.INITIATED, externalSender, externalToken, block.timestamp, stratoRecipient, a.stratoToken, stratoTokenAmount, block.timestamp
+            BridgeStatus.INITIATED, externalSender, externalToken, block.timestamp, stratoRecipient, targetStratoToken, stratoTokenAmount, block.timestamp
         );
 
-        emit DepositInitiated(externalChainId, externalSender, normalizedTxHash, stratoRecipient, a.stratoToken, stratoTokenAmount);
+        emit DepositInitiated(externalChainId, externalSender, normalizedTxHash, stratoRecipient, targetStratoToken, stratoTokenAmount);
     }
 
     /**
@@ -584,14 +649,38 @@ contract record MercataBridge is Ownable {
      * @param externalTokenAmounts Array of external token amounts (in external token decimals)
      * @param externalTxHashes Array of external transaction hashes
      * @param stratoRecipients Array of STRATO recipient addresses
+     * @param targetStratoTokens Array of selected STRATO token route targets
      */
     function depositBatch(
-        uint256[] externalChainIds, address[] externalSenders, address[] externalTokens, uint256[] externalTokenAmounts, string[] externalTxHashes, address[] stratoRecipients
+        uint256[] externalChainIds,
+        address[] externalSenders,
+        address[] externalTokens,
+        uint256[] externalTokenAmounts,
+        string[] externalTxHashes,
+        address[] stratoRecipients,
+        address[] targetStratoTokens
     ) external onlyOwner whenDepositsOpen {
         uint256 n = externalChainIds.length;
-        require(n > 0 && n == externalSenders.length && n == externalTokens.length && n == externalTokenAmounts.length && n == externalTxHashes.length && n == stratoRecipients.length, "MB: len");
+        require(
+            n > 0 &&
+            n == externalSenders.length &&
+            n == externalTokens.length &&
+            n == externalTokenAmounts.length &&
+            n == externalTxHashes.length &&
+            n == stratoRecipients.length &&
+            n == targetStratoTokens.length,
+            "MB: len"
+        );
         for (uint256 i = 0; i < n; i++) {
-            deposit(externalChainIds[i], externalSenders[i], externalTokens[i], externalTokenAmounts[i], externalTxHashes[i], stratoRecipients[i]);
+            deposit(
+                externalChainIds[i],
+                externalSenders[i],
+                externalTokens[i],
+                externalTokenAmounts[i],
+                externalTxHashes[i],
+                stratoRecipients[i],
+                targetStratoTokens[i]
+            );
         }
     }
 
@@ -774,20 +863,26 @@ contract record MercataBridge is Ownable {
      * @param externalChainId The external chain identifier where tokens should be sent
      * @param externalRecipient The address on the external chain to receive the tokens
      * @param externalToken The token address on the external chain
+     * @param stratoToken The selected STRATO route token to escrow/burn
      * @param stratoTokenAmount The amount of STRATO tokens to withdraw (any dust from decimal conversion will be kept by user)
      * @return id The unique withdrawal identifier
      */
     function requestWithdrawal(
-        uint256 externalChainId, address externalRecipient, address externalToken, uint256 stratoTokenAmount
+        uint256 externalChainId,
+        address externalRecipient,
+        address externalToken,
+        address stratoToken,
+        uint256 stratoTokenAmount
     ) external whenWithdrawalsOpen returns (uint256 id) {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(externalRecipient != address(0), "MB: invalid external recipient");
+        require(stratoToken != address(0), "MB: invalid strato token");
         require(stratoTokenAmount > 0, "MB: invalid strato token amount");
         require(chains[externalChainId].enabled, "MB: chain not enabled");
 
         AssetInfo a = assets[externalToken][externalChainId];
-        require(a.enabled, "MB: asset not enabled");
-        require(TokenFactory(tokenFactory).isTokenActive(a.stratoToken), "MB: inactive token");
+        _requireRouteEnabled(externalToken, externalChainId, stratoToken);
+        require(TokenFactory(tokenFactory).isTokenActive(stratoToken), "MB: inactive token");
 
         // Example: 1e18 USDCST tokens / 10^(18-6) = 1e18 / 10^12 = 1e6 USDC
         // Round down to the nearest integer
@@ -796,7 +891,7 @@ contract record MercataBridge is Ownable {
 
         stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
         require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
-        stratoTokenAmount = _escrowFunds(a.stratoToken, msg.sender, stratoTokenAmount);
+        stratoTokenAmount = _escrowFunds(stratoToken, msg.sender, stratoTokenAmount);
         require(stratoTokenAmount > 0, "MB: no tokens escrowed");
 
         // Example: 1e18 USDCST tokens / 10^(18-6) = 1e18 / 10^12 = 1e6 USDC
@@ -807,10 +902,10 @@ contract record MercataBridge is Ownable {
         id = ++withdrawalCounter;
 
         withdrawals[id] = WithdrawalInfo(
-            BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken, externalTokenAmount, block.timestamp, msg.sender, a.stratoToken, stratoTokenAmount, block.timestamp
+            BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken, externalTokenAmount, block.timestamp, msg.sender, stratoToken, stratoTokenAmount, block.timestamp
         );
 
-        emit WithdrawalRequested(externalRecipient, externalChainId, externalTokenAmount, stratoTokenAmount, a.stratoToken, msg.sender, id);
+        emit WithdrawalRequested(externalRecipient, externalChainId, externalTokenAmount, stratoTokenAmount, stratoToken, msg.sender, id);
     }
 
     /**

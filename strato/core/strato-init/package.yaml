@@ -46,6 +46,7 @@ library:
   - monad-alter
   - nibblestring
   - persistent-postgresql
+  - random
   - raw-strings-qq
   - redis-monad
   - resourcet
@@ -78,9 +79,19 @@ executables:
     dependencies:
       - common-log
       - hflags
-      - kafka-monad
       - strato-init
       - strato-model
+
+    other-modules: []
+
+  seed-genesis:
+    source-dirs: exec_src/
+    main: SeedGenesis.hs
+    dependencies:
+      - common-log
+      - hflags
+      - strato-conf
+      - strato-init
 
     other-modules: []
 

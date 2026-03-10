@@ -3,14 +3,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.DB.ChainDB
   ( BlockHashRoot (..),
-    BestBlockRoot (..),
     bootstrapChainDB,
     putBlockHeaderInChainDB,
     migrateBlockHeader,
@@ -20,100 +16,24 @@ module Blockchain.DB.ChainDB
   )
 where
 
-import BlockApps.Logging
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
-import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToByteString, zeroHash)
+import Blockchain.Strato.Model.ExtendedWord (Word256)
+import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToByteString)
 import Control.DeepSeq
-import Control.Monad (join)
 import Control.Monad.Change.Alter hiding (lookup)
 import Control.Monad.Change.Modify
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
-import Data.Traversable (for)
 import GHC.Generics
 import Text.Format
 
-{-
-|-------------------------------------------------------------------------------|
-|                          The Chain State Root DB                              |
-|-------------------------------------------------------------------------------|
-| When using Proof of Work as a consensus algorithm,                            |
-| we must be able to run blocks from arbitrary state roots,                     |
-| given that we have previously seen the state root.                            |
-| State roots for the main chain are given in the block header,                 |
-| but there is no such explication for private chains.                          |
-| To mitigate this problem, we must be able to recall the state root            |
-| for any chain id, for any block hash.                                         |
-| To solve this, we'll use a hierarchical approach,                             |
-| which leverages several MP tries to relate block hashes to state roots.       |
-| First, each chain will have a state root, just like the main chain:           |
-|                      state root                                               |
-|                          /\                                                   |
-|                         /  \                                                  |
-|                        /\  /\                                                 |
-|                    account states                                             |
-|                                                                               |
-| Next, the chains' state roots will be stored in a trie, keyed by chain id:    |
-|                      chain root                                               |
-|                          /\                                                   |
-|                         /  \                                                  |
-|                        /\  /\                                                 |
-|                 (chain id, state root)                                        |
-| Then, to keep track of chain roots across blocks, we'll store the chain roots |
-| in a trie, keyed by block hash:                                               |
-|                   block hash root                                             |
-|                          /\                                                   |
-|                         /  \                                                  |
-|                        /\  /\                                                 |
-|         (block hash, (parent hash, chain root))                               |
-| Finally, all known chains that haven't been transacted upon will be stored    |
-| in a trie, keyed by chain id, with value being the chain's genesis state:     |
-|                     genesis root                                              |
-|                          /\                                                   |
-|                         /  \                                                  |
-|                        /\  /\                                                 |
-|  (chain id, (creation block hash, genesis state root))                        |
-| It's important to note that each block hash may have a unique chain root,     |
-| but the genesis root only gets updated when the VM receives a new             |
-| VmGenesis message.                                                            |
-|                                                                               |
-| When the VM receives a new block, it will insert it into the block hash       |
-| trie, with the same chain root as its parent.                                 |
-|                                                                               |
-| When the VM runs private transactions in a block, it will load the            |
-| chain's state root using the block's chain root. If the chain trie does       |
-| not include the chain id, the chain's genesis state root will be loaded       |
-| from the genesis trie, and be inserted into the chain trie. This will,        |
-| in effect, change the the chain root, and the block hash root.                |
-|-------------------------------------------------------------------------------|
--}
-
+-- | Maps block hashes to state roots.
+-- This is a single-tier trie: blockHash -> stateRoot
 newtype BlockHashRoot = BlockHashRoot {unBlockHashRoot :: MP.StateRoot}
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (Format, NFData)
-
-newtype BestBlockRoot = BestBlockRoot {unBestBlockRoot :: MP.StateRoot}
-  deriving (Eq, Ord, Show, Generic)
-  deriving newtype (Format, NFData)
-
-newtype ChainStateInfo = ChainStateInfo (Maybe Word256, Maybe Keccak256, MP.StateRoot)
-
-instance Format ChainStateInfo where
-  format (ChainStateInfo x) = format x
-
-instance RLPSerializable ChainStateInfo where
-  rlpEncode (ChainStateInfo (cId, Just bHash, sRoot)) = RLPArray [rlpEncode cId, rlpEncode bHash, rlpEncode sRoot]
-  rlpEncode (ChainStateInfo (cId, Nothing, sRoot)) = RLPArray [rlpEncode cId, rlpEncode sRoot]
-  rlpDecode (RLPArray [cId, bHash, sRoot]) = ChainStateInfo (rlpDecode cId, Just (rlpDecode bHash), rlpDecode sRoot)
-  rlpDecode (RLPArray [cId, sRoot]) = ChainStateInfo (rlpDecode cId, Nothing, rlpDecode sRoot)
-  rlpDecode o = error ("Error in rlpDecode for ChainStateInfo: bad RLPObject: " ++ show o)
-
-word256ToMPKey :: Maybe Word256 -> N.NibbleString
-word256ToMPKey Nothing = N.EvenNibbleString ""
-word256ToMPKey (Just cid) = N.EvenNibbleString $ word256ToBytes cid
 
 getkv ::
   ( RLPSerializable a,
@@ -141,9 +61,8 @@ bootstrapChainDB ::
   Keccak256 ->
   MP.StateRoot ->
   m ()
-bootstrapChainDB genesisHash startingStateRoot = do
-  putChainBlockHashInfo genesisHash zeroHash MP.emptyTriePtr
-  putChainStateRoot Nothing genesisHash startingStateRoot
+bootstrapChainDB genesisHash startingStateRoot =
+  putStateRoot genesisHash startingStateRoot
 
 putBlockHeaderInChainDB ::
   ( BlockHeaderLike h,
@@ -165,7 +84,7 @@ putBlockHashInChainDB ::
   Keccak256 ->
   m ()
 putBlockHashInChainDB p h =
-  putChainBlockHashInfo h p =<< fromMaybe MP.emptyTriePtr <$> getChainRoot p
+  putStateRoot h =<< fromMaybe MP.emptyTriePtr <$> getStateRoot p
 
 migrateBlockHeader ::
   ( BlockHeaderLike h,
@@ -177,56 +96,54 @@ migrateBlockHeader ::
   m ()
 migrateBlockHeader oldBD newH = do
   let oldH = blockHeaderHash oldBD
-      oldP = blockHeaderParentHash oldBD
-  mExistingChainRoot <- getChainRoot oldH
-  case mExistingChainRoot of
+  mExistingStateRoot <- getStateRoot oldH
+  case mExistingStateRoot of
     Nothing -> putBlockHeaderInChainDB oldBD >> migrateBlockHeader oldBD newH
-    Just cr -> putChainBlockHashInfo newH oldP cr
+    Just sr -> putStateRoot newH sr
 
-getChainRoot ::
+getStateRoot ::
   ( Modifiable BlockHashRoot m,
     (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   Keccak256 ->
   m (Maybe MP.StateRoot)
-getChainRoot = fmap (fmap snd) . getChainBlockHashInfo
-
-getChainBlockHashInfo ::
-  ( Modifiable BlockHashRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Keccak256 ->
-  m (Maybe (Keccak256, MP.StateRoot))
-getChainBlockHashInfo h = do
+getStateRoot h = do
   bhr <- unBlockHashRoot <$> get Proxy
   getkv bhr (N.EvenNibbleString $ keccak256ToByteString h)
 
-putChainBlockHashInfo ::
+putStateRoot ::
   ( Modifiable BlockHashRoot m,
     (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   Keccak256 ->
-  Keccak256 ->
   MP.StateRoot ->
   m ()
-putChainBlockHashInfo h parentHash sr = do
+putStateRoot h sr = do
   bhr <- unBlockHashRoot <$> get Proxy
-  newBlockHashRoot <- putkv bhr (N.EvenNibbleString $ keccak256ToByteString h) (parentHash, sr)
+  newBlockHashRoot <- putkv bhr (N.EvenNibbleString $ keccak256ToByteString h) sr
   put Proxy $ BlockHashRoot newBlockHashRoot
 
+deleteStateRoot ::
+  ( Modifiable BlockHashRoot m,
+    (MP.StateRoot `Alters` MP.NodeData) m
+  ) =>
+  Keccak256 ->
+  m ()
+deleteStateRoot h = do
+  bhr <- unBlockHashRoot <$> get Proxy
+  newBlockHashRoot <- MP.deleteKey bhr (N.EvenNibbleString $ keccak256ToByteString h)
+  put Proxy $ BlockHashRoot newBlockHashRoot
+
+-- External API: chainId parameter is ignored (mainchain only)
+
 getChainStateRoot ::
-  ( MonadLogger m,
-    Modifiable BlockHashRoot m,
+  ( Modifiable BlockHashRoot m,
     (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   Maybe Word256 ->
   Keccak256 ->
   m (Maybe MP.StateRoot)
-getChainStateRoot chainId bh = do
-    mChainRoot <- getChainBlockHashInfo bh
-    fmap join . for mChainRoot $ \(_parentHash, chainRoot) -> do
-      mStateRoot <- getkv chainRoot (word256ToMPKey chainId)
-      return $ fmap (\(ChainStateInfo (_, _, sr)) -> sr) mStateRoot
+getChainStateRoot _chainId bh = getStateRoot bh
 
 putChainStateRoot ::
   ( Modifiable BlockHashRoot m,
@@ -236,13 +153,7 @@ putChainStateRoot ::
   Keccak256 ->
   MP.StateRoot ->
   m ()
-putChainStateRoot chainId bHash stateRoot = do
-  mChainRoot <- getChainBlockHashInfo bHash
-  case mChainRoot of
-    Nothing -> pure ()
-    Just (parentHash, chainRoot) -> do
-      newChainRoot <- putkv chainRoot (word256ToMPKey chainId) $ ChainStateInfo (chainId, Just bHash, stateRoot)
-      putChainBlockHashInfo bHash parentHash newChainRoot
+putChainStateRoot _chainId bHash stateRoot = putStateRoot bHash stateRoot
 
 deleteChainStateRoot ::
   ( Modifiable BlockHashRoot m,
@@ -251,10 +162,4 @@ deleteChainStateRoot ::
   Maybe Word256 ->
   Keccak256 ->
   m ()
-deleteChainStateRoot chainId bHash = do
-  mChainRoot <- getChainBlockHashInfo bHash
-  case mChainRoot of
-    Nothing -> pure ()
-    Just (parentHash, chainRoot) -> do
-      newChainRoot <- MP.deleteKey chainRoot (word256ToMPKey chainId)
-      putChainBlockHashInfo bHash parentHash newChainRoot
+deleteChainStateRoot _chainId bHash = deleteStateRoot bHash

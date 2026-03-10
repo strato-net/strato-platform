@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  ArrowUpDown,
-  Landmark,
-  ArrowLeftRight,
-  Menu,
-  Send,
-  Gift,
-  Activity,
-  Download,
-  BarChart3,
-  Droplets,
+import { 
+  LayoutDashboard, 
+  ArrowUpDown, 
+  Landmark, 
+  ArrowLeftRight, 
+  Menu, 
+  Send, 
+  Gift, 
+  Activity, 
+  CreditCard,
+  Download, 
+  BarChart3, 
+  Droplets, 
   Shield,
   UserPlus,
   Vault,
-  CreditCard,
   Gem,
   X
 } from 'lucide-react';
@@ -38,6 +38,7 @@ const MORE_ITEMS = [
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+  { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
   { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
   { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
   { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
