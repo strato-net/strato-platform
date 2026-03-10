@@ -202,9 +202,9 @@ contract record Mercata is Authorizable {
         address metalForgeImpl = address(new MetalForge(implOwnerIgnored));
         metalForge = MetalForge(address(new Proxy(metalForgeImpl, this)));
         metalForge.initialize(
-            address(0x0000000000000000000000000000000000001002),
-            address(0xe4f080a6d6e442a8f256cb76b51f3ea4c49659e0),
-            address(0x000000000000000000000000000000000000100d),
+            address(priceOracle),
+            address(feeCollector), // TODO: Replace with treasurer address
+            address(feeCollector),
             address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010)
         );
         Ownable(metalForge).transferOwnership(address(0x000000000000000000000000000000000000100c));
