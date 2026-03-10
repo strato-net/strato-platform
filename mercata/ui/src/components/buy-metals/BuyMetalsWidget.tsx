@@ -362,12 +362,10 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
         minMetalOutWei.toString(),
       );
       setTxSuccess(true);
-      setTimeout(() => window.location.reload(), 2000);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
       const msg = e?.response?.data?.error || e?.message || "Transaction failed";
       setTxError(msg);
-      setTimeout(() => window.location.reload(), 3000);
     } finally {
       setTxLoading(false);
     }
