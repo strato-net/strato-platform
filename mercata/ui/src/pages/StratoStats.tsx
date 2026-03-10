@@ -77,43 +77,6 @@ interface AggregatedRevenueResponse {
   aggregated: RevenuePeriod;
 }
 
-interface InterestAccruedResponse {
-  totalDailyInterestUSD: string;
-  totalWeeklyInterestUSD: string;
-  totalMonthlyInterestUSD: string;
-  totalYtdInterestUSD: string;
-  totalAllTimeInterestUSD: string;
-  assets: {
-    asset: string;
-    symbol: string;
-    totalDebtUSD: string;
-    annualRatePercent: number;
-    dailyInterestUSD: string;
-    weeklyInterestUSD: string;
-    monthlyInterestUSD: string;
-    ytdInterestUSD: string;
-    allTimeInterestUSD: string;
-  }[];
-}
-
-interface LendingInterestAccruedResponse {
-  totalDailyRevenueUSD: string;
-  totalWeeklyRevenueUSD: string;
-  totalMonthlyRevenueUSD: string;
-  totalYtdRevenueUSD: string;
-  totalAllTimeRevenueUSD: string;
-  borrowableAsset: {
-    asset: string;
-    symbol: string;
-    totalDebtUSD: string;
-    annualRatePercent: number;
-    dailyRevenueUSD: string;
-    weeklyRevenueUSD: string;
-    monthlyRevenueUSD: string;
-    ytdRevenueUSD: string;
-    allTimeRevenueUSD: string;
-  };
-}
 
 const createEmptyRevenuePeriod = (): RevenuePeriod => ({
   daily: { total: '0', byAsset: [] },
@@ -157,20 +120,11 @@ const StratoStats = () => {
   const [revenueLoading, setRevenueLoading] = useState(true);
   const [revenueError, setRevenueError] = useState<string | null>(null);
 
-  // Interest Accrued state (CDP estimated interest)
-  const [interestAccrued, setInterestAccrued] = useState<InterestAccruedResponse | null>(null);
-  const [interestLoading, setInterestLoading] = useState(true);
-
-  // Lending Interest Accrued state
-  const [lendingInterestAccrued, setLendingInterestAccrued] = useState<LendingInterestAccruedResponse | null>(null);
-  const [lendingInterestLoading, setLendingInterestLoading] = useState(true);
 
   useEffect(() => {
     fetchTokenStats();
     fetchCDPStats();
     fetchProtocolRevenue();
-    fetchInterestAccrued();
-    fetchLendingInterestAccrued();
   }, []);
 
   const fetchTokenStats = async () => {
@@ -235,72 +189,7 @@ const StratoStats = () => {
     }
   };
 
-  const fetchInterestAccrued = async () => {
-    try {
-      setInterestLoading(true);
-      const response = await api.get<InterestAccruedResponse>('/cdp/interest');
-      setInterestAccrued(response.data);
-    } catch (err) {
-      console.error('Failed to fetch interest accrued:', err);
-    } finally {
-      setInterestLoading(false);
-    }
-  };
 
-  const fetchLendingInterestAccrued = async () => {
-    try {
-      setLendingInterestLoading(true);
-      const response = await api.get<LendingInterestAccruedResponse>('/lending/interest');
-      setLendingInterestAccrued(response.data);
-    } catch (err) {
-      console.error('Failed to fetch lending interest accrued:', err);
-    } finally {
-      setLendingInterestLoading(false);
-    }
-  };
-
-  const getEstimatedInterestForPeriod = (period: keyof RevenuePeriod): string => {
-    if (!interestAccrued) return '0';
-    switch (period) {
-      case 'daily':
-        return interestAccrued.totalDailyInterestUSD;
-      case 'weekly':
-        return interestAccrued.totalWeeklyInterestUSD;
-      case 'monthly':
-        return interestAccrued.totalMonthlyInterestUSD;
-      case 'ytd':
-        return interestAccrued.totalYtdInterestUSD;
-      case 'allTime':
-        return interestAccrued.totalAllTimeInterestUSD;
-      default:
-        return '0';
-    }
-  };
-
-  const getLendingEstimatedRevenueForPeriod = (period: keyof RevenuePeriod): string => {
-    if (!lendingInterestAccrued) return '0';
-    switch (period) {
-      case 'daily':
-        return lendingInterestAccrued.totalDailyRevenueUSD;
-      case 'weekly':
-        return lendingInterestAccrued.totalWeeklyRevenueUSD;
-      case 'monthly':
-        return lendingInterestAccrued.totalMonthlyRevenueUSD;
-      case 'ytd':
-        return lendingInterestAccrued.totalYtdRevenueUSD;
-      case 'allTime':
-        return lendingInterestAccrued.totalAllTimeRevenueUSD;
-      default:
-        return '0';
-    }
-  };
-
-  // True accrued interest = paid (CDP revenue) + outstanding (unpaid)
-  const getCDPActualAccruedInterest = (period: keyof RevenuePeriod): string => {
-    const paidInterest = BigInt(cdpRevenueByPeriod[period]?.total || '0');
-    const outstandingInterest = BigInt(getEstimatedInterestForPeriod(period) || '0');
-    return (paidInterest + outstandingInterest).toString();
-  };
 
   const formatLargeNumber = (num: number): string => {
     if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
@@ -582,20 +471,6 @@ const StratoStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} CDP fees
                       </p>
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <div className="text-lg font-semibold">
-                          {(revenueLoading || interestLoading) ? (
-                            <Skeleton className="h-6 w-20" />
-                          ) : (
-                            `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getCDPActualAccruedInterest(selectedPeriod) || '0'), 18)))}`
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedPeriod === 'allTime'
-                            ? 'Actual accrued interest'
-                            : `Est. ${selectedPeriod} accrued interest`}
-                        </p>
-                      </div>
                     </CardContent>
                   </Card>
 
@@ -614,20 +489,6 @@ const StratoStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} lending fees
                       </p>
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <div className="text-lg font-semibold">
-                          {lendingInterestLoading ? (
-                            <Skeleton className="h-6 w-20" />
-                          ) : (
-                            `$${formatLargeNumber(parseFloat(formatUnits(BigInt(getLendingEstimatedRevenueForPeriod(selectedPeriod) || '0'), 18)))}`
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedPeriod === 'allTime'
-                            ? 'Actual accrued interest'
-                            : `Est. ${selectedPeriod} accrued interest`}
-                        </p>
-                      </div>
                     </CardContent>
                   </Card>
 
