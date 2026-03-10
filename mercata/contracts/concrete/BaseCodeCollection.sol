@@ -203,7 +203,7 @@ contract record Mercata is Authorizable {
         metalForge = MetalForge(address(new Proxy(metalForgeImpl, this)));
         metalForge.initialize(
             address(priceOracle),
-            address(feeCollector), // TODO: Replace with treasurer address
+            address(0x141e73dc8d2dbbda4fba3797527d22be4b2c4744),
             address(feeCollector),
             address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010)
         );
