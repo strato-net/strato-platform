@@ -104,7 +104,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
-      isSaving ? !token.bridgeable : token.bridgeable
+      isSaving ? !token.isDefaultRoute : token.isDefaultRoute
     );
   }, [bridgeableTokens, isSaving]);
 
@@ -188,29 +188,38 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     [selectedToken?.externalDecimals]
   );
 
-  const isButtonDisabled = useMemo(
-    () =>
-      guestMode ||
-      isLoading ||
-      !hasValidAmount ||
-      !selectedToken ||
-      !isConnected ||
-      !currentNetwork ||
-      !isCorrectNetwork ||
-      isBalanceLoading ||
-      !isTokenPermitted,
-    [
-      guestMode,
-      isLoading,
-      hasValidAmount,
-      selectedToken,
-      isConnected,
-      currentNetwork,
-      isCorrectNetwork,
-      isBalanceLoading,
-      isTokenPermitted,
-    ]
-  );
+  const disabledReasons = useMemo(() => {
+    const reasons: string[] = [];
+    if (guestMode) reasons.push("guestMode");
+    if (isLoading) reasons.push("isLoading");
+    if (!hasValidAmount) {
+      reasons.push(amountError ? `amountError:${amountError}` : "emptyOrInvalidAmount");
+    }
+    if (!selectedToken) reasons.push("noSelectedToken");
+    if (!isConnected) reasons.push("walletNotConnected");
+    if (!currentNetwork) reasons.push("noCurrentNetwork");
+    if (!isCorrectNetwork) {
+      reasons.push(`wrongNetwork(active:${chainId ?? "n/a"}, expected:${expectedChainId ?? "n/a"})`);
+    }
+    if (isBalanceLoading) reasons.push("balanceLoading");
+    if (!isTokenPermitted) reasons.push("tokenNotPermitted");
+    return reasons;
+  }, [
+    guestMode,
+    isLoading,
+    hasValidAmount,
+    amountError,
+    selectedToken,
+    isConnected,
+    currentNetwork,
+    isCorrectNetwork,
+    isBalanceLoading,
+    isTokenPermitted,
+    chainId,
+    expectedChainId,
+  ]);
+
+  const isButtonDisabled = disabledReasons.length > 0;
 
   // Effects
   useEffect(() => {
@@ -272,6 +281,39 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     };
     handleNetworkSwitch();
   }, [chainId, isConnected, selectedNetwork, expectedChainId, switchChain]);
+
+  useEffect(() => {
+    if (!amount) return;
+    console.log("[BridgeIn] Deposit button state", {
+      disabled: isButtonDisabled,
+      reasons: disabledReasons,
+      amount,
+      amountError,
+      selectedTokenId: selectedToken?.id,
+      externalToken: selectedToken?.externalToken,
+      stratoToken: selectedToken?.stratoToken,
+      isTokenPermitted,
+      isBalanceLoading,
+      isConnected,
+      isCorrectNetwork,
+      activeChainId: chainId,
+      expectedChainId,
+      selectedNetwork,
+    });
+  }, [
+    amount,
+    amountError,
+    isButtonDisabled,
+    disabledReasons,
+    selectedToken,
+    isTokenPermitted,
+    isBalanceLoading,
+    isConnected,
+    isCorrectNetwork,
+    chainId,
+    expectedChainId,
+    selectedNetwork,
+  ]);
 
   // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
@@ -425,6 +467,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     try {
       const activeChainId = currentNetwork.chainId;
       const depositRouter = currentNetwork.depositRouter;
+      const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
       
       // Set initial step based on whether it's Easy Savings or Bridge In, and if it needs approval
       if (!isNative) {
@@ -445,6 +488,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         decimals: selectedToken.externalDecimals,
         chainId: activeChainId,
         tokenAddress: isNative ? NATIVE_TOKEN_ADDRESS : ensureHexPrefix(selectedToken.externalToken),
+        targetStratoToken,
       });
 
       if (!validation.isValid) {
@@ -511,6 +555,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         tokenAddress: isNative ? undefined : selectedToken.externalToken,
         amount: depositAmount,
         userAddress,
+        targetStratoToken,
         account: address,
         chainId: activeChainId,
         permitData,
@@ -528,7 +573,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
           address: depositRouter as `0x${string}`,
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "depositETH",
-          args: [ensureHexPrefix(userAddress)],
+          args: [ensureHexPrefix(userAddress), targetStratoToken],
           value: depositAmount,
         chain,
           account: address as `0x${string}`,
@@ -546,6 +591,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
             ensureHexPrefix(selectedToken.externalToken),
             depositAmount,
             ensureHexPrefix(userAddress),
+            targetStratoToken,
             permitData.nonce,
             permitData.deadline,
             permitData.signature as `0x${string}`,
@@ -639,6 +685,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         selectedToken={selectedToken}
         tokens={currentTokens}
         onTokenChange={setSelectedToken}
+        direction="in"
         disabled={guestMode || isLoading}
       />
 

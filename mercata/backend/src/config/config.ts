@@ -48,7 +48,6 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
-export let creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS || "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6";
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
@@ -92,7 +91,7 @@ export let networkId: string | undefined;
 export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
-
+export let creditCardTopUp: string = '';
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
     bridgeUrl = process.env.BRIDGE_SERVICE_URL;

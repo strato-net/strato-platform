@@ -7,7 +7,9 @@
 
 module Blockchain.Init.Generator (
   createGenesisInfo,
-  mkAll
+  mkAll,
+  mkFiles,
+  mkDatabases
   ) where
 
 import BlockApps.Logging
@@ -37,9 +39,11 @@ import qualified Data.Map as M
 import qualified Data.Yaml as YAML
 import Database.Persist.Postgresql
 import System.FilePath ((</>))
+import System.Random (randomRIO)
 import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
+import UnliftIO.Exception (catch, SomeException)
 
 createGenesisInfo :: MonadIO m => String -> m ()
 createGenesisInfo network = do
@@ -100,17 +104,27 @@ strato-network-monitor
 
 
 
-mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
-         String -> m ()
-mkAll network = do
+mkFiles :: (MonadLoggerIO m, MonadFail m) =>
+           String -> m ()
+mkFiles network = do
+  -- Create node directories first (needed before genEthConf reads postgres_password)
+  liftIO $ mapM_ (createDirectoryIfMissing True)
+    ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
+
+  -- Generate random postgres password (needed by genEthConf)
+  let pgPasswordFile = "secrets" </> "postgres_password"
+  pgPasswordExists <- doesFileExist pgPasswordFile
+  unless pgPasswordExists $ liftIO $ do
+    password <- generatePassword 32
+    writeFile pgPasswordFile password
+    void $ chmod roo pgPasswordFile
+
   ethconf <- liftIO genEthConf
 
   let dir = ".ethereumH"
-  liftIO $ createDirectoryIfMissing True dir
   liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
   liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
 
-  -- Set this node as the default for airlock and other tools
   liftIO $ do
     nodeDir <- getCurrentDirectory
     home <- getHomeDirectory
@@ -124,28 +138,48 @@ mkAll network = do
 
   if genesisExists
     then do
-      $logInfoS "mkAll" "Using provided 'genesis.json'"
+      $logInfoS "mkFiles" "Using provided 'genesis.json'"
       return ()
     else do
-      $logInfoS "mkAll" "Creating 'genesis.json' using network name"
+      $logInfoS "mkFiles" "Creating 'genesis.json' using network name"
       createGenesisInfo network
+
+  liftIO createCommandsFile
+  $logInfoS "mkFiles" "File setup complete"
+
+mkDatabases :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
+               m ()
+mkDatabases = do
+  -- Read ethconf from file (created by strato-setup)
+  let ethconf = UEC.ethConf
 
   let pgconf = EC.sqlConfig ethconf
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
       localConn = EC.postgreSQLConnectionString pgconf
       db = EC.database pgconf
-  $logInfoS "ethconf/Create Database" . T.pack $ CL.yellow db
-  $logInfoLS "ethconf/Create Database" rawConn
+  $logInfoS "mkDatabases/Create Database" . T.pack $ CL.yellow db
+  $logInfoLS "mkDatabases/Create Database" rawConn
   let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
 
-  withPostgresqlConn rawConn (runReaderT (rawExecute query []))
+  catch
+    (withPostgresqlConn rawConn (runReaderT (rawExecute query [])))
+    (\(_ :: SomeException) -> $logInfoS "mkDatabases/Create Database" "Database already exists, skipping")
+
+  -- Create cirrus database
+  let cirrusConf = EC.cirrusConfig ethconf
+      cirrusDb = EC.database cirrusConf
+  $logInfoS "mkDatabases/Create Database" . T.pack $ CL.yellow cirrusDb
+  let cirrusQuery = T.pack $ "CREATE DATABASE " ++ show cirrusDb ++ ";"
+  catch
+    (withPostgresqlConn rawConn (runReaderT (rawExecute cirrusQuery [])))
+    (\(_ :: SomeException) -> $logInfoS "mkDatabases/Create Database" "Database already exists, skipping")
 
   withPostgresqlConn localConn $
     runReaderT $ do
-      $logInfoS "ethconf/migrate" . T.pack $ CL.yellow ">>>> Migrating eth"
-      $logInfoLS "ethconf/migrateconn" localConn
+      $logInfoS "mkDatabases/migrate" . T.pack $ CL.yellow ">>>> Migrating eth"
+      $logInfoLS "mkDatabases/migrateconn" localConn
       runMigration DataDefs.migrateAll
-      $logInfoS "ethconf/migrate" . T.pack $ CL.yellow ">>>> Indexing eth"
+      $logInfoS "mkDatabases/migrate" . T.pack $ CL.yellow ">>>> Indexing eth"
       runMigration DataDefs.indexAll
 
   let topics :: [String] =
@@ -165,14 +199,26 @@ mkAll network = do
   let uniqueTopicMap = M.fromList $ map (\x -> (x, x)) topics
   liftIO $ YAML.encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
 
-  liftIO createCommandsFile
-
   runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
-    $logInfoS "runWorker" "Adding empty code"
-    void $ addCode mempty -- blank code is the default for Accounts, but gets added nowhere else.
-    $logInfoS "runWorker" "Processing genesis block"
+    $logInfoS "mkDatabases" "Adding empty code"
+    void $ addCode mempty
+    $logInfoS "mkDatabases" "Processing genesis block"
     initializeGenesisBlock
-    $logInfoS "runWorker" "done. here I am once again"
+    $logInfoS "mkDatabases" "Database setup complete"
+
+mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
+         String -> m ()
+mkAll network = do
+  mkFiles network
+  mkDatabases
 
 makeReadOnly :: FilePath -> IO ()
 makeReadOnly = void . chmod roo
+
+generatePassword :: Int -> IO String
+generatePassword len = mapM (const randomChar) [1..len]
+  where
+    chars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
+    randomChar = do
+      idx <- randomRIO (0, length chars - 1)
+      return $ chars !! idx

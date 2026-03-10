@@ -58,7 +58,6 @@ packages:
 - libs/ethereum-rlp
 - libs/format
 - libs/json-rpc-server
-- libs/json-rpc-client
 - libs/labeled-error
 - libs/kafka/milena
 - libs/kafka/milena-tools

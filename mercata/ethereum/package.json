@@ -7,6 +7,13 @@
 
     "deployWithProxy:sepolia": "npx hardhat run scripts/deployWithProxy.js --network sepolia",
     "deployWithProxy:mainnet": "npx hardhat run scripts/deployWithProxy.js --network mainnet",
+    "deployImpl:sepolia": "npx hardhat run scripts/deployImplementationOnly.js --network sepolia",
+    "deployImpl:mainnet": "npx hardhat run scripts/deployImplementationOnly.js --network mainnet",
+    "deployImpl:baseSepolia": "npx hardhat run scripts/deployImplementationOnly.js --network baseSepolia",
+    "deployImpl:base": "npx hardhat run scripts/deployImplementationOnly.js --network base",
+    "router:ops": "node scripts/depositRouterOps.js",
+    "router:ops:testnet": "node scripts/depositRouterOps.js --env testnet",
+    "router:ops:prod": "node scripts/depositRouterOps.js --env prod",
 
     "verify:sepolia": "hardhat verify --network sepolia",
     "verify:mainnet": "hardhat verify --network mainnet",

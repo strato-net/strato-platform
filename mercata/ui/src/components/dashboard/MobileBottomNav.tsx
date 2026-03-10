@@ -16,7 +16,6 @@ import {
   Shield,
   UserPlus,
   Vault,
-  CreditCard,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';

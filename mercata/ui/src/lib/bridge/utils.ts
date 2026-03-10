@@ -94,6 +94,8 @@ function getFriendlyMessage(errorName: string, data?: `0x${string}`): string {
       return "This token is not currently supported for bridging.";
     case "BelowMinimum":
       return "Amount is below minimum required. Please try a larger amount.";
+    case "NotPermitted":
+      return "This token route is not permitted for deposits.";
     case "InvalidAddress":
       return "Invalid address provided. Please check your wallet connection.";
     case "ETHTransferFailed":
