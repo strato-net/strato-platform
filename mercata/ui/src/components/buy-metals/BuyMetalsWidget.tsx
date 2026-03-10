@@ -363,8 +363,9 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
       );
       setTxSuccess(true);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } }; message?: string };
-      const msg = e?.response?.data?.error || e?.message || "Transaction failed";
+      const e = err as { response?: { data?: { error?: string | { message?: string } } }; message?: string };
+      const raw = e?.response?.data?.error;
+      const msg = (typeof raw === "string" ? raw : raw?.message) || e?.message || "Transaction failed";
       setTxError(msg);
     } finally {
       setTxLoading(false);
