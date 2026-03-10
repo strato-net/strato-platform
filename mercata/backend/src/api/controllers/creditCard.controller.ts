@@ -11,6 +11,7 @@ import {
   submitUpdateCard,
   submitRemoveCard,
   getPendingWithdrawalsForCard,
+  getUsdstBalanceForUser,
 } from "../services/creditCard.service";
 import { validateUpsertConfig, validateAddCardBody, validateUpdateCardBody } from "../validators/creditCard.validators";
 import type { CreditCardConfig } from "@mercata/shared-types";
@@ -357,6 +358,30 @@ class CreditCardController {
       }
       const pending = await getPendingWithdrawalsForCard(accessToken, cardWalletAddress);
       res.json(pending);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  /** GET /credit-card/watcher-balance — operator only: get a user's USDST balance. */
+  static async getWatcherBalance(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const accessToken = req.accessToken as string;
+      if (!accessToken) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const userAddress = req.query.userAddress as string;
+      if (!userAddress) {
+        res.status(400).json({ error: "userAddress query parameter is required" });
+        return;
+      }
+      const balance = await getUsdstBalanceForUser(accessToken, userAddress);
+      res.json({ balance });
     } catch (error: any) {
       next(error);
     }

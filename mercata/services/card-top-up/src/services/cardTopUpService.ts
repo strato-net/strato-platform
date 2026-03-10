@@ -60,6 +60,17 @@ async function hasPendingTopUps(token: string, cardWalletAddress: string): Promi
   return Array.isArray(data) && data.length > 0;
 }
 
+async function getUsdstBalance(token: string, userAddress: string): Promise<bigint> {
+  const { baseUrl, timeout } = config.api;
+  const url = `${baseUrl.replace(/\/$/, "")}/api/credit-card/watcher-balance`;
+  const { data } = await axios.get<{ balance: string }>(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { userAddress },
+    timeout,
+  });
+  return BigInt(data?.balance ?? "0");
+}
+
 export async function runTopUpCycle(): Promise<void> {
   let token: string;
   logInfo("CardTopUp", `Starting top-up cycle`);
@@ -92,6 +103,12 @@ export async function runTopUpCycle(): Promise<void> {
       }
       if (await hasPendingTopUps(token, c.cardWalletAddress)) {
         logInfo("CardTopUp", `Card ${c.id} has pending top-up(s), skipping`);
+        continue;
+      }
+      const topUpAmount = BigInt(c.topUpAmount);
+      const usdstBalance = await getUsdstBalance(token, c.userAddress);
+      if (usdstBalance < topUpAmount) {
+        logInfo("CardTopUp", `Card ${c.id} user ${c.userAddress} has insufficient USDST balance (${usdstBalance} < ${topUpAmount}), skipping`);
         continue;
       }
       await executeTopUp(token, {
