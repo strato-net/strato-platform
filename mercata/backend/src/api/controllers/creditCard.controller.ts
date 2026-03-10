@@ -338,6 +338,30 @@ class CreditCardController {
     }
   }
 
+  /** GET /credit-card/watcher-pending — operator only: pending bridge withdrawals for a card wallet address. */
+  static async getWatcherPending(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const accessToken = req.accessToken as string;
+      if (!accessToken) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const cardWalletAddress = req.query.cardWalletAddress as string;
+      if (!cardWalletAddress) {
+        res.status(400).json({ error: "cardWalletAddress query parameter is required" });
+        return;
+      }
+      const pending = await getPendingWithdrawalsForCard(accessToken, cardWalletAddress);
+      res.json(pending);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
   /** POST /credit-card/manual-top-up — user-triggered manual top-up using custom amount. */
   static async manualTopUp(
     req: Request,
