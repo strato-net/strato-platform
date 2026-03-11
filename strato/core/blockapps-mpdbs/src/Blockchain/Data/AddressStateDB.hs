@@ -30,6 +30,7 @@ import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
+import Data.Binary
 import Control.Monad
 import Control.Monad.Change.Alter
 import Control.Monad.IO.Class
@@ -56,6 +57,8 @@ data AddressState = AddressState
   deriving (Eq, Generic, Read, Show)
 
 instance NFData AddressState
+
+instance Binary AddressState
 
 newtype MainChainT m a = MainChainT {runMainChainT :: m a}
   deriving (Eq, Show, Functor, Applicative, Monad, MonadIO)

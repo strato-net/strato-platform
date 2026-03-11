@@ -39,7 +39,6 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
-import Blockchain.Strato.StateDiff.Database
 import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
@@ -51,7 +50,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
 import Control.Monad.Trans.Reader (ReaderT, runReaderT, asks)
 import Blockchain.Strato.RedisBlockDB (RedisConnection, withRedisBlockDB)
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (for_)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
@@ -106,7 +105,8 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
     assertStateDiffTopicCreation
   kafkaEnv <- runKafkaVMEvents getKafkaEnv
   let pub sd vmes = do
-        traverse_ commitSqlDiffs sd
+        for_ sd $ \diff -> liftIO $ UEC.runKafkaMConfigured "vm-runner-bootstrap" $
+          IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]
         void . runKafkaMUsingEnv kafkaEnv $ produceVMEvents' vmes
   let sr = GI.stateRoot genesisInfo
 

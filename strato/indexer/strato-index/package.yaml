@@ -16,6 +16,7 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-mpdbs
   - blockDB
   - common-log
   - containers
@@ -25,6 +26,7 @@ library:
   - seqevents
   - strato-conf
   - strato-model
+  - strato-statediff
   - text
 
 executables:
@@ -46,6 +48,7 @@ executables:
       - strato-conf
       - strato-index
       - strato-model
+      - strato-statediff
     other-modules:
       - Wiring
 
