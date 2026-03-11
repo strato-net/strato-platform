@@ -57,7 +57,6 @@ import Control.Monad
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
-import Control.Monad.Composable.SQL
 import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
@@ -70,7 +69,7 @@ import Text.Format (format)
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
-  void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
+  void . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
 --    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
     bootstrapIfFirstRun
