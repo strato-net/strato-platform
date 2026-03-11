@@ -33,8 +33,6 @@ import {
 } from "@/lib/bridge/contractService";
 import {
   normalizeError,
-  formatTxHash,
-  getExplorerUrl,
 } from "@/lib/bridge/utils";
 import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits } from "@/utils/numberUtils";
 import { handleAmountInputChange } from "@/utils/transferValidation";
@@ -43,20 +41,29 @@ import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useLendingContext } from "@/context/LendingContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
-import NetworkSelector from "./NetworkSelector";
 import TokenSelector from "./TokenSelector";
 import PercentageButtons from "@/components/ui/PercentageButtons";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import DepositTransactionSummary from "./DepositTransactionSummary";
 import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
+import { redirectToLogin } from "@/lib/auth";
+import { Link } from "react-router-dom";
+import { ArrowDownToLine, CreditCard, CheckCircle2 } from "lucide-react";
 
 interface BridgeInProps {
   isSaving?: boolean;
   guestMode?: boolean;
+  isFundPage?: boolean;
 }
 
-const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false }) => {
-  // Hooks & Context
+const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false, isFundPage = false }) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
@@ -77,9 +84,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     triggerDepositRefresh,
   } = useBridgeContext();
 
-  // State
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefetchingBalance, setIsRefetchingBalance] = useState(false);
   const [amountError, setAmountError] = useState("");
   const [networkError, setNetworkError] = useState("");
   const [minDepositInfo, setMinDepositInfo] = useState<{ 
@@ -99,18 +106,35 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
   const [progressError, setProgressError] = useState<string>();
   const [progressIsNative, setProgressIsNative] = useState(true);
 
-  // Computed values
   const modeLabels = BRIDGE_IN_MODE_LABELS[isSaving ? "easy-savings" : "bridge"];
 
   const currentTokens = useMemo(() => {
+    if (isFundPage) return bridgeableTokens;
     return bridgeableTokens.filter((token) =>
       isSaving ? !token.isDefaultRoute : token.isDefaultRoute
     );
-  }, [bridgeableTokens, isSaving]);
+  }, [bridgeableTokens, isSaving, isFundPage]);
 
   const currentNetwork = useMemo(() => {
     return availableNetworks.find((n) => n.chainName === selectedNetwork) || null;
   }, [availableNetworks, selectedNetwork]);
+
+  const sourceTokenRoutes = useMemo(() => {
+    if (!selectedToken) return [];
+    return currentTokens.filter((token) =>
+      token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
+    );
+  }, [currentTokens, selectedToken]);
+
+  const uniqueExternalTokens = useMemo(() => {
+    const seen = new Set<string>();
+    return currentTokens.filter((token) => {
+      const key = (token.externalToken || "").toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [currentTokens]);
 
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
@@ -221,7 +245,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
   const isButtonDisabled = disabledReasons.length > 0;
 
-  // Effects
+  const prevExternalTokenRef = React.useRef<string | null>(null);
+
   useEffect(() => {
     if (!selectedNetwork && availableNetworks.length) {
       setSelectedNetwork(availableNetworks[0].chainName);
@@ -234,8 +259,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     ) {
       setSelectedToken(currentTokens[0] || null);
     }
-    setAmount("");
-    setAmountError("");
+
+    const currentExternal = (selectedToken?.externalToken || "").toLowerCase();
+    const prevExternal = prevExternalTokenRef.current;
+    if (prevExternal !== null && prevExternal !== currentExternal) {
+      setAmount("");
+      setAmountError("");
+    }
+    prevExternalTokenRef.current = currentExternal;
   }, [
     availableNetworks,
     currentTokens,
@@ -249,7 +280,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     if (selectedToken && currentNetwork) {
       fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
     }
-  }, [selectedToken]);
+  }, [selectedToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setAmount("");
@@ -315,7 +346,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     selectedNetwork,
   ]);
 
-  // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
     if (!tokenAddress || !currentNetwork) return;
     
@@ -369,47 +399,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     [maxAmount, selectedToken?.externalDecimals, selectedToken?.externalSymbol, minDepositInfo.amountWei, minDepositInfo.amount]
   );
 
-  const ensureAllowanceOrPermit = async ({
-    tokenAddress,
-    owner,
-      amount,
-    chainId,
-  }: {
-    tokenAddress: string;
-    owner: string;
-    amount: bigint;
-    chainId: string;
-  }) => {
-    const approval = await checkPermit2Approval({
-      token: tokenAddress,
-      owner,
-      amount,
-      chainId,
-    });
-
-    if (!approval.isApproved) {
-      toast({
-        title: "Approval Required",
-        description: "Approving Permit2 to spend your tokens...",
-      });
-
-        const approveTx = await writeContractAsync({
-        address: ensureHexPrefix(tokenAddress),
-          abi: ERC20_ABI,
-          functionName: "approve",
-        args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
-        chain: await resolveViemChain(chainId),
-        account: owner as `0x${string}`,
-        });
-
-      await waitForTransaction(approveTx, chainId);
-        toast({
-          title: "Approval Successful",
-        description: "Approval confirmed. Processing transaction...",
-      });
-    }
-  };
-
   const buildPermit = async ({
     tokenAddress,
     amount,
@@ -458,7 +447,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     setIsLoading(true);
     setProgressError(undefined);
     
-    // Determine if native token before opening modal
     const isNative = BigInt(selectedToken.externalToken || "0") === 0n;
     setProgressIsNative(isNative);
     
@@ -469,12 +457,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
       const depositRouter = currentNetwork.depositRouter;
       const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
       
-      // Set initial step based on whether it's Easy Savings or Bridge In, and if it needs approval
       if (!isNative) {
-        // ERC20 tokens need approval for both Easy Savings and Bridge In
         setCurrentStep("approve");
       } else {
-        // Native tokens (ETH) go straight to confirm
         setCurrentStep("confirm_tx");
       }
       const depositAmount = safeParseUnits(
@@ -499,7 +484,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         | { signature: string; nonce: bigint; deadline: bigint }
         | undefined;
       if (!isNative) {
-        // Step: Approve Token (for both Easy Savings and Bridge In with ERC20 tokens)
         setCurrentStep("approve");
         
         const approval = await checkPermit2Approval({
@@ -532,11 +516,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
           });
         }
         
-        // Move to sign_permit step after approval completes (or if already approved)
-        // This ensures the "approve" step shows as completed (green) before moving to sign_permit
         setCurrentStep("sign_permit");
         
-        // Build permit (this involves message signing, not a transaction)
         permitData = await buildPermit({
           tokenAddress: selectedToken.externalToken,
           amount: depositAmount,
@@ -545,7 +526,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
           owner: address,
         });
         
-        // Move to confirm_tx step after permit is signed
         setCurrentStep("confirm_tx");
       }
 
@@ -561,7 +541,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         permitData,
       });
 
-      // Step: Confirm Transaction (for native tokens, this is already set above)
       if (isNative && currentStep !== "confirm_tx") {
         setCurrentStep("confirm_tx");
       }
@@ -603,7 +582,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
       setProgressTxHash(txHash);
       
-      // Step: Waiting for Transaction
       setCurrentStep("waiting_tx");
       const success = await waitForTransaction(txHash, activeChainId);
       if (!success) {
@@ -636,7 +614,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
       localStorage.setItem('pendingDeposits', JSON.stringify(existing));
       triggerDepositRefresh();
 
-      // Step: Waiting for Autosave (if Easy Savings) or Complete
       if (autoDeposit) {
         setCurrentStep("waiting_autosave");
         await requestAutoSave({
@@ -645,15 +622,20 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         });
       }
 
-      // Step: Complete
       setCurrentStep("complete");
       setAmount("");
 
-      await Promise.all([
+      setIsRefetchingBalance(true);
+      const refetchBalance = () => Promise.all([
         isNative ? refetchNative() : refetchToken(),
         fetchUsdstBalance(),
       ]);
-    } catch (error: any) {
+      await new Promise((r) => setTimeout(r, 2000));
+      await refetchBalance();
+      setTimeout(() => {
+        refetchBalance().finally(() => setIsRefetchingBalance(false));
+      }, 5000);
+    } catch (error: unknown) {
       const bridgeError = normalizeError(error);
       setCurrentStep("error");
       setProgressError(bridgeError.userMessage);
@@ -667,14 +649,258 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
       setIsLoading(false);
     }
   };
+
+  const networkNames = availableNetworks.map((n) => n.chainName).join(" or ");
+  const depositSummaryText = selectedToken && amount
+    ? `Deposit ${amount} ${selectedToken.externalSymbol} \u2192 ${amount} ${selectedToken.stratoTokenSymbol}`
+    : null;
+
+  const fundTokenLabel = (token: { externalSymbol?: string; externalName?: string } | null): string => {
+    if (!token) return "Select asset";
+    return token.externalSymbol || token.externalName || "Select asset";
+  };
   
+  if (isFundPage) {
+    return (
+      <div className="space-y-7">
+        {/* STEP 1 */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">1</span>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How Are You Funding?</h3>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => { if (guestMode) redirectToLogin(); }}
+              className="relative rounded-md border-2 border-blue-500 bg-blue-500/5 dark:bg-blue-500/10 p-3 text-left"
+            >
+              <div className="absolute top-2 right-2">
+                <CheckCircle2 className="w-5 h-5 text-blue-500" />
+              </div>
+              <ArrowDownToLine className="w-5 h-5 text-blue-500 mb-2" />
+              <p className="text-sm font-semibold">{guestMode ? "Connect" : "Bridge In"}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">From {networkNames}</p>
+            </button>
+            <button
+              type="button"
+              disabled
+              className="rounded-md border-2 border-border p-3 text-left opacity-40 cursor-not-allowed"
+            >
+              <CreditCard className="w-5 h-5 text-muted-foreground mb-2" />
+              <p className="text-sm font-semibold">Buy Crypto</p>
+              <p className="text-xs text-muted-foreground mt-0.5">With card or bank transfer</p>
+            </button>
+          </div>
+
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${availableNetworks.length || 1}, 1fr)` }}>
+            {availableNetworks.map((network) => {
+              const active = selectedNetwork === network.chainName;
+              return (
+                <button
+                  key={network.chainId}
+                  type="button"
+                  onClick={() => setSelectedNetwork(network.chainName)}
+                  disabled={guestMode || isLoading}
+                  className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${
+                    active
+                      ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                      : "border-border text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  {active && (
+                    <div className="absolute top-1 right-1">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    </div>
+                  )}
+                  {network.chainName}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* STEP 2 */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Send</h3>
+            </div>
+            <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
+              <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
+              <BridgeWalletStatus guestMode={guestMode} />
+            </div>
+          </div>
+
+          <div className="rounded-md border-2 border-border p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Select
+                value={(selectedToken?.externalToken || "").toLowerCase()}
+                onValueChange={(val) => {
+                  const match = currentTokens.find(
+                    (t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute
+                  ) || currentTokens.find(
+                    (t) => (t.externalToken || "").toLowerCase() === val
+                  ) || null;
+                  setSelectedToken(match);
+                }}
+                disabled={!uniqueExternalTokens.length || guestMode || isLoading}
+              >
+                <SelectTrigger className="h-10 w-auto min-w-0 shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
+                  <SelectValue placeholder="Token" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueExternalTokens
+                    .filter((t) => t.externalSymbol || t.externalName)
+                    .map((t) => (
+                      <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
+                        {fundTokenLabel(t)}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*\.?[0-9]*"
+                placeholder="0.00"
+                className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
+                value={amount}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                disabled={guestMode || !isConnected || isLoading}
+              />
+            </div>
+            {amountError && <p className="text-xs text-red-500">{amountError}</p>}
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-muted-foreground">
+                Balance:{" "}
+                {isRefetchingBalance ? (
+                  <span className="inline-block w-3 h-3 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin align-middle ml-1" />
+                ) : (
+                  <span className="text-foreground font-medium">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
+                )}
+              </span>
+              {isConnected && (
+                <div className="flex items-center gap-1">
+                  <PercentageButtons
+                    value={amount}
+                    maxValue={maxAmount}
+                    onChange={handleAmountChange}
+                    decimals={parseInt(selectedToken?.externalDecimals || "18")}
+                    disabled={guestMode || isLoading}
+                    className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* STEP 3 */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+            </div>
+            <label className={`flex items-center gap-1.5 text-[11px] ${
+              selectedToken && !selectedToken.isDefaultRoute
+                ? "text-foreground cursor-pointer"
+                : "text-muted-foreground/50 cursor-not-allowed"
+            }`}>
+              <input
+                type="checkbox"
+                className="accent-blue-600 w-3.5 h-3.5"
+                checked={autoDeposit}
+                onChange={(e) => setAutoDeposit(e.target.checked)}
+                disabled={guestMode || !selectedToken || selectedToken.isDefaultRoute}
+              />
+              Auto-deposit to lending
+            </label>
+          </div>
+
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(sourceTokenRoutes.length || 1, 3)}, 1fr)` }}>
+            {sourceTokenRoutes.map((routeToken) => {
+              const active = routeToken.id === selectedToken?.id;
+              const routeType = routeToken.isDefaultRoute ? "VIA WRAP" : "VIA MINT";
+              return (
+                <button
+                  key={routeToken.id}
+                  type="button"
+                  onClick={() => setSelectedToken(routeToken)}
+                  disabled={guestMode || isLoading}
+                  className={`relative text-left rounded-md border-2 p-3 transition-colors ${
+                    active
+                      ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                      : "border-border hover:bg-muted/30"
+                  }`}
+                >
+                  {active && (
+                    <div className="absolute top-2 right-2">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mb-1">
+                    {routeToken.stratoTokenImage ? (
+                      <img src={routeToken.stratoTokenImage} alt={routeToken.stratoTokenSymbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">
+                        {(routeToken.stratoTokenSymbol || "?").charAt(0)}
+                      </span>
+                    )}
+                    <p className="text-sm font-semibold text-foreground">{routeToken.stratoTokenSymbol}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {"\u2248"} {amount || "0"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{routeType}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <Button
+          onClick={handleBridge}
+          disabled={isButtonDisabled}
+          className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
+        >
+          {isLoading ? "Processing..." : "Deposit"}
+        </Button>
+
+        {networkError && (
+          <p className="text-sm text-red-500">{networkError}</p>
+        )}
+
+        <DepositProgressModal
+          open={progressModalOpen}
+          currentStep={currentStep}
+          txHash={progressTxHash}
+          chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
+          isEasySavings={isSaving && autoDeposit}
+          isNative={progressIsNative}
+          error={progressError}
+          onClose={() => {
+            setProgressModalOpen(false);
+            setCurrentStep("confirm_tx");
+            setProgressTxHash(undefined);
+            setProgressError(undefined);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="space-y-2 text-center">
-        <h3 className="text-lg font-semibold text-foreground">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-foreground text-center">
           {modeLabels.title}
         </h3>
-        <p className="text-sm text-muted-foreground">{modeLabels.description}</p>
+        <p className="text-sm text-muted-foreground text-center">{modeLabels.description}</p>
       </div>
 
       <div className="w-full">
@@ -691,7 +917,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
       <div className="space-y-1.5">
         <div className="flex justify-between items-center">
-        <Label>Amount</Label>
+          <Label>Amount</Label>
           {maxAmount && (
             <div className="flex items-center gap-3">
               <p className="text-sm text-muted-foreground">
@@ -716,9 +942,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
           inputMode="decimal"
           pattern="[0-9]*\.?[0-9]*"
           placeholder={isConnected ? "0.00" : "Connect wallet to enter amount"}
-          className={`w-full ${
-            amountError ? "border-red-500 focus:ring-red-400" : ""
-          }`}
+          className={`w-full ${amountError ? "border-red-500 focus:ring-red-400" : ""}`}
           value={amount}
           onChange={(e) => handleAmountChange(e.target.value)}
           disabled={guestMode || !isConnected || isLoading}
@@ -734,7 +958,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
             className="mt-2"
             disabled={guestMode || isLoading}
           />
-                    )}
+        )}
       </div>
 
       <DepositTransactionSummary
@@ -761,13 +985,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         </label>
       )}
 
-        <Button
-          onClick={handleBridge}
+      <Button
+        onClick={handleBridge}
         disabled={isButtonDisabled}
         className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-        >
+      >
         {isLoading ? "Processing..." : isSaving && autoDeposit ? "Deposit and Earn" : "Deposit"}
-        </Button>
+      </Button>
 
       <AdvancedOptionsDropdown
         selectedNetwork={selectedNetwork}

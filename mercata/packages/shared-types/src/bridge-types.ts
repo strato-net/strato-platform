@@ -38,6 +38,7 @@ export interface BridgeToken {
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
   enabled: boolean;              // effective route enabled state
   isDefaultRoute: boolean;       // true when route token matches asset default token
+  stratoTokenImage?: string;     // First image URL from TokenFactory images
 }
 
 // ============================================================================
