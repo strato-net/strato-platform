@@ -18,7 +18,7 @@ type LendingContextType = {
   loadingLoans: boolean;
   refreshLoans: (showLoading?: boolean) => Promise<NewLoanData[] | undefined>;
   liquidityInfo: LiquidityData;
-  refreshLiquidity: (signal?: AbortSignal) => void;
+  refreshLiquidity: (signal?: AbortSignal) => Promise<void>;
   loadingLiquidity: boolean;
   setPrice: (payload: { token: string; price: string }) => Promise<void>;
   configureAsset: (payload: { 
@@ -46,7 +46,7 @@ type LendingContextType = {
   withdrawLiquidityAll: () => Promise<void>;
 
   collateralInfo: CollateralData[];
-  refreshCollateral: (signal?: AbortSignal) => void;
+  refreshCollateral: (signal?: AbortSignal) => Promise<void>;
   loadingCollateral: boolean;
   supplyCollateral: (args: { asset: string; amount: string }) => Promise<void>;
   withdrawCollateral: (args: { asset: string; amount: string }) => Promise<void>;

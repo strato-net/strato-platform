@@ -6,12 +6,18 @@ type LendingCollateralInput = {
   amount: string;
 };
 
+type CdpCollateralInput = {
+  asset: string;
+  amount: string;
+};
+
 type PreviewBorrowRouteArgs = {
   accessToken: string;
   userAddress: string;
   amount: string;
   targetHealthFactor?: number;
   lendingCollateral?: LendingCollateralInput[];
+  cdpCollateral?: CdpCollateralInput[];
 };
 
 type CdpCandidate = {
@@ -40,9 +46,11 @@ type CdpAllocation = {
   collateralRatio: number;
   effectiveHealthFactor: number;
   collateralValueUSD: bigint;
+  depositCollateralValueUSD: bigint;
   liquidationRatioWad: bigint;
   collateralAfter: bigint;
   debtAfter: bigint;
+  targetCRWad: bigint;
   unitScale: bigint;
   oraclePrice: bigint;
 };
@@ -122,7 +130,8 @@ const clampHF = (hf: number | undefined): number => {
 
 const buildCdpCandidates = (
   raw: any[],
-  lendingCollateralByAsset: Map<string, bigint>
+  lendingCollateralByAsset: Map<string, bigint>,
+  cdpManualCaps: Map<string, bigint>
 ): CdpCandidate[] => {
   return raw
     .map((entry: any) => {
@@ -130,6 +139,17 @@ const buildCdpCandidates = (
       const reservedForLending = lendingCollateralByAsset.get(assetAddress) || 0n;
       const potentialRaw = toBig(entry.potentialCollateral);
       const potentialAdjusted = potentialRaw > reservedForLending ? (potentialRaw - reservedForLending) : 0n;
+      const currentCollateralRaw = toBig(entry.currentCollateral);
+      let currentCollateral = currentCollateralRaw;
+      let potentialCollateral = potentialAdjusted;
+      const manualCap = cdpManualCaps.get(assetAddress);
+      if (manualCap !== undefined) {
+        const capSafe = manualCap > 0n ? manualCap : 0n;
+        const totalAvailable = currentCollateralRaw + potentialAdjusted;
+        const cappedTotal = minBig(totalAvailable, capSafe);
+        currentCollateral = minBig(currentCollateralRaw, cappedTotal);
+        potentialCollateral = cappedTotal > currentCollateral ? (cappedTotal - currentCollateral) : 0n;
+      }
       return {
         assetAddress,
         symbol: String(entry.symbol || ""),
@@ -138,8 +158,8 @@ const buildCdpCandidates = (
         liquidationRatio: toBig(entry.liquidationRatio),
         stabilityFeeRate: toBig(entry.stabilityFeeRate),
         oraclePrice: toBig(entry.oraclePrice),
-        currentCollateral: toBig(entry.currentCollateral),
-        potentialCollateral: potentialAdjusted,
+        currentCollateral,
+        potentialCollateral,
         currentDebt: toBig(entry.currentDebt),
         globalDebt: toBig(entry.globalDebt),
         debtFloor: toBig(entry.debtFloor),
@@ -319,6 +339,7 @@ const planCdp = (targetMint: bigint, targetHF: number, candidates: CdpCandidate[
 
     const collateralAfter = candidate.currentCollateral + depositAmount;
     const collateralValueAfter = (collateralAfter * candidate.oraclePrice) / candidate.unitScale;
+    const depositCollateralValueUSD = (depositAmount * candidate.oraclePrice) / candidate.unitScale;
     const crWad = newDebt > 0n ? (collateralValueAfter * WAD) / newDebt : 0n;
     const collateralRatio = Number(crWad) / Number(WAD) * 100;
     const effectiveHF = candidate.liquidationRatio > 0n ? Number(crWad) / Number(candidate.liquidationRatio) : Number.POSITIVE_INFINITY;
@@ -333,9 +354,11 @@ const planCdp = (targetMint: bigint, targetHF: number, candidates: CdpCandidate[
       collateralRatio,
       effectiveHealthFactor: effectiveHF,
       collateralValueUSD: collateralValueAfter,
+      depositCollateralValueUSD,
       liquidationRatioWad: candidate.liquidationRatio,
       collateralAfter,
       debtAfter: newDebt,
+      targetCRWad: targetCR,
       unitScale: candidate.unitScale,
       oraclePrice: candidate.oraclePrice,
     });
@@ -368,6 +391,13 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
   const currentLendingCollateralLTWeighted = toBig(loan?.totalCollateralValueUSD);
   const currentLendingCollateralValueUSD = toBig(loan?.totalCollateralValueSupplied);
   const lendingCandidates = buildLendingCandidates(collateralAssets || [], args.lendingCollateral);
+  const cdpManualCaps = new Map<string, bigint>();
+  (args.cdpCollateral || []).forEach((item) => {
+    const key = String(item.asset || "").toLowerCase();
+    const amount = toBig(item.amount);
+    if (!key || amount < 0n) return;
+    cdpManualCaps.set(key, amount);
+  });
   const additionalLendingLTCapacity = maxAdditionalLendingLTValue(lendingCandidates);
   const totalLendingCollateralLTWeightedCapacity = currentLendingCollateralLTWeighted + additionalLendingLTCapacity;
   const targetHFRaw = BigInt(Math.round(targetHealthFactor * 1e18));
@@ -376,8 +406,16 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
   const lendingApr = Number(loan?.interestRate || 0) / 100;
 
   const rawCandidates = [...(cdpCandidatesRaw?.existingVaults || []), ...(cdpCandidatesRaw?.potentialVaults || [])];
-  const cdpCandidatesUnreserved = buildCdpCandidates(rawCandidates, new Map());
+  const cdpCandidatesUnreserved = buildCdpCandidates(rawCandidates, new Map(), cdpManualCaps);
   const cdpCapacityFull = planCdp((10n ** 30n), targetHealthFactor, cdpCandidatesUnreserved).capacity;
+  const cdpCandidatesExistingOnly = cdpCandidatesUnreserved.map((candidate) => ({
+    ...candidate,
+    potentialCollateral: 0n,
+  }));
+  const cdpCapacityExistingOnly = planCdp((10n ** 30n), targetHealthFactor, cdpCandidatesExistingOnly).capacity;
+  const cdpCapacityFreshCollateral = cdpCapacityFull > cdpCapacityExistingOnly
+    ? (cdpCapacityFull - cdpCapacityExistingOnly)
+    : 0n;
   const lendingCandidateByAsset = new Map(lendingCandidates.map((candidate) => [candidate.assetAddress, candidate]));
   const cdpHeadroomByApr = [...cdpCandidatesUnreserved]
     .map((candidate) => ({
@@ -403,7 +441,7 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
       targetHealthFactor,
       lendingCandidates
     );
-    const cdpCandidates = buildCdpCandidates(rawCandidates, lendingPlan.reservedByAsset);
+    const cdpCandidates = buildCdpCandidates(rawCandidates, lendingPlan.reservedByAsset, cdpManualCaps);
     const cdpTarget = safeTarget > lendingAmount ? (safeTarget - lendingAmount) : 0n;
     const cdpPlan = planCdp(cdpTarget, targetHealthFactor, cdpCandidates);
     const totalRouted = lendingAmount + cdpPlan.totalMint;
@@ -556,6 +594,20 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
         }
         refinementStep /= 2n;
       }
+
+      // Keep an explicit CDP-only candidate in contention when feasible.
+      // This makes "fresh CDP deposit + mint" routes deterministic whenever they are cheaper.
+      const cdpOnlyCandidate = evaluateSplit(safeTarget, 0n);
+      if (cdpOnlyCandidate.feasible) {
+        const betterApr = cdpOnlyCandidate.blendedApr < selected.blendedApr - 1e-9;
+        const sameApr = Math.abs(cdpOnlyCandidate.blendedApr - selected.blendedApr) <= 1e-9;
+        const betterHF = cdpOnlyCandidate.unifiedHF > selected.unifiedHF + 1e-9;
+        const sameHF = Math.abs(cdpOnlyCandidate.unifiedHF - selected.unifiedHF) <= 1e-9;
+        const lowerCollateral = cdpOnlyCandidate.lendingPlan.addedCollateralValueUSD < selected.lendingPlan.addedCollateralValueUSD;
+        if (betterApr || (sameApr && (betterHF || (sameHF && lowerCollateral)))) {
+          selected = cdpOnlyCandidate;
+        }
+      }
     } else {
       selected = evaluated.reduce((best, candidate) => {
         if (!best) return candidate;
@@ -590,7 +642,7 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
   const cdpPlan = selected?.cdpPlan || planCdp(0n, targetHealthFactor, cdpCandidatesUnreserved);
   const totalRouted = selected?.totalRouted || 0n;
   const feasible = selected?.feasible || false;
-  const shortfall = selected?.shortfall || requestedAmountSafe;
+  const shortfall = selected ? selected.shortfall : requestedAmountSafe;
   const lendingHF = selected?.lendingHF ?? Number.POSITIVE_INFINITY;
   const cdpHF = selected?.cdpHF ?? Number.POSITIVE_INFINITY;
   const unifiedHF = selected?.unifiedHF ?? targetHealthFactor;
@@ -599,6 +651,23 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
   const liquidationDropPercent = selected?.liquidationDropPercent ?? 0;
   const liquidationPriceUSD = selected?.liquidationPriceUSD ?? 0;
   const liquidationSymbol = selected?.liquidationSymbol || "USD";
+  const cdpRouted = cdpPlan.totalMint;
+  const cdpFreshMintUsed = cdpPlan.allocations.reduce((sum, allocation) => {
+    if (allocation.depositCollateralValueUSD <= 0n || allocation.targetCRWad <= 0n) return sum;
+    const fromFreshCollateral = (allocation.depositCollateralValueUSD * WAD) / allocation.targetCRWad;
+    return sum + minBig(allocation.mintAmount, fromFreshCollateral);
+  }, 0n);
+  const cdpExistingMintUsed = cdpRouted > cdpFreshMintUsed ? (cdpRouted - cdpFreshMintUsed) : 0n;
+  const selectionReason = (() => {
+    if (!selected?.feasible) return "insufficient_total_capacity";
+    if (cdpRouted <= 0n) {
+      if (cdpCapacityFull <= 0n) return "cdp_capacity_unavailable_or_constrained";
+      if (cdpPlan.weightedApr <= 0 || lendingApr <= cdpPlan.weightedApr) return "lending_apr_optimal";
+      return "cdp_constraints_prevented_split";
+    }
+    if (lendingAmount <= 0n) return "cdp_apr_optimal";
+    return "blended_apr_optimal_split";
+  })();
 
   return {
     requestedAmount: requestedAmountSafe.toString(),
@@ -632,7 +701,16 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
     constraints: {
       lendingCapacity: lendingCapacity.toString(),
       cdpCapacity: cdpCapacityFull.toString(),
+      cdpCapacityFromExistingCollateral: cdpCapacityExistingOnly.toString(),
+      cdpCapacityFromFreshCollateral: cdpCapacityFreshCollateral.toString(),
       totalCapacity: maxTotalRouted.toString(),
+    },
+    routing: {
+      selectionReason,
+      selectedLendingAmount: lendingAmount.toString(),
+      selectedCdpAmount: cdpRouted.toString(),
+      cdpFromFreshCollateral: cdpFreshMintUsed.toString(),
+      cdpFromExistingCollateral: cdpExistingMintUsed.toString(),
     },
     lendingAllocations: lendingPlan.allocations.map((a) => ({
       asset: a.assetAddress,
@@ -647,6 +725,7 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
       symbol: a.symbol,
       decimals: a.decimals,
       depositAmount: a.depositAmount.toString(),
+      depositCollateralValueUSD: a.depositCollateralValueUSD.toString(),
       mintAmount: a.mintAmount.toString(),
       apr: a.apr,
       collateralRatio: a.collateralRatio,

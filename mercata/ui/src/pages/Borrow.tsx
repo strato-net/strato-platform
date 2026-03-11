@@ -22,6 +22,8 @@ import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import { Skeleton } from "@/components/ui/skeleton";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
@@ -60,7 +62,18 @@ type RoutePreviewApiResponse = {
     liquidationAssetSymbol: string;
   };
   constraints: {
+    lendingCapacity?: string;
+    cdpCapacity?: string;
+    cdpCapacityFromExistingCollateral?: string;
+    cdpCapacityFromFreshCollateral?: string;
     totalCapacity: string;
+  };
+  routing?: {
+    selectionReason?: string;
+    selectedLendingAmount?: string;
+    selectedCdpAmount?: string;
+    cdpFromFreshCollateral?: string;
+    cdpFromExistingCollateral?: string;
   };
   lendingAllocations: Array<{
     asset: string;
@@ -74,6 +87,7 @@ type RoutePreviewApiResponse = {
     symbol: string;
     decimals: number;
     depositAmount: string;
+    depositCollateralValueUSD?: string;
     mintAmount: string;
     apr: number;
     collateralRatio: number;
@@ -110,6 +124,24 @@ type CdpVault = {
   healthFactor: number;
 };
 
+type CollateralRow = {
+  key: string;
+  address: string;
+  symbol: string;
+  source: "Lending Collateral" | "CDP Vault";
+  sourceSubLabel?: string;
+  balanceText: string;
+  amountText: string;
+  usedText: string;
+  muted: boolean;
+  manual: boolean;
+  inputValue: string;
+  availableText: string;
+  asset?: CollateralData;
+};
+
+type SourceLoadStatus = "idle" | "loading" | "success" | "error";
+
 const Borrow = () => {
   const { userAddress, isLoggedIn } = useUser();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
@@ -134,16 +166,18 @@ const Borrow = () => {
   const [autoAllocate, setAutoAllocate] = useState(true);
   const [targetHealthFactor, setTargetHealthFactor] = useState(2.1);
   const [showDetails, setShowDetails] = useState(true);
-  const [isDraggingHealthBar, setIsDraggingHealthBar] = useState(false);
-  const healthBarRef = useRef<HTMLDivElement | null>(null);
   const [routePreviewData, setRoutePreviewData] = useState<RoutePreviewApiResponse | null>(null);
   const [routePreviewLoading, setRoutePreviewLoading] = useState(false);
+  const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showRepayPanel, setShowRepayPanel] = useState(false);
   const [cdpVaults, setCdpVaults] = useState<CdpVault[]>([]);
+  const [lendingCollateralStatus, setLendingCollateralStatus] = useState<SourceLoadStatus>("idle");
+  const [cdpVaultsStatus, setCdpVaultsStatus] = useState<SourceLoadStatus>("idle");
   const { userRewards } = useRewardsUserInfo();
 
   const guestMode = !isLoggedIn;
   type CustomCollateralEntry = { source: "wei"; wei: bigint } | { source: "usd"; usd: string };
+  type CustomCdpEntry = { usd: string };
   const normalizedBorrowInput = borrowInput.replace(/,/g, "").trim();
   const requestedBorrow = Number(normalizedBorrowInput || "0");
   const requestedBorrowWei = safeParseUnits(normalizedBorrowInput || "0", 18);
@@ -183,22 +217,49 @@ const Borrow = () => {
   useEffect(() => {
     if (!isLoggedIn) {
       setCdpVaults([]);
+      setLendingCollateralStatus("idle");
+      setCdpVaultsStatus("idle");
       return;
     }
+    let cancelled = false;
     const refreshData = async () => {
-      try {
-        const [, , , vaultsRes] = await Promise.all([
-          refreshLoans(),
-          refreshCollateral(),
-          fetchUsdstBalance(),
-          api.get<CdpVault[]>("/cdp/vaults"),
-        ]);
-        setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
-      } catch (error) {
-        console.error("Error refreshing borrow page data:", error);
-      }
+      setLendingCollateralStatus("loading");
+      setCdpVaultsStatus("loading");
+
+      refreshLoans().catch((error) => {
+        console.error("Error refreshing loan data:", error);
+      });
+      fetchUsdstBalance().catch((error) => {
+        console.error("Error refreshing USDST balance:", error);
+      });
+
+      refreshCollateral()
+        .then(() => {
+          if (!cancelled) setLendingCollateralStatus("success");
+        })
+        .catch((error) => {
+          if (!cancelled) setLendingCollateralStatus("error");
+          console.error("Error refreshing lending collateral data:", error);
+        });
+
+      api
+        .get<CdpVault[]>("/cdp/vaults")
+        .then((vaultsRes) => {
+          if (cancelled) return;
+          setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
+          setCdpVaultsStatus("success");
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setCdpVaults([]);
+          setCdpVaultsStatus("error");
+          console.error("Error refreshing CDP vault data:", error);
+        });
     };
     refreshData();
+    return () => {
+      cancelled = true;
+    };
   }, [userAddress, isLoggedIn, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
   const potentialCollateral = useMemo(() => {
@@ -213,6 +274,8 @@ const Borrow = () => {
 
   const [customCollateralEntries, setCustomCollateralEntries] = useState<Map<string, CustomCollateralEntry>>(new Map());
   const [manualCollateralInputErrors, setManualCollateralInputErrors] = useState<Map<string, string>>(new Map());
+  const [customCdpEntries, setCustomCdpEntries] = useState<Map<string, CustomCdpEntry>>(new Map());
+  const [manualCdpInputErrors, setManualCdpInputErrors] = useState<Map<string, string>>(new Map());
 
   const sliderExtrema = useMemo(() => {
     return calculateHFSliderExtrema(loans, collateralInfo);
@@ -265,12 +328,42 @@ const Borrow = () => {
   }, [autoAllocate, recommendedCollateral, manualCollateral]);
 
   const totalCollateralUsedWei = useMemo(() => {
+    if (routePreviewData) {
+      const parseCollateralValue = (value?: string) => {
+        try {
+          return BigInt(value || "0");
+        } catch {
+          return 0n;
+        }
+      };
+      const lendingUsed = (routePreviewData.lendingAllocations || []).reduce(
+        (sum, item) => sum + parseCollateralValue(item.collateralValueUSD),
+        0n
+      );
+      const cdpUsed = (routePreviewData.cdpAllocations || []).reduce(
+        (sum, item) => sum + parseCollateralValue(item.depositCollateralValueUSD),
+        0n
+      );
+      return lendingUsed + cdpUsed;
+    }
     return Array.from(selectedCollateral.entries()).reduce((sum, [asset, amount]) => {
       const decimals = BigInt(asset.customDecimals ?? 18);
       const price = BigInt(asset.assetPrice || "0");
       return sum + (amount * price) / (10n ** decimals);
     }, 0n);
-  }, [selectedCollateral]);
+  }, [selectedCollateral, routePreviewData]);
+
+  const totalBorrowRoutedWei = useMemo(() => {
+    if (!routePreviewData) return 0n;
+    const parseWei = (value?: string) => {
+      try {
+        return BigInt(value || "0");
+      } catch {
+        return 0n;
+      }
+    };
+    return parseWei(routePreviewData.split?.lendingAmount) + parseWei(routePreviewData.split?.cdpAmount);
+  }, [routePreviewData]);
 
   const handleAutoAllocateToggle = () => {
     setAutoAllocate((prev) => {
@@ -287,9 +380,18 @@ const Borrow = () => {
         }
         setCustomCollateralEntries(initialEntries);
         setManualCollateralInputErrors(new Map());
+        const initialCdpEntries = new Map<string, CustomCdpEntry>();
+        for (const vault of cdpVaults) {
+          const maxUsd = Number(formatUnits(BigInt(vault.collateralValueUSD || "0"), 18));
+          initialCdpEntries.set(vault.asset, { usd: maxUsd.toFixed(2) });
+        }
+        setCustomCdpEntries(initialCdpEntries);
+        setManualCdpInputErrors(new Map());
       } else {
         setCustomCollateralEntries(new Map());
         setManualCollateralInputErrors(new Map());
+        setCustomCdpEntries(new Map());
+        setManualCdpInputErrors(new Map());
       }
       return next;
     });
@@ -337,8 +439,51 @@ const Borrow = () => {
     });
   };
 
+  const handleCustomCdpValueChange = (assetAddress: string, value: string) => {
+    if (!/^\d*\.?\d*$/.test(value)) return;
+    const vault = cdpVaults.find((item) => item.asset.toLowerCase() === assetAddress.toLowerCase());
+    const maxUsd = vault ? Number(formatUnits(BigInt(vault.collateralValueUSD || "0"), 18)) : 0;
+    let nextValue = value;
+    let errorText = "";
+    if (value !== "") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed) && parsed > maxUsd) {
+        nextValue = maxUsd.toFixed(2);
+        errorText = `Max available is $${maxUsd.toFixed(2)}`;
+      }
+    }
+    setCustomCdpEntries((prev) => {
+      const next = new Map(prev);
+      next.set(assetAddress, { usd: nextValue });
+      return next;
+    });
+    setManualCdpInputErrors((prev) => {
+      const next = new Map(prev);
+      if (errorText) {
+        next.set(assetAddress, errorText);
+      } else {
+        next.delete(assetAddress);
+      }
+      return next;
+    });
+  };
+
+  const handleFillMaxCdpCollateral = (vault: CdpVault) => {
+    const maxUsd = Number(formatUnits(BigInt(vault.collateralValueUSD || "0"), 18));
+    setCustomCdpEntries((prev) => {
+      const next = new Map(prev);
+      next.set(vault.asset, { usd: maxUsd.toFixed(2) });
+      return next;
+    });
+    setManualCdpInputErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(vault.asset);
+      return next;
+    });
+  };
+
   const collateralRows = useMemo(() => {
-    const rowsFromAmounts = (entries: Array<[CollateralData, bigint]>) => {
+    const rowsFromAmounts = (entries: Array<[CollateralData, bigint]>): CollateralRow[] => {
       return entries
         .filter(([, amount]) => amount > 0n)
         .slice(0, 3)
@@ -347,8 +492,10 @@ const Borrow = () => {
           const tokenAmount = Number(formatUnits(amount, decimals));
           const usdValue = Number((amount * BigInt(asset.assetPrice || "0")) / (10n ** BigInt(decimals))) / 1e18;
           return {
+            key: `lending-auto-${asset.address}`,
             address: asset.address,
             symbol: asset._symbol,
+            source: "Lending Collateral" as const,
             balanceText: `Balance: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
             amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
             usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
@@ -361,11 +508,135 @@ const Borrow = () => {
         });
     };
 
+    const existingCdpVaultRows: CollateralRow[] = cdpVaults.map((vault) => {
+      const decimals = vault.collateralAmountDecimals || 18;
+      const tokenAmount = Number(formatUnits(BigInt(vault.collateralAmount || "0"), decimals));
+      const usdValue = Number(formatUnits(BigInt(vault.collateralValueUSD || "0"), 18));
+      return {
+        key: `cdp-existing-${vault.asset}`,
+        address: vault.asset,
+        symbol: vault.symbol,
+        source: "CDP Vault",
+        sourceSubLabel: "Existing Vault Position",
+        balanceText: `Debt: ${formatBalance(vault.debtAmount || "0", "USDST", 18, 2, 2)}`,
+        amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${vault.symbol}`,
+        usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in vault`,
+        muted: false,
+        manual: false,
+        inputValue: "",
+        availableText: "",
+      };
+    });
+    const existingLendingRows: CollateralRow[] = (collateralInfo || [])
+      .filter((asset) => BigInt(asset.collateralizedAmount || "0") > 0n)
+      .map((asset) => {
+        const decimals = asset.customDecimals ?? 18;
+        const amount = BigInt(asset.collateralizedAmount || "0");
+        const amountNumber = Number(formatUnits(amount, decimals));
+        const usdValue = Number(formatUnits(BigInt(asset.collateralizedAmountValue || "0"), 18));
+        return {
+          key: `lending-existing-${asset.address}`,
+          address: asset.address,
+          symbol: asset._symbol,
+          source: "Lending Collateral",
+          sourceSubLabel: "Existing Lending Position",
+          balanceText: `Wallet: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
+          amountText: `${amountNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
+          usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} already collateralized`,
+          muted: false,
+          manual: false,
+          inputValue: "",
+          availableText: "",
+          asset,
+        };
+      });
+
     if (autoAllocate) {
-      return rowsFromAmounts(Array.from(recommendedCollateral.entries()));
+      if (isLoggedIn && requestedBorrowWei > 0n && routePreviewLoading && !routePreviewData) {
+        return [...existingLendingRows, ...existingCdpVaultRows];
+      }
+      if (routePreviewData) {
+        const lendingRows: CollateralRow[] = (routePreviewData.lendingAllocations || [])
+          .filter((item) => BigInt(item.supplyAmount || "0") > 0n)
+          .map((item) => {
+            const supplyAmount = BigInt(item.supplyAmount || "0");
+            const usdValue = Number(formatUnits(BigInt(item.collateralValueUSD || "0"), 18));
+            const matchingAsset = Array.from(potentialCollateral.keys()).find((asset) => asset.address === item.asset);
+            const balanceText = matchingAsset
+              ? `Balance: ${formatBalance(matchingAsset.userBalance || "0", undefined, matchingAsset.customDecimals ?? 18, 2, 2)} · ${formatBalance(matchingAsset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`
+              : "Balance sourced from wallet collateral";
+            return {
+              key: `lending-route-${item.asset}`,
+              address: item.asset,
+              symbol: item.symbol,
+              source: "Lending Collateral",
+              sourceSubLabel: "Allocated by Health Factor",
+              balanceText,
+              amountText: `${Number(formatUnits(supplyAmount, item.decimals || 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.symbol}`,
+              usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
+              muted: false,
+              manual: false,
+              inputValue: "",
+              availableText: "",
+            };
+          });
+        const lendingAmountWei = (() => {
+          try {
+            return BigInt(routePreviewData.split?.lendingAmount || "0");
+          } catch {
+            return 0n;
+          }
+        })();
+        if (lendingRows.length === 0 && lendingAmountWei > 0n) {
+          lendingRows.push({
+            key: "lending-route-existing-capacity",
+            address: "lending-existing",
+            symbol: "USDST",
+            source: "Lending Collateral",
+            sourceSubLabel: "Allocated by Health Factor (Existing Position)",
+            balanceText: `Borrow route: ${Number(formatUnits(lendingAmountWei, 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST`,
+            amountText: "No new supply required",
+            usedText: "Using existing lending collateral capacity",
+            muted: false,
+            manual: false,
+            inputValue: "",
+            availableText: "",
+          });
+        }
+
+        const cdpRouteRows: CollateralRow[] = (routePreviewData.cdpAllocations || [])
+          .filter((item) => BigInt(item.mintAmount || "0") > 0n)
+          .map((item) => {
+            const depositAmount = BigInt(item.depositAmount || "0");
+            const depositUsd = BigInt(item.depositCollateralValueUSD || "0");
+            const usedValueWei = depositUsd > 0n ? depositUsd : 0n;
+            const usdValue = Number(formatUnits(usedValueWei, 18));
+            const usingExistingOnly = depositAmount <= 0n;
+            return {
+              key: `cdp-route-${item.asset}`,
+              address: item.asset,
+              symbol: item.symbol,
+              source: "CDP Vault",
+              sourceSubLabel: usingExistingOnly ? "Allocated by Health Factor (Existing Vault)" : "Allocated by Health Factor",
+              balanceText: `Mint: ${Number(formatUnits(BigInt(item.mintAmount || "0"), 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST`,
+              amountText: usingExistingOnly
+                ? `0.00 ${item.symbol} (new deposit)`
+                : `${Number(formatUnits(depositAmount, item.decimals || 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.symbol}`,
+              usedText: usingExistingOnly
+                ? "$0.00 additional used (minting via existing vault headroom)"
+                : `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} routed to CDP`,
+              muted: false,
+              manual: false,
+              inputValue: "",
+              availableText: "",
+            };
+          });
+        return [...lendingRows, ...cdpRouteRows];
+      }
+      return [...rowsFromAmounts(Array.from(recommendedCollateral.entries())), ...existingLendingRows, ...existingCdpVaultRows];
     }
 
-    return Array.from(potentialCollateral.keys()).map((asset) => {
+    const manualLendingRows: CollateralRow[] = Array.from(potentialCollateral.keys()).map((asset) => {
       const decimals = asset.customDecimals ?? 18;
       const entry = customCollateralEntries.get(asset.address);
       const amount = getManualCollateralAmount(asset, entry);
@@ -373,8 +644,11 @@ const Borrow = () => {
       const usdValue = Number((amount * BigInt(asset.assetPrice || "0")) / (10n ** BigInt(decimals))) / 1e18;
       const inputValue = entry?.source === "usd" ? entry.usd : usdValue.toFixed(2);
       return {
+        key: `lending-manual-${asset.address}`,
         address: asset.address,
         symbol: asset._symbol,
+        source: "Lending Collateral",
+        sourceSubLabel: "Manual Allocation",
         balanceText: `Balance: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
         amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
         usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
@@ -385,7 +659,28 @@ const Borrow = () => {
         asset,
       };
     });
-  }, [autoAllocate, recommendedCollateral, potentialCollateral, customCollateralEntries]);
+    return [...manualLendingRows, ...existingCdpVaultRows];
+  }, [
+    autoAllocate,
+    recommendedCollateral,
+    potentialCollateral,
+    customCollateralEntries,
+    cdpVaults,
+    collateralInfo,
+    routePreviewData,
+    routePreviewLoading,
+    requestedBorrowWei,
+    isLoggedIn,
+  ]);
+
+  const lendingRows = useMemo(
+    () => collateralRows.filter((row) => row.source === "Lending Collateral"),
+    [collateralRows]
+  );
+  const cdpRows = useMemo(
+    () => collateralRows.filter((row) => row.source === "CDP Vault"),
+    [collateralRows]
+  );
 
   const ltvNow = useMemo(() => {
     const debt = Number(formatUnits(BigInt(loans?.totalAmountOwed || "0"), 18));
@@ -404,9 +699,32 @@ const Borrow = () => {
       }));
   }, [autoAllocate, selectedCollateral]);
 
+  const cdpCollateralPayload = useMemo(() => {
+    if (autoAllocate) return [];
+    return cdpVaults.map((vault) => {
+      const entry = customCdpEntries.get(vault.asset);
+      const collateralAmountWei = BigInt(vault.collateralAmount || "0");
+      const collateralValueWei = BigInt(vault.collateralValueUSD || "0");
+      const defaultUsd = collateralValueWei > 0n ? formatUnits(collateralValueWei, 18) : "0";
+      const usdInput = (entry?.usd ?? defaultUsd).trim();
+      const usdWei = safeParseUnits(usdInput || "0", 18);
+      if (usdWei <= 0n || collateralAmountWei <= 0n || collateralValueWei <= 0n) {
+        return { asset: vault.asset, amount: "0" };
+      }
+      const cappedUsdWei = usdWei > collateralValueWei ? collateralValueWei : usdWei;
+      const amountWei = (cappedUsdWei * collateralAmountWei) / collateralValueWei;
+      return { asset: vault.asset, amount: amountWei.toString() };
+    });
+  }, [autoAllocate, cdpVaults, customCdpEntries]);
+
   useEffect(() => {
     if (!isLoggedIn || requestedBorrowWei <= 0n) {
+      if (previewDebounceRef.current) {
+        clearTimeout(previewDebounceRef.current);
+        previewDebounceRef.current = null;
+      }
       setRoutePreviewData(null);
+      setRoutePreviewLoading(false);
       return;
     }
 
@@ -418,14 +736,13 @@ const Borrow = () => {
           amount: requestedBorrowWei.toString(),
           targetHealthFactor,
           lendingCollateral: lendingCollateralPayload,
+          cdpCollateral: cdpCollateralPayload,
         });
         if (!cancelled) {
           setRoutePreviewData(res.data);
         }
       } catch {
-        if (!cancelled) {
-          setRoutePreviewData(null);
-        }
+        // Keep last good preview to avoid UI flicker to fallback mode.
       } finally {
         if (!cancelled) {
           setRoutePreviewLoading(false);
@@ -433,23 +750,34 @@ const Borrow = () => {
       }
     };
 
-    fetchRoutePreview();
+    if (previewDebounceRef.current) {
+      clearTimeout(previewDebounceRef.current);
+    }
+    previewDebounceRef.current = setTimeout(() => {
+      fetchRoutePreview();
+    }, 220);
     return () => {
       cancelled = true;
+      if (previewDebounceRef.current) {
+        clearTimeout(previewDebounceRef.current);
+        previewDebounceRef.current = null;
+      }
     };
-  }, [isLoggedIn, requestedBorrowWei, targetHealthFactor, lendingCollateralPayload]);
+  }, [isLoggedIn, requestedBorrowWei, targetHealthFactor, lendingCollateralPayload, cdpCollateralPayload]);
+
+  const previewPending = requestedBorrowWei > 0n && routePreviewLoading && !routePreviewData;
+  const previewRefreshing = requestedBorrowWei > 0n && routePreviewLoading;
 
   const routePreview = useMemo(() => {
-    const fallbackTotal = requestedBorrow > 0 ? requestedBorrow : 0;
     const fallbackLendingApr = Number(((loans?.interestRate || 0) / 100).toFixed(2));
     if (!routePreviewData) {
       return {
-        lendingAmount: fallbackTotal,
+        lendingAmount: previewPending ? 0 : requestedBorrow > 0 ? requestedBorrow : 0,
         cdpAmount: 0,
-        mechanisms: fallbackTotal > 0 ? 1 : 0,
+        mechanisms: previewPending ? 0 : requestedBorrow > 0 ? 1 : 0,
         lendingApr: fallbackLendingApr,
         cdpApr: 0,
-        blendedApr: fallbackLendingApr,
+        blendedApr: previewPending ? 0 : fallbackLendingApr,
         cdpDebt: 0,
         cdpCollateralUsd: 0,
         liquidationDropPercent: 0,
@@ -494,7 +822,21 @@ const Borrow = () => {
       cdpEffectiveHF: Number(routePreviewData.health.cdpEffectiveHealthFactor || targetHealthFactor),
       projectedLtvPercent: Number(routePreviewData.position?.projectedLtvPercent || ltvNow),
     };
-  }, [routePreviewData, requestedBorrow, loans?.interestRate, targetHealthFactor, ltvNow]);
+  }, [routePreviewData, requestedBorrow, loans?.interestRate, targetHealthFactor, ltvNow, previewPending]);
+
+  const routingReasonText = useMemo(() => {
+    const reason = routePreviewData?.routing?.selectionReason;
+    if (!reason) return "";
+    const mapping: Record<string, string> = {
+      insufficient_total_capacity: "Route limited by total available capacity.",
+      cdp_capacity_unavailable_or_constrained: "CDP route unavailable or constrained at current settings.",
+      lending_apr_optimal: "Lending-only route selected as lowest APR option.",
+      cdp_constraints_prevented_split: "CDP constraints prevented a lower blended split.",
+      cdp_apr_optimal: "CDP-only route selected as lowest APR option.",
+      blended_apr_optimal_split: "Mixed Lending + CDP split selected for minimum blended APR.",
+    };
+    return mapping[reason] || "Route selected by optimizer constraints.";
+  }, [routePreviewData?.routing?.selectionReason]);
 
   const maxBorrowableWei = useMemo(() => {
     if (routePreviewData?.constraints?.totalCapacity) {
@@ -519,28 +861,93 @@ const Borrow = () => {
   const cdpRouteCollateralText = useMemo(() => {
     const allocations = routePreviewData?.cdpAllocations || [];
     if (allocations.length === 0) return "No CDP collateral needed";
-    return allocations
-      .filter((item) => BigInt(item.depositAmount || "0") > 0n)
-      .map((item) => `${Number(formatUnits(BigInt(item.depositAmount || "0"), item.decimals || 18)).toFixed(2)} ${item.symbol}`)
-      .join(" + ");
+    const withDeposit = allocations.filter((item) => BigInt(item.depositAmount || "0") > 0n);
+    if (withDeposit.length > 0) {
+      return withDeposit
+        .map((item) => `${Number(formatUnits(BigInt(item.depositAmount || "0"), item.decimals || 18)).toFixed(2)} ${item.symbol}`)
+        .join(" + ");
+    }
+    const withExisting = allocations.filter((item) => BigInt(item.mintAmount || "0") > 0n);
+    if (withExisting.length > 0) {
+      return withExisting.map((item) => `${item.symbol} (existing vault collateral)`).join(" + ");
+    }
+    return "No CDP collateral needed";
   }, [routePreviewData?.cdpAllocations]);
+
+  const cdpMintSourceText = useMemo(() => {
+    const fresh = routePreviewData?.routing?.cdpFromFreshCollateral;
+    const existing = routePreviewData?.routing?.cdpFromExistingCollateral;
+    if (!fresh && !existing) return "";
+    let freshAmount = 0;
+    let existingAmount = 0;
+    try {
+      freshAmount = Number(formatUnits(BigInt(fresh || "0"), 18));
+      existingAmount = Number(formatUnits(BigInt(existing || "0"), 18));
+    } catch {
+      return "";
+    }
+    if (freshAmount <= 0 && existingAmount <= 0) return "";
+    return `CDP source: fresh deposit ${freshAmount.toFixed(2)} USDST, existing vault collateral ${existingAmount.toFixed(2)} USDST.`;
+  }, [routePreviewData?.routing?.cdpFromFreshCollateral, routePreviewData?.routing?.cdpFromExistingCollateral]);
+
+  const cdpCapacityBreakdownText = useMemo(() => {
+    const existing = routePreviewData?.constraints?.cdpCapacityFromExistingCollateral;
+    const fresh = routePreviewData?.constraints?.cdpCapacityFromFreshCollateral;
+    if (!existing && !fresh) return "";
+    let existingAmount = 0;
+    let freshAmount = 0;
+    try {
+      existingAmount = Number(formatUnits(BigInt(existing || "0"), 18));
+      freshAmount = Number(formatUnits(BigInt(fresh || "0"), 18));
+    } catch {
+      return "";
+    }
+    return `CDP capacity: existing ${existingAmount.toFixed(2)} USDST + fresh ${freshAmount.toFixed(2)} USDST.`;
+  }, [routePreviewData?.constraints?.cdpCapacityFromExistingCollateral, routePreviewData?.constraints?.cdpCapacityFromFreshCollateral]);
 
   const totalCdpDebtActual = useMemo(() => {
     return cdpVaults.reduce((sum, vault) => sum + Number(formatUnits(BigInt(vault.debtAmount || "0"), 18)), 0);
   }, [cdpVaults]);
 
-  const progressValue = useMemo(() => {
-    const sourceHealthFactor = routePreviewData?.health?.unifiedHealthFactor && routePreviewData.health.unifiedHealthFactor > 0
-      ? routePreviewData.health.unifiedHealthFactor
-      : targetHealthFactor;
-    const min = 1;
-    const max = Math.max(3, sourceHealthFactor * 1.5, targetHealthFactor * 1.2);
-    if (max <= min) return 50;
-    const clamped = Math.max(min, Math.min(max, sourceHealthFactor));
-    return ((clamped - min) / (max - min)) * 100;
-  }, [routePreviewData?.health?.unifiedHealthFactor, targetHealthFactor]);
+  const sliderRange = useMemo(() => {
+    const min = Number(sliderExtrema.min);
+    const max = Number(sliderExtrema.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 0;
+    return max - min;
+  }, [sliderExtrema.min, sliderExtrema.max]);
+
+  const sliderPosition = useMemo(() => {
+    const min = Number(sliderExtrema.min);
+    const max = Number(sliderExtrema.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 0;
+    const clamped = Math.max(min, Math.min(max, Number(targetHealthFactor)));
+    return max - clamped;
+  }, [targetHealthFactor, sliderExtrema.min, sliderExtrema.max]);
+
+  useEffect(() => {
+    const min = Number(sliderExtrema.min);
+    const max = Number(sliderExtrema.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
+    const current = Number(targetHealthFactor);
+    if (current < min || current > max) {
+      const clamped = Math.max(min, Math.min(max, current));
+      setTargetHealthFactor(Number(clamped.toFixed(2)));
+    }
+  }, [sliderExtrema.min, sliderExtrema.max, targetHealthFactor]);
+
+  const handleHealthSliderChange = (values: number[]) => {
+    const sliderPos = values[0] ?? 0;
+    const min = Number(sliderExtrema.min);
+    const max = Number(sliderExtrema.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
+    const newHF = max - sliderPos;
+    setTargetHealthFactor(Number(newHF.toFixed(2)));
+  };
 
   const displayHealthFactor = useMemo(() => {
+    if (previewRefreshing) {
+      return Number(targetHealthFactor);
+    }
     if (routePreviewData?.health?.unifiedHealthFactor && routePreviewData.health.unifiedHealthFactor > 0) {
       return Number(routePreviewData.health.unifiedHealthFactor);
     }
@@ -552,52 +959,13 @@ const Borrow = () => {
       }
     }
     return Number(targetHealthFactor);
-  }, [routePreviewData?.health?.unifiedHealthFactor, loans, requestedBorrow, selectedCollateral, targetHealthFactor]);
+  }, [previewRefreshing, routePreviewData?.health?.unifiedHealthFactor, loans, requestedBorrow, selectedCollateral, targetHealthFactor]);
 
-  const updateTargetHealthFactorFromClientX = (clientX: number) => {
-    const barEl = healthBarRef.current;
-    if (!barEl) return;
-    const rect = barEl.getBoundingClientRect();
-    if (rect.width <= 0) return;
-
-    const min = Number(sliderExtrema.min);
-    const max = Number(sliderExtrema.max);
-    if (max <= min) return;
-
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const next = min + ratio * (max - min);
-    setTargetHealthFactor(Number(next.toFixed(2)));
-  };
-
-  useEffect(() => {
-    if (!isDraggingHealthBar) return;
-
-    const handleMouseMove = (event: MouseEvent) => {
-      updateTargetHealthFactorFromClientX(event.clientX);
-    };
-
-    const handleTouchMove = (event: TouchEvent) => {
-      const touch = event.touches[0];
-      if (!touch) return;
-      updateTargetHealthFactorFromClientX(touch.clientX);
-    };
-
-    const stopDragging = () => {
-      setIsDraggingHealthBar(false);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", stopDragging);
-    window.addEventListener("touchmove", handleTouchMove);
-    window.addEventListener("touchend", stopDragging);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", stopDragging);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", stopDragging);
-    };
-  }, [isDraggingHealthBar, sliderExtrema]);
+  const projectedHealthFactor = useMemo(() => {
+    const hf = Number(routePreviewData?.health?.unifiedHealthFactor || 0);
+    if (!Number.isFinite(hf) || hf <= 0) return null;
+    return hf;
+  }, [routePreviewData?.health?.unifiedHealthFactor]);
 
   const handleBorrowNow = async () => {
     if (guestMode) return;
@@ -622,6 +990,7 @@ const Borrow = () => {
         amount: requestedBorrowWei.toString(),
         targetHealthFactor,
         lendingCollateral: lendingCollateralPayload,
+        cdpCollateral: cdpCollateralPayload,
       });
       if (res.data?.status !== "success") {
         const failedStep = res.data?.steps?.find((step) => step.status === "failed");
@@ -642,18 +1011,28 @@ const Borrow = () => {
         })} USDST`,
         variant: "success",
       });
-      const [, , , vaultsRes] = await Promise.all([
+      setLendingCollateralStatus("loading");
+      setCdpVaultsStatus("loading");
+      const [, collateralResult, , vaultsResult] = await Promise.allSettled([
         refreshLoans(),
         refreshCollateral(),
         fetchUsdstBalance(),
         api.get<CdpVault[]>("/cdp/vaults"),
       ]);
-      setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
+      setLendingCollateralStatus(collateralResult.status === "fulfilled" ? "success" : "error");
+      if (vaultsResult.status === "fulfilled") {
+        setCdpVaults(Array.isArray(vaultsResult.value.data) ? vaultsResult.value.data : []);
+        setCdpVaultsStatus("success");
+      } else {
+        setCdpVaults([]);
+        setCdpVaultsStatus("error");
+      }
       setBorrowInput("");
       setSelectedBorrowPreset(null);
       setRoutePreviewData(null);
-    } catch (error: any) {
-      const responseData = error?.response?.data as ExecuteBorrowRouteResponse | undefined;
+    } catch (error: unknown) {
+      const errorObj = error as { message?: string; response?: { data?: ExecuteBorrowRouteResponse } };
+      const responseData = errorObj?.response?.data;
       const failedStep = responseData?.steps?.find((step) => step.status === "failed");
       const lendingBorrowed = Number(formatUnits(BigInt(responseData?.execution?.lendingBorrowed || "0"), 18));
       const cdpMinted = Number(formatUnits(BigInt(responseData?.execution?.cdpMinted || "0"), 18));
@@ -663,7 +1042,7 @@ const Borrow = () => {
       setInlineBorrowError(
         (failedStep?.error ||
           responseData?.error ||
-          error?.message ||
+          errorObj?.message ||
           "Borrow execution failed. Please try again.") + partialDetails
       );
     } finally {
@@ -686,18 +1065,77 @@ const Borrow = () => {
         description: amount === "ALL" ? "Repay all transaction submitted." : "Repay transaction submitted.",
         variant: "success",
       });
-      const [, , , vaultsRes] = await Promise.all([
+      setLendingCollateralStatus("loading");
+      setCdpVaultsStatus("loading");
+      const [, collateralResult, , vaultsResult] = await Promise.allSettled([
         refreshLoans(),
         refreshCollateral(),
         fetchUsdstBalance(),
         api.get<CdpVault[]>("/cdp/vaults"),
       ]);
-      setCdpVaults(Array.isArray(vaultsRes.data) ? vaultsRes.data : []);
-    } catch (error: any) {
-      setInlineRepayError(error?.message || "Repay failed");
+      setLendingCollateralStatus(collateralResult.status === "fulfilled" ? "success" : "error");
+      if (vaultsResult.status === "fulfilled") {
+        setCdpVaults(Array.isArray(vaultsResult.value.data) ? vaultsResult.value.data : []);
+        setCdpVaultsStatus("success");
+      } else {
+        setCdpVaults([]);
+        setCdpVaultsStatus("error");
+      }
+    } catch (error: unknown) {
+      const errorObj = error as { message?: string };
+      setInlineRepayError(errorObj?.message || "Repay failed");
     } finally {
       setRepayLoading(false);
     }
+  };
+
+  const renderCollateralRow = (row: CollateralRow) => {
+    const iconBg = row.symbol === "ETHST" ? "bg-slate-500/50" : row.symbol === "GOLDST" ? "bg-amber-500/60" : "bg-orange-600/50";
+    return (
+      <div key={row.key} className="flex items-center justify-between px-4 py-4 border-t border-border/50">
+        <div className="flex items-center gap-3">
+          <span className={`w-10 h-10 rounded-full ${iconBg} inline-flex items-center justify-center text-sm font-semibold`}>
+            {row.symbol.slice(0, 1)}
+          </span>
+          <div>
+            <p className={`font-medium ${row.muted ? "text-muted-foreground/70" : ""}`}>{row.symbol}</p>
+            <p className="text-[10px] text-muted-foreground">{row.source}{row.sourceSubLabel ? ` · ${row.sourceSubLabel}` : ""}</p>
+            <p className={`text-xs text-muted-foreground ${row.muted ? "opacity-70" : ""}`}>{row.balanceText}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          {row.manual && row.asset ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-end gap-1">
+                <span className="text-xs text-muted-foreground">$</span>
+                <Input
+                  value={row.inputValue}
+                  onChange={(e) => handleCustomCollateralValueChange(row.address, e.target.value)}
+                  disabled={guestMode}
+                  className={`h-7 w-24 px-2 text-right text-xs ${manualCollateralInputErrors.get(row.address) ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                />
+              </div>
+              {manualCollateralInputErrors.get(row.address) ? (
+                <p className="text-[10px] text-red-500">{manualCollateralInputErrors.get(row.address)}</p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => handleFillMaxCollateral(row.asset)}
+                className="text-xs text-muted-foreground underline"
+                disabled={guestMode}
+              >
+                {row.availableText}
+              </button>
+            </div>
+          ) : (
+            <>
+              {row.amountText ? <p className="font-semibold">{row.amountText}</p> : null}
+              <p className={`text-xs text-muted-foreground ${row.muted ? "opacity-70" : ""}`}>{row.usedText}</p>
+            </>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -730,7 +1168,16 @@ const Borrow = () => {
                       onChange={(e) => {
                         const value = e.target.value.replace(/,/g, "");
                         if (/^\d*\.?\d*$/.test(value)) {
-                          setBorrowInput(value);
+                          const enteredWei = safeParseUnits(value || "0", 18);
+                          if (maxBorrowableWei > 0n && enteredWei > maxBorrowableWei) {
+                            setBorrowInput(Number(formatUnits(maxBorrowableWei, 18)).toFixed(2));
+                            setInlineBorrowError("Amount capped at max borrowable limit");
+                          } else {
+                            setBorrowInput(value);
+                            if (inlineBorrowError === "Amount capped at max borrowable limit") {
+                              setInlineBorrowError("");
+                            }
+                          }
                           setSelectedBorrowPreset(null);
                         }
                       }}
@@ -787,7 +1234,7 @@ const Borrow = () => {
 
             <div className="flex items-center gap-3 px-1 pt-2">
               <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">2</span>
-              <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">YOUR COLLATERAL</p>
+              <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">YOUR COLLATERAL (LENDING + CDP)</p>
             </div>
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0 space-y-2">
@@ -808,67 +1255,113 @@ const Borrow = () => {
                     </span>
                   </button>
                 </div>
-                {collateralRows.length > 0 ? (
-                  collateralRows.map((row) => {
-                    const iconBg = row.symbol === "ETHST" ? "bg-slate-500/50" : row.symbol === "GOLDST" ? "bg-amber-500/60" : "bg-orange-600/50";
-                    return (
-                      <div key={row.symbol} className="flex items-center justify-between px-4 py-4 border-t border-border/50">
-                        <div className="flex items-center gap-3">
-                          <span className={`w-10 h-10 rounded-full ${iconBg} inline-flex items-center justify-center text-sm font-semibold`}>
-                            {row.symbol.slice(0, 1)}
-                          </span>
-                          <div>
-                          <p className={`font-medium ${row.muted ? "text-muted-foreground/70" : ""}`}>{row.symbol}</p>
-                          <p className={`text-xs text-muted-foreground ${row.muted ? "opacity-70" : ""}`}>{row.balanceText}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {row.manual ? (
-                            <div className="space-y-1">
+                {lendingCollateralStatus === "loading" ? (
+                  <div className="border-t border-border/50 px-4 py-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">Loading lending collateral...</p>
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : null}
+                {lendingCollateralStatus === "error" ? (
+                  <div className="border-t border-border/50 px-4 py-4 text-xs text-amber-600">
+                    Lending collateral unavailable. Showing available sources only.
+                  </div>
+                ) : null}
+                {requestedBorrowWei > 0n && routePreviewLoading ? (
+                  <div className="border-t border-border/50 px-4 py-3 text-xs text-muted-foreground">
+                    Calculating optimal Lending/CDP split for selected health factor...
+                  </div>
+                ) : null}
+                {lendingRows.map(renderCollateralRow)}
+
+                {cdpVaultsStatus === "loading" ? (
+                  <div className="border-t border-border/50 px-4 py-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">Loading CDP vault collateral...</p>
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : null}
+                {cdpVaultsStatus === "error" ? (
+                  <div className="border-t border-border/50 px-4 py-4 text-xs text-amber-600">
+                    CDP vault data unavailable. Lending collateral is still usable.
+                  </div>
+                ) : null}
+                {!autoAllocate && cdpVaultsStatus !== "loading" && cdpVaults.length > 0 ? (
+                  <div className="border-t border-border/50 px-4 py-3 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Manual CDP cap (USD): set how much existing vault collateral value each CDP token can use.
+                    </p>
+                    <div className="space-y-2">
+                      {cdpVaults.map((vault) => {
+                        const entry = customCdpEntries.get(vault.asset);
+                        const maxUsd = Number(formatUnits(BigInt(vault.collateralValueUSD || "0"), 18));
+                        const inputValue = entry?.usd ?? maxUsd.toFixed(2);
+                        return (
+                          <div key={`manual-cdp-${vault.asset}`} className="flex items-start justify-between gap-3 rounded-md border border-border/60 p-2">
+                            <div>
+                              <p className="text-sm font-medium">{vault.symbol}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                Max: ${maxUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from existing vault collateral
+                              </p>
+                            </div>
+                            <div className="space-y-1 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <span className="text-xs text-muted-foreground">$</span>
                                 <Input
-                                  value={row.inputValue}
-                                  onChange={(e) => handleCustomCollateralValueChange(row.address, e.target.value)}
+                                  value={inputValue}
+                                  onChange={(e) => handleCustomCdpValueChange(vault.asset, e.target.value)}
                                   disabled={guestMode}
-                                  className={`h-7 w-24 px-2 text-right text-xs ${manualCollateralInputErrors.get(row.address) ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                                  className={`h-7 w-28 px-2 text-right text-xs ${manualCdpInputErrors.get(vault.asset) ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                                 />
                               </div>
-                              {manualCollateralInputErrors.get(row.address) ? (
-                                <p className="text-[10px] text-red-500">{manualCollateralInputErrors.get(row.address)}</p>
+                              {manualCdpInputErrors.get(vault.asset) ? (
+                                <p className="text-[10px] text-red-500">{manualCdpInputErrors.get(vault.asset)}</p>
                               ) : null}
                               <button
                                 type="button"
-                                onClick={() => handleFillMaxCollateral(row.asset)}
+                                onClick={() => handleFillMaxCdpCollateral(vault)}
                                 className="text-xs text-muted-foreground underline"
                                 disabled={guestMode}
                               >
-                                {row.availableText}
+                                Use max
                               </button>
                             </div>
-                          ) : (
-                            <>
-                              {row.amountText ? (
-                                <p className="font-semibold">{row.amountText}</p>
-                              ) : null}
-                              <p className={`text-xs text-muted-foreground ${row.muted ? "opacity-70" : ""}`}>{row.usedText}</p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                {autoAllocate ? cdpRows.map(renderCollateralRow) : null}
+
+                {lendingCollateralStatus !== "loading" &&
+                cdpVaultsStatus !== "loading" &&
+                lendingCollateralStatus !== "error" &&
+                cdpVaultsStatus !== "error" &&
+                collateralRows.length === 0 ? (
                   <div className="px-4 py-6 border-t border-border/50 text-sm text-muted-foreground text-center">
                     No data found
                   </div>
-                )}
+                ) : null}
                 <div className="flex justify-between text-sm px-4 py-4 border-t border-border/50">
-                  <span className="text-muted-foreground">Total collateral used</span>
+                  <span className="text-muted-foreground">
+                    {routePreviewData && requestedBorrowWei > 0n ? "Total additional collateral used" : "Total collateral used"}
+                  </span>
                   <span className="font-semibold">
-                    ${(Number(totalCollateralUsedWei) / 1e18).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {previewRefreshing
+                      ? "Updating..."
+                      : `$${(Number(totalCollateralUsedWei) / 1e18).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </span>
                 </div>
+                {routePreviewData && requestedBorrowWei > 0n ? (
+                  <div className="flex justify-between text-sm px-4 py-4 border-t border-border/50">
+                    <span className="text-muted-foreground">Total borrow routed</span>
+                    <span className="font-semibold">
+                      {previewRefreshing
+                        ? "Updating..."
+                        : `${(Number(totalBorrowRoutedWei) / 1e18).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST`}
+                    </span>
+                  </div>
+                ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -884,30 +1377,21 @@ const Borrow = () => {
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
                     {getRiskLabel(displayHealthFactor)}
                   </span>
-                  <span className="font-semibold">Health Factor: {displayHealthFactor.toFixed(1)}x</span>
+                  <span className="font-semibold">
+                    {previewRefreshing
+                      ? `Target HF: ${Number(targetHealthFactor).toFixed(1)}x · Projected HF: Updating...`
+                      : `Target HF: ${Number(targetHealthFactor).toFixed(1)}x · Projected HF: ${(projectedHealthFactor ?? displayHealthFactor).toFixed(1)}x`}
+                  </span>
                 </div>
-                <div
-                  ref={healthBarRef}
-                  className={`relative h-3 rounded-full overflow-hidden bg-muted/30 ${guestMode ? "cursor-not-allowed" : "cursor-pointer"}`}
-                  onMouseDown={(event) => {
-                    if (guestMode) return;
-                    setIsDraggingHealthBar(true);
-                    updateTargetHealthFactorFromClientX(event.clientX);
-                  }}
-                  onTouchStart={(event) => {
-                    if (guestMode) return;
-                    const touch = event.touches[0];
-                    if (!touch) return;
-                    setIsDraggingHealthBar(true);
-                    updateTargetHealthFactorFromClientX(touch.clientX);
-                  }}
-                >
-                  <div className="h-full w-full bg-gradient-to-r from-red-500 via-yellow-400 to-emerald-500" />
-                  <span
-                    className="absolute top-1/2 -translate-y-1/2 w-1 h-5 rounded-full bg-white shadow-sm pointer-events-none"
-                    style={{ left: `${Math.max(2, Math.min(98, progressValue))}%` }}
-                  />
-                </div>
+                <Slider
+                  value={[sliderPosition]}
+                  min={0}
+                  max={sliderRange}
+                  step={0.01}
+                  onValueChange={handleHealthSliderChange}
+                  className="w-full"
+                  disabled={guestMode || sliderRange <= 0}
+                />
                 <div className="flex justify-between text-[11px] text-muted-foreground">
                   <span>Liquidation</span>
                   <span>Risky</span>
@@ -917,16 +1401,22 @@ const Borrow = () => {
                 <div className="grid grid-cols-3 gap-3 text-sm">
                   <div className="rounded-lg border p-3">
                     <p className="text-muted-foreground text-xs">LTV</p>
-                    <p className="font-semibold">{routePreview.projectedLtvPercent.toFixed(1)}%</p>
+                    <p className="font-semibold">
+                      {previewRefreshing ? "Updating..." : `${routePreview.projectedLtvPercent.toFixed(1)}%`}
+                    </p>
                   </div>
                   <div className="rounded-lg border p-3">
                     <p className="text-muted-foreground text-xs">Blended Rate</p>
-                    <p className="font-semibold">{routePreview.blendedApr.toFixed(2)}% APR</p>
+                    <p className="font-semibold">
+                      {previewRefreshing ? "Updating..." : `${routePreview.blendedApr.toFixed(2)}% APR`}
+                    </p>
                   </div>
                   <div className="rounded-lg border p-3">
                     <p className="text-muted-foreground text-xs">Liquidation At</p>
                     <p className="font-semibold">
-                      ${routePreview.liquidationPriceUSD.toFixed(2)} {routePreview.liquidationAssetSymbol} ({routePreview.liquidationDropPercent.toFixed(1)}% drop)
+                      {previewRefreshing
+                        ? "Updating..."
+                        : `$${routePreview.liquidationPriceUSD.toFixed(2)} ${routePreview.liquidationAssetSymbol} (${routePreview.liquidationDropPercent.toFixed(1)}% drop)`}
                     </p>
                   </div>
                 </div>
@@ -962,11 +1452,16 @@ const Borrow = () => {
                 <div className="flex items-center gap-3 px-1 pt-2">
                   <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">4</span>
                   <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">
-                    {`BORROW ROUTED ACROSS ${Math.max(1, routePreview.mechanisms)} MECHANISM${Math.max(1, routePreview.mechanisms) > 1 ? "S" : ""}`}
+                    {`BORROW ROUTED ACROSS ${Math.max(2, routePreview.mechanisms)} MECHANISM${Math.max(2, routePreview.mechanisms) > 1 ? "S" : ""}`}
                   </p>
                 </div>
                 <Card className="border-0 shadow-none bg-transparent">
                   <CardContent className="p-4 md:p-5 space-y-0 rounded-xl border border-border/70 bg-card dark:bg-[#1f274f]">
+                    {previewRefreshing ? (
+                      <div className="pb-3 border-b border-border/60">
+                        <p className="text-xs text-muted-foreground text-right">Updating route preview...</p>
+                      </div>
+                    ) : null}
                     <div className="py-3 min-h-[86px] flex items-center justify-between border-b border-border/60">
                       <div className="flex items-center gap-2">
                         <Landmark className="h-4 w-4 text-primary" />
@@ -976,9 +1471,13 @@ const Borrow = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{routePreview.lendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST</p>
-                        <p className="text-xs text-emerald-500">{routePreview.lendingHF.toFixed(1)}x</p>
-                        <p className="text-[11px] text-muted-foreground mt-1">{lendingRouteCollateralText}</p>
+                        <p className="font-semibold">
+                          {previewRefreshing
+                            ? "Updating..."
+                            : `${routePreview.lendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST`}
+                        </p>
+                        <p className="text-xs text-emerald-500">{previewRefreshing ? "..." : `${routePreview.lendingHF.toFixed(1)}x`}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">{previewRefreshing ? "Recomputing..." : lendingRouteCollateralText}</p>
                       </div>
                     </div>
                     <div className="py-3 min-h-[86px] flex items-center justify-between">
@@ -990,13 +1489,32 @@ const Borrow = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{routePreview.cdpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST</p>
-                        <p className="text-xs text-emerald-500">CR {routePreview.cdpCR.toFixed(1)}% · HF {routePreview.cdpEffectiveHF.toFixed(2)}x</p>
-                        <p className="text-[11px] text-muted-foreground mt-1">{cdpRouteCollateralText}</p>
+                        <p className="font-semibold">
+                          {previewRefreshing
+                            ? "Updating..."
+                            : `${routePreview.cdpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST`}
+                        </p>
+                        <p className="text-xs text-emerald-500">
+                          {previewRefreshing ? "..." : `CR ${routePreview.cdpCR.toFixed(1)}% · HF ${routePreview.cdpEffectiveHF.toFixed(2)}x`}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-1">{previewRefreshing ? "Recomputing..." : cdpRouteCollateralText}</p>
                       </div>
                     </div>
                     <div className="pt-3 border-t border-border/60">
-                      <p className="text-right text-sm font-semibold text-emerald-500">Blended rate (weighted): {routePreview.blendedApr.toFixed(2)}% APR</p>
+                      <p className="text-right text-sm font-semibold text-emerald-500">
+                        {previewPending || previewRefreshing
+                          ? "Blended rate (weighted): Calculating..."
+                          : `Blended rate (weighted): ${routePreview.blendedApr.toFixed(2)}% APR`}
+                      </p>
+                      {!previewRefreshing && routingReasonText ? (
+                        <p className="text-right text-[11px] text-muted-foreground mt-1">{routingReasonText}</p>
+                      ) : null}
+                      {!previewRefreshing && cdpMintSourceText ? (
+                        <p className="text-right text-[11px] text-muted-foreground mt-1">{cdpMintSourceText}</p>
+                      ) : null}
+                      {!previewRefreshing && cdpCapacityBreakdownText ? (
+                        <p className="text-right text-[11px] text-muted-foreground mt-1">{cdpCapacityBreakdownText}</p>
+                      ) : null}
                     </div>
                   </CardContent>
                 </Card>

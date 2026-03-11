@@ -15,6 +15,7 @@ class BorrowRouterController {
         amount: String(body.amount),
         targetHealthFactor: body.targetHealthFactor ? Number(body.targetHealthFactor) : undefined,
         lendingCollateral: Array.isArray(body.lendingCollateral) ? body.lendingCollateral : [],
+        cdpCollateral: Array.isArray(body.cdpCollateral) ? body.cdpCollateral : [],
       });
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -34,6 +35,7 @@ class BorrowRouterController {
         amount: String(body.amount),
         targetHealthFactor: body.targetHealthFactor ? Number(body.targetHealthFactor) : undefined,
         lendingCollateral: Array.isArray(body.lendingCollateral) ? body.lendingCollateral : [],
+        cdpCollateral: Array.isArray(body.cdpCollateral) ? body.cdpCollateral : [],
       });
       if (result.status !== "success") {
         res.status(RestStatus.CONFLICT).json(result);
