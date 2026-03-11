@@ -135,6 +135,7 @@ export interface WithdrawalInfo {
   timestamp: string;
 
   withdrawalId: string;
+  useHotWallet?: boolean;
 }
 
 export interface ChainInfo {

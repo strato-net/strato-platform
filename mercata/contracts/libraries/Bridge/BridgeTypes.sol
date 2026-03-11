@@ -32,11 +32,13 @@ library BridgeTypes {
         address stratoToken;         // STRATO token to burn
         uint256 stratoTokenAmount;   // STRATO token amount to burn
         uint256 timestamp;           // timestamp of the withdrawal
+        bool    useHotWallet;        // Whether to prefer hot wallet for withdrawal
     }
 
     struct ChainInfo {
         string  chainName;
         address custody;            // custody on that chain
+        address hotWallet;          // wallet used for hot withdrawals
         address depositRouter;      // contract users interact with on L1/L2
         bool    enabled;            // quick toggle
         uint256 lastProcessedBlock; // last processed block on the chain for polling

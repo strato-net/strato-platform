@@ -143,14 +143,27 @@ export async function createWithdrawalProposals(
 
   const transactionProposals: SafeTransactionData[] = [];
   const safeAddress = config.safe.address || "";
+  const safeHotWalletAddress = config.safe.hotWalletAddress || "";
   const relayer = config.safe.safeProposerAddress || "";
   let currentNonce = Number(await retry(
     () => apiKit.getNextNonce(safeAddress),
     { logPrefix: "SafeService" }
   ));
+  let currentHotWalletNonce = Number(await retry(
+    () => apiKit.getNextNonce(safeHotWalletAddress),
+    { logPrefix: "SafeService" }
+  ));
 
   for (const withdrawal of withdrawals) {
-    const nonce = currentNonce++;
+    let nonce;
+    let toAddress;
+    if (withdrawal.useHotWallet) {
+      toAddress = safeHotWalletAddress;
+      nonce = currentHotWalletNonce++;
+    } else {
+      toAddress = safeAddress;
+      nonce = currentNonce++;
+    }
     const descriptor = buildTxDescriptor({
       type: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? "eth" : "erc20",
       externalRecipient: withdrawal.externalRecipient,
@@ -166,7 +179,7 @@ export async function createWithdrawalProposals(
     logInfo("SafeService", `Created tx proposal: nonce ${nonce}, withdrawalId ${withdrawal.withdrawalId}`);
 
     transactionProposals.push({
-      safeAddress,
+      safeAddress: toAddress,
       safeTransactionData: safeTransaction.data,
       safeTxHash,
       senderAddress: relayer,
