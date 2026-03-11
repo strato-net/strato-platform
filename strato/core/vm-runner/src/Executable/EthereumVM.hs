@@ -22,13 +22,15 @@ import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.Transactions as Flush
 import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
-import Blockchain.DB.StateDB (setStateDBStateRoot)
+import Blockchain.DB.CodeDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
+import Blockchain.DB.StateDB (setStateDBStateRoot)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
 import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
 import Blockchain.Data.GenesisInfo (stateRoot, getGenesisInfo)
 import qualified Blockchain.Data.TXOrigin as TO
+import Blockchain.Bootstrap
 import Blockchain.Database.MerklePatricia.NodeData
 import Blockchain.EthConf
 import Blockchain.Event
@@ -40,6 +42,7 @@ import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
+import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.RedisBlockDB
@@ -131,16 +134,18 @@ ethereumVM d = runResourceT $ do
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
-bootstrapIfFirstRun :: (MonadLogger m, (StateRoot `Alters` NodeData) m, HasContext m) => m ()
+bootstrapIfFirstRun :: (MonadLogger m, HasCodeDB m, (StateRoot `Alters` NodeData) m, HasContext m, HasSQL m, (Ad.Address `Alters` AddressState) m) => m ()
 bootstrapIfFirstRun = do
   genesisInfo <- getGenesisInfo
-  let genesisHash = blockHash (genesisInfoToBlock genesisInfo)
+  let genesisBlock = genesisInfoToBlock genesisInfo
+      genesisHash = blockHash genesisBlock
   maybeGenesisStateRoot <- getChainStateRoot Nothing genesisHash
   case maybeGenesisStateRoot of -- If first run, then bootstrap
-    Nothing -> do
+    Nothing -> withCurrentBlockHash genesisHash $ do
       $logInfoS "bootstrap" "Bootstrapping"
       bootstrapChainDB genesisHash $ stateRoot genesisInfo
       setStateDBStateRoot Nothing  $ stateRoot genesisInfo
+      populateStorageDBs genesisInfo genesisBlock Nothing
     Just _ -> $logInfoS "bootstrap" "Bootstrapping not needed"
 
 initializeBestBlock :: (HasContext m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
