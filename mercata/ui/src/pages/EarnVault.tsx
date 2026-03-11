@@ -28,12 +28,24 @@ const formatUsd = (value: string): string => {
 const formatShares = (value: string): string => {
   try {
     const num = parseFloat(formatUnits(value || "0", 18));
+    if (num === 0) return "0";
     return num.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 6,
     });
   } catch {
     return "0";
+  }
+};
+
+const formatTotalShares = (value: string): string => {
+  try {
+    const num = parseFloat(formatUnits(value || "0", 18));
+    return num.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  } catch {
+    return "0.00";
   }
 };
 
@@ -169,7 +181,7 @@ const EarnVault = () => {
                     <div className="rounded-xl border border-border bg-muted/40 p-4">
                       <p className="text-xs md:text-sm text-muted-foreground">Total Shares</p>
                       <p className="mt-1 text-2xl md:text-3xl font-semibold">
-                        {loading ? "..." : formatShares(totalShares)}
+                        {loading ? "..." : formatTotalShares(totalShares)}
                       </p>
                     </div>
                     <div className="rounded-xl border border-border bg-muted/40 p-4">
