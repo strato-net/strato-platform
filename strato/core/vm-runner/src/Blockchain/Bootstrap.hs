@@ -14,15 +14,12 @@ import BlockApps.Logging
 import Blockchain.BlockDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
-import Blockchain.Data.BlockDB
 import Blockchain.Data.BlockHeader (number, currentValidators)
-import Blockchain.Data.Extra
 import Blockchain.Data.GenesisInfo hiding (stateRoot, number)
 import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
-import Blockchain.DB.SQLDB
 import Blockchain.DB.StateDB (HasStateDB)
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.EthConf as UEC
@@ -90,7 +87,7 @@ addrInfoToAddressState (GI.SolidVMContractWithStorage _ bal ch _) =
 
 populateStorageDBs ::
   ( MonadLogger m,
-    HasSQLDB m,
+    MonadIO m,
     HasCodeDB m,
     HasStateDB m,
     HasHashDB m,
@@ -215,7 +212,7 @@ bootstrapIndexer obGB = do
   putStrLn "bootstrapIndex genesis seed successful!"
 
 seedDatabases ::
-  ( HasSQLDB m,
+  ( MonadIO m,
     Mod.Accessible RedisConnection m,
     MonadLogger m
   ) =>
@@ -226,9 +223,6 @@ seedDatabases genesisBlock = do
       genesisHash' = blockHash genesisBlock
   $logInfoS "bootstrap" $ T.pack $ "Genesis hash: " ++ format genesisHash'
   $logInfoS "bootstrap" $ T.pack $ "Validators: " ++ show (length validators')
-
-  putGenesisHash genesisHash'
-  void $ putBlocks [genesisBlock] False
 
   _ <- withRedisBlockDB $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators'
 

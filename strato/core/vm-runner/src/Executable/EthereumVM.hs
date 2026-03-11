@@ -130,7 +130,7 @@ ethereumVM d = runResourceT $ do
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
-bootstrapIfFirstRun :: (MonadLogger m, HasCodeDB m, (StateRoot `Alters` NodeData) m, HasContext m, HasSQL m, Mod.Accessible RedisConnection m, (Ad.Address `Alters` AddressState) m) => m ()
+bootstrapIfFirstRun :: (MonadLogger m, HasCodeDB m, (StateRoot `Alters` NodeData) m, HasContext m, Mod.Accessible RedisConnection m, (Ad.Address `Alters` AddressState) m) => m ()
 bootstrapIfFirstRun = do
   genesisInfo <- getGenesisInfo
   let genesisBlock = genesisInfoToBlock genesisInfo
