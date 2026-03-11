@@ -15,6 +15,7 @@ import { useBridgeContext } from '@/context/BridgeContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import { getChainName } from '@/lib/bridge/utils';
 import { formatBalance } from '@/utils/numberUtils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type RecentTx = {
   _type: 'deposit' | 'withdrawal';
@@ -35,6 +36,8 @@ const DepositsPage = () => {
     depositRefreshKey,
     withdrawalRefreshKey,
   } = useBridgeContext();
+  const isMobile = useIsMobile();
+  const recentLimit = isMobile ? 6 : 8;
   const [recentTransactions, setRecentTransactions] = useState<RecentTx[]>([]);
 
   useEffect(() => {
@@ -50,7 +53,7 @@ const DepositsPage = () => {
       return;
     }
 
-    const params = { limit: "6", offset: "0", order: "block_timestamp.desc" };
+    const params = { limit: String(recentLimit), offset: "0", order: "block_timestamp.desc" };
 
     Promise.all([
       fetchDepositTransactions(params, "deposits"),
@@ -96,7 +99,7 @@ const DepositsPage = () => {
 
         const merged = [...pendingTxs, ...deposits, ...withdrawals]
           .sort((a, b) => new Date(b.block_timestamp || 0).getTime() - new Date(a.block_timestamp || 0).getTime())
-          .slice(0, 6);
+          .slice(0, recentLimit);
 
         setRecentTransactions(merged);
       })

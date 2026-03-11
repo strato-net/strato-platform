@@ -50,12 +50,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import DepositTransactionSummary from "./DepositTransactionSummary";
 import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, CreditCard, CheckCircle2 } from "lucide-react";
+import { ArrowDownToLine, CreditCard, CheckCircle2, Info } from "lucide-react";
 
 interface BridgeInProps {
   isSaving?: boolean;
@@ -107,6 +109,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
   const [progressIsNative, setProgressIsNative] = useState(true);
 
   const modeLabels = BRIDGE_IN_MODE_LABELS[isSaving ? "easy-savings" : "bridge"];
+  const prevRouteCountRef = React.useRef<number>(1);
 
   const currentTokens = useMemo(() => {
     if (isFundPage) return bridgeableTokens;
@@ -121,9 +124,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
   const sourceTokenRoutes = useMemo(() => {
     if (!selectedToken) return [];
-    return currentTokens.filter((token) =>
+    const routes = currentTokens.filter((token) =>
       token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
     );
+    if (routes.length > 0) prevRouteCountRef.current = routes.length;
+    return routes;
   }, [currentTokens, selectedToken]);
 
   const uniqueExternalTokens = useMemo(() => {
@@ -206,7 +211,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
       const num = Number(formatUnits(valueWei, decimals));
       return num.toLocaleString(undefined, {
         minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        maximumFractionDigits: 6,
       });
     },
     [selectedToken?.externalDecimals]
@@ -728,9 +733,23 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
               <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">2</span>
               <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Send</h3>
             </div>
-            <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
-              <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
-              <BridgeWalletStatus guestMode={guestMode} />
+            <div className="flex items-center gap-2">
+              <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
+                <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
+                <BridgeWalletStatus guestMode={guestMode} />
+              </div>
+              {isConnected && address && (
+                <button
+                  type="button"
+                  className="text-[11px] text-muted-foreground font-mono hover:text-foreground transition-colors"
+                  onClick={() => {
+                    navigator.clipboard.writeText(address);
+                    toast({ title: "Copied", description: "Address copied to clipboard", duration: 1500 });
+                  }}
+                >
+                  {address.slice(0, 6)}...{address.slice(-4)}
+                </button>
+              )}
             </div>
           </div>
 
@@ -745,6 +764,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
                     (t) => (t.externalToken || "").toLowerCase() === val
                   ) || null;
                   setSelectedToken(match);
+                  if (match?.isDefaultRoute) setAutoDeposit(false);
                 }}
                 disabled={!uniqueExternalTokens.length || guestMode || isLoading}
               >
@@ -806,70 +826,97 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
               <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
               <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
             </div>
-            <label className={`flex items-center gap-1.5 text-[11px] ${
+            <div className={`flex items-center gap-1.5 ${
               selectedToken && !selectedToken.isDefaultRoute
-                ? "text-foreground cursor-pointer"
-                : "text-muted-foreground/50 cursor-not-allowed"
+                ? "opacity-100"
+                : "opacity-40 pointer-events-none"
             }`}>
-              <input
-                type="checkbox"
-                className="accent-blue-600 w-3.5 h-3.5"
+              <Switch
                 checked={autoDeposit}
-                onChange={(e) => setAutoDeposit(e.target.checked)}
+                onCheckedChange={setAutoDeposit}
                 disabled={guestMode || !selectedToken || selectedToken.isDefaultRoute}
+                className="h-4 w-7 data-[state=checked]:bg-blue-500 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
               />
-              Auto-deposit to lending
-            </label>
+              <span className="text-[11px] text-muted-foreground">Auto-deposit</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[200px] text-xs">
+                  Automatically deposits your received tokens into the lending pool to start earning yield.
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(sourceTokenRoutes.length || 1, 3)}, 1fr)` }}>
-            {sourceTokenRoutes.map((routeToken) => {
-              const active = routeToken.id === selectedToken?.id;
-              const routeType = routeToken.isDefaultRoute ? "VIA WRAP" : "VIA MINT";
-              return (
-                <button
-                  key={routeToken.id}
-                  type="button"
-                  onClick={() => setSelectedToken(routeToken)}
-                  disabled={guestMode || isLoading}
-                  className={`relative text-left rounded-md border-2 p-3 transition-colors ${
-                    active
-                      ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
-                      : "border-border hover:bg-muted/30"
-                  }`}
-                >
-                  {active && (
-                    <div className="absolute top-2 right-2">
-                      <CheckCircle2 className="w-4 h-4 text-blue-500" />
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 mb-1">
-                    {routeToken.stratoTokenImage ? (
-                      <img src={routeToken.stratoTokenImage} alt={routeToken.stratoTokenSymbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
-                    ) : (
-                      <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">
-                        {(routeToken.stratoTokenSymbol || "?").charAt(0)}
-                      </span>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((sourceTokenRoutes.length || prevRouteCountRef.current), 3)}, 1fr)` }}>
+            {sourceTokenRoutes.length > 0 ? (
+              sourceTokenRoutes.map((routeToken) => {
+                const active = routeToken.id === selectedToken?.id;
+                const routeType = routeToken.isDefaultRoute ? "VIA WRAP" : "VIA MINT";
+                return (
+                  <button
+                    key={routeToken.id}
+                    type="button"
+                    onClick={() => { setSelectedToken(routeToken); if (routeToken.isDefaultRoute) setAutoDeposit(false); }}
+                    disabled={guestMode || isLoading}
+                    className={`relative text-left rounded-md border-2 p-3 transition-colors ${
+                      active
+                        ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                        : "border-border hover:bg-muted/30"
+                    }`}
+                  >
+                    {active && (
+                      <div className="absolute top-2 right-2">
+                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                      </div>
                     )}
-                    <p className="text-sm font-semibold text-foreground">{routeToken.stratoTokenSymbol}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      {routeToken.stratoTokenImage ? (
+                        <img src={routeToken.stratoTokenImage} alt={routeToken.stratoTokenSymbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">
+                          {(routeToken.stratoTokenSymbol || "?").charAt(0)}
+                        </span>
+                      )}
+                      <p className="text-sm font-semibold text-foreground">{routeToken.stratoTokenSymbol}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {"\u2248"} {amount || "0"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">{routeType}</p>
+                  </button>
+                );
+              })
+            ) : (
+              Array.from({ length: prevRouteCountRef.current }).map((_, i) => (
+                <div key={`skeleton-${i}`} className="relative text-left rounded-md border-2 border-border p-3 animate-pulse">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-6 h-6 rounded-full bg-muted shrink-0" />
+                    <div className="h-[1.25rem] w-16 bg-muted rounded" />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {"\u2248"} {amount || "0"}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-1">{routeType}</p>
-                </button>
-              );
-            })}
+                  <div className="h-[1rem] w-12 bg-muted rounded" />
+                  <div className="h-[0.875rem] w-14 bg-muted rounded mt-1" />
+                </div>
+              ))
+            )}
           </div>
         </section>
 
-        <Button
-          onClick={handleBridge}
-          disabled={isButtonDisabled}
-          className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
-        >
-          {isLoading ? "Processing..." : "Deposit"}
-        </Button>
+        <div className="space-y-2">
+          <Button
+            onClick={handleBridge}
+            disabled={isButtonDisabled}
+            className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
+          >
+            {isLoading ? "Processing..." : "Deposit"}
+          </Button>
+          <div className="text-right">
+            <Link to="/dashboard/withdrawals" className="text-xs text-blue-500 hover:text-blue-400">
+              Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
+            </Link>
+          </div>
+        </div>
 
         {networkError && (
           <p className="text-sm text-red-500">{networkError}</p>
