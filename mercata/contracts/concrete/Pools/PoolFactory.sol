@@ -303,6 +303,77 @@ contract record PoolFactory is Ownable {
         return pool;
     }
 
+    /// @notice Create a new pool for multiple tokens
+    /// @dev After pool creation, the pool should be whitelisted for mint and burn of the LP tokenby the admin registry
+    function createMultiTokenStablePool(
+        address[] tokens,
+        uint[] rateMultipliers,
+        uint[] assetTypes,
+        address[] oracles
+    ) external onlyOwner returns (address pool) {
+        for (uint i = 0; i < tokens.length; i++) {
+            require(TokenFactory(tokenFactory).isTokenActive(tokens[i]), "Token not active");
+            require(tokens[i] != address(0), "Zero address");
+            for (uint j = 0; j < tokens.length; j++) {
+                if (i != j) {
+                    require(tokens[i] != tokens[j], "Identical addresses");
+                    require(pools[tokens[i]][tokens[j]] == address(0), "Pool exists");
+                }
+            }
+        }
+
+        // deploy new lp token
+        string lpName = ERC20(tokens[0]).name() + "Multi-Token Stable LP Token";
+        string lpSymbol = ERC20(tokens[0]).symbol() + "-MTSLP";
+
+        address lpTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+            lpName,
+            "Liquidity Provider Token",
+            [],
+            [],
+            [],
+            lpSymbol,
+            0,
+            18,
+            this
+        );
+
+        // deploy new pool first
+        _updatePoolImplementation();
+        _updateStablePoolImplementation();
+        pool = address(new Proxy(poolImplementation, address(this)));
+        Pool(pool).setFeeParameters(swapFeeRate, lpSharePercent); // Get StablePool to show up in Pool table
+        Proxy(pool).setLogicContract(stablePoolImplementation);
+        StablePool(pool).initialize(
+            100,
+            swapFeeRate * 1e6, // 0.3% * FEE_DENOMINATOR
+            1e10,
+            block.timestamp,
+            tokens,
+            rateMultipliers,
+            assetTypes,
+            oracles,
+            lpTokenAddress
+        );
+        address thisOwner = owner();
+        Ownable(pool).transferOwnership(thisOwner);
+        Ownable(lpTokenAddress).transferOwnership(thisOwner);
+
+        for (uint i = 0; i < tokens.length; i++) {
+            for (uint j = 0; j < tokens.length; j++) {
+                if (i != j) {
+                    // update pool registry
+                    pools[tokens[i]][tokens[j]] = pool;
+                    allPools.push(pool);
+
+                    emit NewPool(tokens[i], tokens[j], pool);
+                }
+            }
+        }
+
+        return pool;
+    }
+
     /// @notice Transfer all pools to a new factory
     /// @param newFactory Address of the new factory
     function transferPoolsToFactory(address newFactory) external onlyOwner {

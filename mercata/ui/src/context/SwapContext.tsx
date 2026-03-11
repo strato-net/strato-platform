@@ -284,6 +284,86 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Multi-token pool operations
+  const swapMultiToken = useCallback(async (data: {
+    poolAddress: string;
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: string;
+    minAmountOut: string;
+  }) => {
+    setLoading(true);
+    try {
+      const res = await api.post("/swap/multi-token", data);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const addLiquidityMultiToken = useCallback(async (data: {
+    poolAddress: string;
+    amounts: string[];
+    minMintAmount: string;
+    stakeLPToken?: boolean;
+  }) => {
+    setLoading(true);
+    try {
+      const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity/multi-token`, {
+        amounts: data.amounts,
+        minMintAmount: data.minMintAmount,
+        stakeLPToken: data.stakeLPToken,
+      });
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const removeLiquidityMultiToken = useCallback(async (data: {
+    poolAddress: string;
+    lpTokenAmount: string;
+    minAmounts: string[];
+    includeStakedLPToken?: boolean;
+  }) => {
+    setLoading(true);
+    try {
+      const response = await api.delete(`/swap-pools/${data.poolAddress}/liquidity/multi-token`, {
+        data: {
+          lpTokenAmount: data.lpTokenAmount,
+          minAmounts: data.minAmounts,
+          includeStakedLPToken: data.includeStakedLPToken,
+        }
+      });
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const removeLiquidityMultiTokenOneCoin = useCallback(async (data: {
+    poolAddress: string;
+    lpTokenAmount: string;
+    coinIndex: number;
+    minReceived: string;
+    includeStakedLPToken?: boolean;
+  }) => {
+    setLoading(true);
+    try {
+      const response = await api.delete(`/swap-pools/${data.poolAddress}/liquidity/multi-token/one-coin`, {
+        data: {
+          lpTokenAmount: data.lpTokenAmount,
+          coinIndex: data.coinIndex,
+          minReceived: data.minReceived,
+          includeStakedLPToken: data.includeStakedLPToken,
+        }
+      });
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Utility functions
   const fetchTokenBalances = useCallback(async (pool: Pool, _userAddress: string, usdstAddress: string) => {
     const [balanceA, balanceB, balanceUsdst] = await Promise.all([
@@ -382,6 +462,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         addLiquidityDualToken,
         addLiquiditySingleToken,
         removeLiquidity,
+        swapMultiToken,
+        addLiquidityMultiToken,
+        removeLiquidityMultiToken,
+        removeLiquidityMultiTokenOneCoin,
         fetchTokenBalances,
         userPools,
         fetchUserPositions,

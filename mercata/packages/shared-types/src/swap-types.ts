@@ -14,6 +14,52 @@ export interface SwapParams {
 }
 
 /**
+ * Parameters for executing a multi-token swap (uses exchange(i, j, ...) on StablePool)
+ */
+export interface MultiTokenSwapParams {
+  poolAddress: string;
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  minAmountOut: string;
+  deadline: number;
+}
+
+/**
+ * Parameters for adding liquidity to a multi-token pool
+ */
+export interface MultiTokenLiquidityParams {
+  poolAddress: string;
+  amounts: string[];  // amount for each coin index, "0" for coins not being deposited
+  minMintAmount: string;
+  deadline: number;
+  stakeLPToken?: boolean;
+}
+
+/**
+ * Parameters for removing liquidity from a multi-token pool
+ */
+export interface MultiTokenRemoveLiquidityParams {
+  poolAddress: string;
+  lpTokenAmount: string;
+  minAmounts: string[];  // minimum amount for each coin index
+  deadline: number;
+  includeStakedLPToken?: boolean;
+}
+
+/**
+ * Parameters for removing liquidity as a single token from a multi-token pool
+ */
+export interface MultiTokenRemoveLiquidityOneParams {
+  poolAddress: string;
+  lpTokenAmount: string;
+  coinIndex: number;
+  minReceived: string;
+  deadline: number;
+  includeStakedLPToken?: boolean;
+}
+
+/**
  * Parameters for adding liquidity with both tokens
  */
 export interface LiquidityParams {
@@ -125,6 +171,22 @@ export interface LPToken {
 }
 
 /**
+ * A coin in a multi-token pool
+ */
+export interface PoolCoin {
+  coinIndex: number;
+  address: string;
+  _name: string;
+  _symbol: string;
+  customDecimals: number;
+  _totalSupply: string;
+  balance: string;      // user's wallet balance
+  price: string;        // oracle price (USD)
+  poolBalance: string;  // balance held in pool
+  images: Array<{ value: string }>;
+}
+
+/**
  * Complete liquidity pool information
  */
 export interface Pool {
@@ -146,6 +208,8 @@ export interface Pool {
   isStable: boolean;
   isPaused: boolean;
   isDisabled: boolean;
+  // Multi-token pool fields (populated when pool has more than 2 tokens)
+  coins?: PoolCoin[];
 }
 
 /**
@@ -263,6 +327,24 @@ export interface PoolWithBalances {
   lpToken: {
     _totalSupply: string;
   };
+}
+
+/**
+ * Raw coin entry from the StablePool coins sub-table
+ */
+export interface RawPoolCoin {
+  address: string;  // pool address
+  key: number;      // coin index
+  value: string;    // token address
+}
+
+/**
+ * Raw token balance from the StablePool tokenBalances mapping sub-table
+ */
+export interface RawPoolTokenBalance {
+  address: string;  // pool address
+  key: string;      // token address
+  value: string;    // balance
 }
 
 /**

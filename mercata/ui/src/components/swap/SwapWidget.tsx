@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePoolPolling } from "@/hooks/useSmartPolling";
-import { calculateSwapOutput, calculateSwapInput, calculateImpact } from "@/helpers/swapCalculations";
+import { calculateSwapOutput, calculateSwapInput, calculateImpact, isMultiTokenPool, getMultiTokenExchangeRate, calculateMultiTokenSwapOutput, calculateMultiTokenSwapInput } from "@/helpers/swapCalculations";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
@@ -45,33 +45,51 @@ const isValidInputAmount = (amount: string): boolean => {
   return amount && amount !== "." && amount !== "0." && !isNaN(Number(amount));
 };
 
-const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) => {
-  if (!pool || !fromAsset?.address) return { 
-    exchangeRateRaw: undefined, 
-    exchangeRate: undefined, 
+const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null, toAsset: SwapToken | null) => {
+  if (!pool || !fromAsset?.address || !toAsset?.address) return {
+    exchangeRateRaw: undefined,
+    exchangeRate: undefined,
     oracleExchangeRate: undefined,
     invertedExchangeRate: undefined,
     invertedOracleExchangeRate: undefined,
     isFractionalRate: false,
     isFractionalOracleRate: false
   };
-  
+
+  // Multi-token pool: use oracle-based rates from coins
+  if (isMultiTokenPool(pool)) {
+    const rate = getMultiTokenExchangeRate(pool, fromAsset.address, toAsset.address);
+    const invertedRate = getMultiTokenExchangeRate(pool, toAsset.address, fromAsset.address);
+    const cleanRate = rate && rate !== "0" ? rate : undefined;
+    const isFractional = cleanRate ? parseFloat(cleanRate) < 1 : false;
+
+    return {
+      exchangeRateRaw: cleanRate,
+      exchangeRate: cleanRate ? formatAmount(cleanRate) : undefined,
+      oracleExchangeRate: cleanRate ? formatAmount(cleanRate) : undefined,
+      invertedExchangeRate: invertedRate && invertedRate !== "0" ? formatAmount(invertedRate) : undefined,
+      invertedOracleExchangeRate: invertedRate && invertedRate !== "0" ? formatAmount(invertedRate) : undefined,
+      isFractionalRate: isFractional,
+      isFractionalOracleRate: isFractional
+    };
+  }
+
   const isAToB = pool.tokenA?.address === fromAsset.address;
   const poolRate = isAToB ? pool.aToBRatio : pool.bToARatio;
   const oracleRate = isAToB ? pool.oracleAToBRatio : pool.oracleBToARatio;
-  
+
   // Strip commas from raw rate in case backend sends pre-formatted data
   const cleanRate = poolRate && poolRate !== "0" ? String(poolRate).replace(/,/g, '') : undefined;
   const cleanOracleRate = oracleRate && oracleRate !== "0" ? String(oracleRate).replace(/,/g, '') : undefined;
-  
+
   // Get inverted rates for display when rate is fractional
   const invertedPoolRate = isAToB ? pool.bToARatio : pool.aToBRatio;
   const invertedOracleRate = isAToB ? pool.oracleBToARatio : pool.oracleAToBRatio;
-  
+
   // Check if rates are fractional (less than 1) - these are harder to understand
   const isFractionalRate = cleanRate ? parseFloat(cleanRate) < 1 : false;
   const isFractionalOracleRate = cleanOracleRate ? parseFloat(cleanOracleRate) < 1 : false;
-  
+
   return {
     exchangeRateRaw: cleanRate,
     exchangeRate: poolRate && poolRate !== "0" ? formatAmount(poolRate) : undefined,

@@ -14,7 +14,11 @@ import {
   pausePool,
   unpausePool,
   disablePool,
-  enablePool
+  enablePool,
+  exchangeMultiToken,
+  addLiquidityMultiToken,
+  removeLiquidityMultiToken,
+  removeLiquidityMultiTokenOneCoin,
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -31,6 +35,10 @@ import {
   validateSetPoolRatesArgs,
   validateTogglePauseArgs,
   validateToggleDisableArgs,
+  validateMultiTokenSwapArgs,
+  validateMultiTokenAddLiquidityArgs,
+  validateMultiTokenRemoveLiquidityArgs,
+  validateMultiTokenRemoveLiquidityOneArgs,
 } from "../validators/swapping.validator";
 import { validateAddressField } from "../validators/common.validators";
 
@@ -310,6 +318,74 @@ class SwappingController {
       const result = body.isDisabled
         ? await disablePool(accessToken, body.poolAddress, userAddress as string)
         : await enablePool(accessToken, body.poolAddress, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Multi-token pool operations
+  static async swapMultiToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateMultiTokenSwapArgs(body);
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await exchangeMultiToken(accessToken, { ...body, deadline }, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async addLiquidityMultiToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params, address: userAddress } = req;
+      validateMultiTokenAddLiquidityArgs(body);
+      validatePoolAddressArgs(params);
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await addLiquidityMultiToken(
+        accessToken,
+        { ...body, poolAddress: params.poolAddress, deadline },
+        userAddress as string
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async removeLiquidityMultiToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params, address: userAddress } = req;
+      validateMultiTokenRemoveLiquidityArgs(body);
+      validatePoolAddressArgs(params);
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await removeLiquidityMultiToken(
+        accessToken,
+        { ...body, poolAddress: params.poolAddress, deadline },
+        userAddress as string
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async removeLiquidityMultiTokenOneCoin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params, address: userAddress } = req;
+      validateMultiTokenRemoveLiquidityOneArgs(body);
+      validatePoolAddressArgs(params);
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await removeLiquidityMultiTokenOneCoin(
+        accessToken,
+        { ...body, poolAddress: params.poolAddress, deadline },
+        userAddress as string
+      );
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

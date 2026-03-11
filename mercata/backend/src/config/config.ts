@@ -51,8 +51,14 @@ export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
-  "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user 
+  "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user
 ]);
+
+// Multi-token stable pool addresses - pools with more than 2 coins
+// These pools use StablePool's exchange(i,j,...) / addLiquidityGeneral / removeLiquidityGeneral
+export const multiTokenStablePools: Set<string> = new Set(
+  (process.env.MULTI_TOKEN_STABLE_POOLS || "").split(",").filter(Boolean)
+);
 
 /*
    Network-specific defaults;
