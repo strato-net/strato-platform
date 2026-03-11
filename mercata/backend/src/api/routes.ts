@@ -25,6 +25,7 @@ import referRoutes from "./routes/refer.routes";
 import vaultRoutes from "./routes/vault.routes";
 import borrowRouterRoutes from "./routes/borrowRouter.routes";
 import onrampRoutes from "./routes/onramp.routes";
+import metalForgeRoutes from "./routes/metalForge.routes";
 
 const router = Router();
 
@@ -101,6 +102,9 @@ router.use("/vault", vaultRoutes);
 router.use("/borrow-router", borrowRouterRoutes);
 // ----- Onramp Routes -----
 router.use("/onramp", onrampRoutes);
+
+// ----- Metal Forge Routes -----
+router.use("/metal-forge", metalForgeRoutes);
 
 // ----- Documentation Routes -----
 // Serve static files for Swagger customizations

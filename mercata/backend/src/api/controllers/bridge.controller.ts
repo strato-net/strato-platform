@@ -75,8 +75,9 @@ class BridgeController {
         return;
       }
       
-      const result: BridgeToken[] = await getBridgeableTokens(accessToken, chainId);
-      res.json(result);
+      const bridgeRoutes: BridgeToken[] = await getBridgeableTokens(accessToken, chainId);
+      const enabledBridgeRoutes = bridgeRoutes.filter((route) => route.enabled);
+      res.json(enabledBridgeRoutes);
     } catch (error: any) {
       next(error);
     }
@@ -137,4 +138,3 @@ class BridgeController {
 }
 
 export default BridgeController;
-

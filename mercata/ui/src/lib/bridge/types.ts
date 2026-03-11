@@ -20,7 +20,7 @@ export type BridgeContextType = {
   loading: boolean;
   error: string | null;
   availableNetworks: NetworkSummary[];
-  bridgeableTokens: BridgeToken[]; // All tokens for the selected network (filter by bridgeable flag)
+  bridgeableTokens: BridgeToken[]; // All route tokens for the selected network (filter by isDefaultRoute)
   selectedNetwork: string | null;
   selectedToken: BridgeToken | null;
   // Navigation state for bridge transactions
@@ -109,6 +109,7 @@ export interface ValidationParams {
   decimals: string;
   chainId: string;
   tokenAddress: string;
+  targetStratoToken: string;
 }
 
 export interface Permit2ApprovalResult {

@@ -48,7 +48,6 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
-export let creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS || "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6";
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
@@ -81,6 +80,11 @@ export const defaultVaultFactoryFor: Record<string, string> = {
   "33056204878082667": "55c77951e9cadc73af24ec18881d01fedff1f1f1" // Upquark mainnet
 };
 
+export const defaultMetalForgeFor: Record<string, string> = {
+  "114784819836269": "c5ed981b816a626981a5747d125e0e7296b2c7c6", // Helium testnet
+  "33056204878082667": "1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113", // Upquark mainnet
+};
+
 export const defaultCreditCardTopUpFor: Record<string, string> = {
   "114784819836269": "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6", // Helium testnet
   "33056204878082667": "656139504763b2fab4e158ddb1f4ca8eb878305d" // Upquark mainnet
@@ -92,6 +96,8 @@ export let networkId: string | undefined;
 export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
+export let metalForge: string = '';
+export let creditCardTopUp: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -130,6 +136,14 @@ function setVaultFactoryConfig(networkId: string) {
   }
 }
 
+function setMetalForgeConfig(networkId: string) {
+  if (process.env.METAL_FORGE) {
+    metalForge = process.env.METAL_FORGE;
+  } else {
+    metalForge = defaultMetalForgeFor[networkId];
+  }
+}
+
 export function setCreditCardTopUpConfig(networkId: string) {
   if (process.env.CREDIT_CARD_TOP_UP_ADDRESS) {
     creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS;
@@ -151,6 +165,7 @@ export async function initNetworkConfig() {
   setRewardsConfig(networkId);
   setReferralConfig(networkId);
   setVaultFactoryConfig(networkId);
+  setMetalForgeConfig(networkId);
   setCreditCardTopUpConfig(networkId);
 }
 
