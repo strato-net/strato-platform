@@ -7,7 +7,7 @@ import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getBridgeAssets } from "./bridge.service";
+import { getBridgeableTokens } from "./bridge.service";
 import { getTokenDetails } from "../helpers/cirrusHelpers";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher, CollateralVault } = constants;
@@ -408,23 +408,20 @@ export const getVoucherBalance = async (
 /**
  * Get all tokens with their total supply for stats
  * Includes price data for market cap calculation
- * Only returns bridgeable tokens + USDST, GOLDST, SILVST
+ * Only returns route token addresses + USDST, GOLDST, SILVST
  */
 export const getTokenStats = async (
   accessToken: string
 ): Promise<{ tokens: any[], totalMarketCap: string }> => {
   try {
-    // Get bridgeable tokens
-    const bridgeAssets = await getBridgeAssets(accessToken);
+    const bridgeRoutes = await getBridgeableTokens(accessToken);
     
     // Create a set of allowed token addresses
     const allowedTokens = new Set<string>();
     
-    // Add all bridgeable token addresses
-    for (const [_, assetInfo] of bridgeAssets) {
-      if (assetInfo.stratoToken && assetInfo.enabled) {
-        allowedTokens.add(assetInfo.stratoToken);
-      }
+    // Add all route token addresses
+    for (const route of bridgeRoutes) {
+      if (route.stratoToken) allowedTokens.add(route.stratoToken);
     }
 
     // Fetch all tokens with total supply
@@ -448,7 +445,7 @@ export const getTokenStats = async (
     const tokens = tokensResponse.data || [];
     
     // Filter tokens to only include:
-    // 1. Bridgeable tokens (already in allowedTokens set)
+    // 1. Route tokens (already in allowedTokens set)
     // 2. USDST, GOLDST, SILVST by address
     const filteredTokens = tokens.filter((token: any) => {
       const address = token.address;

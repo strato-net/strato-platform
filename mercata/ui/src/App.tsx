@@ -34,6 +34,7 @@ import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
 import EarnVault from "./pages/EarnVault";
 import OnrampPage from "./pages/OnrampPage";
+import BuyMetals from "./pages/BuyMetals";
 import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
@@ -205,6 +206,14 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <SwapAsset />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/buy-metals"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <BuyMetals />
                                               </GuestAccessibleRoute>
                                             }
                                           />
