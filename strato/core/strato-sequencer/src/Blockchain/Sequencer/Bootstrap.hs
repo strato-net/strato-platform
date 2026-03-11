@@ -1,4 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
@@ -6,17 +7,14 @@ module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 import Blockchain.Constants
 import Blockchain.Data.Block
 import qualified Blockchain.Data.TXOrigin as TO
-import qualified Blockchain.Data.Transaction as TX
 import Blockchain.Model.WrappedBlock
 import Blockchain.EthConf (runKafkaMConfigured)
-import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents, assertSequencerTopicsCreation)
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import ClassyPrelude (atomically, fromMaybe)
+import Blockchain.Strato.Model.Keccak256
 import Control.Monad.Composable.Kafka
 import qualified Data.ByteString.Char8 as C8
 
@@ -26,44 +24,25 @@ import qualified Data.ByteString.Char8 as C8
 -- 1. Marks the genesis block as 'Emitted' in the DependentBlockDB
 -- 2. Creates the sequencer Kafka topics
 -- 3. Writes the genesis block to the VM and P2P event topics
-bootstrapSequencer :: Block -> IO OutputBlock
-bootstrapSequencer
-  Block
-    { blockBlockData = bd,
-      blockReceiptTransactions = txs,
-      blockBlockUncles = us
-    } = do
-    pkg <- atomically newCablePackage
-    initLevelDB
-    initKafka pkg
-    return shortCircuit
-    where
-      shortCircuit :: OutputBlock
-      shortCircuit =
-        OutputBlock
-          { obOrigin = TO.Direct,
-            obBlockData = bd,
-            obBlockUncles = us,
-            obReceiptTransactions = map kludge txs
-          }
-      hash = blockHeaderHash bd
-      kludge t = fromMaybe fallback (wrapIngestBlockTransactionUnanchored hash t)
-        where
-          fallback =
-            OutputTx
-              { otOrigin = TO.BlockHash hash,
-                otSigner = Address 0,
-                otBaseTx = t,
-                otHash = TX.transactionHash t
-              }
-      initLevelDB :: IO ()
-      initLevelDB = do
+bootstrapSequencer :: Block -> IO ()
+bootstrapSequencer Block{..} = do
+    initLevelDB $ blockHeaderHash blockBlockData
+    initKafka OutputBlock
+      { obOrigin = TO.Direct,
+        obBlockData = blockBlockData,
+        obBlockUncles = blockBlockUncles,
+        obReceiptTransactions = []
+      }
+      
+initLevelDB :: Keccak256 -> IO ()
+initLevelDB hash' = do
         let dbPath = dbDir "h" ++ sequencerDependentBlockDBPath
             cacheSize = 0
         runWithDependentBlockDB dbPath cacheSize $
-          bootstrapGenesisBlock hash
-      initKafka :: CablePackage -> IO ()
-      initKafka _ = do
+          bootstrapGenesisBlock hash'
+
+initKafka :: OutputBlock -> IO ()
+initKafka shortCircuit = do
         runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do
           _ <- assertSequencerTopicsCreation
           _ <- writeSeqVmEvents [VmBlock shortCircuit] -- todo handle the error :)

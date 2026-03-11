@@ -11,22 +11,27 @@
 module Blockchain.Bootstrap where
 
 import BlockApps.Logging
+import Blockchain.BlockDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockDB
+import Blockchain.Data.BlockHeader (number, currentValidators)
+import Blockchain.Data.Extra
+import Blockchain.Data.GenesisInfo hiding (stateRoot, number)
+import qualified Blockchain.Data.GenesisInfo as GI
+import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.SQLDB
 import Blockchain.DB.StateDB (HasStateDB)
-import Blockchain.Data.GenesisInfo hiding (stateRoot, number)
-import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.EthConf as UEC
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
+import Blockchain.Model.SyncState
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
-import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Strato.Model.Event
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
@@ -38,10 +43,14 @@ import Blockchain.Strato.StateDiff.Database
 import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
+import Blockchain.SyncDB
 import Conduit
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
+import Control.Monad.Trans.Reader (ReaderT, runReaderT, asks)
+import Blockchain.Strato.RedisBlockDB (RedisConnection, withRedisBlockDB)
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
@@ -50,7 +59,6 @@ import qualified Data.Sequence as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Traversable (for)
-import Control.Monad.Trans.Reader (ReaderT, runReaderT, asks)
 import Text.Format
 
 -- | Transformer that provides read-only access to a map of AddressStates.
@@ -145,13 +153,12 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
 
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
-  let obGB = OutputBlock
-        { obOrigin = Origin.Direct,
-          obBlockData = blockBlockData genesisBlock,
-          obReceiptTransactions = [],  -- genesis block has no transactions
-          obBlockUncles = blockBlockUncles genesisBlock
-        }
-  liftIO $ bootstrapIndexer obGB
+  liftIO $ bootstrapIndexer OutputBlock
+    { obOrigin = Origin.Direct,
+      obBlockData = blockBlockData genesisBlock,
+      obReceiptTransactions = [],  -- genesis block has no transactions
+      obBlockUncles = blockBlockUncles genesisBlock
+    }
 
   where
     mkStateDiff ad =
@@ -206,3 +213,36 @@ bootstrapIndexer obGB = do
 
   print res
   putStrLn "bootstrapIndex genesis seed successful!"
+
+seedDatabases ::
+  ( HasSQLDB m,
+    Mod.Accessible RedisConnection m,
+    MonadLogger m
+  ) =>
+  Block ->
+  m ()
+seedDatabases genesisBlock = do
+  let validators' = currentValidators $ blockHeader genesisBlock
+      genesisHash' = blockHash genesisBlock
+  $logInfoS "bootstrap" $ T.pack $ "Genesis hash: " ++ format genesisHash'
+  $logInfoS "bootstrap" $ T.pack $ "Validators: " ++ show (length validators')
+
+  putGenesisHash genesisHash'
+  void $ putBlocks [genesisBlock] False
+
+  _ <- withRedisBlockDB $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators'
+
+  void . withRedisBlockDB $ do
+    forceBestBlockInfo
+      genesisHash'
+      (number . blockBlockData $ genesisBlock)
+
+  void . withRedisBlockDB $
+    putBlock OutputBlock
+    { obOrigin = Origin.Direct,
+      obBlockData = blockBlockData genesisBlock,
+      obReceiptTransactions = [],
+      obBlockUncles = []
+    }
+
+  $logInfoS "bootstrap" "Database seeding complete"
