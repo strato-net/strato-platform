@@ -33,9 +33,6 @@ import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
-import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
-import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
-import qualified Blockchain.Strato.Indexer.Model as IdxModel
 import Blockchain.Strato.Model.Class
 import Blockchain.SyncDB
 import Conduit
@@ -117,7 +114,7 @@ seedDatabases = do
   $logInfoS "seed-genesis" $ T.pack $ "Genesis hash: " ++ format (blockHash genesisBlock)
   $logInfoS "seed-genesis" $ T.pack $ "Validators: " ++ show (length validators')
 
-  obGB <- liftIO $ bootstrapSequencer genesisBlock
+  _ <- liftIO $ bootstrapSequencer genesisBlock
   putGenesisHash $ blockHash genesisBlock
   void $ putBlocks [genesisBlock] False
 
@@ -136,17 +133,4 @@ seedDatabases = do
       obBlockUncles = []
     }
 
-  liftIO $ bootstrapIndexer obGB
   $logInfoS "seed-genesis" "Database seeding complete"
-
-
-bootstrapIndexer :: OutputBlock -> IO ()
-bootstrapIndexer obGB = do
-  let clientId = fst ApiIndexer.kafkaClientIds
-  putStrLn "About to bootstrap index events"
-  res <-
-    UEC.runKafkaMConfigured clientId $
-    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
-
-  print res
-  putStrLn "bootstrapIndex genesis seed successful!"

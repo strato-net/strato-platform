@@ -11,17 +11,22 @@
 module Blockchain.Bootstrap where
 
 import BlockApps.Logging
+import Blockchain.Data.AddressStateDB
+import Blockchain.Data.Block
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.SQLDB
 import Blockchain.DB.StateDB (HasStateDB)
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.Block
 import Blockchain.Data.GenesisInfo hiding (stateRoot, number)
 import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.EthConf as UEC
+import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.SolidVM.CodeCollectionDB
+import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
+import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
+import qualified Blockchain.Strato.Indexer.Model as IdxModel
+import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Strato.Model.Event
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
@@ -140,6 +145,14 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
 
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
+  let obGB = OutputBlock
+        { obOrigin = Origin.Direct,
+          obBlockData = blockBlockData genesisBlock,
+          obReceiptTransactions = [],  -- genesis block has no transactions
+          obBlockUncles = blockBlockUncles genesisBlock
+        }
+  liftIO $ bootstrapIndexer obGB
+
   where
     mkStateDiff ad =
       StateDiff
@@ -182,3 +195,14 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
         storageDiff = case storage d of
           SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
           EVMDiff _ -> error "evm state in genesis block isn't supported"
+
+bootstrapIndexer :: OutputBlock -> IO ()
+bootstrapIndexer obGB = do
+  let clientId = fst ApiIndexer.kafkaClientIds
+  putStrLn "About to bootstrap index events"
+  res <-
+    UEC.runKafkaMConfigured clientId $
+    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
+
+  print res
+  putStrLn "bootstrapIndex genesis seed successful!"
