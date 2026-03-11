@@ -39,6 +39,7 @@ const DepositsPage = () => {
   const isMobile = useIsMobile();
   const recentLimit = isMobile ? 6 : 8;
   const [recentTransactions, setRecentTransactions] = useState<RecentTx[]>([]);
+  const [txLoading, setTxLoading] = useState(true);
 
   useEffect(() => {
     loadNetworksAndTokens().catch((error) => {
@@ -50,9 +51,11 @@ const DepositsPage = () => {
   useEffect(() => {
     if (!isLoggedIn) {
       setRecentTransactions([]);
+      setTxLoading(false);
       return;
     }
 
+    setTxLoading(true);
     const params = { limit: String(recentLimit), offset: "0", order: "block_timestamp.desc" };
 
     Promise.all([
@@ -102,8 +105,9 @@ const DepositsPage = () => {
           .slice(0, recentLimit);
 
         setRecentTransactions(merged);
+        setTxLoading(false);
       })
-      .catch(() => setRecentTransactions([]));
+      .catch(() => { setRecentTransactions([]); setTxLoading(false); });
   }, [isLoggedIn, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey]);
 
   const getStatusLabel = (status?: string | number) => {
@@ -162,6 +166,22 @@ const DepositsPage = () => {
 
                   {!isLoggedIn ? (
                     <p className="text-sm text-muted-foreground px-4 py-4">Sign in to view your recent activity.</p>
+                  ) : txLoading ? (
+                    <div className="divide-y divide-border/40">
+                      {Array.from({ length: isMobile ? 4 : 6 }).map((_, i) => (
+                        <div key={`tx-skel-${i}`} className="flex items-center gap-3 px-4 py-4 animate-pulse">
+                          <div className="w-9 h-9 rounded-full bg-muted shrink-0" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3.5 w-24 bg-muted rounded" />
+                            <div className="h-3 w-16 bg-muted rounded" />
+                          </div>
+                          <div className="space-y-1.5 text-right">
+                            <div className="h-3.5 w-20 bg-muted rounded ml-auto" />
+                            <div className="h-3 w-14 bg-muted rounded ml-auto" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : recentTransactions.length === 0 ? (
                     <p className="text-sm text-muted-foreground px-4 py-4">No recent transactions.</p>
                   ) : (

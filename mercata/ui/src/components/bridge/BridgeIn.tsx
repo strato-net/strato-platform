@@ -305,9 +305,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         return;
       }
       if (chainId !== expectedChainId) {
-        setNetworkError(`Switching to ${selectedNetwork} network...`);
+        if (!isFundPage) setNetworkError(`Switching to ${selectedNetwork} network...`);
         try {
           await switchChain({ chainId: expectedChainId });
+          setNetworkError("");
         } catch {
           setNetworkError(`Please switch to ${selectedNetwork}`);
         }
