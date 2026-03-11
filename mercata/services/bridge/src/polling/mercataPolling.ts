@@ -3,7 +3,6 @@ import {
   confirmDepositBatch,
   reviewDepositBatch,
   confirmWithdrawalBatch,
-  confirmWithdrawalBatchHotWallet,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
 } from "../services/bridgeService";
