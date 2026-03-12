@@ -1,0 +1,87 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           core-api2
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Core.API
+      FaucetKey
+      Handlers.AccountInfo
+      Handlers.BlkLast
+      Handlers.Block
+      Handlers.Metadata
+      Handlers.Peers
+      Handlers.QueuedTransactions
+      Handlers.Stats
+      Handlers.Storage
+      Handlers.Transaction
+      Handlers.TransactionResult
+      Handlers.TxLast
+      Settings
+      SortDirection
+      SQLM
+      Versioning
+  other-modules:
+      Paths_core_api2
+  hs-source-dirs:
+      src
+  build-depends:
+      QuickCheck
+    , aeson
+    , aeson-casing
+    , base
+    , base64-bytestring
+    , binary
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-client
+    , bytestring
+    , clock
+    , common-log
+    , conduit
+    , containers
+    , deepseq
+    , directory
+    , esqueleto
+    , ethereum-discovery
+    , evm-solidity
+    , extra
+    , filepath
+    , format
+    , hflags
+    , http-types
+    , labeled-error
+    , lens
+    , monad-alter
+    , mtl
+    , openapi3
+    , persistent-postgresql
+    , process
+    , seqevents
+    , servant-client
+    , servant-multipart
+    , servant-multipart-client
+    , servant-server
+    , solid-vm-model
+    , source-tools
+    , sql-monad
+    , strato-conf
+    , strato-model
+    , strato-redis-blockdb
+    , template-haskell
+    , text
+    , time
+    , transformers
+    , unliftio
+    , unordered-containers
+    , vault-monad
+  default-language: Haskell2010

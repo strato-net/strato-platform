@@ -1,0 +1,68 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           x509-tools
+version:        0.0.1
+synopsis:       A toolkit for x509 usage in STRATO
+description:    A toolkit for x509 usage in STRATO
+category:       Data Structures
+author:         dpmesko
+maintainer:     daniel@blockapps.net
+license:        Apache-2.0
+build-type:     Simple
+
+executable x509-generator
+  main-is: X509CertGenerator.hs
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -Werror
+  build-depends:
+      aeson
+    , base ==4.*
+    , bytestring
+    , hourglass
+    , strato-model
+    , transformers
+  default-language: Haskell2010
+
+executable x509-info
+  main-is: X509CertInfo.hs
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -Werror
+  build-depends:
+      base ==4.*
+    , bytestring
+    , strato-model
+  default-language: Haskell2010
+
+executable x509-keygen
+  main-is: X509Keygen.hs
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -Werror
+  build-depends:
+      aeson
+    , base ==4.*
+    , bytestring
+    , strato-model
+  default-language: Haskell2010
+
+executable x509-saltine-decrypt
+  main-is: X509SaltineDecrypt.hs
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -Werror
+  build-depends:
+      base ==4.*
+    , base16-bytestring
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-server
+    , bytestring
+    , optparse-applicative
+    , saltine
+    , strato-model
+  default-language: Haskell2010

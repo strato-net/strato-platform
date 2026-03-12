@@ -1,0 +1,43 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           solid-vm-compiler
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.SolidVM.CodeCollectionDB
+      Blockchain.SolidVM.Metrics
+      SolidVM.CodeCollectionTools
+  other-modules:
+      Blockchain.SolidVM.ImportResolver
+      Paths_solid_vm_compiler
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      aeson
+    , base
+    , blockapps-mpdbs
+    , bytestring
+    , containers
+    , data-default
+    , deepseq
+    , lens
+    , lrucache
+    , monad-alter
+    , parsec
+    , prometheus-client
+    , solid-vm-model
+    , solid-vm-parser
+    , solid-vm-static-analysis
+    , source-tools
+    , strato-model
+    , text
+    , transformers
+  default-language: Haskell2010
