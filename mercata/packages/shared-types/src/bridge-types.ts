@@ -101,12 +101,15 @@ export interface WithdrawalRequestParams {
 }
 
 /**
- * Parameters for requesting automatic supply of liquidity
- * to the lending pool upon deposit completion
+ * Parameters for requesting a post-deposit action (auto-save, auto-forge, etc.)
+ * @param action - Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)
+ * @param targetToken - Action-specific target token (e.g. metal token address for AUTO_FORGE, unused for AUTO_SAVE)
  */
-export interface AutoSaveRequestParams {
+export interface DepositActionRequestParams {
   externalChainId: string;
   externalTxHash: string;
+  action: number;
+  targetToken?: string;
 }
 
 /**

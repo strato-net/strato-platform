@@ -74,7 +74,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
-    requestAutoSave,
+    requestDepositAction,
     triggerDepositRefresh,
   } = useBridgeContext();
 
@@ -599,9 +599,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
       // Step: Waiting for Autosave or Complete
       if (autoDeposit) {
         setCurrentStep("waiting_autosave");
-        await requestAutoSave({
+        await requestDepositAction({
           externalChainId: activeChainId,
           externalTxHash: txHash,
+          action: 1,
         });
       }
 

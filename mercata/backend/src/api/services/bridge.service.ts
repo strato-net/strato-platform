@@ -13,7 +13,7 @@ import {
   parseBridgeRouteMappings,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, AutoSaveRequestParams, WithdrawalSummaryResponse, TransactionResponse } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse } from "@mercata/shared-types";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 
@@ -60,22 +60,22 @@ export const requestWithdrawal = async (
   );
 };
 
-export const requestAutoSave = async (
+export const requestDepositAction = async (
   accessToken: string,
   {
     externalChainId,
     externalTxHash,
-  }: AutoSaveRequestParams,
+    action,
+    targetToken,
+  }: DepositActionRequestParams,
   userAddress: string
 ) : Promise<TransactionResponse> => {
-  const params: AutoSaveRequestParams = {
+  const response = await bridge.post<TransactionResponse>(accessToken, `/request-deposit-action`, {
     externalChainId,
     externalTxHash,
-  };
-
-  // Bridge service handles transaction execution and polling internally,
-  // so we just call it directly and return the result
-  const response = await bridge.post<TransactionResponse>(accessToken, `/request-autosave`, params);
+    action,
+    targetToken,
+  });
   return response.data;
 };
 

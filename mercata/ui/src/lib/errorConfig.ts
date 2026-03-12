@@ -39,7 +39,7 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/bridge/balance": "Bridge Balance Error",
   "/bridge/depositStatus": "Deposit Status Error",
   "/bridge/withdrawalStatus": "Withdrawal Status Error",
-  "/bridge/requestAutoSave": "Automatic Lending Error",
+  "/bridge/requestDepositAction": "Deposit Action Error",
   
   // User operations
   "/user/me": "User Profile Error",
