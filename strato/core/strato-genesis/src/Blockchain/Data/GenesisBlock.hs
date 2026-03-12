@@ -12,7 +12,8 @@ module Blockchain.Data.GenesisBlock
     initializeStateDB,
     genesisInfoToGenesisBlock,
     genesisInfoToBlock,
-    populateMPTAndWriteGenesis
+    populateMPTAndWriteGenesis,
+    populateMPTFromGenesis
   )
 where
 
@@ -222,4 +223,34 @@ populateMPTAndWriteGenesis genesisInfo = do
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode updatedGenesisInfo
   $logInfoS "strato-setup" $ T.pack $ "Wrote genesis.json with stateRoot: " ++ format computedStateRoot
   $logInfoS "strato-setup" $ T.pack $ "  genesis hash: " ++ format (blockHash genesisBlock)
+
+-- | Populate the MPT from a provided genesis.json (without modifying the file).
+-- Used when strato-setup finds an existing genesis.json.
+-- Assumes genesis.json was created with correct stateRoot (e.g., by genesis-builder).
+populateMPTFromGenesis ::
+  ( HasCodeDB m,
+    HasHashDB m,
+    Mem.HasMemAddressStateDB m,
+    HasStateDB m,
+    HasStorageDB m,
+    HasMemStorageDB m,
+    MonadLogger m,
+    (Address `Alters` AddressState) m
+  ) =>
+  GenesisInfo ->
+  m ()
+populateMPTFromGenesis genesisInfo = do
+  $logInfoS "strato-setup" "Populating Merkle Patricia Trie from provided genesis.json"
+  genesisBlock <- genesisInfoToGenesisBlock genesisInfo
+  let computedStateRoot = stateRoot $ blockBlockData genesisBlock
+      expectedStateRoot = GI.stateRoot genesisInfo
+  if computedStateRoot == expectedStateRoot
+    then
+      $logInfoS "strato-setup" $ T.pack $ "MPT populated, stateRoot verified: " ++ format computedStateRoot
+    else
+      $logErrorS "strato-setup" $ T.pack $
+        "ERROR: Computed stateRoot " ++ format computedStateRoot ++
+        " differs from genesis.json stateRoot " ++ format expectedStateRoot ++
+        ". The genesis.json file may have been created incorrectly."
+  $logInfoS "strato-setup" $ T.pack $ "Genesis hash: " ++ format (blockHash genesisBlock)
 

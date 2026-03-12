@@ -14,7 +14,7 @@ import BlockApps.Logging
 import Blockchain.Data.GenesisInfo (GenesisInfo)
 import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.DB.CodeDB
-import Blockchain.Data.GenesisBlock
+import Blockchain.Data.GenesisBlock (populateMPTAndWriteGenesis, populateMPTFromGenesis)
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -23,6 +23,7 @@ import Conduit
 import Control.Monad
 import Control.Monad.Change.Alter ()
 import qualified Data.Aeson as JSON
+import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
 import qualified Data.Yaml as YAML
 import System.FilePath ((</>))
@@ -125,15 +126,19 @@ mkFilesAndGenesis network = do
 
   genesisExists <- doesFileExist "genesis.json"
 
+  liftIO createCommandsFile
+
   if genesisExists
     then do
-      $logInfoS "strato-setup" "Using provided 'genesis.json' - skipping MPT population"
-      liftIO createCommandsFile
+      $logInfoS "strato-setup" "Using provided 'genesis.json' - populating MPT from it"
+      content <- liftIO $ BS.readFile "genesis.json"
+      case JSON.decode (BL.fromStrict content) of
+        Nothing -> error "Failed to parse provided genesis.json"
+        Just genesisInfo -> runResourceT . runSetupDBM $ do
+          void $ addCode mempty
+          populateMPTFromGenesis genesisInfo
     else do
       $logInfoS "strato-setup" "Creating genesis info from network template"
-
-      liftIO createCommandsFile
-
       let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
 
       -- Populate MPT and write genesis.json with computed stateRoot

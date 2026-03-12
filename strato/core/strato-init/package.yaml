@@ -89,7 +89,11 @@ executables:
     main: GenesisBuilder.hs
     dependencies:
       - aeson
+      - blockapps-data
+      - blockapps-mpdbs
       - bytestring
+      - common-log
+      - conduit
       - data-default
       - strato-genesis
       - strato-init
