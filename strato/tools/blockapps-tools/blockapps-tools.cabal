@@ -1,0 +1,119 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockapps-tools
+version:        0.0.1
+synopsis:       A Haskell version of an Ethereum client
+description:    Tool to query the ethereum databases
+category:       Data Structures
+author:         Jamshid
+maintainer:     jamshidnh@gmail.com
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      BlockApps.Tools.Checkpoints
+      BlockApps.Tools.Code
+      BlockApps.Tools.DumpKafkaSequencer
+      BlockApps.Tools.DumpKafkaStateDiff
+      BlockApps.Tools.DumpKafkaUnSequencer
+      BlockApps.Tools.DumpKafkaVMEvents
+      BlockApps.Tools.DumpLevelDB
+      BlockApps.Tools.FRawMP
+      BlockApps.Tools.Hash
+      BlockApps.Tools.InsertP2P
+      BlockApps.Tools.InsertSeq
+      BlockApps.Tools.InsertTX
+      BlockApps.Tools.Psql
+      BlockApps.Tools.Raw
+      BlockApps.Tools.RawMP
+      BlockApps.Tools.Redis
+      BlockApps.Tools.RLP
+      BlockApps.Tools.State
+      BlockApps.Tools.SyncStats
+      BlockApps.Tools.Util
+  other-modules:
+      Paths_blockapps_tools
+  hs-source-dirs:
+      src/
+  build-depends:
+      aeson
+    , base
+    , binary
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-mpdbs
+    , blockstanbul
+    , bytestring
+    , common-log
+    , data-default
+    , ethereum-discovery
+    , ethereum-rlp
+    , filepath
+    , format
+    , hedis
+    , hflags
+    , kafka-monad
+    , labeled-error
+    , leveldb-haskell
+    , merkle-patricia-db
+    , monad-logger
+    , monad-loops
+    , nibblestring
+    , persistent-postgresql
+    , resourcet
+    , seqevents
+    , solid-vm-model
+    , strato-conf
+    , strato-model
+    , strato-redis-blockdb
+    , text
+    , time
+    , transformers
+    , vm-tools
+  default-language: Haskell2010
+
+executable b16decode
+  main-is: B16Decode.hs
+  hs-source-dirs:
+      exec_src/
+  build-depends:
+      base
+    , bytestring
+    , labeled-error
+  default-language: Haskell2010
+
+executable modifyDate
+  main-is: ModifyDate.hs
+  hs-source-dirs:
+      exec_src/
+  build-depends:
+      base
+    , hflags
+    , time
+  default-language: Haskell2010
+
+executable strato-barometer
+  main-is: Main.hs
+  hs-source-dirs:
+      exec_src/
+  build-depends:
+      base
+    , blockapps-tools
+    , bytestring
+    , cmdargs
+    , directory
+    , filepath
+    , labeled-error
+    , merkle-patricia-db
+    , process
+    , seqevents
+    , strato-model
+    , strato-p2p
+    , text
+  default-language: Haskell2010

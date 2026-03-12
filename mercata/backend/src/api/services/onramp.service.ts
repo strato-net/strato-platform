@@ -29,9 +29,36 @@ export interface OnrampTransaction {
 
 const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
 
-const EXTERNAL_TOKEN: Record<string, string> = {
-  eth: ZERO_ADDRESS,
-  usdc: "a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+const CHAIN_ID_ETHEREUM = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ? 11155111 : 1;
+const CHAIN_ID_BASE = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ? 84532 : 8453;
+const CHAIN_ID_LINEA = 59144;
+
+const EXTERNAL_TOKEN_BY_CHAIN: Record<number, Record<string, string>> = {
+  1: {
+    eth: ZERO_ADDRESS,
+    usdc: "a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+  },
+  11155111: {
+    eth: ZERO_ADDRESS,
+    usdc: "94a9d9ac8a22534e3faca9f4e7f2e2cf85d5e4c8",
+  },
+  8453: {
+    eth: ZERO_ADDRESS,
+    usdc: "833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  },
+  84532: {
+    eth: ZERO_ADDRESS,
+    usdc: "036cbd53842c5426634e7929541ec2318f3dcf7e",
+  },
+  59144: {
+    eth: ZERO_ADDRESS,
+    usdc: "176211869ca2b568f2a7d4ee941e073a821ee1ff",
+  },
+};
+
+const TARGET_STRATO_TOKEN: Record<string, string> = {
+  eth: "93fb7295859b2d70199e0a4883b7c320cf874e6c",
+  usdc: constants.USDST,
 };
 
 const EXTERNAL_DECIMALS: Record<string, number> = {
@@ -40,8 +67,9 @@ const EXTERNAL_DECIMALS: Record<string, number> = {
 };
 
 const BRIDGE_CHAIN_ID: Record<string, number> = {
-  ethereum: process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ? 11155111 : 1,
-  base: process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ? 84532 : 8453,
+  ethereum: CHAIN_ID_ETHEREUM,
+  base: CHAIN_ID_BASE,
+  linea: CHAIN_ID_LINEA,
 };
 
 // ————————————————————————————————————————————————————————————————
@@ -132,6 +160,7 @@ async function depositOnStrato(
   externalTokenAmount: string,
   externalTxHash: string,
   stratoRecipient: string,
+  targetStratoToken: string,
 ): Promise<void> {
   const accessToken = await getBridgeAdminToken();
 
@@ -146,12 +175,13 @@ async function depositOnStrato(
       externalTokenAmount,
       externalTxHash,
       stratoRecipient,
+      targetStratoToken,
     },
   });
 
   console.log(
     `[Onramp] Calling deposit — chainId=${externalChainId}, token=${externalToken}, ` +
-    `amount=${externalTokenAmount}, txHash=${externalTxHash}, recipient=${stratoRecipient}`
+      `amount=${externalTokenAmount}, txHash=${externalTxHash}, recipient=${stratoRecipient}`
   );
 
   await postAndWaitForTx(accessToken, () =>
@@ -239,11 +269,12 @@ export async function handleSessionUpdate(sessionData: any): Promise<void> {
       return;
     }
 
-    const externalToken = EXTERNAL_TOKEN[currency];
-    const decimals = EXTERNAL_DECIMALS[currency];
     const chainId = BRIDGE_CHAIN_ID[network];
+    const externalToken = EXTERNAL_TOKEN_BY_CHAIN[chainId]?.[currency];
+    const targetStratoToken = TARGET_STRATO_TOKEN[currency];
+    const decimals = EXTERNAL_DECIMALS[currency];
 
-    if (externalToken === undefined || decimals === undefined || chainId === undefined) {
+    if (externalToken === undefined || targetStratoToken === undefined || decimals === undefined || chainId === undefined) {
       console.error(`[Onramp] Unsupported currency=${currency} or network=${network}`);
       return;
     }
@@ -264,6 +295,7 @@ export async function handleSessionUpdate(sessionData: any): Promise<void> {
         externalTokenAmount,
         txHash,
         userAddress,
+        targetStratoToken,
       );
     } catch (err: any) {
       if (err.message?.includes("MB: duplicate deposit")) {

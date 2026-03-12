@@ -27,13 +27,13 @@ const METAMASK_CARD: CardProvider = {
   id: "metamask-card",
   name: "MetaMask Card",
   networks: [
-    // { chainId: "59144", chainName: "Linea" },
+    { chainId: "59144", chainName: "Linea" },
     // { chainId: "solana", chainName: "Solana" },
     { chainId: "8453", chainName: "Base", mainnetOnly: true },
     { chainId: "84532", chainName: "Base Sepolia", testnetOnly: true },
   ],
   tokensByNetwork: {
-    "59144": ["mUSD", "USDC", "USDT", "wETH", "EURe", "GBPe", "aUSDC", "amUSD"],
+    "59144": ["USDC"],
     solana: ["USDC", "USDT"],
     "8453": ["USDC"], //, "USDT", "aBasUSDC"],
     "84532": ["USDC"], //, "USDT", "aBasUSDC"],
