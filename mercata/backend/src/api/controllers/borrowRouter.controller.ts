@@ -6,7 +6,7 @@ class BorrowRouterController {
   static async preview(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
-      if (!body?.amount) {
+      if (!body || body.amount === undefined || body.amount === null) {
         throw new Error("amount is required");
       }
       const result = await previewBorrowRoute({
@@ -14,6 +14,7 @@ class BorrowRouterController {
         userAddress: userAddress as string,
         amount: String(body.amount),
         targetHealthFactor: body.targetHealthFactor ? Number(body.targetHealthFactor) : undefined,
+        allocationRatio: body.allocationRatio !== undefined ? Number(body.allocationRatio) : undefined,
         lendingCollateral: Array.isArray(body.lendingCollateral) ? body.lendingCollateral : [],
         cdpCollateral: Array.isArray(body.cdpCollateral) ? body.cdpCollateral : [],
       });
@@ -26,7 +27,7 @@ class BorrowRouterController {
   static async execute(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
-      if (!body?.amount) {
+      if (!body || body.amount === undefined || body.amount === null) {
         throw new Error("amount is required");
       }
       const result = await executeBorrowRoute({
@@ -34,6 +35,7 @@ class BorrowRouterController {
         userAddress: userAddress as string,
         amount: String(body.amount),
         targetHealthFactor: body.targetHealthFactor ? Number(body.targetHealthFactor) : undefined,
+        allocationRatio: body.allocationRatio !== undefined ? Number(body.allocationRatio) : undefined,
         lendingCollateral: Array.isArray(body.lendingCollateral) ? body.lendingCollateral : [],
         cdpCollateral: Array.isArray(body.cdpCollateral) ? body.cdpCollateral : [],
       });

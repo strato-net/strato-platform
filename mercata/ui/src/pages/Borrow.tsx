@@ -36,7 +36,6 @@ import {
   calculateAfterBorrowHealthFactor,
   calculateAvailableToBorrowUSD,
   calculateHFSliderExtrema,
-  getRiskLabel,
   recommendCollateralToSupply,
 } from "@/utils/lendingUtils";
 
@@ -129,7 +128,6 @@ type CollateralRow = {
   address: string;
   symbol: string;
   source: "Lending Collateral" | "CDP Vault";
-  sourceSubLabel?: string;
   balanceText: string;
   amountText: string;
   usedText: string;
@@ -141,6 +139,8 @@ type CollateralRow = {
 };
 
 type SourceLoadStatus = "idle" | "loading" | "success" | "error";
+type CollateralPayload = { asset: string; amount: string };
+const EMPTY_COLLATERAL_PAYLOAD: CollateralPayload[] = [];
 
 const Borrow = () => {
   const { userAddress, isLoggedIn } = useUser();
@@ -165,6 +165,8 @@ const Borrow = () => {
   const [inlineRepayError, setInlineRepayError] = useState("");
   const [autoAllocate, setAutoAllocate] = useState(true);
   const [targetHealthFactor, setTargetHealthFactor] = useState(2.1);
+  const [allocationRatio, setAllocationRatio] = useState(0.5);
+  const [hasInitializedHF, setHasInitializedHF] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [routePreviewData, setRoutePreviewData] = useState<RoutePreviewApiResponse | null>(null);
   const [routePreviewLoading, setRoutePreviewLoading] = useState(false);
@@ -517,7 +519,6 @@ const Borrow = () => {
         address: vault.asset,
         symbol: vault.symbol,
         source: "CDP Vault",
-        sourceSubLabel: "Existing Vault Position",
         balanceText: `Debt: ${formatBalance(vault.debtAmount || "0", "USDST", 18, 2, 2)}`,
         amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${vault.symbol}`,
         usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in vault`,
@@ -539,7 +540,6 @@ const Borrow = () => {
           address: asset.address,
           symbol: asset._symbol,
           source: "Lending Collateral",
-          sourceSubLabel: "Existing Lending Position",
           balanceText: `Wallet: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
           amountText: `${amountNumber.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
           usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} already collateralized`,
@@ -570,7 +570,6 @@ const Borrow = () => {
               address: item.asset,
               symbol: item.symbol,
               source: "Lending Collateral",
-              sourceSubLabel: "Allocated by Health Factor",
               balanceText,
               amountText: `${Number(formatUnits(supplyAmount, item.decimals || 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.symbol}`,
               usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
@@ -593,7 +592,6 @@ const Borrow = () => {
             address: "lending-existing",
             symbol: "USDST",
             source: "Lending Collateral",
-            sourceSubLabel: "Allocated by Health Factor (Existing Position)",
             balanceText: `Borrow route: ${Number(formatUnits(lendingAmountWei, 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST`,
             amountText: "No new supply required",
             usedText: "Using existing lending collateral capacity",
@@ -617,14 +615,11 @@ const Borrow = () => {
               address: item.asset,
               symbol: item.symbol,
               source: "CDP Vault",
-              sourceSubLabel: usingExistingOnly ? "Allocated by Health Factor (Existing Vault)" : "Allocated by Health Factor",
               balanceText: `Mint: ${Number(formatUnits(BigInt(item.mintAmount || "0"), 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDST`,
               amountText: usingExistingOnly
-                ? `0.00 ${item.symbol} (new deposit)`
+                ? "Using existing vault collateral"
                 : `${Number(formatUnits(depositAmount, item.decimals || 18)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${item.symbol}`,
-              usedText: usingExistingOnly
-                ? "$0.00 additional used (minting via existing vault headroom)"
-                : `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} routed to CDP`,
+              usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} routed to CDP`,
               muted: false,
               manual: false,
               inputValue: "",
@@ -648,7 +643,6 @@ const Borrow = () => {
         address: asset.address,
         symbol: asset._symbol,
         source: "Lending Collateral",
-        sourceSubLabel: "Manual Allocation",
         balanceText: `Balance: ${formatBalance(asset.userBalance || "0", undefined, decimals, 2, 2)} · ${formatBalance(asset.userBalanceValue || "0", undefined, 18, 2, 2, true)}`,
         amountText: `${tokenAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${asset._symbol}`,
         usedText: `${usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} used`,
@@ -690,7 +684,7 @@ const Borrow = () => {
   }, [loans?.totalAmountOwed, loans?.totalCollateralValueSupplied]);
 
   const lendingCollateralPayload = useMemo(() => {
-    if (autoAllocate) return [];
+    if (autoAllocate) return EMPTY_COLLATERAL_PAYLOAD;
     return Array.from(selectedCollateral.entries())
       .filter(([, amount]) => amount > 0n)
       .map(([asset, amount]) => ({
@@ -700,7 +694,7 @@ const Borrow = () => {
   }, [autoAllocate, selectedCollateral]);
 
   const cdpCollateralPayload = useMemo(() => {
-    if (autoAllocate) return [];
+    if (autoAllocate) return EMPTY_COLLATERAL_PAYLOAD;
     return cdpVaults.map((vault) => {
       const entry = customCdpEntries.get(vault.asset);
       const collateralAmountWei = BigInt(vault.collateralAmount || "0");
@@ -718,7 +712,7 @@ const Borrow = () => {
   }, [autoAllocate, cdpVaults, customCdpEntries]);
 
   useEffect(() => {
-    if (!isLoggedIn || requestedBorrowWei <= 0n) {
+    if (!isLoggedIn) {
       if (previewDebounceRef.current) {
         clearTimeout(previewDebounceRef.current);
         previewDebounceRef.current = null;
@@ -735,6 +729,7 @@ const Borrow = () => {
         const res = await api.post<RoutePreviewApiResponse>("/borrow-router/preview", {
           amount: requestedBorrowWei.toString(),
           targetHealthFactor,
+          allocationRatio,
           lendingCollateral: lendingCollateralPayload,
           cdpCollateral: cdpCollateralPayload,
         });
@@ -763,29 +758,30 @@ const Borrow = () => {
         previewDebounceRef.current = null;
       }
     };
-  }, [isLoggedIn, requestedBorrowWei, targetHealthFactor, lendingCollateralPayload, cdpCollateralPayload]);
+  }, [isLoggedIn, requestedBorrowWei, targetHealthFactor, allocationRatio, lendingCollateralPayload, cdpCollateralPayload]);
 
-  const previewPending = requestedBorrowWei > 0n && routePreviewLoading && !routePreviewData;
-  const previewRefreshing = requestedBorrowWei > 0n && routePreviewLoading;
+  const previewPending = routePreviewLoading && !routePreviewData;
+  const previewRefreshing = routePreviewLoading;
+  // Placeholder values until borrow route includes actionable swap/earn opportunities.
+  const routeOpportunityDefaults = { swapPairs: 0, earnApr: 0 };
 
   const routePreview = useMemo(() => {
     const fallbackLendingApr = Number(((loans?.interestRate || 0) / 100).toFixed(2));
     if (!routePreviewData) {
+      const waitingForRoute = requestedBorrow > 0;
       return {
         lendingAmount: previewPending ? 0 : requestedBorrow > 0 ? requestedBorrow : 0,
         cdpAmount: 0,
         mechanisms: previewPending ? 0 : requestedBorrow > 0 ? 1 : 0,
-        lendingApr: fallbackLendingApr,
+        lendingApr: waitingForRoute ? 0 : fallbackLendingApr,
         cdpApr: 0,
-        blendedApr: previewPending ? 0 : fallbackLendingApr,
-        cdpDebt: 0,
-        cdpCollateralUsd: 0,
+        blendedApr: 0,
         liquidationDropPercent: 0,
         liquidationHealthFactor: 1,
         liquidationPriceUSD: 0,
         liquidationAssetSymbol: "USD",
-        swapPairs: 0,
-        earnApr: 0,
+        swapPairs: routeOpportunityDefaults.swapPairs,
+        earnApr: routeOpportunityDefaults.earnApr,
         cdpCR: 0,
         unifiedHealthFactor: targetHealthFactor,
         lendingHF: targetHealthFactor,
@@ -796,10 +792,6 @@ const Borrow = () => {
 
     const lendingAmount = Number(formatUnits(BigInt(routePreviewData.split.lendingAmount || "0"), 18));
     const cdpAmount = Number(formatUnits(BigInt(routePreviewData.split.cdpAmount || "0"), 18));
-    const cdpCollateralUsd = routePreviewData.cdpAllocations.reduce((sum, item) => {
-      const value = Number(formatUnits(BigInt(item.collateralValueUSD || "0"), 18));
-      return sum + value;
-    }, 0);
 
     return {
       lendingAmount,
@@ -808,35 +800,19 @@ const Borrow = () => {
       lendingApr: Number(routePreviewData.rates.lendingApr || 0),
       cdpApr: Number(routePreviewData.rates.cdpApr || 0),
       blendedApr: Number(routePreviewData.rates.blendedApr || 0),
-      cdpDebt: cdpAmount,
-      cdpCollateralUsd,
       liquidationDropPercent: Number(routePreviewData.position?.liquidationDropPercent || 0),
       liquidationHealthFactor: Number(routePreviewData.position?.liquidationHealthFactor || 1),
       liquidationPriceUSD: Number(routePreviewData.position?.liquidationPriceUSD || 0),
       liquidationAssetSymbol: routePreviewData.position?.liquidationAssetSymbol || "USD",
-      swapPairs: 0,
-      earnApr: 0,
+      swapPairs: routeOpportunityDefaults.swapPairs,
+      earnApr: routeOpportunityDefaults.earnApr,
       cdpCR: Number(routePreviewData.health.cdpCollateralRatio || 0),
       unifiedHealthFactor: Number(routePreviewData.health.unifiedHealthFactor || targetHealthFactor),
       lendingHF: Number(routePreviewData.health.lendingHealthFactor || targetHealthFactor),
       cdpEffectiveHF: Number(routePreviewData.health.cdpEffectiveHealthFactor || targetHealthFactor),
       projectedLtvPercent: Number(routePreviewData.position?.projectedLtvPercent || ltvNow),
     };
-  }, [routePreviewData, requestedBorrow, loans?.interestRate, targetHealthFactor, ltvNow, previewPending]);
-
-  const routingReasonText = useMemo(() => {
-    const reason = routePreviewData?.routing?.selectionReason;
-    if (!reason) return "";
-    const mapping: Record<string, string> = {
-      insufficient_total_capacity: "Route limited by total available capacity.",
-      cdp_capacity_unavailable_or_constrained: "CDP route unavailable or constrained at current settings.",
-      lending_apr_optimal: "Lending-only route selected as lowest APR option.",
-      cdp_constraints_prevented_split: "CDP constraints prevented a lower blended split.",
-      cdp_apr_optimal: "CDP-only route selected as lowest APR option.",
-      blended_apr_optimal_split: "Mixed Lending + CDP split selected for minimum blended APR.",
-    };
-    return mapping[reason] || "Route selected by optimizer constraints.";
-  }, [routePreviewData?.routing?.selectionReason]);
+  }, [routePreviewData, requestedBorrow, loans?.interestRate, targetHealthFactor, ltvNow, previewPending, routeOpportunityDefaults.earnApr, routeOpportunityDefaults.swapPairs]);
 
   const maxBorrowableWei = useMemo(() => {
     if (routePreviewData?.constraints?.totalCapacity) {
@@ -849,6 +825,11 @@ const Borrow = () => {
     return availableToBorrow;
   }, [routePreviewData?.constraints?.totalCapacity, availableToBorrow]);
 
+  const availableBorrowDisplay = useMemo(() => {
+    const amount = Number(formatUnits(maxBorrowableWei, 18));
+    return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }, [maxBorrowableWei]);
+
   const lendingRouteCollateralText = useMemo(() => {
     const allocations = routePreviewData?.lendingAllocations || [];
     if (allocations.length === 0) return "No additional collateral needed";
@@ -860,50 +841,14 @@ const Borrow = () => {
 
   const cdpRouteCollateralText = useMemo(() => {
     const allocations = routePreviewData?.cdpAllocations || [];
-    if (allocations.length === 0) return "No CDP collateral needed";
-    const withDeposit = allocations.filter((item) => BigInt(item.depositAmount || "0") > 0n);
-    if (withDeposit.length > 0) {
-      return withDeposit
-        .map((item) => `${Number(formatUnits(BigInt(item.depositAmount || "0"), item.decimals || 18)).toFixed(2)} ${item.symbol}`)
-        .join(" + ");
-    }
-    const withExisting = allocations.filter((item) => BigInt(item.mintAmount || "0") > 0n);
-    if (withExisting.length > 0) {
-      return withExisting.map((item) => `${item.symbol} (existing vault collateral)`).join(" + ");
-    }
-    return "No CDP collateral needed";
+    const active = allocations.filter((item) => BigInt(item.mintAmount || "0") > 0n);
+    if (active.length === 0) return "No CDP collateral used";
+    const deposits = active
+      .filter((item) => BigInt(item.depositAmount || "0") > 0n)
+      .map((item) => `${Number(formatUnits(BigInt(item.depositAmount || "0"), item.decimals || 18)).toFixed(2)} ${item.symbol}`);
+    if (deposits.length === 0) return "Using existing CDP vault collateral";
+    return deposits.join(" + ");
   }, [routePreviewData?.cdpAllocations]);
-
-  const cdpMintSourceText = useMemo(() => {
-    const fresh = routePreviewData?.routing?.cdpFromFreshCollateral;
-    const existing = routePreviewData?.routing?.cdpFromExistingCollateral;
-    if (!fresh && !existing) return "";
-    let freshAmount = 0;
-    let existingAmount = 0;
-    try {
-      freshAmount = Number(formatUnits(BigInt(fresh || "0"), 18));
-      existingAmount = Number(formatUnits(BigInt(existing || "0"), 18));
-    } catch {
-      return "";
-    }
-    if (freshAmount <= 0 && existingAmount <= 0) return "";
-    return `CDP source: fresh deposit ${freshAmount.toFixed(2)} USDST, existing vault collateral ${existingAmount.toFixed(2)} USDST.`;
-  }, [routePreviewData?.routing?.cdpFromFreshCollateral, routePreviewData?.routing?.cdpFromExistingCollateral]);
-
-  const cdpCapacityBreakdownText = useMemo(() => {
-    const existing = routePreviewData?.constraints?.cdpCapacityFromExistingCollateral;
-    const fresh = routePreviewData?.constraints?.cdpCapacityFromFreshCollateral;
-    if (!existing && !fresh) return "";
-    let existingAmount = 0;
-    let freshAmount = 0;
-    try {
-      existingAmount = Number(formatUnits(BigInt(existing || "0"), 18));
-      freshAmount = Number(formatUnits(BigInt(fresh || "0"), 18));
-    } catch {
-      return "";
-    }
-    return `CDP capacity: existing ${existingAmount.toFixed(2)} USDST + fresh ${freshAmount.toFixed(2)} USDST.`;
-  }, [routePreviewData?.constraints?.cdpCapacityFromExistingCollateral, routePreviewData?.constraints?.cdpCapacityFromFreshCollateral]);
 
   const totalCdpDebtActual = useMemo(() => {
     return cdpVaults.reduce((sum, vault) => sum + Number(formatUnits(BigInt(vault.debtAmount || "0"), 18)), 0);
@@ -921,8 +866,17 @@ const Borrow = () => {
     const max = Number(sliderExtrema.max);
     if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 0;
     const clamped = Math.max(min, Math.min(max, Number(targetHealthFactor)));
-    return max - clamped;
+    return clamped - min;
   }, [targetHealthFactor, sliderExtrema.min, sliderExtrema.max]);
+
+  // Advanced Mint parity: initialize once to the highest usable HF bound.
+  useEffect(() => {
+    if (hasInitializedHF) return;
+    const max = Number(sliderExtrema.max);
+    if (!Number.isFinite(max) || max <= 0) return;
+    setTargetHealthFactor(Number(max.toFixed(2)));
+    setHasInitializedHF(true);
+  }, [hasInitializedHF, sliderExtrema.max]);
 
   useEffect(() => {
     const min = Number(sliderExtrema.min);
@@ -935,12 +889,18 @@ const Borrow = () => {
     }
   }, [sliderExtrema.min, sliderExtrema.max, targetHealthFactor]);
 
+  useEffect(() => {
+    if (isLoggedIn) return;
+    setHasInitializedHF(false);
+    setTargetHealthFactor(2.1);
+  }, [isLoggedIn]);
+
   const handleHealthSliderChange = (values: number[]) => {
     const sliderPos = values[0] ?? 0;
     const min = Number(sliderExtrema.min);
     const max = Number(sliderExtrema.max);
     if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
-    const newHF = max - sliderPos;
+    const newHF = min + sliderPos;
     setTargetHealthFactor(Number(newHF.toFixed(2)));
   };
 
@@ -961,11 +921,15 @@ const Borrow = () => {
     return Number(targetHealthFactor);
   }, [previewRefreshing, routePreviewData?.health?.unifiedHealthFactor, loans, requestedBorrow, selectedCollateral, targetHealthFactor]);
 
-  const projectedHealthFactor = useMemo(() => {
-    const hf = Number(routePreviewData?.health?.unifiedHealthFactor || 0);
-    if (!Number.isFinite(hf) || hf <= 0) return null;
-    return hf;
-  }, [routePreviewData?.health?.unifiedHealthFactor]);
+  const riskDisplay = useMemo(() => {
+    if (displayHealthFactor <= 1) {
+      return { label: "Liquidation", dotClass: "bg-red-400", textClass: "text-red-500" };
+    }
+    if (displayHealthFactor < 1.5) {
+      return { label: "Risky", dotClass: "bg-amber-400", textClass: "text-amber-500" };
+    }
+    return { label: "Healthy", dotClass: "bg-emerald-400", textClass: "text-emerald-500" };
+  }, [displayHealthFactor]);
 
   const handleBorrowNow = async () => {
     if (guestMode) return;
@@ -989,6 +953,7 @@ const Borrow = () => {
       const res = await api.post<ExecuteBorrowRouteResponse>("/borrow-router/execute", {
         amount: requestedBorrowWei.toString(),
         targetHealthFactor,
+        allocationRatio,
         lendingCollateral: lendingCollateralPayload,
         cdpCollateral: cdpCollateralPayload,
       });
@@ -1099,7 +1064,7 @@ const Borrow = () => {
           </span>
           <div>
             <p className={`font-medium ${row.muted ? "text-muted-foreground/70" : ""}`}>{row.symbol}</p>
-            <p className="text-[10px] text-muted-foreground">{row.source}{row.sourceSubLabel ? ` · ${row.sourceSubLabel}` : ""}</p>
+            <p className="text-[10px] text-muted-foreground">{row.source}</p>
             <p className={`text-xs text-muted-foreground ${row.muted ? "opacity-70" : ""}`}>{row.balanceText}</p>
           </div>
         </div>
@@ -1159,7 +1124,7 @@ const Borrow = () => {
                   <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-background/60 dark:border-[#2d3765] dark:bg-[#232d57] px-4 py-3 text-sm w-fit mt-1">
                     <CircleDollarSign className="h-5 w-5 text-blue-400" />
                     <span className="font-semibold text-base text-foreground">USDST</span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground ml-1" />
+                    <span className="text-xs text-muted-foreground">(fixed asset)</span>
                   </div>
                   <div className="flex-1 max-w-[220px] ml-auto">
                     <Input
@@ -1189,6 +1154,18 @@ const Borrow = () => {
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-2xl text-muted-foreground">
                     ≈ ${requestedBorrowUsdDisplay}
+                  </p>
+                  <div className="flex flex-col items-end gap-2">
+                  <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                    <span>Available to Borrow:</span>
+                    {routePreviewLoading ? (
+                      <>
+                        <span className="inline-block h-2 w-2 rounded-full bg-primary/80 animate-pulse" />
+                        <span>Updating...</span>
+                      </>
+                    ) : (
+                      <span>{availableBorrowDisplay} USDST</span>
+                    )}
                   </p>
                   <div className="flex items-center gap-2">
                   {[25, 50, 75].map((percent) => (
@@ -1228,13 +1205,14 @@ const Borrow = () => {
                     Max
                   </Button>
                   </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             <div className="flex items-center gap-3 px-1 pt-2">
               <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">2</span>
-              <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">YOUR COLLATERAL (LENDING + CDP)</p>
+              <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">YOUR COLLATERAL</p>
             </div>
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-0 space-y-2">
@@ -1243,7 +1221,7 @@ const Borrow = () => {
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                     <p className="text-sm font-medium">Auto-allocate</p>
-                    <p className="text-xs text-muted-foreground">- optimal mix for best rate</p>
+                    <p className="text-xs text-muted-foreground">- algorithm routes collateral + split</p>
                   </div>
                   <button
                     className="inline-flex items-center"
@@ -1255,6 +1233,11 @@ const Borrow = () => {
                     </span>
                   </button>
                 </div>
+                {!autoAllocate ? (
+                  <div className="border-t border-border/50 px-4 py-3 text-xs text-muted-foreground">
+                    Manual mode sets collateral caps. Borrow split is still routed automatically using the ratio preference.
+                  </div>
+                ) : null}
                 {lendingCollateralStatus === "loading" ? (
                   <div className="border-t border-border/50 px-4 py-4 space-y-3">
                     <p className="text-xs text-muted-foreground">Loading lending collateral...</p>
@@ -1267,7 +1250,7 @@ const Borrow = () => {
                     Lending collateral unavailable. Showing available sources only.
                   </div>
                 ) : null}
-                {requestedBorrowWei > 0n && routePreviewLoading ? (
+                {routePreviewLoading ? (
                   <div className="border-t border-border/50 px-4 py-3 text-xs text-muted-foreground">
                     Calculating optimal Lending/CDP split for selected health factor...
                   </div>
@@ -1288,7 +1271,7 @@ const Borrow = () => {
                 {!autoAllocate && cdpVaultsStatus !== "loading" && cdpVaults.length > 0 ? (
                   <div className="border-t border-border/50 px-4 py-3 space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      Manual CDP cap (USD): set how much existing vault collateral value each CDP token can use.
+                      Manual CDP cap (USD): limit how much existing vault collateral value each CDP token can use.
                     </p>
                     <div className="space-y-2">
                       {cdpVaults.map((vault) => {
@@ -1373,15 +1356,11 @@ const Borrow = () => {
             <Card className="border-0 shadow-none bg-transparent">
               <CardContent className="p-4 md:p-5 space-y-3 rounded-xl border border-border/70 bg-card dark:bg-[#1f274f]">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium inline-flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                    {getRiskLabel(displayHealthFactor)}
+                  <span className={`font-medium inline-flex items-center gap-2 ${riskDisplay.textClass}`}>
+                    <span className={`h-2.5 w-2.5 rounded-full ${riskDisplay.dotClass}`} />
+                    {riskDisplay.label}
                   </span>
-                  <span className="font-semibold">
-                    {previewRefreshing
-                      ? `Target HF: ${Number(targetHealthFactor).toFixed(1)}x · Projected HF: Updating...`
-                      : `Target HF: ${Number(targetHealthFactor).toFixed(1)}x · Projected HF: ${(projectedHealthFactor ?? displayHealthFactor).toFixed(1)}x`}
-                  </span>
+                  <span className="font-semibold">Health Factor: {displayHealthFactor.toFixed(1)}x</span>
                 </div>
                 <Slider
                   value={[sliderPosition]}
@@ -1452,9 +1431,34 @@ const Borrow = () => {
                 <div className="flex items-center gap-3 px-1 pt-2">
                   <span className="w-6 h-6 rounded-full bg-primary/20 text-primary inline-flex items-center justify-center text-xs font-semibold">4</span>
                   <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase font-semibold">
-                    {`BORROW ROUTED ACROSS ${Math.max(2, routePreview.mechanisms)} MECHANISM${Math.max(2, routePreview.mechanisms) > 1 ? "S" : ""}`}
+                    {`BORROW ROUTED ACROSS ${Math.max(1, routePreview.mechanisms)} MECHANISM${Math.max(1, routePreview.mechanisms) > 1 ? "S" : ""}`}
                   </p>
                 </div>
+                <Card className="border-0 shadow-none bg-transparent">
+                  <CardContent className="p-4 md:p-5 space-y-2 rounded-xl border border-border/70 bg-card dark:bg-[#1f274f]">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Split preference (smaller pool)</span>
+                      <span className="font-medium">{Math.round(allocationRatio * 100)}%</span>
+                    </div>
+                    <Slider
+                      value={[allocationRatio * 100]}
+                      min={0}
+                      max={100}
+                      step={1}
+                      onValueChange={(values) => {
+                        const raw = values[0] ?? 50;
+                        const clamped = Math.max(0, Math.min(100, raw));
+                        setAllocationRatio(clamped / 100);
+                      }}
+                      className="w-full"
+                      disabled={guestMode}
+                    />
+                    <div className="flex justify-between text-[11px] text-muted-foreground">
+                      <span>Lower smaller-pool share</span>
+                      <span>Higher smaller-pool share</span>
+                    </div>
+                  </CardContent>
+                </Card>
                 <Card className="border-0 shadow-none bg-transparent">
                   <CardContent className="p-4 md:p-5 space-y-0 rounded-xl border border-border/70 bg-card dark:bg-[#1f274f]">
                     {previewRefreshing ? (
@@ -1506,15 +1510,6 @@ const Borrow = () => {
                           ? "Blended rate (weighted): Calculating..."
                           : `Blended rate (weighted): ${routePreview.blendedApr.toFixed(2)}% APR`}
                       </p>
-                      {!previewRefreshing && routingReasonText ? (
-                        <p className="text-right text-[11px] text-muted-foreground mt-1">{routingReasonText}</p>
-                      ) : null}
-                      {!previewRefreshing && cdpMintSourceText ? (
-                        <p className="text-right text-[11px] text-muted-foreground mt-1">{cdpMintSourceText}</p>
-                      ) : null}
-                      {!previewRefreshing && cdpCapacityBreakdownText ? (
-                        <p className="text-right text-[11px] text-muted-foreground mt-1">{cdpCapacityBreakdownText}</p>
-                      ) : null}
                     </div>
                   </CardContent>
                 </Card>

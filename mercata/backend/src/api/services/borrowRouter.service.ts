@@ -16,6 +16,7 @@ type PreviewBorrowRouteArgs = {
   userAddress: string;
   amount: string;
   targetHealthFactor?: number;
+  allocationRatio?: number;
   lendingCollateral?: LendingCollateralInput[];
   cdpCollateral?: CdpCollateralInput[];
 };
@@ -76,6 +77,7 @@ type LendingAllocation = {
 const WAD = 10n ** 18n;
 const RAY = 10n ** 27n;
 const SECONDS_PER_YEAR = 31536000n;
+const MAX_SPLIT_CANDIDATES = 401;
 
 const toBig = (value: string | number | bigint | undefined | null): bigint => {
   if (value === undefined || value === null) return 0n;
@@ -87,6 +89,13 @@ const toBig = (value: string | number | bigint | undefined | null): bigint => {
 };
 
 const minBig = (a: bigint, b: bigint): bigint => (a < b ? a : b);
+const clampRatio = (value?: number): number => {
+  if (!Number.isFinite(value as number)) return 0.5;
+  const safe = Number(value);
+  if (safe < 0) return 0;
+  if (safe > 1) return 1;
+  return safe;
+};
 const ceilDiv = (a: bigint, b: bigint): bigint => {
   if (b <= 0n) return 0n;
   return (a + b - 1n) / b;
@@ -376,6 +385,21 @@ const planCdp = (targetMint: bigint, targetHF: number, candidates: CdpCandidate[
   return { allocations, totalMint, weightedApr, weightedCR, effectiveHFMin, capacity };
 };
 
+const estimateCheapestCdpApr = (targetHF: number, candidates: CdpCandidate[]): number => {
+  const options = candidates
+    .filter((candidate) => computeCdpHeadroom(candidate, targetHF) > 0n)
+    .map((candidate) => annualPercentFromRateRay(candidate.stabilityFeeRate));
+  if (options.length === 0) return Number.POSITIVE_INFINITY;
+  return Math.min(...options);
+};
+
+const assertRouteCandidate = <T>(candidate: T | null, context: string): T => {
+  if (!candidate) {
+    throw new Error(`Route candidate selection failed: ${context}`);
+  }
+  return candidate;
+};
+
 export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
   const targetHealthFactor = clampHF(args.targetHealthFactor);
   const requestedAmount = toBig(args.amount);
@@ -416,20 +440,8 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
   const cdpCapacityFreshCollateral = cdpCapacityFull > cdpCapacityExistingOnly
     ? (cdpCapacityFull - cdpCapacityExistingOnly)
     : 0n;
+  const combinedCapacity = lendingCapacity + cdpCapacityFull;
   const lendingCandidateByAsset = new Map(lendingCandidates.map((candidate) => [candidate.assetAddress, candidate]));
-  const cdpHeadroomByApr = [...cdpCandidatesUnreserved]
-    .map((candidate) => ({
-      apr: annualPercentFromRateRay(candidate.stabilityFeeRate),
-      headroom: computeCdpHeadroom(candidate, targetHealthFactor),
-    }))
-    .filter((item) => item.headroom > 0n)
-    .sort((a, b) => a.apr - b.apr);
-  const cdpCumulativeBreakpoints: bigint[] = [];
-  let runningCdpHeadroom = 0n;
-  for (const entry of cdpHeadroomByApr) {
-    runningCdpHeadroom += entry.headroom;
-    cdpCumulativeBreakpoints.push(runningCdpHeadroom);
-  }
 
   const evaluateSplit = (targetAmount: bigint, candidateLendingAmount: bigint) => {
     const safeTarget = targetAmount > 0n ? targetAmount : 0n;
@@ -458,6 +470,8 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
     const blendedApr = totalRouted > 0n
       ? ((Number(lendingAmount) * lendingApr) + (Number(cdpPlan.totalMint) * cdpPlan.weightedApr)) / Number(totalRouted)
       : Number.POSITIVE_INFINITY;
+    const cdpAdditionalCollateralValueUSD = cdpPlan.allocations.reduce((sum, a) => sum + a.depositCollateralValueUSD, 0n);
+    const totalAdditionalCollateralValueUSD = lendingPlan.addedCollateralValueUSD + cdpAdditionalCollateralValueUSD;
 
     const projectedTotalDebt = currentDebt + lendingAmount + cdpPlan.totalMint;
     const projectedTotalCollateralValueUSD =
@@ -536,6 +550,7 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
       cdpHF,
       unifiedHF,
       blendedApr,
+      totalAdditionalCollateralValueUSD,
       projectedLtvPercent,
       liquidationDropPercent: liquidationDropPercentExact,
       liquidationPriceUSD,
@@ -543,114 +558,117 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
     };
   };
 
-  const optimizeForTarget = (targetAmount: bigint) => {
+  const pickLendingAmountForDeterministicSplit = (targetAmount: bigint): bigint[] => {
     const safeTarget = targetAmount > 0n ? targetAmount : 0n;
     const maxLendingForTarget = minBig(lendingCapacity, safeTarget);
-    const splitCandidates = new Set<bigint>([0n, maxLendingForTarget]);
-    const coarseSteps = 80n;
-    for (let i = 1n; i < coarseSteps; i += 1n) {
-      splitCandidates.add((maxLendingForTarget * i) / coarseSteps);
-    }
-    for (const cdpCum of cdpCumulativeBreakpoints) {
-      const lendingFromBreakpoint = safeTarget > cdpCum ? (safeTarget - cdpCum) : 0n;
-      splitCandidates.add(minBig(lendingFromBreakpoint, maxLendingForTarget));
-    }
-    const evaluated = Array.from(splitCandidates).map((candidate) => evaluateSplit(safeTarget, candidate));
+    const ratio = clampRatio(args.allocationRatio);
+    const ratioMillion = BigInt(Math.round(ratio * 1_000_000));
+    const desiredForSmallerPool = (safeTarget * ratioMillion) / 1_000_000n;
+    const smallerPoolIsLending = lendingCapacity <= cdpCapacityFull;
 
-    let selected = evaluated.find((item) => item.feasible) || null;
-    if (selected) {
-      for (const candidate of evaluated) {
-        if (!candidate.feasible) continue;
-        const betterApr = candidate.blendedApr < selected.blendedApr - 1e-9;
-        const sameApr = Math.abs(candidate.blendedApr - selected.blendedApr) <= 1e-9;
-        const betterHF = candidate.unifiedHF > selected.unifiedHF + 1e-9;
-        const sameHF = Math.abs(candidate.unifiedHF - selected.unifiedHF) <= 1e-9;
-        const lowerCollateral = candidate.lendingPlan.addedCollateralValueUSD < selected.lendingPlan.addedCollateralValueUSD;
-        if (betterApr || (sameApr && (betterHF || (sameHF && lowerCollateral)))) {
-          selected = candidate;
-        }
-      }
-      let refinementStep = maxLendingForTarget / coarseSteps;
-      for (let round = 0; round < 6 && refinementStep > 0n; round += 1) {
-        const center = selected.lendingAmount;
-        const localCandidates = new Set<bigint>([
-          center,
-          center > refinementStep ? (center - refinementStep) : 0n,
-          minBig(maxLendingForTarget, center + refinementStep),
-          center > (2n * refinementStep) ? (center - (2n * refinementStep)) : 0n,
-          minBig(maxLendingForTarget, center + (2n * refinementStep)),
-        ]);
-        for (const lendingCandidate of localCandidates) {
-          const candidate = evaluateSplit(safeTarget, lendingCandidate);
-          if (!candidate.feasible) continue;
-          const betterApr = candidate.blendedApr < selected.blendedApr - 1e-9;
-          const sameApr = Math.abs(candidate.blendedApr - selected.blendedApr) <= 1e-9;
-          const betterHF = candidate.unifiedHF > selected.unifiedHF + 1e-9;
-          const sameHF = Math.abs(candidate.unifiedHF - selected.unifiedHF) <= 1e-9;
-          const lowerCollateral = candidate.lendingPlan.addedCollateralValueUSD < selected.lendingPlan.addedCollateralValueUSD;
-          if (betterApr || (sameApr && (betterHF || (sameHF && lowerCollateral)))) {
-            selected = candidate;
-          }
-        }
-        refinementStep /= 2n;
-      }
-
-      // Keep an explicit CDP-only candidate in contention when feasible.
-      // This makes "fresh CDP deposit + mint" routes deterministic whenever they are cheaper.
-      const cdpOnlyCandidate = evaluateSplit(safeTarget, 0n);
-      if (cdpOnlyCandidate.feasible) {
-        const betterApr = cdpOnlyCandidate.blendedApr < selected.blendedApr - 1e-9;
-        const sameApr = Math.abs(cdpOnlyCandidate.blendedApr - selected.blendedApr) <= 1e-9;
-        const betterHF = cdpOnlyCandidate.unifiedHF > selected.unifiedHF + 1e-9;
-        const sameHF = Math.abs(cdpOnlyCandidate.unifiedHF - selected.unifiedHF) <= 1e-9;
-        const lowerCollateral = cdpOnlyCandidate.lendingPlan.addedCollateralValueUSD < selected.lendingPlan.addedCollateralValueUSD;
-        if (betterApr || (sameApr && (betterHF || (sameHF && lowerCollateral)))) {
-          selected = cdpOnlyCandidate;
-        }
-      }
+    let primaryLendingAmount = 0n;
+    if (smallerPoolIsLending) {
+      primaryLendingAmount = minBig(desiredForSmallerPool, maxLendingForTarget);
     } else {
-      selected = evaluated.reduce((best, candidate) => {
-        if (!best) return candidate;
-        if (candidate.totalRouted > best.totalRouted) return candidate;
-        if (candidate.totalRouted === best.totalRouted && candidate.blendedApr < best.blendedApr) return candidate;
-        return best;
-      }, null as ((typeof evaluated)[number] | null));
+      const desiredCdpAmount = minBig(desiredForSmallerPool, cdpCapacityFull);
+      const lendingFromRemaining = safeTarget > desiredCdpAmount ? (safeTarget - desiredCdpAmount) : 0n;
+      primaryLendingAmount = minBig(lendingFromRemaining, maxLendingForTarget);
     }
-    return { selected, evaluated };
+
+    const candidates = new Set<bigint>([
+      primaryLendingAmount,
+      0n,
+      maxLendingForTarget,
+    ]);
+
+    if (smallerPoolIsLending) {
+      candidates.add(minBig(lendingCapacity, safeTarget));
+    } else {
+      const cdpMax = minBig(cdpCapacityFull, safeTarget);
+      const lendingFromCdpMax = safeTarget > cdpMax ? (safeTarget - cdpMax) : 0n;
+      candidates.add(minBig(lendingFromCdpMax, maxLendingForTarget));
+    }
+
+    return Array.from(candidates);
   };
 
-  const requestedOptimization = optimizeForTarget(requestedAmountSafe);
-  const selected = requestedOptimization.selected;
-  const upperTargetForCapacity = lendingCapacity + cdpCapacityFull;
-  let low = 0n;
-  let high = upperTargetForCapacity;
-  let maxTotalRouted = 0n;
-  for (let i = 0; i < 28 && low <= high; i += 1) {
-    const mid = (low + high) / 2n;
-    const midOptimization = optimizeForTarget(mid);
-    if (midOptimization.selected?.feasible) {
-      maxTotalRouted = mid;
-      low = mid + 1n;
-    } else {
-      if (mid === 0n) break;
-      high = mid - 1n;
-    }
-  }
+  const generateLendingSweepCandidates = (targetAmount: bigint): bigint[] => {
+    const safeTarget = targetAmount > 0n ? targetAmount : 0n;
+    const maxLendingForTarget = minBig(lendingCapacity, safeTarget);
+    if (maxLendingForTarget <= 0n) return [0n];
 
-  const lendingAmount = selected?.lendingAmount || 0n;
-  const lendingPlan = selected?.lendingPlan || planLendingCollateralForBorrow(0n, currentDebt, currentLendingCollateralLTWeighted, targetHealthFactor, lendingCandidates);
-  const cdpPlan = selected?.cdpPlan || planCdp(0n, targetHealthFactor, cdpCandidatesUnreserved);
-  const totalRouted = selected?.totalRouted || 0n;
-  const feasible = selected?.feasible || false;
-  const shortfall = selected ? selected.shortfall : requestedAmountSafe;
-  const lendingHF = selected?.lendingHF ?? Number.POSITIVE_INFINITY;
-  const cdpHF = selected?.cdpHF ?? Number.POSITIVE_INFINITY;
-  const unifiedHF = selected?.unifiedHF ?? targetHealthFactor;
-  const blendedApr = selected?.blendedApr ?? 0;
-  const projectedLtvPercent = selected?.projectedLtvPercent ?? 0;
-  const liquidationDropPercent = selected?.liquidationDropPercent ?? 0;
-  const liquidationPriceUSD = selected?.liquidationPriceUSD ?? 0;
-  const liquidationSymbol = selected?.liquidationSymbol || "USD";
+    const step = ceilDiv(maxLendingForTarget, BigInt(MAX_SPLIT_CANDIDATES - 1));
+    const candidates = new Set<bigint>();
+    let value = 0n;
+    while (value <= maxLendingForTarget) {
+      candidates.add(value);
+      value += step;
+    }
+    candidates.add(maxLendingForTarget);
+    return Array.from(candidates);
+  };
+
+  const cheapestCdpApr = estimateCheapestCdpApr(targetHealthFactor, cdpCandidatesUnreserved);
+  const candidateLendingAmountsSet = new Set<bigint>([
+    ...generateLendingSweepCandidates(requestedAmountSafe),
+    ...pickLendingAmountForDeterministicSplit(requestedAmountSafe),
+  ]);
+  const maxLendingForTarget = minBig(lendingCapacity, requestedAmountSafe);
+  if (lendingApr <= cheapestCdpApr) {
+    candidateLendingAmountsSet.add(maxLendingForTarget);
+  } else {
+    const maxCdpForTarget = minBig(cdpCapacityFull, requestedAmountSafe);
+    const lendingRemainder = requestedAmountSafe > maxCdpForTarget ? (requestedAmountSafe - maxCdpForTarget) : 0n;
+    candidateLendingAmountsSet.add(minBig(lendingRemainder, maxLendingForTarget));
+  }
+  const candidateLendingAmounts = Array.from(candidateLendingAmountsSet);
+  const evaluatedCandidates = candidateLendingAmounts.map((candidate) => evaluateSplit(requestedAmountSafe, candidate));
+  const feasibleCandidates = evaluatedCandidates.filter((item) => item.feasible);
+  const selected = assertRouteCandidate(
+    feasibleCandidates.length > 0
+    ? feasibleCandidates.reduce((best, candidate) => {
+      if (!best) return candidate;
+      if (candidate.blendedApr < best.blendedApr) return candidate;
+      if (candidate.blendedApr === best.blendedApr && candidate.unifiedHF > best.unifiedHF) return candidate;
+      if (
+        candidate.blendedApr === best.blendedApr &&
+        candidate.unifiedHF === best.unifiedHF &&
+        candidate.totalAdditionalCollateralValueUSD < best.totalAdditionalCollateralValueUSD
+      ) {
+        return candidate;
+      }
+      if (
+        candidate.blendedApr === best.blendedApr &&
+        candidate.unifiedHF === best.unifiedHF &&
+        candidate.totalAdditionalCollateralValueUSD === best.totalAdditionalCollateralValueUSD &&
+        candidate.totalRouted > best.totalRouted
+      ) {
+        return candidate;
+      }
+      return best;
+    }, null as ((typeof evaluatedCandidates)[number] | null))
+    : evaluatedCandidates.reduce((best, candidate) => {
+      if (!best) return candidate;
+      if (candidate.totalRouted > best.totalRouted) return candidate;
+      return best;
+    }, null as ((typeof evaluatedCandidates)[number] | null)),
+    "no evaluated split candidate"
+  );
+
+  const lendingAmount = selected.lendingAmount;
+  const lendingPlan = selected.lendingPlan;
+  const cdpPlan = selected.cdpPlan;
+  const totalRouted = selected.totalRouted;
+  const feasible = selected.feasible;
+  const shortfall = selected.shortfall;
+  const lendingHF = selected.lendingHF;
+  const cdpHF = selected.cdpHF;
+  const unifiedHF = selected.unifiedHF;
+  const blendedApr = selected.blendedApr;
+  const projectedLtvPercent = selected.projectedLtvPercent;
+  const liquidationDropPercent = selected.liquidationDropPercent;
+  const liquidationPriceUSD = selected.liquidationPriceUSD;
+  const liquidationSymbol = selected.liquidationSymbol || "USD";
   const cdpRouted = cdpPlan.totalMint;
   const cdpFreshMintUsed = cdpPlan.allocations.reduce((sum, allocation) => {
     if (allocation.depositCollateralValueUSD <= 0n || allocation.targetCRWad <= 0n) return sum;
@@ -658,16 +676,7 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
     return sum + minBig(allocation.mintAmount, fromFreshCollateral);
   }, 0n);
   const cdpExistingMintUsed = cdpRouted > cdpFreshMintUsed ? (cdpRouted - cdpFreshMintUsed) : 0n;
-  const selectionReason = (() => {
-    if (!selected?.feasible) return "insufficient_total_capacity";
-    if (cdpRouted <= 0n) {
-      if (cdpCapacityFull <= 0n) return "cdp_capacity_unavailable_or_constrained";
-      if (cdpPlan.weightedApr <= 0 || lendingApr <= cdpPlan.weightedApr) return "lending_apr_optimal";
-      return "cdp_constraints_prevented_split";
-    }
-    if (lendingAmount <= 0n) return "cdp_apr_optimal";
-    return "blended_apr_optimal_split";
-  })();
+  const selectionReason = selected.feasible ? "lowest_blended_apr" : "insufficient_total_capacity";
 
   return {
     requestedAmount: requestedAmountSafe.toString(),
@@ -703,7 +712,7 @@ export const previewBorrowRoute = async (args: PreviewBorrowRouteArgs) => {
       cdpCapacity: cdpCapacityFull.toString(),
       cdpCapacityFromExistingCollateral: cdpCapacityExistingOnly.toString(),
       cdpCapacityFromFreshCollateral: cdpCapacityFreshCollateral.toString(),
-      totalCapacity: maxTotalRouted.toString(),
+      totalCapacity: combinedCapacity.toString(),
     },
     routing: {
       selectionReason,
