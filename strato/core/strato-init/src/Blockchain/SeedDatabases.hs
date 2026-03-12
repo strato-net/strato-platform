@@ -18,8 +18,7 @@ import qualified Data.Text as T
 mkKafkaTopics :: (MonadLoggerIO m, HasKafka m) => m ()
 mkKafkaTopics = do
   let topics =
-        [ "statediff"
-        , "seq_vm_events"
+        [ "seq_vm_events"
         , "seq_p2p_events"
         , "unseqevents"
         , "jsonrpcresponse"

@@ -36,7 +36,6 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
-import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
@@ -98,8 +97,6 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs genesisInfo genesisBlock genesisChainId = do
-  liftIO . UEC.runKafkaMConfigured "strato-init" $ do
-    assertStateDiffTopicCreation
   kafkaEnv <- runKafkaVMEvents getKafkaEnv
   let pub sd vmes = do
         for_ sd $ \diff -> liftIO $ UEC.runKafkaMConfigured "vm-runner-bootstrap" $
