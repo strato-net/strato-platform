@@ -15,7 +15,6 @@ library
   exposed-modules:
       Blockchain.Strato.StateDiff
       Blockchain.Strato.StateDiff.Database
-      Blockchain.Strato.StateDiff.Kafka
   other-modules:
       Paths_strato_statediff
   hs-source-dirs:
@@ -37,6 +36,7 @@ library
   ghc-options: -Wall -Werror -fno-warn-orphans -fno-warn-unused-imports
   build-depends:
       base
+    , binary
     , blockapps-data
     , blockapps-datadefs
     , blockapps-mpdbs
