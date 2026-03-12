@@ -97,7 +97,11 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs genesisInfo genesisBlock genesisChainId = do
-  liftIO $ UEC.runKafkaMConfigured "vm-runner-bootstrap" $ createTopic IdxKafka.indexEventsTopicName
+  liftIO $ UEC.runKafkaMConfigured "vm-runner-bootstrap" $ do
+    createTopicAndWait IdxKafka.indexEventsTopicName
+    createTopicAndWait "vmevents"
+    createTopicAndWait "jsonrpcresponse"
+    createTopicAndWait "seq_vm_events"
   kafkaEnv <- runKafkaVMEvents getKafkaEnv
   let pub sd vmes = do
         for_ sd $ \diff -> liftIO $ UEC.runKafkaMConfigured "vm-runner-bootstrap" $

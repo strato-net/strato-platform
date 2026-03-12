@@ -45,6 +45,6 @@ initKafka :: OutputBlock -> IO ()
 initKafka shortCircuit = do
         runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do
           _ <- assertSequencerTopicsCreation
-          _ <- writeSeqVmEvents [VmBlock shortCircuit] -- todo handle the error :)
-          _ <- writeSeqP2pEvents [P2pBlock shortCircuit] -- todo handle the error :)
+          _ <- writeSeqVmEvents [VmBlock shortCircuit]
+          _ <- writeSeqP2pEvents [P2pBlock shortCircuit]
           return ()

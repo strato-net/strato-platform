@@ -10,7 +10,7 @@ where
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Strato.Indexer.Kafka (indexEventsTopicName)
-import Control.Monad.Composable.Kafka (createTopic)
+import Control.Monad.Composable.Kafka (createTopicAndWait)
 import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.Text as T
 import Database.Persist.Postgresql (withPostgresqlConn, rawExecute, runMigration)
@@ -22,7 +22,7 @@ import UnliftIO.Exception (catch, SomeException)
 
 bootstrapIndexer :: (MonadLoggerIO m, MonadUnliftIO m) => m ()
 bootstrapIndexer = do
-  UEC.runKafkaMConfigured "strato-api-indexer" $ createTopic indexEventsTopicName
+  UEC.runKafkaMConfigured "strato-api-indexer" $ createTopicAndWait indexEventsTopicName
   let ethconf = UEC.ethConf
       pgconf = EC.sqlConfig ethconf
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}

@@ -33,9 +33,9 @@ seqP2pEventsTopicName = "seq_p2p_events"
 
 assertSequencerTopicsCreation :: HasKafka m => m ()
 assertSequencerTopicsCreation = do
-  createTopic unseqEventsTopicName
-  createTopic seqVmEventsTopicName
-  createTopic seqP2pEventsTopicName
+  createTopicAndWait unseqEventsTopicName
+  createTopicAndWait seqVmEventsTopicName
+  createTopicAndWait seqP2pEventsTopicName
 
 readUnseqEvents :: HasKafka k => Offset -> k [IngestEvent]
 readUnseqEvents off = do

@@ -71,6 +71,7 @@ executables:
       - bloc2
       - blockapps-init
       - hflags
+      - kafka-monad
       - persistent-postgresql
       - process-monitor
       - postgresql-simple

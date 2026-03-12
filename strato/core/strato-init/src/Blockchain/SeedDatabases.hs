@@ -18,15 +18,10 @@ import qualified Data.Text as T
 mkKafkaTopics :: (MonadLoggerIO m, HasKafka m) => m ()
 mkKafkaTopics = do
   let topics =
-        [ "seq_vm_events"
-        , "seq_p2p_events"
-        , "unseqevents"
-        , "jsonrpcresponse"
-        , "vmevents"
-        , "solidvmevents"
+        [ "solidvmevents"
         ]
 
   $logInfoS "seed-genesis" . T.pack $ "Creating Kafka topics: " ++ show topics
-  forM_ topics $ createTopic . fromString
+  forM_ topics $ createTopicAndWait . fromString
 
   $logInfoS "seed-genesis" "Kafka topic creation complete"
