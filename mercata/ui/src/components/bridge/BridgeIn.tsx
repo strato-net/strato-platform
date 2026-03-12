@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   useAccount,
@@ -18,7 +17,6 @@ import {
   DEPOSIT_ROUTER_ABI,
   ERC20_ABI,
   PERMIT2_ADDRESS,
-  BRIDGE_IN_MODE_LABELS,
 } from "@/lib/bridge/constants";
 import {
   getTokenConfig,
@@ -39,9 +37,7 @@ import { handleAmountInputChange } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
-import { useLendingContext } from "@/context/LendingContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
-import TokenSelector from "./TokenSelector";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import {
   Select,
@@ -52,20 +48,17 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import DepositTransactionSummary from "./DepositTransactionSummary";
-import AdvancedOptionsDropdown from "./AdvancedOptionsDropdown";
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link } from "react-router-dom";
 import { ArrowDownToLine, CreditCard, CheckCircle2, Info } from "lucide-react";
 
 interface BridgeInProps {
-  isSaving?: boolean;
   guestMode?: boolean;
-  isFundPage?: boolean;
 }
 
-const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false, isFundPage = false }) => {
+const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
+  // Hooks & Context
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
@@ -74,7 +67,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { fetchUsdstBalance } = useTokenContext();
-  const { liquidityInfo } = useLendingContext();
   const {
     availableNetworks,
     bridgeableTokens,
@@ -86,9 +78,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     triggerDepositRefresh,
   } = useBridgeContext();
 
+  // State
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isRefetchingBalance, setIsRefetchingBalance] = useState(false);
   const [amountError, setAmountError] = useState("");
   const [networkError, setNetworkError] = useState("");
   const [minDepositInfo, setMinDepositInfo] = useState<{ 
@@ -101,22 +93,17 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     loading: false
   });
   const [isTokenPermitted, setIsTokenPermitted] = useState(true);
-  const [autoDeposit, setAutoDeposit] = useState(isSaving);
+  const [autoDeposit, setAutoDeposit] = useState(false);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<DepositStep>("confirm_tx");
   const [progressTxHash, setProgressTxHash] = useState<string>();
   const [progressError, setProgressError] = useState<string>();
   const [progressIsNative, setProgressIsNative] = useState(true);
 
-  const modeLabels = BRIDGE_IN_MODE_LABELS[isSaving ? "easy-savings" : "bridge"];
   const prevRouteCountRef = React.useRef<number>(1);
 
-  const currentTokens = useMemo(() => {
-    if (isFundPage) return bridgeableTokens;
-    return bridgeableTokens.filter((token) =>
-      isSaving ? !token.isDefaultRoute : token.isDefaultRoute
-    );
-  }, [bridgeableTokens, isSaving, isFundPage]);
+  // Computed values
+  const currentTokens = useMemo(() => bridgeableTokens, [bridgeableTokens]);
 
   const currentNetwork = useMemo(() => {
     return availableNetworks.find((n) => n.chainName === selectedNetwork) || null;
@@ -193,17 +180,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
   const hasValidAmount = !!amount && !amountError;
 
-  const balanceImpact = useMemo(() => {
-    try {
-      const maxAmountWei = BigInt(maxAmount || "0");
-      const decimals = parseInt(selectedToken?.externalDecimals || "18");
-      const amountWei = safeParseUnits(amount || "0", decimals);
-      const afterWei = maxAmountWei > amountWei ? maxAmountWei - amountWei : 0n;
-      return { before: maxAmountWei.toString(), after: afterWei.toString() };
-    } catch {
-      return { before: "0", after: "0" };
-    }
-  }, [maxAmount, amount, selectedToken?.externalDecimals]);
 
   const formatBalanceDisplay = useCallback(
     (valueWei: string) => {
@@ -252,6 +228,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
   const prevExternalTokenRef = React.useRef<string | null>(null);
 
+  // Effects
   useEffect(() => {
     if (!selectedNetwork && availableNetworks.length) {
       setSelectedNetwork(availableNetworks[0].chainName);
@@ -285,18 +262,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     if (selectedToken && currentNetwork) {
       fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
     }
-  }, [selectedToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedToken, currentNetwork]);
 
-  useEffect(() => {
-    setAmount("");
-    setAmountError("");
-    setMinDepositInfo({ 
-      amount: "", 
-      amountWei: 0n,
-      loading: false
-    });
-    setAutoDeposit(isSaving);
-  }, [isSaving]);
 
   useEffect(() => {
     const handleNetworkSwitch = async () => {
@@ -305,7 +272,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         return;
       }
       if (chainId !== expectedChainId) {
-        if (!isFundPage) setNetworkError(`Switching to ${selectedNetwork} network...`);
         try {
           await switchChain({ chainId: expectedChainId });
           setNetworkError("");
@@ -352,6 +318,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
     selectedNetwork,
   ]);
 
+  // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
     if (!tokenAddress || !currentNetwork) return;
     
@@ -463,9 +430,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
       const depositRouter = currentNetwork.depositRouter;
       const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
       
+      // Set initial step based on token type
       if (!isNative) {
+        // ERC20 tokens need approval
         setCurrentStep("approve");
       } else {
+        // Native tokens (ETH) go straight to confirm
         setCurrentStep("confirm_tx");
       }
       const depositAmount = safeParseUnits(
@@ -490,6 +460,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         | { signature: string; nonce: bigint; deadline: bigint }
         | undefined;
       if (!isNative) {
+        // Step: Approve Token
         setCurrentStep("approve");
         
         const approval = await checkPermit2Approval({
@@ -522,8 +493,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
           });
         }
         
+        // Move to sign_permit step after approval completes (or if already approved)
         setCurrentStep("sign_permit");
         
+        // Build permit (this involves message signing, not a transaction)
         permitData = await buildPermit({
           tokenAddress: selectedToken.externalToken,
           amount: depositAmount,
@@ -532,6 +505,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
           owner: address,
         });
         
+        // Move to confirm_tx step after permit is signed
         setCurrentStep("confirm_tx");
       }
 
@@ -547,6 +521,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         permitData,
       });
 
+      // Step: Confirm Transaction (for native tokens, this is already set above)
       if (isNative && currentStep !== "confirm_tx") {
         setCurrentStep("confirm_tx");
       }
@@ -588,6 +563,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
       setProgressTxHash(txHash);
       
+      // Step: Waiting for Transaction
       setCurrentStep("waiting_tx");
       const success = await waitForTransaction(txHash, activeChainId);
       if (!success) {
@@ -604,7 +580,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
       existing.push({
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
-        type: isSaving ? 'saving' : 'bridge',
+        type: autoDeposit ? 'saving' : 'bridge',
         DepositInfo: {
           externalSender: address,
           stratoRecipient: userAddress,
@@ -620,6 +596,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
       localStorage.setItem('pendingDeposits', JSON.stringify(existing));
       triggerDepositRefresh();
 
+      // Step: Waiting for Autosave or Complete
       if (autoDeposit) {
         setCurrentStep("waiting_autosave");
         await requestAutoSave({
@@ -628,19 +605,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         });
       }
 
+      // Step: Complete
       setCurrentStep("complete");
       setAmount("");
 
-      setIsRefetchingBalance(true);
-      const refetchBalance = () => Promise.all([
+      await Promise.all([
         isNative ? refetchNative() : refetchToken(),
         fetchUsdstBalance(),
       ]);
-      await new Promise((r) => setTimeout(r, 2000));
-      await refetchBalance();
-      setTimeout(() => {
-        refetchBalance().finally(() => setIsRefetchingBalance(false));
-      }, 5000);
     } catch (error: unknown) {
       const bridgeError = normalizeError(error);
       setCurrentStep("error");
@@ -657,17 +629,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
   };
 
   const networkNames = availableNetworks.map((n) => n.chainName).join(" or ");
-  const depositSummaryText = selectedToken && amount
-    ? `Deposit ${amount} ${selectedToken.externalSymbol} \u2192 ${amount} ${selectedToken.stratoTokenSymbol}`
-    : null;
 
   const fundTokenLabel = (token: { externalSymbol?: string; externalName?: string } | null): string => {
     if (!token) return "Select asset";
     return token.externalSymbol || token.externalName || "Select asset";
   };
   
-  if (isFundPage) {
-    return (
+  return (
       <div className="space-y-7">
         {/* STEP 1 */}
         <section className="space-y-3">
@@ -797,12 +765,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
 
             <div className="flex items-center justify-between pt-1">
               <span className="text-xs text-muted-foreground">
-                Balance:{" "}
-                {isRefetchingBalance ? (
-                  <span className="inline-block w-3 h-3 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin align-middle ml-1" />
-                ) : (
-                  <span className="text-foreground font-medium">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
-                )}
+                Balance: <span className="text-foreground font-medium">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
               </span>
               {isConnected && (
                 <div className="flex items-center gap-1">
@@ -928,7 +891,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
           currentStep={currentStep}
           txHash={progressTxHash}
           chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
-          isEasySavings={isSaving && autoDeposit}
+          isEasySavings={autoDeposit}
           isNative={progressIsNative}
           error={progressError}
           onClose={() => {
@@ -940,136 +903,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ isSaving = false, guestMode = false
         />
       </div>
     );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-foreground text-center">
-          {modeLabels.title}
-        </h3>
-        <p className="text-sm text-muted-foreground text-center">{modeLabels.description}</p>
-      </div>
-
-      <div className="w-full">
-        <BridgeWalletStatus guestMode={guestMode} />
-      </div>
-
-      <TokenSelector
-        selectedToken={selectedToken}
-        tokens={currentTokens}
-        onTokenChange={setSelectedToken}
-        direction="in"
-        disabled={guestMode || isLoading}
-      />
-
-      <div className="space-y-1.5">
-        <div className="flex justify-between items-center">
-          <Label>Amount</Label>
-          {maxAmount && (
-            <div className="flex items-center gap-3">
-              <p className="text-sm text-muted-foreground">
-                Max: {formatBalance(
-                  maxAmount,
-                  undefined,
-                  parseInt(selectedToken?.externalDecimals || "18"),
-                  2,
-                  parseInt(selectedToken?.externalDecimals || "18")
-                )}
-              </p>
-              {selectedToken && currentNetwork && (
-                <p className="text-sm text-muted-foreground">
-                  Min: {minDepositInfo.amount || "0"}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-        <Input
-          type="text"
-          inputMode="decimal"
-          pattern="[0-9]*\.?[0-9]*"
-          placeholder={isConnected ? "0.00" : "Connect wallet to enter amount"}
-          className={`w-full ${amountError ? "border-red-500 focus:ring-red-400" : ""}`}
-          value={amount}
-          onChange={(e) => handleAmountChange(e.target.value)}
-          disabled={guestMode || !isConnected || isLoading}
-        />
-        {amountError && <p className="text-sm text-red-500">{amountError}</p>}
-        
-        {isConnected && (
-          <PercentageButtons
-            value={amount}
-            maxValue={maxAmount}
-            onChange={handleAmountChange}
-            decimals={parseInt(selectedToken?.externalDecimals || "18")}
-            className="mt-2"
-            disabled={guestMode || isLoading}
-          />
-        )}
-      </div>
-
-      <DepositTransactionSummary
-        selectedToken={selectedToken}
-        amount={amount}
-        amountError={amountError}
-        balanceImpact={balanceImpact}
-        formatBalanceDisplay={formatBalanceDisplay}
-        savingRate={liquidityInfo?.supplyAPY}
-        isSaving={isSaving}
-        autoDeposit={autoDeposit}
-      />
-
-      {isSaving && (
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input 
-            type="checkbox" 
-            className="accent-blue-600" 
-            checked={autoDeposit} 
-            onChange={e => setAutoDeposit(e.target.checked)}
-            disabled={guestMode}
-          />
-          Earn saving rate by offering USDST for lending
-        </label>
-      )}
-
-      <Button
-        onClick={handleBridge}
-        disabled={isButtonDisabled}
-        className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-      >
-        {isLoading ? "Processing..." : isSaving && autoDeposit ? "Deposit and Earn" : "Deposit"}
-      </Button>
-
-      <AdvancedOptionsDropdown
-        selectedNetwork={selectedNetwork}
-        availableNetworks={availableNetworks}
-        onNetworkChange={setSelectedNetwork}
-        direction="in"
-        disabled={isLoading}
-      />
-
-      {networkError && (
-        <p className="text-sm text-red-500">{networkError}</p>
-      )}
-
-      <DepositProgressModal
-        open={progressModalOpen}
-        currentStep={currentStep}
-        txHash={progressTxHash}
-        chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
-        isEasySavings={isSaving && autoDeposit}
-        isNative={progressIsNative}
-        error={progressError}
-        onClose={() => {
-          setProgressModalOpen(false);
-          setCurrentStep("confirm_tx");
-          setProgressTxHash(undefined);
-          setProgressError(undefined);
-        }}
-      />
-    </div>
-  );
 };
 
 export default BridgeIn;
