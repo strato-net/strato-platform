@@ -523,7 +523,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
-  const { swappableTokens, pairableTokens, pairablesLoading, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory } = useSwapContext();
+  const { swappableTokens, pairableTokens, pairablesLoading, fetchPairableTokens, swap, swapMultiToken, getPoolByTokenPair, getPoolByAddress, fromAsset, toAsset, pool, setPool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory, pools } = useSwapContext();
 
   // ========================================================================
   // DERIVED STATE
@@ -563,7 +563,9 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // ========================================================================
   
   // Exchange rates (both pool and oracle)
-  const { exchangeRateRaw, exchangeRate, oracleExchangeRate, invertedExchangeRate, invertedOracleExchangeRate, isFractionalRate, isFractionalOracleRate } = calculateExchangeRates(pool, fromAsset);
+  const isMultiToken = pool ? isMultiTokenPool(pool) : false;
+
+  const { exchangeRateRaw, exchangeRate, oracleExchangeRate, invertedExchangeRate, invertedOracleExchangeRate, isFractionalRate, isFractionalOracleRate } = calculateExchangeRates(pool, fromAsset, toAsset);
 
   // Price impact calculation - use raw rate for calculations
   const priceImpact = useMemo(() => {
@@ -672,13 +674,30 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // Fetch pool immediately when both assets are selected
   useEffect(() => {
     if (fromAsset?.address && toAsset?.address) {
-      // Fetch pool immediately when both assets are selected
-      getPoolByTokenPair(fromAsset.address, toAsset.address);
+      // First try the standard 2-token pool lookup
+      getPoolByTokenPair(fromAsset.address, toAsset.address).then((result) => {
+        if (!result) {
+          // No 2-token pool found — check if both tokens are in a multi-token pool
+          const multiPool = pools.find(p =>
+            p.coins && p.coins.length > 2 &&
+            p.coins.some(c => c.address === fromAsset.address) &&
+            p.coins.some(c => c.address === toAsset.address)
+          );
+          if (multiPool) {
+            // Set the multi-token pool and update asset balances from coins
+            const fromCoin = multiPool.coins!.find(c => c.address === fromAsset.address);
+            const toCoin = multiPool.coins!.find(c => c.address === toAsset.address);
+            setPool(multiPool);
+            if (fromCoin) setFromAsset(prev => prev ? { ...prev, balance: fromCoin.balance || "0", poolBalance: fromCoin.poolBalance || "0", price: fromCoin.price || "0" } : prev);
+            if (toCoin) setToAsset(prev => prev ? { ...prev, balance: toCoin.balance || "0", poolBalance: toCoin.poolBalance || "0", price: toCoin.price || "0" } : prev);
+          }
+        }
+      });
       startPolling();
     } else {
       stopPolling();
     }
-  }, [fromAsset?.address, toAsset?.address, getPoolByTokenPair, startPolling, stopPolling]);
+  }, [fromAsset?.address, toAsset?.address, getPoolByTokenPair, startPolling, stopPolling, pools]);
 
 
 
@@ -705,22 +724,29 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
 
     if (!inputAsset?.address || !outputAsset?.address || !pool) return;
 
-    // Check if pool has liquidity
-    const inputPoolBalance = pool.tokenA?.address === inputAsset.address
-      ? pool.tokenA.poolBalance || "0"
-      : pool.tokenB?.address === inputAsset.address
-        ? pool.tokenB.poolBalance || "0"
-        : "0";
+    // For multi-token pools, check liquidity using coins array
+    if (isMultiToken) {
+      const inputCoin = pool.coins?.find(c => c.address === inputAsset.address);
+      const outputCoin = pool.coins?.find(c => c.address === outputAsset.address);
+      if (!inputCoin || !outputCoin) return;
+      if (BigInt(inputCoin.poolBalance || "0") === 0n || BigInt(outputCoin.poolBalance || "0") === 0n) return;
+    } else {
+      // Check if pool has liquidity (2-token pool)
+      const inputPoolBalance = pool.tokenA?.address === inputAsset.address
+        ? pool.tokenA.poolBalance || "0"
+        : pool.tokenB?.address === inputAsset.address
+          ? pool.tokenB.poolBalance || "0"
+          : "0";
 
-    const outputPoolBalance = pool.tokenA?.address === outputAsset.address
-      ? pool.tokenA.poolBalance || "0"
-      : pool.tokenB?.address === outputAsset.address
-        ? pool.tokenB.poolBalance || "0"
-        : "0";
+      const outputPoolBalance = pool.tokenA?.address === outputAsset.address
+        ? pool.tokenA.poolBalance || "0"
+        : pool.tokenB?.address === outputAsset.address
+          ? pool.tokenB.poolBalance || "0"
+          : "0";
 
-    // If either pool balance is 0, no liquidity available - don't clear amounts, just don't calculate
-    if (BigInt(inputPoolBalance) === 0n || BigInt(outputPoolBalance) === 0n) {
-      return;
+      if (BigInt(inputPoolBalance) === 0n || BigInt(outputPoolBalance) === 0n) {
+        return;
+      }
     }
 
     try {
@@ -730,16 +756,27 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       }
 
       const parsedValue = safeParseUnits(inputAmount);
-      const isAToB = pool.tokenA?.address === fromAsset?.address;
 
-      if (isFromInput) {
-        // Forward calculation: input -> output
-        const swapAmount = calculateSwapOutput(parsedValue.toString(), pool, isAToB);
-        handleAmountInputChange(formatUnits(swapAmount), setToAmount, setToAmountError, toAsset?.poolBalance || "0");
+      if (isMultiToken) {
+        // Multi-token pool: use oracle-based calculation
+        if (isFromInput) {
+          const swapAmount = calculateMultiTokenSwapOutput(parsedValue.toString(), pool, fromAsset!.address, toAsset!.address);
+          handleAmountInputChange(formatUnits(swapAmount), setToAmount, setToAmountError, toAsset?.poolBalance || "0");
+        } else {
+          const requiredInput = calculateMultiTokenSwapInput(parsedValue.toString(), pool, fromAsset!.address, toAsset!.address);
+          handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+        }
       } else {
-        // Reverse calculation: output -> input
-        const requiredInput = calculateSwapInput(parsedValue.toString(), pool, isAToB);
-        handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+        // Standard 2-token pool
+        const isAToB = pool.tokenA?.address === fromAsset?.address;
+
+        if (isFromInput) {
+          const swapAmount = calculateSwapOutput(parsedValue.toString(), pool, isAToB);
+          handleAmountInputChange(formatUnits(swapAmount), setToAmount, setToAmountError, toAsset?.poolBalance || "0");
+        } else {
+          const requiredInput = calculateSwapInput(parsedValue.toString(), pool, isAToB);
+          handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+        }
       }
     } catch (err) {
       // Show the exact error message
@@ -811,18 +848,27 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     if (!fromAsset || !toAsset || !pool) return;
 
     try {
-      const isAToB = pool.tokenA?.address === fromAsset.address;
-
       if (!fromAmount || isNaN(Number(fromAmount)) || toAmountMinWei === 0n) {
         throw new Error("Invalid amount values");
       }
 
-      await swap({
-        poolAddress: pool.address,
-        isAToB,
-        amountIn: safeParseUnits(fromAmount).toString(),
-        minAmountOut: toAmountMinWei.toString(),
-      });
+      if (isMultiToken) {
+        await swapMultiToken({
+          poolAddress: pool.address,
+          tokenIn: fromAsset.address,
+          tokenOut: toAsset.address,
+          amountIn: safeParseUnits(fromAmount).toString(),
+          minAmountOut: toAmountMinWei.toString(),
+        });
+      } else {
+        const isAToB = pool.tokenA?.address === fromAsset.address;
+        await swap({
+          poolAddress: pool.address,
+          isAToB,
+          amountIn: safeParseUnits(fromAmount).toString(),
+          minAmountOut: toAmountMinWei.toString(),
+        });
+      }
 
       toast({
         title: "Success",
@@ -847,7 +893,9 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         refreshLoans(),          // Refresh LendingContext
         refreshCollateral(),     // Refresh LendingContext
         // Refetch pool data to get updated balances and exchange rates
-        fromAsset?.address && toAsset?.address ? getPoolByTokenPair(fromAsset.address, toAsset.address) : Promise.resolve(),
+        isMultiToken
+          ? getPoolByAddress(pool.address).then(p => p && setPool(p))
+          : fromAsset?.address && toAsset?.address ? getPoolByTokenPair(fromAsset.address, toAsset.address) : Promise.resolve(),
       ]);
     }
   };
