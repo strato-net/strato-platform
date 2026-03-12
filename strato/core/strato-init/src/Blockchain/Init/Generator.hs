@@ -26,7 +26,8 @@ import qualified Data.Aeson as JSON
 import Data.Maybe
 import qualified Data.Yaml as YAML
 import System.FilePath ((</>))
-import System.Random (randomRIO)
+import System.Entropy (getEntropy)
+import qualified Data.ByteString as BS
 import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
@@ -151,9 +152,9 @@ makeReadOnly :: FilePath -> IO ()
 makeReadOnly = void . chmod roo
 
 generatePassword :: Int -> IO String
-generatePassword len = mapM (const randomChar) [1..len]
+generatePassword len = do
+  bytes <- getEntropy len
+  return $ map toChar (BS.unpack bytes)
   where
     chars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
-    randomChar = do
-      idx <- randomRIO (0, length chars - 1)
-      return $ chars !! idx
+    toChar b = chars !! (fromIntegral b `mod` length chars)

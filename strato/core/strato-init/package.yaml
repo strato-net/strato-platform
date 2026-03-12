@@ -46,7 +46,7 @@ library:
   - monad-alter
   - nibblestring
   - persistent-postgresql
-  - random
+  - entropy
   - raw-strings-qq
   - redis-monad
   - resourcet
