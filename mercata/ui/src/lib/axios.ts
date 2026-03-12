@@ -5,6 +5,13 @@ import { getErrorTitle } from "./errorConfig";
 import { getCsrfToken } from "./csrf";
 import { redirectToLogin } from "./auth";
 
+// Extend AxiosRequestConfig to support skipGlobalErrorToast
+declare module "axios" {
+  interface InternalAxiosRequestConfig {
+    skipGlobalErrorToast?: boolean;
+  }
+}
+
 const api = axios.create({
   baseURL: "/api",
   withCredentials: true,
@@ -165,6 +172,11 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     
+    // Skip global error toast if the request opted out (component handles errors itself)
+    if (error?.config?.skipGlobalErrorToast) {
+      return Promise.reject(error);
+    }
+
     // Show toast for all other API errors
     const errorMessage = extractApiErrorMessage(error);
     const errorTitle = getErrorTitle(url);
@@ -175,7 +187,7 @@ api.interceptors.response.use(
         : "An unexpected error occurred.",
       variant: "destructive",
     });
-    
+
     return Promise.reject(error);
   }
 );

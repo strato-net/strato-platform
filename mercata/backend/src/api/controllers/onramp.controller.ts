@@ -39,6 +39,23 @@ class OnrampController {
           });
           return;
         }
+        // Catch-all for any other StripeInvalidRequestError codes
+        console.warn(`[Onramp] Unhandled StripeInvalidRequestError code=${code}: ${error.raw?.message || error.message}`);
+        res.status(400).json({
+          success: false,
+          error: { message: "Onramp is not available. Please try again later", code: code || "stripe_error" },
+        });
+        return;
+      }
+      // Catch any other Stripe error types (StripeAPIError, StripeConnectionError, etc.)
+      if (error.type?.startsWith("Stripe")) {
+        const code = error.raw?.code || error.code || "stripe_error";
+        console.warn(`[Onramp] Stripe error type=${error.type}, code=${code}: ${error.message}`);
+        res.status(error.statusCode || 502).json({
+          success: false,
+          error: { message: "Onramp service is temporarily unavailable.", code },
+        });
+        return;
       }
       next(error);
     }

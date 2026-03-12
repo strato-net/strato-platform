@@ -58,7 +58,7 @@ const OnrampPage = () => {
         return;
       }
 
-      const { data: sessionData } = await api.post("/onramp/session");
+      const { data: sessionData } = await api.post("/onramp/session", {}, { skipGlobalErrorToast: true });
       const clientSecret = sessionData.data.clientSecret;
 
       const stripeOnramp = await loadStripeOnramp(config.stripePublishableKey);
