@@ -317,7 +317,7 @@ contract record PoolFactory is Ownable {
             for (uint j = 0; j < tokens.length; j++) {
                 if (i != j) {
                     require(tokens[i] != tokens[j], "Identical addresses");
-                    require(pools[tokens[i]][tokens[j]] == address(0), "Pool exists");
+                    // require(pools[tokens[i]][tokens[j]] == address(0), "Pool exists");
                 }
             }
         }
@@ -363,13 +363,13 @@ contract record PoolFactory is Ownable {
             for (uint j = 0; j < tokens.length; j++) {
                 if (i != j) {
                     // update pool registry
-                    pools[tokens[i]][tokens[j]] = pool;
-                    allPools.push(pool);
+                    // pools[tokens[i]][tokens[j]] = pool;
 
                     emit NewPool(tokens[i], tokens[j], pool);
                 }
             }
         }
+        allPools.push(pool);
 
         return pool;
     }
