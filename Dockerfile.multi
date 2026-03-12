@@ -44,7 +44,6 @@ COPY \
   ./usr/local/bin/strato-api-indexer \
   ./usr/local/bin/strato-p2p \
   ./usr/local/bin/strato-p2p-indexer \
-  ./usr/local/bin/seed-genesis \
   ./usr/local/bin/strato-sequencer \
   ./usr/local/bin/strato-setup \
   ./usr/local/bin/vm-runner \
