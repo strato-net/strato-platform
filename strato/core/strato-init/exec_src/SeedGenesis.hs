@@ -11,4 +11,4 @@ main = do
   _ <- $initHFlags "seed-genesis"
   runLoggingT $
     runKafkaMConfigured "seed-genesis"
-    mkDatabases
+    mkKafkaTopics
