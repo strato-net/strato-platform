@@ -31,7 +31,6 @@ library:
   - conduit
   - containers
   - cross-monitoring
-  - debugger
   - dlist
   - ethereum-rlp
 #  - ethereum-vm
@@ -68,10 +67,8 @@ executables:
       - async
       - blockapps-init
       - common-log
-      - debugger
       - hflags
       - process-monitor
-      - solid-vm-fuzzer
       - strato-model
       - vm-runner
       - vm-tools

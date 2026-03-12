@@ -62,14 +62,13 @@ import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
-import Debugger
 import Executable.EthereumVM2
 import Text.Format (format)
 
 
-ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
-ethereumVM d = runResourceT $ do
-  ctx <- initContext d
+ethereumVM :: LoggingT IO ()
+ethereumVM = runResourceT $ do
+  ctx <- initContext
   void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
 --    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
