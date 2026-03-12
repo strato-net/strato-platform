@@ -13,7 +13,8 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 
 module Blockchain.Init.Monad (
-  runSetupDBM
+  runSetupDBM,
+  runSetupDBMInDir
   ) where
 
 import BlockApps.Logging
@@ -55,8 +56,14 @@ type HasDBs m = Mod.Accessible SetupDBs m
 
 runSetupDBM :: (MonadResource m, MonadFail m) =>
                ReaderT SetupDBs m b -> m b
-runSetupDBM mv = do
-  let open path = DB.open (".ethereumH" ++ path) DB.defaultOptions {DB.createIfMissing = True, DB.cacheSize = 1024}
+runSetupDBM = runSetupDBMInDir ".ethereumH"
+
+-- | Run setup with databases in a specified directory.
+-- Useful for genesis-builder which needs its own temp database to avoid locking conflicts.
+runSetupDBMInDir :: (MonadResource m, MonadFail m) =>
+                    FilePath -> ReaderT SetupDBs m b -> m b
+runSetupDBMInDir baseDir mv = do
+  let open path = DB.open (baseDir ++ path) DB.defaultOptions {DB.createIfMissing = True, DB.cacheSize = 1024}
   sdb <- open stateDBPath
   srRef <- liftIO $ newIORef M.empty
   hdb <- HashDB <$> open hashDBPath

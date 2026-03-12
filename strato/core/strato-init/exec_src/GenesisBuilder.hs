@@ -13,7 +13,7 @@ import qualified Blockchain.Data.BlockHeader as BH
 import Blockchain.Data.GenesisBlock (genesisInfoToGenesisBlock)
 import Blockchain.Data.GenesisInfo
 import Blockchain.GenesisBlocks.Builder
-import Blockchain.Init.Monad (runSetupDBM)
+import Blockchain.Init.Monad (runSetupDBMInDir)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Validator
 import Conduit (runResourceT)
@@ -138,8 +138,9 @@ main = do
 
   let gi' = buildGenesisInfo optFaucets optValidators optAdmins def
 
-  -- Compute the correct stateRoot by populating the MPT
-  computedStateRoot <- runStdoutLoggingT $ runResourceT $ runSetupDBM $ do
+  -- Compute the correct stateRoot by populating the MPT in a temp directory
+  -- (avoids locking conflicts with running strato processes)
+  computedStateRoot <- runStdoutLoggingT $ runResourceT $ runSetupDBMInDir "/tmp/genesis-builder-db" $ do
     void $ addCode mempty
     genesisBlock <- genesisInfoToGenesisBlock gi'
     return $ BH.stateRoot $ blockBlockData genesisBlock
