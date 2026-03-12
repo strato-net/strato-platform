@@ -417,6 +417,7 @@ export const getTokenStats = async (
       cirrus.get(accessToken, `/${Token}`, {
         params: {
           select: "address,_name,_symbol,_totalSupply::text",
+          status: `eq.2`,
           _totalSupply: `gt.0`
         }
       }),
