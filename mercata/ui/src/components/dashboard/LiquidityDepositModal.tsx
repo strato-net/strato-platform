@@ -581,6 +581,7 @@ const LiquidityDepositModal = ({
               </div>
             </>
           ) : (
+          <>
           <div className="grid grid-cols-1 gap-4">
             {/* First Token */}
             <div className={`rounded-lg border p-2 transition-colors ${
@@ -912,6 +913,7 @@ const LiquidityDepositModal = ({
               )}
             </Button>
           </div>
+          </>
           )}
         </form>
       </DialogContent>
