@@ -40,6 +40,7 @@ import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
 import SolidVM.Model.Storable
+import System.Directory (createDirectoryIfMissing)
 
 data SetupDBs = SetupDBs
   { stateDB :: StateDB,
@@ -63,6 +64,7 @@ runSetupDBM = runSetupDBMInDir ".ethereumH"
 runSetupDBMInDir :: (MonadResource m, MonadFail m) =>
                     FilePath -> ReaderT SetupDBs m b -> m b
 runSetupDBMInDir baseDir mv = do
+  liftIO $ createDirectoryIfMissing True baseDir
   let open path = DB.open (baseDir ++ path) DB.defaultOptions {DB.createIfMissing = True, DB.cacheSize = 1024}
   sdb <- open stateDBPath
   srRef <- liftIO $ newIORef M.empty
