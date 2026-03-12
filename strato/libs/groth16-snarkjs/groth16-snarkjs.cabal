@@ -1,0 +1,34 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           groth16-snarkjs
+version:        0.1.0
+synopsis:       Groth16 prover wrapper for snarkjs CLI
+description:    Wrapper for snarkjs (Node.js) Groth16 proof generation.
+                Handles witness calculation and proof generation via CLI calls.
+author:         BlockApps
+maintainer:     info@blockapps.net
+license:        AllRightsReserved
+build-type:     Simple
+
+library
+  exposed-modules:
+      Groth16.Snarkjs
+  other-modules:
+      Paths_groth16_snarkjs
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Werror
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , filepath
+    , process
+    , temporary
+    , text
+    , vector
+  default-language: Haskell2010
