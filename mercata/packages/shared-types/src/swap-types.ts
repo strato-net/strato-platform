@@ -146,6 +146,10 @@ export interface Pool {
   isStable: boolean;
   isPaused: boolean;
   isDisabled: boolean;
+  userTotalDepositedUsd?: string; // All-time liquidity adds in USD (18 decimals)
+  userTotalWithdrawnUsd?: string; // All-time liquidity removals in USD (18 decimals)
+  userNetInvestedUsd?: string; // Deposits - withdrawals in USD (18 decimals)
+  userAllTimeEarningsUsd?: string; // Current value - net invested in USD (18 decimals)
 }
 
 /**

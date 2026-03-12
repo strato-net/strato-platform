@@ -449,9 +449,7 @@ const Earn = () => {
                   const lpBalance = safeBigInt(pool.lpToken?.totalBalance);
                   const lpPrice = safeBigInt(pool.lpToken?.price);
                   const depositedUsd = lpPrice > BigInt(0) ? (lpBalance * lpPrice) / WAD : BigInt(0);
-                  const poolEarningsWei = lpPrice > 0n
-                    ? (lpBalance * (lpPrice - WAD)) / WAD
-                    : 0n;
+                  const poolEarningsWei = safeBigInt((pool as any).userAllTimeEarningsUsd);
                   const poolEarningsLabel = formatSignedUsdFromWei(poolEarningsWei);
                   const poolEarningsClass = poolEarningsWei >= 0n
                     ? "text-green-600 dark:text-green-400"

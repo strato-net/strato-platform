@@ -17,7 +17,8 @@ import {
   buildTokenApprovalTx,
   getTradingVolume24hForPools,
   getTokenBalance,
-  stakeNewLPTokens
+  stakeNewLPTokens,
+  getUserPoolLiquidityFlowTotals
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
 import { getPools as getRewardsChefPools } from "./rewardsChef.service";
@@ -83,6 +84,7 @@ export const getPools = async (
 
   // Fetch staked balances from RewardsChef if userAddress is provided
   let stakedBalanceMap: Map<string, string> | undefined;
+  let userLiquidityFlowTotals: Map<string, { totalDepositedUsd: bigint; totalWithdrawnUsd: bigint }> | undefined;
   if (userAddress) {
     // Get all RewardsChef pools
     const rewardsChefPools = await getRewardsChefPools(accessToken, config.rewardsChef);
@@ -109,9 +111,56 @@ export const getPools = async (
         }
       })
     );
+
+    userLiquidityFlowTotals = await getUserPoolLiquidityFlowTotals(
+      accessToken,
+      validatedPools,
+      userAddress,
+      priceMap
+    );
   }
 
-  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress, stakedBalanceMap);
+  const poolList = buildPoolList(
+    validatedPools,
+    priceMap,
+    volumeMap,
+    validatedFactory,
+    userAddress,
+    stakedBalanceMap
+  );
+
+  if (!userAddress) {
+    return poolList;
+  }
+
+  return poolList.map((pool) => {
+    const flow = userLiquidityFlowTotals?.get(pool.address.toLowerCase()) || {
+      totalDepositedUsd: 0n,
+      totalWithdrawnUsd: 0n,
+    };
+    const netInvestedUsd = flow.totalDepositedUsd - flow.totalWithdrawnUsd;
+
+    let currentValueUsd = 0n;
+    try {
+      const totalBalance = BigInt(pool.lpToken?.totalBalance || "0");
+      const lpPrice = BigInt(pool.lpToken?.price || "0");
+      if (totalBalance > 0n && lpPrice > 0n) {
+        currentValueUsd = (totalBalance * lpPrice) / (10n ** 18n);
+      }
+    } catch {
+      currentValueUsd = 0n;
+    }
+
+    const userAllTimeEarningsUsd = currentValueUsd - netInvestedUsd;
+
+    return {
+      ...pool,
+      userTotalDepositedUsd: flow.totalDepositedUsd.toString(),
+      userTotalWithdrawnUsd: flow.totalWithdrawnUsd.toString(),
+      userNetInvestedUsd: netInvestedUsd.toString(),
+      userAllTimeEarningsUsd: userAllTimeEarningsUsd.toString(),
+    };
+  });
 };
 
 // --- Token Queries ---
