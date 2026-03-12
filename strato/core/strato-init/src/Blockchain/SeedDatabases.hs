@@ -22,7 +22,6 @@ mkKafkaTopics = do
         , "seq_p2p_events"
         , "unseqevents"
         , "jsonrpcresponse"
-        , "indexevents"
         , "vmevents"
         , "solidvmevents"
         ]
