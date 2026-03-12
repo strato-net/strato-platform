@@ -1,0 +1,55 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           groth16-native
+version:        0.1.0
+synopsis:       Native Haskell Groth16 prover for BN254 curve
+description:    Pure Haskell implementation of Groth16 zero-knowledge proof generation
+                for the BN254 (alt_bn128) curve. Parses snarkjs/circom format files.
+                .
+                EXPERIMENTAL: May produce invalid proofs - use for development/testing only.
+author:         BlockApps
+maintainer:     info@blockapps.net
+license:        AllRightsReserved
+build-type:     Simple
+
+library
+  exposed-modules:
+      Groth16.BN254
+  other-modules:
+      Paths_groth16_native
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Werror -O2
+  build-depends:
+      aeson
+    , base
+    , binary
+    , bytestring
+    , deepseq
+    , elliptic-curve
+    , galois-field
+    , groups
+    , pairing
+    , parallel
+    , random
+    , text
+    , vector
+  default-language: Haskell2010
+
+executable bench-groth16-native
+  main-is: Main.hs
+  other-modules:
+      Paths_groth16_native
+  hs-source-dirs:
+      bench
+  ghc-options: -Wall -Werror -O2 -threaded -rtsopts -with-rtsopts=-N -O2
+  build-depends:
+      base
+    , groth16-native
+    , text
+    , time
+  default-language: Haskell2010

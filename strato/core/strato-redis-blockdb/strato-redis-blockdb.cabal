@@ -1,0 +1,40 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-redis-blockdb
+version:        0.1.0.0
+description:    Functions to operate against the Redis-backed BlockDB
+author:         BlockApps
+maintainer:     blockapps
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Strato.RedisBlockDB
+      Blockchain.Strato.RedisBlockDB.Models
+      Blockchain.Strato.RedisBlockDB.Test.Chain
+  other-modules:
+      Paths_strato_redis_blockdb
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Werror -O2
+  build-depends:
+      QuickCheck
+    , base
+    , base16-bytestring
+    , binary
+    , blockapps-data
+    , bytestring
+    , containers
+    , ethereum-rlp
+    , format
+    , hedis
+    , monad-alter
+    , mtl
+    , strato-conf
+    , strato-model
+  default-language: Haskell2010

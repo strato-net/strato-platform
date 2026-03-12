@@ -1,0 +1,192 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockapps-vault-wrapper-server
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/server#readme>
+homepage:       https://github.com/githubuser/vault-wrapper#readme
+bug-reports:    https://github.com/githubuser/vault-wrapper/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2018 Author name here
+license:        Apache-2.0
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/vault-wrapper
+
+library
+  exposed-modules:
+      Strato.Strato23.Database.Create
+      Strato.Strato23.Database.Migrations
+      Strato.Strato23.Database.Queries
+      Strato.Strato23.Database.Tables
+      Strato.Strato23.Monad
+      Strato.Strato23.Server
+      Strato.Strato23.Server.Key
+      Strato.Strato23.Server.Password
+      Strato.Strato23.Server.Ping
+      Strato.Strato23.Server.Signature
+      Strato.Strato23.Server.User
+      Strato.Strato23.Server.Utils
+  other-modules:
+      Paths_blockapps_vault_wrapper_server
+  hs-source-dirs:
+      src
+  build-depends:
+      base
+    , blockapps-vault-wrapper-api
+    , bytestring
+    , cache
+    , common-log
+    , cryptonite
+    , http-client
+    , lens
+    , mtl
+    , opaleye
+    , openapi3
+    , postgresql-simple
+    , product-profunctors
+    , profunctors
+    , resource-pool
+    , saltine
+    , servant-openapi3
+    , servant-server
+    , strato-model
+    , text
+    , transformers
+    , unliftio
+  default-language: Haskell2010
+
+executable blockapps-vault-wrapper-server
+  main-is: Main.hs
+  other-modules:
+      Options
+  hs-source-dirs:
+      app
+  ghc-options: -threaded
+  build-depends:
+      base
+    , blockapps-init
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-server
+    , cache
+    , clock
+    , common-log
+    , hflags
+    , http-client
+    , postgresql-simple
+    , resource-pool
+    , servant-options
+    , servant-server
+    , wai-cors
+    , wai-extra
+    , wai-middleware-prometheus
+    , warp
+  default-language: Haskell2010
+
+executable migrate-keys
+  main-is: MigrateKeys.hs
+  other-modules:
+      Options
+  hs-source-dirs:
+      app
+  build-depends:
+      base
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-server
+    , bytestring
+    , csv
+    , hflags
+    , lens
+    , opaleye
+    , postgresql-simple
+    , text
+  default-language: Haskell2010
+
+executable migrate-mercata
+  main-is: MigrateMercata.hs
+  other-modules:
+      Options
+  hs-source-dirs:
+      app
+  build-depends:
+      base
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-server
+    , bytestring
+    , hflags
+    , lens
+    , opaleye
+    , postgresql-simple
+    , saltine
+    , strato-model
+    , text
+  default-language: Haskell2010
+
+executable migrate-nodekey
+  main-is: MigrateNodeKey.hs
+  other-modules:
+      Options
+  hs-source-dirs:
+      app
+  build-depends:
+      base
+    , base64-bytestring
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-server
+    , bytestring
+    , hflags
+    , opaleye
+    , postgresql-simple
+    , saltine
+    , strato-model
+    , text
+  default-language: Haskell2010
+
+executable migrate-salt
+  main-is: MigrateSalt.hs
+  other-modules:
+      Options
+  hs-source-dirs:
+      app
+  build-depends:
+      base
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-server
+    , bytestring
+    , hflags
+    , lens
+    , opaleye
+    , postgresql-simple
+    , saltine
+    , strato-model
+    , text
+  default-language: Haskell2010
+
+test-suite vault-wrapper-spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_blockapps_vault_wrapper_server
+  hs-source-dirs:
+      test/
+  build-depends:
+      base
+    , blockapps-data
+    , blockapps-secp256k1-haskell
+    , bytestring
+    , clockwork
+    , cryptonite
+    , ethereum-rlp
+    , hspec
+    , labeled-error
+    , strato-model
+  default-language: Haskell2010
