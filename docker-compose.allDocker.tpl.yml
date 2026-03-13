@@ -138,9 +138,6 @@ services:
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - connectionTimeout=${connectionTimeout}
-    - debugPort=${debugPort}
-    - debugWSHost=${debugWSHost}
-    - debugWSPort=${debugWSPort}
     - validatorBehavior=${validatorBehavior:-true}
     - evmDebugMode=${evmDebugMode}
     - FILE_SERVER_URL=${FILE_SERVER_URL}
@@ -192,7 +189,6 @@ services:
     - useCustomGenesis=${useCustomGenesis}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
-    - VM_DEBUGGER=${VM_DEBUGGER}
     - VM_DEBUG_LOG=${VM_DEBUG_LOG:-false}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - zkHost=zookeeper
@@ -260,8 +256,6 @@ services:
     environment:
     - APEX_HOST=${APEX_HOST}
     - blockTime=${blockTime}
-    - debugPort=${debugPort}
-    - debugWSPort=${debugWSPort}
     - DOCS_HOST=${DOCS_HOST}
     - NGINX_TRUST_PROXY_CIDRS=${NGINX_TRUST_PROXY_CIDRS}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
@@ -283,7 +277,6 @@ services:
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - VAULT_URL=${VAULT_URL}
-    - VM_DEBUGGER=${VM_DEBUGGER}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:

@@ -10,10 +10,6 @@ sslCertFileType=${sslCertFileType:-pem}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-VM_DEBUGGER=${VM_DEBUGGER:-false}
-debugPort=${debugPort:-8051}
-debugWSHost=${debugWSHost:-strato}
-debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
 SMD_DEV_MODE=${SMD_DEV_MODE:-false}
 SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
@@ -52,12 +48,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate nginx.conf from template according to configuration provided
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
-
-  if [ "$VM_DEBUGGER" != true ]; then
-    sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
-  fi
-  sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
-  sed -i 's/<WS_DEBUG_PORT_PLACEHOLDER>/'"$debugWSPort"'/g' /tmp/nginx.conf
 
   # This is used to remove lines from the nginx.conf
   # without having to put the entire replacement string in this file
