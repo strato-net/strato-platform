@@ -233,7 +233,7 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
   const [{ data: mappings = [] }, { data: [pool] = [] }, prices, { data: [rateEvt] = [] }] = await Promise.all([
     constants.metalForge
       ? cirrus.get(accessToken, "/mapping", {
-          params: { select: "collection_name,key,value::text", collection_name: "in.(metalConfigs,payTokenConfigs)", address: `eq.${constants.metalForge}` }
+          params: { select: "collection_name,key,value::text", collection_name: "in.(metalConfigs,isSupportedPayToken)", address: `eq.${constants.metalForge}` }
         })
       : Promise.resolve({ data: [] }),
     cirrus.get(accessToken, `/${LendingRegistry}`, {
@@ -246,7 +246,7 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
   ]);
 
   const metals = mappings.filter((r: any) => r.collection_name === "metalConfigs").map((r: any) => ({ addr: key(r), ...val(r) })).filter((m: any) => m.isEnabled === true);
-  const payTokens = mappings.filter((r: any) => r.collection_name === "payTokenConfigs").map((r: any) => ({ addr: key(r), ...val(r) })).filter((p: any) => p.isEnabled === true);
+  const payTokens = mappings.filter((r: any) => r.collection_name === "isSupportedPayToken").filter((r: any) => r.value === true || r.value === "true").map((r: any) => ({ addr: key(r) }));
   const { borrowableAsset, mToken } = pool?.lendingPool || {};
   if (mToken) prices.set(mToken, rateEvt?.newRate || (10n ** 18n).toString());
 
