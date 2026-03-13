@@ -7,7 +7,6 @@ import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getBridgeableTokens } from "./bridge.service";
 import { getTokenDetails } from "../helpers/cirrusHelpers";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher, CollateralVault } = constants;
@@ -408,27 +407,18 @@ export const getVoucherBalance = async (
 /**
  * Get all tokens with their total supply for stats
  * Includes price data for market cap calculation
- * Only returns route token addresses + USDST, GOLDST, SILVST
+ * Returns all tokens that have an oracle price
  */
 export const getTokenStats = async (
   accessToken: string
 ): Promise<{ tokens: any[], totalMarketCap: string }> => {
   try {
-    const bridgeRoutes = await getBridgeableTokens(accessToken);
-    
-    // Create a set of allowed token addresses
-    const allowedTokens = new Set<string>();
-    
-    // Add all route token addresses
-    for (const route of bridgeRoutes) {
-      if (route.stratoToken) allowedTokens.add(route.stratoToken);
-    }
-
-    // Fetch all tokens with total supply
     const [tokensResponse, priceData] = await Promise.all([
       cirrus.get(accessToken, `/${Token}`, {
         params: {
-          select: "address,_name,_symbol,_totalSupply::text"
+          select: "address,_name,_symbol,_totalSupply::text",
+          status: `eq.2`,
+          _totalSupply: `gt.0`
         }
       }),
       getOraclePrices(accessToken)
@@ -443,18 +433,9 @@ export const getTokenStats = async (
     }
 
     const tokens = tokensResponse.data || [];
-    
-    // Filter tokens to only include:
-    // 1. Route tokens (already in allowedTokens set)
-    // 2. USDST, GOLDST, SILVST by address
-    const filteredTokens = tokens.filter((token: any) => {
-      const address = token.address;
-      return allowedTokens.has(token.address) || 
-             address === '937efa7e3a77e20bbdbd7c0d32b6514f368c1010' || // USDST
-             address === 'cdc93d30182125e05eec985b631c7c61b3f63ff0' || // GOLDST
-             address === '2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94' // SILVST
-    });
-    // Map prices to tokens and calculate market cap
+
+    const filteredTokens = tokens.filter((token: any) => priceData.has(token.address));
+
     const tokensWithMarketCap = filteredTokens.map((token: any) => {
       const price = BigInt(priceData.get(token.address) || "0");
       const totalSupply = BigInt(token._totalSupply || "0");

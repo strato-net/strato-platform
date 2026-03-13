@@ -19,7 +19,6 @@ library
       BlockApps.Tools.Checkpoints
       BlockApps.Tools.Code
       BlockApps.Tools.DumpKafkaSequencer
-      BlockApps.Tools.DumpKafkaStateDiff
       BlockApps.Tools.DumpKafkaUnSequencer
       BlockApps.Tools.DumpKafkaVMEvents
       BlockApps.Tools.DumpLevelDB

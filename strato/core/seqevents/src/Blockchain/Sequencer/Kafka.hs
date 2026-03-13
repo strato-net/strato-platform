@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Sequencer.Kafka
@@ -15,7 +16,6 @@ module Blockchain.Sequencer.Kafka
 where
 
 import qualified Blockchain.Blockstanbul as PBFT
-import Blockchain.KafkaTopics (lookupTopic)
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka.Metrics
 import Control.Monad.Change.Modify (Outputs (..))
@@ -23,19 +23,19 @@ import Control.Monad.Composable.Kafka
 import Data.Binary (Binary)
 
 unseqEventsTopicName :: TopicName
-unseqEventsTopicName = lookupTopic "unseqevents"
+unseqEventsTopicName = "unseqevents"
 
 seqVmEventsTopicName :: TopicName
-seqVmEventsTopicName = lookupTopic "seq_vm_events"
+seqVmEventsTopicName = "seq_vm_events"
 
 seqP2pEventsTopicName :: TopicName
-seqP2pEventsTopicName = lookupTopic "seq_p2p_events"
+seqP2pEventsTopicName = "seq_p2p_events"
 
 assertSequencerTopicsCreation :: HasKafka m => m ()
 assertSequencerTopicsCreation = do
-  createTopic unseqEventsTopicName
-  createTopic seqVmEventsTopicName
-  createTopic seqP2pEventsTopicName
+  createTopicAndWait unseqEventsTopicName
+  createTopicAndWait seqVmEventsTopicName
+  createTopicAndWait seqP2pEventsTopicName
 
 readUnseqEvents :: HasKafka k => Offset -> k [IngestEvent]
 readUnseqEvents off = do

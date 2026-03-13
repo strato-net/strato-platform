@@ -108,9 +108,11 @@ executable strato-p2p
     , common-log
     , ethereum-discovery
     , hflags
+    , kafka-monad
     , lifted-async
     , ordered-containers
     , process-monitor
+    , seqevents
     , strato-conf
     , strato-model
     , strato-p2p
