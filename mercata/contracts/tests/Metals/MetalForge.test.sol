@@ -490,14 +490,13 @@ contract Describe_MetalForge is Authorizable {
     }
 
     function it_forge_reverts_when_fee_bps_exceeds_10000() {
-        forge.setFeeBps(goldAddr, 10001);
         bool reverted = false;
-        try {
-            buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, 1000e18, 0);
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Should revert: feeAmount > payAmount causes underflow");
+        try { forge.setFeeBps(goldAddr, 10001); } catch { reverted = true; }
+        require(reverted, "setFeeBps should revert when feeBps > 10000");
+
+        reverted = false;
+        try { forge.setMetalConfig(goldAddr, true, GOLD_CAP, 10001); } catch { reverted = true; }
+        require(reverted, "setMetalConfig should revert when feeBps > 10000");
     }
 
     // ============================================================

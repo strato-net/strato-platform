@@ -3,8 +3,6 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../Lending/PriceOracle.sol";
 import "../Tokens/Token.sol";
 import "../Admin/FeeCollector.sol";
-// TODO at the end: add reentrancy protection
-
 contract record MetalForge is Ownable {
 
     PriceOracle public oracle;
@@ -155,13 +153,13 @@ contract record MetalForge is Ownable {
         usdst = Token(_usdst);
         emit UsdstUpdated(_usdst);
     }
-
     function setMetalConfig(
         address _metalToken,
         bool _isEnabled,
         uint _mintCap,
         uint _feeBps
     ) external onlyOwner {
+        require(_feeBps <= 10000, "MetalForge: feeBps exceeds 10,000");
         metalConfigs[_metalToken].isEnabled = _isEnabled;
         metalConfigs[_metalToken].mintCap = _mintCap;
         metalConfigs[_metalToken].feeBps = _feeBps;
@@ -179,6 +177,7 @@ contract record MetalForge is Ownable {
     }
 
     function setFeeBps(address _metalToken, uint _feeBps) external onlyOwner {
+        require(_feeBps <= 10000, "MetalForge: feeBps exceeds 10,000");
         metalConfigs[_metalToken].feeBps = _feeBps;
         emit FeeBpsUpdated(_metalToken, _feeBps);
     }
