@@ -552,6 +552,9 @@ const Borrow = () => {
       });
 
     if (autoAllocate) {
+      if (requestedBorrowWei <= 0n) {
+        return [...existingLendingRows, ...existingCdpVaultRows];
+      }
       if (isLoggedIn && requestedBorrowWei > 0n && routePreviewLoading && !routePreviewData) {
         return [...existingLendingRows, ...existingCdpVaultRows];
       }
@@ -721,10 +724,19 @@ const Borrow = () => {
       setRoutePreviewLoading(false);
       return;
     }
+    if (requestedBorrowWei <= 0n) {
+      if (previewDebounceRef.current) {
+        clearTimeout(previewDebounceRef.current);
+        previewDebounceRef.current = null;
+      }
+      setRoutePreviewData(null);
+      setRoutePreviewLoading(false);
+      return;
+    }
 
     let cancelled = false;
     const fetchRoutePreview = async () => {
-      try {
+      try {442 
         setRoutePreviewLoading(true);
         const res = await api.post<RoutePreviewApiResponse>("/borrow-router/preview", {
           amount: requestedBorrowWei.toString(),
