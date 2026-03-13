@@ -76,7 +76,10 @@ export const ERC20_ABI = [
 export const DEPOSIT_ROUTER_ABI = [
   // Functions
   {
-    inputs: [{ name: 'stratoAddress', type: 'address' }],
+    inputs: [
+      { name: 'stratoAddress', type: 'address' },
+      { name: 'targetStratoToken', type: 'address' }
+    ],
     name: 'depositETH',
     outputs: [],
     stateMutability: 'payable',
@@ -87,6 +90,7 @@ export const DEPOSIT_ROUTER_ABI = [
       { name: 'token', type: 'address' },
       { name: 'amount', type: 'uint256' },
       { name: 'stratoAddress', type: 'address' },
+      { name: 'targetStratoToken', type: 'address' },
       { name: 'nonce', type: 'uint256' },
       { name: 'deadline', type: 'uint256' },
       { name: 'signature', type: 'bytes' }
@@ -99,7 +103,8 @@ export const DEPOSIT_ROUTER_ABI = [
   {
     inputs: [
       { name: 'token', type: 'address' },
-      { name: 'amount', type: 'uint256' }
+      { name: 'amount', type: 'uint256' },
+      { name: 'targetStratoToken', type: 'address' }
     ],
     name: 'canDeposit',
     outputs: [{ name: '', type: 'bool' }],
@@ -183,6 +188,7 @@ export const SUPPORTED_CHAINS = {
   OPTIMISM: 10,
   BASE: 8453,
   BASE_SEPOLIA: 84532,
+  LINEA: 59144,
   ARBITRUM: 42161,
   ARBITRUM_NOVA: 42170,
   BSC: 56,
@@ -227,6 +233,7 @@ async function loadBuiltInChain(id: number): Promise<Chain | null> {
       case SUPPORTED_CHAINS.OPTIMISM:      return chains.optimism;
       case SUPPORTED_CHAINS.BASE:          return chains.base;
       case SUPPORTED_CHAINS.BASE_SEPOLIA:  return chains.baseSepolia;
+      case SUPPORTED_CHAINS.LINEA:         return chains.linea;
       case SUPPORTED_CHAINS.ARBITRUM:      return chains.arbitrum;
       case SUPPORTED_CHAINS.ARBITRUM_NOVA: return chains.arbitrumNova;
       case SUPPORTED_CHAINS.BSC:           return chains.bsc;

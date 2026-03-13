@@ -13,8 +13,6 @@ where
 
 import Blockchain.Data.TransactionResult
 import Blockchain.EthConf
-import Blockchain.KafkaTopics
-
 import Blockchain.Stream.Action (Action)
 import Conduit
 import Control.Monad.Composable.Kafka
@@ -51,10 +49,10 @@ produceVMEvents :: MonadIO m => [VMEvent] -> m [ProduceResponse]
 produceVMEvents = runKafkaVMEvents . produceVMEvents'
 
 produceVMEvents' :: HasKafka k => [VMEvent] -> k [ProduceResponse]
-produceVMEvents' = produceItems (lookupTopic "vmevents")
+produceVMEvents' = produceItems "vmevents"
 
 runKafkaVMEvents :: MonadIO m => KafkaM m a -> m a
 runKafkaVMEvents = runKafkaMConfigured "blockapps-data"
 
 fetchVMEvents :: HasKafka k => Offset -> k [VMEvent]
-fetchVMEvents = fetchItems $ lookupTopic "vmevents"
+fetchVMEvents = fetchItems "vmevents"

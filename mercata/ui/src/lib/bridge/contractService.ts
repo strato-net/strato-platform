@@ -140,11 +140,13 @@ export async function validateRouterContract({
     amount, 
     decimals, 
     chainId,
-    tokenAddress
+    tokenAddress,
+    targetStratoToken
   }: ValidationParams): Promise<ContractValidationResult> {
     try {
     const client = await getClient(chainId);
     const normalizedTokenAddress = formatAddress(tokenAddress);
+    const normalizedTargetStratoToken = formatAddress(targetStratoToken);
       const depositAmount = safeParseUnits(amount, parseInt(decimals) || 18);
       
       const config = await client.readContract({
@@ -160,7 +162,7 @@ export async function validateRouterContract({
       address: formatAddress(depositRouterAddress),
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "canDeposit",
-        args: [normalizedTokenAddress, depositAmount]
+        args: [normalizedTokenAddress, depositAmount, normalizedTargetStratoToken]
       });
 
       const tokenType = normalizedTokenAddress === NATIVE_TOKEN_ADDRESS ? "ETH" : "ERC20";
@@ -229,6 +231,7 @@ export async function simulateDeposit({
   tokenAddress,
   amount,
   userAddress,
+  targetStratoToken,
     account,
   chainId,
   permitData
@@ -238,6 +241,7 @@ export async function simulateDeposit({
   tokenAddress?: string;
   amount: bigint;
   userAddress: string;
+  targetStratoToken: string;
     account: string;
     chainId: string;
   permitData?: { nonce: bigint; deadline: bigint; signature: string };
@@ -251,7 +255,7 @@ export async function simulateDeposit({
       address: routerAddress,
       abi: DEPOSIT_ROUTER_ABI,
       functionName: "depositETH",
-      args: [formatAddress(userAddress)],
+      args: [formatAddress(userAddress), formatAddress(targetStratoToken)],
       value: amount,
       account: accountAddress,
     });
@@ -267,6 +271,7 @@ export async function simulateDeposit({
         formatAddress(tokenAddress),
         amount,
         formatAddress(userAddress),
+        formatAddress(targetStratoToken),
         permitData.nonce,
         permitData.deadline,
         permitData.signature as `0x${string}`

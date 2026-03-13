@@ -94,6 +94,8 @@ const GUEST_SAFE_URLS = [
   '/lending/liquidity/public',
   // Advanced page - Swap tab
   '/swap-pools',
+  // Metal Forge page
+  '/metal-forge/configs',
   // Advanced page - Safety tab
   '/lending/safety/info',
   '/lending/safety/info/public',

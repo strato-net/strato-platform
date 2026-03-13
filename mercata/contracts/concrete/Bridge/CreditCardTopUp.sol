@@ -14,10 +14,17 @@ struct IAssetInfo {
 
 abstract contract IMercataBridge is Ownable {
     mapping(address => mapping(uint256 => IAssetInfo)) public record assets;
+    function USDST_ADDRESS() external view returns (address);
 
     function requestWithdrawal(
-        uint256 externalChainId, address externalRecipient, address externalToken, uint256 stratoTokenAmount
+        uint256 externalChainId,
+        address externalRecipient,
+        address externalToken,
+        address stratoToken,
+        uint256 stratoTokenAmount
     ) external returns (uint256);
+
+    function abortWithdrawal(uint256 id) public;
 }
 
 /**
@@ -57,6 +64,7 @@ contract record CreditCardTopUp is Ownable {
     error TransferFailed();
     error ApproveFailed();
     error AssetNotFound();
+    error RouteNotEnabled();
     error IndexOutOfBounds();
 
     constructor(address _owner) Ownable(_owner) {}
@@ -81,7 +89,7 @@ contract record CreditCardTopUp is Ownable {
      * @param stratoTokenAmount Amount of STRATO token (e.g. USDST) to bridge out
      * @param externalChainId Destination chain id
      * @param externalRecipient Card wallet address on the destination chain
-     * @param externalToken External token address on the destination chain (used to look up stratoToken and asset config on MercataBridge)
+     * @param externalToken External token address on the destination chain (used to look up route config on MercataBridge)
      */
     function topUpCard(
         address user,
@@ -98,13 +106,16 @@ contract record CreditCardTopUp is Ownable {
         require(externalToken != address(0), "CCTU: zero external token");
 
         IMercataBridge bridge = IMercataBridge(mercataBridge);
-        (,,,,,,, address stratoToken) = bridge.assets(externalToken, externalChainId);
+        (,,,,, address configuredExternalToken,,) = bridge.assets(externalToken, externalChainId);
+        if (configuredExternalToken == address(0)) revert AssetNotFound();
+
+        address stratoToken = bridge.USDST_ADDRESS();
         if (stratoToken == address(0)) revert AssetNotFound();
 
         if (!IERC20(stratoToken).transferFrom(user, address(this), stratoTokenAmount)) revert TransferFailed();
         if (!IERC20(stratoToken).approve(mercataBridge, stratoTokenAmount)) revert ApproveFailed();
 
-        withdrawalId = bridge.requestWithdrawal(externalChainId, externalRecipient, externalToken, stratoTokenAmount);
+        withdrawalId = bridge.requestWithdrawal(externalChainId, externalRecipient, externalToken, stratoToken, stratoTokenAmount);
         _updateLastTopUpTimestamp(user, externalChainId, externalRecipient, externalToken);
         emit TopUpRequested(user, stratoTokenAmount, externalChainId, externalRecipient, withdrawalId);
         return withdrawalId;
@@ -211,5 +222,13 @@ contract record CreditCardTopUp is Ownable {
      */
     function getCards(address user) external view returns (CardInfo[] memory) {
         return userCards[user];
+    }
+
+    function refund(address _token, address _recipient, uint _amount) external onlyOwner {
+        IERC20(_token).transfer(_recipient, _amount);
+    }
+
+    function abortWithdrawal(uint _id) external onlyOwner {
+        IMercataBridge(mercataBridge).abortWithdrawal(_id);
     }
 }

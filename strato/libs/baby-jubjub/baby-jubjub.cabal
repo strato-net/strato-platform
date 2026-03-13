@@ -1,0 +1,74 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           baby-jubjub
+version:        0.1.0.0
+synopsis:       Baby JubJub elliptic curve and EdDSA signatures for SNARK circuits
+description:    Implementation of the Baby JubJub twisted Edwards curve and EdDSA signature
+                scheme, compatible with circom/snarkjs. Baby JubJub is defined over the
+                BN254 scalar field and is commonly used in zkSNARK applications.
+                .
+                This library is intended for generating valid SNARK witness inputs.
+                It has not been audited for use cases requiring timing-attack resistance.
+category:       Cryptography
+author:         BlockApps
+maintainer:     info@blockapps.net
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+library
+  exposed-modules:
+      Crypto.Curve.BabyJubJub
+      Crypto.Curve.BabyJubJub.EdDSA
+  other-modules:
+      Paths_baby_jubjub
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.12 && <5
+    , bytestring >=0.10
+    , cryptonite >=0.25
+    , memory >=0.14
+    , text >=1.2
+  default-language: Haskell2010
+
+executable baby-jubjub-cli
+  main-is: Main.hs
+  other-modules:
+      Paths_baby_jubjub
+  hs-source-dirs:
+      app
+  build-depends:
+      baby-jubjub
+    , base >=4.12 && <5
+    , base16-bytestring >=1.0
+    , bytestring >=0.10
+    , cryptonite >=0.25
+    , memory >=0.14
+    , optparse-applicative >=0.14
+    , text >=1.2
+  default-language: Haskell2010
+
+test-suite baby-jubjub-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_baby_jubjub
+  hs-source-dirs:
+      test
+  build-depends:
+      QuickCheck >=2.13
+    , baby-jubjub
+    , base >=4.12 && <5
+    , bytestring >=0.10
+    , cryptonite >=0.25
+    , hspec >=2.7
+    , memory >=0.14
+    , text >=1.2
+  default-language: Haskell2010

@@ -125,11 +125,6 @@ extra-deps:
 #- git: https://github.com/blockapps/milena
 #  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
 
-flags:
-  blockapps-secp256k1-haskell:
-    ecdh: true
-    recovery: true
-
 nix:
   enable: false
   pure: false

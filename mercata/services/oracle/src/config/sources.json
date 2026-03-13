@@ -5,7 +5,7 @@
     "parse": "data[].prices[0].value",
     "timestamp": "data[0].prices[0].lastUpdatedAt",
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT"]
   },
   "CoinMarketCap": {
     "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
@@ -14,7 +14,7 @@
     "parse": "data.{symbol}[0].quote.USD.price",
     "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
     "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH", "SYRUPUSDC", "RETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT"]
   },
   "Metals.dev": {
     "url": "https://api.metals.dev/v1/latest",
@@ -42,7 +42,7 @@
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
     "apiKeyEnvVar": "COINGECKO_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
@@ -51,7 +51,9 @@
       "SUSDS": "susds",
       "WSTETH": "wrapped-steth",
       "SYRUPUSDC": "syrupusdc",
-      "RETH": "rocket-pool-eth"
+      "RETH": "rocket-pool-eth",
+      "USDC": "usd-coin",
+      "USDT": "tether"
     }
   },
   "CoinAPI": {
@@ -61,13 +63,13 @@
     "parse": "assets",
     "timestamp": "data_quote_start",
     "apiKeyEnvVar": "COINAPI_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "USDC", "USDT"]
   },
   "DefiLlama": {
     "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",
     "parse": "defiLlama",
     "apiKeyEnvVar": "DEFILLAMA_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT"],
     "symbolMapping": {
       "ETH": "coingecko:ethereum",
       "WBTC": "coingecko:wrapped-bitcoin",
@@ -76,7 +78,9 @@
       "SUSDS": "coingecko:susds",
       "WSTETH": "coingecko:wrapped-steth",
       "SYRUPUSDC": "coingecko:syrupusdc",
-      "RETH": "coingecko:rocket-pool-eth"
+      "RETH": "coingecko:rocket-pool-eth",
+      "USDC": "coingecko:usd-coin",
+      "USDT": "coingecko:tether"
     }
   },
   "Commodities-API": {

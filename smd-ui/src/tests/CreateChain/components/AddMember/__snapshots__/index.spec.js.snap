@@ -37,7 +37,7 @@ Object {
 exports[`CreateChain: index render component (Oauth mode) with empty values 1`] = `
 "<div>
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
-  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
@@ -101,7 +101,7 @@ exports[`CreateChain: index render component (Oauth mode) with empty values 1`] 
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Add Member\\" />
+          <Blueprint.Button intent={0} onClick={[Function (anonymous)]} text=\\"Add Member\\" />
         </div>
       </div>
     </form>
@@ -112,7 +112,7 @@ exports[`CreateChain: index render component (Oauth mode) with empty values 1`] 
 exports[`CreateChain: index render component (Oauth mode) with values 1`] = `
 "<div>
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
-  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
@@ -176,7 +176,7 @@ exports[`CreateChain: index render component (Oauth mode) with values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Add Member\\" />
+          <Blueprint.Button intent={0} onClick={[Function (anonymous)]} text=\\"Add Member\\" />
         </div>
       </div>
     </form>
@@ -224,7 +224,7 @@ Object {
 exports[`CreateChain: index render component (non Oauth mode) with empty values 1`] = `
 "<div>
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
-  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
@@ -288,7 +288,7 @@ exports[`CreateChain: index render component (non Oauth mode) with empty values 
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Add Member\\" />
+          <Blueprint.Button intent={0} onClick={[Function (anonymous)]} text=\\"Add Member\\" />
         </div>
       </div>
     </form>
@@ -299,7 +299,7 @@ exports[`CreateChain: index render component (non Oauth mode) with empty values 
 exports[`CreateChain: index render component (non Oauth mode) with values 1`] = `
 "<div>
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" style={{...}} text=\\"Add Member\\" />
-  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+  <Blueprint.Dialog iconName=\\"add\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"Add Member\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
@@ -363,7 +363,7 @@ exports[`CreateChain: index render component (non Oauth mode) with values 1`] = 
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Add Member\\" />
+          <Blueprint.Button intent={0} onClick={[Function (anonymous)]} text=\\"Add Member\\" />
         </div>
       </div>
     </form>

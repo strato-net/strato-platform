@@ -1,0 +1,134 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockapps-highway-server
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/server#readme>
+homepage:       https://github.com/githubuser/blockapps-highway-server#readme
+bug-reports:    https://github.com/githubuser/blockapps-highway-server/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2018 Author name here
+license:        Apache-2.0
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/blockapps-highway-server
+
+library
+  exposed-modules:
+      Strato.Monad
+      Strato.Server
+      Strato.Server.GetS3File
+      Strato.Server.Ping
+      Strato.Server.PutS3File
+  other-modules:
+      Paths_blockapps_highway_server
+  hs-source-dirs:
+      src
+  build-depends:
+      aws
+    , base
+    , blockapps-highway-api
+    , bytestring
+    , common-log
+    , conduit
+    , filepath
+    , http-client
+    , http-conduit
+    , http-types
+    , monad-logger
+    , mtl
+    , resourcet
+    , servant-multipart
+    , servant-server
+    , strato-model
+    , text
+    , transformers
+    , unliftio
+    , unliftio-core
+    , wai-extra
+  default-language: Haskell2010
+
+executable blockapps-highway-server
+  main-is: Main.hs
+  other-modules:
+      Options
+  hs-source-dirs:
+      app
+  ghc-options: -threaded
+  build-depends:
+      aws
+    , base
+    , blockapps-highway-api
+    , blockapps-highway-server
+    , blockapps-init
+    , bytestring
+    , common-log
+    , hflags
+    , http-client
+    , http-client-tls
+    , http-types
+    , raw-strings-qq
+    , servant-multipart
+    , servant-multipart-client
+    , servant-server
+    , text
+    , unliftio-core
+    , wai
+    , wai-cors
+    , wai-extra
+    , wai-middleware-prometheus
+    , warp
+  default-language: Haskell2010
+
+test-suite highway-spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Options
+      Paths_blockapps_highway_server
+  hs-source-dirs:
+      test/
+  build-depends:
+      HUnit
+    , aws
+    , base
+    , blockapps-highway-api
+    , blockapps-highway-client
+    , blockapps-highway-server
+    , bytestring
+    , common-log
+    , hflags
+    , hspec
+    , http-client
+    , http-client-tls
+    , http-types
+    , network
+    , random
+    , regex-compat
+    , resourcet
+    , servant-client
+    , servant-client-core
+    , servant-multipart
+    , servant-multipart-api
+    , servant-multipart-client
+    , servant-server
+    , stm
+    , strato-model
+    , text
+    , transformers
+    , unliftio-core
+    , utf8-string
+    , wai-cors
+    , wai-extra
+    , warp
+    , word8
+  default-language: Haskell2010

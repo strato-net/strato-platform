@@ -218,6 +218,42 @@ getAccountField addressString field = do
         _ -> return Nothing
     _ -> return Nothing
 
+-- TODO: These Kafka-based functions use non-existent helpers (fetchBytesIO, runKafkaConfigured)
+-- Commenting out until the required infrastructure is implemented
+--
+-- emitKafkaJsonRlpCommand :: JsonRpcCommand -> IO ()
+-- emitKafkaJsonRlpCommand c = do
+--   _ <- runKafkaMConfigured "strato-api" $ writeSeqVmEvents [VmJsonRpcCommand c]
+--   return ()
+--
+-- waitForResponse :: String -> Offset -> IO B.ByteString
+-- waitForResponse id offset = do
+--   putStrLn $ "before wait: " ++ show offset
+--   maybeResponses <- fetchBytesIO "jsonrpcresponse" offset
+--   putStrLn "something has come"
+--   let responses = map (decode . BLC.fromStrict) $
+--         case maybeResponses of
+--           Nothing -> error "can't connect to Kafka"
+--           Just v -> v
+--   putStrLn $ "fetched " ++ show responses
+--   case filter ((id ==) . fst) responses of
+--     [] -> waitForResponse id (offset + fromIntegral (length responses))
+--     [(_, val)] -> return val
+--     _ -> error "you should not have more than one response with the same id"
+--
+-- callVM :: JsonRpcCommand -> IO B.ByteString
+-- callVM c = do
+--   lastOffsetOrError <-
+--     liftIO $
+--       runKafkaConfigured "ethereum-jsonrpc" $
+--         getLastOffset LatestTime 0 "jsonrpcresponse"
+--   let lastOffset =
+--         case lastOffsetOrError of
+--           Left e -> error $ show e
+--           Right val -> val
+--   emitKafkaJsonRlpCommand c
+--   waitForResponse (jrcId c) lastOffset
+
 eth_getBalance :: Method Server
 eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "blockString" :+: ())
   where

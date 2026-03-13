@@ -32,6 +32,7 @@ import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
 import OnrampPage from "./pages/OnrampPage";
+import BuyMetals from "./pages/BuyMetals";
 import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
@@ -116,7 +117,7 @@ const App = () => {
       const appName = "Mercata";
       const stratoChainId = networkId ? Number(networkId) : null;
       const stratoChain =
-        stratoChainId != null && !Number.isNaN(stratoChainId)
+        stratoChainId != null && !Number.isNaN(stratoChainId) && Number.isSafeInteger(stratoChainId)
           ? defineChain({
               id: stratoChainId,
               name: "STRATO",
@@ -203,6 +204,14 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <SwapAsset />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/buy-metals"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <BuyMetals />
                                               </GuestAccessibleRoute>
                                             }
                                           />

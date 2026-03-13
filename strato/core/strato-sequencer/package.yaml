@@ -71,8 +71,10 @@ executables:
       - prometheus-client
       - seqevents
       - stm
+      - strato-genesis
       - stm-chans
       - strato-conf
+      - strato-genesis
       - strato-model
       - strato-redis-blockdb
       - strato-sequencer

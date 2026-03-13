@@ -22,7 +22,10 @@ executables:
       - http-client
       - http-types
       - json-rpc-server
+      - kafka-monad
       - mtl
+      - seqevents
+      - strato-conf
       - strato-model
       - text
       - vector
