@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Strato.Auth.Client
   ( AuthEnv
@@ -8,6 +9,8 @@ module Strato.Auth.Client
   , runWithUserToken
   ) where
 
+import Control.Concurrent (threadDelay)
+import Control.Exception (SomeException, try)
 import Data.Text (Text)
 import Network.HTTP.Client (Manager, newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
@@ -16,6 +19,7 @@ import Servant.Client
 import Servant.Client.Core (Request, addHeader)
 import Strato.Auth.ClientCredentials
 import Strato.Auth.Token
+import System.IO (hPutStrLn, stderr)
 
 data AuthEnv = AuthEnv
   { aeBaseUrl :: BaseUrl
@@ -32,16 +36,41 @@ newAuthEnv url = do
     , aeManager = mgr
     }
 
--- | Run a Servant client action with OAuth authentication (retries once on 401)
+-- | Run a Servant client action with OAuth authentication.
+--
+-- Retries on 401 (with token refresh) and on connection errors
+-- (up to 4 attempts with exponential backoff: 1s, 2s, 4s).
 runWithAuth :: AuthEnv -> ClientM a -> IO (Either ClientError a)
-runWithAuth ae action = do
-  result <- runOnce ae
-  case result of
-    Left (FailureResponse _ resp) | responseStatusCode resp == status401 -> do
-      _ <- refreshToken (discoveryUrl clientCredentialsConfig)
-      runOnce ae
-    _ -> pure result
+runWithAuth ae action = withConnectionRetry (1 :: Int)
   where
+    maxAttempts = 4 :: Int
+
+    withConnectionRetry attempt = do
+      result <- try $ doRequestWith401Retry
+      case joinResult result of
+        Left (ConnectionError e)
+          | attempt < maxAttempts -> do
+              let delaySec = min 30 (2 ^ (attempt - 1) :: Int)
+              hPutStrLn stderr $
+                "Vault request: attempt " ++ show attempt ++ "/" ++ show maxAttempts ++
+                " failed (" ++ show e ++ "), retrying in " ++ show delaySec ++ "s"
+              threadDelay (delaySec * 1000000)
+              withConnectionRetry (attempt + 1)
+        r -> return r
+
+    -- Collapse exceptions from try into ConnectionError
+    joinResult :: Either SomeException (Either ClientError a) -> Either ClientError a
+    joinResult (Left e) = Left (ConnectionError e)
+    joinResult (Right r) = r
+
+    doRequestWith401Retry = do
+      result <- runOnce ae
+      case result of
+        Left (FailureResponse _ resp) | responseStatusCode resp == status401 -> do
+          _ <- refreshToken (discoveryUrl clientCredentialsConfig)
+          runOnce ae
+        _ -> pure result
+
     runOnce AuthEnv{..} = do
       token <- getToken (discoveryUrl clientCredentialsConfig)
       let addAuth :: Request -> Request

@@ -18,6 +18,7 @@ import qualified Data.Text.IO as TIO
 import Data.Text.Encoding as TE
 import Network.HTTP.Req as R
 import Strato.Auth.ClientCredentials
+import Strato.Auth.Retry (withRetry)
 import System.Directory (createDirectoryIfMissing, doesFileExist)
 import System.FileLock (withFileLock, SharedExclusive(Exclusive))
 import System.FilePath (takeDirectory)
@@ -38,13 +39,17 @@ getToken discUrl = do
     Nothing -> refreshToken discUrl
 
 -- | Force refresh the token (call this on 401)
+--
+-- Retries up to 4 times with exponential backoff on network failures
+-- (e.g. connection timeout, DNS failure, TLS errors).
 refreshToken :: T.Text -> IO T.Text
-refreshToken discUrl = withFileLock lockFilePath Exclusive $ \_ -> do
-  let ClientCredentialsConfig{..} = clientCredentialsConfig
-  tokenEndpoint <- getTokenEndpoint discUrl
-  token <- fetchToken tokenEndpoint clientId clientSecret
-  writeCachedToken token
-  pure token
+refreshToken discUrl = withFileLock lockFilePath Exclusive $ \_ ->
+  withRetry "OAuth token fetch" 4 $ do
+    let ClientCredentialsConfig{..} = clientCredentialsConfig
+    tokenEndpoint <- getTokenEndpoint discUrl
+    token <- fetchToken tokenEndpoint clientId clientSecret
+    writeCachedToken token
+    pure token
 
 readCachedToken :: IO (Maybe T.Text)
 readCachedToken = do

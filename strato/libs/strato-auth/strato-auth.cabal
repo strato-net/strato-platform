@@ -15,6 +15,7 @@ library
       Strato.Auth
       Strato.Auth.Client
       Strato.Auth.ClientCredentials
+      Strato.Auth.Retry
       Strato.Auth.Token
   other-modules:
       Paths_strato_auth
