@@ -1,0 +1,29 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           debugger-tools
+version:        0.0.1
+synopsis:       A toolkit for debugging in STRATO
+description:    A toolkit for debugging in STRATO
+category:       Debugging
+author:         jxuan101
+maintainer:     jin_huai_xuan@blockapps.net
+license:        Apache-2.0
+build-type:     Simple
+
+executable ghc-debug
+  main-is: ghc-debug.hs
+  hs-source-dirs:
+      exec_src/
+  build-depends:
+      base
+    , containers
+    , ghc-debug-client
+    , ghc-debug-common
+    , language-dot
+    , mtl
+    , text
+  default-language: Haskell2010

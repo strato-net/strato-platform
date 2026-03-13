@@ -1,0 +1,45 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           solid-vm-static-analysis
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      SolidVM.Solidity.StaticAnalysis
+      SolidVM.Solidity.StaticAnalysis.Contracts.ParentConstructors
+      SolidVM.Solidity.StaticAnalysis.Expressions.BooleanLiterals
+      SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply
+      SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion
+      SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions
+      SolidVM.Solidity.StaticAnalysis.Optimizer
+      SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations
+      SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing
+      SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables
+      SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite
+      SolidVM.Solidity.StaticAnalysis.Typechecker
+      SolidVM.Solidity.StaticAnalysis.Types
+      SolidVM.Solidity.StaticAnalysis.Variables.StateVariables
+  other-modules:
+      SolidVM.Solidity.StaticAnalysis.Trivial
+      Paths_solid_vm_static_analysis
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      Decimal
+    , base
+    , containers
+    , lens
+    , mtl
+    , solid-vm-model
+    , solid-vm-parser
+    , source-tools
+    , text
+    , transformers
+  default-language: Haskell2010
