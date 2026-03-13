@@ -45,7 +45,7 @@ contract record MercataBridge is Ownable {
     event AssetToggled(bool enabled, uint256 externalChainId, address externalToken);
 
     /// @notice Emitted when the hot withdrawal threshold is updated
-    event HotWithdrawalThresholdUpdated(uint256 newThreshold, uint256 oldThreshold);
+    event HotWithdrawalThresholdUpdated(uint256 chainId, address token, uint256 newThreshold, uint256 oldThreshold);
 
     // ───────────── Deposit & withdrawal related events ─────────────
     /// @notice Emitted when a deposit is aborted by the owner
@@ -89,11 +89,11 @@ contract record MercataBridge is Ownable {
     /// @param token The STRATO token address that was escrowed
     /// @param user The address that requested the withdrawal
     /// @param withdrawalId The unique withdrawal identifier
-    event WithdrawalRequested(address dest, uint256 destChainId, uint256 externalTokenAmount, uint256 stratoTokenAmount, address token, address user, uint256 withdrawalId);
+    event WithdrawalRequested(address dest, uint256 destChainId, uint256 externalTokenAmount, uint256 stratoTokenAmount, address token, address user, uint256 withdrawalId, bool useHotWallet);
 
     // ───────────── Registry related events ─────────────
     /// @notice Emitted when chain configuration is updated
-    event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router);
+    event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address hotWallet);
 
     /// @notice Emitted when the last processed block is updated for a chain
     event LastProcessedBlockUpdated(uint256 externalChainId, uint256 lastProcessedBlock);
@@ -160,8 +160,7 @@ contract record MercataBridge is Ownable {
     uint256 public WITHDRAWAL_ABORT_DELAY = 172800;
 
     /// @notice Threshold below which withdrawals bypass SAFE multi-sig and use hot wallet
-    /// @dev Default: 100 * 10^18 ($100 in USDST wei). Set to 0 to disable hot wallet path.
-    uint256 public hotWithdrawalThreshold = 100 * (10 ** 18);
+    mapping (uint256 => mapping (address => uint256)) public hotWithdrawalThresholds;
 
     // ───────────── Deposit & withdrawal related state variables ─────────────
     /// @notice Registry of deposit transactions with replay protection
@@ -352,14 +351,14 @@ contract record MercataBridge is Ownable {
      * @param router The router contract address for deposits
      */
     function setChain(
-        string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router
+        string chainName, address custody, address hotWallet, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router
     ) external onlyOwner {
         require(chainName.length > 0, "MB: invalid chain name");
         require(custody != address(0), "MB: zero custody address");
         require(externalChainId > 0, "MB: invalid external chain id");
         require(router != address(0), "MB: zero router address");
-        chains[externalChainId] = ChainInfo(chainName, custody, router, enabled, lastProcessedBlock);
-        emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, router);
+        chains[externalChainId] = ChainInfo(chainName, custody, hotWallet, router, enabled, lastProcessedBlock);
+        emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, router, hotWallet);
     }
 
     /**
@@ -495,9 +494,10 @@ contract record MercataBridge is Ownable {
      * @notice Set to 0 to disable the hot wallet path (all withdrawals go through SAFE)
      * @param newThreshold The new threshold in wei (e.g. 100e18 for $100)
      */
-    function setHotWithdrawalThreshold(uint256 newThreshold) external onlyOwner {
-        emit HotWithdrawalThresholdUpdated(newThreshold, hotWithdrawalThreshold);
-        hotWithdrawalThreshold = newThreshold;
+    function setHotWithdrawalThreshold(uint256 chainId, address token, uint256 newThreshold) external onlyOwner {
+        uint256 oldThreshold = hotWithdrawalThresholds[chainId][token];
+        emit HotWithdrawalThresholdUpdated(chainId, token, newThreshold, oldThreshold);
+        hotWithdrawalThresholds[chainId][token] = newThreshold;
     }
 
     // ───────────── Escrow related functions ─────────────
@@ -964,11 +964,14 @@ contract record MercataBridge is Ownable {
 
         id = ++withdrawalCounter;
 
+        uint256 hotThreshold = hotWithdrawalThresholds[externalChainId][externalToken];
+        bool useHotWallet = externalTokenAmount <= hotThreshold && chains[externalChainId].hotWallet != address(0);
+
         withdrawals[id] = WithdrawalInfo(
-            BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken, externalTokenAmount, block.timestamp, msg.sender, stratoToken, stratoTokenAmount, block.timestamp
+            BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken, externalTokenAmount, block.timestamp, msg.sender, stratoToken, stratoTokenAmount, block.timestamp, useHotWallet
         );
 
-        emit WithdrawalRequested(externalRecipient, externalChainId, externalTokenAmount, stratoTokenAmount, stratoToken, msg.sender, id);
+        emit WithdrawalRequested(externalRecipient, externalChainId, externalTokenAmount, stratoTokenAmount, stratoToken, msg.sender, id, useHotWallet);
     }
 
     /**

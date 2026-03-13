@@ -77,6 +77,9 @@ const CHAIN_NAME_TO_ID = {
   linea: 59144,
   linea_mainnet: 59144,
   "linea-mainnet": 59144,
+  linea_sepolia: 59141,
+  "linea-sepolia": 59141,
+  lineasepolia: 59141,
 };
 
 function parseChains(args) {
@@ -103,7 +106,7 @@ function getImplementationForChain(chainId) {
   const implLinea = normalizeAddress(process.env.ROUTER_IMPL_LINEA);
   if (chainId === 1 || chainId === 11155111) return implEth;
   if (chainId === 8453 || chainId === 84532) return implBase;
-  if (chainId === 59144) return implLinea;
+  if (chainId === 59144 || chainId === 59141) return implLinea;
   return "";
 }
 
@@ -123,6 +126,7 @@ function getHardhatNetwork(chainId) {
   if (chainId === 11155111) return "sepolia";
   if (chainId === 84532) return "baseSepolia";
   if (chainId === 59144) return "linea";
+  if (chainId === 59141) return "lineaSepolia";
   return "";
 }
 
@@ -388,7 +392,7 @@ async function main() {
   const implLinea = normalizeAddress(process.env.ROUTER_IMPL_LINEA);
   if (!implEth) throw new Error("Missing ROUTER_IMPL_ETH in .env");
   if (!implBase) throw new Error("Missing ROUTER_IMPL_BASE in .env");
-  if (chains.includes(59144) && !implLinea) throw new Error("Missing ROUTER_IMPL_LINEA in .env");
+  if (!implLinea) throw new Error("Missing ROUTER_IMPL_LINEA in .env");
   const token = await getCirrusAccessToken();
   const topology = await fetchBridgeTopology(
     nodeUrl,

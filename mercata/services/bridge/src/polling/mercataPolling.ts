@@ -3,7 +3,6 @@ import {
   confirmDepositBatch,
   reviewDepositBatch,
   confirmWithdrawalBatch,
-  confirmWithdrawalBatchHotWallet,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
 } from "../services/bridgeService";
@@ -21,8 +20,6 @@ import { checkBalances } from "../utils/balanceCheck";
 
 export const startWithdrawalRequestPolling = (): void => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
-  const hotWalletThreshold = config.hotWallet.threshold;
-  const hotWalletEnabled = !!config.hotWallet.privateKey && hotWalletThreshold > 0n;
 
   const poll = async () => {
     try {
@@ -32,31 +29,7 @@ export const startWithdrawalRequestPolling = (): void => {
       const initiatedWithdrawals: WithdrawalInfo[] = await getWithdrawalsByStatus("1");
       if (initiatedWithdrawals.length === 0) return;
 
-      if (hotWalletEnabled) {
-        // Split into hot wallet (small) and SAFE (large) paths
-        const hotWalletWithdrawals: WithdrawalInfo[] = [];
-        const safeWithdrawals: WithdrawalInfo[] = [];
-
-        for (const w of initiatedWithdrawals) {
-          const amount = BigInt(w.stratoTokenAmount || "0");
-          if (amount > 0n && amount <= hotWalletThreshold) {
-            hotWalletWithdrawals.push(w);
-          } else {
-            safeWithdrawals.push(w);
-          }
-        }
-
-        if (hotWalletWithdrawals.length > 0) {
-          logInfo("MercataPolling", `Processing ${hotWalletWithdrawals.length} withdrawals via hot wallet (threshold: ${hotWalletThreshold})`);
-          await confirmWithdrawalBatchHotWallet(hotWalletWithdrawals as NonEmptyArray<WithdrawalInfo>);
-        }
-
-        if (safeWithdrawals.length > 0) {
-          await confirmWithdrawalBatch(safeWithdrawals as NonEmptyArray<WithdrawalInfo>);
-        }
-      } else {
-        await confirmWithdrawalBatch(initiatedWithdrawals as NonEmptyArray<WithdrawalInfo>);
-      }
+      await confirmWithdrawalBatch(initiatedWithdrawals as NonEmptyArray<WithdrawalInfo>);
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
         operation: "startWithdrawalRequestPolling",
