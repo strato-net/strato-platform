@@ -1,0 +1,114 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           solid-vm-model
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      BlockApps.Ethereum2
+      Blockchain.SolidVM.Exception
+      Blockchain.VM.SolidException
+      SolidVM.Model.CodeCollection
+      SolidVM.Model.CodeCollection.ConstantDecl
+      SolidVM.Model.CodeCollection.Contract
+      SolidVM.Model.CodeCollection.Def
+      SolidVM.Model.CodeCollection.Event
+      SolidVM.Model.CodeCollection.Function
+      SolidVM.Model.CodeCollection.Import
+      SolidVM.Model.CodeCollection.Statement
+      SolidVM.Model.CodeCollection.VarDef
+      SolidVM.Model.CodeCollection.VariableDecl
+      SolidVM.Model.CodeCollection.Visibility
+      SolidVM.Model.SolidString
+      SolidVM.Model.Storable
+      SolidVM.Model.Type
+      SolidVM.Model.Value
+  other-modules:
+      Paths_solid_vm_model
+  hs-source-dirs:
+      src/
+  default-extensions:
+      BangPatterns
+      OverloadedStrings
+  build-depends:
+      Decimal
+    , QuickCheck
+    , aeson >=2.1.1.0 && <2.3
+    , aeson-casing
+    , attoparsec
+    , base
+    , base16-bytestring
+    , binary
+    , bytestring
+    , containers
+    , cryptonite
+    , data-default
+    , deepseq
+    , esqueleto
+    , ethereum-rlp
+    , format
+    , generic-random
+    , hashable
+    , labeled-error
+    , lens
+    , openapi3
+    , persistent
+    , quickcheck-instances
+    , regex-tdfa
+    , scientific
+    , servant-server
+    , source-tools
+    , strato-model
+    , text
+    , utf8-string
+    , vector
+  default-language: Haskell2010
+
+test-suite storage-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      BasicValueStringTest
+      StorageTest
+  hs-source-dirs:
+      test/
+  default-extensions:
+      BangPatterns
+      OverloadedStrings
+  ghc-options: -dynamic
+  build-depends:
+      base
+    , bytestring
+    , ethereum-rlp
+    , format
+    , hspec
+    , persistent
+    , solid-vm-model
+    , unliftio
+  default-language: Haskell2010
+
+benchmark storage-bench
+  type: exitcode-stdio-1.0
+  main-is: StorageBench.hs
+  hs-source-dirs:
+      bench/
+  default-extensions:
+      BangPatterns
+      OverloadedStrings
+  ghc-options: -dynamic
+  build-depends:
+      base
+    , binary
+    , bytestring
+    , cereal
+    , criterion
+    , ethereum-rlp
+    , solid-vm-model
+    , strato-model
+  default-language: Haskell2010

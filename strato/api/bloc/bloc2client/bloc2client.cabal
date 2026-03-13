@@ -1,0 +1,40 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           bloc2client
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/bloc2client#readme>
+homepage:       https://github.com/githubuser/bloc2client#readme
+bug-reports:    https://github.com/githubuser/bloc2client/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2023 Author name here
+license:        BSD3
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/bloc2client
+
+library
+  exposed-modules:
+      Bloc.Client
+  other-modules:
+      Paths_bloc2client
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      base
+    , bloc2api
+    , servant-client
+    , solid-vm-model
+    , strato-model
+    , text
+  default-language: Haskell2010

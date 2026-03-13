@@ -226,6 +226,7 @@ services:
         max-file: "3"
   postgres:
     environment:
+      - POSTGRES_DB=eth
       - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:14.18
     volumes:

@@ -1,0 +1,29 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           certificateDB
+version:        0.0.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.CertificateDB
+  other-modules:
+      Paths_certificateDB
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Werror -O2
+  build-depends:
+      base
+    , bytestring
+    , hedis
+    , monad-alter
+    , mtl
+    , strato-conf
+    , strato-model
+    , strato-redis-blockdb
+    , text
+  default-language: Haskell2010

@@ -10,12 +10,11 @@ module Blockchain.Strato.Indexer.Kafka
   )
 where
 
-import Blockchain.KafkaTopics (lookupTopic)
 import Control.Monad.Composable.Kafka
 import Data.Binary
 
 indexEventsTopicName :: TopicName
-indexEventsTopicName = lookupTopic "indexevents"
+indexEventsTopicName = "indexevents"
 
 produceIndexEvents :: (Binary a, HasKafka m) =>
                       [a] -> m [ProduceResponse]

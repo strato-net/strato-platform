@@ -313,13 +313,6 @@ function doInit {
     tail -f /dev/null
   fi
 
-  echo "Running seed-genesis to create databases and topics..."
-  seed-genesis 2>&1 | tee logs/seed-genesis
-  if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    echo "SEED-GENESIS FAILED: see /var/lib/strato/logs/seed-genesis for details"
-    tail -f /dev/null
-  fi
-
   #we need to create the private key for the faucet
   mkdir config
 

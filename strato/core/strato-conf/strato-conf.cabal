@@ -1,0 +1,35 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-conf
+version:        0.1.0.0
+category:       Web
+author:         Jamshid
+maintainer:     Jamshid
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.EthConf
+      Blockchain.EthConf.Model
+  other-modules:
+      Paths_strato_conf
+  hs-source-dirs:
+      src
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , data-default
+    , hedis
+    , kafka-monad
+    , postgresql-simple
+    , servant-client
+    , strato-model
+    , text
+    , yaml
+  default-language: Haskell2010
