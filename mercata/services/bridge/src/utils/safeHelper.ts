@@ -98,22 +98,45 @@ export async function proposeTransactions(
   chainId: number,
 ): Promise<void> {
   const { apiKit } = await initializeSafeForChain(chainId);
-  
+
+  // Initialize hot wallet protocol kit once if any hot transactions exist
+  const hotSafeAddress = transactions.find(t => t.isHot)?.safeAddress;
+  let hotProtocolKit: Awaited<ReturnType<typeof initializeSafeForChain>>["protocolKit"] | undefined;
+  if (hotSafeAddress) {
+    const hotSafe = await initializeSafeForChain(chainId, hotSafeAddress);
+    hotProtocolKit = hotSafe.protocolKit;
+  }
+
   let successful = 0;
   let failed = 0;
-  
+
   for (const txData of transactions) {
     const { isHot, ...tx } = txData;
     try {
       await retry(
-        async () => {
-          await apiKit.proposeTransaction(tx)
-          if (isHot) {
-            await apiKit.confirmTransaction(tx.safeTxHash, tx.senderSignature);
-          }
-        },
+        () => apiKit.proposeTransaction(tx),
         { logPrefix: "SafeService" }
       );
+
+      // Execute hot wallet transactions on-chain immediately
+      if (isHot && hotProtocolKit) {
+        try {
+          const confirmedTx = await retry(
+            () => apiKit.getTransaction(tx.safeTxHash),
+            { logPrefix: "SafeService" }
+          );
+          const result = await hotProtocolKit.executeTransaction(confirmedTx);
+          logInfo("SafeService", `Executed hot wallet tx on-chain: ${tx.safeTxHash}, txHash: ${result.hash}`);
+        } catch (execError) {
+          logError("SafeService", execError as Error, {
+            operation: "executeHotWalletTransaction",
+            safeTxHash: tx.safeTxHash,
+            nonce: tx.nonce,
+            chainId,
+          });
+        }
+      }
+
       successful++;
     } catch (error) {
       logError("SafeService", error as Error, {
@@ -125,7 +148,7 @@ export async function proposeTransactions(
       failed++;
     }
   }
-  
+
   logInfo("SafeService", `Proposed transactions for chain ${chainId}: ${successful} successful, ${failed} failed out of ${transactions.length} total`);
 }
 
