@@ -50,6 +50,9 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
       } else {
         navigate('/dashboard');
       }
+    } else if (pathname === '/dashboard/trading-desk') {
+      // Navigate back to Advanced Swap tab
+      navigate('/dashboard/advanced?tab=swap');
     } else {
       navigate('/dashboard');
     }
