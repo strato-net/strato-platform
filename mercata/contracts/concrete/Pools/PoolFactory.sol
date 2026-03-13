@@ -416,17 +416,26 @@ contract record PoolFactory is Ownable {
 
     /// @notice Merge multiple StablePool instances into a single multi-token StablePool
     /// @param poolAddresses Array of StablePool addresses to merge
-    /// @param lpHolders Array of arrays, where lpHolders[i] contains all LP token holder addresses for pool i
+    /// @param allLpHolders Flat array of all LP holder addresses across all pools, concatenated in pool order
+    /// @param holdersPerPool Array where holdersPerPool[i] is the number of LP holders for pool i
     /// @return newPool The address of the newly created merged pool
     /// @dev After calling this function, the admin must whitelist the new pool for mint/burn
     ///      on the new LP token via the AdminRegistry, just as with any new pool creation.
     ///      Old pools will be drained but not disabled - the admin should disable them separately.
     function mergeStablePools(
         address[] poolAddresses,
-        address[][] lpHolders
+        address[] allLpHolders,
+        uint[] holdersPerPool
     ) external onlyOwner returns (address newPool) {
         require(poolAddresses.length >= 2, "Need at least 2 pools to merge");
-        require(poolAddresses.length == lpHolders.length, "Mismatched array lengths");
+        require(poolAddresses.length == holdersPerPool.length, "Mismatched array lengths");
+
+        // Validate that holdersPerPool sums to allLpHolders.length
+        uint totalHolders = 0;
+        for (uint i = 0; i < holdersPerPool.length; i++) {
+            totalHolders += holdersPerPool[i];
+        }
+        require(totalHolders == allLpHolders.length, "holdersPerPool sum does not match allLpHolders length");
 
         // 1. Collect all unique tokens and their properties from the pools being merged
         address[] uniqueTokens;
@@ -436,7 +445,7 @@ contract record PoolFactory is Ownable {
 
         for (uint i = 0; i < poolAddresses.length; i++) {
             StablePool pool = StablePool(poolAddresses[i]);
-            require(address(Pool(poolAddresses[i]).poolFactory()) == address(this), "Pool does not belong to this factory");
+            require(StablePool(poolAddresses[i]).getPoolFactory() == address(this), "Pool does not belong to this factory");
 
             uint numCoins = pool.getNumCoins();
             for (uint j = 0; j < numCoins; j++) {
@@ -548,6 +557,7 @@ contract record PoolFactory is Ownable {
         // 7. Mint new LP tokens to old LP holders proportionally
         //    Each pool gets a share of new LP tokens based on its value contribution.
         //    Within each pool, LP tokens are distributed proportional to old LP balances.
+        uint holderOffset = 0;
         for (uint i = 0; i < poolAddresses.length; i++) {
             StablePool pool = StablePool(poolAddresses[i]);
             Token oldLpToken = pool.lpToken();
@@ -556,8 +566,8 @@ contract record PoolFactory is Ownable {
 
             uint poolLPShare = (totalNewLP * poolValues[i]) / totalValue;
 
-            for (uint h = 0; h < lpHolders[i].length; h++) {
-                address holder = lpHolders[i][h];
+            for (uint h = 0; h < holdersPerPool[i]; h++) {
+                address holder = allLpHolders[holderOffset + h];
                 uint holderBalance = oldLpToken.balanceOf(holder);
                 if (holderBalance > 0) {
                     uint holderNewLP = (poolLPShare * holderBalance) / oldTotalSupply;
@@ -566,6 +576,7 @@ contract record PoolFactory is Ownable {
                     }
                 }
             }
+            holderOffset += holdersPerPool[i];
         }
 
         // 8. Transfer LP token ownership to admin (same pattern as createMultiTokenStablePool)

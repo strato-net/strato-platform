@@ -1150,6 +1150,11 @@ contract record StablePool is Ownable {
 
     // ============ MIGRATION HELPERS ============
 
+    /// @notice Returns the pool factory address
+    function getPoolFactory() external view returns (address) {
+        return address(poolFactory);
+    }
+
     /// @notice Returns the number of tokens in the pool
     function getNumCoins() external view returns (uint) {
         return coins.length;
