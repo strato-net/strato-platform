@@ -9,6 +9,7 @@ import "../../concrete/Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
 import "../../concrete/Lending/LendingRegistry.sol";
 import "../../concrete/BaseCodeCollection.sol";
+import "../../concrete/Metals/MetalForge.sol";
 
 
 contract TestERC20 is ERC20, Ownable {
@@ -64,6 +65,10 @@ contract Describe_MercataBridge is Authorizable {
     TestERC20 testToken;
     TestUSDST usdstToken;
     TestERC20 mUSDST;
+    MetalForge metalForge;
+    PriceOracle oracle;
+    FeeCollector feeCollector;
+    TestERC20 goldToken;
     User user1;
     User user2;
     User relayer;
@@ -112,7 +117,7 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry.addWhitelist(address(bridge), "finaliseWithdrawalBatch", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "abortWithdrawal", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "abortWithdrawalBatch", address(relayer));
-        adminRegistry.addWhitelist(address(bridge), "requestAutoSave", address(relayer));
+        adminRegistry.addWhitelist(address(bridge), "requestDepositAction", address(relayer));
 
         // Create test tokens through token factory with AdminRegistry as owner
         testToken = TestERC20(tokenFactory.createTokenWithInitialOwner("Test Token", "TEST", [], [], [], "TEST", 0, 18, address(adminRegistry)));
@@ -165,6 +170,25 @@ contract Describe_MercataBridge is Authorizable {
 
         mercata.poolConfigurator().setBorrowableAsset(address(usdstToken));
         mercata.poolConfigurator().setMToken(address(mUSDST));
+
+        // MetalForge setup for autoForge tests
+        oracle = new PriceOracle(address(this));
+        oracle.initialize();
+        feeCollector = new FeeCollector(address(this));
+
+        goldToken = TestERC20(tokenFactory.createTokenWithInitialOwner("Gold", "GOLDST", [], [], [], "GOLDST", 0, 18, address(adminRegistry)));
+        Token(address(goldToken)).setStatus(2);
+
+        metalForge = new MetalForge(address(this));
+        metalForge.initialize(address(oracle), address(0xDEAD), address(feeCollector), address(usdstToken));
+
+        oracle.setAssetPrice(address(goldToken), 2000e18);
+        metalForge.setMetalConfig(address(goldToken), true, 1000000e18);
+        metalForge.setPayTokenConfig(address(usdstToken), true, 0);
+
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(goldToken), "mint", address(metalForge));
+
+        bridge.setMetalForge(address(metalForge));
     }
 
     // ============ CONSTRUCTOR TESTS ============
@@ -1638,8 +1662,7 @@ contract Describe_MercataBridge is Authorizable {
         // First initiate deposit
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
 
-
-        relayer.do(address(bridge), "requestAutoSave", recipient, externalChainId, txHash);
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(1), address(0));
 
         // Confirm the deposit with auto save
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
@@ -1658,13 +1681,11 @@ contract Describe_MercataBridge is Authorizable {
         address recipient = address(new User());
         string memory txHash = keccak256("example transaction hash");
 
-        // This is what we expect to actually happen;
         // autoSave request before the bridge service picks up the deposit
-        relayer.do(address(bridge), "requestAutoSave", recipient, externalChainId, txHash);
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(1), address(0));
 
         // First initiate deposit
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
-
 
         // Confirm the deposit with auto save
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
@@ -1686,16 +1707,88 @@ contract Describe_MercataBridge is Authorizable {
         // First initiate deposit
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
 
-        relayer.do(address(bridge), "requestAutoSave", recipient, externalChainId, txHash);
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(1), address(0));
 
         // Confirm the deposit with auto save, which will fail due to disabled minting of mUSDST
         adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(mUSDST), "mint", address(mercata.liquidityPool()));
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
 
-        // Verify deposit was completed
+        // Verify deposit was completed — falls back to minting USDST directly
         (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
         require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
         require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Tokens should be minted");
+    }
+
+    // ============ AUTO FORGE TESTS ============
+
+    function it_bridge_autoforge_successful() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("autoforge transaction hash");
+
+        // Initiate deposit of USDST
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
+
+        // Request auto-forge into gold (action=2)
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(2), address(goldToken));
+
+        // Confirm the deposit — should auto-forge USDST into GOLDST
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        // Verify deposit was completed
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+
+        // With gold price at 2000e18 and 0% fee: 1000 USDST should yield 0.5 GOLDST
+        uint256 expectedGold = (amount * 1e18) / 2000e18;
+        require(IERC20(address(goldToken)).balanceOf(recipient) == expectedGold, "Recipient should have received GOLDST");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == 0, "Recipient should not have USDST");
+    }
+
+    function it_bridge_autoforge_before_deposit_initialized_succeeds() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("autoforge early transaction hash");
+
+        // Request auto-forge before deposit is initiated
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(2), address(goldToken));
+
+        // Initiate deposit
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
+
+        // Confirm the deposit
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        // Verify deposit was completed
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+
+        uint256 expectedGold = (amount * 1e18) / 2000e18;
+        require(IERC20(address(goldToken)).balanceOf(recipient) == expectedGold, "Recipient should have received GOLDST");
+    }
+
+    function it_bridge_autoforge_reversion_causes_mint_to_recipient() {
+        uint256 amount = 1000e18;
+        address recipient = address(new User());
+        string memory txHash = keccak256("autoforge revert transaction hash");
+
+        // Initiate deposit
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
+
+        // Request auto-forge
+        relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(2), address(goldToken));
+
+        // Break MetalForge by removing gold mint whitelist
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(goldToken), "mint", address(metalForge));
+
+        // Confirm the deposit — auto-forge will fail, should fall back to minting USDST
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+
+        // Verify deposit was completed — falls back to minting USDST directly
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Recipient should have received USDST as fallback");
+        require(IERC20(address(goldToken)).balanceOf(recipient) == 0, "Recipient should not have GOLDST");
     }
 
 }

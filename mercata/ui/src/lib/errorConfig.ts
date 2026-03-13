@@ -34,12 +34,13 @@ export const API_ERROR_TITLES: Record<string, string> = {
   // Bridge operations 
   "/bridge/config": "Bridge Configuration Error",
   "/bridge/bridgeableTokens": "Bridge Tokens Error",
+  "/bridge/depositActions": "Deposit Actions Error",
   "/bridge/networkConfigs": "Bridge Network Config Error",
   "/bridge/requestWithdrawal": "Withdrawal Request Error",
   "/bridge/balance": "Bridge Balance Error",
   "/bridge/depositStatus": "Deposit Status Error",
   "/bridge/withdrawalStatus": "Withdrawal Status Error",
-  "/bridge/requestAutoSave": "Automatic Lending Error",
+  "/bridge/requestDepositAction": "Deposit Action Error",
   
   // User operations
   "/user/me": "User Profile Error",

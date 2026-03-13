@@ -62,9 +62,9 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
 
 /**
  * @openapi
- * /bridge/requestAutoSave:
+ * /bridge/requestDepositAction:
  *   post:
- *     summary: Request auto save
+ *     summary: "Request a post-deposit action (auto-save to lending pool, auto-forge metal, etc.)"
  *     tags: [Bridge]
  *     requestBody:
  *       required: true
@@ -75,6 +75,7 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
  *             required:
  *               - externalChainId
  *               - externalTxHash
+ *               - action
  *             properties:
  *               externalChainId:
  *                 type: string
@@ -82,9 +83,15 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
  *               externalTxHash:
  *                 type: string
  *                 description: External transaction hash
+ *               action:
+ *                 type: number
+ *                 description: "Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)"
+ *               targetToken:
+ *                 type: string
+ *                 description: "Action-specific target token address (e.g. metal token for AUTO_FORGE, omit for AUTO_SAVE)"
  *     responses:
  *       200:
- *         description: Auto save request submitted
+ *         description: Deposit action request submitted
  *         content:
  *           application/json:
  *             schema:
@@ -100,7 +107,41 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
  *                     hash:
  *                       type: string
  */
-router.post("/requestAutoSave", authHandler.authorizeRequest(), BridgeController.requestAutoSave);
+router.post("/requestDepositAction", authHandler.authorizeRequest(), BridgeController.requestDepositAction);
+
+/**
+ * @openapi
+ * /bridge/depositActions:
+ *   get:
+ *     summary: "List available post-deposit actions (earn, forge metal) with oracle prices"
+ *     tags: [Bridge]
+ *     responses:
+ *       200:
+ *         description: List of virtual deposit action routes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                   stratoToken:
+ *                     type: string
+ *                   stratoTokenSymbol:
+ *                     type: string
+ *                   depositAction:
+ *                     type: number
+ *                     description: "1 = AUTO_SAVE, 2 = AUTO_FORGE"
+ *                   routeType:
+ *                     type: string
+ *                     description: "earn | forge"
+ *                   oraclePrice:
+ *                     type: string
+ *                     description: WAD-scaled oracle price for the output token
+ */
+router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.getDepositActions);
 
 /**
  * @openapi
