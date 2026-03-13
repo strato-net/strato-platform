@@ -45,9 +45,9 @@ contract record StablePool is Ownable {
 
     bool private poolContainsRebasingTokens;
 
-    mapping (address => uint) record tokenBalances;
+    mapping (address => uint) public record tokenBalances;
 
-    mapping (address => uint) record adminBalances;
+    mapping (address => uint) public record adminBalances;
 
     uint constant FEE_DENOMINATOR = 1e10;
 
@@ -75,9 +75,9 @@ contract record StablePool is Ownable {
 
     uint constant MIN_RAMP_TIME = 86400;
 
-    mapping (address => uint) record rateMultipliers;
+    mapping (address => uint) public record rateMultipliers;
 
-    mapping (address => PriceOracle) record rateOracles;
+    mapping (address => PriceOracle) public record rateOracles;
 
     uint[] callAmount;
 
@@ -1146,5 +1146,74 @@ contract record StablePool is Ownable {
         DMaTime = _DMaTime;
 
         emit SetNewMATime(_maExpTime, _DMaTime);
+    }
+
+    // ============ MIGRATION HELPERS ============
+
+    /// @notice Returns the number of tokens in the pool
+    function getNumCoins() external view returns (uint) {
+        return coins.length;
+    }
+
+    /// @notice Returns the asset type for a given coin index
+    /// @param i The index of the coin
+    function getAssetType(uint i) external view returns (uint) {
+        require(i < coins.length, "Invalid coin index");
+        return assetTypes[i];
+    }
+
+    /// @notice Computes the current D invariant of the pool
+    /// @return The D invariant value
+    function computeInvariant() external view returns (uint) {
+        uint amp = _A();
+        uint[] rates = _storedRates();
+        uint[] balances = _balances();
+        uint[] xp = _xpMem(rates, balances);
+        return getD(xp, amp);
+    }
+
+    /// @notice Migrates all user tokens out of the pool to a receiver
+    /// @param receiver The address to receive the tokens
+    /// @dev Withdraws admin fees first, then transfers all remaining tokens
+    /// @dev Only callable by the pool factory or pool owner
+    function migrateAllTokens(address receiver) external onlyPoolFactory {
+        require(receiver != address(0), "Cannot migrate to address 0");
+        _withdrawAdminFees();
+        for (uint i = 0; i < coins.length; i++) {
+            address tokenAddr = address(coins[i]);
+            uint balance = tokenBalances[tokenAddr];
+            if (balance > 0) {
+                _transferOut(i, balance, receiver);
+            }
+        }
+    }
+
+    /// @notice Syncs internal pool state after tokens have been transferred in via migration
+    /// @dev Updates tokenBalances from actual ERC20 balances and initializes oracle state
+    /// @dev Only callable by the pool factory or pool owner
+    function syncAfterMigration() external onlyPoolFactory {
+        for (uint i = 0; i < coins.length; i++) {
+            address tokenAddr = address(coins[i]);
+            uint balance = ERC20(tokenAddr).balanceOf(address(this));
+            tokenBalances[tokenAddr] = balance;
+            if (i == 0) tokenABalance = balance;
+            else if (i == 1) tokenBBalance = balance;
+        }
+
+        uint amp = _A();
+        uint[] rates = _storedRates();
+        uint[] balances = _balances();
+        uint[] xp = _xpMem(rates, balances);
+        uint d = getD(xp, amp);
+
+        lastDPacked = pack2(d, d);
+        uint[2] maLastTimeUnpacked = unpack2(maLastTime);
+        if (maLastTimeUnpacked[1] < block.timestamp) {
+            maLastTimeUnpacked[1] = block.timestamp;
+            maLastTime = pack2(maLastTimeUnpacked[0], maLastTimeUnpacked[1]);
+        }
+
+        _updateRatios(rates, xp, amp, d);
+        upkeepOracles(xp, amp, d);
     }
 }
