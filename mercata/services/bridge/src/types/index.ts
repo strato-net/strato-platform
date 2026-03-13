@@ -76,6 +76,7 @@ export interface SafeTransactionData {
   senderSignature: any;
   nonce: number;
   externalChainId: number;
+  isHot: boolean;
 }
 
 export interface PreparedWithdrawal {

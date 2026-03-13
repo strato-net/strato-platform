@@ -102,10 +102,16 @@ export async function proposeTransactions(
   let successful = 0;
   let failed = 0;
   
-  for (const tx of transactions) {
+  for (const txData of transactions) {
+    const { isHot, ...tx } = txData;
     try {
       await retry(
-        () => apiKit.proposeTransaction(tx),
+        async () => {
+          await apiKit.proposeTransaction(tx)
+          if (isHot) {
+            await apiKit.confirmTransaction(tx.safeTxHash, tx.senderSignature);
+          }
+        },
         { logPrefix: "SafeService" }
       );
       successful++;
@@ -123,12 +129,12 @@ export async function proposeTransactions(
   logInfo("SafeService", `Proposed transactions for chain ${chainId}: ${successful} successful, ${failed} failed out of ${transactions.length} total`);
 }
 
-export async function initializeSafeForChain(chainId: number) {
+export async function initializeSafeForChain(chainId: number, safeAddress?: string) {
   const rpcUrl = getChainRpcUrl(chainId);
   const protocolKit = await Safe.init({
     provider: rpcUrl,
     signer: config.safe.safeProposerPrivateKey || "",
-    safeAddress: config.safe.address || "",
+    safeAddress: safeAddress || config.safe.address || "",
   });
   const apiKit = new SafeApiKit({ chainId: safeToBigInt(chainId), apiKey: config.safe.apiKey });
 
@@ -139,30 +145,34 @@ export async function createWithdrawalProposals(
   externalChainId: number,
   withdrawals: NonEmptyArray<WithdrawalInfo>
 ): Promise<SafeTransactionData[]> {
-  const { protocolKit, apiKit } = await initializeSafeForChain(externalChainId);
-
-  const transactionProposals: SafeTransactionData[] = [];
   const safeAddress = config.safe.address || "";
   const safeHotWalletAddress = config.safe.hotWalletAddress || "";
+  const { protocolKit, apiKit } = await initializeSafeForChain(externalChainId, safeAddress);
+  const { protocolKit: hotProtocolKit, apiKit: hotApiKit } = await initializeSafeForChain(externalChainId, safeHotWalletAddress);
+
+  const transactionProposals: SafeTransactionData[] = [];
   const relayer = config.safe.safeProposerAddress || "";
   let currentNonce = Number(await retry(
     () => apiKit.getNextNonce(safeAddress),
     { logPrefix: "SafeService" }
   ));
   let currentHotWalletNonce = Number(await retry(
-    () => apiKit.getNextNonce(safeHotWalletAddress),
+    () => hotApiKit.getNextNonce(safeHotWalletAddress),
     { logPrefix: "SafeService" }
   ));
 
   for (const withdrawal of withdrawals) {
     let nonce;
     let toAddress;
+    let protocolKitForWithdrawal;
     if (withdrawal.useHotWallet) {
       toAddress = safeHotWalletAddress;
       nonce = currentHotWalletNonce++;
+      protocolKitForWithdrawal = hotProtocolKit;
     } else {
       toAddress = safeAddress;
       nonce = currentNonce++;
+      protocolKitForWithdrawal = protocolKit;
     }
     const descriptor = buildTxDescriptor({
       type: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? "eth" : "erc20",
@@ -172,9 +182,9 @@ export async function createWithdrawalProposals(
       nonce,
     });
 
-    const safeTransaction = await protocolKit.createTransaction(descriptor);
-    const safeTxHash = await protocolKit.getTransactionHash(safeTransaction);
-    const signature = await protocolKit.signHash(safeTxHash);
+    const safeTransaction = await protocolKitForWithdrawal.createTransaction(descriptor);
+    const safeTxHash = await protocolKitForWithdrawal.getTransactionHash(safeTransaction);
+    const signature = await protocolKitForWithdrawal.signHash(safeTxHash);
 
     logInfo("SafeService", `Created tx proposal: nonce ${nonce}, withdrawalId ${withdrawal.withdrawalId}`);
 
@@ -186,6 +196,7 @@ export async function createWithdrawalProposals(
       senderSignature: signature.data,
       nonce,
       externalChainId: Number(withdrawal.externalChainId as string),
+      isHot: withdrawal.useHotWallet || false,
     });
   }
 
