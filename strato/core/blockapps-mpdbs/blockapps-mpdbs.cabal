@@ -1,0 +1,91 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockapps-mpdbs
+version:        0.0.1
+synopsis:       A Haskell version of an Ethereum client
+description:    The client described in the Ethereum Yellowpaper
+category:       Data Structures
+author:         Jamshid
+maintainer:     jamshidnh@gmail.com
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Data.AddressStateDB
+      Blockchain.DB.AddressStateDB
+      Blockchain.DB.ChainDB
+      Blockchain.DB.CodeDB
+      Blockchain.DB.HashDB
+      Blockchain.DB.MemAddressStateDB
+      Blockchain.DB.RawStorageDB
+      Blockchain.DB.SolidStorageDB
+      Blockchain.DB.StateDB
+      Blockchain.DB.StorageDB
+  other-modules:
+      Paths_blockapps_mpdbs
+  hs-source-dirs:
+      src/
+  default-extensions:
+      TemplateHaskell
+  ghc-options: -Wall -O2
+  build-depends:
+      base
+    , base16-bytestring
+    , binary
+    , bytestring
+    , common-log
+    , containers
+    , data-default
+    , deepseq
+    , ethereum-rlp
+    , fastMP
+    , format
+    , leveldb-haskell
+    , merkle-patricia-db
+    , monad-alter
+    , monad-logger
+    , monad-loops
+    , nibblestring
+    , solid-vm-model
+    , strato-model
+    , text
+    , transformers
+    , unliftio-core
+  default-language: Haskell2010
+
+test-suite blockapps-mpdbs-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      StorageSpec
+      Paths_blockapps_mpdbs
+  hs-source-dirs:
+      test/
+  ghc-options: -Wall -O2 -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -dynamic
+  build-depends:
+      base
+    , blockapps-data
+    , blockapps-mpdbs
+    , bytestring
+    , common-log
+    , containers
+    , directory
+    , hspec
+    , hspec-expectations-lifted
+    , lens
+    , leveldb-haskell
+    , merkle-patricia-db
+    , monad-alter
+    , nibblestring
+    , resourcet
+    , solid-vm-model
+    , strato-model
+    , transformers
+    , unix
+    , unliftio
+  default-language: Haskell2010

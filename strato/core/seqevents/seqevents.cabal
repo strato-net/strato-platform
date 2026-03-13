@@ -1,0 +1,58 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           seqevents
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Sequencer.Constants
+      Blockchain.Sequencer.Event
+      Blockchain.Sequencer.Kafka
+      Blockchain.Sequencer.Kafka.Metrics
+  other-modules:
+      Paths_seqevents
+  hs-source-dirs:
+      src/
+  ghc-options: -fconstraint-solver-iterations=8
+  build-depends:
+      base
+    , binary
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockstanbul
+    , bytestring
+    , format
+    , kafka-monad
+    , merkle-patricia-db
+    , monad-alter
+    , prometheus-client
+    , strato-conf
+    , strato-model
+    , text
+  default-language: Haskell2010
+
+test-suite seqevents-spec
+  type: exitcode-stdio-1.0
+  main-is: EventSpec.hs
+  other-modules:
+      Paths_seqevents
+  hs-source-dirs:
+      test/
+  ghc-options: -dynamic
+  build-depends:
+      QuickCheck
+    , base
+    , binary
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , hspec
+    , seqevents
+  default-language: Haskell2010

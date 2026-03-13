@@ -272,6 +272,16 @@ router.get("/watcher-config", authHandler.authorizeRequest(), CreditCardControll
 router.post("/execute-top-up", authHandler.authorizeRequest(), CreditCardController.executeTopUp);
 
 /**
+ * GET /credit-card/watcher-pending — operator only: check pending bridge withdrawals for a card wallet.
+ */
+router.get("/watcher-pending", authHandler.authorizeRequest(), CreditCardController.getWatcherPending);
+
+/**
+ * GET /credit-card/watcher-balance — operator only: get a user's USDST balance.
+ */
+router.get("/watcher-balance", authHandler.authorizeRequest(), CreditCardController.getWatcherBalance);
+
+/**
  * User-triggered manual top-up for a specific card (uses operator service token under the hood).
  */
 router.post("/manual-top-up", authHandler.authorizeRequest(), CreditCardController.manualTopUp);

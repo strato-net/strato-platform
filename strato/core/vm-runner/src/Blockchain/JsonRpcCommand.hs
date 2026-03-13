@@ -16,7 +16,6 @@ import Blockchain.DB.CodeDB
 --import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.EthConf
-import Blockchain.KafkaTopics
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address
 import Control.Monad ((<=<))
@@ -33,7 +32,7 @@ import Prelude hiding (id)
 produceResponse :: String -> B.ByteString -> IO ()
 produceResponse id theData = do
   _ <- runKafkaMConfigured "ethereum-vm" $
-       produceItems (lookupTopic "jsonrpcresponse") [(id, theData)]
+       produceItems "jsonrpcresponse" [(id, theData)]
 
   return ()
 

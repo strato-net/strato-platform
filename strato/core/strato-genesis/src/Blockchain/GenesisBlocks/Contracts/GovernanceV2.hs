@@ -29,7 +29,7 @@ import           Text.Printf
 
 -- | Inserts a Governance contract into the genesis block with the BlockApps root cert as owner
 insertMercataGovernanceContract :: Address -> [Validator] -> [Address] -> GenesisInfo -> GenesisInfo
-insertMercataGovernanceContract owner validators admins gi =
+insertMercataGovernanceContract owner validatorList admins gi =
   gi
     { addressInfo = initialAccounts ++ [govLogicAcct, govStorageAcct],
       codeInfo = initialCode ++ [CodeInfo governanceSrc (Just "MercataGovernance")],
@@ -43,7 +43,7 @@ insertMercataGovernanceContract owner validators admins gi =
 
     governanceSrc = decodeUtf8 mercataGovernanceContract
 
-    valIx = zip [0 ..] validators
+    valIx = zip [0 ..] validatorList
     adminIx = zip [0 ..] admins
     govLogicAddr = 0xff
     govLogicAcct =
@@ -59,7 +59,7 @@ insertMercataGovernanceContract owner validators admins gi =
         0
         (SolidVMCode "Proxy" (KECCAK256.hash mercataGovernanceContract))
         $ [ ("_owner", BAddress owner)
-          , ("validators.length", BInteger . toInteger $ length validators)
+          , ("validators.length", BInteger . toInteger $ length validatorList)
           , ("admins.length", BInteger . toInteger $ length admins)
           , ("logicContract", BAddress govLogicAddr)
           ]
