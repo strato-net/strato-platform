@@ -58,6 +58,7 @@ function applyEnvProfile(profile) {
   const rpcDefaults = {
     SEPOLIA_RPC_URL: `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`,
     BASE_SEPOLIA_RPC_URL: `https://base-sepolia.g.alchemy.com/v2/${alchemyKey}`,
+    LINEA_SEPOLIA_RPC_URL: `https://linea-sepolia.g.alchemy.com/v2/${alchemyKey}`,
     MAINNET_RPC_URL: `https://eth-mainnet.g.alchemy.com/v2/${alchemyKey}`,
     BASE_RPC_URL: `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`,
     LINEA_RPC_URL: `https://linea-mainnet.g.alchemy.com/v2/${alchemyKey}`,

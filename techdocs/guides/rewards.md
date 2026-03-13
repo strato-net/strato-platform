@@ -478,7 +478,7 @@ APR = (Annual rewards in $) / (Your position value in $) × 100%
 - **Liquidity pools**: RewardPoints-USDC, RewardPoints-ETH
 - **External exchanges**: (if listed)
 
-### Price Tracking
+### Trading Desk
 
 Monitor Reward Point value:
 

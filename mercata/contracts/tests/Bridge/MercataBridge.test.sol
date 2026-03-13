@@ -185,8 +185,8 @@ contract Describe_MercataBridge is Authorizable {
         metalForge.initialize(address(oracle), address(0xDEAD), address(feeCollector), address(usdstToken));
 
         oracle.setAssetPrice(address(goldToken), 2000e18);
-        metalForge.setMetalConfig(address(goldToken), true, 1000000e18);
-        metalForge.setPayTokenConfig(address(usdstToken), true, 0);
+        metalForge.setMetalConfig(address(goldToken), true, 1000000e18, 0);
+        metalForge.setPayToken(address(usdstToken), true);
 
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(goldToken), "mint", address(metalForge));
 
