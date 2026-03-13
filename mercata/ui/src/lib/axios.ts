@@ -72,6 +72,7 @@ const GUEST_SAFE_URLS = [
   '/tokens/v2/earning-assets/public',
   '/bridge/networkConfigs',
   '/bridge/bridgeableTokens',
+  '/bridge/depositActions',
   '/bridge/withdrawalSummary',
   '/bridge/balance',
   '/bridge/transactions/withdrawal',

@@ -41,6 +41,20 @@ export interface BridgeToken {
   stratoTokenImage?: string;     // First image URL from TokenFactory images
 }
 
+/**
+ * A post-deposit action (earn yield or forge metal) returned by /bridge/depositActions
+ */
+export interface DepositAction {
+  id: string;
+  action: number;                // 1 = AUTO_SAVE, 2 = AUTO_FORGE
+  stratoToken: string;           // output token address (mToken for earn, metal for forge)
+  stratoTokenSymbol: string;
+  stratoTokenName: string;
+  stratoTokenImage?: string;
+  payToken: string;              // STRATO pay token this applies to (join key to match VIA MINT routes)
+  oraclePrice?: string;          // WAD-scaled price for estimated output calc
+}
+
 // ============================================================================
 // BRIDGE TRANSACTION TYPES
 // ============================================================================

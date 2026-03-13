@@ -15,7 +15,7 @@ import {
   NetworkSummary,
   BridgeContextType,
 } from "@/lib/bridge/types";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
@@ -27,6 +27,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
   const [bridgeableTokens, setBridgeableTokens] = useState<BridgeToken[]>([]);
+  const [depositActions, setDepositActions] = useState<DepositAction[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [selectedToken, setSelectedToken] = useState<BridgeToken | null>(null);
   const [networksLoaded, setNetworksLoaded] = useState(false);
@@ -89,6 +90,11 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
       setAvailableNetworks(networks);
       setNetworksLoaded(true);
+
+      // Fetch deposit actions (earn/forge) in parallel with first chain tokens
+      api.get<DepositAction[]>("/bridge/depositActions")
+        .then(({ data }) => setDepositActions(data || []))
+        .catch(() => setDepositActions([]));
 
       if (!selectedNetwork && networks.length > 0) {
         const defaultName = networks[0].chainName;
@@ -350,6 +356,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         error,
         availableNetworks,
         bridgeableTokens,
+        depositActions,
         selectedNetwork,
         selectedToken,
         targetTransactionTab,

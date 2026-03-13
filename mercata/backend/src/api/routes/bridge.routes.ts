@@ -111,6 +111,40 @@ router.post("/requestDepositAction", authHandler.authorizeRequest(), BridgeContr
 
 /**
  * @openapi
+ * /bridge/depositActions:
+ *   get:
+ *     summary: "List available post-deposit actions (earn, forge metal) with oracle prices"
+ *     tags: [Bridge]
+ *     responses:
+ *       200:
+ *         description: List of virtual deposit action routes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                   stratoToken:
+ *                     type: string
+ *                   stratoTokenSymbol:
+ *                     type: string
+ *                   depositAction:
+ *                     type: number
+ *                     description: "1 = AUTO_SAVE, 2 = AUTO_FORGE"
+ *                   routeType:
+ *                     type: string
+ *                     description: "earn | forge"
+ *                   oraclePrice:
+ *                     type: string
+ *                     description: WAD-scaled oracle price for the output token
+ */
+router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.getDepositActions);
+
+/**
+ * @openapi
  * /bridge/bridgeableTokens/{chainId}:
  *   get:
  *     summary: List enabled bridge routes for a chain

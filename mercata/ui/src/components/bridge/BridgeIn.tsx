@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DepositAction } from "@mercata/shared-types";
 import { useToast } from "@/hooks/use-toast";
 import {
   useAccount,
@@ -46,12 +47,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, CreditCard, CheckCircle2, Info } from "lucide-react";
+import { ArrowDownToLine, CreditCard, CheckCircle2 } from "lucide-react";
 
 interface BridgeInProps {
   guestMode?: boolean;
@@ -70,6 +69,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
   const {
     availableNetworks,
     bridgeableTokens,
+    depositActions,
     selectedNetwork,
     setSelectedNetwork,
     selectedToken,
@@ -93,7 +93,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     loading: false
   });
   const [isTokenPermitted, setIsTokenPermitted] = useState(true);
-  const [autoDeposit, setAutoDeposit] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<DepositAction | null>(null);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<DepositStep>("confirm_tx");
   const [progressTxHash, setProgressTxHash] = useState<string>();
@@ -117,6 +117,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
     return routes;
   }, [currentTokens, selectedToken]);
+
+  const matchingActions = useMemo(() => {
+    const normalize = (addr: string) => (addr || "").toLowerCase().replace(/^0x/, "");
+    const mintStratoTokens = new Set(sourceTokenRoutes.filter(r => !r.isDefaultRoute).map(r => normalize(r.stratoToken)));
+    return depositActions.filter(a => a.payToken && mintStratoTokens.has(normalize(a.payToken)));
+  }, [sourceTokenRoutes, depositActions]);
 
   const uniqueExternalTokens = useMemo(() => {
     const seen = new Set<string>();
@@ -247,6 +253,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     if (prevExternal !== null && prevExternal !== currentExternal) {
       setAmount("");
       setAmountError("");
+      setSelectedAction(null);
     }
     prevExternalTokenRef.current = currentExternal;
   }, [
@@ -577,10 +584,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
         : depositAmount.toString();
 
       const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+      const action = selectedAction?.action || 0;
       existing.push({
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
-        type: autoDeposit ? 'saving' : 'bridge',
+        type: action === 1 ? 'saving' : action === 2 ? 'forge' : 'bridge',
         DepositInfo: {
           externalSender: address,
           stratoRecipient: userAddress,
@@ -596,13 +604,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
       localStorage.setItem('pendingDeposits', JSON.stringify(existing));
       triggerDepositRefresh();
 
-      // Step: Waiting for Autosave or Complete
-      if (autoDeposit) {
+      if (action > 0 && selectedAction) {
         setCurrentStep("waiting_autosave");
         await requestDepositAction({
           externalChainId: activeChainId,
           externalTxHash: txHash,
-          action: 1,
+          action,
+          targetToken: action === 2 ? selectedAction.stratoToken : undefined,
         });
       }
 
@@ -734,7 +742,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                     (t) => (t.externalToken || "").toLowerCase() === val
                   ) || null;
                   setSelectedToken(match);
-                  if (match?.isDefaultRoute) setAutoDeposit(false);
                 }}
                 disabled={!uniqueExternalTokens.length || guestMode || isLoading}
               >
@@ -786,73 +793,79 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
 
         {/* STEP 3 */}
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
-            </div>
-            <div className={`flex items-center gap-1.5 ${
-              selectedToken && !selectedToken.isDefaultRoute
-                ? "opacity-100"
-                : "opacity-40 pointer-events-none"
-            }`}>
-              <Switch
-                checked={autoDeposit}
-                onCheckedChange={setAutoDeposit}
-                disabled={guestMode || !selectedToken || selectedToken.isDefaultRoute}
-                className="h-4 w-7 data-[state=checked]:bg-blue-500 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
-              />
-              <span className="text-[11px] text-muted-foreground">Auto-deposit</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[200px] text-xs">
-                  Automatically deposits your received tokens into the lending pool to start earning yield.
-                </TooltipContent>
-              </Tooltip>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
           </div>
 
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((sourceTokenRoutes.length || prevRouteCountRef.current), 3)}, 1fr)` }}>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((sourceTokenRoutes.length + matchingActions.length) || prevRouteCountRef.current, 3)}, 1fr)` }}>
             {sourceTokenRoutes.length > 0 ? (
-              sourceTokenRoutes.map((routeToken) => {
-                const active = routeToken.id === selectedToken?.id;
-                const routeType = routeToken.isDefaultRoute ? "VIA WRAP" : "VIA MINT";
-                return (
-                  <button
-                    key={routeToken.id}
-                    type="button"
-                    onClick={() => { setSelectedToken(routeToken); if (routeToken.isDefaultRoute) setAutoDeposit(false); }}
-                    disabled={guestMode || isLoading}
-                    className={`relative text-left rounded-md border-2 p-3 transition-colors ${
-                      active
-                        ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
-                        : "border-border hover:bg-muted/30"
-                    }`}
-                  >
-                    {active && (
-                      <div className="absolute top-2 right-2">
-                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
+              <>
+                {sourceTokenRoutes.map((routeToken) => {
+                  const active = routeToken.id === selectedToken?.id && !selectedAction;
+                  const label = routeToken.isDefaultRoute ? "VIA WRAP" : "VIA MINT";
+                  return (
+                    <button
+                      key={routeToken.id}
+                      type="button"
+                      onClick={() => { setSelectedToken(routeToken); setSelectedAction(null); }}
+                      disabled={guestMode || isLoading}
+                      className={`relative text-left rounded-md border-2 p-3 transition-colors ${
+                        active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
+                      }`}
+                    >
+                      {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /></div>}
+                      <div className="flex items-center gap-2 mb-1">
+                        {routeToken.stratoTokenImage
+                          ? <img src={routeToken.stratoTokenImage} alt={routeToken.stratoTokenSymbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
+                          : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(routeToken.stratoTokenSymbol || "?").charAt(0)}</span>
+                        }
+                        <p className="text-sm font-semibold text-foreground">{routeToken.stratoTokenSymbol}</p>
                       </div>
-                    )}
-                    <div className="flex items-center gap-2 mb-1">
-                      {routeToken.stratoTokenImage ? (
-                        <img src={routeToken.stratoTokenImage} alt={routeToken.stratoTokenSymbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">
-                          {(routeToken.stratoTokenSymbol || "?").charAt(0)}
-                        </span>
-                      )}
-                      <p className="text-sm font-semibold text-foreground">{routeToken.stratoTokenSymbol}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {"\u2248"} {amount || "0"}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-1">{routeType}</p>
-                  </button>
-                );
-              })
+                      <p className="text-xs text-muted-foreground">{"\u2248"} {amount || "0"}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
+                    </button>
+                  );
+                })}
+                {matchingActions.map((action) => {
+                  const active = selectedAction?.id === action.id;
+                  const label = action.action === 1 ? "EARN YIELD" : "BUY METAL";
+                  let estimatedAmount = amount || "0";
+                  if (action.action === 2 && action.oraclePrice && amount) {
+                    try {
+                      const input = safeParseUnits(amount, 18);
+                      const price = BigInt(action.oraclePrice);
+                      if (price > 0n) estimatedAmount = formatUnits((input * BigInt("1000000000000000000")) / price, 18);
+                    } catch { /* keep original */ }
+                  }
+                  return (
+                    <button
+                      key={action.id}
+                      type="button"
+                      onClick={() => {
+                        const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
+                        if (mintRoute) setSelectedToken(mintRoute);
+                        setSelectedAction(action);
+                      }}
+                      disabled={guestMode || isLoading}
+                      className={`relative text-left rounded-md border-2 p-3 transition-colors ${
+                        active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
+                      }`}
+                    >
+                      {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /></div>}
+                      <div className="flex items-center gap-2 mb-1">
+                        {action.stratoTokenImage
+                          ? <img src={action.stratoTokenImage} alt={action.stratoTokenSymbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
+                          : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(action.stratoTokenSymbol || "?").charAt(0)}</span>
+                        }
+                        <p className="text-sm font-semibold text-foreground">{action.stratoTokenSymbol}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{"\u2248"} {estimatedAmount}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
+                    </button>
+                  );
+                })}
+              </>
             ) : (
               Array.from({ length: prevRouteCountRef.current }).map((_, i) => (
                 <div key={`skeleton-${i}`} className="relative text-left rounded-md border-2 border-border p-3 animate-pulse">
@@ -892,7 +905,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
           currentStep={currentStep}
           txHash={progressTxHash}
           chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
-          isEasySavings={autoDeposit}
+          isEasySavings={(selectedAction?.action || 0) > 0}
           isNative={progressIsNative}
           error={progressError}
           onClose={() => {

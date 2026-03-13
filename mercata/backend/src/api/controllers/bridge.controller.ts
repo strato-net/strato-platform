@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { 
   requestWithdrawal,
   requestDepositAction,
+  getDepositActions,
   getBridgeableTokens,
   getNetworkConfigs,
   getBridgeTransactions,
@@ -56,6 +57,20 @@ class BridgeController {
         success: true,
         data: result,
       });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getDepositActions(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await getDepositActions(accessToken);
+      res.json(result);
     } catch (error: any) {
       next(error);
     }
