@@ -16,7 +16,6 @@ build-type:     Simple
 
 library
   exposed-modules:
-      Blockchain.GenesisBlock
       Blockchain.Init.EthConf
       Blockchain.Init.Generator
       Blockchain.Init.Monad
@@ -42,6 +41,7 @@ library
     , containers
     , data-default
     , directory
+    , entropy
     , ethereum-rlp
     , evm-solidity
     , exceptions
@@ -90,7 +90,11 @@ executable genesis-builder
   build-depends:
       aeson
     , base
+    , blockapps-data
+    , blockapps-mpdbs
     , bytestring
+    , common-log
+    , conduit
     , data-default
     , strato-genesis
     , strato-init
@@ -107,7 +111,6 @@ executable strato-setup
       base
     , common-log
     , hflags
-    , kafka-monad
     , strato-init
     , strato-model
   default-language: Haskell2010

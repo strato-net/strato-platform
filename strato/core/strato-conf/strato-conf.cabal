@@ -16,7 +16,6 @@ library
   exposed-modules:
       Blockchain.EthConf
       Blockchain.EthConf.Model
-      Blockchain.KafkaTopics
   other-modules:
       Paths_strato_conf
   hs-source-dirs:
@@ -25,7 +24,6 @@ library
       aeson
     , base
     , bytestring
-    , containers
     , data-default
     , hedis
     , kafka-monad

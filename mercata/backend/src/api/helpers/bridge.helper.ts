@@ -160,7 +160,7 @@ export async function executeParallelQueries(
 // Bridge-specific helper function to enrich assets with token metadata
 export function enrichAssetsWithTokenData(
   assets: BridgeableAssetRoute[],
-  tokenMap: Map<string, { name?: string; symbol?: string }>
+  tokenMap: Map<string, { name?: string; symbol?: string; image?: string }>
 ): BridgeToken[] {
   const enriched: BridgeToken[] = new Array(assets.length);
   for (let i = 0; i < assets.length; i++) {
@@ -174,6 +174,7 @@ export function enrichAssetsWithTokenData(
       ...assetInfo,
       stratoTokenName: tokenMeta?.name ?? "",
       stratoTokenSymbol: tokenMeta?.symbol ?? "",
+      stratoTokenImage: tokenMeta?.image,
       isDefaultRoute: route.isDefaultRoute,
       id: route.id
     };

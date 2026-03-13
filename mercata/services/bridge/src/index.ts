@@ -10,7 +10,7 @@ import { startMultiChainDepositPolling } from "./polling/alchemyPolling";
 import { initializeMercataPolling } from "./polling/mercataPolling";
 import { initOpenIdConfig} from "./auth";
 import { healthMonitor } from "./utils/healthMonitor";
-import AutoSaveController from "./controllers/autosave.controller";
+import DepositActionController from "./controllers/depositAction.controller";
 import AuthHandler from "./auth/tokenMiddleware";
 
 const app = express();
@@ -40,7 +40,7 @@ app.get("/health", async (_, res) => {
   const errorFileExists = await healthMonitor.errorFileExists();
   res.status(errorFileExists ? 500 : 200).json({status: !errorFileExists, message: 'pong'})
 });
-app.post("/request-autosave", AuthHandler.authorizeRequest(), AutoSaveController.requestAutoSave);
+app.post("/request-deposit-action", AuthHandler.authorizeRequest(), DepositActionController.requestDepositAction);
 
 app.listen(port, async () => {
   try {

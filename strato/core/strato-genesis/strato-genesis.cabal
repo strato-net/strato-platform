@@ -21,7 +21,6 @@ library
       Blockchain.Data.CodeInfoOld
       Blockchain.Data.GenesisBlock
       Blockchain.Data.GenesisInfo
-      Blockchain.Generation
       Blockchain.GenesisBlocks.Builder
       Blockchain.GenesisBlocks.Contracts.Decide
       Blockchain.GenesisBlocks.Contracts.GovernanceV2

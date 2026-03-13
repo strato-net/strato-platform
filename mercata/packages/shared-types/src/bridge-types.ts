@@ -38,6 +38,21 @@ export interface BridgeToken {
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
   enabled: boolean;              // effective route enabled state
   isDefaultRoute: boolean;       // true when route token matches asset default token
+  stratoTokenImage?: string;     // First image URL from TokenFactory images
+}
+
+/**
+ * A post-deposit action (earn yield or forge metal) returned by /bridge/depositActions
+ */
+export interface DepositAction {
+  id: string;
+  action: number;                // 1 = AUTO_SAVE, 2 = AUTO_FORGE
+  stratoToken: string;           // output token address (mToken for earn, metal for forge)
+  stratoTokenSymbol: string;
+  stratoTokenName: string;
+  stratoTokenImage?: string;
+  payToken: string;              // STRATO pay token this applies to (join key to match VIA MINT routes)
+  oraclePrice?: string;          // WAD-scaled price for estimated output calc
 }
 
 // ============================================================================
@@ -100,12 +115,15 @@ export interface WithdrawalRequestParams {
 }
 
 /**
- * Parameters for requesting automatic supply of liquidity
- * to the lending pool upon deposit completion
+ * Parameters for requesting a post-deposit action (auto-save, auto-forge, etc.)
+ * @param action - Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)
+ * @param targetToken - Action-specific target token (e.g. metal token address for AUTO_FORGE, unused for AUTO_SAVE)
  */
-export interface AutoSaveRequestParams {
+export interface DepositActionRequestParams {
   externalChainId: string;
   externalTxHash: string;
+  action: number;
+  targetToken?: string;
 }
 
 /**
