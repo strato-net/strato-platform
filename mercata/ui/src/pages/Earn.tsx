@@ -162,7 +162,7 @@ const PositionCard = ({
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <p className="text-[11px] md:text-xs text-muted-foreground">Deposited</p>
+            <p className="text-[11px] md:text-xs text-muted-foreground">Your Shares</p>
             <p className="text-lg md:text-xl font-medium leading-tight">{deposited}</p>
           </div>
           <div>
