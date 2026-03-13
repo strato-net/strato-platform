@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+set -e
+
+if [[ -z "$1" ]]; then
+    echo "Usage: strato-up <node-directory>"
+    exit 1
+fi
+
+# Ensure credentials exist
+strato-login --check || strato-login
+
+# Export for services that don't yet read from file (mercata-backend)
+CREDS="$HOME/.secrets/strato_credentials.yaml"
+export OAUTH_DISCOVERY_URL=$(grep "discoveryUrl:" "$CREDS" | cut -d'"' -f2)
+export OAUTH_CLIENT_ID=$(grep "clientId:" "$CREDS" | cut -d'"' -f2)
+export OAUTH_CLIENT_SECRET=$(grep "clientSecret:" "$CREDS" | cut -d'"' -f2)
+
+export network=${network:-helium}
+export svmTrace=${svmTrace:-false}
+export VAULT_URL=https://vault.blockapps.net:8093
+
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    export STRATO_HOSTNAME=172.17.0.1
+else
+    export STRATO_HOSTNAME=host.docker.internal
+fi
+export HTTP_PORT=${HTTP_PORT:-8081}
+export NODE_HOST="localhost:$HTTP_PORT"
+export blocHost=$STRATO_HOSTNAME:3000
+
+# Setup node directory
+mkdir -p "$1/secrets"
+cp docker-compose.yml "$1/"
+cd "$1"
+
+cp "$HOME/.secrets/strato_credentials.yaml" secrets/oauth_credentials.yaml
+chmod 600 secrets/oauth_credentials.yaml
+
+if [[ ! -e .ethereumH/ethconf.yaml ]]; then
+    echo "Running strato-setup..."
+    strato-setup --network=$network --apiIPAddress=$STRATO_HOSTNAME
+    sed -i.bak "s|--svmTrace=false|--svmTrace=$svmTrace|g" commands.txt && rm -f commands.txt.bak
+fi
+
+export postgres_password=$(cat secrets/postgres_password)
+
+echo "Starting Docker containers..."
+DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d --wait
+
+echo "Starting convoke..."
+mkdir -p logs
+nohup convoke > logs/convoke.log 2>&1 &
+CONVOKE_PID=$!
+echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
+
+# Verify convoke started successfully
+sleep 3
+if ! kill -0 "$CONVOKE_PID" 2>/dev/null; then
+    echo "ERROR: convoke crashed shortly after starting"
+    echo "Last 20 lines of logs/convoke.log:"
+    tail -20 logs/convoke.log
+    echo ""
+    echo "Shutting down docker containers..."
+    docker compose -p strato down
+    rm -f .strato.pid
+    exit 1
+fi
+
+echo "STRATO started in: $(pwd)"

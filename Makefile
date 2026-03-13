@@ -242,6 +242,12 @@ build_common:
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	cd strato && stack install ${NIX_FLAG}
+	@echo installing strato bash scripts to ~/.local/bin
+	@mkdir -p $(HOME)/.local/bin
+	@install -m 755 bin/strato-login $(HOME)/.local/bin/
+	@install -m 755 bin/strato-up $(HOME)/.local/bin/
+	@install -m 755 bin/strato-down $(HOME)/.local/bin/
+	@install -m 755 bin/strato-ps $(HOME)/.local/bin/
 
 build_common_docker:
 	@echo building haskell libraries and creating directories in docker
@@ -414,3 +420,16 @@ install-zsh-completions:
 	@echo '_strato_barometer "$$@"' >> $(ZSH_COMPLETION_DIR)/_strato-barometer
 	@echo "Zsh completions installed to $(ZSH_COMPLETION_DIR)"
 	@echo "Add 'fpath=(~/.zsh/completions \$$fpath)' to ~/.zshrc if not already present"
+
+# Uninstall strato CLI tools
+.PHONY: uninstall
+
+uninstall:
+	@echo "Removing strato tools from ~/.local/bin..."
+	@rm -f $(HOME)/.local/bin/strato-login
+	@rm -f $(HOME)/.local/bin/strato-up
+	@rm -f $(HOME)/.local/bin/strato-down
+	@rm -f $(HOME)/.local/bin/strato-ps
+	@rm -f $(HOME)/.local/bin/strato-setup
+	@rm -f $(HOME)/.local/bin/convoke
+	@echo "Done"

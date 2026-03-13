@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+set -e
+
+CREDENTIALS_FILE="$HOME/.secrets/strato_credentials.yaml"
+
+credentials_exist() {
+    [[ -f "$CREDENTIALS_FILE" ]] && grep -q "clientId:" "$CREDENTIALS_FILE" 2>/dev/null
+}
+
+if [[ "$1" == "--check" ]]; then
+    credentials_exist
+    exit $?
+fi
+
+if credentials_exist && [[ "$1" != "--force" ]]; then
+    echo "Credentials already configured at: $CREDENTIALS_FILE"
+    echo "Use --force to reconfigure."
+    exit 0
+fi
+
+DEFAULT_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+
+read -e -p "OAuth Discovery URL [$DEFAULT_URL]: " OAUTH_DISCOVERY_URL
+OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-$DEFAULT_URL}
+
+read -e -p "OAuth Client ID: " OAUTH_CLIENT_ID
+[[ -z "$OAUTH_CLIENT_ID" ]] && echo "Error: Client ID required" && exit 1
+
+read -s -e -p "OAuth Client Secret: " OAUTH_CLIENT_SECRET
+echo
+[[ -z "$OAUTH_CLIENT_SECRET" ]] && echo "Error: Client Secret required" && exit 1
+
+mkdir -p "$HOME/.secrets"
+chmod 700 "$HOME/.secrets"
+cat > "$CREDENTIALS_FILE" << EOF
+discoveryUrl: "$OAUTH_DISCOVERY_URL"
+clientId: "$OAUTH_CLIENT_ID"
+clientSecret: "$OAUTH_CLIENT_SECRET"
+EOF
+chmod 600 "$CREDENTIALS_FILE"
+
+echo "Credentials saved to: $CREDENTIALS_FILE"

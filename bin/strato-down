@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -e
+
+if [[ -z "$1" ]]; then
+    echo "Usage: strato-down <node-directory>"
+    exit 1
+fi
+
+cd "$1"
+
+echo "Stopping STRATO..."
+
+if [[ -f .strato.pid ]]; then
+    source .strato.pid
+    if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
+        echo "Stopping convoke (PID $CONVOKE_PID)..."
+        kill "$CONVOKE_PID" 2>/dev/null || true
+        sleep 2
+    fi
+    rm -f .strato.pid
+else
+    echo "No pidfile found"
+fi
+
+echo "Stopping Docker containers..."
+docker compose -p strato down
+
+echo "STRATO stopped"
