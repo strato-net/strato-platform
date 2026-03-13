@@ -33,13 +33,10 @@ const config = {
   },
   safe: {
     address: process.env.SAFE_ADDRESS,
+    hotWalletAddress: process.env.SAFE_HOT_WALLET_ADDRESS,
     safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
     safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
     apiKey: process.env.SAFE_API_KEY,
-  },
-  hotWallet: {
-    privateKey: process.env.HOT_WALLET_PRIVATE_KEY || "",
-    threshold: BigInt(process.env.HOT_WALLET_THRESHOLD || String(100n * 10n ** 18n)),
   },
   voucher: {
     contractAddress:
