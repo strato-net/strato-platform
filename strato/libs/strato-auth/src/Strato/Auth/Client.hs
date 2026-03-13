@@ -12,7 +12,7 @@ module Strato.Auth.Client
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException, try)
 import Data.Text (Text)
-import Network.HTTP.Client (Manager, newManager)
+import Network.HTTP.Client (Manager, newManager, managerResponseTimeout, responseTimeoutMicro)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types.Status (Status(..))
 import Servant.Client
@@ -31,6 +31,8 @@ newAuthEnv :: String -> IO AuthEnv
 newAuthEnv url = do
   baseUrl <- parseBaseUrl url
   mgr <- newManager tlsManagerSettings
+    { managerResponseTimeout = responseTimeoutMicro 10000000 -- 10 seconds
+    }
   pure AuthEnv
     { aeBaseUrl = baseUrl
     , aeManager = mgr

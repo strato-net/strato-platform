@@ -68,7 +68,8 @@ getTokenEndpoint :: T.Text -> IO T.Text
 getTokenEndpoint discoveryUrl = do
   uri <- URI.mkURI discoveryUrl
   let (url, _) = fromJust (useHttpsURI uri)
-  response <- runReq defaultHttpConfig $ R.req R.GET url NoReqBody jsonResponse mempty
+  response <- runReq defaultHttpConfig $ R.req R.GET url NoReqBody jsonResponse
+    (R.responseTimeout 10000000) -- 10 seconds
   pure $ ddTokenEndpoint (responseBody response)
 
 newtype DiscoveryDocument = DiscoveryDocument { ddTokenEndpoint :: T.Text }
@@ -87,7 +88,7 @@ fetchToken tokenEndpoint clientId' clientSecret' = do
       body = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
   
   response <- runReq defaultHttpConfig $
-    R.req R.POST url body jsonResponse (authHeader <> contentType)
+    R.req R.POST url body jsonResponse (authHeader <> contentType <> R.responseTimeout 10000000) -- 10 seconds
   
   pure $ trAccessToken (responseBody response)
 
