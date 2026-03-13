@@ -9,6 +9,7 @@ library:
   source-dirs: src/
   dependencies:
     - base
+    - binary
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs

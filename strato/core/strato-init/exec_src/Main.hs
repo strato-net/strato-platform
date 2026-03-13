@@ -10,4 +10,4 @@ import HFlags
 main :: IO ()
 main = do
   _ <- $initHFlags "strato-setup"
-  runLoggingT $ mkFiles flags_network
+  runLoggingT $ mkFilesAndGenesis flags_network

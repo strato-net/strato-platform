@@ -46,7 +46,7 @@ library:
   - monad-alter
   - nibblestring
   - persistent-postgresql
-  - random
+  - entropy
   - raw-strings-qq
   - redis-monad
   - resourcet
@@ -84,23 +84,16 @@ executables:
 
     other-modules: []
 
-  seed-genesis:
-    source-dirs: exec_src/
-    main: SeedGenesis.hs
-    dependencies:
-      - common-log
-      - hflags
-      - strato-conf
-      - strato-init
-
-    other-modules: []
-
   genesis-builder:
     source-dirs: exec_src/
     main: GenesisBuilder.hs
     dependencies:
       - aeson
+      - blockapps-data
+      - blockapps-mpdbs
       - bytestring
+      - common-log
+      - conduit
       - data-default
       - strato-genesis
       - strato-init
