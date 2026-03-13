@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVaultContext } from "@/context/VaultContext";
 import { useSwapContext } from "@/context/SwapContext";
+import { useLendingContext } from "@/context/LendingContext";
+import { useSafetyContext } from "@/context/SafetyContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
@@ -18,9 +20,11 @@ import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModa
 import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
-import { ChevronDown, ChevronUp, CircleArrowDown, CircleArrowUp, Star, Vault as VaultIcon } from "lucide-react";
+import { formatBalance } from "@/utils/numberUtils";
+import { ChevronDown, ChevronUp, CircleArrowDown, CircleArrowUp, Shield, Star, Vault as VaultIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import stratoVaultLogo from "@/assets/strato-vault-logo.png";
+import { mUsdstAddress, sUsdstAddress } from "@/lib/constants";
 
 const WAD = BigInt(10) ** BigInt(18);
 
@@ -206,7 +210,7 @@ const TokenPairIcon = ({ pool }: { pool: Pool }) => {
 
 const Earn = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<"all" | "vaults" | "pools">("all");
+  const [activeFilter, setActiveFilter] = useState<"all" | "vaults" | "pools" | "safety">("all");
   const [expandedPools, setExpandedPools] = useState<Set<string>>(new Set());
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [isPoolDepositModalOpen, setIsPoolDepositModalOpen] = useState(false);
@@ -216,7 +220,9 @@ const Earn = () => {
 
   const { vaultState, refreshVault } = useVaultContext();
   const { pools, fetchPools, poolsLoading } = useSwapContext();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance } = useTokenContext();
+  const { liquidityInfo, loadingLiquidity, refreshLiquidity } = useLendingContext();
+  const { safetyInfo, loading: safetyLoading, refreshSafetyInfo } = useSafetyContext();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { activities: rewardsActivities, loading: rewardsLoading } = useRewardsActivities();
   const { isLoggedIn } = useUser();
   const guestMode = !isLoggedIn;
@@ -230,6 +236,18 @@ const Earn = () => {
   useEffect(() => {
     fetchPools();
   }, [fetchPools]);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+    refreshLiquidity(abortController.signal);
+    return () => abortController.abort();
+  }, [refreshLiquidity]);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+    refreshSafetyInfo(abortController.signal);
+    return () => abortController.abort();
+  }, [refreshSafetyInfo]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -292,10 +310,13 @@ const Earn = () => {
   }, [sortedPools]);
 
   const userHasVaultPosition = safeBigInt(vaultState.userShares) > BigInt(0);
+  const userHasLendingPosition = safeBigInt(liquidityInfo?.withdrawable?.userBalance) > BigInt(0);
+  const userHasSafetyPosition = safeBigInt(safetyInfo?.userSharesTotal) > BigInt(0);
   const vaultTokenCount = vaultState.assets?.length || 0;
 
   const allOpportunities = useMemo(() => {
     if (activeFilter === "vaults") return [];
+    if (activeFilter === "safety") return [];
     if (activeFilter === "pools") return sortedPools;
     return sortedPools;
   }, [activeFilter, sortedPools]);
@@ -330,6 +351,12 @@ const Earn = () => {
       if (activity && activity.emissionRate > 0n) emissions.push(activity.emissionRate);
     }
 
+    const lendingActivity = rewardActivityByContract.get(mUsdstAddress.toLowerCase());
+    if (lendingActivity && lendingActivity.emissionRate > 0n) emissions.push(lendingActivity.emissionRate);
+
+    const safetyActivity = rewardActivityByContract.get(sUsdstAddress.toLowerCase());
+    if (safetyActivity && safetyActivity.emissionRate > 0n) emissions.push(safetyActivity.emissionRate);
+
     if (emissions.length === 0) return 0n;
     return emissions.reduce((min, curr) => (curr < min ? curr : min), emissions[0]);
   }, [rewardActivityByContract, sortedPools, vaultState.shareTokenAddress]);
@@ -352,13 +379,14 @@ const Earn = () => {
   };
 
   const vaultRewardMeta = getRewardMeta(vaultState.shareTokenAddress);
+  const lendingRewardMeta = getRewardMeta(mUsdstAddress);
+  const safetyRewardMeta = getRewardMeta(sUsdstAddress);
 
   const pageLoading =
     vaultState.loading ||
     (isLoggedIn && vaultState.loadingUser) ||
     poolsLoading ||
-    rewardsLoading ||
-    (isLoggedIn && loadingUsdstBalance);
+    rewardsLoading;
 
   if (pageLoading) {
     return (
@@ -445,6 +473,34 @@ const Earn = () => {
                   />
                 )}
 
+                {userHasLendingPosition && (
+                  <PositionCard
+                    title="USDST Lending Pool"
+                    icon={<CircleArrowDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                    deposited={`$${formatUsd(liquidityInfo?.withdrawable?.userBalance || "0")}`}
+                    earnings={{
+                      label: "-",
+                      className: "text-foreground",
+                    }}
+                    rateLabel="APY"
+                    rateValue={liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}
+                  />
+                )}
+
+                {userHasSafetyPosition && (
+                  <PositionCard
+                    title="USDST Safety Module"
+                    icon={<Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                    deposited={formatBalance(safetyInfo?.redeemValueTotal || "0", undefined, 18, 2, 2, true)}
+                    earnings={{
+                      label: "-",
+                      className: "text-foreground",
+                    }}
+                    rateLabel="APY"
+                    rateValue="N/A"
+                  />
+                )}
+
                 {poolsWithUserPosition.map((pool) => {
                   const lpBalance = safeBigInt(pool.lpToken?.totalBalance);
                   const lpPrice = safeBigInt(pool.lpToken?.price);
@@ -471,7 +527,7 @@ const Earn = () => {
                   );
                 })}
 
-                {!userHasVaultPosition && poolsWithUserPosition.length === 0 && (
+                {!userHasVaultPosition && !userHasLendingPosition && !userHasSafetyPosition && poolsWithUserPosition.length === 0 && (
                   <Card>
                     <CardContent className="pt-6 text-sm text-muted-foreground">
                       No active positions yet.
@@ -585,6 +641,18 @@ const Earn = () => {
                 >
                   Pools
                 </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActiveFilter("safety")}
+                  className={`h-9 rounded-full px-6 text-base font-medium transition-all ${
+                    activeFilter === "safety"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
+                      : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                  }`}
+                >
+                  Safety Modules
+                </Button>
               </div>
             </div>
 
@@ -632,6 +700,108 @@ const Earn = () => {
                               )}
                               <Button className="h-9 min-w-[108px]" size="sm" onClick={handleVaultDepositClick}>
                                 Deposit
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
+                      {(activeFilter === "all" || activeFilter === "pools") && (
+                        <tr className="border-b border-border/40">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
+                                <CircleArrowDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <p className="font-medium truncate">USDST Lending Pool</p>
+                              <Badge variant="secondary" className="text-[10px]">Lending</Badge>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            Earn yield by supplying USDST liquidity
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-semibold">
+                              {liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">APY</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-semibold">
+                              {loadingLiquidity || !liquidityInfo?.totalUSDSTSupplied
+                                ? "$0.00"
+                                : `$${formatUsd(liquidityInfo.totalUSDSTSupplied.toString())}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">TVL</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              {lendingRewardMeta.pointsLabel !== "-" && (
+                                <div className="hidden md:flex items-center gap-1 text-sm text-muted-foreground mr-1">
+                                  <Star className="h-4 w-4 text-amber-500" />
+                                  <span className="font-medium text-foreground">{lendingRewardMeta.pointsLabel}</span>
+                                  {lendingRewardMeta.featured && (
+                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Featured</Badge>
+                                  )}
+                                </div>
+                              )}
+                              <Button
+                                className="h-9 min-w-[108px] justify-center"
+                                size="sm"
+                                onClick={() => navigate("/dashboard/earn-lending")}
+                              >
+                                <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
+                                Deposit
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
+                      {(activeFilter === "all" || activeFilter === "pools" || activeFilter === "safety") && (
+                        <tr className="border-b border-border/40">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
+                                <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <p className="font-medium truncate">USDST Safety Module</p>
+                              <Badge variant="secondary" className="text-[10px]">Safety</Badge>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            Stake USDST to support protocol safety
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-semibold">N/A</p>
+                            <p className="text-xs text-muted-foreground">APY</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-semibold">
+                              {safetyLoading || !safetyInfo?.totalAssets
+                                ? "$0.00"
+                                : `$${formatUsd(safetyInfo.totalAssets.toString())}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">TVL</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              {safetyRewardMeta.pointsLabel !== "-" && (
+                                <div className="hidden md:flex items-center gap-1 text-sm text-muted-foreground mr-1">
+                                  <Star className="h-4 w-4 text-amber-500" />
+                                  <span className="font-medium text-foreground">{safetyRewardMeta.pointsLabel}</span>
+                                  {safetyRewardMeta.featured && (
+                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Featured</Badge>
+                                  )}
+                                </div>
+                              )}
+                              <Button
+                                className="h-9 min-w-[108px] justify-center"
+                                size="sm"
+                                onClick={() => navigate("/dashboard/earn-safety")}
+                              >
+                                <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
+                                Stake
                               </Button>
                             </div>
                           </td>

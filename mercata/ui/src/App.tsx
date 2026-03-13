@@ -33,6 +33,8 @@ import ReferralsManagement from "./pages/ReferralsManagement";
 import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
 import EarnVault from "./pages/EarnVault";
+import EarnLending from "./pages/EarnLending";
+import EarnSafety from "./pages/EarnSafety";
 import OnrampPage from "./pages/OnrampPage";
 import BuyMetals from "./pages/BuyMetals";
 import CreditCardPage from "./pages/CreditCard";
@@ -270,6 +272,22 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Earn />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-lending"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnLending />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-safety"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnSafety />
                                               </GuestAccessibleRoute>
                                             }
                                           />
