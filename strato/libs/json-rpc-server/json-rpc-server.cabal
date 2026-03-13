@@ -1,0 +1,74 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           json-rpc-server
+version:        0.3.0.0
+synopsis:       JSON-RPC 2.0 on the server side (BlockApps fork)
+description:    BlockApps-maintained fork of json-rpc-server.
+                .
+                An implementation of the server side of JSON-RPC 2.0.
+                See <http://www.jsonrpc.org/specification>. This library uses
+                'ByteString' for input and output, leaving the choice of transport
+                up to the user.
+                .
+                Originally by Kristen Kozak (grayjay). Forked and maintained by
+                BlockApps with updated dependency bounds for modern GHC.
+category:       Network, JSON
+homepage:       https://github.com/blockapps/strato-platform#readme
+bug-reports:    https://github.com/blockapps/strato-platform/issues
+author:         Kristen Kozak
+maintainer:     BlockApps <support@blockapps.net>
+copyright:      (c) 2013 Kristen Kozak, (c) 2024-2026 BlockApps Inc.
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    changelog.md
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/strato-platform
+
+library
+  exposed-modules:
+      Network.JsonRpc.Server
+  other-modules:
+      Network.JsonRpc.Types
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+  build-depends:
+      aeson >=0.6 && <3
+    , base >=4.3 && <5
+    , bytestring >=0.9 && <1
+    , deepseq >=1.1 && <2
+    , mtl >=2.2.1 && <2.4
+    , text >=0.11 && <3
+    , unordered-containers >=0.1 && <0.3
+    , vector >=0.7.1 && <1
+  default-language: Haskell2010
+
+test-suite tests
+  type: exitcode-stdio-1.0
+  main-is: TestSuite.hs
+  other-modules:
+      TestParallelism
+      Internal
+  hs-source-dirs:
+      tests
+  ghc-options: -Wall
+  build-depends:
+      HUnit >=1.2 && <1.7
+    , aeson
+    , base
+    , bytestring
+    , json-rpc-server
+    , mtl
+    , test-framework >=0.7 && <0.9
+    , test-framework-hunit ==0.3.*
+    , text
+    , vector
+  default-language: Haskell2010
