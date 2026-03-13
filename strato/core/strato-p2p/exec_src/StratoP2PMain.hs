@@ -30,6 +30,8 @@ import           BlockApps.Logging as BL
 import           Data.IORef
 import           Data.Set.Ordered (empty)
 import           Instrumentation
+import           Blockchain.Sequencer.Kafka (seqP2pEventsTopicName, unseqEventsTopicName)
+import           Control.Monad.Composable.Kafka (createTopicAndWait)
 
 main :: IO ()
 main = runLoggingT initP2P
@@ -44,6 +46,9 @@ initP2P = labelTheThread "initP2P" $ do
   -- a freshly created table will already have all peers in the inactive state.
   _ <- liftIO $ (try resetPeers :: IO (Either SomeException ()))
   _ <- liftIO $ $initHFlags "Strato P2P"
+  liftIO $ runKafkaMConfigured "strato-p2p" $ do
+    createTopicAndWait seqP2pEventsTopicName
+    createTopicAndWait unseqEventsTopicName
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef

@@ -7,7 +7,3 @@ cabal-dev
 *.chs.h
 .virtualenv
 .hsenv
-.cabal-sandbox/
-cabal.sandbox.config
-cabal.config
-merkle-patricia-db.cabal

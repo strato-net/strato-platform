@@ -16,7 +16,7 @@ const DEFAULTS = {
   },
   [PROFILE_PROD]: {
     NODE_URL: "https://app.strato.nexus",
-    DEFAULT_CHAINS: "1,8453,59144",
+    DEFAULT_CHAINS: "1,8453",
   },
 };
 

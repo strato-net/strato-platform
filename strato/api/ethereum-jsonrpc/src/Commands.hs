@@ -10,7 +10,6 @@ import Binary
 import Blockchain.Constants
 import Blockchain.Data.Transaction
 import Blockchain.EthConf
-import Blockchain.KafkaTopics
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
@@ -238,7 +237,7 @@ emitKafkaJsonRlpCommand c = do
 waitForResponse :: String -> Offset -> IO B.ByteString
 waitForResponse id offset = do
   putStrLn $ "before wait: " ++ show offset
-  maybeResponses <- fetchBytesIO (lookupTopic "jsonrpcresponse") offset
+  maybeResponses <- fetchBytesIO "jsonrpcresponse" offset
 
   putStrLn "something has come"
 
@@ -259,7 +258,7 @@ callVM c = do
   lastOffsetOrError <-
     liftIO $
       runKafkaConfigured "ethereum-jsonrpc" $
-        getLastOffset LatestTime 0 (lookupTopic "jsonrpcresponse")
+        getLastOffset LatestTime 0 "jsonrpcresponse"
   let lastOffset =
         case lastOffsetOrError of
           Left e -> error $ show e

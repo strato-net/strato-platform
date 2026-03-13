@@ -1,0 +1,123 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-p2p
+version:        0.0.0
+synopsis:       a microservice that handles peer to peer connections for strato
+author:         Jamshid
+maintainer:     jamshidnh@gmail.com
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.CommunicationConduit
+      Blockchain.Context
+      Blockchain.Data.Control
+      Blockchain.Data.Wire
+      Blockchain.Display
+      Blockchain.Event
+      Blockchain.EventException
+      Blockchain.EventModel
+      Blockchain.ExtMergeSources
+      Blockchain.HeaderCache
+      Blockchain.Metrics
+      Blockchain.Options
+      Blockchain.P2PUtil
+      Blockchain.Participation
+      Blockchain.SeqEventNotify
+      Blockchain.Threads
+      Blockchain.TimerSource
+      Executable.StratoP2P
+      Executable.StratoP2PClient
+      Executable.StratoP2PLoopback
+      Executable.StratoP2PServer
+  other-modules:
+      Paths_strato_p2p
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -threaded -Wall -O2
+  build-depends:
+      aeson
+    , base
+    , base16-bytestring
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockstanbul
+    , bytestring
+    , common-log
+    , composable-monads-base
+    , conduit
+    , conduit-extra
+    , containers
+    , cross-monitoring
+    , crypto-pubkey-types
+    , dns
+    , either
+    , ethereum-discovery
+    , ethereum-encryption
+    , ethereum-rlp
+    , format
+    , hedis
+    , hflags
+    , http-client
+    , iproute
+    , kafka-monad
+    , lens
+    , lifted-async
+    , lifted-base
+    , merkle-patricia-db
+    , monad-alter
+    , mtl
+    , network
+    , ordered-containers
+    , persistent
+    , prometheus-client
+    , resourcet
+    , seqevents
+    , servant-client
+    , servant-server
+    , split
+    , sql-monad
+    , stm-conduit
+    , strato-conf
+    , strato-model
+    , strato-redis-blockdb
+    , text
+    , time
+    , unliftio
+    , unliftio-core
+    , vault-monad
+    , warp
+  default-language: Haskell2010
+
+executable strato-p2p
+  main-is: StratoP2PMain.hs
+  other-modules:
+      Paths_strato_p2p
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -threaded
+  build-depends:
+      base
+    , blockapps-init
+    , common-log
+    , ethereum-discovery
+    , hflags
+    , kafka-monad
+    , lifted-async
+    , ordered-containers
+    , process-monitor
+    , seqevents
+    , strato-conf
+    , strato-model
+    , strato-p2p
+    , vault-monad
+    , vm-tools
+    , wai-middleware-prometheus
+    , warp
+  default-language: Haskell2010

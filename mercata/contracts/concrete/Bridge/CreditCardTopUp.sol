@@ -14,7 +14,6 @@ struct IAssetInfo {
 
 abstract contract IMercataBridge is Ownable {
     mapping(address => mapping(uint256 => IAssetInfo)) public record assets;
-    mapping(address => mapping(uint256 => mapping(address => bool))) public record assetRouteEnabled;
     function USDST_ADDRESS() external view returns (address);
 
     function requestWithdrawal(
@@ -24,6 +23,8 @@ abstract contract IMercataBridge is Ownable {
         address stratoToken,
         uint256 stratoTokenAmount
     ) external returns (uint256);
+
+    function abortWithdrawal(uint256 id) public;
 }
 
 /**
@@ -110,8 +111,6 @@ contract record CreditCardTopUp is Ownable {
 
         address stratoToken = bridge.USDST_ADDRESS();
         if (stratoToken == address(0)) revert AssetNotFound();
-        bool routeEnabled = bridge.assetRouteEnabled(externalToken, externalChainId, stratoToken);
-        if (!routeEnabled) revert RouteNotEnabled();
 
         if (!IERC20(stratoToken).transferFrom(user, address(this), stratoTokenAmount)) revert TransferFailed();
         if (!IERC20(stratoToken).approve(mercataBridge, stratoTokenAmount)) revert ApproveFailed();
@@ -223,5 +222,13 @@ contract record CreditCardTopUp is Ownable {
      */
     function getCards(address user) external view returns (CardInfo[] memory) {
         return userCards[user];
+    }
+
+    function refund(address _token, address _recipient, uint _amount) external onlyOwner {
+        IERC20(_token).transfer(_recipient, _amount);
+    }
+
+    function abortWithdrawal(uint _id) external onlyOwner {
+        IMercataBridge(mercataBridge).abortWithdrawal(_id);
     }
 }

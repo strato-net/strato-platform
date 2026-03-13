@@ -30,7 +30,7 @@
     "@hapi/joi": "^17.1.1",
     "@mercata/shared-types": "file:../packages/shared-types",
     "@types/json-bigint": "^1.0.4",
-    "axios": "^1.0.11",
+    "axios": "^1.13.6",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",

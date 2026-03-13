@@ -2,8 +2,8 @@
  * One-time MercataBridge stable route migration helper.
  *
  * Purpose:
- * 1) Set USDC default route to USDCST via setAsset(...)
- * 2) Set USDT default route to USDTST via setAsset(...)
+ * 1) Set USDC default route to the STRATO USDC token via setAsset(...)
+ * 2) Set USDT default route to the STRATO USDT token via setAsset(...)
  * 3) Enable USDC/USDT -> USDST alternate routes via setAssetRoute(...)
  *
  * Dry-run by default. Use --apply to execute transactions.
@@ -58,6 +58,10 @@ const { callListAndWait } = require("./util");
 const DEFAULT_BRIDGE_ADDRESS = "0000000000000000000000000000000000001008";
 const DEFAULT_USDST_ADDRESS = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
 const ZERO_UINT256 = "0000000000000000000000000000000000000000";
+const ROUTE_TOKEN_SYMBOL_CANDIDATES = {
+  USDC: ["USDC", "USDCST"],
+  USDT: ["USDT", "USDTST"],
+};
 const PROFILE_CHAIN_IDS = {
   testnet: [11155111, 84532],
   prod: [1, 8453],
@@ -216,6 +220,22 @@ async function resolveActiveTokenBySymbol(tokenObj, symbol) {
   return sorted[0].address;
 }
 
+async function resolveActiveTokenBySymbols(tokenObj, symbols) {
+  const seen = new Set();
+  for (const candidate of symbols) {
+    const normalized = String(candidate || "").trim().toUpperCase();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+
+    const address = await resolveActiveTokenBySymbol(tokenObj, normalized);
+    if (address) {
+      return { symbol: normalized, address };
+    }
+  }
+
+  return { symbol: "", address: "" };
+}
+
 function buildSetAssetCall(bridgeAddress, target, usdcstToken) {
   return {
     contract: { address: bridgeAddress, name: "MercataBridge" },
@@ -259,6 +279,7 @@ async function main() {
   const bridgeAddress = normalizeAddress(DEFAULT_BRIDGE_ADDRESS);
   const targetSymbols = ["USDC", "USDT"];
   const defaultRouteTokenBySymbol = {};
+  const selectedRouteTokenSymbolByExternalSymbol = {};
   const usdstToken = normalizeAddress(DEFAULT_USDST_ADDRESS);
   const apply = !!args.apply;
 
@@ -268,14 +289,15 @@ async function main() {
   const tokenObj = await getTokenObj();
 
   for (const symbol of targetSymbols) {
-    const routeTokenSymbol = `${symbol}ST`;
-    const tokenAddress = await resolveActiveTokenBySymbol(tokenObj, routeTokenSymbol);
-    if (!tokenAddress) {
+    const candidateSymbols = ROUTE_TOKEN_SYMBOL_CANDIDATES[symbol] || [symbol];
+    const resolvedRouteToken = await resolveActiveTokenBySymbols(tokenObj, candidateSymbols);
+    if (!resolvedRouteToken.address) {
       throw new Error(
-        `${routeTokenSymbol} not found as active token in Cirrus. Create/activate token first.`,
+        `${candidateSymbols.join(" or ")} not found as active token in Cirrus. Create/activate token first.`,
       );
     }
-    defaultRouteTokenBySymbol[symbol] = tokenAddress;
+    defaultRouteTokenBySymbol[symbol] = resolvedRouteToken.address;
+    selectedRouteTokenSymbolByExternalSymbol[symbol] = resolvedRouteToken.symbol;
   }
 
   const targetsBySymbol = {};
@@ -310,6 +332,7 @@ async function main() {
         env: ENV_PROFILE,
         bridgeAddress,
         defaultRouteTokenBySymbol,
+        selectedRouteTokenSymbolByExternalSymbol,
         usdstToken,
         apply,
         targetsBySymbol,

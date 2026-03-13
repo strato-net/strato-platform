@@ -1,0 +1,176 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           solid-vm
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.SolidVM
+      Blockchain.SolidVM.Simple
+      Blockchain.SolidVM.SM
+  other-modules:
+      Blockchain.SolidVM.Builtins
+      Blockchain.SolidVM.Environment
+      Blockchain.SolidVM.GasInfo
+      Blockchain.SolidVM.SetGet
+      Blockchain.SolidVM.TraceTools
+      Paths_solid_vm
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      Decimal
+    , base
+    , base16-bytestring
+    , base64-bytestring
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-haskoin
+    , blockapps-mpdbs
+    , bytestring
+    , common-log
+    , containers
+    , cryptohash
+    , crypton
+    , data-default
+    , debugger
+    , deepseq
+    , elliptic-curve
+    , ethereum-rlp
+    , exceptions
+    , extra
+    , format
+    , galois-field
+    , labeled-error
+    , lens
+    , merkle-patricia-db
+    , monad-alter
+    , nibblestring
+    , ordered-containers
+    , pairing
+    , parsec
+    , poseidon-hash
+    , solid-vm-compiler
+    , solid-vm-model
+    , solid-vm-parser
+    , solid-vm-static-analysis
+    , source-tools
+    , strato-conf
+    , strato-model
+    , text
+    , time
+    , transformers
+    , unliftio
+    , utf8-string
+    , vector
+    , vm-tools
+  default-language: Haskell2010
+
+executable exprs-needed
+  main-is: ExprsNeeded.hs
+  hs-source-dirs:
+      exec_src
+  build-depends:
+      base
+    , containers
+    , parsec
+    , solid-vm-compiler
+    , solid-vm-model
+    , solid-vm-parser
+    , solid-vm-static-analysis
+    , text
+  default-language: Haskell2010
+
+test-suite solid-vm-spec
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      OptimizerSpec
+      SolidVMSpec
+      Spec
+      StaticAnalysisSpec
+      TypecheckerSpec
+      Paths_solid_vm
+  hs-source-dirs:
+      tests/
+  ghc-options: -dynamic
+  build-depends:
+      QuickCheck
+    , aeson
+    , async
+    , base
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-mpdbs
+    , bytestring
+    , common-log
+    , composable-monads-base
+    , containers
+    , crypto-api
+    , ethereum-rlp
+    , extra
+    , hflags
+    , hspec
+    , hspec-expectations-lifted
+    , labeled-error
+    , lens
+    , merkle-patricia-db
+    , monad-alter
+    , ordered-containers
+    , raw-strings-qq
+    , seqevents
+    , solid-vm
+    , solid-vm-compiler
+    , solid-vm-model
+    , solid-vm-parser
+    , solid-vm-static-analysis
+    , source-tools
+    , strato-genesis
+    , strato-init
+    , strato-model
+    , strato-redis-blockdb
+    , text
+    , time
+    , transformers
+    , unliftio
+    , utf8-string
+    , vm-tools
+  default-language: Haskell2010
+
+benchmark codebench
+  type: exitcode-stdio-1.0
+  main-is: CodeBench.hs
+  other-modules:
+      Paths_solid_vm
+  hs-source-dirs:
+      bench/
+  ghc-options: -dynamic
+  build-depends:
+      base
+    , binary
+    , bytestring
+    , common-log
+    , containers
+    , criterion
+    , deepseq
+    , file-embed
+    , hflags
+    , lens
+    , memory
+    , parsec
+    , solid-vm
+    , solid-vm-compiler
+    , solid-vm-model
+    , solid-vm-parser
+    , solid-vm-static-analysis
+    , strato-model
+    , text
+    , vm-tools
+  default-language: Haskell2010

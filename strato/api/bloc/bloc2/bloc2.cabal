@@ -1,0 +1,97 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           bloc2
+version:        0.1.0.0
+synopsis:       Bloc microservice
+description:    Bloc microservice
+category:       Web
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Bloc.Database.Queries
+      Bloc.Monad
+      Bloc.Server
+      Bloc.Server.Contracts
+      Bloc.Server.Transaction
+      Bloc.Server.TransactionResult
+      Bloc.Server.Utils
+      Bloc.XabiHelper
+  other-modules:
+      Paths_bloc2
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
+  build-depends:
+      base
+    , base16-bytestring
+    , bimap
+    , bloc2api
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-mpdbs
+    , blockapps-secp256k1-haskell
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-client
+    , bytestring
+    , cache
+    , clock
+    , common-log
+    , containers
+    , core-api2
+    , deepseq
+    , esqueleto
+    , ethereum-rlp
+    , evm-solidity
+    , extra
+    , format
+    , hashable
+    , insert-ordered-containers
+    , labeled-error
+    , lens
+    , monad-alter
+    , monad-logger
+    , mtl
+    , openapi3
+    , ordered-containers
+    , parsec
+    , seqevents
+    , servant-client
+    , servant-openapi3
+    , servant-server
+    , solid-vm-compiler
+    , solid-vm-model
+    , solid-vm-parser
+    , source-tools
+    , sql-monad
+    , strato-auth
+    , strato-model
+    , strato-redis-blockdb
+    , text
+    , time
+    , transformers
+    , unliftio
+    , vault-monad
+    , vector
+  default-language: Haskell2010
+
+test-suite blockapps-bloc22-server-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      UtilsSpec
+      Paths_bloc2
+  hs-source-dirs:
+      test/
+  ghc-options: -Wall -Werror
+  build-depends:
+      base
+    , bloc2
+    , hspec
+  default-language: Haskell2010

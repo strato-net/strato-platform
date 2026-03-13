@@ -71,6 +71,7 @@ executables:
       - bloc2
       - blockapps-init
       - hflags
+      - kafka-monad
       - persistent-postgresql
       - process-monitor
       - postgresql-simple
@@ -79,6 +80,7 @@ executables:
       - strato-conf
       - text
       - transformers
+      - unliftio
       - wai-middleware-prometheus
       - warp
 

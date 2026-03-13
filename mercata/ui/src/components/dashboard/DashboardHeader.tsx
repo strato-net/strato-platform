@@ -17,11 +17,12 @@ import LiquidationNotification from '../ui/LiquidationNotification';
 
 interface DashboardHeaderProps {
   title: string;
+  subtitle?: string;
 }
 
 const GRADIENT_BUTTON_CLASS = "w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
 
-const DashboardHeader = ({ title }: DashboardHeaderProps) => {
+const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
   const { userAddress, userName, logout, isLoggedIn } = useUser();
   const { isTestnet } = useNetwork();
   const { resolvedTheme } = useTheme();
@@ -88,8 +89,12 @@ const DashboardHeader = ({ title }: DashboardHeaderProps) => {
             className="h-8" 
           />
         </button>
-        {/* Title always visible */}
-        <h1 className="text-base md:text-xl font-bold whitespace-nowrap">{title}</h1>
+        <div className="flex flex-col">
+          <h1 className="text-base md:text-xl font-bold whitespace-nowrap">{title}</h1>
+          {subtitle && (
+            <p className="text-xs md:text-sm text-muted-foreground">{subtitle}</p>
+          )}
+        </div>
         {isTestnet && (
           <span className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold uppercase hidden sm:inline-block">
             TESTNET

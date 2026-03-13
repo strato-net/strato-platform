@@ -20,9 +20,11 @@ executables:
       - blockapps-init
       - ethereum-discovery
       - hflags
+      - kafka-monad
       - lifted-async
       - ordered-containers
       - process-monitor
+      - seqevents
       - strato-conf
       - strato-model
       - strato-p2p

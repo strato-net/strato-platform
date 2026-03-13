@@ -117,7 +117,7 @@ const App = () => {
       const appName = "Mercata";
       const stratoChainId = networkId ? Number(networkId) : null;
       const stratoChain =
-        stratoChainId != null && !Number.isNaN(stratoChainId)
+        stratoChainId != null && !Number.isNaN(stratoChainId) && Number.isSafeInteger(stratoChainId)
           ? defineChain({
               id: stratoChainId,
               name: "STRATO",

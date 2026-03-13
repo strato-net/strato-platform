@@ -36,7 +36,7 @@ getAndProcessMessages ::
   PGConnection ->
   m ()
 getAndProcessMessages conn = do
-  _ <- createTopic solidVmEventsTopicName
+  createTopicAndWait solidVmEventsTopicName
 
   consume "getAndProcessMessages'" "slipstream" "vmevents" $ \() messages -> do
     recordKafkaMessages messages

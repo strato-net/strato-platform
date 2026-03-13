@@ -496,6 +496,31 @@ export async function getPendingWithdrawalsForCard(
 }
 
 /**
+ * Get a user's USDST balance from Cirrus (on-chain). Returns wei string.
+ */
+export async function getUsdstBalanceForUser(
+  accessToken: string,
+  userAddress: string
+): Promise<string> {
+  const normalizedUser = normalizeAddress(userAddress);
+  if (!normalizedUser) return "0";
+  try {
+    const { data } = await cirrus.get(accessToken, `/${Token}-_balances`, {
+      params: {
+        select: "value",
+        address: `eq.${USDST}`,
+        key: `eq.${normalizedUser}`,
+      },
+    });
+    if (!Array.isArray(data) || data.length === 0) return "0";
+    return String(data[0]?.value ?? "0");
+  } catch (err) {
+    console.error("getUsdstBalanceForUser:", err);
+    return "0";
+  }
+}
+
+/**
  * Get card wallet token balance for a config (for display). Returns wei string or null if RPC unavailable.
  */
 export async function getCardBalance(config: CreditCardConfig): Promise<string | null> {

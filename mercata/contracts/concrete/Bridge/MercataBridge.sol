@@ -6,6 +6,7 @@ import "../Tokens/Token.sol";
 import "../Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
 import "../Lending/LendingRegistry.sol";
+import "../Metals/MetalForge.sol";
 
 /**
  * @title MercataBridge
@@ -111,18 +112,17 @@ contract record MercataBridge is Ownable {
     /// @param stratoToken The corresponding STRATO token address
     event AssetUpdated(bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken);
 
-    /// @notice Emitted when a user requests to auto save a deposit to the lending pool
-    /// @param user The address that requested the auto save
-    /// @param externalChainId The external chain identifier where the deposit occurred
-    /// @param externalTxHash The transaction hash on the external chain
-    event AutoSaveRequested(address user, uint256 externalChainId, string externalTxHash);
+    /// @notice Emitted when the metal forge address is updated
+    event MetalForgeUpdated(address newForge, address oldForge);
+
+    /// @notice Emitted when a user requests a post-deposit action
+    event DepositActionRequested(address user, uint256 externalChainId, string externalTxHash, DepositAction action, address targetToken);
 
     /// @notice Emitted when a deposit is auto saved to the lending pool
-    /// @param externalChainId The external chain identifier where the deposit occurred
-    /// @param externalTxHash The transaction hash on the external chain
-    /// @param mintedAmount The amount of USDST minted and supplied as liquidity
-    /// @param mTokenAmount The amount of mUSDST LP tokens for the deposit
     event AutoSaved(uint256 externalChainId, string externalTxHash, uint256 mintedAmount, uint256 mTokenAmount);
+
+    /// @notice Emitted when a deposit is auto forged into metal
+    event AutoForged(uint256 externalChainId, string externalTxHash, address payToken, uint256 payAmount, address metalToken, uint256 metalAmount);
 
     /* ===================================================================== */
     /*                            STATE VARIABLES                            */
@@ -143,6 +143,9 @@ contract record MercataBridge is Ownable {
 
     /// @notice Lending registry contract for managing auto earning
     address public lendingRegistry;
+
+    /// @notice MetalForge contract for auto-forging metals on deposit
+    address public metalForge;
 
     /// @notice USDST token address for cross-chain minting/redeeming
     /// @dev Default USDST address: 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
@@ -168,13 +171,9 @@ contract record MercataBridge is Ownable {
     /// @dev Stores deposit state and conversion information
     mapping(uint256 => mapping(string => DepositInfo)) public record deposits;
 
-    /// @notice Registry of requests to supply liquidity to the lending pool upon deposit completion
-    /// @dev Maps user address, external chain ID, and transaction hash
-    ///      to a boolean indicating whether that user wishes to autosave the indicated deposit
-    /// @dev Only autoSave requests from the deposit recipient will be honored
-    /// @dev Only autoSave requests for the strato token borrowable in the lending pool will be performed
-    /// @dev Key: (userAddress, externalChainId, externalTxHash) -> Value: bool
-    mapping(address => mapping (uint256 => mapping(string => bool))) public record autoSaveRequested;
+    /// @notice Registry of post-deposit action requests
+    /// @dev Key: (userAddress, externalChainId, externalTxHash) -> Value: DepositActionRequest
+    mapping(address => mapping(uint256 => mapping(string => DepositActionRequest))) public record depositActionRequests;
 
     /// @notice Registry of withdrawal requests by withdrawal ID
     /// @dev Maps withdrawal ID to withdrawal information
@@ -417,6 +416,17 @@ contract record MercataBridge is Ownable {
     }
 
     /**
+     * @dev Sets the metal forge address
+     * @notice Only the owner can update the metal forge address
+     * @param newMetalForge The new metal forge address (must not be zero address)
+     */
+    function setMetalForge(address newMetalForge) public onlyOwner {
+        require(newMetalForge != address(0), "MB: zero metal forge address");
+        emit MetalForgeUpdated(newMetalForge, metalForge);
+        metalForge = newMetalForge;
+    }
+
+    /**
      * @dev Sets the USDST token address
      * @notice Only the owner can update the USDST address
      * @param newUSDSTAddress The new USDST token address (must not be zero address)
@@ -585,6 +595,38 @@ contract record MercataBridge is Ownable {
         emit AutoSaved(externalChainId, normalizedTxHash, actualMintedAmount, mTokenAmount);
     }
 
+    /**
+     * @dev Forges metal tokens from a deposit's minted stablecoin via MetalForge
+     * @notice Mints stablecoin to the bridge, calls MetalForge.mintMetal (which mints metal to the bridge),
+     *         then transfers the minted metal to the deposit recipient
+     * @param d The deposit information containing token and recipient details
+     * @param externalChainId The external chain identifier where the deposit occurred
+     * @param normalizedTxHash The normalized transaction hash on the external chain
+     * @param metalToken The metal token address to forge (e.g. GOLDST, SILVST)
+     */
+    function _autoForge(DepositInfo d, uint256 externalChainId, string normalizedTxHash, address metalToken) internal {
+        require(metalForge != address(0), "MB: metal forge not set");
+        require(metalToken != address(0), "MB: invalid metal token");
+
+        // Mint stablecoin to this contract temporarily
+        uint256 actualMintedAmount = _mintFunds(d.stratoToken, address(this), d.stratoTokenAmount);
+        require(actualMintedAmount > 0, "MB: no tokens minted");
+
+        // Approve MetalForge to spend the minted stablecoin
+        IERC20(d.stratoToken).approve(metalForge, actualMintedAmount);
+
+        // Call mintMetal — metal is minted to msg.sender (this bridge)
+        uint256 metalBalanceBefore = IERC20(metalToken).balanceOf(address(this));
+        MetalForge(metalForge).mintMetal(metalToken, d.stratoToken, actualMintedAmount, 0);
+        uint256 metalAmount = IERC20(metalToken).balanceOf(address(this)) - metalBalanceBefore;
+        require(metalAmount > 0, "MB: no metal minted");
+
+        // Transfer the minted metal to the deposit recipient
+        IERC20(metalToken).transfer(d.stratoRecipient, metalAmount);
+
+        emit AutoForged(externalChainId, normalizedTxHash, d.stratoToken, actualMintedAmount, metalToken, metalAmount);
+    }
+
     // ───────────── Deposit & withdrawal related functions ─────────────
     // ───────────── Deposit flow functions ─────────────
     /**
@@ -684,18 +726,31 @@ contract record MercataBridge is Ownable {
         }
     }
 
-    function requestAutoSave(address user, uint externalChainId, string externalTxHash) external onlyOwner {
+    /**
+     * @dev Requests a post-deposit action for a pending deposit
+     * @notice Only the owner can request deposit actions on behalf of users
+     * @notice The action will be executed when the deposit is confirmed via confirmDeposit
+     * @notice On action failure during confirmation, falls back to minting tokens directly to the recipient
+     * @param user The address requesting the action (must match the deposit recipient to be honored)
+     * @param externalChainId The external chain identifier where the deposit occurred
+     * @param externalTxHash The transaction hash on the external chain
+     * @param action The deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)
+     * @param targetToken Action-specific target token (e.g. metal token address for AUTO_FORGE, unused for AUTO_SAVE)
+     */
+    function requestDepositAction(address user, uint externalChainId, string externalTxHash, uint action, address targetToken) external onlyOwner {
         require(user != address(0), "MB: invalid user");
         require(externalChainId > 0, "MB: invalid external chain id");
         require(chains[externalChainId].enabled, "MB: chain not enabled");
         require(externalTxHash.length > 0, "MB: invalid external tx hash");
+        require(action != uint(DepositAction.NONE), "MB: invalid action");
+        DepositAction _action = DepositAction(action);
 
         string normalizedTxHash = externalTxHash.normalizeHex();
 
         require(deposits[externalChainId][normalizedTxHash].bridgeStatus != BridgeStatus.COMPLETED, "MB: Already completed");
-        autoSaveRequested[user][externalChainId][normalizedTxHash] = true;
+        depositActionRequests[user][externalChainId][normalizedTxHash] = DepositActionRequest(_action, targetToken);
 
-        emit AutoSaveRequested(user, externalChainId, normalizedTxHash);
+        emit DepositActionRequested(user, externalChainId, normalizedTxHash, _action, targetToken);
     }
 
     /**
@@ -719,20 +774,28 @@ contract record MercataBridge is Ownable {
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
-        if (autoSaveRequested[d.stratoRecipient][externalChainId][normalizedTxHash]) {
+        DepositActionRequest req = depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
+        if (req.action == DepositAction.AUTO_SAVE) {
             try {
                 _autoSave(d, externalChainId, normalizedTxHash);
             }
             catch {
-                // On failure, just mint stratoToken to the recipient instead
                 uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
                 require(actualMintedAmount > 0, "MB: no tokens minted");
             }
-            // Delete the auto save request regardless of success or failure
-            delete autoSaveRequested[d.stratoRecipient][externalChainId][normalizedTxHash];
+            delete depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
+        }
+        else if (req.action == DepositAction.AUTO_FORGE) {
+            try {
+                _autoForge(d, externalChainId, normalizedTxHash, req.targetToken);
+            }
+            catch {
+                uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
+                require(actualMintedAmount > 0, "MB: no tokens minted");
+            }
+            delete depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
         }
         else {
-            // If auto save is not requested, just mint stratoToken to the recipient
             uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
             require(actualMintedAmount > 0, "MB: no tokens minted");
         }
