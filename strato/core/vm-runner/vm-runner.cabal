@@ -20,6 +20,7 @@ library
       Executable.EthereumVM
       Executable.EthereumVM2
   other-modules:
+      Blockchain.Bootstrap
       Blockchain.JsonRpcCommand
       Blockchain.TheDAOFork
       Blockchain.Verifier
@@ -54,12 +55,16 @@ library
     , merkle-patricia-db
     , monad-alter
     , ordered-containers
+    , persistent-postgresql
     , prometheus-client
+    , redis-monad
     , seqevents
     , solid-vm
+    , solid-vm-compiler
     , solid-vm-model
     , sql-monad
     , strato-conf
+    , strato-genesis
     , strato-index
     , strato-model
     , strato-redis-blockdb

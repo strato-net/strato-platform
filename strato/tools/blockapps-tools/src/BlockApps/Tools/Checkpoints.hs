@@ -18,7 +18,6 @@ import qualified Blockchain.MilenaTools as K
 import qualified Blockchain.Sequencer.Constants as SeqConst
 import qualified Blockchain.Sequencer.Kafka as SeqKafka
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
-import qualified Blockchain.Strato.StateDiff.Kafka as DiffKafka
 import Control.Concurrent (threadDelay)
 import Control.Monad (forM_, unless, void)
 import qualified Data.ByteString.Char8 as S8
@@ -82,7 +81,7 @@ kafkaBitsForService = \case
   EVM -> ("ethereum-vm", "ethereum-vm", SeqKafka.seqVmEventsTopicName)
   ApiIndexer -> ("strato-api-indexer", "strato-api-indexer", IdxKafka.indexEventsTopicName)
   P2PIndexer -> ("strato-p2p-indexer", "strato-p2p-indexer", IdxKafka.indexEventsTopicName)
-  Slipstream -> ("slipstream", "slipstream", DiffKafka.stateDiffTopicName)
+  Slipstream -> ("slipstream", "slipstream", "vmevents")
 
 lookupByBits :: KafkaBits -> IO CPTuple
 lookupByBits bits@(clientId, consumerId, topicName) =

@@ -70,10 +70,8 @@ EOF
 fi
 
 # Run strato-setup before Docker (creates config files only, no DB connections)
-FIRST_RUN=false
 if [ ! -e .ethereumH/ethconf.yaml ]
 then
-    FIRST_RUN=true
     echo "######## running strato-setup (config files)"
     strato-setup --network=$network --apiIPAddress=$STRATO_IP
     sed -i.bak "s|--svmTrace=false|--svmTrace=$svmTrace|g" commands.txt && rm commands.txt.bak
@@ -86,14 +84,6 @@ export postgres_password=$(cat secrets/postgres_password)
 # Start containers (--wait blocks until healthchecked services are ready)
 echo "Starting Docker containers..."
 DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d --wait
-
-# Run seed-genesis after Docker (needs PostgreSQL, Redis, Kafka)
-if [ "$FIRST_RUN" = true ]
-then
-    echo "######## running seed-genesis (databases)"
-    seed-genesis > logs/seed-genesis 2>&1
-    echo "Setup complete"
-fi
 
 echo "######## convoking"
 nohup convoke > logs/convoke.log 2>&1 &
