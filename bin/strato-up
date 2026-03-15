@@ -42,8 +42,6 @@ if [[ ! -e .ethereumH/ethconf.yaml ]]; then
     sed -i.bak "s|--svmTrace=false|--svmTrace=$svmTrace|g" commands.txt && rm -f commands.txt.bak
 fi
 
-export postgres_password=$(cat secrets/postgres_password)
-
 echo "Starting Docker containers..."
 DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d --wait
 

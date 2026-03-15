@@ -78,7 +78,6 @@ services:
     environment:
     - ADMIN_EMAIL=${ADMIN_EMAIL:-}
     - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
     - PROMETHEUS_HOST=${PROMETHEUS_HOST:-}
@@ -88,6 +87,8 @@ services:
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - MONITOR_URL=${MONITOR_URL:-}
     - vaultUrl=http://nginx
+    volumes:
+    - ./secrets/postgres_password:/run/secrets/postgres_password:ro
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
     restart: unless-stopped
@@ -122,10 +123,11 @@ services:
     - blocHost=${blocHost:-strato:3000}
     - PG_ENV_POSTGRES_DB=cirrus
     - PG_ENV_POSTGRES_HOST=postgres
-    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
     - PG_ENV_POSTGRES_USER=postgres
     - PG_PORT_5432_TCP_PORT=5432
     - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
+    volumes:
+    - ./secrets/postgres_password:/run/secrets/postgres_password:ro
     build: .
     image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
     restart: unless-stopped

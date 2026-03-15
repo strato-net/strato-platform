@@ -10,6 +10,11 @@ STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
 
 source set-aux-env-vars.sh
 
+# Read postgres password from mounted secrets file
+if [ -f /run/secrets/postgres_password ]; then
+  postgres_password=$(cat /run/secrets/postgres_password)
+fi
+
 # Set postgres configurations
 sed -i -e 's|__apex_postgres_user__|'"${postgres_user}"'|g' config/config.json
 sed -i -e 's|__apex_postgres_password__|'"${postgres_password}"'|g' config/config.json
