@@ -10,12 +10,6 @@ fi
 # Ensure credentials exist
 strato-login --check || strato-login
 
-# Export for services that don't yet read from file (mercata-backend)
-CREDS="$HOME/.secrets/strato_credentials.yaml"
-export OAUTH_DISCOVERY_URL=$(grep "discoveryUrl:" "$CREDS" | cut -d'"' -f2)
-export OAUTH_CLIENT_ID=$(grep "clientId:" "$CREDS" | cut -d'"' -f2)
-export OAUTH_CLIENT_SECRET=$(grep "clientSecret:" "$CREDS" | cut -d'"' -f2)
-
 export network=${network:-helium}
 export svmTrace=${svmTrace:-false}
 export VAULT_URL=https://vault.blockapps.net:8093
@@ -30,11 +24,8 @@ export NODE_HOST="localhost:$HTTP_PORT"
 export blocHost=$STRATO_HOSTNAME:3000
 
 # Setup node directory
-mkdir -p "$1/secrets"
+mkdir -p "$1"
 cd "$1"
-
-cp "$HOME/.secrets/strato_credentials.yaml" secrets/oauth_credentials.yaml
-chmod 600 secrets/oauth_credentials.yaml
 
 if [[ ! -e .ethereumH/ethconf.yaml ]]; then
     echo "Running strato-setup..."

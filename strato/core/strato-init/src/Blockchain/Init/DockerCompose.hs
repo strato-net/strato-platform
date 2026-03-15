@@ -33,15 +33,6 @@ generateDockerCompose = do
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
   
-  -- Read OAuth credentials from secrets/ (already copied there by strato-up)
-  oauthCreds <- TIO.readFile "secrets/oauth_credentials.yaml"
-  let oauthDiscoveryUrl = extractYamlValue "discoveryUrl" oauthCreds
-      oauthClientId = extractYamlValue "clientId" oauthCreds
-      oauthClientSecret = extractYamlValue "clientSecret" oauthCreds
-  
-  -- Read postgres password (generated earlier in mkFilesAndGenesis)
-  postgresPassword <- T.strip <$> TIO.readFile "secrets/postgres_password"
-  
   let httpPort = "8081"  -- TODO: make this a flag
       nodeHost = "localhost:" ++ httpPort
       stratoHostname = flags_apiIPAddress
@@ -58,11 +49,6 @@ generateDockerCompose = do
         , ("${HTTP_PORT}", httpPort)
         , ("${STRATO_HOSTNAME}", stratoHostname)
         , ("${VAULT_URL}", vaultUrl)
-        , ("${OAUTH_DISCOVERY_URL}", oauthDiscoveryUrl)
-        , ("${OAUTH_CLIENT_ID}", oauthClientId)
-        , ("${OAUTH_CLIENT_SECRET}", oauthClientSecret)
-        , ("${postgres_password:-api}", T.unpack postgresPassword)
-        , ("${postgres_password}", T.unpack postgresPassword)
         , ("<REPO_URL>", "")  -- Use local images, no repo prefix
         ] ++ imageSubstitutions
   
@@ -102,13 +88,3 @@ applyDefaultsToLine line =
                  before <> "${" <> varPart <> "}" <> applyDefaultsToLine afterClose
         _ -> line
     _ -> line
-
-extractYamlValue :: String -> T.Text -> String
-extractYamlValue key content =
-  case filter (T.isInfixOf (T.pack (key ++ ":"))) (T.lines content) of
-    (line:_) -> T.unpack $ T.strip $ removeQuotes $ T.strip $ T.drop 1 $ snd $ T.breakOn ":" line
-    [] -> ""
-  where
-    removeQuotes t
-      | T.length t >= 2 && T.head t == '"' && T.last t == '"' = T.init (T.tail t)
-      | otherwise = t

@@ -110,6 +110,19 @@ mkFilesAndGenesis network = do
     writeFile pgPasswordFile password
     void $ chmod roo pgPasswordFile
 
+  -- Copy OAuth credentials from ~/.secrets/
+  liftIO $ do
+    home <- getHomeDirectory
+    let sourceOauth = home </> ".secrets" </> "strato_credentials.yaml"
+        destOauth = "secrets" </> "oauth_credentials.yaml"
+    sourceExists <- doesFileExist sourceOauth
+    if sourceExists
+      then do
+        copyFile sourceOauth destOauth
+        void $ chmod roo destOauth
+      else
+        error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
+
   ethconf <- liftIO genEthConf
 
   let dir = ".ethereumH"

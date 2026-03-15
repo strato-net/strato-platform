@@ -7,10 +7,9 @@ services:
     build: ./mercata/backend
     image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>}
     init: true
+    volumes:
+      - ./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro
     environment:
-      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - NODE_URL=http://nginx  # no TLS required within the docker network
       - BASE_URL=https://${NODE_HOST}  # todo: protocol to depend on ssl=true|false
       - RPC_URL_MAINNET=${RPC_URL_MAINNET:-}
@@ -180,9 +179,6 @@ services:
     - debugWSPort=${debugWSPort:-}
     - DOCS_HOST=${DOCS_HOST:-}
     - NGINX_TRUST_PROXY_CIDRS=${NGINX_TRUST_PROXY_CIDRS:-}
-    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_SCOPE=${OAUTH_SCOPE:-}
     - POSTGREST_HOST=${POSTGREST_HOST:-}
     - PROMETHEUS_HOST=${PROMETHEUS_HOST:-}
@@ -209,6 +205,7 @@ services:
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
     volumes:
     - ./ssl:/tmp/ssl:ro
+    - ./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro
     restart: unless-stopped
     logging:
       driver: "json-file"
