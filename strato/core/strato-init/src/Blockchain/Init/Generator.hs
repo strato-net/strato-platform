@@ -138,7 +138,7 @@ mkFilesAndGenesis network = do
     writeFile defaultNodeFile nodeDir
     putStrLn $ "Set default node directory: " ++ nodeDir
 
-  -- Generate docker-compose.yml from template
+  -- Generate docker-compose.yml
   liftIO generateDockerCompose
 
   genesisExists <- doesFileExist "genesis.json"
