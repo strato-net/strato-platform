@@ -10,23 +10,9 @@ strato-setup "$@"
 
 cd "$1"
 
-echo "Starting Docker containers..."
-DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d --wait
-
 echo "Starting convoke..."
-mkdir -p logs
 # stdout goes to log, stderr goes to both log and terminal
 nohup convoke > logs/convoke.log 2> >(tee -a logs/convoke.log >&2) &
-CONVOKE_PID=$!
-echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
-
-# Brief check for immediate startup failures
-sleep 2
-if ! kill -0 "$CONVOKE_PID" 2>/dev/null; then
-    echo "ERROR: convoke failed to start"
-    docker compose -p strato down
-    rm -f .strato.pid
-    exit 1
-fi
+echo "CONVOKE_PID=$!" > .strato.pid
 
 echo "STRATO started in: $(pwd)"

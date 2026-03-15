@@ -1,9 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- {-# OPTIONS -fno-warn-unused-imports #-}
--- {-# OPTIONS -fno-warn-unused-matches #-}
--- {-# OPTIONS -fno-warn-missing-export-lists #-}
-
 module Main (
   main
   ) where
@@ -12,7 +8,9 @@ import System.Process
 import System.IO
 import System.Exit
 import System.Directory
+import System.Environment (setEnv)
 import System.Posix.Types (ProcessID)
+import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
 import System.Posix.Signals (signalProcess, sigTERM)
 import Control.Concurrent.Async
 import Control.Exception
@@ -100,6 +98,36 @@ tailFile n path = do
     let linesToPrint = tailN n (lines contents)
     hPutStrLn stderr $ unlines linesToPrint
 
+-- Start docker compose containers
+dockerComposeUp :: IO ()
+dockerComposeUp = do
+  uid <- show <$> getEffectiveUserID
+  gid <- show <$> getEffectiveGroupID
+  setEnv "DOCKER_UID" uid
+  setEnv "DOCKER_GID" gid
+  putStrLn "Starting Docker containers..."
+  -- Redirect docker compose stderr to stdout (goes to log, not terminal)
+  let cp = (proc "docker" ["compose", "-p", "strato", "up", "-d", "--wait"])
+             { std_err = UseHandle stdout }
+  (_, _, _, ph) <- createProcess cp
+  ec <- waitForProcess ph
+  case ec of
+    ExitSuccess -> putStrLn "Docker containers started."
+    ExitFailure code -> do
+      hPutStrLn stderr $ "ERROR: docker compose up failed with exit code " ++ show code
+      exitWith ec
+
+-- Stop docker compose containers
+dockerComposeDown :: IO ()
+dockerComposeDown = do
+  hPutStrLn stderr "Stopping Docker containers..."
+  -- Redirect docker compose stderr to stdout (goes to log, not terminal)
+  let cp = (proc "docker" ["compose", "-p", "strato", "down"])
+             { std_err = UseHandle stdout }
+  (_, _, _, ph) <- createProcess cp
+  _ <- waitForProcess ph
+  hPutStrLn stderr "Docker containers stopped."
+
 main :: IO ()
 main = do
   -- Clear previous PID file
@@ -114,6 +142,9 @@ main = do
   unless (not (null commandList)) $
     error "No valid commands found in commands.txt"
 
+  -- Start docker compose first
+  dockerComposeUp
+
   putStrLn $ "Launching " ++ show (length commandList) ++ " processes..."
   asyncs <- sequence $ map launchCommand commandList
 
@@ -127,6 +158,9 @@ main = do
     Nothing -> do
       hPutStrLn stderr "Interrupted by Ctrl-C"
       killAllProcesses
+
+  -- Stop docker compose on shutdown
+  dockerComposeDown
 
   removeFile pidFile `catch` \e ->
     hPutStrLn stderr $ "Warning: could not delete pid file: " ++ show (e :: IOError)
