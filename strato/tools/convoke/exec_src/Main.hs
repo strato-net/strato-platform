@@ -79,12 +79,12 @@ killRemainingExcept survivor = do
   contents <- readFile pidFile
   let maybePids = mapM readMaybe (lines contents) :: Maybe [ProcessID]
   case maybePids of
-    Nothing -> putStrLn "Warning: invalid PIDs in pid file"
+    Nothing -> hPutStrLn stderr "Warning: invalid PIDs in pid file"
     Just pids -> forM_ (filter (/= survivor) pids) $ \pid -> do
       result <- try $ signalProcess sigTERM pid :: IO (Either SomeException ())
       case result of
-        Left e  -> putStrLn $ "Failed to kill PID " ++ show pid ++ ": " ++ displayException e
-        Right _ -> putStrLn $ "Killed PID " ++ show pid
+        Left e  -> hPutStrLn stderr $ "Failed to kill PID " ++ show pid ++ ": " ++ displayException e
+        Right _ -> hPutStrLn stderr $ "Killed PID " ++ show pid
 
 -- Kill all PIDs unconditionally
 killAllProcesses :: IO ()
@@ -98,7 +98,7 @@ tailFile :: Int -> FilePath -> IO ()
 tailFile n path = do
     contents <- readFile path
     let linesToPrint = tailN n (lines contents)
-    putStrLn $ unlines linesToPrint
+    hPutStrLn stderr $ unlines linesToPrint
 
 main :: IO ()
 main = do
@@ -120,14 +120,14 @@ main = do
   result <- waitAnyOrInterrupt asyncs
   case result of
     Just (_, (exitCode, pid, cmd)) -> do
-      putStrLn $ "Process " ++ cmd ++ " (" ++ show pid ++ ") exited with: " ++ show exitCode
+      hPutStrLn stderr $ "ERROR: Process " ++ cmd ++ " (PID " ++ show pid ++ ") exited with: " ++ show exitCode
       killRemainingExcept pid
-      putStrLn "Tail of logs for crashed process:"
+      hPutStrLn stderr "Tail of logs for crashed process:"
       tailFile 20 (logsDir </> cmd)
     Nothing -> do
-      putStrLn "Interrupted by Ctrl-C"
+      hPutStrLn stderr "Interrupted by Ctrl-C"
       killAllProcesses
 
   removeFile pidFile `catch` \e ->
-    putStrLn $ "Warning: could not delete pid file: " ++ show (e :: IOError)
-  putStrLn "Shutdown complete."
+    hPutStrLn stderr $ "Warning: could not delete pid file: " ++ show (e :: IOError)
+  hPutStrLn stderr "Shutdown complete."

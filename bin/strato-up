@@ -15,18 +15,15 @@ DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d --wait
 
 echo "Starting convoke..."
 mkdir -p logs
-nohup convoke > logs/convoke.log 2>&1 &
+# stdout goes to log, stderr goes to both log and terminal
+nohup convoke > logs/convoke.log 2> >(tee -a logs/convoke.log >&2) &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 
-# Verify convoke started successfully
-sleep 3
+# Brief check for immediate startup failures
+sleep 2
 if ! kill -0 "$CONVOKE_PID" 2>/dev/null; then
-    echo "ERROR: convoke crashed shortly after starting"
-    echo "Last 20 lines of logs/convoke.log:"
-    tail -20 logs/convoke.log
-    echo ""
-    echo "Shutting down docker containers..."
+    echo "ERROR: convoke failed to start"
     docker compose -p strato down
     rm -f .strato.pid
     exit 1
