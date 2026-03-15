@@ -3,8 +3,9 @@
 
 module Blockchain.Init.DockerCompose (generateDockerCompose) where
 
+import Blockchain.EthConf (ethConf)
+import Blockchain.EthConf.Model (apiConfig, httpPort, ipAddress, urlConfig, vaultUrl)
 import Blockchain.Init.DirHash (computeDirHash)
-import Blockchain.Init.Options
 import Data.FileEmbed (embedStringFile)
 import Data.List (foldl')
 import qualified Data.Text as T
@@ -33,10 +34,12 @@ generateDockerCompose = do
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
   
-  let httpPort = "8081"  -- TODO: make this a flag
-      nodeHost = "localhost:" ++ httpPort
-      stratoHostname = flags_apiIPAddress
-      vaultUrl = flags_vaultUrl
+  -- Read config from ethconf.yaml (written earlier in setup)
+  let conf = ethConf
+      portNum = show $ httpPort (apiConfig conf)
+      nodeHost = "localhost:" ++ portNum
+      stratoHostname = ipAddress (apiConfig conf)
+      vault = vaultUrl (urlConfig conf)
   
   -- Create substitutions for each image: "imagename:<VERSION>" -> "imagename:hash"
   let imageSubstitutions = map (\(img, hash) -> (img ++ ":<VERSION>", img ++ ":" ++ hash)) imageHashes
@@ -45,10 +48,10 @@ generateDockerCompose = do
         [ ("${DOCKER_UID}", uid)
         , ("${DOCKER_GID}", gid)
         , ("${NODE_HOST}", nodeHost)
-        , ("${HTTP_PORT:-80}", httpPort)
-        , ("${HTTP_PORT}", httpPort)
+        , ("${HTTP_PORT:-80}", portNum)
+        , ("${HTTP_PORT}", portNum)
         , ("${STRATO_HOSTNAME}", stratoHostname)
-        , ("${VAULT_URL}", vaultUrl)
+        , ("${VAULT_URL}", vault)
         , ("<REPO_URL>", "")  -- Use local images, no repo prefix
         ] ++ imageSubstitutions
   

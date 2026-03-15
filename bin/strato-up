@@ -3,34 +3,24 @@
 set -e
 
 if [[ -z "$1" ]]; then
-    echo "Usage: strato-up <node-directory>"
+    echo "Usage: strato-up <node-directory> [strato-setup flags...]"
+    echo "Example: strato-up mynode --network=lithium --httpPort=9000"
     exit 1
 fi
+
+NODE_DIR="$1"
+shift
 
 # Ensure credentials exist
 strato-login --check || strato-login
 
-export network=${network:-helium}
-export svmTrace=${svmTrace:-false}
-export VAULT_URL=https://vault.blockapps.net:8093
-
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    export STRATO_HOSTNAME=172.17.0.1
-else
-    export STRATO_HOSTNAME=host.docker.internal
-fi
-export HTTP_PORT=${HTTP_PORT:-8081}
-export NODE_HOST="localhost:$HTTP_PORT"
-export blocHost=$STRATO_HOSTNAME:3000
-
 # Setup node directory
-mkdir -p "$1"
-cd "$1"
+mkdir -p "$NODE_DIR"
+cd "$NODE_DIR"
 
 if [[ ! -e .ethereumH/ethconf.yaml ]]; then
     echo "Running strato-setup..."
-    strato-setup --network=$network --apiIPAddress=$STRATO_HOSTNAME
-    sed -i.bak "s|--svmTrace=false|--svmTrace=$svmTrace|g" commands.txt && rm -f commands.txt.bak
+    strato-setup "$@"
 fi
 
 echo "Starting Docker containers..."

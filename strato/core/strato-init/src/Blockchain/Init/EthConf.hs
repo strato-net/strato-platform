@@ -14,7 +14,15 @@ import Servant.Client
 import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
 import qualified Strato.Strato23.API.Types as VC
 import Strato.Strato23.Client
+import System.Info (os)
 import Text.Format
+
+-- | Get the API IP address, using OS-appropriate default for Docker
+getApiIPAddress :: String
+getApiIPAddress
+  | flags_apiIPAddress /= "127.0.0.1" = flags_apiIPAddress  -- User provided explicit value
+  | os == "linux" = "172.17.0.1"                            -- Linux Docker bridge
+  | otherwise = "host.docker.internal"                      -- macOS/Windows Docker
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -44,9 +52,13 @@ runtimeConfig = def
       , averageTxsPerBlock = flags_averageTxsPerBlock
       , maxHeadersTxsLens = flags_maxHeadersTxsLens
       }
-  , apiConfig = def { ipAddress = flags_apiIPAddress }
+  , apiConfig = def
+      { ipAddress = getApiIPAddress
+      , httpPort = flags_httpPort
+      }
   , contractsConfig = getRailgunProxyForNetwork flags_network >>= \addr ->
       Just ContractsConf { railgunProxy = Just addr }
+  , debugConfig = def { svmTrace = flags_svmTrace }
   }
 
 getNodeKey :: IO (VC.PublicKey, Address)
