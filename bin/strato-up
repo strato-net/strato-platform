@@ -31,7 +31,6 @@ export blocHost=$STRATO_HOSTNAME:3000
 
 # Setup node directory
 mkdir -p "$1/secrets"
-cp docker-compose.yml "$1/"
 cd "$1"
 
 cp "$HOME/.secrets/strato_credentials.yaml" secrets/oauth_credentials.yaml

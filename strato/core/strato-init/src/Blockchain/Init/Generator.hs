@@ -15,6 +15,7 @@ import Blockchain.Data.GenesisInfo (GenesisInfo)
 import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.DB.CodeDB
 import Blockchain.Data.GenesisBlock (populateMPTAndWriteGenesis, populateMPTFromGenesis)
+import Blockchain.Init.DockerCompose
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -123,6 +124,9 @@ mkFilesAndGenesis network = do
     createDirectoryIfMissing True stratoDir
     writeFile defaultNodeFile nodeDir
     putStrLn $ "Set default node directory: " ++ nodeDir
+
+  -- Generate docker-compose.yml from template
+  liftIO generateDockerCompose
 
   genesisExists <- doesFileExist "genesis.json"
 

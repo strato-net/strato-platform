@@ -47,6 +47,7 @@ library:
   - nibblestring
   - persistent-postgresql
   - entropy
+  - process
   - raw-strings-qq
   - redis-monad
   - resourcet
@@ -63,9 +64,11 @@ library:
   - strato-sequencer
   - strato-statediff
   # - strato-p2p
+  - template-haskell
   - text
   - transformers
   - turtle
+  - unix
   - unliftio
   - vm-tools
   - yaml

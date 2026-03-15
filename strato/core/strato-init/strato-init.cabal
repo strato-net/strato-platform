@@ -16,6 +16,8 @@ build-type:     Simple
 
 library
   exposed-modules:
+      Blockchain.Init.DirHash
+      Blockchain.Init.DockerCompose
       Blockchain.Init.EthConf
       Blockchain.Init.Generator
       Blockchain.Init.Monad
@@ -59,6 +61,7 @@ library
     , nibblestring
     , ordered-containers
     , persistent-postgresql
+    , process
     , raw-strings-qq
     , redis-monad
     , resourcet
@@ -74,9 +77,11 @@ library
     , strato-model
     , strato-sequencer
     , strato-statediff
+    , template-haskell
     , text
     , transformers
     , turtle
+    , unix
     , unliftio
     , vm-tools
     , yaml
