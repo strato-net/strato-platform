@@ -96,74 +96,89 @@ strato-network-monitor
 -- | Create files AND populate Merkle Patricia Trie, write genesis.json with computed stateRoot.
 -- This is called by strato-setup before docker containers are running.
 mkFilesAndGenesis :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m) =>
-                     String -> m ()
-mkFilesAndGenesis network = do
-  -- Create node directories first (needed before genEthConf reads postgres_password)
-  liftIO $ mapM_ (createDirectoryIfMissing True)
-    ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
-
-  -- Generate random postgres password (needed by genEthConf)
-  let pgPasswordFile = "secrets" </> "postgres_password"
-  pgPasswordExists <- doesFileExist pgPasswordFile
-  unless pgPasswordExists $ liftIO $ do
-    password <- generatePassword 32
-    writeFile pgPasswordFile password
-    void $ chmod roo pgPasswordFile
-
-  -- Copy OAuth credentials from ~/.secrets/
+                     FilePath -> Bool -> String -> m ()
+mkFilesAndGenesis nodeDir hasFlags network = do
+  -- Create node directory and cd to it
   liftIO $ do
-    home <- getHomeDirectory
-    let sourceOauth = home </> ".secrets" </> "strato_credentials.yaml"
-        destOauth = "secrets" </> "oauth_credentials.yaml"
-    sourceExists <- doesFileExist sourceOauth
-    if sourceExists
+    createDirectoryIfMissing True nodeDir
+    setCurrentDirectory nodeDir
+
+  -- Check if node already exists
+  nodeExists <- doesFileExist (".ethereumH" </> "ethconf.yaml")
+  when nodeExists $ do
+    if hasFlags
+      then liftIO $ error $ "Node already exists at " ++ nodeDir ++ ". Run without options to use it, or remove the directory to recreate."
+      else do
+        liftIO $ putStrLn $ "Node already exists at " ++ nodeDir ++ ", skipping setup."
+        return ()
+  
+  unless nodeExists $ do
+    -- Create node directories first (needed before genEthConf reads postgres_password)
+    liftIO $ mapM_ (createDirectoryIfMissing True)
+      ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
+
+    -- Generate random postgres password (needed by genEthConf)
+    let pgPasswordFile = "secrets" </> "postgres_password"
+    pgPasswordExists <- doesFileExist pgPasswordFile
+    unless pgPasswordExists $ liftIO $ do
+      password <- generatePassword 32
+      writeFile pgPasswordFile password
+      void $ chmod roo pgPasswordFile
+
+    -- Copy OAuth credentials from ~/.secrets/
+    liftIO $ do
+      home <- getHomeDirectory
+      let sourceOauth = home </> ".secrets" </> "strato_credentials.yaml"
+          destOauth = "secrets" </> "oauth_credentials.yaml"
+      sourceExists <- doesFileExist sourceOauth
+      if sourceExists
+        then do
+          copyFile sourceOauth destOauth
+          void $ chmod roo destOauth
+        else
+          error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
+
+    ethconf <- liftIO genEthConf
+
+    let dir = ".ethereumH"
+    liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
+    liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
+
+    liftIO $ do
+      cwd <- getCurrentDirectory
+      home <- getHomeDirectory
+      let stratoDir = home </> ".strato"
+          defaultNodeFile = stratoDir </> "default-node"
+      createDirectoryIfMissing True stratoDir
+      writeFile defaultNodeFile cwd
+      putStrLn $ "Set default node directory: " ++ cwd
+
+    -- Generate docker-compose.yml
+    liftIO generateDockerCompose
+
+    genesisExists <- doesFileExist "genesis.json"
+
+    liftIO createCommandsFile
+
+    if genesisExists
       then do
-        copyFile sourceOauth destOauth
-        void $ chmod roo destOauth
-      else
-        error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
+        $logInfoS "strato-setup" "Using provided 'genesis.json' - populating MPT from it"
+        content <- liftIO $ BS.readFile "genesis.json"
+        case JSON.decode (BL.fromStrict content) of
+          Nothing -> error "Failed to parse provided genesis.json"
+          Just genesisInfo -> runResourceT . runSetupDBM $ do
+            void $ addCode mempty
+            populateMPTFromGenesis genesisInfo
+      else do
+        $logInfoS "strato-setup" "Creating genesis info from network template"
+        let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
 
-  ethconf <- liftIO genEthConf
-
-  let dir = ".ethereumH"
-  liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
-  liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
-
-  liftIO $ do
-    nodeDir <- getCurrentDirectory
-    home <- getHomeDirectory
-    let stratoDir = home </> ".strato"
-        defaultNodeFile = stratoDir </> "default-node"
-    createDirectoryIfMissing True stratoDir
-    writeFile defaultNodeFile nodeDir
-    putStrLn $ "Set default node directory: " ++ nodeDir
-
-  -- Generate docker-compose.yml
-  liftIO generateDockerCompose
-
-  genesisExists <- doesFileExist "genesis.json"
-
-  liftIO createCommandsFile
-
-  if genesisExists
-    then do
-      $logInfoS "strato-setup" "Using provided 'genesis.json' - populating MPT from it"
-      content <- liftIO $ BS.readFile "genesis.json"
-      case JSON.decode (BL.fromStrict content) of
-        Nothing -> error "Failed to parse provided genesis.json"
-        Just genesisInfo -> runResourceT . runSetupDBM $ do
+        -- Populate MPT and write genesis.json with computed stateRoot
+        runResourceT . runSetupDBM $ do
           void $ addCode mempty
-          populateMPTFromGenesis genesisInfo
-    else do
-      $logInfoS "strato-setup" "Creating genesis info from network template"
-      let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
+          populateMPTAndWriteGenesis genesisInfo
 
-      -- Populate MPT and write genesis.json with computed stateRoot
-      runResourceT . runSetupDBM $ do
-        void $ addCode mempty
-        populateMPTAndWriteGenesis genesisInfo
-
-  $logInfoS "strato-setup" "Setup complete"
+    $logInfoS "strato-setup" "Setup complete"
 
 -- We have to normalize the information held in GenesisInfo, unfortunalely we have some characters that done encode and decode back from JSON the same
 -- If we don't do this, the stateroot created from the raw data won't match that if created from the data read from genesis.json

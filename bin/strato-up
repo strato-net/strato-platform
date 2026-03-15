@@ -2,26 +2,13 @@
 
 set -e
 
-if [[ -z "$1" ]]; then
-    echo "Usage: strato-up <node-directory> [strato-setup flags...]"
-    echo "Example: strato-up mynode --network=lithium --httpPort=9000"
-    exit 1
-fi
-
-NODE_DIR="$1"
-shift
-
 # Ensure credentials exist
 strato-login --check || strato-login
 
-# Setup node directory
-mkdir -p "$NODE_DIR"
-cd "$NODE_DIR"
+# Setup node (creates if needed, skips if exists with no flags, errors if exists with flags)
+strato-setup "$@"
 
-if [[ ! -e .ethereumH/ethconf.yaml ]]; then
-    echo "Running strato-setup..."
-    strato-setup "$@"
-fi
+cd "$1"
 
 echo "Starting Docker containers..."
 DOCKER_UID=$(id -u) DOCKER_GID=$(id -g) docker compose -p strato up -d --wait
