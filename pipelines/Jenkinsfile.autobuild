@@ -24,6 +24,8 @@ pipeline {
           docker rm -f $(docker ps -aq) || true
           docker system prune -f || true
           docker volume prune -fa || true
+          # Clean up node data from previous builds
+          sudo rm -rf bootstrap-docker/nodedata || true
         '''
       }
     }
