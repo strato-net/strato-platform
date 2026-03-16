@@ -13,6 +13,8 @@ import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.DB.CodeDB
 import Blockchain.Data.GenesisBlock (populateMPTAndWriteGenesis, populateMPTFromGenesis)
 import Blockchain.Init.DockerCompose
+import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
+import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -155,8 +157,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       writeFile defaultNodeFile cwd
 
     -- Generate docker-compose.yml
-    liftIO generateDockerCompose
-    liftIO $ putStrLn "  ✓ Generated docker-compose.yml"
+    liftIO $ case flags_dockerMode of
+      "allDocker" -> generateDockerComposeAllDocker
+      _ -> generateDockerCompose
 
     liftIO createCommandsFile
     liftIO $ putStrLn "  ✓ Generated commands.txt"

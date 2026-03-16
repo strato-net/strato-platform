@@ -95,9 +95,12 @@ clientSecret: "${OAUTH_CLIENT_SECRET}"
 EOF
 
   if [[ ! -f strato/.initialized ]] ; then
-    # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
-    if [[ -d strato/.ethereumH && -d strato/config && ! -f strato/.initNotFinished ]]; then
+    # Check if node was already created (by strato-setup on host, or older version)
+    if [[ -d strato/.ethereumH && -f strato/.ethereumH/ethconf.yaml && ! -f strato/.initNotFinished ]]; then
       touch strato/.initialized
+      # Create config dir if not exists (needed for faucet key)
+      mkdir -p strato/config
+      echo -ne "\x1d\xd8\x85\xa4\x23\xf4\xe2\x12\x74\x0f\x11\x6a\xfa\x66\xd4\x0a\xaf\xdb\xb3\xa3\x81\x07\x91\x50\x37\x18\x01\x87\x1d\x9e\xa2\x81" > strato/config/priv
       cd strato
       sleep 10
     else

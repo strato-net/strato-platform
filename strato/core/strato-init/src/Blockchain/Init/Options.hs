@@ -44,6 +44,8 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 
+defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
+
 -- P2P config flags
 defineFlag "maxConn" (1000 :: Int) "Maximum number of P2P client connections"
 defineFlag "connectionTimeout" (3600 :: Int) "Number of seconds to tolerate a useless peer"

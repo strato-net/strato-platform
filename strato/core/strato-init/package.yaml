@@ -46,6 +46,7 @@ library:
   - nibblestring
   - persistent-postgresql
   - entropy
+  - file-embed
   - process
   - raw-strings-qq
   - redis-monad

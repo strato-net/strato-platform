@@ -10,8 +10,6 @@ volumes:
     driver: local
   redisdata:
     driver: local
-  stratodata:
-    driver: local
   zookeeperdata:
     driver: local
 services:
@@ -204,7 +202,7 @@ services:
         max-size: "100m"
         max-file: "3"
     volumes:
-      - stratodata:/var/lib/strato
+      - ./strato:/var/lib/strato
   postgrest:
     depends_on:
     - postgres
