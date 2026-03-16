@@ -129,6 +129,7 @@ genEthConf = do
         { vaultUrl = flags_vaultUrl
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
+        , repoUrl = flags_repoUrl
         }
     , networkConfig = def
         { network = flags_network

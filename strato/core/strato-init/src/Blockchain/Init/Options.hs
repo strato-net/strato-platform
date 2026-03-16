@@ -46,6 +46,8 @@ defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodeke
 
 defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
 
+defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g., 'registry.example.com/org/')"
+
 -- P2P config flags
 defineFlag "maxConn" (1000 :: Int) "Maximum number of P2P client connections"
 defineFlag "connectionTimeout" (3600 :: Int) "Number of seconds to tolerate a useless peer"

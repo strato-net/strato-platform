@@ -153,6 +153,7 @@ data UrlConfig = UrlConfig
   { vaultUrl :: String
   , fileServerUrl :: String
   , notificationServerUrl :: String
+  , repoUrl :: String  -- Docker registry URL prefix for images
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -250,6 +251,7 @@ instance Default UrlConfig where
     { vaultUrl = "https://vault.blockapps.net:8093/strato/v2.3"
     , fileServerUrl = ""
     , notificationServerUrl = ""
+    , repoUrl = ""
     }
 
 instance Default NetworkConf where

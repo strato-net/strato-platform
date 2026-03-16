@@ -18,7 +18,7 @@ services:
       - strato
       - postgrest
     build: ./mercata/backend
-    image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<HASH_MERCATA_BACKEND>}
+    image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>-<HASH_MERCATA_BACKEND>}
     init: true
     environment:
       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
@@ -58,7 +58,7 @@ services:
     depends_on:
       - mercata-backend
     build: ./mercata/ui
-    image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<HASH_MERCATA_UI>}
+    image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>-<HASH_MERCATA_UI>}
     environment:
       - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID}
       - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID}
@@ -78,7 +78,7 @@ services:
     - NODE_HOST=${NODE_HOST}
     - ssl=${ssl:-false}
     build: .
-    image: ${SMD_IMAGE:-<REPO_URL>smd:<HASH_SMD>}
+    image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>-<HASH_SMD>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -103,7 +103,7 @@ services:
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - MONITOR_URL=${MONITOR_URL}
     build: .
-    image: ${APEX_IMAGE:-<REPO_URL>apex:<HASH_APEX>}
+    image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>-<HASH_APEX>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -191,7 +191,7 @@ services:
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - zkHost=zookeeper
     build: .
-    image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
+    image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>-<HASH_STRATO>}
     ports:
     - 30303:30303
     - 30303:30303/udp
@@ -215,7 +215,7 @@ services:
     - PG_PORT_5432_TCP_PORT=5432
     - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
     build: .
-    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<HASH_POSTGREST>}
+    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>-<HASH_POSTGREST>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -276,7 +276,7 @@ services:
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - VAULT_URL=${VAULT_URL}
     build: .
-    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<HASH_NGINX>}
+    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>-<HASH_NGINX>}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
@@ -339,7 +339,7 @@ services:
     environment:
       - NODE_HOST=${NODE_HOST}
       - STRATO_HOSTNAME=${STRATO_HOSTNAME}
-    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<HASH_PROMETHEUS>}
+    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>-<HASH_PROMETHEUS>}
     volumes:
     - prometheusdata:/prometheus
     restart: unless-stopped

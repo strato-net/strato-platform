@@ -53,6 +53,7 @@ DOCKER_SENTINELS = .docker-built
 dir_hash = $(shell git ls-files $(1) 2>/dev/null | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
 
 # Image content hashes - used for docker tags
+HASH_STRATO := $(call dir_hash,strato)
 HASH_POSTGREST := $(call dir_hash,postgrest-packager)
 HASH_NGINX := $(call dir_hash,nginx-packager)
 HASH_APEX := $(call dir_hash,apex)
@@ -64,7 +65,8 @@ HASH_BRIDGE := $(call dir_hash,mercata/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,mercata/services/bridge/nginx)
 
 # Sed substitutions for docker-compose templates
-HASH_SUBS = -e 's|<HASH_POSTGREST>|$(HASH_POSTGREST)|g' \
+HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
+            -e 's|<HASH_POSTGREST>|$(HASH_POSTGREST)|g' \
             -e 's|<HASH_NGINX>|$(HASH_NGINX)|g' \
             -e 's|<HASH_APEX>|$(HASH_APEX)|g' \
             -e 's|<HASH_MERCATA_BACKEND>|$(HASH_MERCATA_BACKEND)|g' \
@@ -90,7 +92,7 @@ needs_rebuild = [ ! -f $@ ] || [ "$$(cat $@ 2>/dev/null)" != "$(2)" ] || [ -n "$
 $(DOCKER_SENTINELS)/postgrest: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,postgrest-packager,$(HASH_POSTGREST)); then \
 		echo "Building postgrest ($(HASH_POSTGREST))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)postgrest:$(HASH_POSTGREST) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)postgrest:$(HASH_POSTGREST) $(MAKE) --directory=postgrest-packager/; \
+		BASIL_DOCKER_TAG=$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) $(MAKE) --directory=postgrest-packager/; \
 		echo "$(HASH_POSTGREST)" > $@; \
 	else \
 		echo "postgrest up to date"; \
@@ -99,7 +101,7 @@ $(DOCKER_SENTINELS)/postgrest: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/nginx: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,nginx-packager,$(HASH_NGINX)); then \
 		echo "Building nginx ($(HASH_NGINX))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)nginx:$(HASH_NGINX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)nginx:$(HASH_NGINX) $(MAKE) --directory=nginx-packager/; \
+		BASIL_DOCKER_TAG=$(REPO_URL)nginx:$(VERSION)-$(HASH_NGINX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)nginx:$(VERSION)-$(HASH_NGINX) $(MAKE) --directory=nginx-packager/; \
 		echo "$(HASH_NGINX)" > $@; \
 	else \
 		echo "nginx up to date"; \
@@ -108,7 +110,7 @@ $(DOCKER_SENTINELS)/nginx: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/apex: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,apex,$(HASH_APEX)); then \
 		echo "Building apex ($(HASH_APEX))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(HASH_APEX) STRATO_VERSION=$(HASH_APEX) $(MAKE) --directory=apex/; \
+		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(VERSION)-$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(HASH_APEX) $(MAKE) --directory=apex/; \
 		echo "$(HASH_APEX)" > $@; \
 	else \
 		echo "apex up to date"; \
@@ -117,8 +119,8 @@ $(DOCKER_SENTINELS)/apex: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/mercata-backend: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,mercata/backend,$(HASH_MERCATA_BACKEND)); then \
 		echo "Building mercata-backend ($(HASH_MERCATA_BACKEND))..."; \
-		docker build -t $(REPO_URL)mercata-backend:$(HASH_MERCATA_BACKEND) -f ./mercata/backend/Dockerfile ./mercata; \
-		docker tag $(REPO_URL)mercata-backend:$(HASH_MERCATA_BACKEND) $(REPO_AWS_ECR_URL)mercata-backend:$(HASH_MERCATA_BACKEND); \
+		docker build -t $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) -f ./mercata/backend/Dockerfile ./mercata; \
+		docker tag $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_AWS_ECR_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND); \
 		echo "$(HASH_MERCATA_BACKEND)" > $@; \
 	else \
 		echo "mercata-backend up to date"; \
@@ -127,8 +129,8 @@ $(DOCKER_SENTINELS)/mercata-backend: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/mercata-ui: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,mercata/ui,$(HASH_MERCATA_UI)); then \
 		echo "Building mercata-ui ($(HASH_MERCATA_UI))..."; \
-		docker build -t $(REPO_URL)mercata-ui:$(HASH_MERCATA_UI) -f ./mercata/ui/Dockerfile ./mercata; \
-		docker tag $(REPO_URL)mercata-ui:$(HASH_MERCATA_UI) $(REPO_AWS_ECR_URL)mercata-ui:$(HASH_MERCATA_UI); \
+		docker build -t $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) -f ./mercata/ui/Dockerfile ./mercata; \
+		docker tag $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) $(REPO_AWS_ECR_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI); \
 		echo "$(HASH_MERCATA_UI)" > $@; \
 	else \
 		echo "mercata-ui up to date"; \
@@ -137,7 +139,7 @@ $(DOCKER_SENTINELS)/mercata-ui: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/prometheus: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,prometheus-packager,$(HASH_PROMETHEUS)); then \
 		echo "Building prometheus ($(HASH_PROMETHEUS))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)prometheus:$(HASH_PROMETHEUS) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)prometheus:$(HASH_PROMETHEUS) $(MAKE) --directory=prometheus-packager/; \
+		BASIL_DOCKER_TAG=$(REPO_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) $(MAKE) --directory=prometheus-packager/; \
 		echo "$(HASH_PROMETHEUS)" > $@; \
 	else \
 		echo "prometheus up to date"; \
@@ -146,7 +148,7 @@ $(DOCKER_SENTINELS)/prometheus: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/smd: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,smd-ui,$(HASH_SMD)); then \
 		echo "Building smd ($(HASH_SMD))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(HASH_SMD) STRATO_VERSION=$(HASH_SMD) $(MAKE) --directory=smd-ui/; \
+		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(VERSION)-$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(HASH_SMD) $(MAKE) --directory=smd-ui/; \
 		echo "$(HASH_SMD)" > $@; \
 	else \
 		echo "smd up to date"; \
@@ -155,8 +157,8 @@ $(DOCKER_SENTINELS)/smd: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/bridge: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,mercata/services/bridge,$(HASH_BRIDGE)); then \
 		echo "Building bridge ($(HASH_BRIDGE))..."; \
-		docker build -t $(REPO_URL)bridge:$(HASH_BRIDGE) ./mercata/services/bridge; \
-		docker tag $(REPO_URL)bridge:$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(HASH_BRIDGE); \
+		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./mercata/services/bridge; \
+		docker tag $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE); \
 		echo "$(HASH_BRIDGE)" > $@; \
 	else \
 		echo "bridge up to date"; \
@@ -165,8 +167,8 @@ $(DOCKER_SENTINELS)/bridge: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/bridge-nginx: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,mercata/services/bridge/nginx,$(HASH_BRIDGE_NGINX)); then \
 		echo "Building bridge-nginx ($(HASH_BRIDGE_NGINX))..."; \
-		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-nginx:$(HASH_BRIDGE_NGINX) ./mercata/services/bridge/nginx; \
-		docker tag $(REPO_URL)bridge-nginx:$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(HASH_BRIDGE_NGINX); \
+		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) ./mercata/services/bridge/nginx; \
+		docker tag $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX); \
 		echo "$(HASH_BRIDGE_NGINX)" > $@; \
 	else \
 		echo "bridge-nginx up to date"; \
@@ -203,51 +205,51 @@ bridge-nginx: $(DOCKER_SENTINELS)/bridge-nginx
 # Force rebuild targets (ignore sentinel files)
 apex-force:
 	@echo Now building apex...
-	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}apex:${VERSION} STRATO_VERSION=${VERSION} make --directory=apex/
+	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION}-${HASH_APEX} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}apex:${VERSION}-${HASH_APEX} STRATO_VERSION=${VERSION}-${HASH_APEX} make --directory=apex/
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/apex
 
 nginx-force:
 	@echo Now building nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}nginx:${VERSION} make --directory=nginx-packager/
+	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION}-${HASH_NGINX} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}nginx:${VERSION}-${HASH_NGINX} make --directory=nginx-packager/
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/nginx
 
 postgrest-force:
 	@echo Now building postgrest...
-	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}postgrest:${VERSION} make --directory=postgrest-packager/
+	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION}-${HASH_POSTGREST} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}postgrest:${VERSION}-${HASH_POSTGREST} make --directory=postgrest-packager/
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/postgrest
 
 prometheus-force:
 	@echo Now building prometheus...
-	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}prometheus:${VERSION} make --directory=prometheus-packager/
+	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION}-${HASH_PROMETHEUS} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}prometheus:${VERSION}-${HASH_PROMETHEUS} make --directory=prometheus-packager/
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/prometheus
 
 smd-force:
 	@echo building smd...
-	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
+	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION}-${HASH_SMD} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION}-${HASH_SMD} STRATO_VERSION=${VERSION}-${HASH_SMD} make --directory=smd-ui/
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/smd
 
 mercata-backend-force:
 	@echo Now building mercata-backend...
-	docker build -t ${REPO_URL}mercata-backend:${VERSION} -f ./mercata/backend/Dockerfile ./mercata
-	docker tag ${REPO_URL}mercata-backend:${VERSION} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}
+	docker build -t ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} -f ./mercata/backend/Dockerfile ./mercata
+	docker tag ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-backend
 
 mercata-ui-force:
 	@echo Now building mercata-ui...
-	docker build -t ${REPO_URL}mercata-ui:${VERSION} -f ./mercata/ui/Dockerfile ./mercata
-	docker tag ${REPO_URL}mercata-ui:${VERSION} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}
+	docker build -t ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} -f ./mercata/ui/Dockerfile ./mercata
+	docker tag ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-ui
 
 bridge-force:
 	@echo Now building bridge...
-	docker build -t ${REPO_URL}bridge:${VERSION} ./mercata/services/bridge
-	docker tag ${REPO_URL}bridge:${VERSION} ${REPO_AWS_ECR_URL}bridge:${VERSION}
+	docker build -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./mercata/services/bridge
+	docker tag ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ${REPO_AWS_ECR_URL}bridge:${VERSION}-${HASH_BRIDGE}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/bridge
 
 bridge-nginx-force:
 	@echo Now building bridge-nginx...
-	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION} ./mercata/services/bridge/nginx
-	docker tag ${REPO_URL}bridge-nginx:${VERSION} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}
+	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./mercata/services/bridge/nginx
+	docker tag ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/bridge-nginx
 
 oracle:
@@ -344,26 +346,26 @@ highway-nginx:
 strato: build_common
 	@echo Now building core-strato...
 	cp -fr strato/extraFiles/* ${STRATODIR}
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
 
 strato_docker: build_common_docker
 	@echo Now building core-strato for docker...
 	cp -fr strato/extraFiles/* ${STRATODIR}
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
 
 develop: build_common_fast
 	@echo Now building core-strato using --fast...
 	cp -fr strato/extraFiles/* ${STRATODIR}
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
 
 profile: build_common_profiled
 	@echo Now building core-strato using --profile...
 	cp -fr strato/extraFiles/* ${STRATODIR}
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} ${REPO_AWS_ECR_URL}strato:${VERSION}-${HASH_STRATO}
 
 vault-wrapper: build_common_docker
 	@echo Now building vault-wrapper...
@@ -403,7 +405,7 @@ docker-compose:
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}
-	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION}-${HASH_STRATO} --file Dockerfile.multi ${FAKEROOT}
 
 test:
 	@echo ${VERSION}
