@@ -18,6 +18,7 @@ import {
   HandCoins,
   Vault,
   Gem,
+  ArrowDownToLine,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -26,7 +27,7 @@ import { useUser } from '@/context/UserContext';
 // Primary navigation items shown in bottom bar
 const PRIMARY_NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
-  { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
+  { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
   { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
 ];

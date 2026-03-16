@@ -14,6 +14,7 @@ export interface MetalConfig {
   imageUrl: string;
   isEnabled: boolean;
   mintCap: string;
+  feeBps: string;
   totalMinted: string;
 }
 
@@ -22,8 +23,6 @@ export interface PayTokenConfig {
   symbol: string;
   name: string;
   imageUrl: string;
-  isEnabled: boolean;
-  feeBps: string;
 }
 
 export interface Config {
@@ -54,7 +53,7 @@ export const getConfigs = async (
     cirrus.get(accessToken, `/${MetalForge}-metalConfigs`, {
       params: { address: `eq.${constants.metalForge}`, select: "key,value::text" },
     }),
-    cirrus.get(accessToken, `/${MetalForge}-payTokenConfigs`, {
+    cirrus.get(accessToken, `/${MetalForge}-isSupportedPayToken`, {
       params: { address: `eq.${constants.metalForge}`, select: "key,value::text" },
     }),
     cirrus.get(accessToken, `/${MetalForge}-totalMinted`, {
@@ -106,23 +105,23 @@ export const getConfigs = async (
       imageUrl: info.imageUrl,
       isEnabled: v.isEnabled ?? false,
       mintCap: String(v.mintCap ?? "0"),
+      feeBps: String(v.feeBps ?? "???"),
       totalMinted: totalMintedMap.get(tokenAddr) || "0",
     };
   });
 
   const payTokens: PayTokenConfig[] = (payTokenConfigRows || []).map((r: any) => {
     const tokenAddr = r.key;
-    const v = parseStructValue(r.value);
+    const isSupported = r.value === true || r.value === "true";
+    if (!isSupported) return null;
     const info = tokenInfoMap.get(tokenAddr) || { symbol: tokenAddr, name: "", imageUrl: "" };
     return {
       address: tokenAddr,
       symbol: info.symbol,
       name: info.name,
       imageUrl: info.imageUrl,
-      isEnabled: v.isEnabled ?? false,
-      feeBps: String(v.feeBps ?? "0"),
     };
-  });
+  }).filter(Boolean) as PayTokenConfig[];
 
   return { metals, payTokens };
 };

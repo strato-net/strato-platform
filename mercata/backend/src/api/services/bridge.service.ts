@@ -13,11 +13,12 @@ import {
   parseBridgeRouteMappings,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, AutoSaveRequestParams, WithdrawalSummaryResponse, TransactionResponse } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@mercata/shared-types";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
+import { getOraclePrices } from "./oracle.service";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 
-const { MercataBridge, Token, mercataBridge, DECIMALS } = constants;
+const { MercataBridge, Token, LendingPool, LendingRegistry, mercataBridge, DECIMALS } = constants;
 
 export const requestWithdrawal = async (
   accessToken: string,
@@ -60,22 +61,22 @@ export const requestWithdrawal = async (
   );
 };
 
-export const requestAutoSave = async (
+export const requestDepositAction = async (
   accessToken: string,
   {
     externalChainId,
     externalTxHash,
-  }: AutoSaveRequestParams,
+    action,
+    targetToken,
+  }: DepositActionRequestParams,
   userAddress: string
 ) : Promise<TransactionResponse> => {
-  const params: AutoSaveRequestParams = {
+  const response = await bridge.post<TransactionResponse>(accessToken, `/request-deposit-action`, {
     externalChainId,
     externalTxHash,
-  };
-
-  // Bridge service handles transaction execution and polling internally,
-  // so we just call it directly and return the result
-  const response = await bridge.post<TransactionResponse>(accessToken, `/request-autosave`, params);
+    action,
+    targetToken,
+  });
   return response.data;
 };
 
@@ -223,4 +224,42 @@ export const getWithdrawalSummary = async (
     pendingWithdrawals: pendingUSD.toString(),
     availableToWithdraw: availableUSD.toString()
   };
+};
+
+export const getDepositActions = async (accessToken: string): Promise<DepositAction[]> => {
+  const key = (r: any) => typeof r.key === "object" ? r.key.key : r.key;
+  const val = (r: any) => typeof r.value === "string" ? JSON.parse(r.value) : r.value ?? {};
+
+  const [{ data: mappings = [] }, { data: [pool] = [] }, prices, { data: [rateEvt] = [] }] = await Promise.all([
+    constants.metalForge
+      ? cirrus.get(accessToken, "/mapping", {
+          params: { select: "collection_name,key,value::text", collection_name: "in.(metalConfigs,isSupportedPayToken)", address: `eq.${constants.metalForge}` }
+        })
+      : Promise.resolve({ data: [] }),
+    cirrus.get(accessToken, `/${LendingRegistry}`, {
+      params: { address: `eq.${constants.lendingRegistry}`, select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken)" }
+    }),
+    getOraclePrices(accessToken),
+    cirrus.get(accessToken, `/${LendingPool}-ExchangeRateUpdated`, {
+      params: { select: "newRate::text", order: "block_timestamp.desc", limit: "1" }
+    }),
+  ]);
+
+  const metals = mappings.filter((r: any) => r.collection_name === "metalConfigs").map((r: any) => ({ addr: key(r), ...val(r) })).filter((m: any) => m.isEnabled === true);
+  const payTokens = mappings.filter((r: any) => r.collection_name === "isSupportedPayToken").filter((r: any) => r.value === true || r.value === "true").map((r: any) => ({ addr: key(r) }));
+  const { borrowableAsset, mToken } = pool?.lendingPool || {};
+  if (mToken) prices.set(mToken, rateEvt?.newRate || (10n ** 18n).toString());
+
+  const allAddrs = [...metals.map((m: any) => m.addr), ...(mToken ? [mToken] : [])];
+  const tokenMap = allAddrs.length ? await getTokenMetadata(accessToken, allAddrs) : new Map();
+
+  const toAction = (id: string, action: number, addr: string, pay: string): DepositAction => {
+    const m = tokenMap.get(addr);
+    return { id, action, stratoToken: addr, stratoTokenName: m?.name ?? "", stratoTokenSymbol: m?.symbol ?? "", stratoTokenImage: m?.image, payToken: pay, oraclePrice: prices.get(addr) };
+  };
+
+  return [
+    ...(borrowableAsset && mToken ? [toAction(`earn-${borrowableAsset}`, 1, mToken, borrowableAsset)] : []),
+    ...payTokens.flatMap((p: any) => metals.map((m: any) => toAction(`forge-${p.addr}-${m.addr}`, 2, m.addr, p.addr))),
+  ];
 };

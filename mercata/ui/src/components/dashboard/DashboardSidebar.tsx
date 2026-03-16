@@ -18,7 +18,8 @@ import {
   HandCoins,
   Vault,
   CreditCard,
-  Gem
+  Gem,
+  ArrowDownToLine
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -34,7 +35,7 @@ interface NavItem {
 const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
   { icon: Gem, label: 'Buy Metals', path: '/dashboard/buy-metals' },
-  { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
+  { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
   { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },

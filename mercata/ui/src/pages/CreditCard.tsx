@@ -78,6 +78,7 @@ const NETWORK_LOGO: Record<string, string> = {
   "8453": `${TW}/blockchains/base/info/logo.png`,
   "84532": `${TW}/blockchains/base/info/logo.png`,
   "59144": `${TW}/blockchains/linea/info/logo.png`,
+  "59141": `${TW}/blockchains/linea/info/logo.png`,
   solana: `${TW}/blockchains/solana/info/logo.png`,
 };
 const TOKEN_LOGO: Record<string, string> = {

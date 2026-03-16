@@ -1,0 +1,61 @@
+nodes:
+  - name: "node-1"
+    url: "https://node1.example.com"
+    auth:
+      openIdDiscoveryUrl: "https://keycloak.example.com/realms/strato/.well-known/openid-configuration"
+      clientId: "strato-client"
+      clientSecret: "secret"
+      username: "loadtest-user"
+      password: "password"
+  # - name: "node-2"
+  #   url: "https://node2.example.com"
+  #   auth:
+  #     openIdDiscoveryUrl: "https://keycloak.example.com/realms/strato/.well-known/openid-configuration"
+  #     clientId: "strato-client"
+  #     clientSecret: "secret"
+  #     username: "loadtest-user"
+  #     password: "password"
+
+gas:
+  limit: 32100000000
+  price: 1
+
+polling:
+  interval: 2000      # ms between result polls
+  timeout: 120000     # ms before giving up
+
+scenarios:
+  contractDeploy:
+    enabled: true
+    batchSize: 10
+    batchCount: 5
+    batchDelay: 0
+    submitMode: sequential  # "sequential" (submit+confirm each batch) or "pipeline" (submit all, then confirm)
+    contractSource: "contracts/SimpleStorage.sol"
+    contractName: "SimpleStorage"
+    contractArgs:
+      _value: "42"
+  functionCall:
+    enabled: true
+    batchSize: 20
+    batchCount: 10
+    batchDelay: 0
+    submitMode: sequential  # "pipeline" mode shows how latency grows as the mempool fills
+    setupContract: "contracts/SimpleIncrement.sol"
+    contractName: "SimpleIncrement"
+    method: "increment"
+    args: {}
+  mixedWorkload:
+    enabled: false
+    deployRatio: 0.3
+    totalTxCount: 100
+    batchSize: 10
+    submitMode: sequential
+  multiNode:
+    enabled: true     # run scenarios against all nodes simultaneously
+
+report:
+  outputDir: "./reports"
+  formats:
+    - json
+    - html

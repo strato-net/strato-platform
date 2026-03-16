@@ -30,6 +30,7 @@ import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
+import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
 import EarnVault from "./pages/EarnVault";
@@ -377,6 +378,15 @@ const App = () => {
                                               <GuestAccessibleRoute>
                                                 <ReferralsManagement />
                                               </GuestAccessibleRoute>
+                                            }
+                                          />
+
+                                          <Route
+                                            path="/dashboard/trading-desk"
+                                            element={
+                                              <ProtectedRoute>
+                                                <PriceTracking />
+                                              </ProtectedRoute>
                                             }
                                           />
 

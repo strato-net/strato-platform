@@ -44,7 +44,6 @@ import           Data.Bits                             (shiftL)
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import qualified Data.Conduit.Binary                   as CB
-import           Data.Conduit.TQueue
 import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
@@ -63,14 +62,14 @@ blockstanbulVersion = 1
 
 debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
 debounceTxSendsAndUnseq = do
-  txq <- atomically newTQueue
+  txq <- atomically $ newTBQueue 10000
   awaitForever $ \case
     Right (W.Transactions txs) -> do
-      atomically $ mapM_ (writeTQueue txq) txs
+      atomically $ mapM_ (writeTBQueue txq) txs
       recordQueuedTxs txs
     Right other -> yield other
     Left TXQueueTimeout -> do
-      txs <- atomically $ flushTQueue txq
+      txs <- atomically $ flushTBQueue txq
       recordEmptyQueue
       yieldMany . map W.Transactions $ chunksOf 100 txs
     Left (ToUnseq ie) -> lift $ Mod.output ie
