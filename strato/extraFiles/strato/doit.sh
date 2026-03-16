@@ -192,10 +192,6 @@ EOF
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner \
     --debug=${evmDebugMode:-false} \
-    --debugEnabled=${VM_DEBUGGER:-false} \
-    --debugPort=${debugPort:-8051} \
-    --debugWSHost=${debugWSHost:-strato} \
-    --debugWSPort=${debugWSPort:-8052} \
     --diffPublish=${diffPublish:-true} \
     --minLogLevel=${vmMinLogLevel} \
     --sqlDiff=${sqlDiff:-true} \

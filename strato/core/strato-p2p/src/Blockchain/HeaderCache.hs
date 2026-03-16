@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
@@ -39,7 +40,8 @@ instance MonadP2P m => HasHeaderCache m where
 
   addToHeaderCache headers = do
     alreadyRequestedRemainingHeaders <- getRemainingBHeaders
-    putRemainingBHeaders $ alreadyRequestedRemainingHeaders ++ headers
+    let !combined = alreadyRequestedRemainingHeaders ++ headers
+    length combined `seq` putRemainingBHeaders combined
 
   getBodiesToFetch = do
     alreadyRequestedHeaders <- getBlockHeaders -- check what already requested
@@ -57,9 +59,9 @@ instance MonadP2P m => HasHeaderCache m where
           return newNeededHeaders
         (first, rest) -> do
           let (newNeededHeaders, remainingHeaders) = splitNeededHeaders first
-              newRemainingHeaders = remainingHeaders ++ rest
+              !newRemainingHeaders = remainingHeaders ++ rest
           $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putRemainingBHeaders called: range = " ++ showRanges (map BlockHeader.number newRemainingHeaders)
-          putRemainingBHeaders newRemainingHeaders -- save it to handle later
+          length newRemainingHeaders `seq` putRemainingBHeaders newRemainingHeaders
           $logInfoS "handleEvents/BlockHeaders" $
             "Not requesting BlockBodies because cache is currently in use, but will request after next batch of BlockBodies arrives."
           return newNeededHeaders

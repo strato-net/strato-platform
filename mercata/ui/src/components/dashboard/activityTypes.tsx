@@ -19,6 +19,7 @@ import {
   Coins,
   Plus,
   Banknote,
+  Gem,
   LucideIcon
 } from "lucide-react";
 import { usdstAddress } from "@/lib/constants";
@@ -1123,6 +1124,75 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           },
           line2: {
             fieldLabels: ["Recipient"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "MetalMinted": {
+    contract_name: "MetalForge",
+    event_name: "MetalMinted",
+    displayName: "Metal Mint",
+    filterConfig: { type: "single", attribute: "buyer" },
+    iconConfig: { icon: Gem, color: "bg-yellow-600" },
+    getTokenAddress: (event: Event) => {
+      const metalToken = event.attributes.metalToken || event.attributes.metal_token;
+      const payToken = event.attributes.payToken || event.attributes.pay_token;
+      return [metalToken, payToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const buyer = event.attributes.buyer || event.attributes.Buyer || "";
+      const metalToken = event.attributes.metalToken || event.attributes.metal_token || "";
+      const payToken = event.attributes.payToken || event.attributes.pay_token || "";
+      const payAmount = event.attributes.payAmount || event.attributes.pay_amount || "0";
+      const metalAmount = event.attributes.metalAmount || event.attributes.metal_amount || "0";
+
+      const metalSymbol = metalToken ? tokenSymbols.get(metalToken) : undefined;
+      const paySymbol = payToken ? tokenSymbols.get(payToken) : undefined;
+      const metalImage = metalToken ? tokenImages?.get(metalToken) : undefined;
+      const payImage = payToken ? tokenImages?.get(payToken) : undefined;
+
+      const fields: ActivityField[] = [
+        {
+          label: "Paid",
+          value: formatValue(payAmount, payToken),
+          type: "amount",
+          badge: paySymbol,
+          image: payImage,
+          imageFallback: paySymbol || payToken,
+          rawAmount: getFullAmount(payAmount),
+        },
+        {
+          label: "Received",
+          value: formatValue(metalAmount, metalToken),
+          type: "amount",
+          badge: metalSymbol,
+          image: metalImage,
+          imageFallback: metalSymbol || metalToken,
+          rawAmount: getFullAmount(metalAmount),
+        },
+        {
+          label: "Buyer",
+          value: buyer,
+          type: "address",
+          isUserAddress: isUserAddress(buyer, userAddress),
+        },
+      ];
+
+      return {
+        title: "Metal Mint",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Paid", "Received"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["Buyer"],
             renderer: "addresses-with-bullet",
           },
         },

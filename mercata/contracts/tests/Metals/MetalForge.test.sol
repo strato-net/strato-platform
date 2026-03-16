@@ -31,8 +31,8 @@ contract Describe_MetalForge is Authorizable {
     uint GOLD_PRICE;
     uint SILVER_PRICE;
     uint ALTPAY_PRICE;
-    uint USDST_FEE_BPS;
-    uint ALTPAY_FEE_BPS;
+    uint GOLD_FEE_BPS;
+    uint SILVER_FEE_BPS;
     uint GOLD_CAP;
     uint SILVER_CAP;
     uint BUYER_BALANCE;
@@ -47,8 +47,8 @@ contract Describe_MetalForge is Authorizable {
         GOLD_PRICE = 2000e18;
         SILVER_PRICE = 25e18;
         ALTPAY_PRICE = 2e18;
-        USDST_FEE_BPS = 100;
-        ALTPAY_FEE_BPS = 200;
+        GOLD_FEE_BPS = 100;
+        SILVER_FEE_BPS = 200;
         GOLD_CAP = 1000000e18;
         SILVER_CAP = 10000000e18;
         BUYER_BALANCE = 10000000e18;
@@ -77,10 +77,10 @@ contract Describe_MetalForge is Authorizable {
         oracle.setAssetPrice(silverAddr, SILVER_PRICE);
         oracle.setAssetPrice(altPayAddr, ALTPAY_PRICE);
 
-        forge.setMetalConfig(goldAddr, true, GOLD_CAP);
-        forge.setMetalConfig(silverAddr, true, SILVER_CAP);
-        forge.setPayTokenConfig(usdstAddr, true, USDST_FEE_BPS);
-        forge.setPayTokenConfig(altPayAddr, true, ALTPAY_FEE_BPS);
+        forge.setMetalConfig(goldAddr, true, GOLD_CAP, GOLD_FEE_BPS);
+        forge.setMetalConfig(silverAddr, true, SILVER_CAP, SILVER_FEE_BPS);
+        forge.setPayToken(usdstAddr, true);
+        forge.setPayToken(altPayAddr, true);
 
         AdminRegistry adminReg = m.adminRegistry();
         adminReg.castVoteOnIssue(address(adminReg), "addWhitelist", goldAddr, "mint", address(forge));
@@ -149,12 +149,12 @@ contract Describe_MetalForge is Authorizable {
         require(reverted, "Non-owner should not setOracle");
 
         reverted = false;
-        try { buyer1.do(address(forge), "setMetalConfig", goldAddr, true, 100e18); } catch { reverted = true; }
+        try { buyer1.do(address(forge), "setMetalConfig", goldAddr, true, 100e18, 100); } catch { reverted = true; }
         require(reverted, "Non-owner should not setMetalConfig");
 
         reverted = false;
-        try { buyer1.do(address(forge), "setPayTokenConfig", usdstAddr, true, 100); } catch { reverted = true; }
-        require(reverted, "Non-owner should not setPayTokenConfig");
+        try { buyer1.do(address(forge), "setPayToken", usdstAddr, true); } catch { reverted = true; }
+        require(reverted, "Non-owner should not setPayToken");
     }
 
     // ============================================================
@@ -165,7 +165,7 @@ contract Describe_MetalForge is Authorizable {
         uint payAmount = 10000e18;
         // fee = 10000e18 * 100 / 10000 = 100e18, principal = 9900e18
         // fundsUSD = 9900e18 (USDST branch), goldAmount = 9900e18 * 1e18 / 2000e18 = 4.95e18
-        uint expectedGold = (((payAmount - (payAmount * USDST_FEE_BPS) / 10000)) * WAD) / GOLD_PRICE;
+        uint expectedGold = (((payAmount - (payAmount * GOLD_FEE_BPS) / 10000)) * WAD) / GOLD_PRICE;
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
 
@@ -174,10 +174,10 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_mints_metal_with_non_usdst_payment() {
         uint payAmount = 10000e18;
-        // fee = 10000e18 * 200 / 10000 = 200e18, principal = 9800e18
-        // fundsUSD = 9800e18 * 2e18 / 1e18 = 19600e18
-        // goldAmount = 19600e18 * 1e18 / 2000e18 = 9.8e18
-        uint feeAmt = (payAmount * ALTPAY_FEE_BPS) / 10000;
+        // fee = 10000e18 * 100 / 10000 = 100e18, principal = 9900e18
+        // fundsUSD = 9900e18 * 2e18 / 1e18 = 19800e18
+        // goldAmount = 19800e18 * 1e18 / 2000e18 = 9.9e18
+        uint feeAmt = (payAmount * GOLD_FEE_BPS) / 10000;
         uint principal = payAmount - feeAmt;
         uint fundsUSD = (principal * ALTPAY_PRICE) / WAD;
         uint expectedGold = (fundsUSD * WAD) / GOLD_PRICE;
@@ -198,7 +198,7 @@ contract Describe_MetalForge is Authorizable {
         require(reverted, "Should revert when metal disabled");
 
         forge.setMetalEnabled(goldAddr, true);
-        forge.setPayTokenEnabled(usdstAddr, false);
+        forge.setPayToken(usdstAddr, false);
         reverted = false;
         try {
             buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, 1000e18, 0);
@@ -224,7 +224,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_computes_correct_fee_and_principal() {
         uint payAmount = 7777e18;
-        uint expectedFee = (payAmount * USDST_FEE_BPS) / 10000;
+        uint expectedFee = (payAmount * GOLD_FEE_BPS) / 10000;
         uint expectedPrincipal = payAmount - expectedFee;
 
         uint treasurerBefore = ERC20(usdstAddr).balanceOf(treasurer);
@@ -241,7 +241,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_distributes_payment_to_treasurer_and_fee_collector() {
         uint payAmount = 5000e18;
-        uint expectedFee = (payAmount * USDST_FEE_BPS) / 10000;
+        uint expectedFee = (payAmount * GOLD_FEE_BPS) / 10000;
         uint expectedPrincipal = payAmount - expectedFee;
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
@@ -258,8 +258,8 @@ contract Describe_MetalForge is Authorizable {
             FeeCollector c = new FeeCollector(address(this));
             address t = address(uint(0xBEEF) + i);
             f.initialize(address(oracle), t, address(c), usdstAddr);
-            f.setMetalConfig(goldAddr, true, GOLD_CAP);
-            f.setPayTokenConfig(usdstAddr, true, USDST_FEE_BPS);
+            f.setMetalConfig(goldAddr, true, GOLD_CAP, GOLD_FEE_BPS);
+            f.setPayToken(usdstAddr, true);
             AdminRegistry adminReg = m.adminRegistry();
             adminReg.castVoteOnIssue(address(adminReg), "addWhitelist", goldAddr, "mint", address(f));
             Token(usdstAddr).mint(address(buyer1), amounts[i]);
@@ -279,7 +279,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_dust_payment_bypasses_fee() {
         uint payAmount = 99;
-        uint expectedFee = (payAmount * USDST_FEE_BPS) / 10000;
+        uint expectedFee = (payAmount * GOLD_FEE_BPS) / 10000;
         require(expectedFee == 0, "Precondition: fee should round to 0 for dust");
 
         Token(usdstAddr).mint(address(buyer1), payAmount);
@@ -292,7 +292,7 @@ contract Describe_MetalForge is Authorizable {
     }
 
     function it_forge_zero_fee_sends_all_to_treasurer() {
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
         uint payAmount = 5000e18;
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
@@ -307,7 +307,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_computes_correct_metal_amount() {
         uint payAmount = 10000e18;
-        uint fee = (payAmount * USDST_FEE_BPS) / 10000;
+        uint fee = (payAmount * GOLD_FEE_BPS) / 10000;
         uint principal = payAmount - fee;
         uint expectedGold = (principal * WAD) / GOLD_PRICE;
 
@@ -319,7 +319,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_usdst_branch_skips_pay_token_oracle() {
         uint payAmount = 2000e18;
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
 
@@ -330,7 +330,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_non_usdst_branch_uses_pay_token_price() {
         uint payAmount = 1000e18;
-        forge.setPayTokenConfig(altPayAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
 
         // fundsUSD = 1000e18 * 2e18 / 1e18 = 2000e18
         // goldAmount = 2000e18 * 1e18 / 2000e18 = 1e18
@@ -343,7 +343,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_metal_amount_rounds_down() {
         oracle.setAssetPrice(goldAddr, 3e18);
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
         uint payAmount = 10e18;
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
@@ -357,7 +357,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_high_metal_price_yields_zero_metal() {
         oracle.setAssetPrice(goldAddr, 1e30);
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
         uint payAmount = 1;
 
         Token(usdstAddr).mint(address(buyer1), payAmount);
@@ -374,7 +374,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_reverts_on_slippage_exceeded() {
         uint payAmount = 2000e18;
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
         // metalAmount = (2000e18 * 1e18) / 2000e18 = 1e18
         uint tooHigh = 1e18 + 1;
 
@@ -389,7 +389,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_accepts_mint_at_exact_slippage_boundary() {
         uint payAmount = 2000e18;
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
         uint exactAmount = (payAmount * WAD) / GOLD_PRICE;
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, exactAmount);
@@ -402,8 +402,7 @@ contract Describe_MetalForge is Authorizable {
     // ============================================================
 
     function it_forge_reverts_when_mint_cap_exceeded() {
-        forge.setMetalConfig(goldAddr, true, 1e18);
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setMetalConfig(goldAddr, true, 1e18, 0);
         // 4000 USDST → 2 oz gold, but cap is 1 oz
         bool reverted = false;
         try {
@@ -415,8 +414,7 @@ contract Describe_MetalForge is Authorizable {
     }
 
     function it_forge_accepts_mint_at_exact_cap_boundary() {
-        forge.setMetalConfig(goldAddr, true, 1e18);
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setMetalConfig(goldAddr, true, 1e18, 0);
         // 2000 USDST → exactly 1 oz gold = exactly the cap
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, 2000e18, 0);
 
@@ -424,9 +422,7 @@ contract Describe_MetalForge is Authorizable {
     }
 
     function it_forge_mint_cap_is_per_metal() {
-        forge.setMetalConfig(goldAddr, true, 10e18);
-        forge.setPayTokenConfig(usdstAddr, true, 0);
-        forge.setPayTokenConfig(altPayAddr, true, 0);
+        forge.setMetalConfig(goldAddr, true, 10e18, 0);
 
         // Mint 5 oz via USDST: 10000 USDST → 5 oz
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, 10000e18, 0);
@@ -447,7 +443,7 @@ contract Describe_MetalForge is Authorizable {
     }
 
     function it_forge_total_minted_accumulates_correctly() {
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
         uint cumulative = 0;
 
         for (uint i = 1; i <= 5; i++) {
@@ -459,7 +455,7 @@ contract Describe_MetalForge is Authorizable {
     }
 
     function it_forge_lowered_cap_blocks_further_minting() {
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
 
         // Mint 5 oz
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, 10000e18, 0);
@@ -483,7 +479,7 @@ contract Describe_MetalForge is Authorizable {
     // ============================================================
 
     function it_forge_fee_bps_10000_mints_zero_metal() {
-        forge.setPayTokenConfig(usdstAddr, true, 10000);
+        forge.setFeeBps(goldAddr, 10000);
         uint payAmount = 1000e18;
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, payAmount, 0);
@@ -494,14 +490,13 @@ contract Describe_MetalForge is Authorizable {
     }
 
     function it_forge_reverts_when_fee_bps_exceeds_10000() {
-        forge.setPayTokenConfig(usdstAddr, true, 10001);
         bool reverted = false;
-        try {
-            buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, 1000e18, 0);
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Should revert: feeAmount > payAmount causes underflow");
+        try { forge.setFeeBps(goldAddr, 10001); } catch { reverted = true; }
+        require(reverted, "setFeeBps should revert when feeBps > 10000");
+
+        reverted = false;
+        try { forge.setMetalConfig(goldAddr, true, GOLD_CAP, 10001); } catch { reverted = true; }
+        require(reverted, "setMetalConfig should revert when feeBps > 10000");
     }
 
     // ============================================================
@@ -509,61 +504,58 @@ contract Describe_MetalForge is Authorizable {
     // ============================================================
 
     function it_forge_set_config_stores_values() {
-        forge.setMetalConfig(goldAddr, false, 42e18);
-        (bool mEnabled, uint mCap) = forge.metalConfigs(goldAddr);
+        forge.setMetalConfig(goldAddr, false, 42e18, 555);
+        (bool mEnabled, uint mCap, uint mFee) = forge.metalConfigs(goldAddr);
         require(!mEnabled, "Metal should be disabled");
         require(mCap == 42e18, "MintCap mismatch");
+        require(mFee == 555, "FeeBps mismatch");
 
-        forge.setPayTokenConfig(usdstAddr, false, 555);
-        (bool pEnabled, uint pFee) = forge.payTokenConfigs(usdstAddr);
-        require(!pEnabled, "PayToken should be disabled");
-        require(pFee == 555, "FeeBps mismatch");
+        forge.setPayToken(usdstAddr, false);
+        require(!forge.isSupportedPayToken(usdstAddr), "PayToken should be disabled");
     }
 
     function it_forge_set_metal_and_pay_token_config_independently() {
-        forge.setMetalConfig(goldAddr, true, 50e18);
-        forge.setMetalConfig(silverAddr, false, 99e18);
+        forge.setMetalConfig(goldAddr, true, 50e18, 300);
+        forge.setMetalConfig(silverAddr, false, 99e18, 0);
 
-        (bool gEnabled, uint gCap) = forge.metalConfigs(goldAddr);
-        (bool sEnabled, uint sCap) = forge.metalConfigs(silverAddr);
-        require(gEnabled && gCap == 50e18, "Gold config wrong");
-        require(!sEnabled && sCap == 99e18, "Silver config wrong");
+        (bool gEnabled, uint gCap, uint gFee) = forge.metalConfigs(goldAddr);
+        (bool sEnabled, uint sCap, uint sFee) = forge.metalConfigs(silverAddr);
+        require(gEnabled && gCap == 50e18 && gFee == 300, "Gold config wrong");
+        require(!sEnabled && sCap == 99e18 && sFee == 0, "Silver config wrong");
 
-        forge.setPayTokenConfig(usdstAddr, true, 300);
-        forge.setPayTokenConfig(altPayAddr, false, 0);
+        forge.setPayToken(usdstAddr, true);
+        forge.setPayToken(altPayAddr, false);
 
-        (bool uEnabled, uint uFee) = forge.payTokenConfigs(usdstAddr);
-        (bool aEnabled, uint aFee) = forge.payTokenConfigs(altPayAddr);
-        require(uEnabled && uFee == 300, "USDST pay config wrong");
-        require(!aEnabled && aFee == 0, "AltPay pay config wrong");
+        require(forge.isSupportedPayToken(usdstAddr), "USDST should be supported");
+        require(!forge.isSupportedPayToken(altPayAddr), "AltPay should not be supported");
     }
 
     function it_forge_individual_setters_update_single_field() {
-        // setMintCap should only update mintCap, not isEnabled
-        forge.setMetalConfig(goldAddr, true, 100e18);
+        // setMintCap should only update mintCap, not isEnabled or feeBps
+        forge.setMetalConfig(goldAddr, true, 100e18, 100);
         forge.setMintCap(goldAddr, 200e18);
-        (bool enabled, uint cap) = forge.metalConfigs(goldAddr);
+        (bool enabled, uint cap, uint fee) = forge.metalConfigs(goldAddr);
         require(enabled, "setMintCap should not change isEnabled");
         require(cap == 200e18, "setMintCap should update cap");
+        require(fee == 100, "setMintCap should not change feeBps");
 
-        // setFeeBps should only update feeBps, not isEnabled
-        forge.setPayTokenConfig(usdstAddr, true, 100);
-        forge.setFeeBps(usdstAddr, 500);
-        (bool pEnabled, uint fee) = forge.payTokenConfigs(usdstAddr);
-        require(pEnabled, "setFeeBps should not change isEnabled");
-        require(fee == 500, "setFeeBps should update fee");
+        // setFeeBps should only update feeBps, not isEnabled or mintCap
+        forge.setFeeBps(goldAddr, 500);
+        (bool en1b, uint cap1b, uint fee1b) = forge.metalConfigs(goldAddr);
+        require(en1b, "setFeeBps should not change isEnabled");
+        require(cap1b == 200e18, "setFeeBps should not change mintCap");
+        require(fee1b == 500, "setFeeBps should update fee");
 
-        // setMetalEnabled should only update isEnabled, not mintCap
+        // setMetalEnabled should only update isEnabled, not mintCap or feeBps
         forge.setMetalEnabled(goldAddr, false);
-        (bool en2, uint cap2) = forge.metalConfigs(goldAddr);
+        (bool en2, uint cap2, uint fee2) = forge.metalConfigs(goldAddr);
         require(!en2, "setMetalEnabled should disable");
         require(cap2 == 200e18, "setMetalEnabled should not change cap");
+        require(fee2 == 500, "setMetalEnabled should not change feeBps");
 
-        // setPayTokenEnabled should only update isEnabled, not feeBps
-        forge.setPayTokenEnabled(usdstAddr, false);
-        (bool en3, uint fee2) = forge.payTokenConfigs(usdstAddr);
-        require(!en3, "setPayTokenEnabled should disable");
-        require(fee2 == 500, "setPayTokenEnabled should not change feeBps");
+        // setPayToken should update the flag
+        forge.setPayToken(usdstAddr, false);
+        require(!forge.isSupportedPayToken(usdstAddr), "setPayToken should disable");
     }
 
     // ============================================================
@@ -571,7 +563,7 @@ contract Describe_MetalForge is Authorizable {
     // ============================================================
 
     function it_forge_multiple_buyers_mint_same_metal() {
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
         uint pay1 = 4000e18;
         uint pay2 = 6000e18;
 
@@ -587,7 +579,8 @@ contract Describe_MetalForge is Authorizable {
     }
 
     function it_forge_multiple_metals_independent_state() {
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
+        forge.setFeeBps(silverAddr, 0);
 
         buyer1.do(address(forge), "mintMetal", goldAddr, usdstAddr, 4000e18, 0);
         buyer1.do(address(forge), "mintMetal", silverAddr, usdstAddr, 500e18, 0);
@@ -606,7 +599,7 @@ contract Describe_MetalForge is Authorizable {
 
     function it_forge_end_to_end_balance_invariants() {
         uint payAmount = 8000e18;
-        uint fee = (payAmount * USDST_FEE_BPS) / 10000;
+        uint fee = (payAmount * GOLD_FEE_BPS) / 10000;
         uint principal = payAmount - fee;
         uint expectedGold = (principal * WAD) / GOLD_PRICE;
 
@@ -626,7 +619,7 @@ contract Describe_MetalForge is Authorizable {
     }
 
     function it_forge_cumulative_mints_preserve_invariants() {
-        forge.setPayTokenConfig(usdstAddr, true, 0);
+        forge.setFeeBps(goldAddr, 0);
 
         uint totalPaid = 0;
         uint totalGold = 0;

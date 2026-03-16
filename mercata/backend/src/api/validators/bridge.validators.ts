@@ -47,30 +47,18 @@ export function validateRequestWithdrawal(args: any) {
   }
 }
 
-export function validateAutoSave(args: any) {
+export function validateDepositAction(args: any) {
   if (!args || typeof args !== "object") {
     throw new Error("Invalid input: args must be an object.");
   }
 
-  const { externalChainId, externalTxHash } = args;
+  const { externalChainId, externalTxHash, action } = args;
   
-  if (!externalChainId || !externalTxHash) {
-    throw new Error("RequestAutoSave Argument Validation Error");
+  if (!externalChainId || !externalTxHash || action === undefined || action === null) {
+    throw new Error("RequestDepositAction Argument Validation Error: externalChainId, externalTxHash, and action are required");
   }
 
-  // Step 1: Basic presence and types
-  const baseSchema = Joi.object({
-    externalChainId: Joi.string().required(),
-    externalTxHash: Joi.string().required(),
-  }).strict();
-
-  const { error: baseError } = baseSchema.validate(args);
-  if (baseError) {
-    throw new Error("RequestWithdrawal Argument Validation Error: " + baseError.message);
-  }
-
-  // Step 2: Format and logic checks
-  const finalSchema = Joi.object({
+  const schema = Joi.object({
     externalChainId: Joi.string()
       .required()
       .custom((value, helpers) => {
@@ -85,11 +73,27 @@ export function validateAutoSave(args: any) {
         "any.required": "externalChainId is required.",
       }),
     externalTxHash: validateHashField("externalTxHash"),
-  }).strict();
+    action: Joi.number()
+      .integer()
+      .min(1)
+      .required()
+      .messages({
+        "number.base": "action must be a number.",
+        "number.min": "action must be at least 1.",
+        "any.required": "action is required.",
+      }),
+    targetToken: Joi.string()
+      .optional()
+      .allow("")
+      .pattern(/^(0x)?[a-fA-F0-9]{40}$/)
+      .messages({
+        "string.pattern.base": "targetToken must be a valid 40-character hex address.",
+      }),
+  });
 
-  const { error } = finalSchema.validate(args);
+  const { error } = schema.validate(args);
   if (error) {
-    throw new Error("RequestWithdrawal Argument Validation Error: " + error.message);
+    throw new Error("RequestDepositAction Argument Validation Error: " + error.message);
   }
 }
 

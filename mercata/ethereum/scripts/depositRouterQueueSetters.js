@@ -75,6 +75,8 @@ const CHAIN_NAME_TO_ID = {
   linea: 59144,
   linea_mainnet: 59144,
   "linea-mainnet": 59144,
+  linea_sepolia: 59141,
+  "linea-sepolia": 59141,
 };
 
 function parseChains(args) {

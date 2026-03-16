@@ -175,8 +175,6 @@ services:
     environment:
     - APEX_HOST=${APEX_HOST:-}
     - blockTime=${blockTime:-}
-    - debugPort=${debugPort:-}
-    - debugWSPort=${debugWSPort:-}
     - DOCS_HOST=${DOCS_HOST:-}
     - NGINX_TRUST_PROXY_CIDRS=${NGINX_TRUST_PROXY_CIDRS:-}
     - OAUTH_SCOPE=${OAUTH_SCOPE:-}
@@ -195,7 +193,6 @@ services:
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - VAULT_URL=${VAULT_URL}
-    - VM_DEBUGGER=${VM_DEBUGGER:-}
     build: .
     extra_hosts:
     - "host.docker.internal:host-gateway"

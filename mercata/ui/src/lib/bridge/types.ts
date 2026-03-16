@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, AutoSaveRequestParams, TransactionResponse, WithdrawalSummaryResponse } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
 
 export interface BalanceResponse {
   balance: string;
@@ -20,14 +20,15 @@ export type BridgeContextType = {
   loading: boolean;
   error: string | null;
   availableNetworks: NetworkSummary[];
-  bridgeableTokens: BridgeToken[]; // All route tokens for the selected network (filter by isDefaultRoute)
+  bridgeableTokens: BridgeToken[];
+  depositActions: DepositAction[];
   selectedNetwork: string | null;
   selectedToken: BridgeToken | null;
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
   requestWithdrawal: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
-  requestAutoSave: (params: AutoSaveRequestParams) => Promise<TransactionResponse>;
+  requestDepositAction: (params: DepositActionRequestParams) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 

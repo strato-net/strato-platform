@@ -422,9 +422,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
 
 initContext ::
   (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
-  Maybe DebugSettings ->
   m Context
-initContext dSettings = do
+initContext = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
   conn <- createPostgresqlPool connStr 20
   let ldbOptions =
@@ -454,7 +453,6 @@ initContext dSettings = do
     newIORef $
       def
         & txRunResultsCache .~ cache
-        & debugSettings .~ dSettings
   que <- newTQueueIO
   pure
     Context
@@ -465,13 +463,12 @@ initContext dSettings = do
 
 runContextM ::
   (MonadUnliftIO m, MonadLoggerIO m) =>
-  Maybe DebugSettings ->
   ReaderT Context (ResourceT m) a ->
   m (a, ContextState)
-runContextM dSettings f = do
+runContextM f = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
   runResourceT $ do
-    ctx <- initContext dSettings
+    ctx <- initContext
     runContextM' ctx f
 
 runContextM' ::
@@ -486,10 +483,9 @@ runContextM' ctx f = do
 
 evalContextM ::
   (MonadUnliftIO m, MonadLoggerIO m) =>
-  Maybe DebugSettings ->
   ReaderT Context (ResourceT m) a ->
   m a
-evalContextM d f = fst <$> runContextM d f
+evalContextM f = fst <$> runContextM f
 
 evalContextM' ::
   MonadUnliftIO m =>
@@ -500,10 +496,9 @@ evalContextM' ctx f = fst <$> runContextM' ctx f
 
 execContextM ::
   (MonadUnliftIO m, MonadLoggerIO m) =>
-  Maybe DebugSettings ->
   ReaderT Context (ResourceT m) a ->
   m ContextState
-execContextM d f = snd <$> runContextM d f
+execContextM f = snd <$> runContextM f
 
 execContextM' ::
   MonadUnliftIO m =>
