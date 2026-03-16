@@ -26,16 +26,8 @@ endif
 
 ifndef VERSION
   GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
-  ifeq ($(REPO),public)
-    VERSION := $(GIT_TAG)
-    $(info Using version from git tag)
-  else ifeq ($(REPO),private)
-    VERSION := $(GIT_TAG)-$(shell git rev-parse --short=7 HEAD)
-    $(info Using version tag with commit hash for registry)
-  else
-    # Local dev - use simple version (no commit hash) for stable image tags
-    VERSION := $(GIT_TAG)
-  endif
+  # Use git tag for VERSION - content hash provides uniqueness
+  VERSION := $(GIT_TAG)
 else
   $(info VERSION is "$(VERSION)" (overriden with env var))
 endif
