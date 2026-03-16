@@ -46,6 +46,28 @@
     },
     "XAUT": {
       "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
+    },
+    "_EXAMPLE_aUSDST": {
+      "targetAssetAddress": "0000000000000000000000000000000000000000",
+      "submit": false,
+      "rebase": {
+        "underlyingAsset": "USDST",
+        "factorUrl": "${STRATO_NODE_URL}/bloc/v2.2/contracts/LendingPool/state/reserves/USDST_ADDRESS/liquidityIndex",
+        "factorParse": "liquidityIndex",
+        "factorPrecision": "1000000000000000000000000000"
+      },
+      "comment": "Example aToken: price = USDST price × liquidityIndex / 1e27. Replace targetAssetAddress and factorUrl, then set submit to true."
+    },
+    "_EXAMPLE_xSTOCK": {
+      "targetAssetAddress": "0000000000000000000000000000000000000000",
+      "submit": false,
+      "rebase": {
+        "underlyingAsset": "USDST",
+        "factorUrl": "${STRATO_NODE_URL}/bloc/v2.2/contracts/xStock/state/currentMultiplier",
+        "factorParse": "currentMultiplier",
+        "factorPrecision": "1000000000000000000"
+      },
+      "comment": "Example xStock: price = USDST price × currentMultiplier / 1e18. Replace targetAssetAddress and factorUrl, then set submit to true."
     }
   }
 }

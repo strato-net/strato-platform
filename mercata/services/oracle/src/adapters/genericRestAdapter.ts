@@ -1,6 +1,6 @@
 import { apiRequest } from '../utils/apiClient';
-import { SourceConfig, BatchPriceResult, Asset } from '../types';
-import { logError } from '../utils/logger';
+import { SourceConfig, BatchPriceResult, Asset, RebaseConfig } from '../types';
+import { logError, logInfo } from '../utils/logger';
 
 function extractNestedProperty(obj: any, path: string): any {
     if (!path) return undefined;
@@ -10,8 +10,35 @@ function extractNestedProperty(obj: any, path: string): any {
     }, obj);
 }
 
-function isValidPrice(price: number): boolean {
-    return price > 0 && isFinite(price);
+function isValidPrice(price: bigint): boolean {
+    return price > 0n;
+}
+
+function parseScaledPrice(value: unknown): bigint {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) return 0n;
+
+    const negative = normalized.startsWith('-');
+    const unsigned = negative ? normalized.slice(1) : normalized;
+    const [wholePartRaw, fractionalPartRaw = ''] = unsigned.split('.');
+
+    if (!/^\d+$/.test(wholePartRaw || '0') || !/^\d*$/.test(fractionalPartRaw)) {
+        return 0n;
+    }
+
+    const wholePart = BigInt(wholePartRaw || '0');
+    const fractionalPart = BigInt((fractionalPartRaw + '0'.repeat(18)).slice(0, 18) || '0');
+    const scaled = wholePart * (10n ** 18n) + fractionalPart;
+
+    return negative ? -scaled : scaled;
+}
+
+function parsePositiveBigInt(value: unknown): bigint {
+    const normalized = String(value ?? '').trim();
+    if (!/^\d+$/.test(normalized)) {
+        return 0n;
+    }
+    return BigInt(normalized);
 }
 
 // Generate constant prices for asset keys
@@ -24,7 +51,7 @@ export function generateConstantPrices(assetKeys: string[], assets: Record<strin
         if (!asset || !asset.constantPrice) {
             throw new Error(`Asset ${key} has no constantPrice`);
         }
-        result[key] = { price: asset.constantPrice, feedTimestamp: timestamp };
+        result[key] = { price: parseScaledPrice(asset.constantPrice), feedTimestamp: timestamp };
     });
     
     return result;
@@ -142,7 +169,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
             const item = data.data.find((d: any) => d.symbol === mapped);
             if (item?.prices?.[0]?.value) {
-                const price = Math.floor(parseFloat(item.prices[0].value) * 1e18);
+                const price = parseScaledPrice(item.prices[0].value);
                 if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: item.prices[0].lastUpdatedAt || new Date().toISOString() };
             }
         });
@@ -152,7 +179,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
         symbols.forEach(symbol => {
             const symbolData = data.data[symbol];
             if (symbolData?.[0]?.quote?.USD?.price) {
-                const price = Math.floor(parseFloat(symbolData[0].quote.USD.price) * 1e18);
+                const price = parseScaledPrice(symbolData[0].quote.USD.price);
                 if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: symbolData[0].quote.USD.last_updated || new Date().toISOString() };
             }
         });
@@ -162,7 +189,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
         symbols.forEach(symbol => {
             const id = sourceConfig.symbolMapping?.[symbol] || symbol.toLowerCase();
             if (data[id]?.usd) {
-                const price = Math.floor(parseFloat(data[id].usd) * 1e18);
+                const price = parseScaledPrice(data[id].usd);
                 if (isValidPrice(price)) {
                     const ts = data[id].last_updated_at ? new Date(data[id].last_updated_at * 1000).toISOString() : new Date().toISOString();
                     result[symbol] = { price, feedTimestamp: ts };
@@ -176,7 +203,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             const assetId = sourceConfig.symbolMapping?.[symbol] || symbol;
             const assetData = data.find((a: any) => a.asset_id === assetId);
             if (assetData?.price_usd) {
-                const price = Math.floor(parseFloat(assetData.price_usd) * 1e18);
+                const price = parseScaledPrice(assetData.price_usd);
                 if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: assetData.data_quote_start || new Date().toISOString() };
             }
         });
@@ -187,7 +214,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             const coinId = sourceConfig.symbolMapping?.[symbol] || symbol;
             const coinData = data.coins[coinId];
             if (coinData?.price) {
-                const price = Math.floor(parseFloat(coinData.price) * 1e18);
+                const price = parseScaledPrice(coinData.price);
                 if (isValidPrice(price)) {
                     const ts = coinData.timestamp ? new Date(coinData.timestamp * 1000).toISOString() : new Date().toISOString();
                     result[symbol] = { price, feedTimestamp: ts };
@@ -201,7 +228,8 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
             const rate = data.data.rates[mapped];
             if (rate) {
-                const price = Math.floor((1 / parseFloat(rate)) * 1e18); // Inverted rate
+                const rateNumber = parseFloat(rate);
+                const price = Number.isFinite(rateNumber) && rateNumber > 0 ? parseScaledPrice(1 / rateNumber) : 0n; // Inverted rate
                 if (isValidPrice(price)) {
                     const ts = data.data.timestamp ? new Date(data.data.timestamp * 1000).toISOString() : new Date().toISOString();
                     result[symbol] = { price, feedTimestamp: ts };
@@ -225,7 +253,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
             
             if (!isNaN(priceUSD) && priceUSD > 0) {
-                const price = Math.floor(priceUSD * 1e18);
+                const price = parseScaledPrice(priceUSD);
                 if (isValidPrice(price)) {
                     result[symbol] = { price, feedTimestamp: ts };
                 }
@@ -240,7 +268,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
                 // Handle both direct number and object with close price
                 const priceUSD = typeof rate === 'number' ? rate : (rate.close || rate.price || rate.value);
                 if (priceUSD) {
-                    const price = Math.floor(parseFloat(priceUSD) * 1e18);
+                    const price = parseScaledPrice(priceUSD);
                     if (isValidPrice(price)) {
                         const ts = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
                         result[symbol] = { price, feedTimestamp: ts };
@@ -257,7 +285,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             // Handle single symbol response (direct price) vs batch response (keyed by symbol)
             const symbolData = data[mapped] || (symbols.length === 1 ? data : null);
             if (symbolData?.price) {
-                const price = Math.floor(parseFloat(symbolData.price) * 1e18);
+                const price = parseScaledPrice(symbolData.price);
                 if (isValidPrice(price)) {
                     result[symbol] = { price, feedTimestamp: new Date().toISOString() };
                 }
@@ -273,7 +301,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
                 const bid = parseFloat(priceData.bids[0].price);
                 const ask = parseFloat(priceData.asks[0].price);
                 const midPrice = (bid + ask) / 2;
-                const price = Math.floor(midPrice * 1e18);
+                const price = parseScaledPrice(midPrice);
                 if (isValidPrice(price)) {
                     result[symbol] = { price, feedTimestamp: priceData.time || new Date().toISOString() };
                 }
@@ -287,7 +315,7 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
                 const path = parsePattern.replace(/\{symbol\}/g, symbol);
                 const priceUSD = extractNestedProperty(data, path);
                 if (priceUSD) {
-                    const price = Math.floor(parseFloat(priceUSD) * 1e18);
+                    const price = parseScaledPrice(priceUSD);
                     if (isValidPrice(price)) result[symbol] = { price, feedTimestamp: new Date().toISOString() };
                 }
             } catch (err) {
@@ -297,4 +325,44 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
     }
     
     return result;
+}
+
+export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig): Promise<bigint> {
+    let url = rebase.factorUrl;
+    const stratoUrl = process.env.STRATO_NODE_URL || '';
+    url = url.replace(/\$\{STRATO_NODE_URL\}/g, stratoUrl);
+
+    const apiKey = rebase.factorApiKeyEnvVar ? process.env[rebase.factorApiKeyEnvVar] || '' : '';
+    if (apiKey) {
+        url = url.replace(/\$\{API_KEY\}/g, apiKey);
+    }
+
+    const headers: Record<string, string> = { 'Accept': 'application/json' };
+    if (rebase.factorHeaders && apiKey) {
+        rebase.factorHeaders.split(',').forEach(h => {
+            const name = h.trim();
+            headers[name] = name === 'Authorization' ? `Bearer ${apiKey}` : apiKey;
+        });
+    }
+
+    const response = await apiRequest({ method: 'GET', url, headers }, {
+        logPrefix: 'RebaseFactor',
+        apiUrl: url,
+        method: 'GET'
+    });
+
+    const raw = extractNestedProperty(response.data, rebase.factorParse);
+    if (raw === undefined || raw === null) {
+        logError('RebaseFactor', new Error(`${assetKey}: no value at path "${rebase.factorParse}"`));
+        return 0n;
+    }
+
+    const factor = parsePositiveBigInt(raw);
+    if (factor <= 0n) {
+        logError('RebaseFactor', new Error(`${assetKey}: invalid factor value "${raw}"`));
+        return 0n;
+    }
+
+    logInfo('RebaseFactor', `${assetKey}: factor=${factor.toString()} (parse="${rebase.factorParse}")`);
+    return factor;
 }

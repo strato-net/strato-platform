@@ -1,14 +1,24 @@
+export interface RebaseConfig {
+    underlyingAsset: string;      // Asset key whose aggregated price is the base (e.g., "USDST")
+    factorUrl: string;            // REST endpoint to fetch the rebase factor (supports ${STRATO_NODE_URL} substitution)
+    factorParse: string;          // JSON path to extract the factor value (e.g., "liquidityIndex")
+    factorPrecision: string;      // Divisor for the raw factor: "1000000000000000000000000000" for ray, "1000000000000000000" for wad
+    factorApiKeyEnvVar?: string;
+    factorHeaders?: string;       // Comma-separated header names that receive the resolved API key
+}
+
 export interface Asset {
     targetAssetAddress: string;
     constantPrice?: number;
     weekendProxy?: string; // Proxy symbol for weekend/market-closed pricing (e.g., "PAXG" for XAU)
     equivalentAssets?: string[]; // Assets with equivalent prices (e.g., ["XAUT"] for XAU)
     submit?: boolean; // Whether to submit this asset to blockchain (default: true)
+    rebase?: RebaseConfig; // Rebasing token config: price = underlyingPrice × factor / precision
 }
 
 export interface BatchPriceResult {
     [assetName: string]: {
-        price: number;
+        price: bigint;
         feedTimestamp: string;
     };
 }
@@ -55,18 +65,17 @@ export interface TxMetric {
 
 export interface SourceResult {
     sourceName: string;
-    prices: Record<string, { price: number; feedTimestamp: string }>;
+    prices: Record<string, { price: bigint; feedTimestamp: string }>;
     success: boolean;
     duration: number;
 }
 
 export interface AggregatedPrice {
     assetKey: string;
-    medianPrice: number;
+    medianPrice: bigint;
     targetAddress: string;
-    sources: Array<{ name: string; price: number }>;
+    sources: Array<{ name: string; price: bigint }>;
     expectedSourceCount: number;
     failed?: boolean;
     error?: string;
 }
-

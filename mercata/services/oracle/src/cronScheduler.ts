@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
-import { fetchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
+import { fetchPrices, generateConstantPrices, fetchRebaseFactor } from './adapters/genericRestAdapter';
 import { pushAssetPrices } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
 import { fetchPreviousPrices } from './utils/priceReader';
@@ -14,24 +14,33 @@ import { TIMEOUTS, ORACLE_CONFIG } from './utils/constants';
 // Helpers
 // ============================================================================
 
-function calculateMedian(prices: number[]): number {
-    if (prices.length === 0) return 0;
-    const sorted = [...prices].sort((a, b) => a - b);
+const PRICE_SCALE = 10n ** 18n;
+
+function formatUsdPrice(price: bigint, decimals = 4): string {
+    const whole = price / PRICE_SCALE;
+    const fraction = (price % PRICE_SCALE).toString().replace('-', '').padStart(18, '0').slice(0, decimals);
+    return `${whole.toString()}.${fraction}`;
+}
+
+function calculateMedian(prices: bigint[]): bigint {
+    if (prices.length === 0) return 0n;
+    const sorted = [...prices].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     const mid = Math.floor(sorted.length / 2);
     return sorted.length % 2 !== 0
         ? sorted[mid]
-        : Math.floor((sorted[mid - 1] + sorted[mid]) / 2);
+        : (sorted[mid - 1] + sorted[mid]) / 2n;
 }
 
-function checkPriceChange(assetKey: string, newPrice: number, previousPrice: number): void {
+function checkPriceChange(assetKey: string, newPrice: bigint, previousPrice: bigint): void {
     // Skip if previous price is 0 or missing (new asset)
-    if (previousPrice <= 0 || newPrice <= 0) return;
+    if (previousPrice <= 0n || newPrice <= 0n) return;
     
-    const changePercent = Math.abs((newPrice - previousPrice) / previousPrice) * 100;
+    const delta = newPrice > previousPrice ? newPrice - previousPrice : previousPrice - newPrice;
+    const changePercent = Number((delta * 10000n) / previousPrice) / 100;
     
     if (changePercent > ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT) {
-        const oldPriceUSD = (previousPrice / 1e18).toFixed(2);
-        const newPriceUSD = (newPrice / 1e18).toFixed(2);
+        const oldPriceUSD = formatUsdPrice(previousPrice, 2);
+        const newPriceUSD = formatUsdPrice(newPrice, 2);
         const direction = newPrice > previousPrice ? 'increased' : 'decreased';
         logWarning('CronScheduler',
             `Significant price change alert for ${assetKey}: ${direction} ${changePercent.toFixed(2)}% (max ${ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT}%). Previous: $${oldPriceUSD}, New: $${newPriceUSD}`
@@ -39,16 +48,16 @@ function checkPriceChange(assetKey: string, newPrice: number, previousPrice: num
     }
 }
 
-function checkSourceDivergence(assetKey: string, sources: Array<{ name: string; price: number }>, medianPrice: number): void {
-    if (sources.length < 2 || medianPrice === 0) return;
+function checkSourceDivergence(assetKey: string, sources: Array<{ name: string; price: bigint }>, medianPrice: bigint): void {
+    if (sources.length < 2 || medianPrice === 0n) return;
     
     const prices = sources.map(s => s.price);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    const spreadPercent = ((maxPrice - minPrice) / medianPrice) * 100;
+    const minPrice = prices.reduce((min, price) => price < min ? price : min, prices[0]);
+    const maxPrice = prices.reduce((max, price) => price > max ? price : max, prices[0]);
+    const spreadPercent = Number(((maxPrice - minPrice) * 10000n) / medianPrice) / 100;
     
     if (spreadPercent > ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT) {
-        const sourcePrices = sources.map(s => `${s.name}: $${(s.price / 1e18).toFixed(2)}`).join(', ');
+        const sourcePrices = sources.map(s => `${s.name}: $${formatUsdPrice(s.price, 2)}`).join(', ');
         logWarning('CronScheduler',
             `Source divergence alert for ${assetKey}: ${spreadPercent.toFixed(2)}% spread (max ${ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT}%). Sources: [${sourcePrices}]`
         );
@@ -125,13 +134,15 @@ function aggregatePrices(
     configLoader: ConfigLoader,
     sourceResults: Map<string, SourceResult>,
     marketClosed: boolean,
-    previousPrices: Map<string, number>
+    previousPrices: Map<string, bigint>
 ): AggregatedPrice[] {
-    return Object.entries(configLoader.getAllAssets()).map(([assetKey, asset]) => {
+    return Object.entries(configLoader.getAllAssets())
+    .filter(([_, asset]) => !asset.rebase)
+    .map(([assetKey, asset]) => {
         const useProxy = asset.weekendProxy && marketClosed;
         const requiredSources = asset.constantPrice !== undefined ? 1 : ORACLE_CONFIG.MIN_VALID_SOURCES;
         const weekdaySources = configLoader.getSourcesForAsset(assetKey);
-        const sources: Array<{ name: string; price: number }> = [];
+        const sources: Array<{ name: string; price: bigint }> = [];
         let expectedCount = weekdaySources.length;
 
         const failedSources: string[] = [];
@@ -172,13 +183,13 @@ function aggregatePrices(
             logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}. Failed: [${failedSources.join(', ')}]`));
         }
         
-        const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0;
+        const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0n;
         
         // Check for source divergence (alert only, still submit)
         if (isValid) {
             checkSourceDivergence(assetKey, sources, medianPrice);
             // Check for significant price change vs previous on-chain price
-            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0;
+            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0n;
             checkPriceChange(assetKey, medianPrice, previousPrice);
         }
         
@@ -209,7 +220,7 @@ function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: Confi
         const sourceCountBefore = p.sources.length;
         asset.equivalentAssets.forEach(equivKey => {
             const equiv = prices.find(ap => ap.assetKey === equivKey);
-            if (equiv && !equiv.failed && equiv.medianPrice > 0) {
+            if (equiv && !equiv.failed && equiv.medianPrice > 0n) {
                 p.sources.push({ name: `${equivKey}(equiv)`, price: equiv.medianPrice });
                 p.expectedSourceCount += 1;
             }
@@ -225,6 +236,58 @@ function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: Confi
         }
     });
     return prices;
+}
+
+// ============================================================================
+// Step 3: Apply Rebase Factors
+// ============================================================================
+
+async function applyRebaseFactors(
+    prices: AggregatedPrice[],
+    configLoader: ConfigLoader,
+    previousPrices: Map<string, bigint>
+): Promise<void> {
+    const allAssets = configLoader.getAllAssets();
+    const rebasingEntries = Object.entries(allAssets).filter(([_, a]) => a.rebase);
+    if (rebasingEntries.length === 0) return;
+
+    for (const [assetKey, asset] of rebasingEntries) {
+        const rebase = asset.rebase!;
+        const underlying = prices.find(p => p.assetKey === rebase.underlyingAsset);
+
+        if (!underlying || underlying.failed || underlying.medianPrice <= 0n) {
+            logWarning('CronScheduler', `${assetKey}: underlying ${rebase.underlyingAsset} has no valid price, skipping`);
+            continue;
+        }
+
+        try {
+            const factor = await withTimeout(fetchRebaseFactor(assetKey, rebase), TIMEOUTS.FETCH);
+            if (factor <= 0n) continue;
+
+            const factorPrecision = BigInt(rebase.factorPrecision);
+            if (factorPrecision <= 0n) {
+                throw new Error(`invalid factorPrecision "${rebase.factorPrecision}"`);
+            }
+
+            const rebasedPrice = (underlying.medianPrice * factor) / factorPrecision;
+            const sourceName = `${rebase.underlyingAsset}×${rebase.factorParse}`;
+
+            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0n;
+            checkPriceChange(assetKey, rebasedPrice, previousPrice);
+
+            prices.push({
+                assetKey,
+                medianPrice: rebasedPrice,
+                targetAddress: asset.targetAssetAddress,
+                sources: [{ name: sourceName, price: rebasedPrice }],
+                expectedSourceCount: 1,
+            });
+
+            logInfo('CronScheduler', `${assetKey}: rebased price $${formatUsdPrice(rebasedPrice)} (underlying=$${formatUsdPrice(underlying.medianPrice)}, factor=${factor.toString()})`);
+        } catch (err) {
+            logError('CronScheduler', new Error(`${assetKey}: rebase factor fetch failed: ${(err as Error).message}`));
+        }
+    }
 }
 
 // ============================================================================
@@ -250,6 +313,7 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
         aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices),
         configLoader
     );
+    await applyRebaseFactors(aggregatedPrices, configLoader, previousPrices);
     
     // Partition into valid and failed prices, excluding proxy-only assets (submit: false)
     const allAssets = configLoader.getAllAssets();

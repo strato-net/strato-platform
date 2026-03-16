@@ -56,8 +56,16 @@ export function logError(context: string, error: Error): void {
     })
 }
 
+const PRICE_SCALE = 10n ** 18n;
+
+function formatUsd(price: bigint): string {
+    const whole = price / PRICE_SCALE;
+    const fraction = (price % PRICE_SCALE).toString().replace('-', '').padStart(18, '0').slice(0, 8);
+    return `${whole.toString()}.${fraction}`;
+}
+
 // Feed-specific logging with table format
-export function logFeedUpdate(feedName: string, price: number, sources: Array<{name: string, price: number}>, expectedSourceCount: number, onChainHash: string, failed?: boolean, error?: string): void {
+export function logFeedUpdate(feedName: string, price: bigint, sources: Array<{name: string, price: bigint}>, expectedSourceCount: number, onChainHash: string, failed?: boolean, error?: string): void {
     const logTime = new Date().toISOString();
     
     if (failed) {
@@ -69,7 +77,7 @@ export function logFeedUpdate(feedName: string, price: number, sources: Array<{n
         if (sources.length > 0) {
             console.log(`└─ Source Prices:`);
             sources.forEach((source, index) => {
-                const sourcePrice = (source.price / 1e18).toFixed(8);
+                const sourcePrice = formatUsd(source.price);
                 const isLast = index === sources.length - 1;
                 const prefix = isLast ? '    └─' : '    ├─';
                 console.log(`${prefix} ${source.name}: $${sourcePrice} USD`);
@@ -79,7 +87,7 @@ export function logFeedUpdate(feedName: string, price: number, sources: Array<{n
         }
         console.log(`\x1b[0m`); // Reset color
     } else {
-        const priceUSD = (price / 1e18).toFixed(8);
+        const priceUSD = formatUsd(price);
         const missingSources = sources.length < expectedSourceCount;
         
         if (missingSources) {
@@ -90,7 +98,7 @@ export function logFeedUpdate(feedName: string, price: number, sources: Array<{n
             console.log(`├─ Transaction: ${onChainHash}`);
             console.log(`└─ Source Prices:`);
             sources.forEach((source, index) => {
-                const sourcePrice = (source.price / 1e18).toFixed(8);
+                const sourcePrice = formatUsd(source.price);
                 const isLast = index === sources.length - 1;
                 const prefix = isLast ? '    └─' : '    ├─';
                 console.log(`${prefix} ${source.name}: $${sourcePrice} USD`);
@@ -104,7 +112,7 @@ export function logFeedUpdate(feedName: string, price: number, sources: Array<{n
             console.log(`├─ Transaction: ${onChainHash}`);
             console.log(`└─ Source Prices:`);
             sources.forEach((source, index) => {
-                const sourcePrice = (source.price / 1e18).toFixed(8);
+                const sourcePrice = formatUsd(source.price);
                 const isLast = index === sources.length - 1;
                 const prefix = isLast ? '    └─' : '    ├─';
                 console.log(`${prefix} ${source.name}: $${sourcePrice} USD`);
