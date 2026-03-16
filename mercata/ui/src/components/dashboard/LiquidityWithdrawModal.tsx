@@ -52,20 +52,22 @@ const LiquidityWithdrawModal = ({
     computeMaxTransferable("100", false, voucherBalance, usdstBalance, safeParseUnits(WITHDRAW_FEE).toString(), setFeeError);
   }, [usdstBalance, voucherBalance]);
 
-  const [includeStakedLPToken, setIncludeStakedLPToken] = useState<boolean>(false);
+  // RewardsChef: include-staked LP toggle disabled intentionally.
+  // const [includeStakedLPToken, setIncludeStakedLPToken] = useState<boolean>(false);
 
   const totalLiquidityBalance = useMemo(() => {
     if (!selectedPool) return "0";
     return selectedPool.lpToken.totalBalance || selectedPool.lpToken.balance || "0";
   }, [selectedPool]);
 
-  // Calculate available balance based on checkbox state
+  // RewardsChef disabled: withdraw uses wallet LP balance only.
   const availableLPBalance = useMemo(() => {
     if (!selectedPool) return "0";
-    return includeStakedLPToken && selectedPool.lpToken.totalBalance
-      ? selectedPool.lpToken.totalBalance
-      : selectedPool.lpToken.balance;
-  }, [selectedPool, includeStakedLPToken]);
+    // return includeStakedLPToken && selectedPool.lpToken.totalBalance
+    //   ? selectedPool.lpToken.totalBalance
+    //   : selectedPool.lpToken.balance;
+    return selectedPool.lpToken.balance;
+  }, [selectedPool]);
 
   const tokenALabel = useMemo(() => {
     if (!selectedPool) return "Token A";
@@ -104,7 +106,8 @@ const LiquidityWithdrawModal = ({
 
   const handleClose = () => {
     setWithdrawPercent('');
-    setIncludeStakedLPToken(false);
+    // RewardsChef disabled.
+    // setIncludeStakedLPToken(false);
     onClose();
   };
 
@@ -123,7 +126,8 @@ const LiquidityWithdrawModal = ({
       await removeLiquidity({
         poolAddress: selectedPool.address,
         lpTokenAmount: calculatedAmount.toString(),
-        includeStakedLPToken: includeStakedLPToken
+        // RewardsChef disabled:
+        // includeStakedLPToken: includeStakedLPToken
       });
 
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -326,7 +330,7 @@ const LiquidityWithdrawModal = ({
             );
           })()}
 
-          {/* Include Staked LP Token Checkbox - only show if pool has rewards program AND rewards are enabled */}
+          {/* RewardsChef disabled:
           {rewardsEnabled && selectedPool?.lpToken?.stakedBalance !== undefined && (
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -354,6 +358,7 @@ const LiquidityWithdrawModal = ({
               </Tooltip>
             </div>
           )}
+          */}
 
           <div className="pt-2">
             <Button

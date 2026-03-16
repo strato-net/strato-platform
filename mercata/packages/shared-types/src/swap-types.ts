@@ -21,7 +21,8 @@ export interface LiquidityParams {
   tokenBAmount: string;
   maxTokenAAmount: string;
   deadline: number;
-  stakeLPToken?: boolean; // If true, stake minted LP tokens in RewardsChef
+  // RewardsChef disabled:
+  // stakeLPToken?: boolean; // If true, stake minted LP tokens in RewardsChef
 }
 
 /**
@@ -32,7 +33,8 @@ export interface SingleTokenLiquidityParams {
   singleTokenAmount: string;
   isAToB: boolean;
   deadline: number;
-  stakeLPToken?: boolean; // If true, stake minted LP tokens in RewardsChef
+  // RewardsChef disabled:
+  // stakeLPToken?: boolean; // If true, stake minted LP tokens in RewardsChef
 }
 
 /**
@@ -42,7 +44,8 @@ export interface RemoveLiquidityParams {
   poolAddress: string;
   lpTokenAmount: string;
   deadline: number;
-  includeStakedLPToken?: boolean; // If true, unstake LP tokens from RewardsChef before burning
+  // RewardsChef disabled:
+  // includeStakedLPToken?: boolean; // If true, unstake LP tokens from RewardsChef before burning
 }
 
 /**

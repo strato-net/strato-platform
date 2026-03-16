@@ -50,7 +50,9 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
     async ({ amount, stakeSToken }: { amount: string; stakeSToken: boolean }) => {
       if (!isLoggedIn) throw new Error("User not connected");
 
-      const response = await api.post("/lending/safety/stake", { amount, stakeSToken });
+      // RewardsChef disabled:
+      // const response = await api.post("/lending/safety/stake", { amount, stakeSToken });
+      const response = await api.post("/lending/safety/stake", { amount, stakeSToken: false });
       refreshSafetyInfo();
       return response.data;
     },
@@ -69,7 +71,9 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
     async ({ sharesAmount, includeStakedSToken }: { sharesAmount: string; includeStakedSToken: boolean }) => {
       if (!isLoggedIn) throw new Error("User not connected");
 
-      const response = await api.post("/lending/safety/redeem", { sharesAmount, includeStakedSToken });
+      // RewardsChef disabled:
+      // const response = await api.post("/lending/safety/redeem", { sharesAmount, includeStakedSToken });
+      const response = await api.post("/lending/safety/redeem", { sharesAmount, includeStakedSToken: false });
       refreshSafetyInfo();
       return response.data;
     },

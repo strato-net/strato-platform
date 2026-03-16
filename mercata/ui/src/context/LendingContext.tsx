@@ -206,7 +206,12 @@ export const LendingProvider = ({
   };
 
   const depositLiquidity = async (args: { amount: string; stakeMToken: boolean }) => {
-    await api.post("/lending/pools/liquidity", args);
+    // RewardsChef disabled:
+    // await api.post("/lending/pools/liquidity", args);
+    await api.post("/lending/pools/liquidity", {
+      amount: args.amount,
+      stakeMToken: false,
+    });
   };
 
   const withdrawLiquidity = async (args: { amount: string }) => {

@@ -32,8 +32,11 @@ const SafetyModuleSection = () => {
   const [stakeAmount, setStakeAmount] = useState<string>("");
   const [redeemAmount, setRedeemAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(rewardsEnabled);
-  const [includeStakedSUSDST, setIncludeStakedSUSDST] = useState<boolean>(false);
+  // RewardsChef disabled:
+  // const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(rewardsEnabled);
+  // const [includeStakedSUSDST, setIncludeStakedSUSDST] = useState<boolean>(false);
+  const stakeSUSDST = false;
+  const includeStakedSUSDST = false;
   const { toast } = useToast();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
@@ -80,9 +83,8 @@ const SafetyModuleSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(redeemAmount)) return false;
     try {
       const amountWei = safeParseUnits(redeemAmount, 18);
-      const availableSharesWei = includeStakedSUSDST
-        ? BigInt(safetyInfo?.userSharesTotal || "0")
-        : BigInt(safetyInfo?.userShares || "0");
+      // RewardsChef disabled: only wallet shares considered.
+      const availableSharesWei = BigInt(safetyInfo?.userShares || "0");
       const usdstBalanceWei = BigInt(usdstBalance);
       const feeWei = safeParseUnits(SAFETY_REDEEM_FEE, 18);
 
@@ -122,21 +124,22 @@ const SafetyModuleSection = () => {
       });
 
       // Then stake the tokens
-      await stakeSafety({ amount: amountWei, stakeSToken: rewardsEnabled && stakeSUSDST });
+      // RewardsChef disabled:
+      // await stakeSafety({ amount: amountWei, stakeSToken: rewardsEnabled && stakeSUSDST });
+      await stakeSafety({ amount: amountWei, stakeSToken: false });
 
-      if (stakeSUSDST) {
-        toast({
-          title: "Deposit Successful",
-          description: "Now staking sUSDST to rewards program...",
-          variant: "success",
-        });
-      }
+      // RewardsChef disabled:
+      // if (stakeSUSDST) {
+      //   toast({
+      //     title: "Deposit Successful",
+      //     description: "Now staking sUSDST to rewards program...",
+      //     variant: "success",
+      //   });
+      // }
 
       toast({
-        title: stakeSUSDST ? "Rewards Staking Successful" : "Stake Successful",
-        description: stakeSUSDST
-          ? `Successfully deposited ${stakeAmount} USDST and staked sUSDST to rewards program.`
-          : `You have successfully staked ${stakeAmount} USDST for safetyUSDST.`,
+        title: "Stake Successful",
+        description: `You have successfully staked ${stakeAmount} USDST for safetyUSDST.`,
         variant: "success",
       });
 
@@ -186,7 +189,9 @@ const SafetyModuleSection = () => {
         await redeemAllSafety();
       } else {
         const sharesAmountWei = safeParseUnits(redeemAmount, 18).toString();
-        await redeemSafety({ sharesAmount: sharesAmountWei, includeStakedSToken: includeStakedSUSDST });
+        // RewardsChef disabled:
+        // await redeemSafety({ sharesAmount: sharesAmountWei, includeStakedSToken: includeStakedSUSDST });
+        await redeemSafety({ sharesAmount: sharesAmountWei, includeStakedSToken: false });
       }
 
       toast({
@@ -313,7 +318,7 @@ const SafetyModuleSection = () => {
                       <Checkbox
                         id="stake-susdst"
                         checked={stakeSUSDST}
-                        onCheckedChange={(checked) => setStakeSUSDST(checked as boolean)}
+                        onCheckedChange={() => {}}
                       />
                       <label
                         htmlFor="stake-susdst"
@@ -550,7 +555,7 @@ const SafetyModuleSection = () => {
                         <Checkbox
                           id="include-staked-susdst"
                           checked={includeStakedSUSDST}
-                          onCheckedChange={(checked) => setIncludeStakedSUSDST(checked as boolean)}
+                          onCheckedChange={() => {}}
                         />
                         <label
                           htmlFor="include-staked-susdst"

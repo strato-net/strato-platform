@@ -33,7 +33,8 @@ export const constants = (() => {
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
-  const RewardsChef = `${CONTRACT_PREFIX}RewardsChef`;
+  // RewardsChef disabled:
+  // const RewardsChef = `${CONTRACT_PREFIX}RewardsChef`;
   const Rewards = `${CONTRACT_PREFIX}Rewards`;
   const Voucher = `${CONTRACT_PREFIX}Voucher`;
   const Vault = `${CONTRACT_PREFIX}Vault`;
@@ -143,7 +144,7 @@ export const constants = (() => {
     CDPEngine,
     CDPVault,
     CDPRegistry,
-    RewardsChef,
+    // RewardsChef,
     Rewards,
     Voucher,
     Vault,

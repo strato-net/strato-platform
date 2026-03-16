@@ -1,6 +1,7 @@
 import { Router } from "express";
 import authHandler from "../middleware/authHandler";
-import RewardsChefController from "../controllers/rewardsChef.controller";
+// RewardsChef disabled:
+// import RewardsChefController from "../controllers/rewardsChef.controller";
 import RewardsController from "../controllers/rewards.controller";
 
 const router = Router();
@@ -34,7 +35,8 @@ const router = Router();
  *       401:
  *         description: Unauthorized
  */
-router.get("/pending", authHandler.authorizeRequest(), RewardsChefController.getPendingRewards);
+// RewardsChef disabled:
+// router.get("/pending", authHandler.authorizeRequest(), RewardsChefController.getPendingRewards);
 
 /**
  * @openapi
@@ -61,7 +63,8 @@ router.get("/pending", authHandler.authorizeRequest(), RewardsChefController.get
  *       401:
  *         description: Unauthorized
  */
-router.post("/claim", authHandler.authorizeRequest(), RewardsChefController.claimRewards);
+// RewardsChef disabled:
+// router.post("/claim", authHandler.authorizeRequest(), RewardsChefController.claimRewards);
 
 /**
  * @openapi
@@ -102,7 +105,8 @@ router.post("/claim", authHandler.authorizeRequest(), RewardsChefController.clai
  *       401:
  *         description: Unauthorized
  */
-router.get("/pools/:poolId/balance", authHandler.authorizeRequest(), RewardsChefController.getStakedBalanceForPool);
+// RewardsChef disabled:
+// router.get("/pools/:poolId/balance", authHandler.authorizeRequest(), RewardsChefController.getStakedBalanceForPool);
 
 /**
  * @openapi
@@ -146,7 +150,8 @@ router.get("/pools/:poolId/balance", authHandler.authorizeRequest(), RewardsChef
  *       401:
  *         description: Unauthorized
  */
-router.get("/pools", authHandler.authorizeRequest(), RewardsChefController.getPools);
+// RewardsChef disabled:
+// router.get("/pools", authHandler.authorizeRequest(), RewardsChefController.getPools);
 
 /**
  * @openapi
@@ -198,7 +203,8 @@ router.get("/pools", authHandler.authorizeRequest(), RewardsChefController.getPo
  *       401:
  *         description: Unauthorized
  */
-router.get("/pools/by-lp-token/:lpTokenAddress", authHandler.authorizeRequest(), RewardsChefController.findPoolByLpToken);
+// RewardsChef disabled:
+// router.get("/pools/by-lp-token/:lpTokenAddress", authHandler.authorizeRequest(), RewardsChefController.findPoolByLpToken);
 
 /**
  * @openapi
@@ -227,7 +233,8 @@ router.get("/pools/by-lp-token/:lpTokenAddress", authHandler.authorizeRequest(),
  *       401:
  *         description: Unauthorized
  */
-router.get("/state", authHandler.authorizeRequest(), RewardsChefController.getState);
+// RewardsChef disabled:
+// router.get("/state", authHandler.authorizeRequest(), RewardsChefController.getState);
 
 // ═════════════════════════════════════════════════════════════════════════
 // REWARDS CONTRACT ENDPOINTS

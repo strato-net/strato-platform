@@ -25,8 +25,10 @@ export const usePendingRewards = (enabled = true, refreshInterval = 10000) => {
 
     try {
       setLoading(true);
-      const response = await api.get<PendingRewardsData>("/rewards/pending");
-      setPendingRewards(response.data.pendingCataFormatted);
+      // RewardsChef disabled:
+      // const response = await api.get<PendingRewardsData>("/rewards/pending");
+      // setPendingRewards(response.data.pendingCataFormatted);
+      setPendingRewards("0");
     } finally {
       setLoading(false);
     }

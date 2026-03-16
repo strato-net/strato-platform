@@ -63,7 +63,8 @@ const LiquidityDepositModal = ({
   const [tokenBBalance, setTokenBBalance] = useState('');
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A&B');
-  const [stakeLPToken, setStakeLPToken] = useState<boolean>(rewardsEnabled);
+  // RewardsChef: LP auto-stake flag disabled intentionally.
+  // const [stakeLPToken, setStakeLPToken] = useState<boolean>(rewardsEnabled);
 
   const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
   const { toast } = useToast();
@@ -104,7 +105,8 @@ const LiquidityDepositModal = ({
     setToken1Amount('');
     setToken2Amount('');
     setDepositMode('A&B');
-    setStakeLPToken(rewardsEnabled); // Reset to default based on rewardsEnabled
+    // RewardsChef disabled.
+    // setStakeLPToken(rewardsEnabled); // Reset to default based on rewardsEnabled
     onClose();
   };
 
@@ -178,7 +180,8 @@ const LiquidityDepositModal = ({
           poolAddress: selectedPool.address,
           singleTokenAmount: token1AmountWei.toString(),
           isAToB: true,
-          stakeLPToken: rewardsEnabled && stakeLPToken && selectedPool.lpToken.stakedBalance !== undefined
+          // RewardsChef disabled:
+          // stakeLPToken: rewardsEnabled && stakeLPToken && selectedPool.lpToken.stakedBalance !== undefined
         });
       } else if (depositMode === 'B') {
         // Single token mode - Token B
@@ -186,7 +189,8 @@ const LiquidityDepositModal = ({
           poolAddress: selectedPool.address,
           singleTokenAmount: token2AmountWei.toString(),
           isAToB: false,
-          stakeLPToken: rewardsEnabled && stakeLPToken && selectedPool.lpToken.stakedBalance !== undefined
+          // RewardsChef disabled:
+          // stakeLPToken: rewardsEnabled && stakeLPToken && selectedPool.lpToken.stakedBalance !== undefined
         });
       } else {
         // Dual token mode
@@ -200,7 +204,8 @@ const LiquidityDepositModal = ({
           poolAddress: selectedPool.address,
           maxTokenAAmount: tokenAAmount.toString(),
           tokenBAmount: tokenBAmount.toString(),
-          stakeLPToken: rewardsEnabled && stakeLPToken && selectedPool.lpToken.stakedBalance !== undefined
+          // RewardsChef disabled:
+          // stakeLPToken: rewardsEnabled && stakeLPToken && selectedPool.lpToken.stakedBalance !== undefined
         });
       }
 
@@ -704,7 +709,7 @@ const LiquidityDepositModal = ({
             )}
           </div>
 
-          {/* Stake LP Token Checkbox - only show if pool has rewards program AND rewards are enabled */}
+          {/* RewardsChef disabled:
           {rewardsEnabled && selectedPool?.lpToken?.stakedBalance !== undefined && (
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -732,6 +737,7 @@ const LiquidityDepositModal = ({
               </Tooltip>
             </div>
           )}
+          */}
 
           <div className="pt-2">
             <Button 

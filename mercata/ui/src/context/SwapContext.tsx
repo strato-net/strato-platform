@@ -238,7 +238,8 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity`, {
         tokenBAmount: data.tokenBAmount,
         maxTokenAAmount: data.maxTokenAAmount,
-        stakeLPToken: data.stakeLPToken
+        // RewardsChef disabled:
+        // stakeLPToken: data.stakeLPToken
       });
       return response.data;
     } finally {
@@ -257,7 +258,8 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity/single`, {
         singleTokenAmount: data.singleTokenAmount,
         isAToB: data.isAToB,
-        stakeLPToken: data.stakeLPToken
+        // RewardsChef disabled:
+        // stakeLPToken: data.stakeLPToken
       });
       return response.data;
     } finally {
@@ -275,7 +277,8 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       const response = await api.delete(`/swap-pools/${data.poolAddress}/liquidity`, {
         data: {
           lpTokenAmount: data.lpTokenAmount,
-          includeStakedLPToken: data.includeStakedLPToken
+          // RewardsChef disabled:
+          // includeStakedLPToken: data.includeStakedLPToken
         }
       });
       return response.data;

@@ -32,7 +32,9 @@ const LendingPoolSection = () => {
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [stakeMToken, setStakeMToken] = useState<boolean>(rewardsEnabled ? true : false);
+  // RewardsChef disabled:
+  // const [stakeMToken, setStakeMToken] = useState<boolean>(rewardsEnabled ? true : false);
+  const stakeMToken = false;
   const { toast } = useToast();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
@@ -117,7 +119,9 @@ const LendingPoolSection = () => {
         if (type === "deposit") {
           await depositLiquidity({
             amount: amountWei,
-            stakeMToken,
+            // RewardsChef disabled:
+            // stakeMToken,
+            stakeMToken: false,
           });
         } else {
           await withdrawLiquidity({
@@ -227,13 +231,13 @@ const LendingPoolSection = () => {
                     inputAmount={depositAmount}
                     actionLabel="Deposit"
                   />
-                  {/* Stake mUSDST Checkbox */}
+                  {/* RewardsChef disabled:
                   {rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">
                       <Checkbox
                         id="stake-musdst"
                         checked={stakeMToken}
-                        onCheckedChange={(checked) => setStakeMToken(checked as boolean)}
+                        onCheckedChange={() => {}}
                       />
                       <label
                         htmlFor="stake-musdst"
@@ -255,6 +259,7 @@ const LendingPoolSection = () => {
                       </Tooltip>
                     </div>
                   )}
+                  */}
                   {/* Fee Warning */}
                   {(() => {
                     const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
