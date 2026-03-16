@@ -90,86 +90,86 @@ needs_rebuild = [ ! -f $@ ] || [ "$$(cat $@ 2>/dev/null)" != "$(2)" ] || [ -n "$
 .PHONY: $(DOCKER_SENTINELS)/smd $(DOCKER_SENTINELS)/bridge $(DOCKER_SENTINELS)/bridge-nginx
 
 $(DOCKER_SENTINELS)/postgrest: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,postgrest-packager,$(HASH_POSTGREST)); then \
-		echo "Building postgrest ($(HASH_POSTGREST))..."; \
+	@if $(call needs_rebuild,postgrest-packager,$(VERSION)-$(HASH_POSTGREST)); then \
+		echo "Building postgrest ($(VERSION)-$(HASH_POSTGREST))..."; \
 		BASIL_DOCKER_TAG=$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) $(MAKE) --directory=postgrest-packager/; \
-		echo "$(HASH_POSTGREST)" > $@; \
+		echo "$(VERSION)-$(HASH_POSTGREST)" > $@; \
 	else \
 		echo "postgrest up to date"; \
 	fi
 
 $(DOCKER_SENTINELS)/nginx: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,nginx-packager,$(HASH_NGINX)); then \
-		echo "Building nginx ($(HASH_NGINX))..."; \
+	@if $(call needs_rebuild,nginx-packager,$(VERSION)-$(HASH_NGINX)); then \
+		echo "Building nginx ($(VERSION)-$(HASH_NGINX))..."; \
 		BASIL_DOCKER_TAG=$(REPO_URL)nginx:$(VERSION)-$(HASH_NGINX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)nginx:$(VERSION)-$(HASH_NGINX) $(MAKE) --directory=nginx-packager/; \
-		echo "$(HASH_NGINX)" > $@; \
+		echo "$(VERSION)-$(HASH_NGINX)" > $@; \
 	else \
 		echo "nginx up to date"; \
 	fi
 
 $(DOCKER_SENTINELS)/apex: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,apex,$(HASH_APEX)); then \
-		echo "Building apex ($(HASH_APEX))..."; \
+	@if $(call needs_rebuild,apex,$(VERSION)-$(HASH_APEX)); then \
+		echo "Building apex ($(VERSION)-$(HASH_APEX))..."; \
 		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(VERSION)-$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(HASH_APEX) $(MAKE) --directory=apex/; \
-		echo "$(HASH_APEX)" > $@; \
+		echo "$(VERSION)-$(HASH_APEX)" > $@; \
 	else \
 		echo "apex up to date"; \
 	fi
 
 $(DOCKER_SENTINELS)/mercata-backend: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/backend,$(HASH_MERCATA_BACKEND)); then \
-		echo "Building mercata-backend ($(HASH_MERCATA_BACKEND))..."; \
+	@if $(call needs_rebuild,mercata/backend,$(VERSION)-$(HASH_MERCATA_BACKEND)); then \
+		echo "Building mercata-backend ($(VERSION)-$(HASH_MERCATA_BACKEND))..."; \
 		docker build -t $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) -f ./mercata/backend/Dockerfile ./mercata; \
 		docker tag $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_AWS_ECR_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND); \
-		echo "$(HASH_MERCATA_BACKEND)" > $@; \
+		echo "$(VERSION)-$(HASH_MERCATA_BACKEND)" > $@; \
 	else \
 		echo "mercata-backend up to date"; \
 	fi
 
 $(DOCKER_SENTINELS)/mercata-ui: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/ui,$(HASH_MERCATA_UI)); then \
-		echo "Building mercata-ui ($(HASH_MERCATA_UI))..."; \
+	@if $(call needs_rebuild,mercata/ui,$(VERSION)-$(HASH_MERCATA_UI)); then \
+		echo "Building mercata-ui ($(VERSION)-$(HASH_MERCATA_UI))..."; \
 		docker build -t $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) -f ./mercata/ui/Dockerfile ./mercata; \
 		docker tag $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) $(REPO_AWS_ECR_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI); \
-		echo "$(HASH_MERCATA_UI)" > $@; \
+		echo "$(VERSION)-$(HASH_MERCATA_UI)" > $@; \
 	else \
 		echo "mercata-ui up to date"; \
 	fi
 
 $(DOCKER_SENTINELS)/prometheus: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,prometheus-packager,$(HASH_PROMETHEUS)); then \
-		echo "Building prometheus ($(HASH_PROMETHEUS))..."; \
+	@if $(call needs_rebuild,prometheus-packager,$(VERSION)-$(HASH_PROMETHEUS)); then \
+		echo "Building prometheus ($(VERSION)-$(HASH_PROMETHEUS))..."; \
 		BASIL_DOCKER_TAG=$(REPO_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) $(MAKE) --directory=prometheus-packager/; \
-		echo "$(HASH_PROMETHEUS)" > $@; \
+		echo "$(VERSION)-$(HASH_PROMETHEUS)" > $@; \
 	else \
 		echo "prometheus up to date"; \
 	fi
 
 $(DOCKER_SENTINELS)/smd: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,smd-ui,$(HASH_SMD)); then \
-		echo "Building smd ($(HASH_SMD))..."; \
+	@if $(call needs_rebuild,smd-ui,$(VERSION)-$(HASH_SMD)); then \
+		echo "Building smd ($(VERSION)-$(HASH_SMD))..."; \
 		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(VERSION)-$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(HASH_SMD) $(MAKE) --directory=smd-ui/; \
-		echo "$(HASH_SMD)" > $@; \
+		echo "$(VERSION)-$(HASH_SMD)" > $@; \
 	else \
 		echo "smd up to date"; \
 	fi
 
 $(DOCKER_SENTINELS)/bridge: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/services/bridge,$(HASH_BRIDGE)); then \
-		echo "Building bridge ($(HASH_BRIDGE))..."; \
+	@if $(call needs_rebuild,mercata/services/bridge,$(VERSION)-$(HASH_BRIDGE)); then \
+		echo "Building bridge ($(VERSION)-$(HASH_BRIDGE))..."; \
 		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./mercata/services/bridge; \
 		docker tag $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE); \
-		echo "$(HASH_BRIDGE)" > $@; \
+		echo "$(VERSION)-$(HASH_BRIDGE)" > $@; \
 	else \
 		echo "bridge up to date"; \
 	fi
 
 $(DOCKER_SENTINELS)/bridge-nginx: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/services/bridge/nginx,$(HASH_BRIDGE_NGINX)); then \
-		echo "Building bridge-nginx ($(HASH_BRIDGE_NGINX))..."; \
+	@if $(call needs_rebuild,mercata/services/bridge/nginx,$(VERSION)-$(HASH_BRIDGE_NGINX)); then \
+		echo "Building bridge-nginx ($(VERSION)-$(HASH_BRIDGE_NGINX))..."; \
 		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) ./mercata/services/bridge/nginx; \
 		docker tag $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX); \
-		echo "$(HASH_BRIDGE_NGINX)" > $@; \
+		echo "$(VERSION)-$(HASH_BRIDGE_NGINX)" > $@; \
 	else \
 		echo "bridge-nginx up to date"; \
 	fi
