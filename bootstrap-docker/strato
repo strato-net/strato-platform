@@ -294,6 +294,14 @@ clientId: "${OAUTH_CLIENT_ID}"
 clientSecret: "${OAUTH_CLIENT_SECRET}"
 EOF
   
+  # Debug: show what's in the container at /node
+  echo "DEBUG: Contents of /node inside container:"
+  docker run --rm \
+    --entrypoint /bin/bash \
+    -v "$(pwd)":/node \
+    "${STRATO_IMAGE}" \
+    -c "ls -la /node/ && ls -la /node/strato 2>/dev/null || echo 'no /node/strato'"
+    
   # Run strato-setup to create node directory and docker-compose.yml
   docker run --rm \
     --entrypoint strato-setup \
