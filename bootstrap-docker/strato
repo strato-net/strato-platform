@@ -262,8 +262,8 @@ if [ ! -f strato/.ethereumH/ethconf.yaml ]; then
   
   # Get strato image - use env var, or find locally built image, or compute from git
   if [ -z "${STRATO_IMAGE}" ]; then
-    # Try to find a locally built strato image
-    LOCAL_STRATO=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^strato:' | head -1)
+    # Try to find a locally built strato image (may have registry prefix)
+    LOCAL_STRATO=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '/strato:\|^strato:' | head -1)
     if [ -n "${LOCAL_STRATO}" ]; then
       STRATO_IMAGE="${LOCAL_STRATO}"
       echo "Found local STRATO_IMAGE: ${STRATO_IMAGE}"
