@@ -260,16 +260,24 @@ fi
 if [ ! -f strato/.ethereumH/ethconf.yaml ]; then
   echo -e "${Yellow}Running strato-setup to generate node configuration...${NC}"
   
-  # Get strato image - compute from git tag if not set
+  # Get strato image - use env var, or find locally built image, or compute from git
   if [ -z "${STRATO_IMAGE}" ]; then
-    GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
-    if git describe --tags --exact-match HEAD >/dev/null 2>&1; then
-      VERSION="${GIT_TAG}"
+    # Try to find a locally built strato image
+    LOCAL_STRATO=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^strato:' | head -1)
+    if [ -n "${LOCAL_STRATO}" ]; then
+      STRATO_IMAGE="${LOCAL_STRATO}"
+      echo "Found local STRATO_IMAGE: ${STRATO_IMAGE}"
     else
-      VERSION="${GIT_TAG}-$(git rev-parse --short=7 HEAD)"
+      # Fallback: compute from git tag
+      GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
+      if git describe --tags --exact-match HEAD >/dev/null 2>&1; then
+        VERSION="${GIT_TAG}"
+      else
+        VERSION="${GIT_TAG}-$(git rev-parse --short=7 HEAD)"
+      fi
+      STRATO_IMAGE="${REPO_URL}strato:${VERSION}"
+      echo "Computed STRATO_IMAGE: ${STRATO_IMAGE}"
     fi
-    STRATO_IMAGE="${REPO_URL}strato:${VERSION}"
-    echo "Computed STRATO_IMAGE: ${STRATO_IMAGE}"
   fi
   
   # Create OAuth credentials file for strato-setup
