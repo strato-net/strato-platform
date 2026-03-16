@@ -2,12 +2,13 @@
 
 set -e
 
-if [[ -z "$1" ]]; then
-    echo "Usage: strato-down <node-directory>"
+NODE_DIR="${1:-$(cat ~/.strato/default-node 2>/dev/null)}"
+if [[ -z "$NODE_DIR" ]]; then
+    echo "Usage: strato-down [node-directory]"
     exit 1
 fi
 
-cd "$1"
+cd "$NODE_DIR"
 
 echo "Stopping STRATO..."
 

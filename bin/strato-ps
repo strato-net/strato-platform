@@ -1,37 +1,61 @@
 #!/usr/bin/env bash
 
-if [[ -z "$1" ]]; then
-    echo "Usage: strato-ps <node-directory>"
+NODE_DIR="${1:-$(cat ~/.strato/default-node 2>/dev/null)}"
+if [[ -z "$NODE_DIR" ]]; then
+    echo "Usage: strato-ps [node-directory]"
     exit 1
 fi
 
-cd "$1"
-
-echo "######## STRATO Status: $(pwd)"
-
-# Network
-if [[ -f .ethereumH/ethconf.yaml ]]; then
-    echo "Network: $(grep "^  network:" .ethereumH/ethconf.yaml | awk '{print $2}')"
+if [[ ! -d "$NODE_DIR" ]]; then
+    echo "Node directory does not exist: $NODE_DIR"
+    exit 1
 fi
 
-# Sync status
+cd "$NODE_DIR"
+
+if [[ ! -f .ethereumH/ethconf.yaml ]]; then
+    echo "Node not configured: $NODE_DIR"
+    echo "Run strato-setup first."
+    exit 1
+fi
+
+NETWORK=$(grep "^  network:" .ethereumH/ethconf.yaml | awk '{print $2}')
+
+# Check if anything is running
+CONVOKE_RUNNING=false
 if [[ -f .strato.pid ]]; then
     source .strato.pid
-    if kill -0 "$CONVOKE_PID" 2>/dev/null; then
-        BAROMETER=$(strato-barometer syncstats 2>/dev/null)
-        BLOCK=$(echo "$BAROMETER" | grep "bestBlockNumber:" | head -1 | awk '{print $2}')
-        WORLD_BLOCK=$(echo "$BAROMETER" | sed -n '/^World Best Block:/,/bestBlockNumber:/p' | grep "bestBlockNumber:" | awk '{print $2}')
-        SYNCED=$(echo "$BAROMETER" | grep -A2 "^Sync Status:$" | tail -1)
-        if [[ -n "$BLOCK" && -n "$WORLD_BLOCK" ]]; then
-            if [[ "$SYNCED" == "True" ]]; then
-                echo "Sync: block $BLOCK (synced)"
-            else
-                PERCENT=$(awk "BEGIN {printf \"%.1f\", ($BLOCK / $WORLD_BLOCK) * 100}")
-                echo "Sync: block $BLOCK / $WORLD_BLOCK ($PERCENT% syncing)"
-            fi
-        elif [[ -n "$BLOCK" ]]; then
-            echo "Sync: block $BLOCK"
+    if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
+        CONVOKE_RUNNING=true
+    fi
+fi
+
+DOCKER_COUNT=$(docker compose -p strato ps -q 2>/dev/null | wc -l)
+
+if [[ "$CONVOKE_RUNNING" == "false" && "$DOCKER_COUNT" -eq 0 ]]; then
+    echo "STRATO is not running ($NETWORK node at $NODE_DIR)"
+    exit 0
+fi
+
+# Something is running - show details
+echo "######## STRATO Status: $(pwd)"
+echo "Network: $NETWORK"
+
+# Sync status
+if [[ "$CONVOKE_RUNNING" == "true" ]]; then
+    BAROMETER=$(strato-barometer syncstats 2>/dev/null)
+    BLOCK=$(echo "$BAROMETER" | grep "bestBlockNumber:" | head -1 | awk '{print $2}')
+    WORLD_BLOCK=$(echo "$BAROMETER" | sed -n '/^World Best Block:/,/bestBlockNumber:/p' | grep "bestBlockNumber:" | awk '{print $2}')
+    SYNCED=$(echo "$BAROMETER" | grep -A2 "^Sync Status:$" | tail -1)
+    if [[ -n "$BLOCK" && -n "$WORLD_BLOCK" ]]; then
+        if [[ "$SYNCED" == "True" ]]; then
+            echo "Sync: block $BLOCK (synced)"
+        else
+            PERCENT=$(awk "BEGIN {printf \"%.1f\", ($BLOCK / $WORLD_BLOCK) * 100}")
+            echo "Sync: block $BLOCK / $WORLD_BLOCK ($PERCENT% syncing)"
         fi
+    elif [[ -n "$BLOCK" ]]; then
+        echo "Sync: block $BLOCK"
     fi
 fi
 
@@ -41,18 +65,13 @@ docker compose -p strato ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null 
 
 echo ""
 echo "Convoke:"
-if [[ -f .strato.pid ]]; then
-    source .strato.pid
-    if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
-        echo "  Running (PID $CONVOKE_PID)"
-        echo "  Processes:"
-        for pid in $(pgrep -P "$CONVOKE_PID" 2>/dev/null); do
-            cmd=$(ps -p "$pid" -o args= 2>/dev/null | awk '{print $1}')
-            echo "    $cmd ($pid)"
-        done
-    else
-        echo "  Not running (stale pidfile)"
-    fi
+if [[ "$CONVOKE_RUNNING" == "true" ]]; then
+    echo "  Running (PID $CONVOKE_PID)"
+    echo "  Processes:"
+    for pid in $(pgrep -P "$CONVOKE_PID" 2>/dev/null); do
+        cmd=$(ps -p "$pid" -o args= 2>/dev/null | awk '{print $1}')
+        echo "    $cmd ($pid)"
+    done
 else
-    echo "  No pidfile - STRATO may not be running"
+    echo "  Not running"
 fi
