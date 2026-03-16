@@ -257,13 +257,9 @@ fi
 ## END OF PARAMETERS VALIDATION
 
 # RUN STRATO-SETUP TO GENERATE NODE CONFIG AND DOCKER-COMPOSE.YML
-if [ ! -f strato/.ethereumH/ethconf.yaml ]; then
+if [ ! -f nodedata/.ethereumH/ethconf.yaml ]; then
   # Clean up any partial previous run
-  echo "Cleaning up strato/ directory if it exists..."
-  ls -la strato/ 2>/dev/null || echo "strato/ does not exist"
-  rm -rf strato/
-  echo "After cleanup:"
-  ls -la strato/ 2>/dev/null || echo "strato/ successfully removed"
+  rm -rf nodedata/
   echo -e "${Yellow}Running strato-setup to generate node configuration...${NC}"
   
   # Get strato image - use env var, or find locally built image, or compute from git
@@ -294,25 +290,18 @@ clientId: "${OAUTH_CLIENT_ID}"
 clientSecret: "${OAUTH_CLIENT_SECRET}"
 EOF
   
-  # Debug: show what's in the container at /node
-  echo "DEBUG: Contents of /node inside container:"
-  docker run --rm \
-    --entrypoint /bin/bash \
-    -v "$(pwd)":/node \
-    "${STRATO_IMAGE}" \
-    -c "ls -la /node/ && ls -la /node/strato 2>/dev/null || echo 'no /node/strato'"
-    
   # Run strato-setup to create node directory and docker-compose.yml
+  # Note: we use /node/nodedata (not /node/strato) because /node/strato is the bootstrap script itself
   docker run --rm \
     --entrypoint strato-setup \
     -v "$(pwd)":/node \
     -v "${HOME}/.secrets:/root/.secrets:ro" \
     -e REPO_URL="${REPO_URL:-}" \
     "${STRATO_IMAGE}" \
-    /node/strato --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}/strato/v2.3"
+    /node/nodedata --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}/strato/v2.3"
   
-  # Move generated docker-compose.yml to current directory
-  mv strato/docker-compose.yml docker-compose.yml
+  # Move generated docker-compose.yml to current directory (strato-setup creates it in the node dir)
+  mv nodedata/docker-compose.yml docker-compose.yml
   
   echo -e "${Green}Node configuration and docker-compose.yml generated.${NC}"
 fi

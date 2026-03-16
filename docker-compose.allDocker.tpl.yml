@@ -202,7 +202,7 @@ services:
         max-size: "100m"
         max-file: "3"
     volumes:
-      - ./strato:/var/lib/strato
+      - ./nodedata:/var/lib/strato
   postgrest:
     depends_on:
     - postgres
