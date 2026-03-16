@@ -15,7 +15,7 @@ import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
 import qualified Strato.Strato23.API.Types as VC
 import Strato.Strato23.Client
 import System.Info (os)
-import Text.Format
+import Text.ShortDescription
 
 -- | Get the API IP address, using OS-appropriate default for Docker
 getApiIPAddress :: String
@@ -64,7 +64,6 @@ runtimeConfig = def
 getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
   env <- newAuthEnv flags_vaultUrl
-  putStrLn "asking vault for the node's key, or to create one if it does not exist"
   ak <- waitOnVault env $ runWithAuth env (getKey Nothing Nothing)
   return (VC.unPubKey ak, VC.unAddress ak)
 
@@ -100,41 +99,23 @@ waitOnVault env request = do
 
 genEthConf :: IO EthConf
 genEthConf = do
-  pgUser <- case flags_pguser of
-    "" -> do
-      putStrLn "using default postgres user: postgres"
-      return "postgres"
-    u -> return u
-
-  pgHost <- case flags_pghost of
-    "" -> do
-      putStrLn "using default postgres host: localhost"
-      return "localhost"
-    h -> return h
-
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
-  kafkaHost' <- case flags_kafkahost of
-    "" -> do
-      putStrLn "using default kafka host: localhost"
-      return "localhost"
-    h -> return h
-
   (pub, _addr) <- getNodeKey
-  putStrLn $ "the node's public key: " ++ format pub
+  putStrLn $ "  ✓ Node key: " ++ shortDescription pub
 
   return runtimeConfig
     { sqlConfig = (sqlConfig runtimeConfig)
-        { user = pgUser
-        , host = pgHost
+        { user = flags_pguser
+        , host = flags_pghost
         , password = pgPass
         }
     , cirrusConfig = (cirrusConfig runtimeConfig)
-        { user = pgUser
-        , host = pgHost
+        { user = flags_pguser
+        , host = flags_pghost
         , password = pgPass
         }
-    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = kafkaHost' }
+    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = flags_kafkahost }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize
         , blockSize = flags_ldbBlockSize

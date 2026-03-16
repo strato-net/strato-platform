@@ -1,16 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NumericUnderscores #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Init.Generator (
   createGenesisInfo,
   mkFilesAndGenesis
   ) where
 
-import BlockApps.Logging
 import Blockchain.Data.GenesisInfo (GenesisInfo)
 import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.DB.CodeDB
@@ -23,6 +20,7 @@ import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Monad
 import Control.Monad.Change.Alter ()
+import BlockApps.Logging (runNoLoggingT)
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
@@ -95,7 +93,7 @@ strato-network-monitor
 
 -- | Create files AND populate Merkle Patricia Trie, write genesis.json with computed stateRoot.
 -- This is called by strato-setup before docker containers are running.
-mkFilesAndGenesis :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m) =>
+mkFilesAndGenesis :: (MonadUnliftIO m, MonadFail m) =>
                      FilePath -> Bool -> String -> m ()
 mkFilesAndGenesis nodeDir hasFlags network = do
   -- Create node directory and cd to it
@@ -113,6 +111,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
         return ()
   
   unless nodeExists $ do
+    liftIO $ putStrLn $ "Setting up STRATO node: " ++ nodeDir
+    liftIO $ putStrLn $ "  Network: " ++ network
+
     -- Create node directories first (needed before genEthConf reads postgres_password)
     liftIO $ mapM_ (createDirectoryIfMissing True)
       ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
@@ -143,6 +144,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     let dir = ".ethereumH"
     liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
     liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
+    liftIO $ putStrLn "  ✓ Generated ethconf.yaml"
 
     liftIO $ do
       cwd <- getCurrentDirectory
@@ -151,34 +153,33 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           defaultNodeFile = stratoDir </> "default-node"
       createDirectoryIfMissing True stratoDir
       writeFile defaultNodeFile cwd
-      putStrLn $ "Set default node directory: " ++ cwd
 
     -- Generate docker-compose.yml
     liftIO generateDockerCompose
+    liftIO $ putStrLn "  ✓ Generated docker-compose.yml"
+
+    liftIO createCommandsFile
+    liftIO $ putStrLn "  ✓ Generated commands.txt"
 
     genesisExists <- doesFileExist "genesis.json"
 
-    liftIO createCommandsFile
-
     if genesisExists
       then do
-        $logInfoS "strato-setup" "Using provided 'genesis.json' - populating MPT from it"
+        liftIO $ putStrLn "  ✓ Using provided genesis.json"
         content <- liftIO $ BS.readFile "genesis.json"
         case JSON.decode (BL.fromStrict content) of
           Nothing -> error "Failed to parse provided genesis.json"
-          Just genesisInfo -> runResourceT . runSetupDBM $ do
+          Just genesisInfo -> runNoLoggingT . runResourceT . runSetupDBM $ do
             void $ addCode mempty
             populateMPTFromGenesis genesisInfo
       else do
-        $logInfoS "strato-setup" "Creating genesis info from network template"
         let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
-
-        -- Populate MPT and write genesis.json with computed stateRoot
-        runResourceT . runSetupDBM $ do
+        runNoLoggingT . runResourceT . runSetupDBM $ do
           void $ addCode mempty
           populateMPTAndWriteGenesis genesisInfo
+        liftIO $ putStrLn "  ✓ Created genesis.json"
 
-    $logInfoS "strato-setup" "Setup complete"
+    liftIO $ putStrLn "Node ready"
 
 -- We have to normalize the information held in GenesisInfo, unfortunalely we have some characters that done encode and decode back from JSON the same
 -- If we don't do this, the stateroot created from the raw data won't match that if created from the data read from genesis.json

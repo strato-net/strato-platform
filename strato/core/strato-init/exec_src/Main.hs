@@ -1,7 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-import BlockApps.Logging
 import Blockchain.Init.Generator
 import Blockchain.Init.Options ()
 import Blockchain.Strato.Model.Options (flags_network)
@@ -27,4 +25,4 @@ main = do
       hPutStrLn stderr "Error: too many positional arguments"
       hPutStrLn stderr "Usage: strato-setup <node-directory> [flags...]"
       exitFailure
-  runLoggingT $ mkFilesAndGenesis nodeDir hasFlags flags_network
+  mkFilesAndGenesis nodeDir hasFlags flags_network

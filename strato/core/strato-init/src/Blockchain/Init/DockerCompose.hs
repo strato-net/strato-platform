@@ -227,4 +227,3 @@ generateDockerCompose = do
         }
 
   Yaml.encodeFile "docker-compose.yml" composeFile
-  putStrLn "Generated docker-compose.yml"
