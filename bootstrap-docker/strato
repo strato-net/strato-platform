@@ -191,7 +191,12 @@ while [ ${#} -gt 0 ]; do
 done
 
 checkDocker
-checkComposeFile
+
+# Only check for existing docker-compose.yml if node is already set up
+# Otherwise, strato-setup will generate it later
+if [ -f nodedata/.ethereumH/ethconf.yaml ]; then
+  checkComposeFile
+fi
 
 export NODE_HOST=${NODE_HOST:-localhost}
 export OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-'https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration'}
@@ -258,8 +263,9 @@ fi
 
 # RUN STRATO-SETUP TO GENERATE NODE CONFIG AND DOCKER-COMPOSE.YML
 if [ ! -f nodedata/.ethereumH/ethconf.yaml ]; then
-  # Clean up any partial previous run
+  # Clean up any partial previous run and old docker-compose.yml
   rm -rf nodedata/
+  rm -f docker-compose.yml
   echo -e "${Yellow}Running strato-setup to generate node configuration...${NC}"
   
   # Get strato image - use env var, or find locally built image, or compute from git
