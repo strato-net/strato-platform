@@ -36,6 +36,7 @@ import {
 import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits } from "@/utils/numberUtils";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
@@ -50,7 +51,7 @@ import {
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, CreditCard, CheckCircle2 } from "lucide-react";
+import { ArrowDownToLine, CreditCard, CheckCircle2, TrendingUp } from "lucide-react";
 
 interface BridgeInProps {
   guestMode?: boolean;
@@ -77,6 +78,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     requestDepositAction,
     triggerDepositRefresh,
   } = useBridgeContext();
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
 
   // State
   const [amount, setAmount] = useState("");
@@ -123,6 +125,27 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     const mintStratoTokens = new Set(sourceTokenRoutes.filter(r => !r.isDefaultRoute).map(r => normalize(r.stratoToken)));
     return depositActions.filter(a => a.payToken && mintStratoTokens.has(normalize(a.payToken)));
   }, [sourceTokenRoutes, depositActions]);
+
+  const getApy = useMemo(() => {
+    const norm = (addr: string) => (addr || "").toLowerCase().replace(/^0x/, "");
+    const m = new Map<string, string>();
+    for (const entry of tokenApys) {
+      const best = entry.apys.reduce((max, a) => parseFloat(a.apy) > parseFloat(max) ? a.apy : max, "0");
+      if (parseFloat(best) > 0) m.set(norm(entry.token), best);
+    }
+    return (addr: string) => m.get(norm(addr));
+  }, [tokenApys]);
+
+  const AprBadge = ({ addr }: { addr: string }) => (
+    <div className="h-[14px] mt-0.5">
+      {!tokenApysLoaded
+        ? <p className="text-[10px] font-medium text-green-500/40 flex items-center gap-0.5 animate-pulse blur-[2px]"><TrendingUp className="w-3 h-3" />0.00% APR</p>
+        : getApy(addr) && (
+          <p className="text-[10px] font-medium text-green-500 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />{getApy(addr)}% APR</p>
+        )
+      }
+    </div>
+  );
 
   const uniqueExternalTokens = useMemo(() => {
     const seen = new Set<string>();
@@ -823,6 +846,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                         <p className="text-sm font-semibold text-foreground">{routeToken.stratoTokenSymbol}</p>
                       </div>
                       <p className="text-xs text-muted-foreground">{"\u2248"} {amount || "0"}</p>
+                      <AprBadge addr={routeToken.stratoToken} />
                       <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
                     </button>
                   );
@@ -861,6 +885,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                         <p className="text-sm font-semibold text-foreground">{action.stratoTokenSymbol}</p>
                       </div>
                       <p className="text-xs text-muted-foreground">{"\u2248"} {estimatedAmount}</p>
+                      <AprBadge addr={action.stratoToken} />
                       <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
                     </button>
                   );
