@@ -38,21 +38,28 @@ stratoVersion = $(do
   )
 
 -- | Just the tag portion, e.g., "16.6.1" (used for docker image tags)
+-- Falls back to commit hash if no tags are reachable
 stratoVersionTag :: String
 stratoVersionTag = $(do
   result <- runIO $ try $ readProcess "git" ["describe", "--tags", "--abbrev=0"] ""
   case result of
     Right v -> litE $ stringL $ filter (/= '\n') v
     Left (_ :: IOException) -> do
-      let gitArchiveRefs = "$Format:%D$"
-          gitArchiveHash = "$Format:%h$"
-          extractTag refs = 
-            let afterTag = drop 5 $ snd $ span (/= 't') refs
-            in takeWhile (\c -> c /= ',' && c /= ' ') afterTag
-      if "$" `isPrefixOf` gitArchiveRefs then
-        fail "Cannot determine version: not a git repository and not a git archive. Please clone with git."
-      else if "tag: " `isInfixOf` gitArchiveRefs then
-        litE $ stringL $ extractTag gitArchiveRefs
-      else
-        litE $ stringL gitArchiveHash
+      -- No tags reachable - try to get commit hash instead
+      hashResult <- runIO $ try $ readProcess "git" ["rev-parse", "--short", "HEAD"] ""
+      case hashResult of
+        Right h -> litE $ stringL $ filter (/= '\n') h
+        Left (_ :: IOException) -> do
+          -- Not a git repo - check if export-subst expanded the placeholders
+          let gitArchiveRefs = "$Format:%D$"
+              gitArchiveHash = "$Format:%h$"
+              extractTag refs = 
+                let afterTag = drop 5 $ snd $ span (/= 't') refs
+                in takeWhile (\c -> c /= ',' && c /= ' ') afterTag
+          if "$" `isPrefixOf` gitArchiveRefs then
+            fail "Cannot determine version: not a git repository and not a git archive. Please clone with git."
+          else if "tag: " `isInfixOf` gitArchiveRefs then
+            litE $ stringL $ extractTag gitArchiveRefs
+          else
+            litE $ stringL gitArchiveHash
   )
