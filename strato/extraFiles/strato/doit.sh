@@ -303,7 +303,7 @@ function doInit {
   ${networkFlag} \
   ${stratoBootnode}"
 
-  cmd="strato-setup $args"
+  cmd="strato-setup . $args"
 
   echo "init event source: $cmd"
   # logging to stdout and log file:
