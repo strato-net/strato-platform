@@ -69,9 +69,6 @@ fi
 
 function newnode {
 
-  # if alternative log in methods are provided then use them
-  mkdir -p logs
-
   echo "Checking if OAUTH parameters are available"
   if [[ -z ${OAUTH_CLIENT_ID} || -z ${OAUTH_CLIENT_SECRET} ]]; then
     echo "Could not obtain OAUTH parameters"
@@ -89,26 +86,30 @@ function newnode {
     echo "OAUTH parameters are available"
   fi
 
-  mkdir -p secrets
-  cat > secrets/oauth_credentials.yaml << EOF
+  # Write OAuth credentials where strato-setup expects them
+  mkdir -p ~/.secrets
+  cat > ~/.secrets/strato_credentials.yaml << EOF
 discoveryUrl: "${OAUTH_DISCOVERY_URL}"
 clientId: "${OAUTH_CLIENT_ID}"
 clientSecret: "${OAUTH_CLIENT_SECRET}"
 EOF
 
-  if [[ ! -f .initialized ]] ; then
+  if [[ ! -f strato/.initialized ]] ; then
     # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
-    if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
-      touch .initialized
+    if [[ -d strato/.ethereumH && -d strato/config && ! -f strato/.initNotFinished ]]; then
+      touch strato/.initialized
+      cd strato
       sleep 10
     else
-      touch .initNotFinished
+      touch strato/.initNotFinished
       cleanupDB
       doInit
+      # doInit does cd strato, so now we're in /var/lib/strato
       touch .initialized
       rm .initNotFinished
     fi
   else
+    cd strato
     sleep 10
   fi
 
@@ -285,9 +286,6 @@ function cleanupDB {
 
 function doInit {
 
-  mkdir -p secrets
-  echo -n "$pgPass" > secrets/postgres_password
-
   args="--addBootnodes=$addBootnodes \
   --apiIPAddress=0.0.0.0 \
   --generateKey=$generateKey \
@@ -303,18 +301,20 @@ function doInit {
   ${networkFlag} \
   ${stratoBootnode}"
 
-  cmd="strato-setup . $args"
+  cmd="strato-setup strato $args"
 
   echo "init event source: $cmd"
   # logging to stdout and log file:
-  $cmd 2>&1 | tee logs/strato-setup
+  mkdir -p strato/logs
+  $cmd 2>&1 | tee strato/logs/strato-setup
   if [ ${PIPESTATUS[0]} -ne 0 ]; then
     echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
     tail -f /dev/null
   fi
+  cd strato
 
   #we need to create the private key for the faucet
-  mkdir config
+  mkdir -p config
 
   echo -ne "\x1d\xd8\x85\xa4\x23\xf4\xe2\x12\x74\x0f\x11\x6a\xfa\x66\xd4\x0a\xaf\xdb\xb3\xa3\x81\x07\x91\x50\x37\x18\x01\x87\x1d\x9e\xa2\x81" > config/priv
 }
@@ -374,13 +374,13 @@ stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 [[ -n $network ]] && addBootnodes=true
 
-mkdir -p /var/lib/strato
-cd /var/lib/strato
+cd /var/lib
 
 set +x
-if [[ ${useCustomGenesis:-false} = "true" && ! -f "genesis.json" ]] ; then
-  echo "useCustomGenesis is set to true - waiting for genesis.json to be added to $(pwd)/ path in the container... (Use: \`docker cp myGenesisFile.json strato-strato-1:$(pwd)/genesis.json\`)"
-  while [ ! -f "genesis.json" ]; do
+if [[ ${useCustomGenesis:-false} = "true" && ! -f "strato/genesis.json" ]] ; then
+  echo "useCustomGenesis is set to true - waiting for genesis.json to be added to $(pwd)/strato/ path in the container... (Use: \`docker cp myGenesisFile.json strato-strato-1:$(pwd)/strato/genesis.json\`)"
+  mkdir -p strato  # OK to pre-create dir - strato-setup checks for .ethereumH/ethconf.yaml to detect existing node
+  while [ ! -f "strato/genesis.json" ]; do
     sleep 1
   done
   echo "File genesis.json found! Continuing with the STRATO boot-up..."
