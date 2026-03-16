@@ -19,6 +19,7 @@ library
       Blockchain.Init.ComposeTypes
       Blockchain.Init.DirHash
       Blockchain.Init.DockerCompose
+      Blockchain.Init.DockerComposeAllDocker
       Blockchain.Init.EthConf
       Blockchain.Init.Generator
       Blockchain.Init.Monad
@@ -48,6 +49,7 @@ library
     , ethereum-rlp
     , evm-solidity
     , exceptions
+    , file-embed
     , filepath
     , format
     , hflags

@@ -6,19 +6,16 @@ module Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker) w
 import Blockchain.Init.DirHash (computeDirHash)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.List (foldl')
-import Language.Haskell.TH
+import Language.Haskell.TH (runIO, Exp(LitE), Lit(StringL))
 import System.Environment (lookupEnv)
 import System.Process (readProcess)
 
-readTemplateAtCompileTime :: Q Exp
-readTemplateAtCompileTime = do
-  content <- runIO $ readProcess "sh" ["-c",
+templateContent :: String
+templateContent = $(runIO $ do
+  content <- readProcess "sh" ["-c",
     "cd $(git rev-parse --show-toplevel) && cat docker-compose.allDocker.tpl.yml"
     ] ""
-  litE $ stringL content
-
-templateContent :: String
-templateContent = $(readTemplateAtCompileTime)
+  return $ LitE $ StringL content)
 
 hashMercataBackend, hashMercataUi, hashSmd, hashApex :: String
 hashPostgrest, hashNginx, hashPrometheus :: String

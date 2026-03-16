@@ -44,7 +44,6 @@ library
     , conduit
     , containers
     , cross-monitoring
-    , debugger
     , dlist
     , ethereum-rlp
     , exceptions
@@ -86,10 +85,8 @@ executable vm-runner
     , base
     , blockapps-init
     , common-log
-    , debugger
     , hflags
     , process-monitor
-    , solid-vm-fuzzer
     , strato-model
     , vm-runner
     , vm-tools

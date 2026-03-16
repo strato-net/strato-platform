@@ -1,0 +1,58 @@
+apiConfig:
+  httpPort: 8081
+  ipAddress: 172.17.0.1
+cirrusConfig:
+  database: cirrus
+  host: localhost
+  password: n9cddvqOQCyHvuf19QYS0FCebksUP0YO
+  poolsize: 10
+  port: 5432
+  user: postgres
+debugConfig:
+  svmTrace: false
+discoveryConfig:
+  discoveryPort: 30303
+  minAvailablePeers: 0
+kafkaConfig:
+  kafkaHost: localhost
+  kafkaPort: 9092
+levelDBConfig:
+  blockSize: 4096
+  cacheSize: 33554432
+  path: ''
+  table: ''
+networkConfig:
+  blockPeriodMs: 1000
+  gasLimit: 1000000
+  network: lithium
+  networkID: 30515246173615469
+  roundPeriodS: 120
+  txSizeLimit: 2097152
+p2pConfig:
+  averageTxsPerBlock: 40
+  connectionTimeout: 3600
+  maxConnections: 1000
+  maxHeadersTxsLens: 2500
+  maxReturnedHeaders: 500
+quarryConfig:
+  lazyBlocks: false
+  maxTxsPerBlock: 500
+  mempoolLivenessCutoff: 60
+redisBlockDBConfig:
+  redisAuth: null
+  redisDBNumber: 0
+  redisHost: localhost
+  redisMaxConnections: 10
+  redisMaxIdleTime: 30
+  redisPort: 6379
+sqlConfig:
+  database: eth
+  host: localhost
+  password: n9cddvqOQCyHvuf19QYS0FCebksUP0YO
+  poolsize: 10
+  port: 5432
+  user: postgres
+urlConfig:
+  fileServerUrl: https://fileserver.mercata.blockapps.net/highway
+  notificationServerUrl: ''
+  vaultUrl: https://vault.blockapps.net:8093/strato/v2.3
