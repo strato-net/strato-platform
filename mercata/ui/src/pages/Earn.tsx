@@ -81,7 +81,7 @@ const formatSignedUsdFromWei = (weiValue: bigint): string => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-    if (absWei < 5000000000000000n) return "+$0.00";
+    if (absWei < 5000000000000000n) return isPositive ? "+$0.00" : "-$0.00";
     return isPositive ? `+$${abs}` : `-$${abs}`;
   } catch {
     return "+$0.00";
@@ -306,12 +306,14 @@ const Earn = () => {
   }, [pools]);
 
   const poolsWithUserPosition = useMemo(() => {
-    return sortedPools.filter((pool) => safeBigInt(pool.lpToken?.totalBalance) > BigInt(0));
-  }, [sortedPools]);
+    return [...(pools || [])].filter((pool) => safeBigInt(pool.lpToken?.totalBalance) > BigInt(0));
+  }, [pools]);
 
   const userHasVaultPosition = safeBigInt(vaultState.userShares) > BigInt(0);
-  const userHasLendingPosition = safeBigInt(liquidityInfo?.withdrawable?.userBalance) > BigInt(0);
-  const userHasSafetyPosition = safeBigInt(safetyInfo?.userSharesTotal) > BigInt(0);
+  const userHasLendingPosition = safeBigInt(liquidityInfo?.withdrawable?.userBalanceTotal) > BigInt(0);
+  const userHasSafetyPosition =
+    safeBigInt(safetyInfo?.userSharesTotal) > BigInt(0) ||
+    safeBigInt(safetyInfo?.redeemValueTotal) > BigInt(0);
   const vaultTokenCount = vaultState.assets?.length || 0;
 
   const allOpportunities = useMemo(() => {
@@ -401,7 +403,7 @@ const Earn = () => {
           className="transition-all duration-300 md:pl-64"
           style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
         >
-          <DashboardHeader title="Vault Opportunities" />
+          <DashboardHeader title="Earn Opportunities" />
 
           <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-6">
             <Skeleton className="h-7 w-44" />
@@ -438,7 +440,7 @@ const Earn = () => {
         className="transition-all duration-300 md:pl-64"
         style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}
       >
-        <DashboardHeader title="Vault Opportunities" />
+        <DashboardHeader title="Earn Opportunities" />
 
         <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-8">
           {guestMode && (
@@ -474,31 +476,45 @@ const Earn = () => {
                 )}
 
                 {userHasLendingPosition && (
-                  <PositionCard
-                    title="USDST Lending Pool"
-                    icon={<CircleArrowDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-                    deposited={`$${formatUsd(liquidityInfo?.withdrawable?.userBalance || "0")}`}
-                    earnings={{
-                      label: "-",
-                      className: "text-foreground",
-                    }}
-                    rateLabel="APY"
-                    rateValue={liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}
-                  />
+                  (() => {
+                    const lendingEarningsWei = safeBigInt(liquidityInfo?.userAllTimeEarningsUsd);
+                    return (
+                      <PositionCard
+                        title="USDST Lending Pool"
+                        icon={<CircleArrowDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                        deposited={`$${formatUsd(liquidityInfo?.withdrawable?.userBalance || "0")}`}
+                        earnings={{
+                          label: formatSignedUsdFromWei(lendingEarningsWei),
+                          className: lendingEarningsWei >= 0n
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-red-600 dark:text-red-400",
+                        }}
+                        rateLabel="APY"
+                        rateValue={liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}
+                      />
+                    );
+                  })()
                 )}
 
                 {userHasSafetyPosition && (
-                  <PositionCard
-                    title="USDST Safety Module"
-                    icon={<Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-                    deposited={formatBalance(safetyInfo?.redeemValueTotal || "0", undefined, 18, 2, 2, true)}
-                    earnings={{
-                      label: "-",
-                      className: "text-foreground",
-                    }}
-                    rateLabel="APY"
-                    rateValue="N/A"
-                  />
+                  (() => {
+                    const safetyEarningsWei = safeBigInt(safetyInfo?.userAllTimeEarningsUsd);
+                    return (
+                      <PositionCard
+                        title="USDST Safety Module"
+                        icon={<Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                        deposited={formatBalance(safetyInfo?.redeemValueTotal || "0", undefined, 18, 2, 2, true)}
+                        earnings={{
+                          label: formatSignedUsdFromWei(safetyEarningsWei),
+                          className: safetyEarningsWei >= 0n
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-red-600 dark:text-red-400",
+                        }}
+                        rateLabel="APY"
+                        rateValue={safetyInfo?.apy && safetyInfo.apy !== "-" ? `${safetyInfo.apy}%` : "N/A"}
+                      />
+                    );
+                  })()
                 )}
 
                 {poolsWithUserPosition.map((pool) => {
@@ -758,7 +774,7 @@ const Earn = () => {
                         </tr>
                       )}
 
-                      {(activeFilter === "all" || activeFilter === "pools" || activeFilter === "safety") && (
+                      {(activeFilter === "all" || activeFilter === "safety") && (
                         <tr className="border-b border-border/40">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5 min-w-0">
@@ -773,7 +789,9 @@ const Earn = () => {
                             Stake USDST to support protocol safety
                           </td>
                           <td className="px-4 py-3">
-                            <p className="text-sm font-semibold">N/A</p>
+                            <p className="text-sm font-semibold">
+                              {safetyInfo?.apy && safetyInfo.apy !== "-" ? `${safetyInfo.apy}%` : "N/A"}
+                            </p>
                             <p className="text-xs text-muted-foreground">APY</p>
                           </td>
                           <td className="px-4 py-3">

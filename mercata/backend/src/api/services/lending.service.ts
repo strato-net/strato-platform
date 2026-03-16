@@ -37,6 +37,108 @@ const {
 
 // Extract constants for consistency with CDP service
 const RAY = BigInt(10) ** BigInt(27);
+const WAD = BigInt(10) ** BigInt(18);
+
+const normalizeAddress = (value: string | undefined | null): string =>
+  (value || "").toLowerCase().replace(/^0x/, "");
+
+const parseEventAttributes = (attributes: unknown): Record<string, any> => {
+  if (!attributes) return {};
+  if (typeof attributes === "string") {
+    try {
+      return JSON.parse(attributes);
+    } catch {
+      return {};
+    }
+  }
+  if (typeof attributes === "object") {
+    return attributes as Record<string, any>;
+  }
+  return {};
+};
+
+const parseBigIntLike = (value: unknown): bigint => {
+  if (value === null || value === undefined) return 0n;
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? BigInt(Math.trunc(value)) : 0n;
+
+  const raw = String(value).trim();
+  if (!raw) return 0n;
+  try {
+    return BigInt(raw);
+  } catch {
+    try {
+      if (/e/i.test(raw)) {
+        const asNumber = Number(raw);
+        return Number.isFinite(asNumber) ? BigInt(Math.trunc(asNumber)) : 0n;
+      }
+    } catch {
+      return 0n;
+    }
+    return 0n;
+  }
+};
+
+const getLendingUserFlowTotals = async (
+  accessToken: string,
+  lendingPoolAddress: string,
+  userAddress: string
+): Promise<{ totalDepositedUsd: bigint; totalWithdrawnUsd: bigint }> => {
+  const normalizedUser = normalizeAddress(userAddress);
+  const pageSize = 1000;
+  let offset = 0;
+  let totalDepositedUsd = 0n;
+  let totalWithdrawnUsd = 0n;
+
+  if (!lendingPoolAddress || !normalizedUser) {
+    return { totalDepositedUsd, totalWithdrawnUsd };
+  }
+
+  try {
+    while (true) {
+      const response = await cirrus.get(accessToken, "/event", {
+        params: {
+          address: `eq.${lendingPoolAddress}`,
+          event_name: "in.(Deposited,Withdrawn)",
+          select: "event_name,attributes,transaction_sender,block_timestamp",
+          order: "block_timestamp.asc",
+          limit: `${pageSize}`,
+          offset: `${offset}`,
+        },
+      });
+
+      const events = response?.data || [];
+      if (!Array.isArray(events) || events.length === 0) break;
+
+      for (const event of events) {
+        const attrs = parseEventAttributes(event.attributes);
+        const actor = normalizeAddress(
+          attrs.user ||
+          attrs.account ||
+          attrs.sender ||
+          event.transaction_sender
+        );
+        if (!actor || actor !== normalizedUser) continue;
+
+        const amount = parseBigIntLike(attrs.amount);
+        if (amount <= 0n) continue;
+
+        if (event.event_name === "Deposited") {
+          totalDepositedUsd += amount;
+        } else if (event.event_name === "Withdrawn") {
+          totalWithdrawnUsd += amount;
+        }
+      }
+
+      if (events.length < pageSize) break;
+      offset += pageSize;
+    }
+  } catch (error) {
+    console.warn("Failed to compute lending flow totals:", error);
+  }
+
+  return { totalDepositedUsd, totalWithdrawnUsd };
+};
 
 
 // Helper function for fixed-point exponentiation (matches contract's _rpow)
@@ -704,12 +806,16 @@ export const liquidityAndBalance = async (
 
   // Get user's staked balance from RewardsChef
   // Find the pool for this mToken
-  const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
-
-  // If no pool found, staked balance is 0
-  const stakedMTokenBalance = rewardsPool
-    ? await getStakedBalance(accessToken, config.rewardsChef, rewardsPool.poolIdx, userAddress)
-    : "0";
+  let stakedMTokenBalance = "0";
+  try {
+    const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
+    stakedMTokenBalance = rewardsPool
+      ? await getStakedBalance(accessToken, config.rewardsChef, rewardsPool.poolIdx, userAddress)
+      : "0";
+  } catch (error) {
+    console.warn("Failed to load staked mToken balance, using wallet-only balance:", error);
+    stakedMTokenBalance = "0";
+  }
 
   // User's withdrawable underlying (min of user mToken value and pool cash)
   const userMTokenBalance = BigInt(mTokenBalance);
@@ -721,6 +827,19 @@ export const liquidityAndBalance = async (
   const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity
     ? userUSDSTValue.toString()
     : poolAvailableLiquidity.toString();
+
+  const userMTokenBalanceTotal = BigInt(mTokenBalance) + BigInt(stakedMTokenBalance);
+  const userUSDSTValueTotal = userMTokenBalanceTotal > 0n
+    ? ((userMTokenBalanceTotal * BigInt(exchangeRate)) / WAD)
+    : 0n;
+
+  const { totalDepositedUsd, totalWithdrawnUsd } = await getLendingUserFlowTotals(
+    accessToken,
+    registry.lendingPool?.address || "",
+    userAddress
+  );
+  const userNetInvestedUsd = totalDepositedUsd - totalWithdrawnUsd;
+  const userAllTimeEarningsUsd = userUSDSTValueTotal - userNetInvestedUsd;
 
   // Clean token objects
   const { balances: _, ...borrowableTokenClean } = borrowableToken || {};
@@ -761,6 +880,10 @@ export const liquidityAndBalance = async (
     totalBorrowPrincipal,
     // Pause status
     isPaused,
+    userTotalDepositedUsd: totalDepositedUsd.toString(),
+    userTotalWithdrawnUsd: totalWithdrawnUsd.toString(),
+    userNetInvestedUsd: userNetInvestedUsd.toString(),
+    userAllTimeEarningsUsd: userAllTimeEarningsUsd.toString(),
   };
 };
 
