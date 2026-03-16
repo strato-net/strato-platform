@@ -57,7 +57,7 @@ export interface TransactionResponse {
 export interface BadDebt {
   asset: string;                          // Asset address
   badDebt: string;                        // Raw integer string (wei format, 18 decimals)
-  symbol?: string;                        // Token symbol (e.g., "WBTC", "ETHST")
+  symbol?: string;                        // Token symbol (e.g., "WBTC", "ETH")
 }
 
 export interface JuniorNote {
