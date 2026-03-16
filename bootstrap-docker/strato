@@ -258,6 +258,8 @@ fi
 
 # RUN STRATO-SETUP TO GENERATE NODE CONFIG AND DOCKER-COMPOSE.YML
 if [ ! -f strato/.ethereumH/ethconf.yaml ]; then
+  # Clean up any partial previous run
+  rm -rf strato/
   echo -e "${Yellow}Running strato-setup to generate node configuration...${NC}"
   
   # Get strato image - use env var, or find locally built image, or compute from git
