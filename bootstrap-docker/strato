@@ -290,11 +290,12 @@ EOF
   
   # Run strato-setup to create node directory and docker-compose.yml
   docker run --rm \
+    --entrypoint strato-setup \
     -v "$(pwd)":/node \
     -v "${HOME}/.secrets:/root/.secrets:ro" \
     -e REPO_URL="${REPO_URL:-}" \
     "${STRATO_IMAGE}" \
-    strato-setup /node/strato --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}/strato/v2.3"
+    /node/strato --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}/strato/v2.3"
   
   # Move generated docker-compose.yml to current directory
   mv strato/docker-compose.yml docker-compose.yml
