@@ -5,6 +5,7 @@ pipeline {
   stages {
     stage('Prepare') {
       steps {
+        sh 'git fetch --tags'
         wrap([$class: 'BuildUser']) {
           script {
             BUILD_USER=''
