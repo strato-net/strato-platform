@@ -194,8 +194,13 @@ checkDocker
 
 # Only check for existing docker-compose.yml if node is already set up
 # Otherwise, strato-setup will generate it later
+echo "DEBUG: Checking if nodedata/.ethereumH/ethconf.yaml exists..."
+ls -la nodedata/.ethereumH/ethconf.yaml 2>&1 || true
 if [ -f nodedata/.ethereumH/ethconf.yaml ]; then
+  echo "DEBUG: Node config exists, using existing docker-compose.yml"
   checkComposeFile
+else
+  echo "DEBUG: Node config does not exist, will generate via strato-setup"
 fi
 
 export NODE_HOST=${NODE_HOST:-localhost}
