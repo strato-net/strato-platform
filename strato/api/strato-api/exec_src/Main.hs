@@ -77,6 +77,7 @@ import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client
 import System.Clock
 import System.Directory (getCurrentDirectory, doesFileExist)
+import System.IO (hPutStrLn, hFlush, stderr)
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -222,12 +223,12 @@ main = do
 
   -- Debug: check OAuth credentials and token cache
   cwd <- getCurrentDirectory
-  putStrLn $ "DEBUG: Current working directory: " ++ cwd
+  hPutStrLn stderr ("DEBUG: Current working directory: " ++ cwd) >> hFlush stderr
   oauthExists <- doesFileExist "secrets/oauth_credentials.yaml"
-  putStrLn $ "DEBUG: secrets/oauth_credentials.yaml exists: " ++ show oauthExists
+  hPutStrLn stderr ("DEBUG: secrets/oauth_credentials.yaml exists: " ++ show oauthExists) >> hFlush stderr
   tokenExists <- doesFileExist "secrets/oauth_token"
-  putStrLn $ "DEBUG: secrets/oauth_token (cached) exists: " ++ show tokenExists
-  putStrLn $ "DEBUG: About to call Vault at: " ++ vaultUrl (urlConfig ethConf)
+  hPutStrLn stderr ("DEBUG: secrets/oauth_token (cached) exists: " ++ show tokenExists) >> hFlush stderr
+  hPutStrLn stderr ("DEBUG: About to call Vault at: " ++ vaultUrl (urlConfig ethConf)) >> hFlush stderr
   
   pubKey <- runLoggingT
           . runVaultM (vaultUrl . urlConfig $ ethConf)
@@ -235,7 +236,7 @@ main = do
           . blocVaultWrapper
           $ getKey Nothing Nothing
   
-  putStrLn "DEBUG: Vault call completed successfully"
+  hPutStrLn stderr "DEBUG: Vault call completed successfully" >> hFlush stderr
 
   let env =
         BlocEnv
