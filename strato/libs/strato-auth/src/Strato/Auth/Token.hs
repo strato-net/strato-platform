@@ -23,6 +23,7 @@ import Strato.Auth.Retry (withRetry)
 import System.Directory (createDirectoryIfMissing)
 import System.FileLock (withFileLock, SharedExclusive(Exclusive))
 import System.FilePath (takeDirectory)
+import System.IO (hPutStrLn, hFlush, stderr)
 import Text.URI as URI
 
 tokenFilePath :: FilePath
@@ -34,14 +35,14 @@ lockFilePath = "secrets/oauth_token.lock"
 -- | Get cached token, or fetch a new one if not cached
 getToken :: T.Text -> IO T.Text
 getToken discUrl = do
-  putStrLn "DEBUG TOKEN: getToken - checking cache"
+  hPutStrLn stderr "DEBUG TOKEN: getToken - checking cache" >> hFlush stderr
   cached <- readCachedToken
   case cached of
     Just token -> do
-      putStrLn "DEBUG TOKEN: getToken - returning cached token (not expired)"
+      hPutStrLn stderr "DEBUG TOKEN: getToken - returning cached token (not expired)" >> hFlush stderr
       pure token
     Nothing -> do
-      putStrLn "DEBUG TOKEN: getToken - no valid cache, calling refreshToken"
+      hPutStrLn stderr "DEBUG TOKEN: getToken - no valid cache, calling refreshToken" >> hFlush stderr
       refreshToken discUrl
 
 -- | Force refresh the token (call this on 401)
@@ -50,16 +51,16 @@ getToken discUrl = do
 -- (e.g. connection timeout, DNS failure, TLS errors).
 refreshToken :: T.Text -> IO T.Text
 refreshToken discUrl = do
-  putStrLn "DEBUG TOKEN: refreshToken - acquiring lock"
+  hPutStrLn stderr "DEBUG TOKEN: refreshToken - acquiring lock" >> hFlush stderr
   withFileLock lockFilePath Exclusive $ \_ -> do
-    putStrLn "DEBUG TOKEN: refreshToken - lock acquired, starting retry loop"
+    hPutStrLn stderr "DEBUG TOKEN: refreshToken - lock acquired, starting retry loop" >> hFlush stderr
     withRetry "OAuth token fetch" 4 $ do
       let ClientCredentialsConfig{..} = clientCredentialsConfig
-      putStrLn $ "DEBUG TOKEN: refreshToken - fetching token endpoint from " ++ T.unpack discUrl
+      hPutStrLn stderr ("DEBUG TOKEN: refreshToken - fetching token endpoint from " ++ T.unpack discUrl) >> hFlush stderr
       tokenEndpoint <- getTokenEndpoint discUrl
-      putStrLn $ "DEBUG TOKEN: refreshToken - got endpoint: " ++ T.unpack tokenEndpoint
+      hPutStrLn stderr ("DEBUG TOKEN: refreshToken - got endpoint: " ++ T.unpack tokenEndpoint) >> hFlush stderr
       TokenResponse{..} <- fetchToken tokenEndpoint clientId clientSecret
-      putStrLn "DEBUG TOKEN: refreshToken - got token, writing cache"
+      hPutStrLn stderr "DEBUG TOKEN: refreshToken - got token, writing cache" >> hFlush stderr
       writeCachedToken trAccessToken trExpiresIn
       pure trAccessToken
 

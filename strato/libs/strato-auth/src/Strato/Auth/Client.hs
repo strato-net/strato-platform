@@ -19,7 +19,7 @@ import Servant.Client
 import Servant.Client.Core (Request, addHeader)
 import Strato.Auth.ClientCredentials
 import Strato.Auth.Token
-import System.IO (hPutStrLn, stderr)
+import System.IO (hPutStrLn, stderr, hFlush, stdout)
 
 data AuthEnv = AuthEnv
   { aeBaseUrl :: BaseUrl
@@ -44,7 +44,7 @@ newAuthEnv url = do
 -- (up to 4 attempts with exponential backoff: 1s, 2s, 4s).
 runWithAuth :: AuthEnv -> ClientM a -> IO (Either ClientError a)
 runWithAuth ae action = do
-  putStrLn "DEBUG AUTH: runWithAuth starting"
+  hPutStrLn stderr "DEBUG AUTH: runWithAuth starting" >> hFlush stderr
   withConnectionRetry (1 :: Int)
   where
     maxAttempts = 4 :: Int
@@ -61,7 +61,7 @@ runWithAuth ae action = do
               threadDelay (delaySec * 1000000)
               withConnectionRetry (attempt + 1)
         r -> do
-          putStrLn $ "DEBUG AUTH: final result: " ++ either (const "Left (error)") (const "Right (success)") r
+          hPutStrLn stderr ("DEBUG AUTH: final result: " ++ either (const "Left (error)") (const "Right (success)") r) >> hFlush stderr
           return r
 
     -- Collapse exceptions from try into ConnectionError
@@ -70,20 +70,20 @@ runWithAuth ae action = do
     joinResult (Right r) = r
 
     doRequestWith401Retry = do
-      putStrLn "DEBUG AUTH: doRequestWith401Retry - calling runOnce"
+      hPutStrLn stderr "DEBUG AUTH: doRequestWith401Retry - calling runOnce" >> hFlush stderr
       result <- runOnce ae
       case result of
         Left (FailureResponse _ resp) | responseStatusCode resp == status401 -> do
-          putStrLn "DEBUG AUTH: Got 401, calling refreshToken"
+          hPutStrLn stderr "DEBUG AUTH: Got 401, calling refreshToken" >> hFlush stderr
           _ <- refreshToken (discoveryUrl clientCredentialsConfig)
-          putStrLn "DEBUG AUTH: refreshToken done, retrying"
+          hPutStrLn stderr "DEBUG AUTH: refreshToken done, retrying" >> hFlush stderr
           runOnce ae
         _ -> pure result
 
     runOnce AuthEnv{..} = do
-      putStrLn "DEBUG AUTH: runOnce - calling getToken"
+      hPutStrLn stderr "DEBUG AUTH: runOnce - calling getToken" >> hFlush stderr
       token <- getToken (discoveryUrl clientCredentialsConfig)
-      putStrLn "DEBUG AUTH: runOnce - got token, making Vault request"
+      hPutStrLn stderr "DEBUG AUTH: runOnce - got token, making Vault request" >> hFlush stderr
       let addAuth :: Request -> Request
           addAuth = addHeader "Authorization" ("Bearer " <> token)
           env = (mkClientEnv aeManager aeBaseUrl) { makeClientRequest = \url req -> defaultMakeClientRequest url (addAuth req) }
