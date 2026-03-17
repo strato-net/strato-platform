@@ -17,11 +17,12 @@ import Strato.Strato23.Client
 import System.Info (os)
 import Text.ShortDescription
 
--- | Get the API IP address, using OS-appropriate default for Docker
+-- | Get the API IP address, using mode-appropriate default for Docker
 getApiIPAddress :: String
 getApiIPAddress
   | flags_apiIPAddress /= "127.0.0.1" = flags_apiIPAddress  -- User provided explicit value
-  | os == "linux" = "172.17.0.1"                            -- Linux Docker bridge
+  | flags_dockerMode == "allDocker" = "0.0.0.0"             -- Bind to all interfaces in container
+  | os == "linux" = "172.17.0.1"                            -- Linux Docker bridge (local mode)
   | otherwise = "host.docker.internal"                      -- macOS/Windows Docker
 
 -- | Get Railgun contract addresses for known networks
