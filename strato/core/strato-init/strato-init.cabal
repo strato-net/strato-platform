@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version: 1.24
 
 -- This file has been generated from package.yaml by hpack version 0.38.1.
 --
@@ -12,16 +12,23 @@ category:       Data Structures
 author:         Jamshid
 maintainer:     jamshidnh@gmail.com
 license:        Apache-2.0
-build-type:     Simple
+build-type:     Custom
+
+custom-setup
+  setup-depends:
+      Cabal
+    , base
+    , directory
+    , process
 
 library
   exposed-modules:
       Blockchain.Init.ComposeTypes
-      Blockchain.Init.DirHash
       Blockchain.Init.DockerCompose
       Blockchain.Init.DockerComposeAllDocker
       Blockchain.Init.EthConf
       Blockchain.Init.Generator
+      Blockchain.Init.Hashes
       Blockchain.Init.Monad
       Blockchain.Init.Options
   other-modules:

@@ -1,6 +1,13 @@
 name: strato-init
 version: 0.0.1
-build-type: Simple
+build-type: Custom
+
+custom-setup:
+  dependencies:
+    - base
+    - Cabal
+    - directory
+    - process
 author: Jamshid
 maintainer: jamshidnh@gmail.com
 synopsis: A tool to setup the DBs for a Strato instance

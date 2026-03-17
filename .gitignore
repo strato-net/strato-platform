@@ -135,3 +135,6 @@ __pycache__/
 /docs/developer/
 /docs/end-user/
 .docker-built/
+
+# Auto-generated hash file (created by Setup.hs)
+strato/core/strato-init/src/Blockchain/Init/Hashes.hs

@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Init.DockerCompose (generateDockerCompose) where
 
@@ -8,7 +7,7 @@ import Prelude hiding (init)
 import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, httpPort, ipAddress, urlConfig, vaultUrl)
 import Blockchain.Init.ComposeTypes
-import Blockchain.Init.DirHash (computeDirHash)
+import Blockchain.Init.Hashes
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
@@ -36,7 +35,7 @@ generateDockerCompose = do
         }
 
   let mercataBackend = def
-        { image = "mercata-backend:" ++ stratoVersionTag ++ "-" ++ $(computeDirHash "mercata/backend")
+        { image = "mercata-backend:" ++ stratoVersionTag ++ "-" ++ hashMercataBackend
         , depends_on = Just ["postgrest"]
         , init = Just True
         , volumes = Just ["./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"]
@@ -50,14 +49,14 @@ generateDockerCompose = do
         }
 
   let mercataUi = def
-        { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ $(computeDirHash "mercata/ui")
+        { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ hashMercataUi
         , depends_on = Just ["mercata-backend"]
         , restart = Just "unless-stopped"
         , logging = stdLogging
         }
 
   let smd = def
-        { image = "smd:" ++ stratoVersionTag ++ "-" ++ $(computeDirHash "smd-ui")
+        { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
         , depends_on = Just ["apex", "postgrest", "prometheus"]
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", nodeHost)
@@ -68,7 +67,7 @@ generateDockerCompose = do
         }
 
   let apex = def
-        { image = "apex:" ++ stratoVersionTag ++ "-" ++ $(computeDirHash "apex")
+        { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , depends_on = Just ["postgres", "prometheus"]
         , environment = Just $ Map.fromList
             [ ("postgres_host", "postgres")
@@ -101,7 +100,7 @@ generateDockerCompose = do
         }
 
   let postgrest = def
-        { image = "postgrest:" ++ stratoVersionTag ++ "-" ++ $(computeDirHash "postgrest-packager")
+        { image = "postgrest:" ++ stratoVersionTag ++ "-" ++ hashPostgrest
         , depends_on = Just ["postgres"]
         , environment = Just $ Map.fromList
             [ ("blocHost", "strato:3000")
@@ -140,7 +139,7 @@ generateDockerCompose = do
         }
 
   let nginx = def
-        { image = "nginx:" ++ stratoVersionTag ++ "-" ++ $(computeDirHash "nginx-packager")
+        { image = "nginx:" ++ stratoVersionTag ++ "-" ++ hashNginx
         , depends_on = Just ["apex", "docs", "postgrest", "prometheus", "smd", "mercata-backend", "mercata-ui"]
         , environment = Just $ Map.fromList
             [ ("STRATO_HOSTNAME", stratoHostname)
@@ -200,7 +199,7 @@ generateDockerCompose = do
         }
 
   let prometheus = def
-        { image = "prometheus:" ++ stratoVersionTag ++ "-" ++ $(computeDirHash "prometheus-packager")
+        { image = "prometheus:" ++ stratoVersionTag ++ "-" ++ hashPrometheus
         , user = Just userGid
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", nodeHost)

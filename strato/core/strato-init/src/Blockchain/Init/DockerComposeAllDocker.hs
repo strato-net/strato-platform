@@ -3,7 +3,7 @@
 
 module Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker) where
 
-import Blockchain.Init.DirHash (computeDirHash)
+import Blockchain.Init.Hashes
 import Blockchain.Init.Options (flags_repoUrl)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.List (foldl')
@@ -16,17 +16,6 @@ templateContent = $(runIO $ do
     "cd $(git rev-parse --show-toplevel) && cat docker-compose.allDocker.tpl.yml"
     ] ""
   return $ LitE $ StringL content)
-
-hashStrato, hashMercataBackend, hashMercataUi, hashSmd, hashApex :: String
-hashPostgrest, hashNginx, hashPrometheus :: String
-hashStrato = $(computeDirHash "strato")
-hashMercataBackend = $(computeDirHash "mercata/backend")
-hashMercataUi = $(computeDirHash "mercata/ui")
-hashSmd = $(computeDirHash "smd-ui")
-hashApex = $(computeDirHash "apex")
-hashPostgrest = $(computeDirHash "postgrest-packager")
-hashNginx = $(computeDirHash "nginx-packager")
-hashPrometheus = $(computeDirHash "prometheus-packager")
 
 substituteAll :: [(String, String)] -> String -> String
 substituteAll subs content = foldl' (\c (old, new) -> replace old new c) content subs
