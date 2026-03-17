@@ -82,10 +82,10 @@ const CardSkeleton = ({ id }: { id: string }) => (
   </div>
 );
 
-const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled, aprBadge }: {
+const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled, apyBadge }: {
   active: boolean; image?: string; symbol: string; estimated: string;
   label: string; onClick: () => void; disabled: boolean;
-  aprBadge: React.ReactNode;
+  apyBadge: React.ReactNode;
 }) => (
   <button type="button" onClick={onClick} disabled={disabled}
     className={`relative text-left rounded-md border-2 p-3 transition-colors ${
@@ -99,7 +99,7 @@ const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled,
       <p className="text-sm font-semibold text-foreground">{symbol}</p>
     </div>
     <p className="text-xs text-muted-foreground">{"\u2248"} {estimated}</p>
-    {aprBadge}
+    {apyBadge}
     <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
   </button>
 );
@@ -199,12 +199,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     return (addr: string) => m.get(norm(addr));
   }, [tokenApys]);
 
-  const AprBadge = ({ addr }: { addr: string }) => (
+  const ApyBadge = ({ addr }: { addr: string }) => (
     <div className="h-[14px] mt-0.5">
       {!tokenApysLoaded
-        ? <p className="text-[10px] font-medium text-green-500/40 flex items-center gap-0.5 animate-pulse blur-[2px]"><TrendingUp className="w-3 h-3" />0.00% APR</p>
+        ? <p className="text-[10px] font-medium text-green-500/40 flex items-center gap-0.5 animate-pulse blur-[2px]"><TrendingUp className="w-3 h-3" />0.00% APY</p>
         : getApy(addr) && (
-          <p className="text-[10px] font-medium text-green-500 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />{getApy(addr)}% APR</p>
+          <p className="text-[10px] font-medium text-green-500 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />{getApy(addr)}% APY</p>
         )
       }
     </div>
@@ -892,7 +892,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                           label={`${Number(metal.feeBps) / 100}% fee`}
                           onClick={() => setSelectedMetal(metal)}
                           disabled={guestMode || isLoading}
-                          aprBadge={<AprBadge addr={metal.address} />}
+                          apyBadge={<ApyBadge addr={metal.address} />}
                         />
                       );
                     })
@@ -910,7 +910,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                       label={rt.isDefaultRoute ? "VIA WRAP" : "VIA MINT"}
                       onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
                       disabled={guestMode || isLoading}
-                      aprBadge={<AprBadge addr={rt.stratoToken} />}
+                      apyBadge={<ApyBadge addr={rt.stratoToken} />}
                     />
                   ))}
                   {matchingActions.map((action) => {
@@ -933,7 +933,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                           setSelectedAction(action);
                         }}
                         disabled={guestMode || isLoading}
-                        aprBadge={<AprBadge addr={action.stratoToken} />}
+                        apyBadge={<ApyBadge addr={action.stratoToken} />}
                       />
                     );
                   })}
