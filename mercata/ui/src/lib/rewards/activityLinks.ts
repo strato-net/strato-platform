@@ -18,9 +18,9 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/deposits?tab=easy-savings';
   }
 
-  // CDP-related activities - goes to the Advanced page, Mint tab, Vaults sub-tab
+  // CDP-related activities - goes to the Borrow page, Vaults sub-tab
   if (lowerName.includes('cdp')) {
-    return '/dashboard/advanced?tab=mint&subtab=vaults';
+    return '/dashboard/borrow?subtab=vaults';
   }
   
   // Vault activities - goes to the Vault page
@@ -38,9 +38,9 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/swap';
   }
 
-  // Borrow activities - goes to the Borrow page
+  // Borrow activities - goes to the Advanced page, Borrow tab
   if (lowerName.includes('borrow')) {
-    return '/dashboard/borrow';
+    return '/dashboard/advanced?tab=borrow';
   }
   
   // Lending activities - goes to the Advanced page, Lending Pools tab
