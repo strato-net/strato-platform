@@ -4,7 +4,6 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useBridgeContext } from '@/context/BridgeContext';
-import { getChainName } from '@/lib/bridge/utils';
 import { formatBalance } from '@/utils/numberUtils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -45,9 +44,12 @@ const RecentTransactions = () => {
   const {
     fetchDepositTransactions,
     fetchWithdrawTransactions,
+    availableNetworks,
     depositRefreshKey,
     withdrawalRefreshKey,
   } = useBridgeContext();
+
+  const chainNameMap = new Map(availableNetworks.map(n => [String(n.chainId), n.chainName]));
   const isMobile = useIsMobile();
   const recentLimit = isMobile ? 6 : 8;
   const [transactions, setTransactions] = useState<RecentTx[]>([]);
@@ -180,7 +182,7 @@ const RecentTransactions = () => {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatTimeAgo(tx.block_timestamp)} · {getChainName(Number(tx.externalChainId || 1))}
+                      {formatTimeAgo(tx.block_timestamp)} · {chainNameMap.get(String(tx.externalChainId)) || "Unknown Chain"}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
