@@ -14,33 +14,24 @@ import { TIMEOUTS, ORACLE_CONFIG } from './utils/constants';
 // Helpers
 // ============================================================================
 
-const PRICE_SCALE = 10n ** 18n;
-
-function formatUsdPrice(price: bigint, decimals = 4): string {
-    const whole = price / PRICE_SCALE;
-    const fraction = (price % PRICE_SCALE).toString().replace('-', '').padStart(18, '0').slice(0, decimals);
-    return `${whole.toString()}.${fraction}`;
-}
-
-function calculateMedian(prices: bigint[]): bigint {
-    if (prices.length === 0) return 0n;
-    const sorted = [...prices].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+function calculateMedian(prices: number[]): number {
+    if (prices.length === 0) return 0;
+    const sorted = [...prices].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
     return sorted.length % 2 !== 0
         ? sorted[mid]
-        : (sorted[mid - 1] + sorted[mid]) / 2n;
+        : Math.floor((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
-function checkPriceChange(assetKey: string, newPrice: bigint, previousPrice: bigint): void {
+function checkPriceChange(assetKey: string, newPrice: number, previousPrice: number): void {
     // Skip if previous price is 0 or missing (new asset)
-    if (previousPrice <= 0n || newPrice <= 0n) return;
+    if (previousPrice <= 0 || newPrice <= 0) return;
     
-    const delta = newPrice > previousPrice ? newPrice - previousPrice : previousPrice - newPrice;
-    const changePercent = Number((delta * 10000n) / previousPrice) / 100;
+    const changePercent = Math.abs((newPrice - previousPrice) / previousPrice) * 100;
     
     if (changePercent > ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT) {
-        const oldPriceUSD = formatUsdPrice(previousPrice, 2);
-        const newPriceUSD = formatUsdPrice(newPrice, 2);
+        const oldPriceUSD = (previousPrice / 1e18).toFixed(2);
+        const newPriceUSD = (newPrice / 1e18).toFixed(2);
         const direction = newPrice > previousPrice ? 'increased' : 'decreased';
         logWarning('CronScheduler',
             `Significant price change alert for ${assetKey}: ${direction} ${changePercent.toFixed(2)}% (max ${ORACLE_CONFIG.MAX_PRICE_CHANGE_PERCENT}%). Previous: $${oldPriceUSD}, New: $${newPriceUSD}`
@@ -48,16 +39,16 @@ function checkPriceChange(assetKey: string, newPrice: bigint, previousPrice: big
     }
 }
 
-function checkSourceDivergence(assetKey: string, sources: Array<{ name: string; price: bigint }>, medianPrice: bigint): void {
-    if (sources.length < 2 || medianPrice === 0n) return;
+function checkSourceDivergence(assetKey: string, sources: Array<{ name: string; price: number }>, medianPrice: number): void {
+    if (sources.length < 2 || medianPrice === 0) return;
     
     const prices = sources.map(s => s.price);
-    const minPrice = prices.reduce((min, price) => price < min ? price : min, prices[0]);
-    const maxPrice = prices.reduce((max, price) => price > max ? price : max, prices[0]);
-    const spreadPercent = Number(((maxPrice - minPrice) * 10000n) / medianPrice) / 100;
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const spreadPercent = ((maxPrice - minPrice) / medianPrice) * 100;
     
     if (spreadPercent > ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT) {
-        const sourcePrices = sources.map(s => `${s.name}: $${formatUsdPrice(s.price, 2)}`).join(', ');
+        const sourcePrices = sources.map(s => `${s.name}: $${(s.price / 1e18).toFixed(2)}`).join(', ');
         logWarning('CronScheduler',
             `Source divergence alert for ${assetKey}: ${spreadPercent.toFixed(2)}% spread (max ${ORACLE_CONFIG.MAX_SOURCE_DIVERGENCE_PERCENT}%). Sources: [${sourcePrices}]`
         );
@@ -134,7 +125,7 @@ function aggregatePrices(
     configLoader: ConfigLoader,
     sourceResults: Map<string, SourceResult>,
     marketClosed: boolean,
-    previousPrices: Map<string, bigint>
+    previousPrices: Map<string, number>
 ): AggregatedPrice[] {
     return Object.entries(configLoader.getAllAssets())
     .filter(([_, asset]) => !asset.rebase)
@@ -144,7 +135,7 @@ function aggregatePrices(
             ? 1
             : (asset.minValidSourcesOverride || ORACLE_CONFIG.MIN_VALID_SOURCES);
         const weekdaySources = configLoader.getSourcesForAsset(assetKey);
-        const sources: Array<{ name: string; price: bigint }> = [];
+        const sources: Array<{ name: string; price: number }> = [];
         let expectedCount = weekdaySources.length;
 
         const failedSources: string[] = [];
@@ -185,13 +176,13 @@ function aggregatePrices(
             logError('CronScheduler', new Error(`Insufficient sources for ${assetKey}: got ${sources.length}, need ${requiredSources}. Failed: [${failedSources.join(', ')}]`));
         }
         
-        const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0n;
+        const medianPrice = isValid ? calculateMedian(sources.map(s => s.price)) : 0;
         
         // Check for source divergence (alert only, still submit)
         if (isValid) {
             checkSourceDivergence(assetKey, sources, medianPrice);
             // Check for significant price change vs previous on-chain price
-            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0n;
+            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0;
             checkPriceChange(assetKey, medianPrice, previousPrice);
         }
         
@@ -222,7 +213,7 @@ function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: Confi
         const sourceCountBefore = p.sources.length;
         asset.equivalentAssets.forEach(equivKey => {
             const equiv = prices.find(ap => ap.assetKey === equivKey);
-            if (equiv && !equiv.failed && equiv.medianPrice > 0n) {
+            if (equiv && !equiv.failed && equiv.medianPrice > 0) {
                 p.sources.push({ name: `${equivKey}(equiv)`, price: equiv.medianPrice });
                 p.expectedSourceCount += 1;
             }
@@ -247,7 +238,7 @@ function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: Confi
 async function applyRebaseFactors(
     prices: AggregatedPrice[],
     configLoader: ConfigLoader,
-    previousPrices: Map<string, bigint>
+    previousPrices: Map<string, number>
 ): Promise<void> {
     const allAssets = configLoader.getAllAssets();
     const rebasingEntries = Object.entries(allAssets).filter(([_, a]) => a.rebase);
@@ -257,24 +248,20 @@ async function applyRebaseFactors(
         const rebase = asset.rebase!;
         const underlying = prices.find(p => p.assetKey === rebase.underlyingAsset);
 
-        if (!underlying || underlying.failed || underlying.medianPrice <= 0n) {
+        if (!underlying || underlying.failed || underlying.medianPrice <= 0) {
             logWarning('CronScheduler', `${assetKey}: underlying ${rebase.underlyingAsset} has no valid price, skipping`);
             continue;
         }
 
         try {
             const factor = await withTimeout(fetchRebaseFactor(assetKey, rebase), TIMEOUTS.FETCH);
-            if (factor <= 0n) continue;
+            if (factor <= 0) continue;
 
-            const factorPrecision = BigInt(rebase.factorPrecision);
-            if (factorPrecision <= 0n) {
-                throw new Error(`invalid factorPrecision "${rebase.factorPrecision}"`);
-            }
-
-            const rebasedPrice = (underlying.medianPrice * factor) / factorPrecision;
+            const precision = Number(rebase.factorPrecision);
+            const rebasedPrice = Math.floor(underlying.medianPrice * factor / precision);
             const sourceName = `${rebase.underlyingAsset}×${rebase.factorParse}`;
 
-            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0n;
+            const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0;
             checkPriceChange(assetKey, rebasedPrice, previousPrice);
 
             prices.push({
@@ -285,7 +272,7 @@ async function applyRebaseFactors(
                 expectedSourceCount: 1,
             });
 
-            logInfo('CronScheduler', `${assetKey}: rebased price $${formatUsdPrice(rebasedPrice)} (underlying=$${formatUsdPrice(underlying.medianPrice)}, factor=${factor.toString()})`);
+            logInfo('CronScheduler', `${assetKey}: rebased price $${(rebasedPrice / 1e18).toFixed(4)} (underlying=$${(underlying.medianPrice / 1e18).toFixed(4)}, factor=${factor})`);
         } catch (err) {
             logError('CronScheduler', new Error(`${assetKey}: rebase factor fetch failed: ${(err as Error).message}`));
         }

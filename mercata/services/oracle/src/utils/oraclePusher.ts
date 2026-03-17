@@ -102,7 +102,7 @@ export async function pushAssetPrices(validPrices: AggregatedPrice[]): Promise<T
         method: "setAssetPrices",
         args: { 
             assets: validPrices.map(p => p.targetAddress), 
-            priceValues: validPrices.map(p => p.medianPrice.toString()) 
+            priceValues: validPrices.map(p => p.medianPrice) 
         },
     }];
 

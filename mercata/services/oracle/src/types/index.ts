@@ -2,7 +2,7 @@ export interface RebaseConfig {
     underlyingAsset: string;      // Asset key whose aggregated price is the base (e.g., "SPY")
     factorUrl: string;            // REST endpoint to fetch the rebase factor (supports ${STRATO_NODE_URL}, ${API_KEY} substitution)
     factorMethod?: string;        // HTTP method; defaults to GET. Use POST for JSON-RPC eth_call.
-    factorBody?: string;          // JSON body template for POST requests (supports ${TOKEN_ADDRESS} substitution)
+    factorBody?: string;          // JSON body template for POST requests
     factorParse: string;          // JSON path to extract the factor value (e.g., "result" for eth_call hex response)
     factorPrecision: string;      // Divisor for the raw factor: "1000000000000000000000000000" for ray, "1000000000000000000" for wad
     factorApiKeyEnvVar?: string;
@@ -21,7 +21,7 @@ export interface Asset {
 
 export interface BatchPriceResult {
     [assetName: string]: {
-        price: bigint;
+        price: number;
         feedTimestamp: string;
     };
 }
@@ -68,16 +68,16 @@ export interface TxMetric {
 
 export interface SourceResult {
     sourceName: string;
-    prices: Record<string, { price: bigint; feedTimestamp: string }>;
+    prices: Record<string, { price: number; feedTimestamp: string }>;
     success: boolean;
     duration: number;
 }
 
 export interface AggregatedPrice {
     assetKey: string;
-    medianPrice: bigint;
+    medianPrice: number;
     targetAddress: string;
-    sources: Array<{ name: string; price: bigint }>;
+    sources: Array<{ name: string; price: number }>;
     expectedSourceCount: number;
     failed?: boolean;
     error?: string;

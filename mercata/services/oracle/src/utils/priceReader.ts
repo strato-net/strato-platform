@@ -6,8 +6,8 @@ import { logError } from './logger';
  * Fetches all previous prices from Cirrus for the oracle contract
  * @returns Map of asset address -> price (in wei), empty map on failure
  */
-export async function fetchPreviousPrices(): Promise<Map<string, bigint>> {
-    const priceMap = new Map<string, bigint>();
+export async function fetchPreviousPrices(): Promise<Map<string, number>> {
+    const priceMap = new Map<string, number>();
 
     try {
         const accessToken = await oauthClient().getAccessToken();
@@ -39,8 +39,8 @@ export async function fetchPreviousPrices(): Promise<Map<string, bigint>> {
         if (Array.isArray(response.data)) {
             for (const row of response.data) {
                 if (row.key && row.value) {
-                    const price = BigInt(String(row.value));
-                    if (price > 0n) {
+                    const price = typeof row.value === 'string' ? parseFloat(row.value) : row.value;
+                    if (price > 0) {
                         priceMap.set(row.key.toLowerCase(), price);
                     }
                 }
