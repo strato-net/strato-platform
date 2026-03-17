@@ -47,17 +47,13 @@ do
 done
 echo 'Zookeeper is available'
 
-# One-time slipstream database creation (on first volume use)
-if [ ! -f /volume_data/_volume_initialized ]; then
-  echo "First run: creating slipstream database..."
-  PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db:-cirrus}
-  PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db:-cirrus}
-  mkdir -p /volume_data
-  date '+%Y-%m-%d %H:%M:%S' > /volume_data/_volume_initialized
-fi
-
 # Go to node directory (created by strato-setup which ran outside the container)
 cd /var/lib/strato
+
+# Debug: show current state
+echo "[DEBUG] pwd=$(pwd)"
+echo "[DEBUG] ls -la:"
+ls -la
 
 # Wait for custom genesis if requested
 if [[ ${useCustomGenesis:-false} = "true" && ! -f "genesis.json" ]] ; then
