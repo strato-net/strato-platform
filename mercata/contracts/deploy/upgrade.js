@@ -12,8 +12,29 @@ const path = require('path');
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
 
 // Batch upgrade targets: proxy addresses
+// All tokens + LP tokens that will be renamed (must upgrade before calling setNameAndSymbol)
+// -----------------------------
+// PROD DEPLOYMENTS
+// -----------------------------
 const BATCH_TARGETS = [
-    // "0000000000000000000000000000000000001017",
+    // Wrapped tokens (8)
+    "93fb7295859b2d70199e0a4883b7c320cf874e6c", // ETHST -> ETH
+    "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9", // WBTCST -> WBTC
+    "2e4789eb7db143576da25990a3c0298917a8a87d", // rETHST -> rETH
+    "f2aa370405030a434ae07e7826178325c675e925", // wstETHST -> wstETH
+    "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca", // syrupUSDCST -> syrupUSDC
+    "6e2d93d323edf1b3cc4672a909681b6a430cae64", // SUSDSST -> sUSDS
+    "47de839c03a3b014c0cc4f3b9352979a5038f910", // XAUTST -> XAUt
+    "491cdfe98470bfe69b662ab368826dca0fc2f24d", // PAXGST -> PAXG
+    // LP tokens (8)
+    "0000000000000000000000000000000000001018", // ETHST-USDST-LP -> ETH-USDST-LP
+    "69010124cdaa64286f6e413267a7001ea9379df4", // ETHST-WBTCST-LP -> ETH-WBTC-LP
+    "000000000000000000000000000000000000101a", // WBTCST-USDST-LP -> WBTC-USDST-LP
+    "2e99b16c78474c437c7003c814ca79a3ba50e5d8", // wstETHST-USDST-LP -> wstETH-USDST-LP
+    "d18a739fc9daa5ff19d2083b1f9b20823133b0cb", // rETHST-wstETHST-LP -> rETH-wstETH-LP
+    "a049efb1a3417801b3dd3877dd566aa24b95b3a0", // syrupUSDCST-USDST-LP -> syrupUSDC-USDST-LP
+    "96c26f8306a0097d985d1654b4596c48bb6277c4", // SUSDSST-USDST-LP -> sUSDS-USDST-LP
+    "af543d9086416b048564fa165f9587aa565cce2f", // XAUTST-GOLDST-LP -> XAUt-GOLDST-LP
 ];
 
 /**
