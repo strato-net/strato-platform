@@ -253,8 +253,12 @@ main = do
   SIO.hPutStrLn SIO.stderr ("DEBUG: About to start server on " ++ bindHost ++ ":" ++ show bindPort) >> SIO.hFlush SIO.stderr
   putStrLn $ "Starting strato-api on " ++ bindHost ++ ":" ++ show bindPort
   SIO.hFlush SIO.stdout
-  SIO.hPutStrLn SIO.stderr "DEBUG: Calling runSettings now..." >> SIO.hFlush SIO.stderr
-  runSettings (setPort bindPort $ setHost (fromString bindHost) defaultSettings) $ app env theDoc urlMap
+  SIO.hPutStrLn SIO.stderr "DEBUG: Building warp settings..." >> SIO.hFlush SIO.stderr
+  let settings = setPort bindPort $ setHost (fromString bindHost) $ setBeforeMainLoop (SIO.hPutStrLn SIO.stderr "DEBUG: Warp server socket bound successfully, entering main loop" >> SIO.hFlush SIO.stderr) defaultSettings
+  SIO.hPutStrLn SIO.stderr "DEBUG: Building app..." >> SIO.hFlush SIO.stderr  
+  let theApp = app env theDoc urlMap
+  SIO.hPutStrLn SIO.stderr "DEBUG: Calling runSettings - if this hangs, port 3000 may be in use or socket binding failed" >> SIO.hFlush SIO.stderr
+  runSettings settings theApp `catch` (\(e :: SomeException) -> SIO.hPutStrLn SIO.stderr ("DEBUG: runSettings threw exception: " ++ show e) >> SIO.hFlush SIO.stderr >> throwIO e)
 
 app :: BlocEnv -> OpenApi -> UrlMap -> Application
 app blocEnv theDoc urlMap =
