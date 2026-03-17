@@ -33,7 +33,6 @@ import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
 import OnrampPage from "./pages/OnrampPage";
-import BuyMetals from "./pages/BuyMetals";
 import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
@@ -207,14 +206,6 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <SwapAsset />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/buy-metals"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <BuyMetals />
                                               </GuestAccessibleRoute>
                                             }
                                           />

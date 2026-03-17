@@ -16,7 +16,7 @@ import {
   Shield,
   UserPlus,
   Vault,
-  Gem,
+
   ArrowDownToLine,
   X
 } from 'lucide-react';
@@ -33,7 +33,7 @@ const PRIMARY_NAV_ITEMS = [
 
 // Items shown in "More" drawer
 const MORE_ITEMS = [
-  { icon: Gem, label: 'Buy Metals', path: '/dashboard/buy-metals' },
+
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
