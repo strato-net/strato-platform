@@ -11,7 +11,6 @@ interface SafetyModuleInfo {
   totalAssets: string;
   totalShares: string;
   userShares: string;
-  userSharesStaked: string;
   userSharesTotal: string;
   userCooldownStart: string;
   cooldownSeconds: string;
@@ -304,7 +303,6 @@ export const getSafetyModuleInfo = async (
       totalAssets,
       totalShares,
       userShares,
-      userSharesStaked: "0",
       userSharesTotal: userSharesTotal.toString(),
       userCooldownStart: cooldownStart,
       cooldownSeconds,
@@ -326,7 +324,6 @@ export const getSafetyModuleInfo = async (
       totalAssets: "0",
       totalShares: "0",
       userShares: "0",
-      userSharesStaked: "0",
       userSharesTotal: "0",
       userCooldownStart: "0",
       cooldownSeconds: "259200",

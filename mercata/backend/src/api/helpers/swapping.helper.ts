@@ -259,15 +259,9 @@ export const buildSwapToken = (
 export const buildLPToken = (
   lpToken: RawLPToken,
   price: string,
-  userBalance: string,
-  stakedBalance?: string
+  userBalance: string
 ): LPToken => {
-  // Always calculate totalBalance
-  const totalBalance = stakedBalance !== undefined
-    ? (BigInt(userBalance) + BigInt(stakedBalance)).toString()
-    : userBalance;
-
-  const result: LPToken = {
+  return {
     address: lpToken.address,
     _name: lpToken._name,
     _symbol: lpToken._symbol,
@@ -276,15 +270,8 @@ export const buildLPToken = (
     balance: userBalance,
     price,
     images: lpToken.images.filter(img => img.value && img.value.trim() !== ""),
-    totalBalance
+    totalBalance: userBalance
   };
-
-  // Only add stakedBalance if pool exists in rewards program
-  if (stakedBalance !== undefined) {
-    result.stakedBalance = stakedBalance;
-  }
-
-  return result;
 };
 
 export const buildPoolList = (
@@ -292,8 +279,7 @@ export const buildPoolList = (
   priceMap: OraclePriceMap,
   volumeMap: Map<string, string>,
   factoryData: RawPoolFactory | undefined,
-  userAddress: string | undefined,
-  stakedBalanceMap?: Map<string, string>
+  userAddress: string | undefined
 ) => {
   return pools.map((pool: RawGetPool) => {
     const tokenAPrice = priceMap.get(pool.tokenA.address) || "0";
@@ -310,9 +296,6 @@ export const buildPoolList = (
     const tokenBBalance = getTokenBalance(pool.tokenB, userAddress || "");
     const lpTokenBalance = getTokenBalance(pool.lpToken, userAddress || "");
 
-    // Get staked balance for this LP token from the map (if available)
-    const stakedBalance = stakedBalanceMap?.get(pool.lpToken.address);
-
     const symbolA = pool.tokenA._symbol;
     const symbolB = pool.tokenB._symbol;
 
@@ -322,7 +305,7 @@ export const buildPoolList = (
       poolSymbol: `${symbolA}-${symbolB}`,
       tokenA: buildSwapToken(pool.tokenA, tokenAPrice, pool.tokenABalance, tokenABalance),
       tokenB: buildSwapToken(pool.tokenB, tokenBPrice, pool.tokenBBalance, tokenBBalance),
-      lpToken: buildLPToken(pool.lpToken, lpTokenPrice, lpTokenBalance, stakedBalance),
+      lpToken: buildLPToken(pool.lpToken, lpTokenPrice, lpTokenBalance),
       totalLiquidityUSD,
       tradingVolume24h: volume24h,
       apy: apy.toFixed(2),

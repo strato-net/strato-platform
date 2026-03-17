@@ -117,8 +117,7 @@ export interface LPToken {
   balance: string; // User LP token balance (unstaked, in wallet)
   price: string; // LP token price
   images: Array<{ value: string }>; // LP token images (filtered to exclude empty values)
-  stakedBalance?: string;
-  totalBalance: string; // Total LP tokens (balance + stakedBalance if exists, otherwise just balance)
+  totalBalance: string;
 }
 
 /**

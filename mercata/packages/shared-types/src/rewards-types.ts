@@ -3,12 +3,6 @@ export interface PendingRewardsData {
   pendingCataFormatted: string;
 }
 
-export interface StakedBalanceData {
-  poolId: number;
-  stakedBalance: string;
-  stakedBalanceFormatted: string;
-}
-
 export interface BonusPeriod {
   startTimestamp: string;
   bonusMultiplier: string;

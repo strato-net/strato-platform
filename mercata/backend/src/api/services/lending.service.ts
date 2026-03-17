@@ -644,8 +644,6 @@ export const liquidityAndBalance = async (
     borrowableAsset
   );
 
-  const stakedMTokenBalance = "0";
-
   // User's withdrawable underlying (min of user mToken value and pool cash)
   const userMTokenBalance = BigInt(mTokenBalance);
   const userUSDSTValue = userMTokenBalance > 0n
@@ -672,8 +670,7 @@ export const liquidityAndBalance = async (
     withdrawable: {
       ...mTokenInfoClean,
       userBalance: mTokenBalance, // This is the unstaked (wallet) balance
-      userBalanceStaked: stakedMTokenBalance,
-      userBalanceTotal: (BigInt(mTokenBalance) + BigInt(stakedMTokenBalance)).toString(), // Total = wallet + staked
+      userBalanceTotal: mTokenBalance,
       maxWithdrawableUSDST,
       withdrawValue: userUSDSTValue.toString(),
     },
@@ -744,7 +741,6 @@ export const getPublicLiquidityInfo = async (
   // User balances are always "0" for guests
   const borrowableBalance = "0";
   const mTokenBalance = "0";
-  const stakedMTokenBalance = "0";
 
   // Supply/token state
   const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
@@ -828,7 +824,6 @@ export const getPublicLiquidityInfo = async (
     withdrawable: {
       ...mTokenInfoClean,
       userBalance: mTokenBalance, // "0" for guests
-      userBalanceStaked: stakedMTokenBalance, // "0" for guests
       userBalanceTotal: "0", // "0" for guests
       maxWithdrawableUSDST, // "0" for guests
       withdrawValue: "0", // "0" for guests

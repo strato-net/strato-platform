@@ -76,10 +76,7 @@ export const getPools = async (
     key: `in.(${tokenAddresses.join(',')})`
   });
   const volumeMap = await getTradingVolume24hForPools(accessToken, validatedPools.map(pool => pool.address), priceMap);
-
-  const stakedBalanceMap: Map<string, string> | undefined = undefined;
-
-  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress, stakedBalanceMap);
+  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress);
 };
 
 // --- Token Queries ---
