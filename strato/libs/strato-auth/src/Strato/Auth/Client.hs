@@ -35,15 +35,21 @@ newAuthEnv url = do
 -- | Run a Servant client action with OAuth authentication (retries once on 401)
 runWithAuth :: AuthEnv -> ClientM a -> IO (Either ClientError a)
 runWithAuth ae action = do
+  putStrLn "DEBUG AUTH: runWithAuth starting, calling runOnce"
   result <- runOnce ae
+  putStrLn $ "DEBUG AUTH: runOnce returned: " ++ either (const "Left (error)") (const "Right (success)") result
   case result of
     Left (FailureResponse _ resp) | responseStatusCode resp == status401 -> do
+      putStrLn "DEBUG AUTH: Got 401, calling refreshToken"
       _ <- refreshToken (discoveryUrl clientCredentialsConfig)
+      putStrLn "DEBUG AUTH: refreshToken done, retrying runOnce"
       runOnce ae
     _ -> pure result
   where
     runOnce AuthEnv{..} = do
+      putStrLn "DEBUG AUTH: runOnce - calling getToken"
       token <- getToken (discoveryUrl clientCredentialsConfig)
+      putStrLn "DEBUG AUTH: runOnce - got token, making Vault request"
       let addAuth :: Request -> Request
           addAuth = addHeader "Authorization" ("Bearer " <> token)
           env = (mkClientEnv aeManager aeBaseUrl) { makeClientRequest = \url req -> defaultMakeClientRequest url (addAuth req) }

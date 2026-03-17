@@ -32,19 +32,30 @@ lockFilePath = "secrets/oauth_token.lock"
 -- | Get cached token, or fetch a new one if not cached
 getToken :: T.Text -> IO T.Text
 getToken discUrl = do
+  putStrLn "DEBUG TOKEN: getToken - checking cache"
   cached <- readCachedToken
   case cached of
-    Just token -> pure token
-    Nothing -> refreshToken discUrl
+    Just token -> do
+      putStrLn "DEBUG TOKEN: getToken - returning cached token"
+      pure token
+    Nothing -> do
+      putStrLn "DEBUG TOKEN: getToken - no cache, calling refreshToken"
+      refreshToken discUrl
 
 -- | Force refresh the token (call this on 401)
 refreshToken :: T.Text -> IO T.Text
-refreshToken discUrl = withFileLock lockFilePath Exclusive $ \_ -> do
-  let ClientCredentialsConfig{..} = clientCredentialsConfig
-  tokenEndpoint <- getTokenEndpoint discUrl
-  token <- fetchToken tokenEndpoint clientId clientSecret
-  writeCachedToken token
-  pure token
+refreshToken discUrl = do
+  putStrLn "DEBUG TOKEN: refreshToken - acquiring lock"
+  withFileLock lockFilePath Exclusive $ \_ -> do
+    putStrLn "DEBUG TOKEN: refreshToken - lock acquired"
+    let ClientCredentialsConfig{..} = clientCredentialsConfig
+    putStrLn $ "DEBUG TOKEN: refreshToken - fetching token endpoint from " ++ T.unpack discUrl
+    tokenEndpoint <- getTokenEndpoint discUrl
+    putStrLn $ "DEBUG TOKEN: refreshToken - got endpoint: " ++ T.unpack tokenEndpoint
+    token <- fetchToken tokenEndpoint clientId clientSecret
+    putStrLn "DEBUG TOKEN: refreshToken - got token, writing cache"
+    writeCachedToken token
+    pure token
 
 readCachedToken :: IO (Maybe T.Text)
 readCachedToken = do
