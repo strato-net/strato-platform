@@ -77,7 +77,7 @@ import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client
 import System.Clock
 import System.Directory (getCurrentDirectory, doesFileExist)
-import System.IO (hPutStrLn, hFlush, stderr)
+import qualified System.IO as SIO
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -223,12 +223,12 @@ main = do
 
   -- Debug: check OAuth credentials and token cache
   cwd <- getCurrentDirectory
-  hPutStrLn stderr ("DEBUG: Current working directory: " ++ cwd) >> hFlush stderr
+  SIO.hPutStrLn SIO.stderr ("DEBUG: Current working directory: " ++ cwd) >> SIO.hFlush SIO.stderr
   oauthExists <- doesFileExist "secrets/oauth_credentials.yaml"
-  hPutStrLn stderr ("DEBUG: secrets/oauth_credentials.yaml exists: " ++ show oauthExists) >> hFlush stderr
+  SIO.hPutStrLn SIO.stderr ("DEBUG: secrets/oauth_credentials.yaml exists: " ++ show oauthExists) >> SIO.hFlush SIO.stderr
   tokenExists <- doesFileExist "secrets/oauth_token"
-  hPutStrLn stderr ("DEBUG: secrets/oauth_token (cached) exists: " ++ show tokenExists) >> hFlush stderr
-  hPutStrLn stderr ("DEBUG: About to call Vault at: " ++ vaultUrl (urlConfig ethConf)) >> hFlush stderr
+  SIO.hPutStrLn SIO.stderr ("DEBUG: secrets/oauth_token (cached) exists: " ++ show tokenExists) >> SIO.hFlush SIO.stderr
+  SIO.hPutStrLn SIO.stderr ("DEBUG: About to call Vault at: " ++ vaultUrl (urlConfig ethConf)) >> SIO.hFlush SIO.stderr
   
   pubKey <- runLoggingT
           . runVaultM (vaultUrl . urlConfig $ ethConf)
@@ -236,7 +236,7 @@ main = do
           . blocVaultWrapper
           $ getKey Nothing Nothing
   
-  hPutStrLn stderr "DEBUG: Vault call completed successfully" >> hFlush stderr
+  SIO.hPutStrLn SIO.stderr "DEBUG: Vault call completed successfully" >> SIO.hFlush SIO.stderr
 
   let env =
         BlocEnv
