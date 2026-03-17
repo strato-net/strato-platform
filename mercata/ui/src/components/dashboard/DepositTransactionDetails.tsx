@@ -3,13 +3,13 @@ import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
 import { useBridgeContext } from "@/context/BridgeContext";
-import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard, getExplorerUrl } from "@/lib/bridge/utils";
+import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
 import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { ensureHexPrefix } from "@/utils/numberUtils";
-import { usdstAddress } from "@/lib/constants";
+
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const DepositTransactionDetails = ({ context }: { context?: string }) => {
@@ -18,7 +18,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number>(0);
   const [selectedChainId, setSelectedChainId] = useState<number>(0);
-  const [selectedType, setSelectedType] = useState<'bridge' | 'saving' | ''>('');
+  const [selectedType, setSelectedType] = useState<'bridge' | 'save' | 'forge' | ''>('');
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
   const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
 
@@ -38,12 +38,6 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           order: 'block_timestamp.desc',
         };
         
-        if (selectedType === 'saving') {
-          (params as any)["value->>stratoToken"] = `eq.${usdstAddress}`;
-        } else if (selectedType === 'bridge') {
-          (params as any)["value->>stratoToken"] = `neq.${usdstAddress}`;
-        }
-        
         if (depositStatus !== 0) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
         }
@@ -55,23 +49,24 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         const result = await fetchDepositTransactions(params, context);
         const apiTransactions = result.data;
         
-        const pendingDeposits = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
-        const apiTxHashes = new Set(apiTransactions.map((tx: any) => tx?.externalTxHash));
-        const remainingPending = pendingDeposits.filter((p: any) => 
-          !apiTxHashes.has(p?.externalTxHash)
-        );
+        const { remaining: remainingPending } = mergePendingDeposits(apiTransactions as any[]);
         
+        const typeFilter = (outcome: string | undefined, pendingType?: string) => {
+          if (!selectedType) return true;
+          const mapped = pendingType === 'saving' ? 'save' : pendingType || outcome || 'bridge';
+          return mapped === selectedType;
+        };
+
         const filteredPending = remainingPending.filter((p: any) => {
-          if (selectedType && p?.type !== selectedType) return false;
+          if (!typeFilter(undefined, p?.type)) return false;
           if (depositStatus !== 0 && parseInt(p?.DepositInfo?.bridgeStatus || '0') !== depositStatus) return false;
           if (selectedChainId !== 0 && p?.externalChainId !== selectedChainId) return false;
           return true;
         });
-        
-        localStorage.setItem('pendingDeposits', JSON.stringify(remainingPending));
-        
-        const merged = currentPage === 1 ? [...filteredPending, ...apiTransactions] : apiTransactions;
-        setTransactions(merged);
+
+        const filteredApi = selectedType ? apiTransactions.filter((tx: any) => typeFilter(tx.depositOutcome)) : apiTransactions;
+        const merged = currentPage === 1 ? [...filteredPending, ...filteredApi] : filteredApi;
+        setTransactions(merged as DepositTransaction[]);
         setTotalCount(result.totalCount + filteredPending.length);
       } catch (error) {
         console.error("Error loading transactions:", error);
@@ -131,35 +126,34 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       width: 100,
     },
     {
-      title: "Token",
-      key: "ethTokenSymbol",
-      render: (_: any, record: any) => (
-        <div className="flex flex-col gap-1">
-          <span className="text-sm text-foreground">{
-            record.externalSymbol ||
-            (record.externalName === 'Ether' ? 'ETH' : record.externalName) ||
-            '-'
-          }</span>
-        </div>
-      ),
-      width: 150,
+      title: "Sent",
+      key: "sent",
+      render: (_: any, record: any) => {
+        const symbol = record.externalSymbol || (record.externalName === 'Ether' ? 'ETH' : record.externalName) || '-';
+        const amount = formatWeiToDecimalHP(record?.DepositInfo?.stratoTokenAmount || '0', 18);
+        return <span className="text-sm text-foreground">{amount} {symbol}</span>;
+      },
+      width: 140,
     },
     {
-      title: "Token (STRATO)",
-      key: "token",
-      render: (_: any, record: any) => (
-        <div className="flex flex-col gap-1">
-          <span className="text-sm text-foreground">{record.stratoTokenSymbol || '-'}</span>
-        </div>
-      ),
-      width: 150,
-    },
-    {
-      title: "Amount",
-      key: "amount",
-      render: (_: any, record: any) =>
-        formatWeiToDecimalHP(record?.DepositInfo?.stratoTokenAmount || '0', 18),
-      width: 80,
+      title: "Received",
+      key: "received",
+      render: (_: any, record: any) => {
+        const outcome = record.depositOutcome;
+        const hasFinal = (outcome === "forge" || outcome === "save") && record.finalTokenSymbol;
+        const symbol = hasFinal ? record.finalTokenSymbol : record.stratoTokenSymbol || '-';
+        const amount = hasFinal && record.finalAmount
+          ? formatWeiToDecimalHP(record.finalAmount, 18)
+          : formatWeiToDecimalHP(record?.DepositInfo?.stratoTokenAmount || '0', 18);
+        const badge = outcome === "forge" ? "Metal" : outcome === "save" ? "Earn" : null;
+        return (
+          <div>
+            <span className="text-sm text-foreground">{amount} {symbol}</span>
+            {badge && <span className="text-[10px] text-muted-foreground ml-1.5">{badge}</span>}
+          </div>
+        );
+      },
+      width: 160,
     },
     {
       title: "Status",
@@ -223,14 +217,15 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
             <Select
               value={selectedType || ''}
               onChange={(v) => {
-                setSelectedType(v === '' ? '' : v as 'bridge' | 'saving');
+                setSelectedType(v === '' ? '' : v as 'bridge' | 'save' | 'forge');
                 setCurrentPage(1);
               }}
               style={{ width: isMobile ? '100%' : 150 }}
               options={[
                 { value: '', label: 'All Types' },
                 { value: 'bridge', label: 'Bridge' },
-                { value: 'saving', label: 'Saving' },
+                { value: 'save', label: 'Earn' },
+                { value: 'forge', label: 'Metal' },
               ]}
             />
           </div>

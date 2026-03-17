@@ -9,6 +9,7 @@ export interface MetalConfig {
   mintCap: string;
   feeBps: string;
   totalMinted: string;
+  price: string;
 }
 
 export interface PayTokenConfig {
@@ -16,6 +17,7 @@ export interface PayTokenConfig {
   symbol: string;
   name: string;
   imageUrl: string;
+  price: string;
 }
 
 export interface Config {
