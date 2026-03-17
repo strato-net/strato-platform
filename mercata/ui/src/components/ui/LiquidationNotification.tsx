@@ -18,8 +18,8 @@ const LiquidationNotification = () => {
   const hasActiveAlert = alertState.shouldShow && !isDismissed;
   const { riskLevel, healthFactor } = alertState;
 
-  const handleAddCollateral = () => navigate('/dashboard/borrow?tab=borrow');
-  const handleRepayLoan = () => navigate('/dashboard/borrow?tab=repay');
+  const handleAddCollateral = () => navigate('/dashboard/advanced?tab=borrow&subtab=borrow');
+  const handleRepayLoan = () => navigate('/dashboard/advanced?tab=borrow&subtab=repay');
 
   return (
     <Popover>
