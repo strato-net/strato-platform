@@ -252,6 +252,8 @@ main = do
       bindPort = 3000 :: Int
   SIO.hPutStrLn SIO.stderr ("DEBUG: About to start server on " ++ bindHost ++ ":" ++ show bindPort) >> SIO.hFlush SIO.stderr
   putStrLn $ "Starting strato-api on " ++ bindHost ++ ":" ++ show bindPort
+  SIO.hFlush SIO.stdout
+  SIO.hPutStrLn SIO.stderr "DEBUG: Calling runSettings now..." >> SIO.hFlush SIO.stderr
   runSettings (setPort bindPort $ setHost (fromString bindHost) defaultSettings) $ app env theDoc urlMap
 
 app :: BlocEnv -> OpenApi -> UrlMap -> Application
