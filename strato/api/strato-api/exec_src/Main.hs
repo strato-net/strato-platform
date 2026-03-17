@@ -238,6 +238,7 @@ main = do
   
   SIO.hPutStrLn SIO.stderr "DEBUG: Vault call completed successfully" >> SIO.hFlush SIO.stderr
 
+  SIO.hPutStrLn SIO.stderr "DEBUG: Creating BlocEnv..." >> SIO.hFlush SIO.stderr
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
@@ -246,8 +247,10 @@ main = do
             Bloc.Monad.globalNonceCounter = nonceCache,
             Bloc.Monad.nodePubKey = pubKey
           }
+  SIO.hPutStrLn SIO.stderr "DEBUG: BlocEnv created" >> SIO.hFlush SIO.stderr
   let bindHost = ipAddress $ apiConfig ethConf
       bindPort = 3000 :: Int
+  SIO.hPutStrLn SIO.stderr ("DEBUG: About to start server on " ++ bindHost ++ ":" ++ show bindPort) >> SIO.hFlush SIO.stderr
   putStrLn $ "Starting strato-api on " ++ bindHost ++ ":" ++ show bindPort
   runSettings (setPort bindPort $ setHost (fromString bindHost) defaultSettings) $ app env theDoc urlMap
 
