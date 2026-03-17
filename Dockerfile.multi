@@ -33,6 +33,7 @@ ENV LANG="en_US.UTF-8" \
 
 FROM base as strato
 COPY \
+  ./usr/local/bin/convoke \
   ./usr/local/bin/ethereum-discover \
   ./usr/local/bin/forced-config-change \
   ./usr/local/bin/ghc-debug \
