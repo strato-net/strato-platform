@@ -35,6 +35,10 @@ function parseScaledPrice(value: unknown): bigint {
 
 function parsePositiveBigInt(value: unknown): bigint {
     const normalized = String(value ?? '').trim();
+    if (normalized.startsWith('0x') || normalized.startsWith('0X')) {
+        if (!/^0x[0-9a-fA-F]+$/i.test(normalized)) return 0n;
+        return BigInt(normalized);
+    }
     if (!/^\d+$/.test(normalized)) {
         return 0n;
     }
@@ -337,7 +341,11 @@ export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig):
         url = url.replace(/\$\{API_KEY\}/g, apiKey);
     }
 
-    const headers: Record<string, string> = { 'Accept': 'application/json' };
+    const method = (rebase.factorMethod || 'GET').toUpperCase();
+    const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {})
+    };
     if (rebase.factorHeaders && apiKey) {
         rebase.factorHeaders.split(',').forEach(h => {
             const name = h.trim();
@@ -345,10 +353,15 @@ export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig):
         });
     }
 
-    const response = await apiRequest({ method: 'GET', url, headers }, {
+    const requestConfig: any = { method, url, headers };
+    if (method === 'POST' && rebase.factorBody) {
+        requestConfig.data = JSON.parse(rebase.factorBody);
+    }
+
+    const response = await apiRequest(requestConfig, {
         logPrefix: 'RebaseFactor',
         apiUrl: url,
-        method: 'GET'
+        method
     });
 
     const raw = extractNestedProperty(response.data, rebase.factorParse);

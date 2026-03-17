@@ -47,27 +47,43 @@
     "XAUT": {
       "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
     },
-    "_EXAMPLE_aUSDST": {
+    "SPY": {
       "targetAssetAddress": "0000000000000000000000000000000000000000",
       "submit": false,
-      "rebase": {
-        "underlyingAsset": "USDST",
-        "factorUrl": "${STRATO_NODE_URL}/bloc/v2.2/contracts/LendingPool/state/reserves/USDST_ADDRESS/liquidityIndex",
-        "factorParse": "liquidityIndex",
-        "factorPrecision": "1000000000000000000000000000"
-      },
-      "comment": "Example aToken: price = USDST price × liquidityIndex / 1e27. Replace targetAssetAddress and factorUrl, then set submit to true."
+      "minValidSourcesOverride": 1,
+      "comment": "SPY stock price feed for SPYX rebase. submit=false: only used as underlying, not pushed directly. TODO: add more stock-capable feeds."
     },
-    "_EXAMPLE_xSTOCK": {
+    "TSLA": {
       "targetAssetAddress": "0000000000000000000000000000000000000000",
       "submit": false,
+      "minValidSourcesOverride": 1,
+      "comment": "TSLA stock price feed for TSLAX rebase. submit=false: only used as underlying, not pushed directly. TODO: add more stock-capable feeds."
+    },
+    "SPYX": {
+      "targetAssetAddress": "1ac696799624c75050b10b7ee3e6fcf6f1f39aa1",
       "rebase": {
-        "underlyingAsset": "USDST",
-        "factorUrl": "${STRATO_NODE_URL}/bloc/v2.2/contracts/xStock/state/currentMultiplier",
-        "factorParse": "currentMultiplier",
-        "factorPrecision": "1000000000000000000"
+        "underlyingAsset": "SPY",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x90a2a4c76b5d8c0bc892a69ea28aa775a8f2dd48\",\"data\":\"0x4dcdbcbf\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
       },
-      "comment": "Example xStock: price = USDST price × currentMultiplier / 1e18. Replace targetAssetAddress and factorUrl, then set submit to true."
+      "comment": "xStock: price = SPY price × currentMultiplier() on Ethereum / 1e18"
+    },
+    "TSLAX": {
+      "targetAssetAddress": "f147e193fd1a629aa75aedd4758444ec0c969ca8",
+      "rebase": {
+        "underlyingAsset": "TSLA",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0\",\"data\":\"0x4dcdbcbf\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      },
+      "comment": "xStock: price = TSLA price × currentMultiplier() on Ethereum / 1e18"
     }
   }
 }

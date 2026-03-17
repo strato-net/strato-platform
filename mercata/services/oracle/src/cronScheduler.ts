@@ -140,7 +140,9 @@ function aggregatePrices(
     .filter(([_, asset]) => !asset.rebase)
     .map(([assetKey, asset]) => {
         const useProxy = asset.weekendProxy && marketClosed;
-        const requiredSources = asset.constantPrice !== undefined ? 1 : ORACLE_CONFIG.MIN_VALID_SOURCES;
+        const requiredSources = asset.constantPrice !== undefined
+            ? 1
+            : (asset.minValidSourcesOverride || ORACLE_CONFIG.MIN_VALID_SOURCES);
         const weekdaySources = configLoader.getSourcesForAsset(assetKey);
         const sources: Array<{ name: string; price: bigint }> = [];
         let expectedCount = weekdaySources.length;

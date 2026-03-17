@@ -105,11 +105,13 @@
     "params": "apikey,symbol",
     "parse": "{symbol}.price",
     "apiKeyEnvVar": "TWELVEDATA_API_KEY",
-    "comment": "Also supports crypto: ETH/USD, BTC/USD, WBTC/USD, PAXG/USD, XAUT/USD. XAG requires Grow plan ($29/mo)",
-    "assets": ["XAU", "XAG"],
+    "comment": "Also supports stocks (SPY, TSLA). TODO: add more stock-capable price feeds so xStock assets are not single-source.",
+    "assets": ["XAU", "XAG", "SPY", "TSLA"],
     "symbolMapping": {
       "XAU": "XAU/USD",
-      "XAG": "XAG/USD"
+      "XAG": "XAG/USD",
+      "SPY": "SPY",
+      "TSLA": "TSLA"
     }
   },
   "OANDA": {
