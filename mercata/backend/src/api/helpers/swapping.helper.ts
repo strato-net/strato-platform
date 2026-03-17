@@ -3,9 +3,6 @@ import { constants } from "../../config/constants";
 import * as config from "../../config/config";
 import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, RawSwapEvent, OraclePriceMap } from "@mercata/shared-types";
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
-// import { buildFunctionTx } from "../../utils/txBuilder";
-// import { executeTransaction } from "../../utils/txHelper";
-// import { waitForBalanceUpdate } from "./rewards/rewardsChef.helpers";
 import { toUTCTime } from "./cirrusHelpers";
 
 const { Pool, PoolSwap, swapHistorySelectFields } = constants;
@@ -413,41 +410,3 @@ export const buildTokenApprovalTx = (tokenAddress: string, spender: string, amou
   args: { spender, value: amount }
 });
 
-/**
- * Stakes newly minted LP tokens into RewardsChef
- */
-export const stakeNewLPTokens = async (
-  accessToken: string,
-  userAddress: string,
-  lpTokenAddress: string,
-  rewardsPoolIdx: number,
-  lpTokenBalanceBefore: string
-): Promise<void> => {
-  // RewardsChef disabled:
-  // const lpTokenBalanceAfter = await waitForBalanceUpdate(
-  //   accessToken,
-  //   lpTokenAddress,
-  //   userAddress,
-  //   lpTokenBalanceBefore,
-  //   10,
-  //   200
-  // );
-  // const newlyMintedAmount = (BigInt(lpTokenBalanceAfter) - BigInt(lpTokenBalanceBefore)).toString();
-  // if (BigInt(newlyMintedAmount) > 0n) {
-  //   const stakingTx = await buildFunctionTx([
-  //     buildTokenApprovalTx(lpTokenAddress, config.rewardsChef, newlyMintedAmount),
-  //     {
-  //       contractName: "RewardsChef",
-  //       contractAddress: config.rewardsChef,
-  //       method: "deposit",
-  //       args: { _pid: rewardsPoolIdx, _amount: newlyMintedAmount }
-  //     }
-  //   ], userAddress, accessToken);
-  //   await executeTransaction(accessToken, stakingTx);
-  // }
-  void accessToken;
-  void userAddress;
-  void lpTokenAddress;
-  void rewardsPoolIdx;
-  void lpTokenBalanceBefore;
-};

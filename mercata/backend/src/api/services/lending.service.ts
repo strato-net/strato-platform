@@ -1,4 +1,4 @@
-import { cirrus, strato,bloc } from "../../utils/mercataApiHelper";
+import { cirrus, strato } from "../../utils/mercataApiHelper";
 
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
@@ -7,9 +7,6 @@ import * as config from "../../config/config";
 import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-// RewardsChef disabled:
-// import { getPools } from "./rewardsChef.service";
-// import { waitForBalanceUpdate, getStakedBalance, findPoolByLpToken } from "../helpers/rewards/rewardsChef.helpers";
 import {
   simulateLoan,
   CollateralInfo,
@@ -33,7 +30,6 @@ const {
   Token,
   CollateralVault,
   PriceOracle,
-  // RewardsChef,
 } = constants;
 
 // Extract constants for consistency with CDP service
@@ -132,8 +128,7 @@ export const getPool = async (
 export const depositLiquidity = async (
   accessToken: string,
   userAddress: string,
-  amount: string,
-  stakeMToken: boolean,
+  amount: string
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset }, mToken: { mToken } } = await getPool(
     accessToken,
@@ -142,12 +137,9 @@ export const depositLiquidity = async (
     } as Record<string, string>
   );
 
-  if (!liquidityPool || !lendingPool || !borrowableAsset || (stakeMToken && !mToken)) {
+  if (!liquidityPool || !lendingPool || !borrowableAsset || !mToken) {
     throw new Error("Liquidity pool, lending pool, borrowable asset or mToken address not found");
   }
-
-  // RewardsChef disabled:
-  // const mTokenBalanceBefore = stakeMToken ? await getTokenBalanceForUser(accessToken, mToken, userAddress) : "0";
 
   // First transaction: deposit liquidity
   const depositTx: FunctionInput[] = [
@@ -169,46 +161,6 @@ export const depositLiquidity = async (
   const depositResult = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtDepositTx)
   );
-
-  // RewardsChef disabled:
-  // if (stakeMToken && depositResult.status === "Success") {
-  //   const mTokenBalanceAfter = await waitForBalanceUpdate(
-  //     accessToken,
-  //     mToken,
-  //     userAddress,
-  //     mTokenBalanceBefore,
-  //     10,
-  //     200
-  //   );
-  //   const newlyMintedAmount = (BigInt(mTokenBalanceAfter) - BigInt(mTokenBalanceBefore)).toString();
-  //   if (BigInt(newlyMintedAmount) > 0n) {
-  //     const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
-  //     if (!rewardsPool) {
-  //       throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot stake after deposit.`);
-  //     }
-  //     const stakingTx: FunctionInput[] = [
-  //       {
-  //         contractName: extractContractName(Token),
-  //         contractAddress: mToken,
-  //         method: "approve",
-  //         args: { spender: config.rewardsChef, value: newlyMintedAmount },
-  //       },
-  //       {
-  //         contractName: extractContractName(RewardsChef),
-  //         contractAddress: config.rewardsChef,
-  //         method: "deposit",
-  //         args: { _pid: rewardsPool.poolIdx, _amount: newlyMintedAmount },
-  //       },
-  //     ];
-  //     const builtStakingTx = await buildFunctionTx(stakingTx, userAddress, accessToken);
-  //     const stakingResult = await postAndWaitForTx(accessToken, () =>
-  //       bloc.post(accessToken, StratoPaths.transactionParallel, builtStakingTx)
-  //     );
-  //     if (stakingResult.status !== "Success") {
-  //       throw new Error("Deposit succeeded but staking failed");
-  //     }
-  //   }
-  // }
 
   return depositResult;
 };
@@ -692,11 +644,6 @@ export const liquidityAndBalance = async (
     borrowableAsset
   );
 
-  // RewardsChef disabled:
-  // const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
-  // const stakedMTokenBalance = rewardsPool
-  //   ? await getStakedBalance(accessToken, config.rewardsChef, rewardsPool.poolIdx, userAddress)
-  //   : "0";
   const stakedMTokenBalance = "0";
 
   // User's withdrawable underlying (min of user mToken value and pool cash)
@@ -725,7 +672,7 @@ export const liquidityAndBalance = async (
     withdrawable: {
       ...mTokenInfoClean,
       userBalance: mTokenBalance, // This is the unstaked (wallet) balance
-      userBalanceStaked: stakedMTokenBalance, // Staked balance from RewardsChef
+      userBalanceStaked: stakedMTokenBalance,
       userBalanceTotal: (BigInt(mTokenBalance) + BigInt(stakedMTokenBalance)).toString(), // Total = wallet + staked
       maxWithdrawableUSDST,
       withdrawValue: userUSDSTValue.toString(),

@@ -79,21 +79,15 @@ export interface SwapContextActions {
     poolAddress: string;
     tokenBAmount: string;
     maxTokenAAmount: string;
-    // RewardsChef disabled:
-    // stakeLPToken?: boolean;
   }) => Promise<void>;
   addLiquiditySingleToken: (data: {
     poolAddress: string;
     singleTokenAmount: string;
     isAToB: boolean;
-    // RewardsChef disabled:
-    // stakeLPToken?: boolean;
   }) => Promise<void>;
   removeLiquidity: (data: {
     poolAddress: string;
     lpTokenAmount: string;
-    // RewardsChef disabled:
-    // includeStakedLPToken?: boolean;
   }) => Promise<void>;
   
   // Utility functions

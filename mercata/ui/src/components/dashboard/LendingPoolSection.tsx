@@ -1,5 +1,5 @@
 import { formatUnits } from "ethers";
-import { CircleArrowDown, CircleArrowUp, HelpCircle, PauseCircle } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, PauseCircle } from "lucide-react";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -7,13 +7,11 @@ import { useTokenContext } from "@/context/TokenContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
-import { rewardsEnabled } from "@/lib/constants";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 
@@ -32,9 +30,6 @@ const LendingPoolSection = () => {
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  // RewardsChef disabled:
-  // const [stakeMToken, setStakeMToken] = useState<boolean>(rewardsEnabled ? true : false);
-  const stakeMToken = false;
   const { toast } = useToast();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
@@ -119,9 +114,6 @@ const LendingPoolSection = () => {
         if (type === "deposit") {
           await depositLiquidity({
             amount: amountWei,
-            // RewardsChef disabled:
-            // stakeMToken,
-            stakeMToken: false,
           });
         } else {
           await withdrawLiquidity({
@@ -231,35 +223,6 @@ const LendingPoolSection = () => {
                     inputAmount={depositAmount}
                     actionLabel="Deposit"
                   />
-                  {/* RewardsChef disabled:
-                  {rewardsEnabled && (
-                    <div className="flex items-center space-x-2 mt-3">
-                      <Checkbox
-                        id="stake-musdst"
-                        checked={stakeMToken}
-                        onCheckedChange={() => {}}
-                      />
-                      <label
-                        htmlFor="stake-musdst"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Stake my mUSDST to earn rewards
-                      </label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs text-sm">
-                            When providing liquidity to the pool, you'll receive equivalent mUSDST tokens.
-                            If this option is enabled, these tokens will be automatically staked in the rewards program.
-                            The longer the tokens are staked, the more rewards they accrue.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  )}
-                  */}
                   {/* Fee Warning */}
                   {(() => {
                     const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
@@ -611,24 +574,6 @@ const LendingPoolSection = () => {
                         )}
                       </span>
                     </div>
-                    {/* RewardsChef disabled:
-                    {rewardsEnabled && (
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                        <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
-                        <span className="font-medium text-xs sm:text-sm sm:text-right">
-                          {loadingLiquidity ? (
-                            <span className="text-muted-foreground animate-pulse">
-                              Loading...
-                            </span>
-                          ) : liquidityInfo?.withdrawable?.userBalance ? (
-                            formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
-                          ) : (
-                            "0.00"
-                          )}
-                        </span>
-                      </div>
-                    )}
-                    */}
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">

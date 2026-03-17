@@ -230,7 +230,7 @@ export interface TokenInfo {
   _totalSupply: string;
   exchangeRate?: string;
   maxWithdrawableUSDST?: string;
-  userBalanceStaked?: string; // Staked balance from RewardsChef
+  userBalanceStaked?: string;
   userBalanceTotal?: string; // Total = wallet + staked
 }
 

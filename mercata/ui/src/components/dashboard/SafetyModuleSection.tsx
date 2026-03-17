@@ -1,5 +1,5 @@
 import { formatUnits } from "ethers";
-import { CircleArrowDown, CircleArrowUp, Clock, Shield, HelpCircle } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Clock, Shield } from "lucide-react";
 import { useSafetyContext } from "@/context/SafetyContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -7,11 +7,9 @@ import { useTokenContext } from "@/context/TokenContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress, rewardsEnabled } from "@/lib/constants";
+import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
@@ -32,11 +30,6 @@ const SafetyModuleSection = () => {
   const [stakeAmount, setStakeAmount] = useState<string>("");
   const [redeemAmount, setRedeemAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  // RewardsChef disabled:
-  // const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(rewardsEnabled);
-  // const [includeStakedSUSDST, setIncludeStakedSUSDST] = useState<boolean>(false);
-  const stakeSUSDST = false;
-  const includeStakedSUSDST = false;
   const { toast } = useToast();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
@@ -83,7 +76,6 @@ const SafetyModuleSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(redeemAmount)) return false;
     try {
       const amountWei = safeParseUnits(redeemAmount, 18);
-      // RewardsChef disabled: only wallet shares considered.
       const availableSharesWei = BigInt(safetyInfo?.userShares || "0");
       const usdstBalanceWei = BigInt(usdstBalance);
       const feeWei = safeParseUnits(SAFETY_REDEEM_FEE, 18);
@@ -123,19 +115,7 @@ const SafetyModuleSection = () => {
         variant: "success",
       });
 
-      // Then stake the tokens
-      // RewardsChef disabled:
-      // await stakeSafety({ amount: amountWei, stakeSToken: rewardsEnabled && stakeSUSDST });
-      await stakeSafety({ amount: amountWei, stakeSToken: false });
-
-      // RewardsChef disabled:
-      // if (stakeSUSDST) {
-      //   toast({
-      //     title: "Deposit Successful",
-      //     description: "Now staking sUSDST to rewards program...",
-      //     variant: "success",
-      //   });
-      // }
+      await stakeSafety({ amount: amountWei });
 
       toast({
         title: "Stake Successful",
@@ -189,9 +169,7 @@ const SafetyModuleSection = () => {
         await redeemAllSafety();
       } else {
         const sharesAmountWei = safeParseUnits(redeemAmount, 18).toString();
-        // RewardsChef disabled:
-        // await redeemSafety({ sharesAmount: sharesAmountWei, includeStakedSToken: includeStakedSUSDST });
-        await redeemSafety({ sharesAmount: sharesAmountWei, includeStakedSToken: false });
+        await redeemSafety({ sharesAmount: sharesAmountWei });
       }
 
       toast({
@@ -312,35 +290,6 @@ const SafetyModuleSection = () => {
                     inputAmount={stakeAmount}
                     actionLabel="Stake"
                   />
-                  {/* Stake sUSDST Checkbox - RewardsChef disabled */}
-                  {/* rewardsEnabled && ( ... ) intentionally kept below for reference */}
-                  {false && rewardsEnabled && (
-                    <div className="flex items-center space-x-2 mt-3">
-                      <Checkbox
-                        id="stake-susdst"
-                        checked={stakeSUSDST}
-                        onCheckedChange={() => {}}
-                      />
-                      <label
-                        htmlFor="stake-susdst"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Stake my sUSDST to earn rewards
-                      </label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs text-sm">
-                            When you deposit USDST to the Safety Module, you receive sUSDST tokens representing your share.
-                            If this option is enabled, these sUSDST tokens will be automatically staked in the rewards program to earn additional rewards.
-                            The longer the tokens are staked, the more rewards they accrue.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  )}
                   {/* Fee Warning - only show when logged in */}
                   {isLoggedIn && (() => {
                     const availableWei = BigInt(usdstBalance);
@@ -493,7 +442,7 @@ const SafetyModuleSection = () => {
                             value={redeemAmount}
                             onChange={(e) => setRedeemAmount(e.target.value)}
                             className={`pl-24 ${!isRedeemAmountValid() ? 'text-red-600' : ''}`}
-                            disabled={!safetyInfo?.canRedeem || (includeStakedSUSDST ? BigInt(safetyInfo?.userSharesTotal || "0") === 0n : BigInt(safetyInfo?.userShares || "0") === 0n)}
+                            disabled={!safetyInfo?.canRedeem || BigInt(safetyInfo?.userShares || "0") === 0n}
                           />
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">safetyUSDST</span>
                         </div>
@@ -517,9 +466,7 @@ const SafetyModuleSection = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const availableShares = includeStakedSUSDST
-                            ? BigInt(safetyInfo?.userSharesTotal || "0")
-                            : BigInt(safetyInfo?.userShares || "0");
+                          const availableShares = BigInt(safetyInfo?.userShares || "0");
                           if (availableShares <= 0n) return;
 
                           const formatted = formatUnits(availableShares, 18);
@@ -529,10 +476,10 @@ const SafetyModuleSection = () => {
 
                           setRedeemAmount(clampedClean);
                         }}
-                        className={`mr-2 ${safetyInfo?.canRedeem && (includeStakedSUSDST ? BigInt(safetyInfo?.userSharesTotal || "0") > 0n : BigInt(safetyInfo?.userShares || "0") > 0n)
+                        className={`mr-2 ${safetyInfo?.canRedeem && BigInt(safetyInfo?.userShares || "0") > 0n
                           ? "text-blue-600 hover:underline cursor-pointer"
                           : "text-muted-foreground cursor-not-allowed"}`}
-                        disabled={!safetyInfo?.canRedeem || (includeStakedSUSDST ? BigInt(safetyInfo?.userSharesTotal || "0") === 0n : BigInt(safetyInfo?.userShares || "0") === 0n)}
+                        disabled={!safetyInfo?.canRedeem || BigInt(safetyInfo?.userShares || "0") === 0n}
                       >
                         Max
                       </button>
@@ -541,44 +488,13 @@ const SafetyModuleSection = () => {
                         <span className="text-muted-foreground animate-pulse">
                           Loading...
                         </span>
-                        : includeStakedSUSDST
-                          ? formatBalance(safetyInfo?.userSharesTotal || 0n, undefined, 18, 2)
-                          : formatBalance(safetyInfo?.userShares || 0n, undefined, 18, 2)}{" "}
+                        : formatBalance(safetyInfo?.userShares || 0n, undefined, 18, 2)}{" "}
                       safetyUSDST
                     </div>
                     {/* Fee Display */}
                     <div className="text-sm text-muted-foreground mt-1">
                       Transaction Fee: {SAFETY_REDEEM_FEE} USDST
                     </div>
-                    {/* Include Staked sUSDST Checkbox - RewardsChef disabled */}
-                    {/* rewardsEnabled && ( ... ) intentionally kept below for reference */}
-                    {false && rewardsEnabled && (
-                      <div className="flex items-center space-x-2 mt-3">
-                        <Checkbox
-                          id="include-staked-susdst"
-                          checked={includeStakedSUSDST}
-                          onCheckedChange={() => {}}
-                        />
-                        <label
-                          htmlFor="include-staked-susdst"
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          Include staked sUSDST
-                        </label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs text-sm">
-                              Some of your sUSDST tokens may be staked in the rewards program.
-                              When this option is enabled, you can redeem sUSDST that was staked as well.
-                              If disabled, only unstaked sUSDST will be eligible for redemption.
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                    )}
                     {/* Mobile Button */}
                     <Button
                       onClick={() => handleRedeemAction("redeem")}
@@ -663,40 +579,6 @@ const SafetyModuleSection = () => {
                     )}
                   </span>
                 </div>
-                {/* RewardsChef disabled:
-                {rewardsEnabled && (
-                  <>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                      <span className="text-muted-foreground text-xs sm:text-sm">• Staked</span>
-                      <span className="font-medium text-xs sm:text-sm sm:text-right">
-                        {loading ? (
-                          <span className="text-muted-foreground animate-pulse">
-                            Loading...
-                          </span>
-                        ) : safetyInfo?.userSharesStaked ? (
-                          formatBalance(safetyInfo.userSharesStaked || 0n, undefined, 18, 2, 2)
-                        ) : (
-                          "0.00"
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
-                      <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
-                      <span className="font-medium text-xs sm:text-sm sm:text-right">
-                        {loading ? (
-                          <span className="text-muted-foreground animate-pulse">
-                            Loading...
-                          </span>
-                        ) : safetyInfo?.userShares ? (
-                          formatBalance(safetyInfo.userShares || 0n, undefined, 18, 2, 2)
-                        ) : (
-                          "0.00"
-                        )}
-                      </span>
-                    </div>
-                      </>
-                    )}
-                    */}
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">

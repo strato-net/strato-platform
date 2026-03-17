@@ -41,7 +41,7 @@ type LendingContextType = {
   }) => Promise<{ status: string; hash: string; amountSent?: string }>;
   repayAll: () => Promise<{ status: string; hash: string; amountRequested?: string; estimatedDebtAtRead?: string }>;
   getLend: () => Promise<LendData>;
-  depositLiquidity: (args: { amount: string; stakeMToken: boolean }) => Promise<void>;
+  depositLiquidity: (args: { amount: string }) => Promise<void>;
   withdrawLiquidity: (args: { amount: string }) => Promise<void>;
   withdrawLiquidityAll: () => Promise<void>;
 
@@ -205,12 +205,9 @@ export const LendingProvider = ({
     return res.data;
   };
 
-  const depositLiquidity = async (args: { amount: string; stakeMToken: boolean }) => {
-    // RewardsChef disabled:
-    // await api.post("/lending/pools/liquidity", args);
+  const depositLiquidity = async (args: { amount: string }) => {
     await api.post("/lending/pools/liquidity", {
       amount: args.amount,
-      stakeMToken: false,
     });
   };
 
