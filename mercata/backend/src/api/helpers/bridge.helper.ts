@@ -3,6 +3,10 @@ import { constants } from "../../config/constants";
 import { ensureHexPrefix } from "../../utils/utils";
 import { BridgeToken } from "@mercata/shared-types";
 
+// ============================================================================
+// TYPES
+// ============================================================================
+
 interface QueryConfig {
   tableName: string;
   selectFields: string;
@@ -36,14 +40,28 @@ export type BridgeableAssetRoute = {
   isDefaultRoute: boolean;
 };
 
-export const normalizeBridgeAddress = (value: string): string => ensureHexPrefix(value).toLowerCase();
+// ============================================================================
+// UTILS
+// ============================================================================
 
+export const normalizeBridgeAddress = (value: string): string => ensureHexPrefix(value).toLowerCase();
 export const toBridgeChainId = (value: unknown): string => String(value ?? "");
+export const isMappingTrue = (value: unknown): boolean => value === true || value === "true";
 
 export const getBridgePairKey = (externalToken: string, externalChainId: string): string =>
   `${normalizeBridgeAddress(externalToken)}-${externalChainId}`;
 
-export const isMappingTrue = (value: unknown): boolean => value === true || value === "true";
+const stripHex = (addr: string): string => {
+  const l = addr.toLowerCase();
+  return l.startsWith("0x") ? l.slice(2) : l;
+};
+
+const normalizeAddr = (value: unknown): string =>
+  typeof value === "string" && value.length > 0 ? stripHex(normalizeBridgeAddress(value)) : "";
+
+// ============================================================================
+// QUERY CONFIGS & EXECUTION
+// ============================================================================
 
 const QUERY_CONFIGS: Record<string, QueryConfig> = {
   withdrawal: {
@@ -64,80 +82,15 @@ export function buildQueryParams(
   excludeFields: string[],
   queryType: 'withdrawal' | 'deposit'
 ): Record<string, string> {
-  const baseParams: Record<string, string> = {
+  return {
     address: `eq.${constants.mercataBridge}`,
     ...Object.fromEntries(
-      Object.entries(rawParams).filter(([key, v]) => 
-        v !== undefined && !excludeFields.includes(key)
-      )
+      Object.entries(rawParams).filter(([key, v]) => v !== undefined && !excludeFields.includes(key))
     ),
     ...(userAddress && {
-      [`value->>${queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender'}`]:
-        `eq.${userAddress}`
+      [`value->>${queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender'}`]: `eq.${userAddress}`
     })
   };
-
-  return baseParams;
-}
-
-export function enrichTransactionData(
-  results: any[],
-  routes: BridgeToken[],
-  type: 'withdrawal' | 'deposit'
-) {
-  const normalizeOptionalAddress = (value: unknown): string =>
-    typeof value === "string" && value.length > 0 ? normalizeBridgeAddress(value) : "";
-
-  const getTxRouteParts = (result: any): { externalToken: string; externalChainId: string; stratoToken: string } => {
-    const info = type === "withdrawal" ? result?.WithdrawalInfo : result?.DepositInfo;
-    return {
-      externalToken: normalizeOptionalAddress(info?.externalToken),
-      externalChainId: type === "withdrawal"
-        ? toBridgeChainId(info?.externalChainId)
-        : toBridgeChainId(result?.externalChainId ?? info?.externalChainId),
-      stratoToken: normalizeOptionalAddress(info?.stratoToken)
-    };
-  };
-
-  const externalPairMap = new Map<string, { externalName: string; externalSymbol: string }>();
-  const stratoMap = new Map<string, { stratoTokenName: string; stratoTokenSymbol: string }>();
-
-  for (const route of routes) {
-    const externalToken = normalizeBridgeAddress(route.externalToken);
-    const stratoToken = normalizeBridgeAddress(route.stratoToken);
-    const pairKey = getBridgePairKey(externalToken, route.externalChainId);
-    if (!externalPairMap.has(pairKey) || route.isDefaultRoute) {
-      externalPairMap.set(pairKey, {
-        externalName: route.externalName || "-",
-        externalSymbol: route.externalSymbol || "-"
-      });
-    }
-    if (!stratoMap.has(stratoToken)) {
-      stratoMap.set(stratoToken, {
-        stratoTokenName: route.stratoTokenName || "-",
-        stratoTokenSymbol: route.stratoTokenSymbol || "-"
-      });
-    }
-  }
-
-  return results.map((result: any) => {
-    const { externalToken, externalChainId, stratoToken } = getTxRouteParts(result);
-    const pairKey =
-      externalToken && externalChainId
-        ? getBridgePairKey(externalToken, externalChainId)
-        : "";
-
-    const externalMeta = pairKey ? externalPairMap.get(pairKey) : undefined;
-    const stratoMeta = stratoToken ? stratoMap.get(stratoToken) : undefined;
-
-    return {
-      ...result,
-      stratoTokenName: stratoMeta?.stratoTokenName || "-",
-      stratoTokenSymbol: stratoMeta?.stratoTokenSymbol || "-",
-      externalName: externalMeta?.externalName || "-",
-      externalSymbol: externalMeta?.externalSymbol || "-"
-    };
-  });
 }
 
 export async function executeParallelQueries(
@@ -150,50 +103,174 @@ export async function executeParallelQueries(
     cirrus.get(accessToken, `/${config.tableName}`, { params: dataParams }),
     cirrus.get(accessToken, `/${config.tableName}`, { params: countParams })
   ]);
-
   return {
     results: dataResponse.data || [],
     totalCount: countResponse.data?.[0]?.count || 0
   };
 }
 
-// Bridge-specific helper function to enrich assets with token metadata
+// ============================================================================
+// TRANSACTION ENRICHMENT
+// ============================================================================
+
+type TxParts = { externalToken: string; externalChainId: string; stratoToken: string };
+
+function extractTxParts(result: any, type: 'withdrawal' | 'deposit'): TxParts {
+  const info = type === "withdrawal" ? result?.WithdrawalInfo : result?.DepositInfo;
+  return {
+    externalToken: normalizeAddr(info?.externalToken),
+    externalChainId: type === "withdrawal"
+      ? toBridgeChainId(info?.externalChainId)
+      : toBridgeChainId(result?.externalChainId ?? info?.externalChainId),
+    stratoToken: normalizeAddr(info?.stratoToken),
+  };
+}
+
+function collectUniqueAddresses(results: any[], type: 'withdrawal' | 'deposit') {
+  const stratoTokens = new Set<string>();
+  const externalTokens = new Set<string>();
+  const txHashes: string[] = [];
+  for (const r of results) {
+    const { externalToken, stratoToken } = extractTxParts(r, type);
+    if (stratoToken) stratoTokens.add(stratoToken);
+    if (externalToken) externalTokens.add(externalToken);
+    if (type === "deposit" && r.externalTxHash) txHashes.push(r.externalTxHash);
+  }
+  return { stratoTokens, externalTokens, txHashes };
+}
+
+async function fetchTokenSymbols(accessToken: string, addresses: Set<string>): Promise<Map<string, { name: string; symbol: string }>> {
+  if (!addresses.size) return new Map();
+  const { data } = await cirrus.get(accessToken, `/${constants.Token}`, {
+    params: { select: "address,_symbol,_name", address: `in.(${[...addresses].join(",")})` }
+  });
+  return new Map((data || []).map((t: any) => [t.address, { name: t._name || "-", symbol: t._symbol || "-" }]));
+}
+
+async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Promise<Map<string, { externalName: string; externalSymbol: string }>> {
+  if (!tokens.size) return new Map();
+  const { data } = await cirrus.get(accessToken, `/${constants.MercataBridge}-assets`, {
+    params: {
+      address: `eq.${constants.mercataBridge}`,
+      key: `in.(${[...tokens].join(",")})`,
+      select: "key,value->>externalName,value->>externalSymbol,value->>externalChainId",
+    }
+  });
+  const map = new Map<string, { externalName: string; externalSymbol: string }>();
+  for (const a of data || []) {
+    const key = getBridgePairKey(normalizeBridgeAddress(a.key), toBridgeChainId(a.externalChainId));
+    if (!map.has(key)) map.set(key, { externalName: a.externalName || "-", externalSymbol: a.externalSymbol || "-" });
+  }
+  return map;
+}
+
+async function fetchDepositEvents(accessToken: string, txHashes: string[]): Promise<Map<string, any>> {
+  if (!txHashes.length) return new Map();
+  const { data } = await cirrus.get(accessToken, `/${constants.Event}`, {
+    params: {
+      select: "event_name,attributes",
+      address: `eq.${constants.mercataBridge}`,
+      or: "(event_name.eq.AutoForged,event_name.eq.AutoSaved)",
+      "attributes->>externalTxHash": `in.(${txHashes.join(",")})`,
+    }
+  });
+  const map = new Map<string, any>();
+  for (const e of data || []) {
+    const hash = e.attributes?.externalTxHash;
+    if (hash) map.set(hash, e);
+  }
+  return map;
+}
+
+function applyDepositOutcome(enriched: any, eventMap: Map<string, any>, stratoMap: Map<string, { name: string; symbol: string }>) {
+  const evt = eventMap.get(enriched.externalTxHash);
+  if (evt?.event_name === "AutoForged") {
+    const addr = stripHex(evt.attributes.metalToken || "");
+    enriched.depositOutcome = "forge";
+    enriched.finalToken = addr;
+    enriched.finalTokenSymbol = stratoMap.get(addr)?.symbol || "-";
+    enriched.finalAmount = evt.attributes.metalAmount || "0";
+  } else if (evt?.event_name === "AutoSaved") {
+    enriched.depositOutcome = "save";
+    enriched.finalAmount = evt.attributes.mTokenAmount || "0";
+  } else {
+    enriched.depositOutcome = "bridge";
+  }
+}
+
+export async function enrichTransactionData(
+  accessToken: string,
+  results: any[],
+  type: 'withdrawal' | 'deposit'
+) {
+  if (!results.length) return results;
+
+  const { stratoTokens, externalTokens, txHashes } = collectUniqueAddresses(results, type);
+
+  const [stratoMap, externalMap, eventMap] = await Promise.all([
+    fetchTokenSymbols(accessToken, stratoTokens),
+    fetchExternalMeta(accessToken, externalTokens),
+    type === "deposit" ? fetchDepositEvents(accessToken, txHashes) : Promise.resolve(new Map<string, any>()),
+  ]);
+
+  const metalAddrs = new Set<string>();
+  for (const [, evt] of eventMap) {
+    if (evt.event_name === "AutoForged" && evt.attributes?.metalToken) {
+      const addr = stripHex(evt.attributes.metalToken);
+      if (!stratoMap.has(addr)) metalAddrs.add(addr);
+    }
+  }
+  if (metalAddrs.size) {
+    const metalMap = await fetchTokenSymbols(accessToken, metalAddrs);
+    for (const [k, v] of metalMap) stratoMap.set(k, v);
+  }
+
+  return results.map((r: any) => {
+    const { externalToken, externalChainId, stratoToken } = extractTxParts(r, type);
+    const pairKey = externalToken && externalChainId ? getBridgePairKey(normalizeBridgeAddress(externalToken), externalChainId) : "";
+    const extMeta = pairKey ? externalMap.get(pairKey) : undefined;
+    const strMeta = stratoToken ? stratoMap.get(stratoToken) : undefined;
+
+    const enriched: any = {
+      ...r,
+      stratoTokenName: strMeta?.name || "-",
+      stratoTokenSymbol: strMeta?.symbol || "-",
+      externalName: extMeta?.externalName || "-",
+      externalSymbol: extMeta?.externalSymbol || "-",
+    };
+
+    if (type === "deposit" && r.externalTxHash) applyDepositOutcome(enriched, eventMap, stratoMap);
+
+    return enriched;
+  });
+}
+
+// ============================================================================
+// BRIDGEABLE TOKEN ROUTES (used by /bridgeableTokens/:chainId endpoint)
+// ============================================================================
+
 export function enrichAssetsWithTokenData(
   assets: BridgeableAssetRoute[],
   tokenMap: Map<string, { name?: string; symbol?: string; image?: string }>
 ): BridgeToken[] {
-  const enriched: BridgeToken[] = new Array(assets.length);
-  for (let i = 0; i < assets.length; i++) {
-    const route = assets[i];
-    const assetInfo = route.AssetInfo;
-    const lower = assetInfo.stratoToken.toLowerCase();
-    const tokenKey = lower.startsWith("0x") ? lower.slice(2) : lower;
-    const tokenMeta = tokenMap.get(tokenKey);
-
-    enriched[i] = {
-      ...assetInfo,
-      stratoTokenName: tokenMeta?.name ?? "",
-      stratoTokenSymbol: tokenMeta?.symbol ?? "",
-      stratoTokenImage: tokenMeta?.image,
+  return assets.map((route) => {
+    const tokenKey = stripHex(route.AssetInfo.stratoToken);
+    const meta = tokenMap.get(tokenKey);
+    return {
+      ...route.AssetInfo,
+      stratoTokenName: meta?.name ?? "",
+      stratoTokenSymbol: meta?.symbol ?? "",
+      stratoTokenImage: meta?.image,
       isDefaultRoute: route.isDefaultRoute,
-      id: route.id
+      id: route.id,
     };
-  }
-  return enriched;
+  });
 }
 
 const toBridgeAssetInfo = (value: unknown, externalToken: string, externalChainId: string): BridgeAssetInfo | null => {
   if (!value || typeof value !== "object") return null;
-  const raw = value as {
-    enabled?: unknown;
-    externalName?: unknown;
-    externalSymbol?: unknown;
-    externalDecimals?: unknown;
-    maxPerWithdrawal?: unknown;
-    stratoToken?: unknown;
-  };
+  const raw = value as Record<string, unknown>;
   if (typeof raw.stratoToken !== "string" || raw.stratoToken.length === 0) return null;
-
   return {
     externalChainId,
     externalToken,
@@ -202,90 +279,48 @@ const toBridgeAssetInfo = (value: unknown, externalToken: string, externalChainI
     externalDecimals: raw.externalDecimals != null ? String(raw.externalDecimals) : "",
     maxPerWithdrawal: raw.maxPerWithdrawal != null ? String(raw.maxPerWithdrawal) : "0",
     stratoToken: normalizeBridgeAddress(raw.stratoToken),
-    enabled: raw.enabled === true
+    enabled: raw.enabled === true,
   };
 };
 
-export function parseBridgeRouteMappings(
-  mappings: BridgeMappingRow[]
-): BridgeableAssetRoute[] {
+export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): BridgeableAssetRoute[] {
   const assetByPair = new Map<string, BridgeAssetInfo>();
-  const explicitRouteTokensByPair = new Map<string, Set<string>>();
-
-  const addExplicitRouteToken = (pairKey: string, stratoToken: string): void => {
-    const normalizedStratoToken = normalizeBridgeAddress(stratoToken);
-    const tokens = explicitRouteTokensByPair.get(pairKey);
-    if (tokens) {
-      tokens.add(normalizedStratoToken);
-      return;
-    }
-    explicitRouteTokensByPair.set(pairKey, new Set<string>([normalizedStratoToken]));
-  };
+  const routeTokensByPair = new Map<string, Set<string>>();
 
   for (const row of mappings) {
     const externalToken = row?.externalToken;
     const externalChainId = toBridgeChainId(row?.externalChainId);
     if (!externalToken || !externalChainId) continue;
-    const normalizedExternalToken = normalizeBridgeAddress(externalToken);
+    const normalized = normalizeBridgeAddress(externalToken);
+    const pairKey = getBridgePairKey(normalized, externalChainId);
 
-    const pairKey = getBridgePairKey(normalizedExternalToken, externalChainId);
-
-    switch (row.collection_name) {
-      case "assets": {
-        const assetInfo = toBridgeAssetInfo(row.mappingValue, normalizedExternalToken, externalChainId);
-        if (!assetInfo) break;
-
-        assetByPair.set(pairKey, assetInfo);
-        break;
-      }
-      case "assetRouteEnabled": {
-        if (!isMappingTrue(row.mappingValue) || !row.targetStratoToken) break;
-        addExplicitRouteToken(pairKey, row.targetStratoToken);
-        break;
-      }
-      default:
-        break;
+    if (row.collection_name === "assets") {
+      const info = toBridgeAssetInfo(row.mappingValue, normalized, externalChainId);
+      if (info) assetByPair.set(pairKey, info);
+    } else if (row.collection_name === "assetRouteEnabled" && isMappingTrue(row.mappingValue) && row.targetStratoToken) {
+      const tokens = routeTokensByPair.get(pairKey) || new Set<string>();
+      tokens.add(normalizeBridgeAddress(row.targetStratoToken));
+      routeTokensByPair.set(pairKey, tokens);
     }
   }
 
   const routes: BridgeableAssetRoute[] = [];
-
-  for (const [pairKey, asset] of assetByPair.entries()) {
-    const explicitRouteTokens = explicitRouteTokensByPair.get(pairKey) || new Set<string>();
-    const externalToken = asset.externalToken;
-    const externalChainId = asset.externalChainId;
-    const defaultStratoToken = asset.stratoToken;
-    const defaultRouteExplicitEnabled = explicitRouteTokens.has(defaultStratoToken);
-    const defaultRouteEnabled = asset.enabled || defaultRouteExplicitEnabled;
+  for (const [pairKey, asset] of assetByPair) {
+    const explicitTokens = routeTokensByPair.get(pairKey) || new Set<string>();
+    const { externalToken, externalChainId, stratoToken: defaultToken } = asset;
 
     routes.push({
-      id: `${externalToken}-${externalChainId}-${defaultStratoToken}`,
-      externalToken,
-      externalChainId,
-      isDefaultRoute: true,
-      AssetInfo: {
-        ...asset,
-        externalToken,
-        externalChainId,
-        stratoToken: defaultStratoToken,
-        enabled: defaultRouteEnabled
-      }
+      id: `${externalToken}-${externalChainId}-${defaultToken}`,
+      externalToken, externalChainId, isDefaultRoute: true,
+      AssetInfo: { ...asset, enabled: asset.enabled || explicitTokens.has(defaultToken) },
     });
 
-    for (const stratoToken of explicitRouteTokens.values()) {
-      if (stratoToken === defaultStratoToken) continue;
+    for (const stratoToken of explicitTokens) {
+      if (stratoToken === defaultToken) continue;
       routes.push({
         id: `${externalToken}-${externalChainId}-${stratoToken}`,
-        externalToken,
-        externalChainId,
-        isDefaultRoute: false,
-        AssetInfo: {
-          ...asset,
-          externalToken,
-          externalChainId,
-          stratoToken,
-          enabled: true
-        }
+        externalToken, externalChainId, isDefaultRoute: false,
+        AssetInfo: { ...asset, stratoToken, enabled: true },
       });
     }
   }

@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
 import * as config from "./config";
 import {
   SWAP_CONTRACTS,
@@ -38,6 +38,7 @@ export const constants = (() => {
   const Vault = `${CONTRACT_PREFIX}Vault`;
   const VaultFactory = `${CONTRACT_PREFIX}VaultFactory`;
   const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
+  const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
   const Event = "event";
     
   const tokenSelectFields = [
@@ -147,8 +148,15 @@ export const constants = (() => {
     Vault,
     VaultFactory,
     MetalForge,
+    SafetyModule,
     get metalForge() { return config.metalForge; },
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
+    get vault() { return config.vault; },  // Use getter to get current value after init
+    priceOracle,
+    liquidityPool,
+    lendingPool,
+    safetyModule,
+    sToken,
     mercataBridge,
     get creditCardTopUp() { return config.creditCardTopUp; },  // Use getter to get current value after init
     Event,

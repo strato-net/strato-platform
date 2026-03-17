@@ -154,8 +154,6 @@ contract record Mercata is Authorizable {
         // Create Services
         address mercataBridgeImpl = address(new MercataBridge(implOwnerIgnored));
         mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
-        mercataBridge.initialize(address(tokenFactory), address(lendingRegistry));
-        Ownable(mercataBridge).transferOwnership(address(adminRegistry));
 
         // Use existing CATA reward token
         cataToken = Token(address(0x2680dc6693021cd3fefb84351570874fbef8332a));
@@ -201,6 +199,9 @@ contract record Mercata is Authorizable {
             address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010)
         );
         Ownable(metalForge).transferOwnership(address(0x000000000000000000000000000000000000100c));
+
+        mercataBridge.initialize(address(tokenFactory), address(lendingRegistry), address(metalForge));
+        Ownable(mercataBridge).transferOwnership(address(adminRegistry));
 
         adminRegistry.swapAdmin(this, msg.sender);
     }

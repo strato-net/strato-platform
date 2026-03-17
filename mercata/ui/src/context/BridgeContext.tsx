@@ -27,6 +27,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
   const [bridgeableTokens, setBridgeableTokens] = useState<BridgeToken[]>([]);
+  const tokenCacheRef = useRef<Map<string, BridgeToken[]>>(new Map());
   const [depositActions, setDepositActions] = useState<DepositAction[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [selectedToken, setSelectedToken] = useState<BridgeToken | null>(null);
@@ -52,13 +53,19 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const fetchTokensForChain = useCallback(
     async (chainId: string) => {
       try {
+        const cached = tokenCacheRef.current.get(chainId);
+        if (cached) {
+          setBridgeableTokens(cached);
+          if (cached.length > 0 && !selectedToken) setSelectedToken(cached[0]);
+          return;
+        }
         const { data } = await api.get<BridgeToken[]>(
           `/bridge/bridgeableTokens/${chainId}`,
         );
         const tokens = Array.isArray(data) ? data : [];
+        tokenCacheRef.current.set(chainId, tokens);
         setBridgeableTokens(tokens);
 
-        // Set initial token if none is selected
         if (tokens.length > 0 && !selectedToken) {
           setSelectedToken(tokens[0]);
         }
@@ -115,7 +122,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const handleSetSelectedNetwork = useCallback(
     async (networkName: string) => {
       setSelectedNetwork(networkName);
-      setBridgeableTokens([]);
 
       const cfg = availableNetworks.find((n) => n.chainName === networkName);
       if (!cfg) return;
