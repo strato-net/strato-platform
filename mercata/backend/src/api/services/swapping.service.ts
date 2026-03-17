@@ -100,21 +100,19 @@ export const getPools = async (
 
   // Fetch staked balances from RewardsChef if userAddress is provided
   let stakedBalanceMap: Map<string, string> | undefined;
+  let lpTokenToPoolIdx: Map<string, number> | undefined;
   if (userAddress) {
-    // Get all RewardsChef pools
     const rewardsChefPools = await getRewardsChefPools(accessToken, config.rewardsChef);
 
-    // Build a map of lpToken address -> rewards pool index
-    const lpTokenToPoolIdx = new Map<string, number>();
+    lpTokenToPoolIdx = new Map<string, number>();
     rewardsChefPools.forEach(pool => {
-      lpTokenToPoolIdx.set(pool.lpToken, pool.poolIdx);
+      lpTokenToPoolIdx!.set(pool.lpToken, pool.poolIdx);
     });
 
-    // For each swap pool, check if it has a matching rewards pool and get staked balance
     stakedBalanceMap = new Map<string, string>();
     await Promise.all(
       validatedPools.map(async (pool) => {
-        const poolIdx = lpTokenToPoolIdx.get(pool.lpToken.address);
+        const poolIdx = lpTokenToPoolIdx!.get(pool.lpToken.address);
         if (poolIdx !== undefined) {
           const stakedBalance = await getStakedBalance(
             accessToken,
@@ -130,17 +128,30 @@ export const getPools = async (
 
   const poolList: any[] = buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress, stakedBalanceMap);
 
-  // Add multi-token stable pools (they don't appear in BlockApps-Pool with valid tokenA/tokenB
-  // because StablePool is a separate contract that doesn't extend Pool)
+  // Replace or add multi-token stable pools. These pools also appear in the BlockApps-Pool table
+  // (from Pool(pool).setFeeParameters()) but with invalid tokenA/tokenB. Replace those entries
+  // with properly built multi-token pool entries.
   const multiTokenStablePools = await fetchMultiTokenStablePools(accessToken);
-  const existingAddresses = new Set(poolList.map((p: any) => p.address));
   await Promise.all(multiTokenStablePools.map(async (stablePool) => {
-    if (existingAddresses.has(stablePool.address)) return;
     try {
+      // Fetch staked balance for multi-token pool LP token if not already cached
+      let lpStakedBalance = stakedBalanceMap?.get(stablePool.lpToken);
+      if (lpStakedBalance === undefined && userAddress && lpTokenToPoolIdx) {
+        const poolIdx = lpTokenToPoolIdx.get(stablePool.lpToken);
+        if (poolIdx !== undefined) {
+          lpStakedBalance = await getStakedBalance(accessToken, config.rewardsChef, poolIdx, userAddress);
+          stakedBalanceMap?.set(stablePool.lpToken, lpStakedBalance);
+        }
+      }
       const poolEntry = await buildMultiTokenPoolEntry(
-        accessToken, stablePool, priceMap, volumeMap, validatedFactory, userAddress
+        accessToken, stablePool, priceMap, volumeMap, validatedFactory, userAddress, lpStakedBalance
       );
-      poolList.push(poolEntry);
+      const existingIdx = poolList.findIndex((p: any) => p.address === stablePool.address);
+      if (existingIdx !== -1) {
+        poolList[existingIdx] = poolEntry;
+      } else {
+        poolList.push(poolEntry);
+      }
     } catch (err) {
       console.error(`Failed to build multi-token pool ${stablePool.address}:`, err);
     }

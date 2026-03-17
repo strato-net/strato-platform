@@ -177,7 +177,7 @@ export function validateMultiTokenSwapArgs(args: any) {
 export function validateMultiTokenAddLiquidityArgs(args: any) {
   const schema = Joi.object({
     amounts: Joi.array().items(numericStringField("amount")).min(1).required(),
-    minMintAmount: numericStringField("MinMintAmount"),
+    minMintAmount: numericStringField("MinMintAmount", { allowZero: true }),
     stakeLPToken: Joi.boolean().optional(),
   });
 
@@ -190,7 +190,7 @@ export function validateMultiTokenAddLiquidityArgs(args: any) {
 export function validateMultiTokenRemoveLiquidityArgs(args: any) {
   const schema = Joi.object({
     lpTokenAmount: numericStringField("LpTokenAmount"),
-    minAmounts: Joi.array().items(numericStringField("minAmount")).min(1).required(),
+    minAmounts: Joi.array().items(numericStringField("minAmount", { allowZero: true })).min(1).required(),
     includeStakedLPToken: Joi.boolean().optional(),
   });
 

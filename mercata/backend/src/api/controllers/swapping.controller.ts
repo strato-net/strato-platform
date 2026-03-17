@@ -57,11 +57,13 @@ class SwappingController {
         address: "eq." + params.poolAddress,
       });
 
-      if (!pools || pools.length === 0) {
+      const pool = pools.find(p => p.address.toLowerCase() === params.poolAddress.toLowerCase());
+
+      if (!pool) {
         throw new Error("Pool not found");
       }
 
-      res.status(RestStatus.OK).json(pools[0]);
+      res.status(RestStatus.OK).json(pool);
     } catch (error) {
       next(error);
     }

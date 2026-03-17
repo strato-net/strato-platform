@@ -682,6 +682,7 @@ export const buildMultiTokenPoolEntry = async (
   volumeMap: Map<string, string>,
   factoryData: { swapFeeRate: number; lpSharePercent: number },
   userAddress?: string,
+  stakedBalance?: string,
 ): Promise<any> => {
   const coinAddresses = stablePool.coins.map(c => c.tokenAddress);
 
@@ -715,7 +716,6 @@ export const buildMultiTokenPoolEntry = async (
   const lpBalance = lpTokenRaw && userAddress ? getTokenBalance(lpTokenRaw, userAddress) : "0";
 
   const symbols = coins.map(c => c._symbol).filter(Boolean);
-  // Use the first two coins for tokenA/tokenB (required by the Pool interface)
   const coinA = coins[0];
   const coinB = coins[1];
 
@@ -745,16 +745,9 @@ export const buildMultiTokenPoolEntry = async (
       price: coinB?.price || "0",
       images: coinB?.images || [],
     },
-    lpToken: {
-      address: stablePool.lpToken,
-      _name: lpTokenRaw?._name || "",
-      _symbol: lpTokenRaw?._symbol || "",
-      _totalSupply: lpTotalSupply,
-      customDecimals: 18,
-      balance: lpBalance,
-      price: lpPrice,
-      images: [],
-    },
+    lpToken: lpTokenRaw
+      ? buildLPToken(lpTokenRaw, lpPrice, lpBalance, stakedBalance)
+      : { address: stablePool.lpToken, _name: "", _symbol: "", _totalSupply: lpTotalSupply, customDecimals: 18, balance: lpBalance, price: lpPrice, images: [], totalBalance: lpBalance },
     totalLiquidityUSD,
     tradingVolume24h: volume24h,
     apy: apy.toFixed(2),
