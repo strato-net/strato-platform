@@ -1,6 +1,13 @@
 #!/bin/sh
 set -e
 
+# Read OAuth credentials from mounted secrets file
+if [ -f /run/secrets/oauth_credentials.yaml ]; then
+  export OAUTH_DISCOVERY_URL=$(grep "discoveryUrl:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
+  export OAUTH_CLIENT_ID=$(grep "clientId:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
+  export OAUTH_CLIENT_SECRET=$(grep "clientSecret:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
+fi
+
 STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_API_URL="http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2"

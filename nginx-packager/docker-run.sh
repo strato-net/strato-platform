@@ -2,6 +2,13 @@
 
 set -e
 
+# Load OAuth from file if env vars not set
+if [[ -f /run/secrets/oauth_credentials.yaml ]]; then
+    OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-$(grep "discoveryUrl:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)}
+    OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-$(grep "clientId:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)}
+    OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-$(grep "clientSecret:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)}
+fi
+
 MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
 BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 blockTime=${blockTime:-13} # keep default the same as strato

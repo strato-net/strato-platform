@@ -53,7 +53,8 @@ data EthConf = EthConf
     apiConfig :: ApiConfig,
     contractsConfig :: Maybe ContractsConf,
     urlConfig :: UrlConfig,
-    networkConfig :: NetworkConf
+    networkConfig :: NetworkConf,
+    debugConfig :: DebugConfig
   }
   deriving (Show, Eq, Generic)
 
@@ -71,6 +72,7 @@ instance FromJSON EthConf where
     <*> v .:? "contractsConfig"
     <*> v .:? "urlConfig" .!= def
     <*> v .:? "networkConfig" .!= def
+    <*> v .:? "debugConfig" .!= def
 
 instance ToJSON EthConf where
   toJSON = Aeson.genericToJSON Aeson.defaultOptions { Aeson.omitNothingFields = True }
@@ -78,7 +80,13 @@ instance ToJSON EthConf where
 
 data ApiConfig = ApiConfig
   { ipAddress :: String
-  } deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  , httpPort :: Int
+  } deriving (Show, Eq, Generic, ToJSON)
+
+instance FromJSON ApiConfig where
+  parseJSON = withObject "ApiConfig" $ \v -> ApiConfig
+    <$> v .: "ipAddress"
+    <*> v .:? "httpPort" .!= 8081
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
@@ -145,6 +153,7 @@ data UrlConfig = UrlConfig
   { vaultUrl :: String
   , fileServerUrl :: String
   , notificationServerUrl :: String
+  , repoUrl :: String  -- Docker registry URL prefix for images
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -155,6 +164,11 @@ data NetworkConf = NetworkConf
   , gasLimit :: Integer
   , blockPeriodMs :: Int
   , roundPeriodS :: Int
+  }
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+data DebugConfig = DebugConfig
+  { svmTrace :: Bool
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -219,6 +233,12 @@ instance Default P2PConf where
 instance Default ApiConfig where
   def = ApiConfig
     { ipAddress = "127.0.0.1"
+    , httpPort = 8081
+    }
+
+instance Default DebugConfig where
+  def = DebugConfig
+    { svmTrace = False
     }
 
 instance Default ContractsConf where
@@ -231,6 +251,7 @@ instance Default UrlConfig where
     { vaultUrl = "https://vault.blockapps.net:8093/strato/v2.3"
     , fileServerUrl = ""
     , notificationServerUrl = ""
+    , repoUrl = ""
     }
 
 instance Default NetworkConf where
@@ -257,4 +278,5 @@ instance Default EthConf where
     , contractsConfig = Nothing
     , urlConfig = def
     , networkConfig = def
+    , debugConfig = def
     }
