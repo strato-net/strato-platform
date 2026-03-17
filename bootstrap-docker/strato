@@ -288,6 +288,9 @@ if [ ! -f nodedata/.ethereumH/ethconf.yaml ]; then
     fi
   fi
   
+  # Export STRATO_IMAGE so docker-compose can use it
+  export STRATO_IMAGE
+  
   # Extract REPO_URL from STRATO_IMAGE if not already set
   # e.g., "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:16.7-xxx" -> "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/"
   if [ -z "${REPO_URL}" ] && [ -n "${STRATO_IMAGE}" ]; then
