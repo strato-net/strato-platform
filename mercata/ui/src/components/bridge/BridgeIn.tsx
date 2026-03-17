@@ -634,6 +634,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
         type: action === 1 ? 'saving' : action === 2 ? 'forge' : 'bridge',
+        finalTokenSymbol: selectedAction?.stratoTokenSymbol,
         DepositInfo: {
           externalSender: address,
           stratoRecipient: userAddress,
