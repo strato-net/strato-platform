@@ -19,7 +19,6 @@ import {
 import { useVaultContext } from "@/context/VaultContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { useLendingContext } from "@/context/LendingContext";
-import { useSafetyContext } from "@/context/SafetyContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
@@ -31,17 +30,13 @@ import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
-import { ChevronDown, ChevronUp, CircleArrowDown, CircleArrowUp, Shield, Star, Vault as VaultIcon } from "lucide-react";
+import { CircleArrowDown, Star, Vault as VaultIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import stratoVaultLogo from "@/assets/strato-vault-logo.png";
 import {
   mUsdstAddress,
-  sUsdstAddress,
   LENDING_DEPOSIT_FEE,
-  SAFETY_STAKE_FEE,
   rewardsEnabled,
-  usdstAddress,
-  safetyModuleAddress,
 } from "@/lib/constants";
 
 const WAD = BigInt(10) ** BigInt(18);
@@ -112,8 +107,8 @@ const parseApy = (value: string | number | undefined): number => {
   return Number.isFinite(apy) ? apy : Number.NEGATIVE_INFINITY;
 };
 
-const isPoolDisabled = (pool: Pool): boolean => Boolean((pool as any).isDisabled);
 const isPoolPaused = (pool: Pool): boolean => Boolean((pool as any).isPaused);
+const isPoolDisabled = (pool: Pool): boolean => Boolean((pool as any).isDisabled);
 
 const formatApyDisplay = (value: string | undefined): { label: string; className: string } => {
   if (!value || value === "-") {
@@ -135,16 +130,6 @@ const formatApyDisplay = (value: string | undefined): { label: string; className
     : "text-red-600 dark:text-red-400";
 
   return { label: `${sign}${Math.abs(apy).toFixed(2)}%`, className };
-};
-
-const stableExitTokenSymbol = (pool: Pool): string => {
-  const symbolA = pool.tokenA?._symbol || "";
-  const symbolB = pool.tokenB?._symbol || "";
-  if (symbolA.includes("USDST")) return symbolA;
-  if (symbolB.includes("USDST")) return symbolB;
-  if (symbolA.endsWith("ST")) return symbolA;
-  if (symbolB.endsWith("ST")) return symbolB;
-  return symbolA || symbolB || "token";
 };
 
 const formatPointsMultiplier = (scaledTenths: bigint): string => {
@@ -235,31 +220,24 @@ const Earn = () => {
   type OpportunityRow =
     | { kind: "vault"; apySortValue: number }
     | { kind: "lending"; apySortValue: number }
-    | { kind: "safety"; apySortValue: number }
     | { kind: "pool"; apySortValue: number; pool: Pool };
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<"all" | "vaults" | "pools" | "safety">("all");
-  const [expandedPools, setExpandedPools] = useState<Set<string>>(new Set());
+  const [activeFilter, setActiveFilter] = useState<"all" | "vaults" | "pools">("all");
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [isPoolDepositModalOpen, setIsPoolDepositModalOpen] = useState(false);
   const [isPoolWithdrawModalOpen, setIsPoolWithdrawModalOpen] = useState(false);
   const [isVaultDepositModalOpen, setIsVaultDepositModalOpen] = useState(false);
   const [isLendingDepositModalOpen, setIsLendingDepositModalOpen] = useState(false);
-  const [isSafetyStakeModalOpen, setIsSafetyStakeModalOpen] = useState(false);
   const [lendingDepositAmount, setLendingDepositAmount] = useState("");
-  const [safetyStakeAmount, setSafetyStakeAmount] = useState("");
   const [stakeLendingRewards, setStakeLendingRewards] = useState<boolean>(rewardsEnabled);
-  const [stakeSafetyRewards, setStakeSafetyRewards] = useState<boolean>(rewardsEnabled);
   const [isLendingSubmitting, setIsLendingSubmitting] = useState(false);
-  const [isSafetySubmitting, setIsSafetySubmitting] = useState(false);
   const operationInProgressRef = useRef(false);
 
   const { vaultState, refreshVault } = useVaultContext();
   const { pools, fetchPools, poolsLoading } = useSwapContext();
   const { liquidityInfo, loadingLiquidity, refreshLiquidity, depositLiquidity } = useLendingContext();
-  const { safetyInfo, loading: safetyLoading, refreshSafetyInfo, stakeSafety } = useSafetyContext();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance, approveToken } = useTokenContext();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { activities: rewardsActivities } = useRewardsActivities();
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
@@ -289,16 +267,8 @@ const Earn = () => {
     setIsPoolWithdrawModalOpen(true);
   };
 
-  const togglePoolRow = (poolAddress: string) => {
-    setExpandedPools((prev) => {
-      const next = new Set(prev);
-      if (next.has(poolAddress)) {
-        next.delete(poolAddress);
-      } else {
-        next.add(poolAddress);
-      }
-      return next;
-    });
+  const navigateToPoolDetails = (pool: Pool) => {
+    navigate(`/dashboard/earn-pools?pool=${pool.address}`);
   };
 
   const handlePoolActionSuccess = async () => {
@@ -327,20 +297,9 @@ const Earn = () => {
     setStakeLendingRewards(rewardsEnabled);
   };
 
-  const closeSafetyStakeModal = () => {
-    setIsSafetyStakeModalOpen(false);
-    setSafetyStakeAmount("");
-    setStakeSafetyRewards(rewardsEnabled);
-  };
-
   const handleLendingDepositClick = () => {
     if (!isLoggedIn) return;
     setIsLendingDepositModalOpen(true);
-  };
-
-  const handleSafetyStakeClick = () => {
-    if (!isLoggedIn) return;
-    setIsSafetyStakeModalOpen(true);
   };
 
   const isValidDecimalInput = (value: string) => /^\d+(\.\d{1,18})?$/.test(value);
@@ -356,18 +315,6 @@ const Earn = () => {
       return false;
     }
   }, [lendingDepositAmount, liquidityInfo?.supplyable?.userBalance]);
-
-  const isSafetyStakeValid = useMemo(() => {
-    if (!safetyStakeAmount || !isValidDecimalInput(safetyStakeAmount)) return false;
-    try {
-      const amountWei = safeParseUnits(safetyStakeAmount, 18);
-      const availableWei = safeBigInt(usdstBalance);
-      const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
-      return amountWei > 0n && amountWei <= availableWei && amountWei + feeWei <= availableWei;
-    } catch {
-      return false;
-    }
-  }, [safetyStakeAmount, usdstBalance]);
 
   const handleLendingDepositSubmit = async () => {
     if (!isLoggedIn || !isLendingDepositValid || isLendingSubmitting) return;
@@ -391,37 +338,9 @@ const Earn = () => {
     }
   };
 
-  const handleSafetyStakeSubmit = async () => {
-    if (!isLoggedIn || !isSafetyStakeValid || isSafetySubmitting) return;
-    try {
-      setIsSafetySubmitting(true);
-      const amountWei = safeParseUnits(safetyStakeAmount, 18).toString();
-      await approveToken({
-        address: usdstAddress,
-        spender: safetyModuleAddress,
-        value: amountWei,
-      });
-      await stakeSafety({
-        amount: amountWei,
-        stakeSToken: rewardsEnabled && stakeSafetyRewards,
-      });
-      closeSafetyStakeModal();
-      toast({
-        title: "Stake Successful",
-        description: `You have successfully staked ${safetyStakeAmount} USDST.`,
-        variant: "success",
-      });
-      await Promise.all([refreshSafetyInfo(), fetchUsdstBalance()]);
-    } catch {
-      // Error toast is handled globally.
-    } finally {
-      setIsSafetySubmitting(false);
-    }
-  };
-
   const sortedPools = useMemo(() => {
     return [...(pools || [])]
-      .filter((pool) => !isPoolDisabled(pool))
+      .filter((pool) => !isPoolPaused(pool) && !isPoolDisabled(pool))
       .sort((a, b) => parseApy(b.apy) - parseApy(a.apy));
   }, [pools]);
 
@@ -431,10 +350,6 @@ const Earn = () => {
 
   const userHasVaultPosition = safeBigInt(vaultState.userShares) > BigInt(0);
   const userHasLendingPosition = safeBigInt(liquidityInfo?.withdrawable?.userBalanceTotal) > BigInt(0);
-  const userHasSafetyPosition =
-    safeBigInt(safetyInfo?.userSharesTotal) > BigInt(0) ||
-    safeBigInt(safetyInfo?.redeemValueTotal) > BigInt(0);
-  const vaultTokenCount = vaultState.assets?.length || 0;
 
   const allOpportunities = useMemo<OpportunityRow[]>(() => {
     const rows: OpportunityRow[] = [];
@@ -450,14 +365,27 @@ const Earn = () => {
       }
     }
 
-    if (activeFilter === "all" || activeFilter === "safety") {
-      rows.push({ kind: "safety", apySortValue: parseApy(safetyInfo?.apy) });
-    }
-
     return rows.sort((a, b) => b.apySortValue - a.apySortValue);
-  }, [activeFilter, liquidityInfo?.supplyAPY, safetyInfo?.apy, sortedPools, vaultState.apy]);
+  }, [activeFilter, liquidityInfo?.supplyAPY, sortedPools, vaultState.apy]);
 
   const topApy = formatApyDisplay(vaultState.apy);
+  const topOpportunity = useMemo<OpportunityRow>(() => {
+    const candidates: OpportunityRow[] = [
+      { kind: "vault", apySortValue: parseApy(vaultState.apy) },
+      { kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) },
+      ...sortedPools.map((pool) => ({
+        kind: "pool" as const,
+        apySortValue: parseApy(pool.apy),
+        pool,
+      })),
+    ];
+    return (
+      candidates.sort((a, b) => b.apySortValue - a.apySortValue)[0] ?? {
+        kind: "vault",
+        apySortValue: Number.NEGATIVE_INFINITY,
+      }
+    );
+  }, [liquidityInfo?.supplyAPY, sortedPools, vaultState.apy]);
 
   const rewardActivityByContract = useMemo(() => {
     const map = new Map<string, { emissionRate: bigint }>();
@@ -490,9 +418,6 @@ const Earn = () => {
     const lendingActivity = rewardActivityByContract.get(mUsdstAddress.toLowerCase());
     if (lendingActivity && lendingActivity.emissionRate > 0n) emissions.push(lendingActivity.emissionRate);
 
-    const safetyActivity = rewardActivityByContract.get(sUsdstAddress.toLowerCase());
-    if (safetyActivity && safetyActivity.emissionRate > 0n) emissions.push(safetyActivity.emissionRate);
-
     if (emissions.length === 0) return 0n;
     return emissions.reduce((min, curr) => (curr < min ? curr : min), emissions[0]);
   }, [rewardActivityByContract, sortedPools, vaultState.shareTokenAddress]);
@@ -516,7 +441,51 @@ const Earn = () => {
 
   const vaultRewardMeta = getRewardMeta(vaultState.shareTokenAddress);
   const lendingRewardMeta = getRewardMeta(mUsdstAddress);
-  const safetyRewardMeta = getRewardMeta(sUsdstAddress);
+  const topOpportunityMeta = useMemo(() => {
+    if (topOpportunity.kind === "vault") {
+      return {
+        title: "STRATO Vault",
+        subtitle: "Diversified real assets: gold, silver, ETH, BTC, stables - actively managed",
+        apyRaw: vaultState.apy,
+        tvl: vaultState.totalEquity,
+        badge: "Vault",
+        onCardClick: () => navigate("/dashboard/earn-vault"),
+        onActionClick: () => handleVaultDepositClick(),
+      };
+    }
+
+    if (topOpportunity.kind === "lending") {
+      return {
+        title: "USDST Lending Pool",
+        subtitle: "Earn yield by supplying USDST liquidity",
+        apyRaw: liquidityInfo?.supplyAPY?.toString(),
+        tvl: liquidityInfo?.totalUSDSTSupplied?.toString() || "0",
+        badge: "Lending",
+        onCardClick: () => navigate("/dashboard/earn-lending"),
+        onActionClick: () => handleLendingDepositClick(),
+      };
+    }
+
+    const pool = topOpportunity.pool;
+    return {
+      title: pool.poolName,
+      subtitle: `Earn fees on ${pool.poolName.replace(" Pool", "")} swaps`,
+      apyRaw: pool.apy,
+      tvl: pool.totalLiquidityUSD,
+      badge: "Pool",
+      onCardClick: () => navigateToPoolDetails(pool),
+      onActionClick: () => handlePoolDeposit(pool),
+      pool,
+    };
+  }, [
+    topOpportunity,
+    vaultState.apy,
+    vaultState.totalEquity,
+    liquidityInfo?.supplyAPY,
+    liquidityInfo?.totalUSDSTSupplied,
+    navigate,
+  ]);
+  const topOpportunityApy = formatApyDisplay(topOpportunityMeta.apyRaw);
 
   const pageLoading =
     vaultState.loading ||
@@ -572,29 +541,6 @@ const Earn = () => {
       });
     }
 
-    if (userHasSafetyPosition) {
-      const safetyEarningsWei = safeBigInt(safetyInfo?.userAllTimeEarningsUsd);
-      positions.push({
-        key: "position-safety",
-        apySortValue: parseApy(safetyInfo?.apy),
-        card: (
-          <PositionCard
-            title="USDST Safety Module"
-            icon={<Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-            deposited={formatBalance(safetyInfo?.redeemValueTotal || "0", undefined, 18, 2, 2, true)}
-            earnings={{
-              label: formatSignedUsdFromWei(safetyEarningsWei),
-              className: safetyEarningsWei >= 0n
-                ? "text-green-600 dark:text-green-400"
-                : "text-red-600 dark:text-red-400",
-            }}
-            rateLabel="APY"
-            rateValue={safetyInfo?.apy && safetyInfo.apy !== "-" ? `${safetyInfo.apy}%` : "N/A"}
-          />
-        ),
-      });
-    }
-
     for (const pool of poolsWithUserPosition) {
       const lpBalance = safeBigInt(pool.lpToken?.totalBalance);
       const lpPrice = safeBigInt(pool.lpToken?.price);
@@ -617,7 +563,7 @@ const Earn = () => {
               label: poolEarningsLabel,
               className: poolEarningsClass,
             }}
-            rateLabel="APR"
+            rateLabel="APY"
             rateValue={pool.apy ? `${pool.apy}%` : "N/A"}
           />
         ),
@@ -716,11 +662,11 @@ const Earn = () => {
               className="border border-blue-500/40 dark:border-blue-400/35 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a] shadow-sm cursor-pointer"
               role="button"
               tabIndex={0}
-              onClick={() => navigate("/dashboard/earn-vault")}
+              onClick={topOpportunityMeta.onCardClick}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  navigate("/dashboard/earn-vault");
+                  topOpportunityMeta.onCardClick();
                 }
               }}
             >
@@ -731,15 +677,25 @@ const Earn = () => {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={stratoVaultLogo}
-                        alt="STRATO Vault"
-                        className="w-16 h-16 rounded-full object-cover shrink-0"
-                      />
+                      {topOpportunity.kind === "vault" ? (
+                        <img
+                          src={stratoVaultLogo}
+                          alt="STRATO Vault"
+                          className="w-16 h-16 rounded-full object-cover shrink-0"
+                        />
+                      ) : topOpportunity.kind === "lending" ? (
+                        <div className="w-16 h-16 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
+                          <CircleArrowDown className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+                        </div>
+                      ) : (
+                        <div className="scale-[2] origin-left pl-2">
+                          <TokenPairIcon pool={topOpportunity.pool} />
+                        </div>
+                      )}
                       <div className="min-w-0">
-                        <h3 className="text-[30px] leading-none font-semibold tracking-tight">STRATO Vault</h3>
+                        <h3 className="text-[30px] leading-none font-semibold tracking-tight">{topOpportunityMeta.title}</h3>
                         <p className="mt-1 text-xs md:text-sm text-muted-foreground">
-                          Diversified real assets: gold, silver, ETH, BTC, stables - actively managed
+                          {topOpportunityMeta.subtitle}
                         </p>
                       </div>
                     </div>
@@ -747,13 +703,15 @@ const Earn = () => {
                   <div className="text-left md:text-right shrink-0">
                     <p className="text-3xl md:text-[40px] leading-none font-semibold text-foreground">
                       <span>APY </span>
-                      <span className={topApy.className}>{topApy.label === "-" ? "-" : topApy.label}</span>
+                      <span className={topOpportunityApy.className}>
+                        {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
+                      </span>
                     </p>
                     <p className="mt-1 text-xs md:text-sm text-muted-foreground">
-                      TVL ${formatUsd(vaultState.totalEquity)} · {vaultTokenCount} {vaultTokenCount === 1 ? "token" : "tokens"}
+                      TVL ${formatUsd(topOpportunityMeta.tvl)}
                     </p>
                     <div className="mt-1.5 flex items-center gap-2 md:justify-end">
-                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-md">Vault</Badge>
+                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-md">{topOpportunityMeta.badge}</Badge>
                       <Badge className="text-[10px] px-2 py-0.5 rounded-md bg-blue-600 hover:bg-blue-600 text-white">Featured</Badge>
                     </div>
                   </div>
@@ -763,8 +721,13 @@ const Earn = () => {
                   variant="default"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleVaultDepositClick();
+                    topOpportunityMeta.onActionClick();
                   }}
+                  disabled={
+                    guestMode ||
+                    (topOpportunity.kind === "pool" &&
+                      (isPoolPaused(topOpportunity.pool) || Boolean((topOpportunity.pool as any).isDisabled)))
+                  }
                 >
                   Deposit
                 </Button>
@@ -814,18 +777,6 @@ const Earn = () => {
                   >
                     Pools
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setActiveFilter("safety")}
-                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${
-                      activeFilter === "safety"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
-                        : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                    }`}
-                  >
-                    Safety Modules
-                  </Button>
                 </div>
               </div>
             </div>
@@ -840,7 +791,7 @@ const Earn = () => {
                           return (
                             <tr
                               key="vault"
-                              className="border-b border-border/50 cursor-pointer bg-blue-500/[0.05] hover:bg-blue-500/[0.08] dark:bg-blue-400/[0.06] dark:hover:bg-blue-400/[0.10]"
+                              className="border-b border-border/50 cursor-pointer hover:bg-muted/20"
                               role="button"
                               tabIndex={0}
                               onClick={() => navigate("/dashboard/earn-vault")}
@@ -862,9 +813,6 @@ const Earn = () => {
                                   <Badge variant="secondary" className="text-[10px]">Vault</Badge>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                Diversified real assets
-                              </td>
                               <td className="px-4 py-3">
                                 <p className={`text-sm font-semibold ${topApy.className}`}>
                                   {topApy.label === "-" ? "-" : topApy.label}
@@ -874,6 +822,9 @@ const Earn = () => {
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">${formatUsd(vaultState.totalEquity)}</p>
                                 <p className="text-xs text-muted-foreground">TVL</p>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                Diversified real assets
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-end gap-3">
@@ -907,7 +858,7 @@ const Earn = () => {
                           return (
                             <tr
                               key="lending"
-                              className="border-b border-border/40 cursor-pointer bg-blue-500/[0.05] hover:bg-blue-500/[0.08] dark:bg-blue-400/[0.06] dark:hover:bg-blue-400/[0.10]"
+                              className="border-b border-border/40 cursor-pointer hover:bg-muted/20"
                               role="button"
                               tabIndex={0}
                               onClick={() => navigate("/dashboard/earn-lending")}
@@ -927,9 +878,6 @@ const Earn = () => {
                                   <Badge variant="secondary" className="text-[10px]">Lending</Badge>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                Earn yield by supplying USDST liquidity
-                              </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">
                                   {liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}
@@ -943,6 +891,9 @@ const Earn = () => {
                                     : `$${formatUsd(liquidityInfo.totalUSDSTSupplied.toString())}`}
                                 </p>
                                 <p className="text-xs text-muted-foreground">TVL</p>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                Earn yield by supplying USDST liquidity
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-end gap-2">
@@ -973,86 +924,22 @@ const Earn = () => {
                           );
                         }
 
-                        if (opportunity.kind === "safety") {
-                          return (
+                        const { pool } = opportunity;
+                        const poolRewardMeta = getRewardMeta(pool.lpToken?.address);
+                        return (
+                          <Fragment key={pool.address}>
                             <tr
-                              key="safety"
-                              className="border-b border-border/40 cursor-pointer bg-blue-500/[0.05] hover:bg-blue-500/[0.08] dark:bg-blue-400/[0.06] dark:hover:bg-blue-400/[0.10]"
+                              className="border-b border-border/40 last:border-b-0 cursor-pointer hover:bg-muted/20"
                               role="button"
                               tabIndex={0}
-                              onClick={() => navigate("/dashboard/earn-safety")}
+                              onClick={() => navigateToPoolDetails(pool)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {
                                   e.preventDefault();
-                                  navigate("/dashboard/earn-safety");
+                                  navigateToPoolDetails(pool);
                                 }
                               }}
                             >
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
-                                    <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                  </div>
-                                  <p className="font-medium truncate">USDST Safety Module</p>
-                                  <Badge variant="secondary" className="text-[10px]">Safety</Badge>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                Stake USDST to support protocol safety
-                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {safetyInfo?.apy && safetyInfo.apy !== "-" ? `${safetyInfo.apy}%` : "N/A"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">APY</p>
-                              </td>
-                              <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {safetyLoading || !safetyInfo?.totalAssets
-                                    ? "$0.00"
-                                    : `$${formatUsd(safetyInfo.totalAssets.toString())}`}
-                                </p>
-                                <p className="text-xs text-muted-foreground">TVL</p>
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center justify-end gap-2">
-                                  {safetyRewardMeta.pointsLabel !== "-" && (
-                                    <div className="hidden md:flex items-center gap-1 text-sm text-muted-foreground mr-1">
-                                      <Star className="h-4 w-4 text-amber-500" />
-                                      <span className="font-medium text-foreground">{safetyRewardMeta.pointsLabel}</span>
-                                      {safetyRewardMeta.featured && (
-                                        <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Featured</Badge>
-                                      )}
-                                    </div>
-                                  )}
-                                  <Button
-                                    className="h-9 min-w-[108px] justify-center"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSafetyStakeClick();
-                                    }}
-                                    disabled={guestMode}
-                                  >
-                                    <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
-                                    Stake
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        const { pool } = opportunity;
-                        const poolRewardMeta = getRewardMeta(pool.lpToken?.address);
-                        const isPoolExpanded = expandedPools.has(pool.address);
-                        const userLpBalance = safeBigInt(pool.lpToken?.totalBalance);
-                        const userLiquidityUsd = safeBigInt(pool.lpToken?.price) > 0n
-                          ? (userLpBalance * safeBigInt(pool.lpToken?.price)) / WAD
-                          : 0n;
-                        return (
-                          <Fragment key={pool.address}>
-                            <tr className="border-b border-border/40 last:border-b-0">
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   <TokenPairIcon pool={pool} />
@@ -1060,20 +947,18 @@ const Earn = () => {
                                   <Badge variant="secondary" className="text-[10px]">Pool</Badge>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {pool.isStable
-                                  ? `Stableswap fees on ${stableExitTokenSymbol(pool)} exits`
-                                  : `Earn fees on ${pool.poolName.replace(" Pool", "")} swaps`}
-                              </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">
                                   {pool.apy ? `${pool.apy}%` : "N/A"}
                                 </p>
-                                <p className="text-xs text-muted-foreground">APR</p>
+                                <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">${formatUsd(pool.totalLiquidityUSD)}</p>
                                 <p className="text-xs text-muted-foreground">TVL</p>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                {`Earn fees on ${pool.poolName.replace(" Pool", "")} swaps`}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-end gap-2">
@@ -1087,18 +972,13 @@ const Earn = () => {
                                     </div>
                                   )}
                                   <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-9 px-2"
-                                    onClick={() => togglePoolRow(pool.address)}
-                                  >
-                                    {isPoolExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                  </Button>
-                                  <Button
                                     className="h-9 min-w-[108px] justify-center"
                                     size="sm"
-                                    onClick={() => handlePoolDeposit(pool)}
-                                    disabled={guestMode || isPoolPaused(pool)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handlePoolDeposit(pool);
+                                    }}
+                                    disabled={guestMode || isPoolPaused(pool) || Boolean((pool as any).isDisabled)}
                                   >
                                     <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
                                     Deposit
@@ -1106,55 +986,6 @@ const Earn = () => {
                                 </div>
                               </td>
                             </tr>
-                            {isPoolExpanded && (
-                              <tr className="border-b border-border/40 bg-muted/20">
-                                <td className="px-4 py-4" colSpan={5}>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                    <div className="rounded-md border border-border/60 p-3">
-                                      <p className="text-xs text-muted-foreground">Your Liquidity</p>
-                                      <p className="text-sm font-semibold">
-                                        {guestMode ? "-" : `$${formatUsd(userLiquidityUsd.toString())}`}
-                                      </p>
-                                    </div>
-                                    <div className="rounded-md border border-border/60 p-3">
-                                      <p className="text-xs text-muted-foreground">Your LP Tokens</p>
-                                      <p className="text-sm font-semibold">
-                                        {guestMode ? "-" : formatTokenAmount(pool.lpToken?.totalBalance || "0")}
-                                      </p>
-                                    </div>
-                                    <div className="rounded-md border border-border/60 p-3">
-                                      <p className="text-xs text-muted-foreground">Pool APR</p>
-                                      <p className="text-sm font-semibold">{pool.apy ? `${pool.apy}%` : "N/A"}</p>
-                                    </div>
-                                    <div className="rounded-md border border-border/60 p-3">
-                                      <p className="text-xs text-muted-foreground">Pool TVL</p>
-                                      <p className="text-sm font-semibold">${formatUsd(pool.totalLiquidityUSD)}</p>
-                                    </div>
-                                  </div>
-                                  <div className="mt-3 flex items-center justify-end gap-2">
-                                    <Button
-                                      className="h-9 min-w-[108px] justify-center"
-                                      size="sm"
-                                      onClick={() => handlePoolDeposit(pool)}
-                                      disabled={guestMode || isPoolPaused(pool)}
-                                    >
-                                      <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
-                                      Deposit
-                                    </Button>
-                                    <Button
-                                      className="h-9 min-w-[108px] justify-center"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handlePoolWithdraw(pool)}
-                                      disabled={guestMode || safeBigInt(pool.lpToken?.totalBalance) === BigInt(0)}
-                                    >
-                                      <CircleArrowUp className="h-4 w-4 mr-1 shrink-0" />
-                                      Withdraw
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
                           </Fragment>
                         );
                       })}
@@ -1225,59 +1056,6 @@ const Earn = () => {
             )}
             <Button className="w-full h-11" onClick={handleLendingDepositSubmit} disabled={!isLendingDepositValid || isLendingSubmitting || !isLoggedIn}>
               {isLendingSubmitting ? "Processing..." : "Deposit"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isSafetyStakeModalOpen} onOpenChange={(open) => (!open ? closeSafetyStakeModal() : setIsSafetyStakeModalOpen(true))}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Stake in USDST Safety Module</DialogTitle>
-            <DialogDescription>Enter USDST amount and confirm stake.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="relative">
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={safetyStakeAmount}
-                onChange={(e) => setSafetyStakeAmount(e.target.value)}
-                className="pl-16 h-11"
-                disabled={!isLoggedIn || isSafetySubmitting}
-              />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">USDST</span>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <button
-                type="button"
-                className="text-blue-600 hover:underline mr-2"
-                onClick={() => {
-                  const availableWei = safeBigInt(usdstBalance);
-                  const feeWei = safeParseUnits(SAFETY_STAKE_FEE, 18);
-                  const maxWei = availableWei > feeWei ? availableWei - feeWei : 0n;
-                  setSafetyStakeAmount(formatMaxAmount(maxWei));
-                }}
-              >
-                Max
-              </button>
-              Available: {formatBalance(usdstBalance || "0", undefined, 18, 2)} USDST
-            </div>
-            <div className="text-sm text-muted-foreground">Transaction Fee: {SAFETY_STAKE_FEE} USDST</div>
-            {rewardsEnabled && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="earn-safety-modal-stake"
-                  checked={stakeSafetyRewards}
-                  onCheckedChange={(checked) => setStakeSafetyRewards(checked === true)}
-                />
-                <label htmlFor="earn-safety-modal-stake" className="text-sm font-medium">
-                  Stake my sUSDST to earn rewards
-                </label>
-              </div>
-            )}
-            <Button className="w-full h-11" onClick={handleSafetyStakeSubmit} disabled={!isSafetyStakeValid || isSafetySubmitting || !isLoggedIn}>
-              {isSafetySubmitting ? "Processing..." : "Stake"}
             </Button>
           </div>
         </DialogContent>

@@ -35,7 +35,7 @@ import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
 import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
-import EarnSafety from "./pages/EarnSafety";
+import EarnPools from "./pages/EarnPools";
 import OnrampPage from "./pages/OnrampPage";
 import CreditCardPage from "./pages/CreditCard";
 
@@ -278,10 +278,10 @@ const App = () => {
                                             }
                                           />
                                           <Route
-                                            path="/dashboard/earn-safety"
+                                            path="/dashboard/earn-pools"
                                             element={
                                               <GuestAccessibleRoute>
-                                                <EarnSafety />
+                                                <EarnPools />
                                               </GuestAccessibleRoute>
                                             }
                                           />
