@@ -43,6 +43,7 @@ COPY \
   ./usr/local/bin/slipstream \
   ./usr/local/bin/strato-api \
   ./usr/local/bin/strato-api-indexer \
+  ./usr/local/bin/strato-network-monitor \
   ./usr/local/bin/strato-p2p \
   ./usr/local/bin/strato-p2p-indexer \
   ./usr/local/bin/strato-sequencer \
