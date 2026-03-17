@@ -8,7 +8,7 @@ import System.Process
 import System.IO
 import System.Exit
 import System.Directory
-import System.Environment (setEnv)
+import System.Environment (getArgs, setEnv)
 import System.Posix.Types (ProcessID)
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
 import System.Posix.Signals (signalProcess, sigTERM)
@@ -130,6 +130,9 @@ dockerComposeDown = do
 
 main :: IO ()
 main = do
+  args <- getArgs
+  let noDocker = "--no-docker" `elem` args
+
   -- Clear previous PID file
   writeFile pidFile ""
 
@@ -142,8 +145,8 @@ main = do
   unless (not (null commandList)) $
     error "No valid commands found in commands.txt"
 
-  -- Start docker compose first
-  dockerComposeUp
+  -- Start docker compose first (unless --no-docker)
+  unless noDocker dockerComposeUp
 
   putStrLn $ "Launching " ++ show (length commandList) ++ " processes..."
   asyncs <- sequence $ map launchCommand commandList
@@ -159,8 +162,8 @@ main = do
       hPutStrLn stderr "Interrupted by Ctrl-C"
       killAllProcesses
 
-  -- Stop docker compose on shutdown
-  dockerComposeDown
+  -- Stop docker compose on shutdown (unless --no-docker)
+  unless noDocker dockerComposeDown
 
   removeFile pidFile `catch` \e ->
     hPutStrLn stderr $ "Warning: could not delete pid file: " ++ show (e :: IOError)
