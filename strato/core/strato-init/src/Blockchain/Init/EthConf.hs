@@ -17,20 +17,12 @@ import Strato.Strato23.Client
 import System.Info (os)
 import Text.ShortDescription
 
--- | Get the API IP address, using mode-appropriate default for Docker
+-- | Get the API IP address, using OS-appropriate default for Docker
 getApiIPAddress :: String
 getApiIPAddress
   | flags_apiIPAddress /= "127.0.0.1" = flags_apiIPAddress  -- User provided explicit value
-  | flags_dockerMode == "allDocker" = "0.0.0.0"             -- Bind to all interfaces in container
-  | os == "linux" = "172.17.0.1"                            -- Linux Docker bridge (local mode)
+  | os == "linux" = "172.17.0.1"                            -- Linux Docker bridge
   | otherwise = "host.docker.internal"                      -- macOS/Windows Docker
-
--- | Get the Kafka host, using mode-appropriate default
-getKafkaHost :: String
-getKafkaHost
-  | flags_kafkahost /= "localhost" = flags_kafkahost        -- User provided explicit value
-  | flags_dockerMode == "allDocker" = "kafka"               -- Service name in Docker network
-  | otherwise = "localhost"                                 -- Local development
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -123,7 +115,7 @@ genEthConf = do
         , host = flags_pghost
         , password = pgPass
         }
-    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = getKafkaHost }
+    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = flags_kafkahost }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize
         , blockSize = flags_ldbBlockSize

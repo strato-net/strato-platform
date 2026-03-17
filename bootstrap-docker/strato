@@ -310,7 +310,8 @@ EOF
     -v "$(pwd)":/node \
     -v "${HOME}/.secrets:/root/.secrets:ro" \
     "${STRATO_IMAGE}" \
-    /node/nodedata --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}/strato/v2.3" --repoUrl="${REPO_URL:-}"
+    /node/nodedata --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}/strato/v2.3" --repoUrl="${REPO_URL:-}" \
+    --pghost=postgres --kafkahost=kafka --redisHost=redis --apiIPAddress=0.0.0.0
   
   # Move generated docker-compose.yml to current directory (strato-setup creates it in the node dir)
   mv nodedata/docker-compose.yml docker-compose.yml
