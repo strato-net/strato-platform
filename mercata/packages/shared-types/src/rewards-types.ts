@@ -22,8 +22,3 @@ export interface RewardsPool {
   lastRewardTimestamp: string;
   bonusPeriods?: BonusPeriod[];
 }
-
-export interface RewardsChefState {
-  cataPerSecond: string;
-  totalAllocPoint: string;
-}

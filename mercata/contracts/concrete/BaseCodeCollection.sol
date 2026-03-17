@@ -23,7 +23,6 @@ import "./Metals/MetalForge.sol";
 // import "Admin/FeeCollector.sol";
 
 //Rewards
-import "./Rewards/RewardsChef.sol";
 import "./Rewards/Rewards.sol";
 
 //Lending
@@ -73,7 +72,6 @@ contract record Mercata is Authorizable {
     CDPRegistry public cdpRegistry;
     CDPReserve public cdpReserve;
     SafetyModule public safetyModule;
-    RewardsChef public rewardsChef;
     Rewards public rewards;
     Token public cataToken;
     Escrow public escrow;
@@ -158,11 +156,6 @@ contract record Mercata is Authorizable {
         mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
         mercataBridge.initialize(address(tokenFactory), address(lendingRegistry));
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));
-
-        // Create RewardsChef (without initialization - to be initialized in tests)
-        address rewardsChefImpl = address(new RewardsChef(implOwnerIgnored));
-        rewardsChef = RewardsChef(address(new Proxy(rewardsChefImpl, this)));
-        Ownable(rewardsChef).transferOwnership(address(adminRegistry));
 
         // Use existing CATA reward token
         cataToken = Token(address(0x2680dc6693021cd3fefb84351570874fbef8332a));

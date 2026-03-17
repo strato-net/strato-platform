@@ -101,7 +101,6 @@ const GUEST_SAFE_URLS = [
   '/lending/safety/info',
   '/lending/safety/info/public',
   // Rewards page
-  '/rewards/pending',
   '/rewards/overview',
   '/rewards/activities',
   // ActivityFeed page

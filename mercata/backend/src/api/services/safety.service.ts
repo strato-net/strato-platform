@@ -253,8 +253,6 @@ export const getSafetyModuleInfo = async (
     const userShares = userTokenBalance?.[0]?.balance || "0";
     const cooldownStart = cooldownData?.[0]?.value || "0";
 
-    const stakedSTokenBalance = "0";
-
     // Calculate exchange rate (assets per share)
     const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n 
       ? (BigInt(totalAssets) * BigInt("1000000000000000000")) / BigInt(totalShares) // 18 decimals
@@ -292,8 +290,8 @@ export const getSafetyModuleInfo = async (
       ? userAssetsValue.toString()
       : availableAssets.toString();
 
-    // For total shares (unstaked + staked)
-    const userSharesTotal = BigInt(userShares) + BigInt(stakedSTokenBalance);
+    // Total shares mirrors user wallet shares.
+    const userSharesTotal = BigInt(userShares);
     const userAssetsTotalValue = userSharesTotal > 0n
       ? ((userSharesTotal * BigInt(exchangeRate)) / (10n ** 18n))
       : 0n;
@@ -305,9 +303,9 @@ export const getSafetyModuleInfo = async (
     return {
       totalAssets,
       totalShares,
-      userShares, // This is the unstaked (wallet) balance
-      userSharesStaked: stakedSTokenBalance,
-      userSharesTotal: userSharesTotal.toString(), // Total = wallet + staked
+      userShares,
+      userSharesStaked: "0",
+      userSharesTotal: userSharesTotal.toString(),
       userCooldownStart: cooldownStart,
       cooldownSeconds,
       unstakeWindow,
@@ -316,10 +314,10 @@ export const getSafetyModuleInfo = async (
       cooldownActive,
       cooldownTimeRemaining,
       unstakeWindowTimeRemaining,
-      maxRedeemable, // Max assets redeemable with just unstaked shares
-      maxRedeemableTotal, // Max assets redeemable with unstaked + staked shares
-      redeemValue: userAssetsValue.toString(), // Value of unstaked shares in assets
-      redeemValueTotal: userAssetsTotalValue.toString(), // Value of total shares in assets
+      maxRedeemable,
+      maxRedeemableTotal,
+      redeemValue: userAssetsValue.toString(),
+      redeemValueTotal: userAssetsTotalValue.toString(),
     };
   } catch (error) {
     console.error("Error fetching SafetyModule info:", error);
