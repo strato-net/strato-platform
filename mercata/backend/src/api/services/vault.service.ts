@@ -112,7 +112,7 @@ export interface WithdrawalBasketItem {
 
 export interface VaultTransaction {
   id: string;
-  type: "swap";
+  type: "swap" | "liquidation";
   timestamp: string;
   tokenIn?: {
     address: string;
@@ -123,6 +123,13 @@ export interface VaultTransaction {
     address: string;
     symbol: string;
     amount: string;
+  };
+  liquidation?: {
+    borrower: string;
+    asset: string;
+    assetSymbol: string;
+    collateralSeized: string;
+    debtBurnedUSD: string;
   };
 }
 
@@ -1371,22 +1378,32 @@ export const getTransactions = async (
   const transactions: VaultTransaction[] = [];
 
   try {
-    // Fetch Swap events where the transaction sender is the bot
-    const { data: swapEvents } = await cirrus.get(accessToken, "/event", {
-      params: {
-        select: "id,event_name,address,attributes,block_timestamp,transaction_sender",
-        event_name: "eq.Swap",
-        transaction_sender: `eq.${botAddress}`,
-        order: "block_timestamp.desc",
-        limit: limit.toString(),
-      },
-    });
+    // Fetch Swap and LiquidationExecuted events in parallel
+    const [{ data: swapEvents }, { data: liquidationEvents }] = await Promise.all([
+      cirrus.get(accessToken, "/event", {
+        params: {
+          select: "id,event_name,address,attributes,block_timestamp,transaction_sender",
+          event_name: "eq.Swap",
+          transaction_sender: `eq.${botAddress}`,
+          order: "block_timestamp.desc",
+          limit: limit.toString(),
+        },
+      }),
+      cirrus.get(accessToken, "/event", {
+        params: {
+          select: "id,event_name,address,attributes,block_timestamp,transaction_sender",
+          event_name: "eq.LiquidationExecuted",
+          transaction_sender: `eq.${botAddress}`,
+          order: "block_timestamp.desc",
+          limit: limit.toString(),
+        },
+      }),
+    ]);
 
     // Process swap events
     for (const event of swapEvents || []) {
       const attrs = event.attributes || {};
       
-      // Get token symbols if addresses are available
       let tokenInInfo = { symbol: "UNKNOWN", name: "Unknown Token" };
       let tokenOutInfo = { symbol: "UNKNOWN", name: "Unknown Token" };
       
@@ -1414,9 +1431,41 @@ export const getTransactions = async (
       });
     }
 
+    // Process liquidation events
+    for (const event of liquidationEvents || []) {
+      const attrs = event.attributes || {};
+
+      let assetSymbol = "UNKNOWN";
+      if (attrs.asset) {
+        const info = await getTokenInfo(accessToken, attrs.asset);
+        assetSymbol = info.symbol;
+      }
+
+      transactions.push({
+        id: event.id || `liq-${event.block_timestamp}-${event.address}`,
+        type: "liquidation",
+        timestamp: event.block_timestamp || new Date().toISOString(),
+        liquidation: {
+          borrower: attrs.borrower || "",
+          asset: attrs.asset || "",
+          assetSymbol,
+          collateralSeized: attrs.collateralOut || "0",
+          debtBurnedUSD: attrs.debtBurnedUSD || "0",
+        },
+      });
+    }
+
+    // Sort merged list by timestamp descending, then trim to limit
+    transactions.sort((a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    if (transactions.length > limit) {
+      transactions.length = limit;
+    }
+
     return { transactions };
   } catch (error) {
-    console.error("Error fetching bot swap transactions:", error);
+    console.error("Error fetching bot transactions:", error);
     return { transactions: [] };
   }
 };
