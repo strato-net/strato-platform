@@ -76,8 +76,6 @@ import Servant.Swagger.UI
 import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client
 import System.Clock
-import System.Directory (getCurrentDirectory, doesFileExist)
-import qualified System.IO as SIO
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -221,24 +219,12 @@ main = do
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
 
-  -- Debug: check OAuth credentials and token cache
-  cwd <- getCurrentDirectory
-  SIO.hPutStrLn SIO.stderr ("DEBUG: Current working directory: " ++ cwd) >> SIO.hFlush SIO.stderr
-  oauthExists <- doesFileExist "secrets/oauth_credentials.yaml"
-  SIO.hPutStrLn SIO.stderr ("DEBUG: secrets/oauth_credentials.yaml exists: " ++ show oauthExists) >> SIO.hFlush SIO.stderr
-  tokenExists <- doesFileExist "secrets/oauth_token"
-  SIO.hPutStrLn SIO.stderr ("DEBUG: secrets/oauth_token (cached) exists: " ++ show tokenExists) >> SIO.hFlush SIO.stderr
-  SIO.hPutStrLn SIO.stderr ("DEBUG: About to call Vault at: " ++ vaultUrl (urlConfig ethConf)) >> SIO.hFlush SIO.stderr
-  
   pubKey <- runLoggingT
           . runVaultM (vaultUrl . urlConfig $ ethConf)
           . fmap V.unPubKey
           . blocVaultWrapper
           $ getKey Nothing Nothing
-  
-  SIO.hPutStrLn SIO.stderr "DEBUG: Vault call completed successfully" >> SIO.hFlush SIO.stderr
 
-  SIO.hPutStrLn SIO.stderr "DEBUG: Creating BlocEnv..." >> SIO.hFlush SIO.stderr
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
@@ -247,18 +233,11 @@ main = do
             Bloc.Monad.globalNonceCounter = nonceCache,
             Bloc.Monad.nodePubKey = pubKey
           }
-  SIO.hPutStrLn SIO.stderr "DEBUG: BlocEnv created" >> SIO.hFlush SIO.stderr
   let bindHost = ipAddress $ apiConfig ethConf
       bindPort = 3000 :: Int
-  SIO.hPutStrLn SIO.stderr ("DEBUG: About to start server on " ++ bindHost ++ ":" ++ show bindPort) >> SIO.hFlush SIO.stderr
   putStrLn $ "Starting strato-api on " ++ bindHost ++ ":" ++ show bindPort
-  SIO.hFlush SIO.stdout
-  SIO.hPutStrLn SIO.stderr "DEBUG: Building warp settings..." >> SIO.hFlush SIO.stderr
-  let settings = setPort bindPort $ setHost (fromString bindHost) $ setBeforeMainLoop (SIO.hPutStrLn SIO.stderr "DEBUG: Warp server socket bound successfully, entering main loop" >> SIO.hFlush SIO.stderr) defaultSettings
-  SIO.hPutStrLn SIO.stderr "DEBUG: Building app..." >> SIO.hFlush SIO.stderr  
-  let theApp = app env theDoc urlMap
-  SIO.hPutStrLn SIO.stderr "DEBUG: Calling runSettings - if this hangs, port 3000 may be in use or socket binding failed" >> SIO.hFlush SIO.stderr
-  runSettings settings theApp `catch` (\(e :: SomeException) -> SIO.hPutStrLn SIO.stderr ("DEBUG: runSettings threw exception: " ++ show e) >> SIO.hFlush SIO.stderr >> throwIO e)
+  let settings = setPort bindPort $ setHost (fromString bindHost) defaultSettings
+  runSettings settings $ app env theDoc urlMap
 
 app :: BlocEnv -> OpenApi -> UrlMap -> Application
 app blocEnv theDoc urlMap =

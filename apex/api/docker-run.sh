@@ -3,10 +3,11 @@ set -e
 set -x
 
 # TODO: Set POSTGRES vars defaults here, remove default from docker-compose.yml, rename postgres vars using uppercase
-PROMETHEUS_HOST=${PROMETHEUS_HOST:-'prometheus:9090'}
-STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
-STRATO_PORT_API=${STRATO_PORT_API:-3000}
-STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
+# These must be exported so Node.js can access them via process.env
+export PROMETHEUS_HOST=${PROMETHEUS_HOST:-'prometheus:9090'}
+export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
+export STRATO_PORT_API=${STRATO_PORT_API:-3000}
+export STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
 
 source set-aux-env-vars.sh
 

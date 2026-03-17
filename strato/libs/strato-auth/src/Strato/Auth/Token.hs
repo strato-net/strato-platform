@@ -23,7 +23,6 @@ import Strato.Auth.Retry (withRetry)
 import System.Directory (createDirectoryIfMissing)
 import System.FileLock (withFileLock, SharedExclusive(Exclusive))
 import System.FilePath (takeDirectory)
-import System.IO (hPutStrLn, hFlush, stderr)
 import Text.URI as URI
 
 tokenFilePath :: FilePath
@@ -35,32 +34,22 @@ lockFilePath = "secrets/oauth_token.lock"
 -- | Get cached token, or fetch a new one if not cached
 getToken :: T.Text -> IO T.Text
 getToken discUrl = do
-  hPutStrLn stderr "DEBUG TOKEN: getToken - checking cache" >> hFlush stderr
   cached <- readCachedToken
   case cached of
-    Just token -> do
-      hPutStrLn stderr "DEBUG TOKEN: getToken - returning cached token (not expired)" >> hFlush stderr
-      pure token
-    Nothing -> do
-      hPutStrLn stderr "DEBUG TOKEN: getToken - no valid cache, calling refreshToken" >> hFlush stderr
-      refreshToken discUrl
+    Just token -> pure token
+    Nothing -> refreshToken discUrl
 
 -- | Force refresh the token (call this on 401)
 --
 -- Retries up to 4 times with exponential backoff on network failures
 -- (e.g. connection timeout, DNS failure, TLS errors).
 refreshToken :: T.Text -> IO T.Text
-refreshToken discUrl = do
-  hPutStrLn stderr "DEBUG TOKEN: refreshToken - acquiring lock" >> hFlush stderr
-  withFileLock lockFilePath Exclusive $ \_ -> do
-    hPutStrLn stderr "DEBUG TOKEN: refreshToken - lock acquired, starting retry loop" >> hFlush stderr
+refreshToken discUrl =
+  withFileLock lockFilePath Exclusive $ \_ ->
     withRetry "OAuth token fetch" 4 $ do
       let ClientCredentialsConfig{..} = clientCredentialsConfig
-      hPutStrLn stderr ("DEBUG TOKEN: refreshToken - fetching token endpoint from " ++ T.unpack discUrl) >> hFlush stderr
       tokenEndpoint <- getTokenEndpoint discUrl
-      hPutStrLn stderr ("DEBUG TOKEN: refreshToken - got endpoint: " ++ T.unpack tokenEndpoint) >> hFlush stderr
       TokenResponse{..} <- fetchToken tokenEndpoint clientId clientSecret
-      hPutStrLn stderr "DEBUG TOKEN: refreshToken - got token, writing cache" >> hFlush stderr
       writeCachedToken trAccessToken trExpiresIn
       pure trAccessToken
 
