@@ -205,7 +205,7 @@ contract Describe_MercataBridge is Authorizable {
     function it_bridge_reverts_with_zero_addresses() {
         bool reverted = false;
         try {
-            new MercataBridge(owner).initialize(address(0), address(lendingRegistry));
+            new MercataBridge(owner).initialize(address(0), address(lendingRegistry), address(metalForge));
         } catch {
             reverted = true;
         }
@@ -213,11 +213,19 @@ contract Describe_MercataBridge is Authorizable {
 
         reverted = false;
         try {
-            new MercataBridge(owner).initialize(address(tokenFactory), address(0));
+            new MercataBridge(owner).initialize(address(tokenFactory), address(0), address(metalForge));
         } catch {
             reverted = true;
         }
         require(reverted, "Should revert with zero lending registry");
+
+        reverted = false;
+        try {
+            new MercataBridge(owner).initialize(address(tokenFactory), address(lendingRegistry), address(0));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert with zero metal forge");
     }
 
     // ============ CHAIN MANAGEMENT TESTS ============

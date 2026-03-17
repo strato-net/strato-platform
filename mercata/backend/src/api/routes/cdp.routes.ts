@@ -865,7 +865,7 @@ router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPCo
  *                         description: Asset contract address
  *                       symbol:
  *                         type: string
- *                         description: Asset symbol (e.g., WBTC, ETHST)
+ *                         description: Asset symbol (e.g., WBTC, ETH)
  *                       totalCollateral:
  *                         type: string
  *                         description: Total collateral amount (raw integer string)
@@ -928,7 +928,7 @@ router.get("/stats", authHandler.authorizeRequest(true), CDPController.getCDPSta
  *                         description: Asset contract address
  *                       symbol:
  *                         type: string
- *                         description: Asset symbol (e.g., WBTC, ETHST)
+ *                         description: Asset symbol (e.g., WBTC, ETH)
  *                       totalDebtUSD:
  *                         type: string
  *                         description: Total debt in USD for this asset (18 decimals)

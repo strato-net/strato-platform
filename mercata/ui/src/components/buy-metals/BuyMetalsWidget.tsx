@@ -178,7 +178,7 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
     try {
       const config = await metalForgeService.getConfigs();
       setMetals(config.metals.filter(m => m.isEnabled));
-      setPayTokens(config.payTokens.filter(p => p.isEnabled));
+      setPayTokens(config.payTokens);
     } catch (err) {
       console.error("Failed to load MetalForge config:", err);
     } finally {
@@ -237,11 +237,15 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
     try { return BigInt(payPriceRaw); } catch { return null; }
   }, [isPayTokenUsdst, payPriceRaw]);
 
-  const pricesReady = metalPriceBn !== null && metalPriceBn > 0n && payTokenPriceBn !== null;
-
   // --- Fee config (BigInt) ---
-  const feeBpsBn = BigInt(selectedPayToken?.feeBps ?? "0");
-  const feePct = Number(feeBpsBn) / 100;
+  const feeBpsBn: bigint | null = useMemo(() => {
+    const raw = selectedMetal?.feeBps;
+    if (!raw || !/^\d+$/.test(raw)) return null;
+    return BigInt(raw);
+  }, [selectedMetal]);
+  const feePct = feeBpsBn !== null ? Number(feeBpsBn) / 100 : null;
+
+  const pricesReady = metalPriceBn !== null && metalPriceBn > 0n && payTokenPriceBn !== null && feeBpsBn !== null;
 
   // --- Parse inputs to wei ---
   const payInputWei = useMemo((): bigint => {
@@ -261,19 +265,19 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
     if (activeField === "pay") {
       if (payInputWei <= 0n) return { computedPayWei: 0n, computedMetalWei: 0n, feeAmountWei: 0n };
       const { metalAmountWei, feeWei } = forwardCalc(
-        payInputWei, feeBpsBn, isPayTokenUsdst, payTokenPriceBn!, metalPriceBn!,
+        payInputWei, feeBpsBn!, isPayTokenUsdst, payTokenPriceBn!, metalPriceBn!,
       );
       return { computedPayWei: payInputWei, computedMetalWei: metalAmountWei, feeAmountWei: feeWei };
     }
 
     if (metalInputWei <= 0n) return { computedPayWei: 0n, computedMetalWei: 0n, feeAmountWei: 0n };
     const { payAmountWei, feeWei } = reverseCalc(
-      metalInputWei, feeBpsBn, isPayTokenUsdst, payTokenPriceBn!, metalPriceBn!,
+      metalInputWei, feeBpsBn!, isPayTokenUsdst, payTokenPriceBn!, metalPriceBn!,
     );
     // Forward-verify: run the pay amount through forwardCalc to get the exact
     // metal amount the contract would produce (eliminates rounding divergence).
     const verified = forwardCalc(
-      payAmountWei, feeBpsBn, isPayTokenUsdst, payTokenPriceBn!, metalPriceBn!,
+      payAmountWei, feeBpsBn!, isPayTokenUsdst, payTokenPriceBn!, metalPriceBn!,
     );
     return { computedPayWei: payAmountWei, computedMetalWei: verified.metalAmountWei, feeAmountWei: feeWei };
   }, [activeField, payInputWei, metalInputWei, pricesReady, feeBpsBn, isPayTokenUsdst, payTokenPriceBn, metalPriceBn]);
@@ -286,8 +290,8 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
 
   // Effective price per metal unit in USD: metalPrice * 10000 / (10000 - feeBps)
   const effectivePriceWei = useMemo((): bigint => {
-    if (!pricesReady || feeBpsBn >= 10000n) return 0n;
-    return (metalPriceBn! * 10000n) / (10000n - feeBpsBn);
+    if (!pricesReady || feeBpsBn! >= 10000n) return 0n;
+    return (metalPriceBn! * 10000n) / (10000n - feeBpsBn!);
   }, [pricesReady, metalPriceBn, feeBpsBn]);
 
   // --- Max pay input (BigInt, exact) ---
@@ -297,13 +301,13 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
     const maxFundsUSD = (capRemainingWei * metalPriceBn!) / WAD;
     const maxPrincipal = isPayTokenUsdst ? maxFundsUSD : (maxFundsUSD * WAD) / payTokenPriceBn!;
 
-    let maxPayFromCap = feeBpsBn < 10000n
-      ? (maxPrincipal * 10000n) / (10000n - feeBpsBn)
+    let maxPayFromCap = feeBpsBn! < 10000n
+      ? (maxPrincipal * 10000n) / (10000n - feeBpsBn!)
       : 0n;
 
     if (maxPayFromCap > 0n) {
       const { metalAmountWei: testMetal } = forwardCalc(
-        maxPayFromCap, feeBpsBn, isPayTokenUsdst, payTokenPriceBn!, metalPriceBn!,
+        maxPayFromCap, feeBpsBn!, isPayTokenUsdst, payTokenPriceBn!, metalPriceBn!,
       );
       if (testMetal > capRemainingWei) {
         maxPayFromCap -= 1n;
@@ -536,7 +540,10 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
       {!pricesReady && !configLoading && (
         <div className="flex items-start gap-2 text-xs text-amber-600 px-1">
           <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-          <span>Oracle price not available. Pricing data is loading or unavailable.</span>
+          <span>{feeBpsBn === null
+            ? "Fee configuration is unavailable for this metal."
+            : "Oracle price not available. Pricing data is loading or unavailable."
+          }</span>
         </div>
       )}
 
@@ -548,9 +555,11 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
       >
         {disabled
           ? "Sign in to buy metals"
-          : !pricesReady
-            ? "Waiting for oracle price..."
-            : computedPayWei <= 0n
+          : feeBpsBn === null
+            ? "Fee not configured"
+            : !pricesReady
+              ? "Waiting for oracle price..."
+              : computedPayWei <= 0n
               ? "Enter an amount"
               : inputError
                 ? inputError
@@ -592,35 +601,41 @@ const BuyMetalsWidget = ({ guestMode = false }: BuyMetalsWidgetProps) => {
                 <DialogDescription>Review the details of your metal purchase</DialogDescription>
               </DialogHeader>
               <div className="space-y-3 py-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">You Pay</span>
-                  <span className="font-medium">{fmtDisplay(computedPayWei)} {selectedPayToken?.symbol}</span>
+                <div className="flex justify-between gap-4 text-sm">
+                  <span className="text-muted-foreground shrink-0">You Pay</span>
+                  <span className="font-medium text-right">{fmtDisplay(computedPayWei)} {selectedPayToken?.symbol}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">You Receive</span>
-                  <span className="font-medium">{fmtWei(computedMetalWei, 6)} {selectedMetal?.symbol}</span>
+                <div className="flex justify-between gap-4 text-sm">
+                  <span className="text-muted-foreground shrink-0">You Receive</span>
+                  <span className="font-medium text-right">{fmtWei(computedMetalWei, 6)} {selectedMetal?.symbol}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Metal Spot Price</span>
-                  <span>${fmtWei(metalPriceBn!, 2)}</span>
+                <div className="flex justify-between gap-4 text-sm">
+                  <span className="text-muted-foreground shrink-0">Metal Spot Price</span>
+                  <span className="text-right">${fmtWei(metalPriceBn!, 2)}</span>
                 </div>
                 {!isPayTokenUsdst && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">{selectedPayToken?.symbol} Price</span>
-                    <span>${fmtWei(payTokenPriceBn!, 4)}</span>
+                  <div className="flex justify-between gap-4 text-sm">
+                    <span className="text-muted-foreground shrink-0">{selectedPayToken?.symbol} Price</span>
+                    <span className="text-right">${fmtWei(payTokenPriceBn!, 4)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Fee ({feePct}%)</span>
-                  <span>{fmtWei(feeAmountWei, 2)} {selectedPayToken?.symbol}</span>
+                <div className="flex justify-between gap-4 text-sm">
+                  <span className="text-muted-foreground shrink-0">Fee ({feePct}%)</span>
+                  <span className="text-right">{fmtWei(feeAmountWei, 2)} {selectedPayToken?.symbol}</span>
                 </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Min received (1% slippage)</span>
-                  <span>{fmtWei(minMetalOutWei, 6)} {selectedMetal?.symbol}</span>
+                <div className="flex justify-between gap-4 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1 shrink-0">
+                    Min Received
+                    <Tooltip>
+                      <TooltipTrigger><HelpCircle className="h-3.5 w-3.5" /></TooltipTrigger>
+                      <TooltipContent side="top" align="start" className="max-w-[250px]"><p>In case prices change, a 1% tolerance is applied</p></TooltipContent>
+                    </Tooltip>
+                  </span>
+                  <span className="text-right">{fmtWei(minMetalOutWei, 6)} {selectedMetal?.symbol}</span>
                 </div>
-                <div className="border-t border-border pt-2 flex justify-between text-sm font-medium">
-                  <span>Effective Price</span>
-                  <span>${fmtWei(effectivePriceWei, 2)} / {selectedMetal?.symbol}</span>
+                <div className="border-t border-border pt-2 flex justify-between gap-4 text-sm font-medium">
+                  <span className="shrink-0">Effective Price</span>
+                  <span className="text-right">${fmtWei(effectivePriceWei, 2)} / {selectedMetal?.symbol}</span>
                 </div>
               </div>
               {txError && (

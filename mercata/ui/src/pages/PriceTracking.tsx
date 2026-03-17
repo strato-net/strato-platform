@@ -415,8 +415,8 @@ const PriceTracking = () => {
 
     if (isPool) {
       // For pools:
-      // Buy: tokenB (from) -> tokenA (to)  [e.g., USDST -> ETHST]
-      // Sell: tokenA (from) -> tokenB (to)  [e.g., ETHST -> USDST]
+      // Buy: tokenB (from) -> tokenA (to)  [e.g., USDST -> ETH]
+      // Sell: tokenA (from) -> tokenB (to)  [e.g., ETH -> USDST]
       
       if (mode === 'buy') {
         // Buy: tokenB (from) -> tokenA (to)
@@ -590,14 +590,14 @@ const PriceTracking = () => {
         });
 
         // Transform tokens to match EarningAsset format
-        // Filter out LP tokens - only keep active tokens (GOLDST, SILVST, ETHST, WBTCST, PAXGST, XAUtST, sUSDSST)
+        // Filter out LP tokens - only keep active tokens (GOLDST, SILVST, ETH, WBTC, PAXG, XAUt, sUSDS)
         const transformedTokens: EarningAsset[] = tokens
           .filter((token: any) => {
             if (!token.address || !(token._symbol || token.symbol)) return false;
             
             const symbol = token._symbol || token.symbol || token.token?._symbol || token.token?.symbol || '';
             
-            // Exclude LP tokens (but allow sUSDSST/SUSDSST as it's an active token)
+            // Exclude LP tokens (but allow sUSDS as it's an active token)
             const isLPToken =
               symbol.endsWith('-LP') ||
               symbol === 'SUSDST' ||
@@ -694,8 +694,8 @@ const PriceTracking = () => {
       const hasConfiguredWidgets = widgets.some(w => w.assetAddress !== null);
 
       if (!hasConfiguredWidgets) {
-        // Default pools: GOLDST-USDST, SILVST-USDST, ETHST-USDST, WBTCST-USDST
-        const defaultPoolNames = ['GOLDST-USDST', 'SILVST-USDST', 'ETHST-USDST', 'WBTCST-USDST'];
+        // Default pools: GOLDST-USDST, SILVST-USDST, ETH-USDST, WBTC-USDST
+        const defaultPoolNames = ['GOLDST-USDST', 'SILVST-USDST', 'ETH-USDST', 'WBTC-USDST'];
 
         setWidgets((prev) => {
           const updated = [...prev];
@@ -1407,8 +1407,8 @@ const PriceTracking = () => {
               
               if (isPool) {
                 // For pools:
-                // Buy: needs tokenB balance (e.g., USDST for ETHST-USDST pool)
-                // Sell: needs tokenA balance (e.g., ETHST for ETHST-USDST pool)
+                // Buy: needs tokenB balance (e.g., USDST for ETH-USDST pool)
+                // Sell: needs tokenA balance (e.g., ETH for ETH-USDST pool)
                 const tokenA = (asset as any).tokenA;
                 const tokenB = (asset as any).tokenB;
                 const tokenAAddress = tokenA?.address || tokenA?.token?.address;

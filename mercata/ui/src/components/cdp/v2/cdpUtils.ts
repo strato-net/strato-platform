@@ -564,9 +564,9 @@ export const calculateAggregateHealthFactor = (
 // Asset utilities
 export const getAssetColor = (symbol: string): string => {
   const colors: Record<string, string> = {
-    'ETHST': '#3b82f6', // blue
-    'PAXGST': '#fbbf24', // yellow/amber
-    'BTCST': '#f59e0b', // orange
+    'ETH': '#3b82f6', // blue
+    'PAXG': '#fbbf24', // yellow/amber
+    'WBTC': '#f59e0b', // orange
   };
   return colors[symbol] || '#6b7280'; // default gray
 };
