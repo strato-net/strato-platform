@@ -51,8 +51,8 @@ echo 'Zookeeper is available'
 cd /var/lib/strato
 
 # Debug: show current state
-echo "[DEBUG] pwd=$(pwd)"
-echo "[DEBUG] ls -la:"
+echo "Working directory: $(pwd)"
+echo "Node contents:"
 ls -la
 
 # Wait for custom genesis if requested
