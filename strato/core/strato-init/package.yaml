@@ -22,6 +22,15 @@ dependencies:
 
 library:
   source-dirs: src/
+  exposed-modules:
+    - Blockchain.Init.ComposeTypes
+    - Blockchain.Init.DockerCompose
+    - Blockchain.Init.DockerComposeAllDocker
+    - Blockchain.Init.EthConf
+    - Blockchain.Init.Generator
+    - Blockchain.Init.Hashes
+    - Blockchain.Init.Monad
+    - Blockchain.Init.Options
   dependencies:
   - aeson
   - base16-bytestring
