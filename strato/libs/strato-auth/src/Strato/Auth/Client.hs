@@ -19,7 +19,7 @@ import Servant.Client
 import Servant.Client.Core (Request, addHeader)
 import Strato.Auth.ClientCredentials
 import Strato.Auth.Token
-import System.IO (hPutStrLn, stderr, hFlush, stdout)
+import System.IO (hPutStrLn, stderr, hFlush)
 
 data AuthEnv = AuthEnv
   { aeBaseUrl :: BaseUrl
