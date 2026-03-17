@@ -25,6 +25,7 @@ executables:
     - cache
     - clock
     - common-log
+    - directory
     - containers
     - core-api2
     - ethereum-discovery
