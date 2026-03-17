@@ -25,6 +25,13 @@ getApiIPAddress
   | os == "linux" = "172.17.0.1"                            -- Linux Docker bridge (local mode)
   | otherwise = "host.docker.internal"                      -- macOS/Windows Docker
 
+-- | Get the Kafka host, using mode-appropriate default
+getKafkaHost :: String
+getKafkaHost
+  | flags_kafkahost /= "localhost" = flags_kafkahost        -- User provided explicit value
+  | flags_dockerMode == "allDocker" = "kafka"               -- Service name in Docker network
+  | otherwise = "localhost"                                 -- Local development
+
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
 getRailgunProxyForNetwork :: String -> Maybe Address
@@ -116,7 +123,7 @@ genEthConf = do
         , host = flags_pghost
         , password = pgPass
         }
-    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = flags_kafkahost }
+    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = getKafkaHost }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize
         , blockSize = flags_ldbBlockSize
