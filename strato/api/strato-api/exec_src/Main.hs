@@ -76,6 +76,7 @@ import Servant.Swagger.UI
 import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client
 import System.Clock
+import System.Directory (getCurrentDirectory, doesFileExist)
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -219,11 +220,22 @@ main = do
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
 
+  -- Debug: check OAuth credentials and token cache
+  cwd <- getCurrentDirectory
+  putStrLn $ "DEBUG: Current working directory: " ++ cwd
+  oauthExists <- doesFileExist "secrets/oauth_credentials.yaml"
+  putStrLn $ "DEBUG: secrets/oauth_credentials.yaml exists: " ++ show oauthExists
+  tokenExists <- doesFileExist "secrets/oauth_token"
+  putStrLn $ "DEBUG: secrets/oauth_token (cached) exists: " ++ show tokenExists
+  putStrLn $ "DEBUG: About to call Vault at: " ++ vaultUrl (urlConfig ethConf)
+  
   pubKey <- runLoggingT
           . runVaultM (vaultUrl . urlConfig $ ethConf)
           . fmap V.unPubKey
           . blocVaultWrapper
           $ getKey Nothing Nothing
+  
+  putStrLn "DEBUG: Vault call completed successfully"
 
   let env =
         BlocEnv
