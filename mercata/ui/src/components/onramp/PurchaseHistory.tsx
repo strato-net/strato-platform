@@ -13,7 +13,7 @@ interface OnrampTransaction {
 }
 
 const STRATO_TOKEN: Record<string, string> = {
-  eth: "ETHST",
+  eth: "ETH",
   usdc: "USDST",
 };
 

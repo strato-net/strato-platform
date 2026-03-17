@@ -60,8 +60,8 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Util (byteString2Integer)
 import Blockchain.Stream.Action (Action)
 import Blockchain.VMContext
-import Blockchain.VMOptions
-import Blockchain.EthConf (ethConf, networkConfig)
+import Blockchain.EthConf (ethConf)
+import Blockchain.EthConf.Model (networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Control.Applicative
 import Control.DeepSeq (force)
@@ -132,7 +132,7 @@ import UnliftIO hiding (assert)
 type SolidVMBase m = VMBase m
 
 onTraced :: Monad m => m () -> m ()
-onTraced = when flags_svmTrace
+onTraced = when (Conf.svmTrace (Conf.debugConfig ethConf))
 
 -- TL;DR Use onTracedSM whenever you have a showSM in a trace over onTraced
 -- Full: In some onTraced logging statements we called showSM. Through a series
@@ -144,7 +144,7 @@ onTraced = when flags_svmTrace
 -- (and therefore changing the stateroot) for just having a logging statement!
 -- TODO: Do not add default values to RawStorageDBs for SolidVM > 3.
 onTracedSM :: MonadSM m => CC.Contract -> m () -> m ()
-onTracedSM _ = when flags_svmTrace
+onTracedSM _ = when (Conf.svmTrace (Conf.debugConfig ethConf))
 
 withSrcPos :: MonadIO m => SourceAnnotation () -> String -> m ()
 withSrcPos pos str =

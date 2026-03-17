@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+set -e
+
+NODE_DIR="${1:-$(cat ~/.strato/default-node 2>/dev/null)}"
+if [[ -z "$NODE_DIR" ]]; then
+    echo "Usage: strato-down [node-directory]"
+    exit 1
+fi
+
+cd "$NODE_DIR"
+
+echo "Stopping STRATO..."
+
+if [[ -f .strato.pid ]]; then
+    source .strato.pid
+    if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
+        kill "$CONVOKE_PID" 2>/dev/null || true
+        wait "$CONVOKE_PID" 2>/dev/null || true
+    fi
+    rm -f .strato.pid
+else
+    echo "No pidfile found"
+fi
+
+echo "STRATO stopped"

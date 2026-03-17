@@ -3,8 +3,6 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../Lending/PriceOracle.sol";
 import "../Tokens/Token.sol";
 import "../Admin/FeeCollector.sol";
-// TODO at the end: add reentrancy protection
-
 contract record MetalForge is Ownable {
 
     PriceOracle public oracle;
@@ -24,13 +22,12 @@ contract record MetalForge is Ownable {
     event FeeCollectorUpdated(address newFeeCollector);
     event UsdstUpdated(address newUsdst);
 
-    event MetalConfigUpdated(address metalToken, bool isEnabled, uint mintCap);
+    event MetalConfigUpdated(address metalToken, bool isEnabled, uint mintCap, uint feeBps);
     event MintCapUpdated(address metalToken, uint newCap);
+    event FeeBpsUpdated(address metalToken, uint newBps);
     event MetalToggled(address metalToken, bool isEnabled);
 
-    event PayTokenConfigUpdated(address payToken, bool isEnabled, uint feeBps);
-    event FeeBpsUpdated(address payToken, uint newBps);
-    event PayTokenToggled(address payToken, bool isEnabled);
+    event PayTokenUpdated(address payToken, bool isSupported);
 
     event MetalMinted(
         address buyer,
@@ -50,15 +47,11 @@ contract record MetalForge is Ownable {
     struct MetalConfig {
         bool isEnabled;
         uint mintCap;
-    }
-
-    struct PayTokenConfig {
-        bool isEnabled;
         uint feeBps;
     }
 
     mapping(address => MetalConfig) public record metalConfigs;
-    mapping(address => PayTokenConfig) public record payTokenConfigs;
+    mapping(address => bool) public record isSupportedPayToken;
     mapping(address => uint) public record totalMinted;
 
 
@@ -66,7 +59,7 @@ contract record MetalForge is Ownable {
     // ================  INITIALIZATION  ==================
     // ====================================================
 
-    constructor(address _owner) Ownable(_owner) {}
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     function initialize(address _oracle, address _treasurer, address _feeCollector, address _usdst) external onlyOwner {
         require(_oracle != address(0), "MetalForge: invalid oracle address");
@@ -94,12 +87,11 @@ contract record MetalForge is Ownable {
         uint minMetalOut
     ) external {
         MetalConfig metalConfig = metalConfigs[metalToken];
-        PayTokenConfig payTokenConfig = payTokenConfigs[payToken];
         require(metalConfig.isEnabled, "MetalForge: metal is disabled");
-        require(payTokenConfig.isEnabled, "MetalForge: pay token is disabled");
+        require(isSupportedPayToken[payToken], "MetalForge: payToken is not supported");
         require(payAmount > 0, "MetalForge: zero amount");
 
-        uint feeAmount = (payAmount * payTokenConfig.feeBps) / 10000;
+        uint feeAmount = (payAmount * metalConfig.feeBps) / 10000;
         uint principal = payAmount - feeAmount;
 
         uint fundsUSD;
@@ -161,25 +153,22 @@ contract record MetalForge is Ownable {
         usdst = Token(_usdst);
         emit UsdstUpdated(_usdst);
     }
-
     function setMetalConfig(
         address _metalToken,
         bool _isEnabled,
-        uint _mintCap
-    ) external onlyOwner {
-        metalConfigs[_metalToken].isEnabled = _isEnabled;
-        metalConfigs[_metalToken].mintCap = _mintCap;
-        emit MetalConfigUpdated(_metalToken, _isEnabled, _mintCap);
-    }
-
-    function setPayTokenConfig(
-        address _payToken,
-        bool _isEnabled,
+        uint _mintCap,
         uint _feeBps
     ) external onlyOwner {
-        payTokenConfigs[_payToken].isEnabled = _isEnabled;
-        payTokenConfigs[_payToken].feeBps = _feeBps;
-        emit PayTokenConfigUpdated(_payToken, _isEnabled, _feeBps);
+        require(_feeBps <= 10000, "MetalForge: feeBps exceeds 10,000");
+        metalConfigs[_metalToken].isEnabled = _isEnabled;
+        metalConfigs[_metalToken].mintCap = _mintCap;
+        metalConfigs[_metalToken].feeBps = _feeBps;
+        emit MetalConfigUpdated(_metalToken, _isEnabled, _mintCap, _feeBps);
+    }
+
+    function setPayToken(address _payToken, bool _isSupported) external onlyOwner {
+        isSupportedPayToken[_payToken] = _isSupported;
+        emit PayTokenUpdated(_payToken, _isSupported);
     }
 
     function setMintCap(address _metalToken, uint _mintCap) external onlyOwner {
@@ -187,9 +176,10 @@ contract record MetalForge is Ownable {
         emit MintCapUpdated(_metalToken, _mintCap);
     }
 
-    function setFeeBps(address _payToken, uint _feeBps) external onlyOwner {
-        payTokenConfigs[_payToken].feeBps = _feeBps;
-        emit FeeBpsUpdated(_payToken, _feeBps);
+    function setFeeBps(address _metalToken, uint _feeBps) external onlyOwner {
+        require(_feeBps <= 10000, "MetalForge: feeBps exceeds 10,000");
+        metalConfigs[_metalToken].feeBps = _feeBps;
+        emit FeeBpsUpdated(_metalToken, _feeBps);
     }
 
     function setMetalEnabled(address _metalToken, bool _isEnabled) external onlyOwner {
@@ -197,9 +187,5 @@ contract record MetalForge is Ownable {
         emit MetalToggled(_metalToken, _isEnabled);
     }
 
-    function setPayTokenEnabled(address _payToken, bool _isEnabled) external onlyOwner {
-        payTokenConfigs[_payToken].isEnabled = _isEnabled;
-        emit PayTokenToggled(_payToken, _isEnabled);
-    }
 
 }

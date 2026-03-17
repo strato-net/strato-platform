@@ -148,6 +148,7 @@ export interface RawWithdrawData {
     mintUSDST: boolean;
     timestamp: string;
     requestedAt: string;
+    useHotWallet?: boolean;
   };
   // Backend enriched fields
   status: string;

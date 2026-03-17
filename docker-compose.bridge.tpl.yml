@@ -11,6 +11,7 @@ services:
     - BA_PASSWORD=${BA_PASSWORD}
     - SAFE_API_KEY=${SAFE_API_KEY}
     - SAFE_ADDRESS=${SAFE_ADDRESS}
+    - SAFE_HOT_WALLET_ADDRESS=${SAFE_HOT_WALLET_ADDRESS}
     - SAFE_PROPOSER_PRIVATE_KEY=${SAFE_PROPOSER_PRIVATE_KEY}
     - SAFE_PROPOSER_ADDRESS=${SAFE_PROPOSER_ADDRESS}
     - OPENID_DISCOVERY_URL=${OPENID_DISCOVERY_URL}
@@ -24,7 +25,7 @@ services:
     - CHAIN_8453_RPC_URL=${CHAIN_8453_RPC_URL}
     - CHAIN_84532_RPC_URL=${CHAIN_84532_RPC_URL}
     build: .
-    image: ${BRIDGE_IMAGE:-<REPO_URL>bridge:<VERSION>}
+    image: ${BRIDGE_IMAGE:-<REPO_URL>bridge:<HASH_BRIDGE>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -41,7 +42,7 @@ services:
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
     build: .
-    image: ${BRIDGENGINX_IMAGE:-<REPO_URL>bridge-nginx:<VERSION>}
+    image: ${BRIDGENGINX_IMAGE:-<REPO_URL>bridge-nginx:<HASH_BRIDGE_NGINX>}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL

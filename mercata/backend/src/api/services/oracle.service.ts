@@ -7,7 +7,7 @@ import { getPool } from "./lending.service";
 import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "@mercata/shared-types";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
-import { getHistory, StorageHistoryElement } from "../helpers/history.helper";
+import { getHistory, getHistoryParams, HistoryParams, StorageHistoryElement } from "../helpers/history.helper";
 
 const {
   PriceOracle,
@@ -147,12 +147,12 @@ const fetchPriceEvents = async (
   accessToken: string,
   oracleAddress: string,
   assetAddress: string,
-  oneMonthAgo: Date,
+  startTime: Date,
   order: string
 ): Promise<PriceHistoryEntry[]> => {
     const params = {
       address: `eq.${oracleAddress}`,
-      block_timestamp: `gte.${toUTCTime(oneMonthAgo)}`,
+      block_timestamp: `gte.${toUTCTime(startTime)}`,
       order,
     };
 
@@ -210,31 +210,31 @@ const fetchPriceEvents = async (
     return priceEvents;
 };
 
-const createHourlyPriceMap = (priceEvents: PriceHistoryEntry[]): Map<string, PriceHistoryEntry> => {
-    const hourlyPrices = new Map<string, PriceHistoryEntry>();
+const createHourlyPriceMap = (priceEvents: PriceHistoryEntry[], intervalMs?: number): Map<number, PriceHistoryEntry> => {
+    // Process events and create interval-based data points based on duration
+    const interval = intervalMs || 60 * 60 * 1000;
+    const intervalPrices = new Map<number, PriceHistoryEntry>();
 
     priceEvents.forEach((event) => {
       const blockTimestamp = event.blockTimestamp;
+      // Round down to the nearest interval
+      const intervalTimestamp = Math.floor(blockTimestamp.getTime() / interval) * interval;
+      const intervalKey = intervalTimestamp;
 
-      // Create hourly bucket (round down to the hour)
-      const hourBucket = new Date(blockTimestamp);
-      hourBucket.setMinutes(0, 0, 0);
-      const hourKey = hourBucket.toISOString();
-
-      // Keep the latest price for each hour
-      if (!hourlyPrices.has(hourKey) || blockTimestamp > hourlyPrices.get(hourKey)!.blockTimestamp) {
-        hourlyPrices.set(hourKey, event);
+      // Keep the latest price for each interval
+      if (!intervalPrices.has(intervalKey) || blockTimestamp > intervalPrices.get(intervalKey)!.blockTimestamp) {
+        intervalPrices.set(intervalKey, event);
       }
     });
 
-    return hourlyPrices;
+    return intervalPrices;
 };
 
 const extractHourlyPriceMap = (priceEvents: PriceHistoryEntry[]): Map<string, string> => {
     const hourlyMap = createHourlyPriceMap(priceEvents);
     const priceMap = new Map<string, string>();
     hourlyMap.forEach((entry, hourKey) => {
-      priceMap.set(hourKey, entry.price);
+      priceMap.set(`${(new Date(hourKey)).toISOString()}`, entry.price);
     });
     return priceMap;
 };
@@ -300,8 +300,8 @@ const calculateHourlyLPPrices = (
   tokenAPriceMap: Map<string, string>,
   tokenBPriceMap: Map<string, string>,
   lpTokenAddress: string
-): Map<string, PriceHistoryEntry> => {
-    const hourlyLPPrices = new Map<string, PriceHistoryEntry>();
+): Map<number, PriceHistoryEntry> => {
+    const hourlyLPPrices = new Map<number, PriceHistoryEntry>();
     let lastTokenAPrice = "0";
     let lastTokenBPrice = "0";
 
@@ -309,6 +309,7 @@ const calculateHourlyLPPrices = (
       const timestamp = new Date(snapshot.timestamp);
       timestamp.setMinutes(0, 0, 0);
       const hourKey = timestamp.toISOString();
+      const hourKeyNumber = timestamp.getTime();
 
       const tokenAPrice = tokenAPriceMap.get(hourKey) || lastTokenAPrice;
       const tokenBPrice = tokenBPriceMap.get(hourKey) || lastTokenBPrice;
@@ -332,8 +333,8 @@ const calculateHourlyLPPrices = (
         lpTokenTotalSupply
       );
 
-      if (!hourlyLPPrices.has(hourKey) || timestamp > hourlyLPPrices.get(hourKey)!.blockTimestamp) {
-        hourlyLPPrices.set(hourKey, {
+      if (!hourlyLPPrices.has(hourKeyNumber) || timestamp > hourlyLPPrices.get(hourKeyNumber)!.blockTimestamp) {
+        hourlyLPPrices.set(hourKeyNumber, {
           id: `lp-${timestamp.getTime()}`,
           timestamp: timestamp,
           asset: lpTokenAddress,
@@ -347,50 +348,52 @@ const calculateHourlyLPPrices = (
 };
 
 const forwardFillPriceHistory = (
-  hourlyPrices: Map<string, PriceHistoryEntry>,
-  assetAddress: string
+  intervalPrices: Map<number, PriceHistoryEntry>,
+  assetAddress: string,
+  intervalMs: number,
 ): PriceHistoryEntry[] => {
-    if (hourlyPrices.size === 0) {
+    if (intervalPrices.size === 0) {
       console.log(`[getPriceHistory] No historical oracle data found for ${assetAddress}`);
       return [];
     }
 
     // Find the earliest and latest actual data points
-    const sortedEvents = Array.from(hourlyPrices.values()).sort(
+    const sortedEvents = Array.from(intervalPrices.values()).sort(
       (a, b) => a.blockTimestamp.getTime() - b.blockTimestamp.getTime()
     );
 
     const earliestDataPoint = sortedEvents[0];
     const latestDataPoint = sortedEvents[sortedEvents.length - 1];
 
-    // Start from the earliest actual data point (rounded to hour)
-    const startTime = new Date(earliestDataPoint.blockTimestamp);
-    startTime.setMinutes(0, 0, 0);
+    // Start from the earliest actual data point (rounded to interval)
+    const earliestInterval = Math.floor(earliestDataPoint.blockTimestamp.getTime() / intervalMs) * intervalMs;
+    const earliestStartTime = new Date(earliestInterval);
 
     // End at current time (or latest data point if it's more recent)
     const now = new Date();
     const endTime = latestDataPoint.blockTimestamp > now ? latestDataPoint.blockTimestamp : now;
+    const endInterval = Math.ceil(endTime.getTime() / intervalMs) * intervalMs;
 
     const filledPriceHistory: PriceHistoryEntry[] = [];
     let currentPrice = earliestDataPoint.price;
 
-    // Generate hourly timestamps from first data point to now
-    for (let currentHour = new Date(startTime); currentHour <= endTime; currentHour.setHours(currentHour.getHours() + 1)) {
-      const hourKey = currentHour.toISOString();
+    // Generate interval-based timestamps from first data point to now
+    for (let currentInterval = earliestStartTime.getTime(); currentInterval <= endInterval; currentInterval += intervalMs) {
+      const intervalKey = currentInterval;
 
-      if (hourlyPrices.has(hourKey)) {
-        // We have actual data for this hour
-        const actualData = hourlyPrices.get(hourKey)!;
+      if (intervalPrices.has(intervalKey)) {
+        // We have actual data for this interval
+        const actualData = intervalPrices.get(intervalKey)!;
         currentPrice = actualData.price;
         filledPriceHistory.push(actualData);
       } else {
         // Fill gap with last known price
         filledPriceHistory.push({
-          id: `filled-${currentHour.getTime()}`,
-          timestamp: new Date(currentHour),
+          id: `filled-${currentInterval}`,
+          timestamp: new Date(currentInterval),
           asset: assetAddress,
           price: currentPrice.toString(),
-          blockTimestamp: new Date(currentHour)
+          blockTimestamp: new Date(currentInterval)
         });
       }
     }
@@ -413,6 +416,11 @@ export const getPriceHistory = async (
     // If the asset is not an LP token, just get the oracle price history
     const oracleAddress = await getOracleAddress(accessToken);
 
+    // Use duration parameter if provided, otherwise default to 1 month
+    const duration = rawParams.duration || '1m';
+    const historyParams = getHistoryParams(duration, rawParams.end);
+    const startTime = new Date(historyParams.endTimestamp - (historyParams.interval * historyParams.numTicks));
+
     // Calculate time range for the last month
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
@@ -421,7 +429,7 @@ export const getPriceHistory = async (
       accessToken,
       oracleAddress,
       assetAddress,
-      oneMonthAgo,
+      startTime,
       rawParams.order || "block_timestamp.asc"
     );
 
@@ -431,7 +439,7 @@ export const getPriceHistory = async (
     }
 
     // Process events and create hourly data points
-    const hourlyPrices = createHourlyPriceMap(priceEvents);
+    const hourlyPrices = createHourlyPriceMap(priceEvents, historyParams?.interval);
 
     // If no historical data, return empty
     if (hourlyPrices.size === 0) {
@@ -439,7 +447,7 @@ export const getPriceHistory = async (
       return { data: [], totalCount: 0 };
     }
 
-    const filledPriceHistory = forwardFillPriceHistory(hourlyPrices, assetAddress);
+    const filledPriceHistory = forwardFillPriceHistory(hourlyPrices, assetAddress, historyParams?.interval);
 
     return { data: filledPriceHistory, totalCount: filledPriceHistory.length };
   } catch (error) {
@@ -491,7 +499,7 @@ const getLPTokenPriceHistory = async (
       return { data: [], totalCount: 0 };
     }
 
-    const filledPriceHistory = forwardFillPriceHistory(hourlyLPPrices, lpTokenAddress);
+    const filledPriceHistory = forwardFillPriceHistory(hourlyLPPrices, lpTokenAddress, 60 * 60 * 1000);
 
     return { data: filledPriceHistory, totalCount: filledPriceHistory.length };
   } catch (error) {
