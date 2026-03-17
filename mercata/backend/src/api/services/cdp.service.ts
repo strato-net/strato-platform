@@ -332,7 +332,7 @@ export interface RefinedVaultCandidate {
 interface BadDebt {
   asset: string;
   badDebt: string;
-  symbol?: string; // Token symbol (e.g., "WBTC", "ETHST")
+  symbol?: string; // Token symbol (e.g., "WBTC", "ETH")
 }
 
 export const getVaults = async (

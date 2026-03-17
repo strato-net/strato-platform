@@ -19,7 +19,7 @@ const OnrampProgressModal: React.FC<OnrampProgressModalProps> = ({ open, externa
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const cryptoName = currency === "usdc" ? "USDC" : currency === "eth" ? "ETH" : (currency || "crypto").toUpperCase();
-  const stratoToken = currency === "usdc" ? "USDST" : currency === "eth" ? "ETHST" : cryptoName;
+  const stratoToken = currency === "usdc" ? "USDST" : currency === "eth" ? "ETH" : cryptoName;
   const formattedAmount = amount ? Number(amount).toFixed(6) : "";
 
   const STEPS = [
