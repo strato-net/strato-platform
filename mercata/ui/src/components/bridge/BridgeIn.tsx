@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DepositAction } from "@mercata/shared-types";
+import { metalForgeService, MetalConfig, PayTokenConfig } from "@/services/metalForgeService";
 import { useToast } from "@/hooks/use-toast";
 import {
   useAccount,
@@ -30,12 +31,11 @@ import {
   simulateDeposit,
   validateRouterContract,
 } from "@/lib/bridge/contractService";
-import {
-  normalizeError,
-} from "@/lib/bridge/utils";
+import { normalizeError } from "@/lib/bridge/utils";
 import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits } from "@/utils/numberUtils";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
@@ -50,7 +50,59 @@ import {
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, CreditCard, CheckCircle2 } from "lucide-react";
+import { ArrowDownToLine, Gem, CheckCircle2, TrendingUp } from "lucide-react";
+
+const WAD = 10n ** 18n;
+
+const calcMetalAmount = (payAmount: string, metal: MetalConfig, payToken: PayTokenConfig): bigint => {
+  try {
+    const input = safeParseUnits(payAmount, 18);
+    const principal = input - (input * BigInt(metal.feeBps || "0") / 10000n);
+    const fundsUSD = (principal * BigInt(payToken.price || "0")) / WAD;
+    const metalPrice = BigInt(metal.price);
+    return metalPrice > 0n ? (fundsUSD * WAD) / metalPrice : 0n;
+  } catch { return 0n; }
+};
+
+const CrossfadePanel = ({ active, children }: { active: boolean; children: React.ReactNode }) => (
+  <div className={`transition-opacity duration-300 ${active ? "opacity-100" : "opacity-0 absolute inset-0 pointer-events-none"}`}>
+    {children}
+  </div>
+);
+
+const CardSkeleton = ({ id }: { id: string }) => (
+  <div key={id} className="relative text-left rounded-md border-2 border-border p-3 animate-pulse">
+    <div className="flex items-center gap-2 mb-1">
+      <div className="w-6 h-6 rounded-full bg-muted shrink-0" />
+      <div className="h-[1.25rem] w-16 bg-muted rounded" />
+    </div>
+    <div className="h-[1rem] w-12 bg-muted rounded" />
+    <div className="h-[14px] w-16 bg-muted/50 rounded mt-0.5" />
+    <div className="h-[0.875rem] w-14 bg-muted rounded mt-1" />
+  </div>
+);
+
+const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled, aprBadge }: {
+  active: boolean; image?: string; symbol: string; estimated: string;
+  label: string; onClick: () => void; disabled: boolean;
+  aprBadge: React.ReactNode;
+}) => (
+  <button type="button" onClick={onClick} disabled={disabled}
+    className={`relative text-left rounded-md border-2 p-3 transition-colors ${
+      active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
+    }`}>
+    {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /></div>}
+    <div className="flex items-center gap-2 mb-1">
+      {image
+        ? <img src={image} alt={symbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
+        : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(symbol || "?").charAt(0)}</span>}
+      <p className="text-sm font-semibold text-foreground">{symbol}</p>
+    </div>
+    <p className="text-xs text-muted-foreground">{"\u2248"} {estimated}</p>
+    {aprBadge}
+    <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
+  </button>
+);
 
 interface BridgeInProps {
   guestMode?: boolean;
@@ -65,7 +117,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
   const { signTypedDataAsync } = useSignTypedData();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { fetchUsdstBalance } = useTokenContext();
+  const { fetchUsdstBalance, activeTokens } = useTokenContext();
   const {
     availableNetworks,
     bridgeableTokens,
@@ -77,8 +129,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     requestDepositAction,
     triggerDepositRefresh,
   } = useBridgeContext();
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
 
   // State
+  const [fundingMode, setFundingMode] = useState<"bridge" | "metals">("bridge");
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [amountError, setAmountError] = useState("");
@@ -94,6 +148,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
   });
   const [isTokenPermitted, setIsTokenPermitted] = useState(true);
   const [selectedAction, setSelectedAction] = useState<DepositAction | null>(null);
+  const [metalsConfig, setMetalsConfig] = useState<{ metals: MetalConfig[]; payTokens: PayTokenConfig[] } | null>(null);
+  const [selectedPayToken, setSelectedPayToken] = useState<PayTokenConfig | null>(null);
+  const [selectedMetal, setSelectedMetal] = useState<MetalConfig | null>(null);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<DepositStep>("confirm_tx");
   const [progressTxHash, setProgressTxHash] = useState<string>();
@@ -101,38 +158,74 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
   const [progressIsNative, setProgressIsNative] = useState(true);
 
   const prevRouteCountRef = React.useRef<number>(1);
+  const prevCardsRef = React.useRef<{ routes: typeof bridgeableTokens; actions: typeof depositActions }>({ routes: [], actions: [] });
+  const prevExternalTokenRef = React.useRef<string | null>(null);
+
+  useEffect(() => {
+    if (fundingMode !== "metals" || metalsConfig) return;
+    metalForgeService.getConfigs().then(cfg => {
+      setMetalsConfig(cfg);
+      const enabledMetals = cfg.metals.filter(m => m.isEnabled);
+      if (cfg.payTokens.length) setSelectedPayToken(cfg.payTokens[0]);
+      if (enabledMetals.length) setSelectedMetal(enabledMetals[0]);
+    }).catch(() => {});
+  }, [fundingMode]);
 
   // Computed values
-  const currentTokens = useMemo(() => bridgeableTokens, [bridgeableTokens]);
-
   const currentNetwork = useMemo(() => {
     return availableNetworks.find((n) => n.chainName === selectedNetwork) || null;
   }, [availableNetworks, selectedNetwork]);
 
-  const sourceTokenRoutes = useMemo(() => {
-    if (!selectedToken) return [];
-    const routes = currentTokens.filter((token) =>
+  const { sourceTokenRoutes, matchingActions } = useMemo(() => {
+    if (!selectedToken) return { sourceTokenRoutes: prevCardsRef.current.routes, matchingActions: prevCardsRef.current.actions };
+    const routes = bridgeableTokens.filter((token) =>
       token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
     );
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
-    return routes;
-  }, [currentTokens, selectedToken]);
-
-  const matchingActions = useMemo(() => {
     const normalize = (addr: string) => (addr || "").toLowerCase().replace(/^0x/, "");
-    const mintStratoTokens = new Set(sourceTokenRoutes.filter(r => !r.isDefaultRoute).map(r => normalize(r.stratoToken)));
-    return depositActions.filter(a => a.payToken && mintStratoTokens.has(normalize(a.payToken)));
-  }, [sourceTokenRoutes, depositActions]);
+    const mintStratoTokens = new Set(routes.filter(r => !r.isDefaultRoute).map(r => normalize(r.stratoToken)));
+    const actions = depositActions.filter(a => a.payToken && mintStratoTokens.has(normalize(a.payToken)));
+    if (routes.length > 0) prevCardsRef.current = { routes, actions };
+    return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
+  }, [bridgeableTokens, selectedToken, depositActions]);
+
+  const getApy = useMemo(() => {
+    const norm = (addr: string) => (addr || "").toLowerCase().replace(/^0x/, "");
+    const m = new Map<string, string>();
+    for (const entry of tokenApys) {
+      const best = entry.apys.reduce((max, a) => parseFloat(a.apy) > parseFloat(max) ? a.apy : max, "0");
+      if (parseFloat(best) > 0) m.set(norm(entry.token), best);
+    }
+    return (addr: string) => m.get(norm(addr));
+  }, [tokenApys]);
+
+  const AprBadge = ({ addr }: { addr: string }) => (
+    <div className="h-[14px] mt-0.5">
+      {!tokenApysLoaded
+        ? <p className="text-[10px] font-medium text-green-500/40 flex items-center gap-0.5 animate-pulse blur-[2px]"><TrendingUp className="w-3 h-3" />0.00% APR</p>
+        : getApy(addr) && (
+          <p className="text-[10px] font-medium text-green-500 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />{getApy(addr)}% APR</p>
+        )
+      }
+    </div>
+  );
+
+  const metalsPayBalance = useMemo(() => {
+    if (!selectedPayToken) return null;
+    const norm = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+    const tok = activeTokens.find((t: any) => norm(t.address) === norm(selectedPayToken.address));
+    return tok?.balance ? formatBalance(tok.balance) : "0.00";
+  }, [selectedPayToken, activeTokens]);
 
   const uniqueExternalTokens = useMemo(() => {
     const seen = new Set<string>();
-    return currentTokens.filter((token) => {
+    return bridgeableTokens.filter((token) => {
       const key = (token.externalToken || "").toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [currentTokens]);
+  }, [bridgeableTokens]);
 
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
@@ -184,9 +277,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     }
   }, [isNativeToken, nativeBalance?.value, tokenRawBalance]);
 
-  const hasValidAmount = !!amount && !amountError;
-
-
   const formatBalanceDisplay = useCallback(
     (valueWei: string) => {
       const decimals = parseInt(selectedToken?.externalDecimals || "18");
@@ -199,53 +289,22 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     [selectedToken?.externalDecimals]
   );
 
-  const disabledReasons = useMemo(() => {
-    const reasons: string[] = [];
-    if (guestMode) reasons.push("guestMode");
-    if (isLoading) reasons.push("isLoading");
-    if (!hasValidAmount) {
-      reasons.push(amountError ? `amountError:${amountError}` : "emptyOrInvalidAmount");
-    }
-    if (!selectedToken) reasons.push("noSelectedToken");
-    if (!isConnected) reasons.push("walletNotConnected");
-    if (!currentNetwork) reasons.push("noCurrentNetwork");
-    if (!isCorrectNetwork) {
-      reasons.push(`wrongNetwork(active:${chainId ?? "n/a"}, expected:${expectedChainId ?? "n/a"})`);
-    }
-    if (isBalanceLoading) reasons.push("balanceLoading");
-    if (!isTokenPermitted) reasons.push("tokenNotPermitted");
-    return reasons;
-  }, [
-    guestMode,
-    isLoading,
-    hasValidAmount,
-    amountError,
-    selectedToken,
-    isConnected,
-    currentNetwork,
-    isCorrectNetwork,
-    isBalanceLoading,
-    isTokenPermitted,
-    chainId,
-    expectedChainId,
-  ]);
-
-  const isButtonDisabled = disabledReasons.length > 0;
-
-  const prevExternalTokenRef = React.useRef<string | null>(null);
+  const isButtonDisabled = guestMode || isLoading || !amount || !!amountError
+    || !selectedToken || !isConnected || !currentNetwork || !isCorrectNetwork
+    || isBalanceLoading || !isTokenPermitted;
 
   // Effects
   useEffect(() => {
     if (!selectedNetwork && availableNetworks.length) {
       setSelectedNetwork(availableNetworks[0].chainName);
     }
-    if (!selectedToken && currentTokens.length) {
-      setSelectedToken(currentTokens[0]);
+    if (!selectedToken && bridgeableTokens.length) {
+      setSelectedToken(bridgeableTokens[0]);
     } else if (
       selectedToken &&
-      !currentTokens.some((t) => t.id === selectedToken.id)
+      !bridgeableTokens.some((t) => t.id === selectedToken.id)
     ) {
-      setSelectedToken(currentTokens[0] || null);
+      setSelectedToken(bridgeableTokens[0] || null);
     }
 
     const currentExternal = (selectedToken?.externalToken || "").toLowerCase();
@@ -258,7 +317,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     prevExternalTokenRef.current = currentExternal;
   }, [
     availableNetworks,
-    currentTokens,
+    bridgeableTokens,
     selectedNetwork,
     selectedToken,
     setSelectedNetwork,
@@ -270,7 +329,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
       fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
     }
   }, [selectedToken, currentNetwork]);
-
 
   useEffect(() => {
     const handleNetworkSwitch = async () => {
@@ -291,39 +349,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     };
     handleNetworkSwitch();
   }, [chainId, isConnected, selectedNetwork, expectedChainId, switchChain]);
-
-  useEffect(() => {
-    if (!amount) return;
-    console.log("[BridgeIn] Deposit button state", {
-      disabled: isButtonDisabled,
-      reasons: disabledReasons,
-      amount,
-      amountError,
-      selectedTokenId: selectedToken?.id,
-      externalToken: selectedToken?.externalToken,
-      stratoToken: selectedToken?.stratoToken,
-      isTokenPermitted,
-      isBalanceLoading,
-      isConnected,
-      isCorrectNetwork,
-      activeChainId: chainId,
-      expectedChainId,
-      selectedNetwork,
-    });
-  }, [
-    amount,
-    amountError,
-    isButtonDisabled,
-    disabledReasons,
-    selectedToken,
-    isTokenPermitted,
-    isBalanceLoading,
-    isConnected,
-    isCorrectNetwork,
-    chainId,
-    expectedChainId,
-    selectedNetwork,
-  ]);
 
   // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
@@ -410,6 +435,27 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     });
 
     return { signature, nonce, deadline };
+  };
+
+  const handleBuyMetals = async () => {
+    if (isLoading || !selectedPayToken || !selectedMetal || !amount || !userAddress) {
+      toast({ title: "Missing info", description: "Please select a token and enter an amount", variant: "destructive" });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const payAmountWei = safeParseUnits(amount, 18).toString();
+      const metalAmount = calcMetalAmount(amount, selectedMetal, selectedPayToken);
+      const minMetalOut = (metalAmount * 9900n / 10000n).toString();
+
+      await metalForgeService.buy(selectedMetal.address, selectedPayToken.address, payAmountWei, minMetalOut);
+      toast({ title: "Success", description: `Purchased ${selectedMetal.symbol}` });
+      setAmount("");
+    } catch (error: any) {
+      toast({ title: "Transaction failed", description: error?.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBridge = async () => {
@@ -538,23 +584,22 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
       if (isNative) {
         txHash = await writeContractAsync({
           address: depositRouter as `0x${string}`,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "depositETH",
+          abi: DEPOSIT_ROUTER_ABI,
+          functionName: "depositETH",
           args: [ensureHexPrefix(userAddress), targetStratoToken],
           value: depositAmount,
-        chain,
+          chain,
           account: address as `0x${string}`,
-      });
-    } else {
-      if (!permitData) {
-        throw new Error("Permit data is required for ERC20 deposits");
-      }
-
+        });
+      } else {
+        if (!permitData) {
+          throw new Error("Permit data is required for ERC20 deposits");
+        }
         txHash = await writeContractAsync({
           address: depositRouter as `0x${string}`,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "deposit",
-        args: [
+          abi: DEPOSIT_ROUTER_ABI,
+          functionName: "deposit",
+          args: [
             ensureHexPrefix(selectedToken.externalToken),
             depositAmount,
             ensureHexPrefix(userAddress),
@@ -562,10 +607,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
             permitData.nonce,
             permitData.deadline,
             permitData.signature as `0x${string}`,
-        ],
-        chain,
+          ],
+          chain,
           account: address as `0x${string}`,
-      });
+        });
       }
 
       setProgressTxHash(txHash);
@@ -589,6 +634,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
         type: action === 1 ? 'saving' : action === 2 ? 'forge' : 'bridge',
+        finalTokenSymbol: selectedAction?.stratoTokenSymbol,
         DepositInfo: {
           externalSender: address,
           stratoRecipient: userAddress,
@@ -656,51 +702,63 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => { if (guestMode) redirectToLogin(); }}
-              className="relative rounded-md border-2 border-blue-500 bg-blue-500/5 dark:bg-blue-500/10 p-3 text-left"
+              onClick={() => { if (guestMode) redirectToLogin(); else setFundingMode("bridge"); }}
+              className={`relative rounded-md border-2 p-3 text-left transition-colors ${
+                fundingMode === "bridge"
+                  ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                  : "border-border hover:bg-muted/30"
+              }`}
             >
-              <div className="absolute top-2 right-2">
-                <CheckCircle2 className="w-5 h-5 text-blue-500" />
-              </div>
-              <ArrowDownToLine className="w-5 h-5 text-blue-500 mb-2" />
+              {fundingMode === "bridge" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
+              <ArrowDownToLine className={`w-5 h-5 mb-2 ${fundingMode === "bridge" ? "text-blue-500" : "text-muted-foreground"}`} />
               <p className="text-sm font-semibold">{guestMode ? "Connect" : "Bridge In"}</p>
               <p className="text-xs text-muted-foreground mt-0.5">From {networkNames}</p>
             </button>
             <button
               type="button"
-              disabled
-              className="rounded-md border-2 border-border p-3 text-left opacity-40 cursor-not-allowed"
+              onClick={() => { if (guestMode) redirectToLogin(); else setFundingMode("metals"); }}
+              className={`relative rounded-md border-2 p-3 text-left transition-colors ${
+                fundingMode === "metals"
+                  ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                  : "border-border hover:bg-muted/30"
+              }`}
             >
-              <CreditCard className="w-5 h-5 text-muted-foreground mb-2" />
-              <p className="text-sm font-semibold">Buy Crypto</p>
-              <p className="text-xs text-muted-foreground mt-0.5">With card or bank transfer</p>
+              {fundingMode === "metals" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
+              <Gem className={`w-5 h-5 mb-2 ${fundingMode === "metals" ? "text-blue-500" : "text-muted-foreground"}`} />
+              <p className="text-sm font-semibold">Buy Metals</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Gold, Silver & more</p>
             </button>
           </div>
 
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${availableNetworks.length || 1}, 1fr)` }}>
-            {availableNetworks.map((network) => {
-              const active = selectedNetwork === network.chainName;
-              return (
-                <button
-                  key={network.chainId}
-                  type="button"
-                  onClick={() => setSelectedNetwork(network.chainName)}
-                  disabled={guestMode || isLoading}
-                  className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${
-                    active
-                      ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                      : "border-border text-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  {active && (
-                    <div className="absolute top-1 right-1">
-                      <CheckCircle2 className="w-4 h-4 text-blue-500" />
-                    </div>
-                  )}
-                  {network.chainName}
-                </button>
-              );
-            })}
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            fundingMode === "bridge" ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0"
+          }`}>
+            <p className="text-xs font-medium text-muted-foreground mb-2">Choose Network</p>
+            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${availableNetworks.length || 1}, 1fr)` }}>
+              {availableNetworks.map((network) => {
+                const active = selectedNetwork === network.chainName;
+                return (
+                  <button
+                    key={network.chainId}
+                    type="button"
+                    onClick={() => setSelectedNetwork(network.chainName)}
+                    disabled={guestMode || isLoading}
+                    className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${
+                      active
+                        ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                        : "border-border text-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {active && (
+                      <div className="absolute top-1 right-1">
+                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                      </div>
+                    )}
+                    {network.chainName}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
 
@@ -711,83 +769,104 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
               <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">2</span>
               <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Send</h3>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
-                <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
-                <BridgeWalletStatus guestMode={guestMode} />
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              fundingMode === "bridge" ? "max-w-[300px] opacity-100" : "max-w-0 opacity-0"
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
+                  <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
+                  <BridgeWalletStatus guestMode={guestMode} />
+                </div>
+                {isConnected && address && (
+                  <button
+                    type="button"
+                    className="text-[11px] text-muted-foreground font-mono hover:text-foreground transition-colors"
+                    onClick={() => {
+                      navigator.clipboard.writeText(address);
+                      toast({ title: "Copied", description: "Address copied to clipboard", duration: 1500 });
+                    }}
+                  >
+                    {address.slice(0, 6)}...{address.slice(-4)}
+                  </button>
+                )}
               </div>
-              {isConnected && address && (
-                <button
-                  type="button"
-                  className="text-[11px] text-muted-foreground font-mono hover:text-foreground transition-colors"
-                  onClick={() => {
-                    navigator.clipboard.writeText(address);
-                    toast({ title: "Copied", description: "Address copied to clipboard", duration: 1500 });
-                  }}
-                >
-                  {address.slice(0, 6)}...{address.slice(-4)}
-                </button>
-              )}
             </div>
           </div>
 
-          <div className="rounded-md border-2 border-border p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <Select
-                value={(selectedToken?.externalToken || "").toLowerCase()}
-                onValueChange={(val) => {
-                  const match = currentTokens.find(
-                    (t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute
-                  ) || currentTokens.find(
-                    (t) => (t.externalToken || "").toLowerCase() === val
-                  ) || null;
-                  setSelectedToken(match);
-                }}
-                disabled={!uniqueExternalTokens.length || guestMode || isLoading}
-              >
-                <SelectTrigger className="h-10 w-auto min-w-0 shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
-                  <SelectValue placeholder="Token" />
-                </SelectTrigger>
-                <SelectContent>
-                  {uniqueExternalTokens
-                    .filter((t) => t.externalSymbol || t.externalName)
-                    .map((t) => (
-                      <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
-                        {fundTokenLabel(t)}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <Input
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9]*\.?[0-9]*"
-                placeholder="0.00"
-                className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
-                value={amount}
-                onChange={(e) => handleAmountChange(e.target.value)}
-                disabled={guestMode || !isConnected || isLoading}
-              />
-            </div>
-            {amountError && <p className="text-xs text-red-500">{amountError}</p>}
-
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-xs text-muted-foreground">
-                Balance: <span className="text-foreground font-medium">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
-              </span>
-              {isConnected && (
-                <div className="flex items-center gap-1">
-                  <PercentageButtons
-                    value={amount}
-                    maxValue={maxAmount}
-                    onChange={handleAmountChange}
-                    decimals={parseInt(selectedToken?.externalDecimals || "18")}
-                    disabled={guestMode || isLoading}
-                    className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground"
-                  />
+          <div className="relative">
+            <CrossfadePanel active={fundingMode === "metals"}>
+              <div className="rounded-md border-2 border-border p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Select value={selectedPayToken?.address || ""}
+                    onValueChange={(val) => setSelectedPayToken(metalsConfig?.payTokens.find(t => t.address === val) || null)}
+                    disabled={fundingMode !== "metals" || !metalsConfig?.payTokens.length || guestMode || isLoading}>
+                    <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
+                      <SelectValue placeholder="Token" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(metalsConfig?.payTokens || []).map((t) => (
+                        <SelectItem key={t.address} value={t.address}>{t.symbol}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
+                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
+                    value={amount} onChange={(e) => handleAmountChange(e.target.value)}
+                    disabled={fundingMode !== "metals" || guestMode || isLoading} />
                 </div>
-              )}
-            </div>
+                {amountError && fundingMode === "metals" && <p className="text-xs text-red-500">{amountError}</p>}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs text-muted-foreground">
+                    Balance: <span className="text-foreground font-medium">{metalsPayBalance || "0.00"} {selectedPayToken?.symbol || ""}</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <PercentageButtons value={amount} maxValue={metalsPayBalance || "0"} onChange={handleAmountChange}
+                      decimals={18} disabled={fundingMode !== "metals" || guestMode || isLoading}
+                      className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
+                  </div>
+                </div>
+              </div>
+            </CrossfadePanel>
+            <CrossfadePanel active={fundingMode === "bridge"}>
+              <div className="rounded-md border-2 border-border p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Select value={(selectedToken?.externalToken || "").toLowerCase()}
+                    onValueChange={(val) => {
+                      const match = bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
+                        || bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
+                      setSelectedToken(match);
+                    }}
+                    disabled={!uniqueExternalTokens.length || guestMode || isLoading}>
+                    <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
+                      <SelectValue placeholder="Token" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {uniqueExternalTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
+                        <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
+                          {fundTokenLabel(t)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
+                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
+                    value={amount} onChange={(e) => handleAmountChange(e.target.value)}
+                    disabled={guestMode || !isConnected || isLoading} />
+                </div>
+                {amountError && <p className="text-xs text-red-500">{amountError}</p>}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs text-muted-foreground">
+                    Balance: <span className="text-foreground font-medium">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <PercentageButtons value={amount} maxValue={maxAmount} onChange={handleAmountChange}
+                      decimals={parseInt(selectedToken?.externalDecimals || "18")}
+                      disabled={guestMode || !isConnected || isLoading}
+                      className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
+                  </div>
+                </div>
+              </div>
+            </CrossfadePanel>
           </div>
         </section>
 
@@ -798,98 +877,85 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
             <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
           </div>
 
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((sourceTokenRoutes.length + matchingActions.length) || prevRouteCountRef.current, 3)}, 1fr)` }}>
-            {sourceTokenRoutes.length > 0 ? (
-              <>
-                {sourceTokenRoutes.map((routeToken) => {
-                  const active = routeToken.id === selectedToken?.id && !selectedAction;
-                  const label = routeToken.isDefaultRoute ? "VIA WRAP" : "VIA MINT";
-                  return (
-                    <button
-                      key={routeToken.id}
-                      type="button"
-                      onClick={() => { setSelectedToken(routeToken); setSelectedAction(null); }}
+          <div className="relative">
+            <CrossfadePanel active={fundingMode === "metals"}>
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((metalsConfig?.metals.filter(m => m.isEnabled).length || 2), 3)}, 1fr)` }}>
+                {!metalsConfig
+                  ? Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={`ms-${i}`} id={`ms-${i}`} />)
+                  : metalsConfig.metals.filter(m => m.isEnabled).map((metal) => {
+                      const metalWei = amount && selectedPayToken ? calcMetalAmount(amount, metal, selectedPayToken) : 0n;
+                      return (
+                        <TokenCard key={metal.address}
+                          active={selectedMetal?.address === metal.address}
+                          image={metal.imageUrl} symbol={metal.symbol}
+                          estimated={metalWei > 0n ? formatUnits(metalWei, 18) : "0"}
+                          label={`${Number(metal.feeBps) / 100}% fee`}
+                          onClick={() => setSelectedMetal(metal)}
+                          disabled={guestMode || isLoading}
+                          aprBadge={<AprBadge addr={metal.address} />}
+                        />
+                      );
+                    })
+                }
+              </div>
+            </CrossfadePanel>
+            <CrossfadePanel active={fundingMode === "bridge"}>
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((sourceTokenRoutes.length + matchingActions.length) || prevRouteCountRef.current, 3)}, 1fr)` }}>
+                {sourceTokenRoutes.length > 0 ? (<>
+                  {sourceTokenRoutes.map((rt) => (
+                    <TokenCard key={rt.id}
+                      active={rt.id === selectedToken?.id && !selectedAction}
+                      image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
+                      estimated={amount || "0"}
+                      label={rt.isDefaultRoute ? "VIA WRAP" : "VIA MINT"}
+                      onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
                       disabled={guestMode || isLoading}
-                      className={`relative text-left rounded-md border-2 p-3 transition-colors ${
-                        active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
-                      }`}
-                    >
-                      {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /></div>}
-                      <div className="flex items-center gap-2 mb-1">
-                        {routeToken.stratoTokenImage
-                          ? <img src={routeToken.stratoTokenImage} alt={routeToken.stratoTokenSymbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
-                          : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(routeToken.stratoTokenSymbol || "?").charAt(0)}</span>
-                        }
-                        <p className="text-sm font-semibold text-foreground">{routeToken.stratoTokenSymbol}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{"\u2248"} {amount || "0"}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
-                    </button>
-                  );
-                })}
-                {matchingActions.map((action) => {
-                  const active = selectedAction?.id === action.id;
-                  const label = action.action === 1 ? "EARN YIELD" : "BUY METAL";
-                  let estimatedAmount = amount || "0";
-                  if (action.action === 2 && action.oraclePrice && amount) {
-                    try {
-                      const input = safeParseUnits(amount, 18);
-                      const price = BigInt(action.oraclePrice);
-                      if (price > 0n) estimatedAmount = formatUnits((input * BigInt("1000000000000000000")) / price, 18);
-                    } catch { /* keep original */ }
-                  }
-                  return (
-                    <button
-                      key={action.id}
-                      type="button"
-                      onClick={() => {
-                        const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
-                        if (mintRoute) setSelectedToken(mintRoute);
-                        setSelectedAction(action);
-                      }}
-                      disabled={guestMode || isLoading}
-                      className={`relative text-left rounded-md border-2 p-3 transition-colors ${
-                        active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
-                      }`}
-                    >
-                      {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /></div>}
-                      <div className="flex items-center gap-2 mb-1">
-                        {action.stratoTokenImage
-                          ? <img src={action.stratoTokenImage} alt={action.stratoTokenSymbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
-                          : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(action.stratoTokenSymbol || "?").charAt(0)}</span>
-                        }
-                        <p className="text-sm font-semibold text-foreground">{action.stratoTokenSymbol}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{"\u2248"} {estimatedAmount}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
-                    </button>
-                  );
-                })}
-              </>
-            ) : (
-              Array.from({ length: prevRouteCountRef.current }).map((_, i) => (
-                <div key={`skeleton-${i}`} className="relative text-left rounded-md border-2 border-border p-3 animate-pulse">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-6 h-6 rounded-full bg-muted shrink-0" />
-                    <div className="h-[1.25rem] w-16 bg-muted rounded" />
-                  </div>
-                  <div className="h-[1rem] w-12 bg-muted rounded" />
-                  <div className="h-[0.875rem] w-14 bg-muted rounded mt-1" />
-                </div>
-              ))
-            )}
+                      aprBadge={<AprBadge addr={rt.stratoToken} />}
+                    />
+                  ))}
+                  {matchingActions.map((action) => {
+                    let est = amount || "0";
+                    if (action.action === 2 && action.oraclePrice && amount) {
+                      try {
+                        const price = BigInt(action.oraclePrice);
+                        if (price > 0n) est = formatUnits((safeParseUnits(amount, 18) * WAD) / price, 18);
+                      } catch { /* keep */ }
+                    }
+                    return (
+                      <TokenCard key={action.id}
+                        active={selectedAction?.id === action.id}
+                        image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
+                        estimated={est}
+                        label={action.action === 1 ? "EARN YIELD" : "BUY METAL"}
+                        onClick={() => {
+                          const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
+                          if (mintRoute) setSelectedToken(mintRoute);
+                          setSelectedAction(action);
+                        }}
+                        disabled={guestMode || isLoading}
+                        aprBadge={<AprBadge addr={action.stratoToken} />}
+                      />
+                    );
+                  })}
+                </>) : (
+                  Array.from({ length: prevRouteCountRef.current }).map((_, i) => <CardSkeleton key={`bs-${i}`} id={`bs-${i}`} />)
+                )}
+              </div>
+            </CrossfadePanel>
           </div>
         </section>
 
         <div className="space-y-2">
           <Button
-            onClick={handleBridge}
-            disabled={isButtonDisabled}
+            onClick={fundingMode === "metals" ? handleBuyMetals : handleBridge}
+            disabled={fundingMode === "metals" ? (isLoading || !selectedPayToken || !selectedMetal || !amount || guestMode) : isButtonDisabled}
             className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
           >
-            {isLoading ? "Processing..." : "Deposit"}
+            {isLoading ? "Processing..." : fundingMode === "metals" ? `Buy ${selectedMetal?.symbol || "Metal"}` : "Deposit"}
           </Button>
-          <div className="text-right">
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${
+            fundingMode === "bridge" ? "max-h-[30px] opacity-100" : "max-h-0 opacity-0"
+          }`}>
             <Link to="/dashboard/withdrawals" className="text-xs text-blue-500 hover:text-blue-400">
               Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
             </Link>

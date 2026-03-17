@@ -18,3 +18,6 @@ export * from './token-types';
 
 // Export all rewards-related types
 export * from './rewards-types';
+
+// Export all earn-related types
+export * from './earn-types';

@@ -86,7 +86,6 @@ export const getBridgeTransactions = async (
   userAddress: string | undefined,
   rawParams: Record<string, string | undefined> = {}
 ): Promise<BridgeTransactionResponse> => {
-  const bridgeRoutes = await getBridgeableTokens(accessToken);
   const config = QUERY_CONFIGS[type];
   
   const dataParams = {
@@ -107,7 +106,7 @@ export const getBridgeTransactions = async (
     return { data: [], totalCount };
   }
 
-  const enrichedData = enrichTransactionData(results, bridgeRoutes, type);
+  const enrichedData = await enrichTransactionData(accessToken, results, type);
   
   return { data: enrichedData, totalCount };
 };

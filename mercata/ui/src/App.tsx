@@ -33,7 +33,6 @@ import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
 import OnrampPage from "./pages/OnrampPage";
-import BuyMetals from "./pages/BuyMetals";
 import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
@@ -51,6 +50,7 @@ import {
 import AdminRoute from "./components/AdminRoute";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
+import { EarnProvider } from "@/context/EarnContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
 import { SafetyProvider } from "./context/SafetyContext";
 import { LendingProvider } from "@/context/LendingContext";
@@ -184,6 +184,7 @@ const App = () => {
                             <LendingProvider>
                               <CDPProvider>
                                 <BridgeProvider>
+                                  <EarnProvider>
                                   <VaultProvider>
                                     <TooltipProvider>
                                       <Toaster />
@@ -205,14 +206,6 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <SwapAsset />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/buy-metals"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <BuyMetals />
                                               </GuestAccessibleRoute>
                                             }
                                           />
@@ -369,6 +362,7 @@ const App = () => {
                                       </BrowserRouter>
                                     </TooltipProvider>
                                   </VaultProvider>
+                                  </EarnProvider>
                                 </BridgeProvider>
                               </CDPProvider>
                             </LendingProvider>
