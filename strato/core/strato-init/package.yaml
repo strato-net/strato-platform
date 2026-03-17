@@ -1,13 +1,7 @@
 name: strato-init
 version: 0.0.1
-build-type: Custom
+build-type: Simple
 
-custom-setup:
-  dependencies:
-    - base
-    - Cabal
-    - directory
-    - process
 author: Jamshid
 maintainer: jamshidnh@gmail.com
 synopsis: A tool to setup the DBs for a Strato instance
@@ -28,7 +22,8 @@ library:
     - Blockchain.Init.DockerComposeAllDocker
     - Blockchain.Init.EthConf
     - Blockchain.Init.Generator
-    - Blockchain.Init.Hashes
+    - Blockchain.Init.BuildMetadata
+    - Blockchain.Init.BuildMetadata.TH
     - Blockchain.Init.Monad
     - Blockchain.Init.Options
   dependencies:

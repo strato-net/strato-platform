@@ -7,7 +7,7 @@ import Prelude hiding (init)
 import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, httpPort, ipAddress, urlConfig, vaultUrl)
 import Blockchain.Init.ComposeTypes
-import Blockchain.Init.Hashes
+import Blockchain.Init.BuildMetadata
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map

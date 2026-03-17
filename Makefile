@@ -56,6 +56,21 @@ HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,mercata/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,mercata/services/bridge/nginx)
 
+# Generate BUILD_METADATA file with version and all hashes for Haskell to read
+# This file is the single source of truth for build metadata
+.PHONY: generate-version-file
+generate-version-file:
+	@echo "VERSION=$(VERSION)" > BUILD_METADATA
+	@echo "HASH_STRATO=$(HASH_STRATO)" >> BUILD_METADATA
+	@echo "HASH_MERCATA_BACKEND=$(HASH_MERCATA_BACKEND)" >> BUILD_METADATA
+	@echo "HASH_MERCATA_UI=$(HASH_MERCATA_UI)" >> BUILD_METADATA
+	@echo "HASH_SMD=$(HASH_SMD)" >> BUILD_METADATA
+	@echo "HASH_APEX=$(HASH_APEX)" >> BUILD_METADATA
+	@echo "HASH_POSTGREST=$(HASH_POSTGREST)" >> BUILD_METADATA
+	@echo "HASH_NGINX=$(HASH_NGINX)" >> BUILD_METADATA
+	@echo "HASH_PROMETHEUS=$(HASH_PROMETHEUS)" >> BUILD_METADATA
+	@echo "Generated BUILD_METADATA file"
+
 # Sed substitutions for docker-compose templates
 HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_POSTGREST>|$(HASH_POSTGREST)|g' \
@@ -258,7 +273,7 @@ build_formatter:
 	@echo building code formatter...
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < Dockerfile.formatter
 
-build_common:
+build_common: generate-version-file
 	@echo building haskell libraries and creating directories
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
@@ -271,7 +286,7 @@ build_common:
 	@install -m 755 bin/strato-down $(HOME)/.local/bin/
 	@install -m 755 bin/strato-ps $(HOME)/.local/bin/
 
-build_common_docker:
+build_common_docker: generate-version-file
 	@echo building haskell libraries and creating directories in docker
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
@@ -279,7 +294,7 @@ build_common_docker:
 	cd strato && stack build ${NIX_FLAG} \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
-build_common_with_tests:
+build_common_with_tests: generate-version-file
 	@echo building haskell libraries and creating directories
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
@@ -287,7 +302,7 @@ build_common_with_tests:
 	cd strato && stack install ${NIX_FLAG} \
 	  --test --no-run-tests
 		
-build_common_profiled:
+build_common_profiled: generate-version-file
 	@echo building haskell libraries and creating directories (profiled)
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
@@ -296,7 +311,7 @@ build_common_profiled:
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
-build_common_fast:
+build_common_fast: generate-version-file
 	@echo building haskell libraries and creating directories (fast)
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}

@@ -3,7 +3,7 @@
 
 module Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker) where
 
-import Blockchain.Init.Hashes
+import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_repoUrl)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.List (foldl')
