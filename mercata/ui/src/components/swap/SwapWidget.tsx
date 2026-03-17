@@ -674,30 +674,12 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // Fetch pool immediately when both assets are selected
   useEffect(() => {
     if (fromAsset?.address && toAsset?.address) {
-      // First try the standard 2-token pool lookup
-      getPoolByTokenPair(fromAsset.address, toAsset.address).then((result) => {
-        if (!result) {
-          // No 2-token pool found — check if both tokens are in a multi-token pool
-          const multiPool = pools.find(p =>
-            p.coins && p.coins.length > 2 &&
-            p.coins.some(c => c.address === fromAsset.address) &&
-            p.coins.some(c => c.address === toAsset.address)
-          );
-          if (multiPool) {
-            // Set the multi-token pool and update asset balances from coins
-            const fromCoin = multiPool.coins!.find(c => c.address === fromAsset.address);
-            const toCoin = multiPool.coins!.find(c => c.address === toAsset.address);
-            setPool(multiPool);
-            if (fromCoin) setFromAsset(prev => prev ? { ...prev, balance: fromCoin.balance || "0", poolBalance: fromCoin.poolBalance || "0", price: fromCoin.price || "0" } : prev);
-            if (toCoin) setToAsset(prev => prev ? { ...prev, balance: toCoin.balance || "0", poolBalance: toCoin.poolBalance || "0", price: toCoin.price || "0" } : prev);
-          }
-        }
-      });
+      getPoolByTokenPair(fromAsset.address, toAsset.address);
       startPolling();
     } else {
       stopPolling();
     }
-  }, [fromAsset?.address, toAsset?.address, getPoolByTokenPair, startPolling, stopPolling, pools]);
+  }, [fromAsset?.address, toAsset?.address, getPoolByTokenPair, startPolling, stopPolling]);
 
 
 

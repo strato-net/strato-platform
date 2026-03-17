@@ -27,6 +27,8 @@ import {
   resolveCoinIndex,
   calculateLPFees24h,
   calculatePoolAPY,
+  fetchMultiTokenStablePools,
+  buildMultiTokenPoolEntry,
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
 import { getPools as getRewardsChefPools } from "./rewardsChef.service";
@@ -128,50 +130,21 @@ export const getPools = async (
 
   const poolList: any[] = buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress, stakedBalanceMap);
 
-  // Enrich multi-token pools with coin data
-  const multiTokenPools = poolList.filter(p => config.multiTokenStablePools.has(p.address));
-  if (multiTokenPools.length > 0) {
-    await Promise.all(multiTokenPools.map(async (pool) => {
-      try {
-        const coinEntries = await fetchPoolCoins(accessToken, pool.address);
-        if (coinEntries.length <= 2) return; // not actually multi-token
-
-        const coinAddresses = coinEntries.map(c => c.tokenAddress);
-
-        // Fetch token metadata and pool balances in parallel
-        const [tokenMetadataMap, poolBalanceMap] = await Promise.all([
-          fetchTokenMetadata(accessToken, coinAddresses, userAddress),
-          fetchPoolTokenBalances(accessToken, pool.address)
-        ]);
-
-        // Ensure all coin token prices are in priceMap
-        const missingPriceAddresses = coinAddresses.filter(addr => !priceMap.has(addr));
-        if (missingPriceAddresses.length > 0) {
-          const additionalPrices = await getOraclePrices(accessToken, {
-            select: "asset:key,price:value::text",
-            key: `in.(${missingPriceAddresses.join(',')})`
-          });
-          additionalPrices.forEach((price, addr) => priceMap.set(addr, price));
-        }
-
-        pool.coins = buildPoolCoins(coinEntries, tokenMetadataMap, poolBalanceMap, priceMap, userAddress);
-
-        // Recalculate pool metrics using all coins
-        pool.totalLiquidityUSD = calculateMultiTokenLiquidity(pool.coins);
-        const volume24h = volumeMap.get(pool.address) || "0";
-        const fees24h = calculateLPFees24h(volume24h, pool.swapFeeRate, pool.lpSharePercent);
-        pool.apy = calculatePoolAPY(fees24h, pool.totalLiquidityUSD).toFixed(2);
-        pool.lpToken.price = calculateMultiTokenLPPrice(pool.coins, pool.lpToken._totalSupply);
-
-        // Build pool name from all coin symbols
-        const symbols = pool.coins.map((c: PoolCoin) => c._symbol).filter(Boolean);
-        pool.poolName = symbols.join("-");
-        pool.poolSymbol = symbols.join("-");
-      } catch (err) {
-        console.error(`Failed to enrich multi-token pool ${pool.address}:`, err);
-      }
-    }));
-  }
+  // Add multi-token stable pools (they don't appear in BlockApps-Pool with valid tokenA/tokenB
+  // because StablePool is a separate contract that doesn't extend Pool)
+  const multiTokenStablePools = await fetchMultiTokenStablePools(accessToken);
+  const existingAddresses = new Set(poolList.map((p: any) => p.address));
+  await Promise.all(multiTokenStablePools.map(async (stablePool) => {
+    if (existingAddresses.has(stablePool.address)) return;
+    try {
+      const poolEntry = await buildMultiTokenPoolEntry(
+        accessToken, stablePool, priceMap, volumeMap, validatedFactory, userAddress
+      );
+      poolList.push(poolEntry);
+    } catch (err) {
+      console.error(`Failed to build multi-token pool ${stablePool.address}:`, err);
+    }
+  }));
 
   return poolList;
 };
@@ -219,44 +192,48 @@ export const getSwapableTokens = async (
     });
   });
 
-  // Also include tokens from multi-token pools
-  const multiTokenPoolAddresses = validatedPools
-    .filter(p => config.multiTokenStablePools.has((p as any).address))
-    .map(p => (p as any).address as string);
+  // Also include tokens from dynamically discovered multi-token pools
+  const multiTokenStablePools = await fetchMultiTokenStablePools(accessToken);
+  await Promise.all(multiTokenStablePools.map(async (stablePool) => {
+    try {
+      // Only include coins that have balance > 0 in the pool
+      const fundedCoins = stablePool.coins.filter(c => {
+        const balance = stablePool.tokenBalances.get(c.tokenAddress) || "0";
+        return BigInt(balance) > 0n;
+      });
 
-  if (multiTokenPoolAddresses.length > 0) {
-    await Promise.all(multiTokenPoolAddresses.map(async (poolAddr) => {
-      try {
-        const coinEntries = await fetchPoolCoins(accessToken, poolAddr);
-        if (coinEntries.length <= 2) return;
+      // Update existing tokens that have 0 poolBalance with the multi-token pool balance
+      fundedCoins.forEach(c => {
+        const existing = tokenMap.get(c.tokenAddress);
+        if (existing && BigInt(existing.poolBalance || "0") === 0n) {
+          const poolBalance = stablePool.tokenBalances.get(c.tokenAddress) || "0";
+          tokenMap.set(c.tokenAddress, { ...existing, poolBalance });
+        }
+      });
 
-        const coinAddresses = coinEntries.map(c => c.tokenAddress).filter(addr => !tokenMap.has(addr));
-        if (coinAddresses.length === 0) return;
+      const coinAddresses = fundedCoins.map(c => c.tokenAddress).filter(addr => !tokenMap.has(addr));
+      if (coinAddresses.length === 0) return;
 
-        const [tokenMetadataMap, poolBalanceMap] = await Promise.all([
-          fetchTokenMetadata(accessToken, coinAddresses, userAddress),
-          fetchPoolTokenBalances(accessToken, poolAddr)
-        ]);
+      const tokenMetadataMap = await fetchTokenMetadata(accessToken, coinAddresses, userAddress);
 
-        // Fetch prices for new tokens
-        const additionalPrices = await getOraclePrices(accessToken, {
-          select: "asset:key,price:value::text",
-          key: `in.(${coinAddresses.join(',')})`
-        });
+      // Fetch prices for new tokens
+      const additionalPrices = await getOraclePrices(accessToken, {
+        select: "asset:key,price:value::text",
+        key: `in.(${coinAddresses.join(',')})`
+      });
 
-        coinAddresses.forEach(addr => {
-          const token = tokenMetadataMap.get(addr);
-          if (token) {
-            const price = additionalPrices.get(addr) || "0";
-            const poolBalance = poolBalanceMap.get(addr) || "0";
-            tokenMap.set(addr, buildSwapToken(token, price, poolBalance, getTokenBalance(token, userAddress)));
-          }
-        });
-      } catch (err) {
-        console.error(`Failed to fetch multi-token pool coins for ${poolAddr}:`, err);
-      }
-    }));
-  }
+      coinAddresses.forEach(addr => {
+        const token = tokenMetadataMap.get(addr);
+        if (token) {
+          const price = additionalPrices.get(addr) || "0";
+          const poolBalance = stablePool.tokenBalances.get(addr) || "0";
+          tokenMap.set(addr, buildSwapToken(token, price, poolBalance, getTokenBalance(token, userAddress)));
+        }
+      });
+    } catch (err) {
+      console.error(`Failed to fetch multi-token pool coins for ${stablePool.address}:`, err);
+    }
+  }));
 
   return Array.from(tokenMap.values());
 };
@@ -319,29 +296,40 @@ export const getSwapableTokenPairs = async (
   });
 
   // For multi-token pools: if the selected token is in a multi-token pool,
-  // add all other coins from that pool as pairable tokens
-  for (const poolAddr of config.multiTokenStablePools) {
+  // add all other coins from that pool as pairable tokens (only if both have balance > 0)
+  const multiTokenStablePools = await fetchMultiTokenStablePools(accessToken);
+  for (const stablePool of multiTokenStablePools) {
     try {
-      const coinEntries = await fetchPoolCoins(accessToken, poolAddr);
-      if (coinEntries.length <= 2) continue;
-
-      // Check if the selected token is in this pool
-      const isTokenInPool = coinEntries.some(
+      // Check if the selected token is in this pool and has balance > 0
+      const selectedCoin = stablePool.coins.find(
         c => c.tokenAddress.toLowerCase() === tokenAddress.toLowerCase()
       );
-      if (!isTokenInPool) continue;
+      if (!selectedCoin) continue;
+      const selectedBalance = stablePool.tokenBalances.get(selectedCoin.tokenAddress) || "0";
+      if (BigInt(selectedBalance) === 0n) continue;
 
-      // Add all other coins as pairable tokens
-      const otherCoinAddresses = coinEntries
+      // Add other coins that have balance > 0 as pairable tokens
+      const otherFundedCoins = stablePool.coins.filter(c => {
+        if (c.tokenAddress.toLowerCase() === tokenAddress.toLowerCase()) return false;
+        const balance = stablePool.tokenBalances.get(c.tokenAddress) || "0";
+        return BigInt(balance) > 0n;
+      });
+
+      // Update existing tokens that have 0 poolBalance with the multi-token pool balance
+      otherFundedCoins.forEach(c => {
+        const existing = tokenMap.get(c.tokenAddress);
+        if (existing && BigInt(existing.poolBalance || "0") === 0n) {
+          const poolBalance = stablePool.tokenBalances.get(c.tokenAddress) || "0";
+          tokenMap.set(c.tokenAddress, { ...existing, poolBalance });
+        }
+      });
+
+      const otherCoinAddresses = otherFundedCoins
         .map(c => c.tokenAddress)
-        .filter(addr => addr.toLowerCase() !== tokenAddress.toLowerCase() && !tokenMap.has(addr));
-
+        .filter(addr => !tokenMap.has(addr));
       if (otherCoinAddresses.length === 0) continue;
 
-      const [tokenMetadataMap, poolBalanceMap] = await Promise.all([
-        fetchTokenMetadata(accessToken, otherCoinAddresses, userAddress),
-        fetchPoolTokenBalances(accessToken, poolAddr)
-      ]);
+      const tokenMetadataMap = await fetchTokenMetadata(accessToken, otherCoinAddresses, userAddress);
 
       const additionalPrices = await getOraclePrices(accessToken, {
         select: "asset:key,price:value::text",
@@ -352,12 +340,12 @@ export const getSwapableTokenPairs = async (
         const token = tokenMetadataMap.get(addr);
         if (token) {
           const price = additionalPrices.get(addr) || "0";
-          const poolBalance = poolBalanceMap.get(addr) || "0";
+          const poolBalance = stablePool.tokenBalances.get(addr) || "0";
           tokenMap.set(addr, buildSwapToken(token, price, poolBalance, getTokenBalance(token, userAddress)));
         }
       });
     } catch (err) {
-      console.error(`Failed to fetch multi-token pool pairs for ${poolAddr}:`, err);
+      console.error(`Failed to fetch multi-token pool pairs for ${stablePool.address}:`, err);
     }
   }
 

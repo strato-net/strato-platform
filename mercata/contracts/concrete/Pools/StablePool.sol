@@ -33,6 +33,8 @@ contract record StablePool is Ownable {
 
     event SetNewMATime(uint maExpTime, uint DMaTime);
 
+    event CoinAdded(address indexed coin, uint assetType, uint rateMultiplier, address oracle, uint initialAmount, uint lpMinted);
+
     uint constant MAX_COINS = 8;
 
     uint constant PRECISION = 1e18;
@@ -1146,6 +1148,93 @@ contract record StablePool is Ownable {
         DMaTime = _DMaTime;
 
         emit SetNewMATime(_maExpTime, _DMaTime);
+    }
+
+    // ============ ADD COIN ============
+
+    /// @notice Add a new coin to the pool with initial liquidity
+    /// @param _coin The address of the new token to add
+    /// @param _rateMultiplier The rate multiplier for the new token
+    /// @param _assetType The asset type (1=normal, 2=rebasing)
+    /// @param _oracle The price oracle address for the new token (address(0) if none)
+    /// @param _initialAmount The initial deposit amount for the new token
+    /// @param _depositor The address providing the initial deposit (must have approved this pool)
+    /// @return mintAmount The amount of LP tokens minted to the depositor
+    function addCoin(
+        address _coin,
+        uint _rateMultiplier,
+        uint _assetType,
+        address _oracle,
+        uint _initialAmount,
+        address _depositor
+    ) external onlyPoolFactory nonReentrant returns (uint) {
+        require(coins.length < MAX_COINS, "Max coins reached");
+        require(_coin != address(0), "Zero token address");
+        require(_initialAmount > 0, "Initial amount must be > 0");
+        require(_depositor != address(0), "Zero depositor address");
+        require(_rateMultiplier > 0, "Rate multiplier must be > 0");
+
+        // Check coin not already in pool
+        for (uint i = 0; i < coins.length; i++) {
+            require(address(coins[i]) != _coin, "Coin already in pool");
+        }
+
+        // Calculate existing pool value before adding coin
+        uint totalSupply = lpToken.totalSupply();
+        require(totalSupply > 0, "Pool must have existing liquidity");
+
+        uint existingValue = 0;
+        for (uint i = 0; i < coins.length; i++) {
+            address tokenAddr = address(coins[i]);
+            uint balance = tokenBalances[tokenAddr] - adminBalances[tokenAddr];
+            existingValue += (balance * rateMultipliers[tokenAddr]) / PRECISION;
+        }
+        require(existingValue > 0, "Pool has no value");
+
+        // Add coin metadata
+        coins.push(Token(_coin));
+        assetTypes.push(_assetType);
+        poolContainsRebasingTokens = poolContainsRebasingTokens || (_assetType == 2);
+        tokenBalances[_coin] = 0;
+        adminBalances[_coin] = 0;
+        rateMultipliers[_coin] = _rateMultiplier;
+        rateOracles[_coin] = PriceOracle(_oracle);
+
+        // Extend internal arrays
+        callAmount.push(0);
+        scaleFactor.push(0);
+        lastPricesPacked.push(pack2(1e18, 1e18));
+
+        // Transfer in initial deposit (new coin is at index coins.length - 1)
+        uint dx = _transferIn(coins.length - 1, _initialAmount, _depositor, false);
+
+        // Calculate LP tokens to mint proportional to value added
+        uint newValue = (dx * _rateMultiplier) / PRECISION;
+        uint mintAmount = (totalSupply * newValue) / existingValue;
+        require(mintAmount > 0, "Deposit too small to mint LP tokens");
+
+        lpToken.mint(_depositor, mintAmount);
+
+        // Update oracle state with new pool composition
+        uint amp = _A();
+        uint[] rates = _storedRates();
+        uint[] balances = _balances();
+        uint[] xp = _xpMem(rates, balances);
+        uint d = getD(xp, amp);
+
+        lastDPacked = pack2(d, d);
+        uint[2] maLastTimeUnpacked = unpack2(maLastTime);
+        if (maLastTimeUnpacked[1] < block.timestamp) {
+            maLastTimeUnpacked[1] = block.timestamp;
+            maLastTime = pack2(maLastTimeUnpacked[0], maLastTimeUnpacked[1]);
+        }
+
+        upkeepOracles(xp, amp, d);
+        _updateRatios(rates, xp, amp, d);
+
+        emit CoinAdded(_coin, _assetType, _rateMultiplier, _oracle, dx, mintAmount);
+
+        return mintAmount;
     }
 
     // ============ MIGRATION HELPERS ============

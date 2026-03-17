@@ -121,24 +121,53 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data } = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
       const poolData: Pool | null = data?.[0] || null;
-      if (!poolData) return null;
 
-      setPool(poolData);
+      if (poolData) {
+        setPool(poolData);
 
-      const read = (addr?: string) => {
-        if (!addr) return { balance: "0", poolBalance: "0", price: "0" };
-        const token = poolData.tokenA?.address === addr ? poolData.tokenA : poolData.tokenB?.address === addr ? poolData.tokenB : null;
-        return token ? { balance: token.balance || "0", poolBalance: token.poolBalance || "0", price: token.price || "0" } : { balance: "0", poolBalance: "0", price: "0" };
-      };
+        const read = (addr?: string) => {
+          if (!addr) return { balance: "0", poolBalance: "0", price: "0" };
+          // For multi-token pools, check coins array first
+          if (poolData.coins && poolData.coins.length > 2) {
+            const coin = poolData.coins.find(c => c.address === addr);
+            if (coin) return { balance: coin.balance || "0", poolBalance: coin.poolBalance || "0", price: coin.price || "0" };
+          }
+          const token = poolData.tokenA?.address === addr ? poolData.tokenA : poolData.tokenB?.address === addr ? poolData.tokenB : null;
+          return token ? { balance: token.balance || "0", poolBalance: token.poolBalance || "0", price: token.price || "0" } : { balance: "0", poolBalance: "0", price: "0" };
+        };
 
-      setFromAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
-      setToAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
+        setFromAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
+        setToAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
 
-      return poolData;
+        return poolData;
+      }
+
+      // No 2-token pool — check for a multi-token pool where both tokens have balance > 0
+      const multiPool = pools.find(p =>
+        p.coins && p.coins.length > 2 &&
+        p.coins.some(c => c.address === tokenA && BigInt(c.poolBalance || "0") > 0n) &&
+        p.coins.some(c => c.address === tokenB && BigInt(c.poolBalance || "0") > 0n)
+      );
+      if (multiPool) {
+        setPool(multiPool);
+        setFromAsset(prev => {
+          if (!prev) return prev;
+          const coin = multiPool.coins!.find(c => c.address === prev.address);
+          return coin ? { ...prev, balance: coin.balance || "0", poolBalance: coin.poolBalance || "0", price: coin.price || "0" } : prev;
+        });
+        setToAsset(prev => {
+          if (!prev) return prev;
+          const coin = multiPool.coins!.find(c => c.address === prev.address);
+          return coin ? { ...prev, balance: coin.balance || "0", poolBalance: coin.poolBalance || "0", price: coin.price || "0" } : prev;
+        });
+        return multiPool;
+      }
+
+      return null;
     } finally {
       setPoolLoading(false);
     }
-  }, [setPool, setFromAsset, setToAsset]);
+  }, [setPool, setFromAsset, setToAsset, pools]);
 
   const getPoolByAddress = useCallback(async (address: string) => {
     try {

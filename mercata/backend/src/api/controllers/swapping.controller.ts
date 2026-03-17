@@ -237,11 +237,35 @@ class SwappingController {
       const { accessToken, params, address: userAddress } = req;
       validateTokenPairArgs(params);
 
+      const addr1 = params.tokenAddress1.toLowerCase();
+      const addr2 = params.tokenAddress2.toLowerCase();
+
       const pools = await getPools(accessToken, userAddress, {
         tokenA: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
         tokenB: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
       });
-      res.status(RestStatus.OK).json(pools);
+
+      // Filter to only pools where both requested tokens have pool balance > 0
+      const filteredPools = pools.filter(pool => {
+        // Multi-token pool: check coins array
+        if (pool.coins && pool.coins.length > 2) {
+          const coin1 = pool.coins.find((c: any) => c.address.toLowerCase() === addr1);
+          const coin2 = pool.coins.find((c: any) => c.address.toLowerCase() === addr2);
+          return coin1 && coin2
+            && BigInt(coin1.poolBalance || "0") > 0n
+            && BigInt(coin2.poolBalance || "0") > 0n;
+        }
+        // 2-token pool: check tokenA and tokenB
+        const tokenAAddr = pool.tokenA?.address?.toLowerCase();
+        const tokenBAddr = pool.tokenB?.address?.toLowerCase();
+        const hasToken1 = tokenAAddr === addr1 || tokenBAddr === addr1;
+        const hasToken2 = tokenAAddr === addr2 || tokenBAddr === addr2;
+        if (!hasToken1 || !hasToken2) return false;
+        return BigInt(pool.tokenA?.poolBalance || "0") > 0n
+            && BigInt(pool.tokenB?.poolBalance || "0") > 0n;
+      });
+
+      res.status(RestStatus.OK).json(filteredPools);
     } catch (error) {
       next(error);
     }

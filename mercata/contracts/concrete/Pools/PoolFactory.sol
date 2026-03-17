@@ -628,6 +628,48 @@ contract record PoolFactory is Ownable {
         return newPool;
     }
 
+    /// @notice Add a new coin to an existing StablePool
+    /// @param poolAddress The address of the StablePool to add the coin to
+    /// @param _coin The address of the new token to add
+    /// @param _rateMultiplier The rate multiplier for the new token
+    /// @param _assetType The asset type (1=normal, 2=rebasing)
+    /// @param _oracle The price oracle address for the new token (address(0) if none)
+    /// @param _initialAmount The initial deposit amount (depositor must have approved the pool)
+    /// @param _depositor The address providing the initial deposit
+    /// @return mintAmount The amount of LP tokens minted to the depositor
+    function addCoinToStablePool(
+        address poolAddress,
+        address _coin,
+        uint _rateMultiplier,
+        uint _assetType,
+        address _oracle,
+        uint _initialAmount,
+        address _depositor
+    ) external onlyOwner returns (uint mintAmount) {
+        require(poolAddress != address(0), "Zero pool address");
+        require(_coin != address(0), "Zero token address");
+        require(TokenFactory(tokenFactory).isTokenActive(_coin), "Token not active");
+
+        StablePool pool = StablePool(poolAddress);
+        require(pool.getPoolFactory() == address(this), "Pool does not belong to this factory");
+
+        mintAmount = pool.addCoin(_coin, _rateMultiplier, _assetType, _oracle, _initialAmount, _depositor);
+
+        // Update pool registry: add mappings for the new coin paired with all existing coins
+        uint numCoins = pool.getNumCoins();
+        for (uint i = 0; i < numCoins; i++) {
+            address existingCoin = address(pool.coins(i));
+            if (existingCoin != _coin) {
+                pools[existingCoin][_coin] = poolAddress;
+                pools[_coin][existingCoin] = poolAddress;
+            }
+        }
+
+        emit NewPool(_coin, address(pool.coins(0)), poolAddress);
+
+        return mintAmount;
+    }
+
     function updatePoolImplementation() external onlyOwner {
         _updatePoolImplementation();
     }
