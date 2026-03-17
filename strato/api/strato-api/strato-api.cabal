@@ -34,7 +34,6 @@ executable strato-api
     , common-log
     , containers
     , core-api2
-    , directory
     , ethereum-discovery
     , format
     , hflags

@@ -1,65 +1,22 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Blockchain.Strato.Version
-  ( stratoVersion
-  , stratoVersionTag
-  ) where
+module Blockchain.Strato.Version (stratoVersion, stratoVersionTag) where
 
-import Control.Exception (IOException, try)
-import Data.List (isInfixOf, isPrefixOf)
-import Language.Haskell.TH
+import Data.FileEmbed (embedStringFile)
+import Language.Haskell.TH (runIO)
 import System.Process (readProcess)
 
--- | Full version from git describe, e.g., "16.6.1-38-g604abc945c-dirty"
-stratoVersion :: String
-stratoVersion = $(do
-  result <- runIO $ try $ readProcess "git" ["describe", "--tags", "--always", "--dirty"] ""
-  case result of
-    Right v -> litE $ stringL $ filter (/= '\n') v
-    Left (_ :: IOException) -> do
-      -- Not a git repo - check if export-subst expanded the placeholders
-      -- These literals are replaced by git archive: $Format:%D$ and $Format:%h$
-      let gitArchiveRefs = "$Format:%D$"
-          gitArchiveHash = "$Format:%h$"
-          -- Inline tag extraction to avoid TH stage restriction
-          extractTag refs = 
-            let afterTag = drop 5 $ snd $ span (/= 't') refs  -- skip to after "tag: "
-            in takeWhile (\c -> c /= ',' && c /= ' ') afterTag
-      if "$" `isPrefixOf` gitArchiveRefs then
-        -- Placeholders not expanded = not a git archive either
-        fail "Cannot determine version: not a git repository and not a git archive. Please clone with git."
-      else if "tag: " `isInfixOf` gitArchiveRefs then
-        -- Has a tag - extract it (e.g., "tag: 16.6.1, origin/master" -> "16.6.1")
-        litE $ stringL $ extractTag gitArchiveRefs
-      else
-        -- No tag, use the commit hash
-        litE $ stringL gitArchiveHash
-  )
+buildMetadata :: String
+buildMetadata = $(do
+  root <- runIO $ filter (/= '\n') <$> readProcess "git" ["rev-parse", "--show-toplevel"] ""
+  embedStringFile (root ++ "/BUILD_METADATA"))
 
--- | Just the tag portion, e.g., "16.6.1" (used for docker image tags)
--- Falls back to commit hash if no tags are reachable
 stratoVersionTag :: String
-stratoVersionTag = $(do
-  result <- runIO $ try $ readProcess "git" ["describe", "--tags", "--abbrev=0"] ""
-  case result of
-    Right v -> litE $ stringL $ filter (/= '\n') v
-    Left (_ :: IOException) -> do
-      -- No tags reachable - try to get commit hash instead
-      hashResult <- runIO $ try $ readProcess "git" ["rev-parse", "--short", "HEAD"] ""
-      case hashResult of
-        Right h -> litE $ stringL $ filter (/= '\n') h
-        Left (_ :: IOException) -> do
-          -- Not a git repo - check if export-subst expanded the placeholders
-          let gitArchiveRefs = "$Format:%D$"
-              gitArchiveHash = "$Format:%h$"
-              extractTag refs = 
-                let afterTag = drop 5 $ snd $ span (/= 't') refs
-                in takeWhile (\c -> c /= ',' && c /= ' ') afterTag
-          if "$" `isPrefixOf` gitArchiveRefs then
-            fail "Cannot determine version: not a git repository and not a git archive. Please clone with git."
-          else if "tag: " `isInfixOf` gitArchiveRefs then
-            litE $ stringL $ extractTag gitArchiveRefs
-          else
-            litE $ stringL gitArchiveHash
-  )
+stratoVersionTag = case lookup "VERSION" pairs of
+    Just v  -> v
+    Nothing -> error "VERSION not in BUILD_METADATA"
+  where
+    pairs = [(k, drop 1 v) | l <- lines buildMetadata, '=' `elem` l, let (k, v) = break (== '=') l]
+
+stratoVersion :: String
+stratoVersion = stratoVersionTag
