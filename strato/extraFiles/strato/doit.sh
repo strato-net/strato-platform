@@ -43,6 +43,14 @@ do
   sleep 0.5
 done
 echo 'Postgres is available'
+
+echo 'Waiting for Kafka to be available...'
+until nc -z ${kafkaHost:-kafka} ${kafkaPort:-9092}
+do
+  echo "Waiting for Kafka at ${kafkaHost:-kafka}:${kafkaPort:-9092}..."
+  sleep 1
+done
+echo 'Kafka is available'
 # Check if this container was initialized before
 if [ ! -f _container_initialized ]; then
   # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
