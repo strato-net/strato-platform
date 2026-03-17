@@ -364,15 +364,22 @@ export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig):
         method
     });
 
-    const raw = extractNestedProperty(response.data, rebase.factorParse);
+    let raw = extractNestedProperty(response.data, rebase.factorParse);
     if (raw === undefined || raw === null) {
         logError('RebaseFactor', new Error(`${assetKey}: no value at path "${rebase.factorParse}"`));
         return 0n;
     }
 
-    const factor = parsePositiveBigInt(raw);
+    // ABI-encoded eth_call responses with multiple return values pack each uint256
+    // as 32 bytes (64 hex chars). Extract only the first word when result is longer.
+    let rawStr = String(raw).trim();
+    if (rawStr.startsWith('0x') && rawStr.length > 66) {
+        rawStr = rawStr.slice(0, 66);
+    }
+
+    const factor = parsePositiveBigInt(rawStr);
     if (factor <= 0n) {
-        logError('RebaseFactor', new Error(`${assetKey}: invalid factor value "${raw}"`));
+        logError('RebaseFactor', new Error(`${assetKey}: invalid factor value "${rawStr}"`));
         return 0n;
     }
 
