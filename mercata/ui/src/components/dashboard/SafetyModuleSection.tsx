@@ -312,8 +312,9 @@ const SafetyModuleSection = () => {
                     inputAmount={stakeAmount}
                     actionLabel="Stake"
                   />
-                  {/* Stake sUSDST Checkbox - only show if rewards are enabled */}
-                  {rewardsEnabled && (
+                  {/* Stake sUSDST Checkbox - RewardsChef disabled */}
+                  {/* rewardsEnabled && ( ... ) intentionally kept below for reference */}
+                  {false && rewardsEnabled && (
                     <div className="flex items-center space-x-2 mt-3">
                       <Checkbox
                         id="stake-susdst"
@@ -549,8 +550,9 @@ const SafetyModuleSection = () => {
                     <div className="text-sm text-muted-foreground mt-1">
                       Transaction Fee: {SAFETY_REDEEM_FEE} USDST
                     </div>
-                    {/* Include Staked sUSDST Checkbox - only show if rewards are enabled */}
-                    {rewardsEnabled && (
+                    {/* Include Staked sUSDST Checkbox - RewardsChef disabled */}
+                    {/* rewardsEnabled && ( ... ) intentionally kept below for reference */}
+                    {false && rewardsEnabled && (
                       <div className="flex items-center space-x-2 mt-3">
                         <Checkbox
                           id="include-staked-susdst"
@@ -661,6 +663,7 @@ const SafetyModuleSection = () => {
                     )}
                   </span>
                 </div>
+                {/* RewardsChef disabled:
                 {rewardsEnabled && (
                   <>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
@@ -693,6 +696,7 @@ const SafetyModuleSection = () => {
                     </div>
                       </>
                     )}
+                    */}
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">

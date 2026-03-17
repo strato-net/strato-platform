@@ -611,6 +611,7 @@ const LendingPoolSection = () => {
                         )}
                       </span>
                     </div>
+                    {/* RewardsChef disabled:
                     {rewardsEnabled && (
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
                         <span className="text-muted-foreground text-xs sm:text-sm">• Unstaked</span>
@@ -627,6 +628,7 @@ const LendingPoolSection = () => {
                         </span>
                       </div>
                     )}
+                    */}
                   </>
                 )}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">

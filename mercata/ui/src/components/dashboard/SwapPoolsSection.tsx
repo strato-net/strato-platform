@@ -235,6 +235,7 @@ const SwapPoolsSection = () => {
                           <div className="flex items-center text-xs text-muted-foreground mt-1">
                             <span>Your Liquidity: {formatYourLiquidityValue(pool)}</span>
                           </div>
+                          {/* RewardsChef disabled:
                           {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
                             <>
                               <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
@@ -245,6 +246,7 @@ const SwapPoolsSection = () => {
                               </div>
                             </>
                           )}
+                          */}
                         </>
                       )}
                     </div>
