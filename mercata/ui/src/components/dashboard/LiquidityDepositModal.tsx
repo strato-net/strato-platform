@@ -226,7 +226,7 @@ const LiquidityDepositModal = ({
       // Dual token mode: calculate maximum possible deposit based on both balances
       const tokenABalanceWei = BigInt(tokenABalance || "0");
       const tokenBBalanceWei = BigInt(tokenBBalance || "0");
-
+  
       // Check if either token is USDST and account for fees
       const tokenAIsUSDST = selectedPool.tokenA?.address.toLowerCase() === usdstAddress.toLowerCase();
       const tokenBIsUSDST = selectedPool.tokenB?.address.toLowerCase() === usdstAddress.toLowerCase();
@@ -287,7 +287,7 @@ const LiquidityDepositModal = ({
         finalTokenAAmount = availableTokenA;
         finalTokenBAmount = tokenBAmountForFullA;
       }
-       
+      
       // Set both amounts
       setToken1Amount(formatUnits(finalTokenAAmount, 18));
       setToken2Amount(formatUnits(finalTokenBAmount, 18));
