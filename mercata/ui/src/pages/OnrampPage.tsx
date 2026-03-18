@@ -4,17 +4,15 @@ import { useTheme } from "next-themes";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
-import OnrampProgressModal from "../components/onramp/OnrampProgressModal";
-import PurchaseHistory from "../components/onramp/PurchaseHistory";
 import { useUser } from "@/context/UserContext";
 import { useNetwork } from "@/context/NetworkContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
 import { getConfig } from "@/lib/config";
-import { Loader2, AlertCircle, Info, CreditCard, ArrowDown, Wallet, ExternalLink } from "lucide-react";
+import { Loader2, AlertCircle, Info, CreditCard, ArrowDown, Wallet, ExternalLink, CheckCircle2, ArrowUpRight } from "lucide-react";
 
 const ONRAMP_NODES: Record<string, string[]> = {
-  testnet: ["https://buildtest.testnet.strato.nexus"],
+  testnet: ["https://buildtest.testnet.strato.nexus", "localhost:3000"],
   mainnet: ["https://app.strato.nexus, https://hasan.stratomercata.com"],
 };
 
@@ -37,11 +35,8 @@ const OnrampPage = () => {
   const isOnrampNode = typeof window !== "undefined" && onrampNodeUrls.some((url) => url.includes(window.location.hostname));
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [showProgressModal, setShowProgressModal] = useState(false);
-  const [onrampTxHash, setOnrampTxHash] = useState<string | null>(null);
   const [onrampCurrency, setOnrampCurrency] = useState<string | null>(null);
   const [onrampAmount, setOnrampAmount] = useState<string | null>(null);
-  const [purchaseRefreshKey, setPurchaseRefreshKey] = useState(0);
   const onrampContainerRef = useRef<HTMLDivElement>(null);
 
   const initOnramp = useCallback(async () => {
@@ -80,14 +75,10 @@ const OnrampPage = () => {
         setSessionStatus(status as SessionStatus);
         if (status === "fulfillment_complete") {
           const session = e.payload.session;
-          const txHash = session.quote?.blockchain_tx_id || session.transaction_details?.transaction_id;
           const amount = session.quote?.destination_crypto_amount || session.transaction_details?.destination_amount || null;
           const currency = session.quote?.destination_currency?.asset_code || session.transaction_details?.destination_currency || null;
           setOnrampCurrency(currency);
           setOnrampAmount(amount);
-          console.log(`[OnrampPage] fulfillment_complete — txHash=${txHash}`);
-          setOnrampTxHash(txHash || null);
-          setShowProgressModal(true);
         }
       });
 
@@ -113,15 +104,40 @@ const OnrampPage = () => {
     switch (sessionStatus) {
       case "fulfillment_processing":
         return null;
-      case "fulfillment_complete":
+      case "fulfillment_complete": {
+        const cryptoName = onrampCurrency === "usdc" ? "USDC" : onrampCurrency === "eth" ? "ETH" : (onrampCurrency || "crypto").toUpperCase();
+        const displayAmount = onrampAmount ? `${Number(onrampAmount).toFixed(6)} ` : "";
         return (
-          <button
-            onClick={initOnramp}
-            className="w-full py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-          >
-            Make Another Purchase
-          </button>
+          <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                Purchase Complete — {displayAmount}{cryptoName} sent to your wallet
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              To use your funds on STRATO, bridge the tokens using the STRATO Bridge.
+            </p>
+            <div className="flex gap-2">
+              <a
+                href="/dashboard/deposits"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+              >
+                Go to Bridge
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </a>
+              <button
+                onClick={initOnramp}
+                className="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Buy More
+              </button>
+            </div>
+          </div>
         );
+      }
       case "rejected":
         return (
           <div className="flex items-start gap-2 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg text-sm">
@@ -208,9 +224,8 @@ const OnrampPage = () => {
                       Powered by Stripe. Available in the US (excl. Hawaii) and EU.
                       Identity verification and payment processing are handled
                       securely by Stripe — STRATO never sees your card or bank
-                      details. The wallet address shown in the Stripe widget is
-                      STRATO's receiving address; once crypto arrives, we
-                      automatically credit the tokens to your account.
+                      details. Enter your own wallet address to receive the crypto
+                      directly, then bridge it to STRATO when ready.
                     </span>
                   </div>
                 </>
@@ -228,17 +243,15 @@ const OnrampPage = () => {
                       <span>Pay with card, bank transfer, or Apple Pay via Stripe</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <ArrowDown className="h-3.5 w-3.5 shrink-0" />
-                      <span>Stripe delivers the purchased crypto to STRATO's receiving address</span>
+                      <Wallet className="h-3.5 w-3.5 shrink-0" />
+                      <span>Enter your Ethereum wallet address — crypto is sent directly to you</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <Wallet className="h-3.5 w-3.5 shrink-0" />
-                      <span>Once crypto arrives, we automatically credit the equivalent wrapped tokens to your STRATO account</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+                      <span>Bridge the tokens to STRATO when you're ready</span>
                     </li>
                   </ol>
                 </div>
-
-                <PurchaseHistory refreshKey={purchaseRefreshKey} />
               </div>
             )}
           </div>
@@ -246,13 +259,6 @@ const OnrampPage = () => {
       </div>
 
       <MobileBottomNav />
-      <OnrampProgressModal
-        open={showProgressModal}
-        externalTxHash={onrampTxHash}
-        currency={onrampCurrency}
-        amount={onrampAmount}
-        onClose={() => { setShowProgressModal(false); setPurchaseRefreshKey((k) => k + 1); }}
-      />
     </div>
   );
 };

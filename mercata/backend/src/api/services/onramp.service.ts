@@ -202,21 +202,21 @@ export async function createOnrampSession(
   if (!stripe || !OnrampSessionResource) {
     throw new Error("Stripe onramp is not configured on this node");
   }
-  const hotWallet = process.env.ONRAMP_HOT_WALLET_ADDRESS;
-  if (!hotWallet) {
-    throw new Error("ONRAMP_HOT_WALLET_ADDRESS is not configured");
-  }
+  // const hotWallet = process.env.ONRAMP_HOT_WALLET_ADDRESS;
+  // if (!hotWallet) {
+  //   throw new Error("ONRAMP_HOT_WALLET_ADDRESS is not configured");
+  // }
 
   console.log(`[Onramp] Creating session — user=${userStratoAddress}, ip=${clientIp}`);
 
   const onrampSession = await new OnrampSessionResource(stripe).create({
-    wallet_addresses: {
-      ethereum: hotWallet,
-    },
+    // wallet_addresses: {
+    //   ethereum: hotWallet,
+    // },
     customer_ip_address: clientIp,
     destination_currencies: ["usdc", "eth"],
     destination_networks: ["ethereum"],
-    lock_wallet_address: true,
+    // lock_wallet_address: true,
     metadata: {
       strato_user_address: userStratoAddress,
     },
@@ -280,30 +280,30 @@ export async function handleSessionUpdate(sessionData: any): Promise<void> {
     }
 
     const externalTokenAmount = toRawAmount(amount, decimals);
-    const hotWallet = process.env.ONRAMP_HOT_WALLET_ADDRESS;
-    if (!hotWallet) {
-      console.error(`[Onramp] ONRAMP_HOT_WALLET_ADDRESS not configured — cannot deposit`);
-      return;
-    }
-    const externalSender = hotWallet.replace(/^0x/, "");
+    // const hotWallet = process.env.ONRAMP_HOT_WALLET_ADDRESS;
+    // if (!hotWallet) {
+    //   console.error(`[Onramp] ONRAMP_HOT_WALLET_ADDRESS not configured — cannot deposit`);
+    //   return;
+    // }
+    // const externalSender = hotWallet.replace(/^0x/, "");
 
-    try {
-      await depositOnStrato(
-        chainId,
-        externalSender,
-        externalToken,
-        externalTokenAmount,
-        txHash,
-        userAddress,
-        targetStratoToken,
-      );
-    } catch (err: any) {
-      if (err.message?.includes("MB: duplicate deposit")) {
-        console.log(`[Onramp] Deposit already recorded for txHash=${txHash} — skipping`);
-      } else {
-        console.error(`[Onramp] depositBatch FAILED — ${err.message}`);
-      }
-    }
+    // try {
+    //   await depositOnStrato(
+    //     chainId,
+    //     externalSender,
+    //     externalToken,
+    //     externalTokenAmount,
+    //     txHash,
+    //     userAddress,
+    //     targetStratoToken,
+    //   );
+    // } catch (err: any) {
+    //   if (err.message?.includes("MB: duplicate deposit")) {
+    //     console.log(`[Onramp] Deposit already recorded for txHash=${txHash} — skipping`);
+    //   } else {
+    //     console.error(`[Onramp] depositBatch FAILED — ${err.message}`);
+    //   }
+    // }
   } else {
     console.log(`[Onramp] Session ${stripeSessionId} → ${status} (user=${userAddress})`);
   }
