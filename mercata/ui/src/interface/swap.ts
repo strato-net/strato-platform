@@ -79,18 +79,15 @@ export interface SwapContextActions {
     poolAddress: string;
     tokenBAmount: string;
     maxTokenAAmount: string;
-    stakeLPToken?: boolean;
   }) => Promise<void>;
   addLiquiditySingleToken: (data: {
     poolAddress: string;
     singleTokenAmount: string;
     isAToB: boolean;
-    stakeLPToken?: boolean;
   }) => Promise<void>;
   removeLiquidity: (data: {
     poolAddress: string;
     lpTokenAmount: string;
-    includeStakedLPToken?: boolean;
   }) => Promise<void>;
 
   // Multi-token pool operations

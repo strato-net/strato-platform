@@ -54,6 +54,8 @@ import qualified LabeledError
 import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
+import Text.ShortDescription
+import Text.Tools (shortenMiddle)
 
 -- This module is a wrapper for Crypto.Secp256k1, with
 -- all the extra instances we need
@@ -155,6 +157,9 @@ instance ToSchema PublicKey where
 
 instance Format PublicKey where
   format = CL.yellow . C8.unpack . B16.encode . exportPublicKey False
+
+instance ShortDescription PublicKey where
+  shortDescription = shortenMiddle 8 4 . C8.unpack . B16.encode . exportPublicKey False
 
 instance ToJSON SharedKey where
   toJSON = String . T.pack . C8.unpack . B16.encode . coerce

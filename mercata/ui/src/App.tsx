@@ -32,8 +32,11 @@ import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
+import Earn from "./pages/Earn";
+import EarnVault from "./pages/EarnVault";
+import EarnLending from "./pages/EarnLending";
+import EarnPools from "./pages/EarnPools";
 import OnrampPage from "./pages/OnrampPage";
-import BuyMetals from "./pages/BuyMetals";
 import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
@@ -51,6 +54,7 @@ import {
 import AdminRoute from "./components/AdminRoute";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
+import { EarnProvider } from "@/context/EarnContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
 import { SafetyProvider } from "./context/SafetyContext";
 import { LendingProvider } from "@/context/LendingContext";
@@ -184,6 +188,7 @@ const App = () => {
                             <LendingProvider>
                               <CDPProvider>
                                 <BridgeProvider>
+                                  <EarnProvider>
                                   <VaultProvider>
                                     <TooltipProvider>
                                       <Toaster />
@@ -205,14 +210,6 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <SwapAsset />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/buy-metals"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <BuyMetals />
                                               </GuestAccessibleRoute>
                                             }
                                           />
@@ -253,6 +250,38 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Vault />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-vault"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnVault />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <Earn />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-lending"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnLending />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-pools"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnPools />
                                               </GuestAccessibleRoute>
                                             }
                                           />
@@ -369,6 +398,7 @@ const App = () => {
                                       </BrowserRouter>
                                     </TooltipProvider>
                                   </VaultProvider>
+                                  </EarnProvider>
                                 </BridgeProvider>
                               </CDPProvider>
                             </LendingProvider>

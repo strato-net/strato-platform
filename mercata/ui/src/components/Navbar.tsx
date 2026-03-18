@@ -70,7 +70,7 @@ const Navbar = () => {
                     : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue/30 dark:border-strato-lightblue/50 hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
               }`}
             >
-              {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login'}
+              {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login/Sign Up'}
             </button>
           </div>
           <div className="flex md:hidden">
@@ -118,7 +118,7 @@ const Navbar = () => {
                       : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue dark:border-strato-lightblue hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
                 }`}
               >
-                {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login'}
+                {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login/Sign Up'}
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 name: strato-init
 version: 0.0.1
 build-type: Simple
+
 author: Jamshid
 maintainer: jamshidnh@gmail.com
 synopsis: A tool to setup the DBs for a Strato instance
@@ -15,6 +16,16 @@ dependencies:
 
 library:
   source-dirs: src/
+  exposed-modules:
+    - Blockchain.Init.ComposeTypes
+    - Blockchain.Init.DockerCompose
+    - Blockchain.Init.DockerComposeAllDocker
+    - Blockchain.Init.EthConf
+    - Blockchain.Init.Generator
+    - Blockchain.Init.BuildMetadata
+    - Blockchain.Init.BuildMetadata.TH
+    - Blockchain.Init.Monad
+    - Blockchain.Init.Options
   dependencies:
   - aeson
   - base16-bytestring
@@ -33,7 +44,6 @@ library:
   - ethereum-rlp
   - evm-solidity
   - exceptions
-  - file-embed
   - filepath
   - format
   - hflags
@@ -47,6 +57,8 @@ library:
   - nibblestring
   - persistent-postgresql
   - entropy
+  - file-embed
+  - process
   - raw-strings-qq
   - redis-monad
   - resourcet
@@ -63,9 +75,11 @@ library:
   - strato-sequencer
   - strato-statediff
   # - strato-p2p
+  - template-haskell
   - text
   - transformers
   - turtle
+  - unix
   - unliftio
   - vm-tools
   - yaml

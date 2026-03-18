@@ -4,8 +4,8 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useBridgeContext } from '@/context/BridgeContext';
-import { getChainName } from '@/lib/bridge/utils';
 import { formatBalance } from '@/utils/numberUtils';
+import { mergePendingDeposits } from '@/lib/bridge/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 type RecentTx = {
@@ -16,6 +16,9 @@ type RecentTx = {
   stratoTokenSymbol?: string;
   amount?: string;
   status?: string;
+  depositOutcome?: 'bridge' | 'save' | 'forge';
+  finalTokenSymbol?: string;
+  finalAmount?: string;
 };
 
 const getStatusLabel = (status?: string | number) => {
@@ -45,9 +48,12 @@ const RecentTransactions = () => {
   const {
     fetchDepositTransactions,
     fetchWithdrawTransactions,
+    availableNetworks,
     depositRefreshKey,
     withdrawalRefreshKey,
   } = useBridgeContext();
+
+  const chainNameMap = new Map(availableNetworks.map(n => [String(n.chainId), n.chainName]));
   const isMobile = useIsMobile();
   const recentLimit = isMobile ? 6 : 8;
   const [transactions, setTransactions] = useState<RecentTx[]>([]);
@@ -69,11 +75,7 @@ const RecentTransactions = () => {
     ])
       .then(([depositResult, withdrawalResult]) => {
         const apiDeposits = (depositResult.data || []) as unknown as Record<string, unknown>[];
-
-        const pendingRaw = JSON.parse(localStorage.getItem('pendingDeposits') || '[]') as Record<string, unknown>[];
-        const apiTxHashes = new Set(apiDeposits.map((tx) => tx?.externalTxHash));
-        const remainingPending = pendingRaw.filter((p) => !apiTxHashes.has(p?.externalTxHash));
-        localStorage.setItem('pendingDeposits', JSON.stringify(remainingPending));
+        const { remaining: remainingPending } = mergePendingDeposits(apiDeposits);
 
         const pendingTxs: RecentTx[] = remainingPending.map((p) => ({
           _type: 'deposit' as const,
@@ -83,6 +85,8 @@ const RecentTransactions = () => {
           stratoTokenSymbol: p.stratoTokenSymbol as string,
           amount: (p.DepositInfo as Record<string, unknown>)?.stratoTokenAmount as string,
           status: (p.DepositInfo as Record<string, unknown>)?.bridgeStatus as string,
+          depositOutcome: (p.type === 'saving' ? 'save' : p.type === 'forge' ? 'forge' : 'bridge') as RecentTx['depositOutcome'],
+          finalTokenSymbol: p.finalTokenSymbol as string | undefined,
         }));
 
         const deposits: RecentTx[] = apiDeposits.map((tx) => ({
@@ -93,6 +97,9 @@ const RecentTransactions = () => {
           stratoTokenSymbol: tx.stratoTokenSymbol as string,
           amount: (tx.DepositInfo as Record<string, unknown>)?.stratoTokenAmount as string,
           status: (tx.DepositInfo as Record<string, unknown>)?.bridgeStatus as string,
+          depositOutcome: tx.depositOutcome as RecentTx['depositOutcome'],
+          finalTokenSymbol: tx.finalTokenSymbol as string | undefined,
+          finalAmount: tx.finalAmount as string | undefined,
         }));
 
         const withdrawals: RecentTx[] = ((withdrawalResult.data || []) as unknown as Record<string, unknown>[]).map((tx) => ({
@@ -158,9 +165,11 @@ const RecentTransactions = () => {
               const status = getStatusLabel(tx.status);
               const isWithdrawal = tx._type === 'withdrawal';
               const amountFormatted = formatBalance(tx.amount || "0", undefined, 18, 2, 4);
+              const hasOutcome = !isWithdrawal && tx.depositOutcome && tx.depositOutcome !== "bridge" && tx.finalTokenSymbol;
+              const toAmount = hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, 18, 2, 4) : amountFormatted;
               const label = isWithdrawal ? "Withdrawal" : "Deposit";
               const fromSymbol = isWithdrawal ? tx.stratoTokenSymbol : tx.externalSymbol;
-              const toSymbol = isWithdrawal ? tx.externalSymbol : tx.stratoTokenSymbol;
+              const toSymbol = hasOutcome ? tx.finalTokenSymbol : (isWithdrawal ? tx.externalSymbol : tx.stratoTokenSymbol);
               return (
                 <div key={`${tx.block_timestamp || "tx"}-${index}`} className="flex items-center gap-3 px-4 py-4">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
@@ -180,7 +189,7 @@ const RecentTransactions = () => {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatTimeAgo(tx.block_timestamp)} · {getChainName(Number(tx.externalChainId || 1))}
+                      {formatTimeAgo(tx.block_timestamp)} · {chainNameMap.get(String(tx.externalChainId)) || "Unknown Chain"}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -188,7 +197,7 @@ const RecentTransactions = () => {
                       {amountFormatted} {fromSymbol || "-"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {"\u2192"} {amountFormatted} {toSymbol || "-"}
+                      {"\u2192"} {toAmount} {toSymbol || "-"}
                     </p>
                   </div>
                 </div>

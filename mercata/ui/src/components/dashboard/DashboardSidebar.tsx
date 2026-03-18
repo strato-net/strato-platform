@@ -15,9 +15,9 @@ import {
   Shield,
   UserPlus,
   LucideIcon,
+  HandCoins,
   Vault,
   CreditCard,
-  Gem,
   ArrowDownToLine
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -33,12 +33,12 @@ interface NavItem {
 
 const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
-  { icon: Gem, label: 'Buy Metals', path: '/dashboard/buy-metals' },
   { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
   { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
+  { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
   { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },

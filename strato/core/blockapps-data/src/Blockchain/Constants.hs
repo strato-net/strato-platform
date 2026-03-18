@@ -2,9 +2,11 @@
 
 module Blockchain.Constants where
 
+import Blockchain.Strato.Version (stratoVersion)
 import System.FilePath
 
-stratoVersionString = "Ethereum(G)/v?.?.?/linux/Haskell"
+stratoVersionString :: String
+stratoVersionString = "STRATO/v" ++ stratoVersion ++ "/linux/Haskell"
 
 stateDBPath :: String
 stateDBPath = "/state/"

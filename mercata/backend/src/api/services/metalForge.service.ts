@@ -16,6 +16,7 @@ export interface MetalConfig {
   mintCap: string;
   feeBps: string;
   totalMinted: string;
+  price: string;
 }
 
 export interface PayTokenConfig {
@@ -23,6 +24,7 @@ export interface PayTokenConfig {
   symbol: string;
   name: string;
   imageUrl: string;
+  price: string;
 }
 
 export interface Config {
@@ -31,13 +33,10 @@ export interface Config {
 }
 
 /**
- * Cirrus response shape for a struct-valued mapping row:
- *   { address, key, value: { field1, field2, ... }, block_hash, ... }
- *
- * For a uint-valued mapping row:
- *   { address, key, value: <number|string>, block_hash, ... }
+ * Fetches MetalForge configuration: enabled metals, supported pay tokens,
+ * mint caps, fees, total minted, and oracle prices.
+ * Uses 2 Cirrus calls: 1 mapping (MetalForge configs + oracle prices) + 1 Token (metadata).
  */
-
 export const getConfigs = async (
   accessToken: string
 ): Promise<Config> => {
@@ -45,47 +44,43 @@ export const getConfigs = async (
     throw new Error("METAL_FORGE address not configured");
   }
 
-  const [
-    { data: metalConfigRows },
-    { data: payTokenConfigRows },
-    { data: totalMintedRows },
-  ] = await Promise.all([
-    cirrus.get(accessToken, `/${MetalForge}-metalConfigs`, {
-      params: { address: `eq.${constants.metalForge}`, select: "key,value::text" },
-    }),
-    cirrus.get(accessToken, `/${MetalForge}-isSupportedPayToken`, {
-      params: { address: `eq.${constants.metalForge}`, select: "key,value::text" },
-    }),
-    cirrus.get(accessToken, `/${MetalForge}-totalMinted`, {
-      params: { address: `eq.${constants.metalForge}`, select: "key,value::text" },
-    }),
-  ]);
+  const mappingOr = `(and(address.eq.${constants.metalForge},collection_name.in.(metalConfigs,isSupportedPayToken,totalMinted)),and(address.eq.${constants.priceOracle},collection_name.eq.prices))`;
+  const { data: mappingRows } = await cirrus.get(accessToken, "/mapping", { params: {
+    select: "collection_name,key->>key,value::text", or: mappingOr,
+  }});
+  const metalConfigs: { addr: string; value: any }[] = [];
+  const payTokenAddrs: string[] = [];
+  const totalMintedMap = new Map<string, string>();
+  const priceMap = new Map<string, string>();
 
-  const parseStructValue = (raw: any): Record<string, any> => {
-    if (typeof raw === "string") {
-      try { return JSON.parse(raw); } catch { return {}; }
+  for (const r of mappingRows || []) {
+    switch (r.collection_name) {
+      case "metalConfigs":
+        metalConfigs.push({ addr: r.key, value: typeof r.value === "string" ? JSON.parse(r.value) : r.value ?? {} });
+        break;
+      case "isSupportedPayToken":
+        if (r.value === "true" || r.value === true) payTokenAddrs.push(r.key);
+        break;
+      case "totalMinted":
+        totalMintedMap.set(r.key, String(r.value ?? "0"));
+        break;
+      case "prices":
+        priceMap.set(r.key, r.value);
+        break;
     }
-    return raw ?? {};
-  };
+  }
 
-  const totalMintedMap = new Map<string, string>(
-    (totalMintedRows || []).map((r: any) => [r.key, String(r.value ?? "0")])
-  );
-
-  const allAddresses = [
-    ...(metalConfigRows || []).map((r: any) => r.key),
-    ...(payTokenConfigRows || []).map((r: any) => r.key),
-  ].filter(Boolean);
-
+  // 1 Token call: metadata for all metal + pay token addresses
+  const allAddresses = [...metalConfigs.map(m => m.addr), ...payTokenAddrs].filter(Boolean);
   const tokenInfoMap = new Map<string, { symbol: string; name: string; imageUrl: string }>();
   if (allAddresses.length > 0) {
-    const { data: tokens } = await cirrus.get(accessToken, `/${Token}`, {
+    const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
       params: {
         address: `in.(${allAddresses.join(",")})`,
         select: `address,_symbol,_name,images:${Token}-images(value)`,
       },
     });
-    for (const t of tokens || []) {
+    for (const t of tokenData || []) {
       tokenInfoMap.set(t.address, {
         symbol: t._symbol,
         name: t._name,
@@ -94,34 +89,31 @@ export const getConfigs = async (
     }
   }
 
-  const metals: MetalConfig[] = (metalConfigRows || []).map((r: any) => {
-    const tokenAddr = r.key;
-    const v = parseStructValue(r.value);
-    const info = tokenInfoMap.get(tokenAddr) || { symbol: tokenAddr, name: "", imageUrl: "" };
+  const metals: MetalConfig[] = metalConfigs.map(({ addr, value: v }) => {
+    const info = tokenInfoMap.get(addr) || { symbol: addr, name: "", imageUrl: "" };
     return {
-      address: tokenAddr,
+      address: addr,
       symbol: info.symbol,
       name: info.name,
       imageUrl: info.imageUrl,
       isEnabled: v.isEnabled ?? false,
       mintCap: String(v.mintCap ?? "0"),
-      feeBps: String(v.feeBps ?? "???"),
-      totalMinted: totalMintedMap.get(tokenAddr) || "0",
+      feeBps: String(v.feeBps ?? "0"),
+      totalMinted: totalMintedMap.get(addr) || "0",
+      price: priceMap.get(addr) || "0",
     };
   });
 
-  const payTokens: PayTokenConfig[] = (payTokenConfigRows || []).map((r: any) => {
-    const tokenAddr = r.key;
-    const isSupported = r.value === true || r.value === "true";
-    if (!isSupported) return null;
-    const info = tokenInfoMap.get(tokenAddr) || { symbol: tokenAddr, name: "", imageUrl: "" };
+  const payTokens: PayTokenConfig[] = payTokenAddrs.map(addr => {
+    const info = tokenInfoMap.get(addr) || { symbol: addr, name: "", imageUrl: "" };
     return {
-      address: tokenAddr,
+      address: addr,
       symbol: info.symbol,
       name: info.name,
       imageUrl: info.imageUrl,
+      price: priceMap.get(addr) || "0",
     };
-  }).filter(Boolean) as PayTokenConfig[];
+  });
 
   return { metals, payTokens };
 };

@@ -14,9 +14,9 @@ type SafetyContextType = {
   safetyInfo: SafetyModuleData | null;
   loading: boolean;
   refreshSafetyInfo: (signal?: AbortSignal) => void;
-  stakeSafety: (args: { amount: string; stakeSToken: boolean }) => Promise<void>;
+  stakeSafety: (args: { amount: string }) => Promise<void>;
   startCooldown: () => Promise<void>;
-  redeemSafety: (args: { sharesAmount: string; includeStakedSToken: boolean }) => Promise<void>;
+  redeemSafety: (args: { sharesAmount: string }) => Promise<void>;
   redeemAllSafety: () => Promise<void>;
 };
 
@@ -47,10 +47,10 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const stakeSafety = useCallback(
-    async ({ amount, stakeSToken }: { amount: string; stakeSToken: boolean }) => {
+    async ({ amount }: { amount: string }) => {
       if (!isLoggedIn) throw new Error("User not connected");
 
-      const response = await api.post("/lending/safety/stake", { amount, stakeSToken });
+      const response = await api.post("/lending/safety/stake", { amount });
       refreshSafetyInfo();
       return response.data;
     },
@@ -66,10 +66,10 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
   }, [isLoggedIn, refreshSafetyInfo]);
 
   const redeemSafety = useCallback(
-    async ({ sharesAmount, includeStakedSToken }: { sharesAmount: string; includeStakedSToken: boolean }) => {
+    async ({ sharesAmount }: { sharesAmount: string }) => {
       if (!isLoggedIn) throw new Error("User not connected");
 
-      const response = await api.post("/lending/safety/redeem", { sharesAmount, includeStakedSToken });
+      const response = await api.post("/lending/safety/redeem", { sharesAmount });
       refreshSafetyInfo();
       return response.data;
     },

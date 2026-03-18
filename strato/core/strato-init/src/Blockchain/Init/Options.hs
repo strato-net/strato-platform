@@ -10,10 +10,10 @@ parseBootnodeString "" = []
 parseBootnodeString s | not $ elem '[' s = [s]
 parseBootnodeString s = read s
 
-defineFlag "u:pguser" ("" :: String) "Postgres user"
-defineFlag "P:pghost" ("" :: String) "Postgres hostname"
+defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
+defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
 defineFlag "p:password" ("" :: String) "Postgres password"
-defineFlag "K:kafkahost" ("" :: String) "Kafka hostname"
+defineFlag "K:kafkahost" ("localhost" :: String) "Kafka hostname"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag
@@ -32,6 +32,10 @@ defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for m
 
 defineFlag "apiIPAddress" "127.0.0.1" "The IP address that strato-api will bind to"
 
+defineFlag "httpPort" (8081 :: Int) "The external HTTP port for nginx"
+
+defineFlag "svmTrace" (False :: Bool) "Enable verbose logging in SolidVM"
+
 defineFlag "vaultUrl" "https://vault.blockapps.net:8093/strato/v2.3" "URL of the shared vault service"
 
 defineFlag "fileServerUrl" "" "URL of the file server for marketplace (derived from network if not provided)"
@@ -39,6 +43,10 @@ defineFlag "fileServerUrl" "" "URL of the file server for marketplace (derived f
 defineFlag "notificationServerUrl" "" "URL of the notification server for marketplace"
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
+
+defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
+
+defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g., 'registry.example.com/org/')"
 
 -- P2P config flags
 defineFlag "maxConn" (1000 :: Int) "Maximum number of P2P client connections"

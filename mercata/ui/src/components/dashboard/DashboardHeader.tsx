@@ -205,7 +205,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
             className="h-8 md:h-9 px-3 md:px-4 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 gap-1.5"
           >
             <LogIn size={14} />
-            <span className="text-xs md:text-sm font-medium">Login</span>
+            <span className="text-xs md:text-sm font-medium">Login/Sign Up</span>
           </Button>
         )}
       </div>

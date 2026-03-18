@@ -53,7 +53,6 @@ export function validateAddLiquidityDualTokenArgs(args: any) {
   const schema = Joi.object({
     tokenBAmount: numericStringField("TokenBAmount").required(),
     maxTokenAAmount: numericStringField("MaxTokenAAmount").required(),
-    stakeLPToken: Joi.boolean().optional(),
   });
 
   const { error } = schema.validate(args);
@@ -66,7 +65,6 @@ export function validateAddLiquiditySingleTokenArgs(args: any) {
   const schema = Joi.object({
     singleTokenAmount: numericStringField("SingleTokenAmount").required(),
     isAToB: Joi.boolean().required(),
-    stakeLPToken: Joi.boolean().optional(),
   });
 
   const { error } = schema.validate(args);
@@ -78,7 +76,6 @@ export function validateAddLiquiditySingleTokenArgs(args: any) {
 export function validateRemoveLiquidityArgs(args: any) {
   const schema = Joi.object({
     lpTokenAmount: numericStringField("LpTokenAmount"),
-    includeStakedLPToken: Joi.boolean().optional(),
   });
 
   const { error } = schema.validate(args);

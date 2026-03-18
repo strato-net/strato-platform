@@ -9,6 +9,7 @@ module Text.Tools
     multilineDebugLog,
     setTitle,
     shorten,
+    shortenMiddle,
     tab,
     tab',
     wrap,
@@ -95,6 +96,11 @@ setTitle value = do
 shorten :: Int -> String -> String
 shorten maxLen s | length s <= maxLen = s
 shorten maxLen s = take maxLen s ++ "..."
+
+shortenMiddle :: Int -> Int -> String -> String
+shortenMiddle startLen endLen s
+  | length s <= startLen + endLen + 3 = s
+  | otherwise = take startLen s ++ "..." ++ drop (length s - endLen) s
 
 wrap :: Int -> String -> [String]
 wrap maxLen s | length s > maxLen = take maxLen s : wrap maxLen (drop maxLen s)

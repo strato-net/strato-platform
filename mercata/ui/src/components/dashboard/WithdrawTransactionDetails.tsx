@@ -137,39 +137,24 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
       width: 120,
     },
     {
-      title: "Token (External)",
-      key: 'ethTokenSymbol',
-      render: (_: any, record: any) => {
-        const symbol =
-          record?.externalSymbol ||
-          (record?.externalName === 'Ether' ? 'ETH' : record?.externalName) ||
-          '-';
-        return (
-          <div className="flex flex-col gap-1">
-            <span className="text-sm text-foreground">{symbol}</span>
-          </div>
-        );
-      },
-      width: 150,
-    },
-    {
-      title: 'Token (STRATO)',
-      key: 'tokenSymbol',
+      title: "Sent",
+      key: "sent",
       render: (_: any, record: any) => {
         const symbol = record?.stratoTokenSymbol || '-';
-        return (
-          <div className="flex flex-col gap-1">
-            <span className="text-sm text-foreground">{symbol}</span>
-          </div>
-        );
+        const amount = formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18);
+        return <span className="text-sm text-foreground">{amount} {symbol}</span>;
       },
-      width: 150,
+      width: 140,
     },
     {
-      title: 'Amount',
-      key: 'amount',
-      render: (_: any, record: any) => formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18),
-      width: 80,
+      title: "Received",
+      key: "received",
+      render: (_: any, record: any) => {
+        const symbol = record?.externalSymbol || (record?.externalName === 'Ether' ? 'ETH' : record?.externalName) || '-';
+        const amount = formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18);
+        return <span className="text-sm text-foreground">{amount} {symbol}</span>;
+      },
+      width: 140,
     },
     {
       title: 'Status',

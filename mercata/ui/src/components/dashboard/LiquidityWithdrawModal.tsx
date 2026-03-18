@@ -1,9 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +10,7 @@ import {
 import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from '@/context/SwapContext';
-import { WITHDRAW_FEE, rewardsEnabled } from "@/lib/constants";
+import { WITHDRAW_FEE } from "@/lib/constants";
 import { Pool } from '@/interface';
 import { safeParseUnits, formatWeiAmount, formatUnits } from '@/utils/numberUtils';
 import { handleAmountInputChange, computeMaxTransferable } from '@/utils/transferValidation';
@@ -53,20 +50,15 @@ const LiquidityWithdrawModal = ({
     computeMaxTransferable("100", false, voucherBalance, usdstBalance, safeParseUnits(WITHDRAW_FEE).toString(), setFeeError);
   }, [usdstBalance, voucherBalance]);
 
-  const [includeStakedLPToken, setIncludeStakedLPToken] = useState<boolean>(false);
-
   const totalLiquidityBalance = useMemo(() => {
     if (!selectedPool) return "0";
     return selectedPool.lpToken.totalBalance || selectedPool.lpToken.balance || "0";
   }, [selectedPool]);
 
-  // Calculate available balance based on checkbox state
   const availableLPBalance = useMemo(() => {
     if (!selectedPool) return "0";
-    return includeStakedLPToken && selectedPool.lpToken.totalBalance
-      ? selectedPool.lpToken.totalBalance
-      : selectedPool.lpToken.balance;
-  }, [selectedPool, includeStakedLPToken]);
+    return selectedPool.lpToken.balance;
+  }, [selectedPool]);
 
   const tokenALabel = useMemo(() => {
     if (!selectedPool) return "Token A";
@@ -92,7 +84,6 @@ const LiquidityWithdrawModal = ({
   const removeLiquidity = removeLiquidityContext as (params: {
     poolAddress: string;
     lpTokenAmount: string;
-    includeStakedLPToken?: boolean;
   }) => Promise<void>;
 
   const isMultiToken = useMemo(() => selectedPool ? isMultiTokenPool(selectedPool) : false, [selectedPool]);
@@ -107,7 +98,6 @@ const LiquidityWithdrawModal = ({
 
   const handleClose = () => {
     setWithdrawPercent('');
-    setIncludeStakedLPToken(false);
     onClose();
   };
 
@@ -130,7 +120,6 @@ const LiquidityWithdrawModal = ({
           poolAddress: selectedPool.address,
           lpTokenAmount: calculatedAmount.toString(),
           minAmounts,
-          includeStakedLPToken: includeStakedLPToken
         });
 
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -159,7 +148,6 @@ const LiquidityWithdrawModal = ({
         await removeLiquidity({
           poolAddress: selectedPool.address,
           lpTokenAmount: calculatedAmount.toString(),
-          includeStakedLPToken: includeStakedLPToken
         });
 
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -386,35 +374,6 @@ const LiquidityWithdrawModal = ({
               />
             );
           })()}
-
-          {/* Include Staked LP Token Checkbox - only show if pool has rewards program AND rewards are enabled */}
-          {rewardsEnabled && selectedPool?.lpToken?.stakedBalance !== undefined && (
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="include-staked-lp-token"
-                checked={includeStakedLPToken}
-                onCheckedChange={(checked) => setIncludeStakedLPToken(checked as boolean)}
-              />
-              <label
-                htmlFor="include-staked-lp-token"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Include staked {selectedPool?.lpToken?._symbol || 'LP token'}
-              </label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs text-sm">
-                    Your {selectedPool?.lpToken?._symbol || 'LP token'} may be staked in the rewards program.
-                    When this option is enabled, you can withdraw the {selectedPool?.lpToken?._symbol || 'LP token'} that was staked as well.
-                    If disabled, only unstaked {selectedPool?.lpToken?._symbol || 'LP token'} will be eligible for withdrawal.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          )}
 
           <div className="pt-2">
             <Button

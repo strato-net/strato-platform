@@ -39,6 +39,9 @@ export const baseUrl = process.env.BASE_URL || "http://localhost";
 
 // Smart contract addresses
 export const burnAddress = process.env.BURN_ADDRESS || "0000000000000000000000000000000000000000";
+export const priceOracle = process.env.PRICE_ORACLE || "0000000000000000000000000000000000001002";
+export const liquidityPool = process.env.LIQUIDITY_POOL || "0000000000000000000000000000000000001004";
+export const lendingPool = process.env.LENDING_POOL || "0000000000000000000000000000000000001005";
 export const poolConfigurator = process.env.POOL_CONFIGURATOR || "0000000000000000000000000000000000001006";
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";
@@ -47,7 +50,9 @@ export const tokenFactory = process.env.TOKEN_FACTORY || "0000000000000000000000
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
-export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
+
+export const safetyModule = process.env.SAFETY_MODULE || "0000000000000000000000000000000000001015";
+export const sToken = process.env.SUSDST_ADDRESS || "0000000000000000000000000000000000001016";
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
@@ -91,6 +96,11 @@ export const defaultCreditCardTopUpFor: Record<string, string> = {
   "33056204878082667": "656139504763b2fab4e158ddb1f4ca8eb878305d" // Upquark mainnet
 };
 
+export const defaultVaultFor: Record<string, string> = {
+  "114784819836269": "d556695364551c8c7eb336f0bed9aed9e1acd69d", // Helium testnet
+  "33056204878082667": "34bc729f66106a146b0864e673a3571b28fa23e1", // Upquark mainnet
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
@@ -99,6 +109,7 @@ export let escrow: string = '';
 export let vaultFactory: string = '';
 export let metalForge: string = '';
 export let creditCardTopUp: string = '';
+export let vault: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -168,6 +179,7 @@ export async function initNetworkConfig() {
   setVaultFactoryConfig(networkId);
   setMetalForgeConfig(networkId);
   setCreditCardTopUpConfig(networkId);
+  vault = process.env.VAULT || defaultVaultFor[networkId] || '';
 }
 
 // Addresses of internal protocol contracts whose Token:Transfer events should

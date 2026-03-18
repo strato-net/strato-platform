@@ -260,14 +260,12 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     poolAddress: string;
     tokenBAmount: string;
     maxTokenAAmount: string;
-    stakeLPToken?: boolean;
   }) => {
     setLoading(true);
     try {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity`, {
         tokenBAmount: data.tokenBAmount,
         maxTokenAAmount: data.maxTokenAAmount,
-        stakeLPToken: data.stakeLPToken
       });
       return response.data;
     } finally {
@@ -279,14 +277,12 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     poolAddress: string;
     singleTokenAmount: string;
     isAToB: boolean;
-    stakeLPToken?: boolean;
   }) => {
     setLoading(true);
     try {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity/single`, {
         singleTokenAmount: data.singleTokenAmount,
         isAToB: data.isAToB,
-        stakeLPToken: data.stakeLPToken
       });
       return response.data;
     } finally {
@@ -297,14 +293,12 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const removeLiquidity = useCallback(async (data: {
     poolAddress: string;
     lpTokenAmount: string;
-    includeStakedLPToken?: boolean;
   }) => {
     setLoading(true);
     try {
       const response = await api.delete(`/swap-pools/${data.poolAddress}/liquidity`, {
         data: {
           lpTokenAmount: data.lpTokenAmount,
-          includeStakedLPToken: data.includeStakedLPToken
         }
       });
       return response.data;

@@ -212,3 +212,13 @@ export const handleCopyToClipboard = async (text: string): Promise<void> => {
     message.error("Failed to copy");
   }
 };
+
+export function mergePendingDeposits(apiDeposits: any[]): {
+  remaining: any[];
+} {
+  const pendingRaw = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+  const apiTxHashes = new Set(apiDeposits.map((tx: any) => tx?.externalTxHash));
+  const remaining = pendingRaw.filter((p: any) => !apiTxHashes.has(p?.externalTxHash));
+  localStorage.setItem('pendingDeposits', JSON.stringify(remaining));
+  return { remaining };
+}

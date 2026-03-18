@@ -7,7 +7,6 @@ Functional summary:
 
 Key contracts:
 - RewardsManager.sol: Tracks balances and updates rewards on token movements.
-- RewardsChef.sol: Distributes rewards per schedule/allocation.
 
 Core flows:
 - Accrual: Token transfers notify RewardsManager to update user accruals.

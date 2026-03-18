@@ -6,10 +6,9 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Banknote, Loader2, Trophy, Send, Book, ArrowRightLeft } from "lucide-react";
+import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
-import { usePendingRewards } from "@/hooks/usePendingRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +18,6 @@ import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
 import { useLendingContext } from "@/context/LendingContext";
 import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
-import { api } from "@/lib/axios";
 import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
 import { Button } from "@/components/ui/button";
@@ -87,9 +85,7 @@ const Dashboard = () => {
     return '1d';
   });
 
-  const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
-  const [isClaiming, setIsClaiming] = useState(false);
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
   const highestIncentiveApy = useMemo(() => {
     if (!rewardsActivities.length) return 0;
@@ -275,31 +271,6 @@ const Dashboard = () => {
     }
   }, [searchParams]);
 
-  const handleClaimRewards = async () => {
-    if (isClaiming || parseFloat(pendingRewards) <= 0) {
-      return;
-    }
-
-    try {
-      setIsClaiming(true);
-      await api.post("/rewards/claim");
-
-      toast?.({
-        title: "Rewards Claimed",
-        description: `Successfully claimed ${pendingRewards} CATA tokens!`,
-      });
-
-      // Refresh data after successful claim (silent refresh)
-      await Promise.all([
-        getEarningAssets(false),
-        getInactiveTokens(false),
-        refetchPendingRewards(),
-      ]);
-    } finally {
-      setIsClaiming(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
@@ -367,17 +338,6 @@ const Dashboard = () => {
                 ) : null
               }
             />
-
-            {rewardsEnabled && isLoggedIn && (
-              <AssetSummary
-                title="Pending CATA"
-                value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
-                icon={isClaiming ? <Loader2 className="text-white animate-spin" size={18} /> : <Banknote className="text-white" size={18} />}
-                color={parseFloat(pendingRewards) > 0 ? "bg-green-500" : "bg-muted-foreground"}
-                onClick={parseFloat(pendingRewards) > 0 && !isClaiming ? handleClaimRewards : undefined}
-                tooltip={isClaiming ? "Processing claim..." : (parseFloat(pendingRewards) > 0 ? "Click to claim your rewards" : undefined)}
-              />
-            )}
 
             <AssetSummary
               title="Total Borrowed"

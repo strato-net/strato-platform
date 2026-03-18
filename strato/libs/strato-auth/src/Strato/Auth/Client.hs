@@ -60,7 +60,6 @@ runWithAuth ae action = withConnectionRetry (1 :: Int)
               withConnectionRetry (attempt + 1)
         r -> return r
 
-    -- Collapse exceptions from try into ConnectionError
     joinResult :: Either SomeException (Either ClientError a) -> Either ClientError a
     joinResult (Left e) = Left (ConnectionError e)
     joinResult (Right r) = r

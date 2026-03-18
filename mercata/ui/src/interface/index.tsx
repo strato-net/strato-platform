@@ -230,8 +230,7 @@ export interface TokenInfo {
   _totalSupply: string;
   exchangeRate?: string;
   maxWithdrawableUSDST?: string;
-  userBalanceStaked?: string; // Staked balance from RewardsChef
-  userBalanceTotal?: string; // Total = wallet + staked
+  userBalanceTotal?: string;
 }
 
 export interface LiquidityData {
@@ -253,6 +252,10 @@ export interface LiquidityData {
   // new (optional)
   totalAmountOwed?: string;
   totalAmountOwedPreview?: string;
+  userTotalDepositedUsd?: string;
+  userTotalWithdrawnUsd?: string;
+  userNetInvestedUsd?: string;
+  userAllTimeEarningsUsd?: string;
   isPaused: boolean;              // LendingPool pause status
 }
 
@@ -374,7 +377,6 @@ export interface SafetyModuleData {
   totalAssets: string;
   totalShares: string;
   userShares: string;
-  userSharesStaked: string;
   userSharesTotal: string;
   userCooldownStart: string;
   cooldownSeconds: string;
@@ -388,4 +390,9 @@ export interface SafetyModuleData {
   maxRedeemableTotal: string;
   redeemValue: string;
   redeemValueTotal: string;
+  apy?: string;
+  userTotalDepositedUsd?: string;
+  userTotalWithdrawnUsd?: string;
+  userNetInvestedUsd?: string;
+  userAllTimeEarningsUsd?: string;
 }
