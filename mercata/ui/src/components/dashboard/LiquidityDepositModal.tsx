@@ -259,7 +259,7 @@ const LiquidityDepositModal = ({
           availableTokenB = tokenBBalanceWei > remainingFee ? tokenBBalanceWei - remainingFee : BigInt(0);
         }
       }
-
+      
       // Calculate maximum possible deposit based on current pool ratio
       const aToBRatioWei = safeParseUnits(selectedPool.aToBRatio, 18);
       const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
