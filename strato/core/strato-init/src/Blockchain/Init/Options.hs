@@ -48,6 +48,10 @@ defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for lo
 
 defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g., 'registry.example.com/org/')"
 
+defineFlag "composeOnly" (False :: Bool) "Only generate docker-compose.yml to stdout and exit (no node setup)"
+
+defineFlag "includeBuild" (False :: Bool) "Include build directives in generated docker-compose.yml"
+
 -- P2P config flags
 defineFlag "maxConn" (1000 :: Int) "Maximum number of P2P client connections"
 defineFlag "connectionTimeout" (3600 :: Int) "Number of seconds to tolerate a useless peer"

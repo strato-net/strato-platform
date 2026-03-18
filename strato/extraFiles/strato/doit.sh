@@ -17,7 +17,6 @@ echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 : ${postgres_user:=postgres}
 : ${kafkaHost:=kafka}
 : ${kafkaPort:=9092}
-: ${zkHost:=zookeeper}
 : ${redisHost:=redis}
 : ${redisPort:=6379}
 
@@ -38,14 +37,6 @@ do
   sleep 1
 done
 echo 'Kafka is available'
-
-echo 'Waiting for Zookeeper to be available...'
-until nc -z ${zkHost} 2181
-do
-  echo "Waiting for Zookeeper at ${zkHost}:2181..."
-  sleep 1
-done
-echo 'Zookeeper is available'
 
 # Go to node directory (created by strato-setup which ran outside the container)
 cd /var/lib/strato
