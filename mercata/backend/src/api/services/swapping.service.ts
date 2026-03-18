@@ -16,7 +16,7 @@ import {
   buildTokenApprovalTx,
   getTradingVolume24hForPools,
   getTokenBalance,
-  fetchLPTokenAddress
+  getUserPoolLiquidityFlowTotals,
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
 import {
@@ -76,7 +76,57 @@ export const getPools = async (
     key: `in.(${tokenAddresses.join(',')})`
   });
   const volumeMap = await getTradingVolume24hForPools(accessToken, validatedPools.map(pool => pool.address), priceMap);
-  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress);
+
+  let userLiquidityFlowTotals: Map<string, { totalDepositedUsd: bigint; totalWithdrawnUsd: bigint }> | undefined;
+  if (userAddress) {
+    userLiquidityFlowTotals = await getUserPoolLiquidityFlowTotals(
+      accessToken,
+      validatedPools,
+      userAddress,
+      priceMap
+    );
+  }
+
+  const poolList = buildPoolList(
+    validatedPools,
+    priceMap,
+    volumeMap,
+    validatedFactory,
+    userAddress
+  );
+
+  if (!userAddress) {
+    return poolList;
+  }
+
+  return poolList.map((pool) => {
+    const flow = userLiquidityFlowTotals?.get(pool.address.toLowerCase()) || {
+      totalDepositedUsd: 0n,
+      totalWithdrawnUsd: 0n,
+    };
+    const netInvestedUsd = flow.totalDepositedUsd - flow.totalWithdrawnUsd;
+
+    let currentValueUsd = 0n;
+    try {
+      const totalBalance = BigInt(pool.lpToken?.totalBalance || "0");
+      const lpPrice = BigInt(pool.lpToken?.price || "0");
+      if (totalBalance > 0n && lpPrice > 0n) {
+        currentValueUsd = (totalBalance * lpPrice) / (10n ** 18n);
+      }
+    } catch {
+      currentValueUsd = 0n;
+    }
+
+    const userAllTimeEarningsUsd = currentValueUsd - netInvestedUsd;
+
+    return {
+      ...pool,
+      userTotalDepositedUsd: flow.totalDepositedUsd.toString(),
+      userTotalWithdrawnUsd: flow.totalWithdrawnUsd.toString(),
+      userNetInvestedUsd: netInvestedUsd.toString(),
+      userAllTimeEarningsUsd: userAllTimeEarningsUsd.toString(),
+    };
+  });
 };
 
 // --- Token Queries ---

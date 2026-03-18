@@ -252,6 +252,10 @@ export interface LiquidityData {
   // new (optional)
   totalAmountOwed?: string;
   totalAmountOwedPreview?: string;
+  userTotalDepositedUsd?: string;
+  userTotalWithdrawnUsd?: string;
+  userNetInvestedUsd?: string;
+  userAllTimeEarningsUsd?: string;
   isPaused: boolean;              // LendingPool pause status
 }
 
@@ -386,4 +390,9 @@ export interface SafetyModuleData {
   maxRedeemableTotal: string;
   redeemValue: string;
   redeemValueTotal: string;
+  apy?: string;
+  userTotalDepositedUsd?: string;
+  userTotalWithdrawnUsd?: string;
+  userNetInvestedUsd?: string;
+  userAllTimeEarningsUsd?: string;
 }
