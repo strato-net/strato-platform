@@ -13,16 +13,12 @@ import {
   buildPoolList,
   fetchPoolTokenAddresses,
   fetchPoolBalances,
-  fetchLPTokenAddress,
   buildTokenApprovalTx,
   getTradingVolume24hForPools,
   getTokenBalance,
-  stakeNewLPTokens
+  fetchLPTokenAddress
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getPools as getRewardsChefPools } from "./rewardsChef.service";
-import { getStakedBalance, findPoolByLpToken } from "../helpers/rewards/rewardsChef.helpers";
-import { getTokenBalanceForUser } from "./tokens.service";
 import {
   SwapHistoryEntry,
   PoolList,
@@ -80,38 +76,7 @@ export const getPools = async (
     key: `in.(${tokenAddresses.join(',')})`
   });
   const volumeMap = await getTradingVolume24hForPools(accessToken, validatedPools.map(pool => pool.address), priceMap);
-
-  // Fetch staked balances from RewardsChef if userAddress is provided
-  let stakedBalanceMap: Map<string, string> | undefined;
-  if (userAddress) {
-    // Get all RewardsChef pools
-    const rewardsChefPools = await getRewardsChefPools(accessToken, config.rewardsChef);
-
-    // Build a map of lpToken address -> rewards pool index
-    const lpTokenToPoolIdx = new Map<string, number>();
-    rewardsChefPools.forEach(pool => {
-      lpTokenToPoolIdx.set(pool.lpToken, pool.poolIdx);
-    });
-
-    // For each swap pool, check if it has a matching rewards pool and get staked balance
-    stakedBalanceMap = new Map<string, string>();
-    await Promise.all(
-      validatedPools.map(async (pool) => {
-        const poolIdx = lpTokenToPoolIdx.get(pool.lpToken.address);
-        if (poolIdx !== undefined) {
-          const stakedBalance = await getStakedBalance(
-            accessToken,
-            config.rewardsChef,
-            poolIdx,
-            userAddress
-          );
-          stakedBalanceMap!.set(pool.lpToken.address, stakedBalance);
-        }
-      })
-    );
-  }
-
-  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress, stakedBalanceMap);
+  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress);
 };
 
 // --- Token Queries ---
@@ -304,23 +269,9 @@ export const addLiquidityDualToken = async (
   params: LiquidityParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, tokenBAmount, maxTokenAAmount, deadline, stakeLPToken } = params;
+  const { poolAddress, tokenBAmount, maxTokenAAmount, deadline } = params;
 
   const pool = await fetchPoolTokenAddresses(accessToken, poolAddress);
-
-  // Prepare for LP token staking if requested
-  let lpTokenAddress: string | undefined;
-  let lpTokenBalanceBefore: string = "0";
-  let rewardsPool: Awaited<ReturnType<typeof findPoolByLpToken>>;
-
-  if (stakeLPToken) {
-    lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
-    rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
-
-    if (rewardsPool) {
-      lpTokenBalanceBefore = await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress);
-    }
-  }
 
   // Execute liquidity deposit
   const tx = await buildFunctionTx([
@@ -336,11 +287,6 @@ export const addLiquidityDualToken = async (
 
   const depositResult = await executeTransaction(accessToken, tx);
 
-  // Stake newly minted LP tokens if requested and deposit succeeded
-  if (stakeLPToken && depositResult.status === "Success" && lpTokenAddress && rewardsPool) {
-    await stakeNewLPTokens(accessToken, userAddress, lpTokenAddress, rewardsPool.poolIdx, lpTokenBalanceBefore);
-  }
-
   return depositResult;
 };
 
@@ -349,24 +295,10 @@ export const addLiquiditySingleToken = async (
   params: SingleTokenLiquidityParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, singleTokenAmount, isAToB, deadline, stakeLPToken } = params;
+  const { poolAddress, singleTokenAmount, isAToB, deadline } = params;
 
   const pool = await fetchPoolTokenAddresses(accessToken, poolAddress);
   const depositTokenAddress = isAToB ? pool.tokenA : pool.tokenB;
-
-  // Prepare for LP token staking if requested
-  let lpTokenAddress: string | undefined;
-  let lpTokenBalanceBefore: string = "0";
-  let rewardsPool: Awaited<ReturnType<typeof findPoolByLpToken>>;
-
-  if (stakeLPToken) {
-    lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
-    rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
-
-    if (rewardsPool) {
-      lpTokenBalanceBefore = await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress);
-    }
-  }
 
   // Execute liquidity deposit
   const tx = await buildFunctionTx([
@@ -381,11 +313,6 @@ export const addLiquiditySingleToken = async (
 
   const depositResult = await executeTransaction(accessToken, tx);
 
-  // Stake newly minted LP tokens if requested and deposit succeeded
-  if (stakeLPToken && depositResult.status === "Success" && lpTokenAddress && rewardsPool) {
-    await stakeNewLPTokens(accessToken, userAddress, lpTokenAddress, rewardsPool.poolIdx, lpTokenBalanceBefore);
-  }
-
   return depositResult;
 };
 
@@ -394,7 +321,7 @@ export const removeLiquidity = async (
   removeLiquidityParams: RemoveLiquidityParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, lpTokenAmount, deadline, includeStakedLPToken } = removeLiquidityParams;
+  const { poolAddress, lpTokenAmount, deadline } = removeLiquidityParams;
 
   const pool = await fetchPoolBalances(accessToken, poolAddress);
 
@@ -412,44 +339,6 @@ export const removeLiquidity = async (
   const minTokenBAmount = (tokenBAmount * 99n) / 100n;
 
   const txArray: any[] = [];
-
-  // If includeStakedLPToken is true, check if we need to unstake from RewardsChef first
-  if (includeStakedLPToken) {
-    const lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
-    const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
-
-    if (rewardsPool) {
-      // Get user's wallet LP token balance
-      const walletLPBalance = BigInt(await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress));
-
-      // Get staked LP token balance
-      const stakedBalance = await getStakedBalance(accessToken, config.rewardsChef, rewardsPool.poolIdx, userAddress);
-      const stakedLPBalance = BigInt(stakedBalance);
-
-      // Calculate required LP tokens and how much needs to be unstaked
-      const requiredLPTokens = lpTokenAmountBigInt;
-
-      if (requiredLPTokens > walletLPBalance) {
-        // Need to unstake some LP tokens first
-        const amountToUnstake = requiredLPTokens - walletLPBalance;
-
-        if (amountToUnstake > stakedLPBalance) {
-          throw new Error(`Insufficient LP tokens: need ${requiredLPTokens.toString()}, have ${walletLPBalance.toString()} in wallet and ${stakedLPBalance.toString()} staked`);
-        }
-
-        // Add unstake transaction
-        txArray.push({
-          contractName: "RewardsChef",
-          contractAddress: config.rewardsChef,
-          method: "withdraw",
-          args: {
-            _pid: rewardsPool.poolIdx,
-            _amount: amountToUnstake.toString()
-          }
-        });
-      }
-    }
-  }
 
   // Add removeLiquidity transaction
   txArray.push({

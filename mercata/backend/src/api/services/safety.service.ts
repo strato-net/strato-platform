@@ -1,22 +1,16 @@
-import { strato, cirrus, bloc } from "../../utils/mercataApiHelper";
+import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
-import * as config from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-import { getTokenBalanceForUser } from "./tokens.service";
-import { getPools } from "./rewardsChef.service";
-import { waitForBalanceUpdate, getStakedBalance, findPoolByLpToken } from "../helpers/rewards/rewardsChef.helpers";
 
 const SafetyModule = "mercata/backend/src/api/contracts/concrete/Lending/SafetyModule.sol";
-const { Token } = constants;
 
 interface SafetyModuleInfo {
   totalAssets: string;
   totalShares: string;
   userShares: string;
-  userSharesStaked: string;
   userSharesTotal: string;
   userCooldownStart: string;
   cooldownSeconds: string;
@@ -258,15 +252,6 @@ export const getSafetyModuleInfo = async (
     const userShares = userTokenBalance?.[0]?.balance || "0";
     const cooldownStart = cooldownData?.[0]?.value || "0";
 
-    // Get user's staked sUSDST balance from RewardsChef
-    // Find the pool for this sToken
-    const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
-
-    // If no pool found, staked balance is 0
-    const stakedSTokenBalance = poolForSToken
-      ? await getStakedBalance(accessToken, config.rewardsChef, poolForSToken.poolIdx, userAddress)
-      : "0";
-
     // Calculate exchange rate (assets per share)
     const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n 
       ? (BigInt(totalAssets) * BigInt("1000000000000000000")) / BigInt(totalShares) // 18 decimals
@@ -304,8 +289,8 @@ export const getSafetyModuleInfo = async (
       ? userAssetsValue.toString()
       : availableAssets.toString();
 
-    // For total shares (unstaked + staked)
-    const userSharesTotal = BigInt(userShares) + BigInt(stakedSTokenBalance);
+    // Total shares mirrors user wallet shares.
+    const userSharesTotal = BigInt(userShares);
     const userAssetsTotalValue = userSharesTotal > 0n
       ? ((userSharesTotal * BigInt(exchangeRate)) / (10n ** 18n))
       : 0n;
@@ -317,9 +302,8 @@ export const getSafetyModuleInfo = async (
     return {
       totalAssets,
       totalShares,
-      userShares, // This is the unstaked (wallet) balance
-      userSharesStaked: stakedSTokenBalance, // Staked balance from RewardsChef
-      userSharesTotal: userSharesTotal.toString(), // Total = wallet + staked
+      userShares,
+      userSharesTotal: userSharesTotal.toString(),
       userCooldownStart: cooldownStart,
       cooldownSeconds,
       unstakeWindow,
@@ -328,10 +312,10 @@ export const getSafetyModuleInfo = async (
       cooldownActive,
       cooldownTimeRemaining,
       unstakeWindowTimeRemaining,
-      maxRedeemable, // Max assets redeemable with just unstaked shares
-      maxRedeemableTotal, // Max assets redeemable with unstaked + staked shares
-      redeemValue: userAssetsValue.toString(), // Value of unstaked shares in assets
-      redeemValueTotal: userAssetsTotalValue.toString(), // Value of total shares in assets
+      maxRedeemable,
+      maxRedeemableTotal,
+      redeemValue: userAssetsValue.toString(),
+      redeemValueTotal: userAssetsTotalValue.toString(),
     };
   } catch (error) {
     console.error("Error fetching SafetyModule info:", error);
@@ -340,7 +324,6 @@ export const getSafetyModuleInfo = async (
       totalAssets: "0",
       totalShares: "0",
       userShares: "0",
-      userSharesStaked: "0",
       userSharesTotal: "0",
       userCooldownStart: "0",
       cooldownSeconds: "259200",
@@ -361,13 +344,9 @@ export const getSafetyModuleInfo = async (
 export const stakeSafetyModule = async (
   accessToken: string,
   userAddress: string,
-  { amount, stakeSToken }: { amount: string; stakeSToken: boolean }
+  { amount }: { amount: string }
 ): Promise<{ status: string; hash: string }> => {
   const safetyModuleConfig = getSafetyModuleConfig();
-  const sTokenAddress = safetyModuleConfig.sToken.address;
-
-  // Get user's sUSDST balance before stake
-  const sTokenBalanceBefore = stakeSToken ? await getTokenBalanceForUser(accessToken, sTokenAddress, userAddress) : "0";
 
   // Calculate minimum shares out (with 1% slippage tolerance)
   const info = await getSafetyModuleInfo(accessToken, userAddress);
@@ -390,59 +369,6 @@ export const stakeSafetyModule = async (
   const stakeResult = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
-
-  // If staking is requested and stake was successful, execute staking transaction
-  if (stakeSToken && stakeResult.status === "Success") {
-    // Wait for Cirrus to index the new sUSDST balance with retry logic
-    const sTokenBalanceAfter = await waitForBalanceUpdate(
-      accessToken,
-      sTokenAddress,
-      userAddress,
-      sTokenBalanceBefore,
-      10,  // max retries
-      200  // 200ms delay between retries
-    );
-
-    const newlyMintedAmount = (BigInt(sTokenBalanceAfter) - BigInt(sTokenBalanceBefore)).toString();
-
-    if (BigInt(newlyMintedAmount) > 0n) {
-      // Find the pool for this sToken
-      const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
-
-      if (!poolForSToken) {
-        throw new Error(`No RewardsChef pool found for sToken ${sTokenAddress}. Cannot stake after deposit.`);
-      }
-
-      const poolIdx = poolForSToken.poolIdx;
-
-      const stakingTx: FunctionInput[] = [
-        // First approve sUSDST for RewardsChef
-        {
-          contractName: extractContractName(Token),
-          contractAddress: sTokenAddress,
-          method: "approve",
-          args: { spender: config.rewardsChef, value: newlyMintedAmount },
-        },
-        // Then deposit into RewardsChef
-        {
-          contractName: "RewardsChef",
-          contractAddress: config.rewardsChef,
-          method: "deposit",
-          args: { _pid: poolIdx, _amount: newlyMintedAmount },
-        },
-      ];
-
-      const builtStakingTx = await buildFunctionTx(stakingTx, userAddress, accessToken);
-      const stakingResult = await postAndWaitForTx(accessToken, () =>
-        bloc.post(accessToken, StratoPaths.transactionParallel, builtStakingTx)
-      );
-
-      // Fail the entire operation if staking fails
-      if (stakingResult.status !== "Success") {
-        throw new Error("Stake to SafetyModule succeeded but staking to rewards program failed");
-      }
-    }
-  }
 
   return stakeResult;
 };
@@ -469,52 +395,9 @@ export const startCooldownSafetyModule = async (
 export const redeemSafetyModule = async (
   accessToken: string,
   userAddress: string,
-  { sharesAmount, includeStakedSToken = false }: { sharesAmount: string; includeStakedSToken?: boolean }
+  { sharesAmount }: { sharesAmount: string }
 ): Promise<{ status: string; hash: string }> => {
   const safetyModuleConfig = getSafetyModuleConfig();
-  const sTokenAddress = safetyModuleConfig.sToken.address;
-
-  // If includeStakedSToken is enabled, we might need to unstake first
-  if (includeStakedSToken) {
-    // Get current sUSDST balance in wallet
-    const unstakedSTokenBalance = await getTokenBalanceForUser(accessToken, sTokenAddress, userAddress);
-
-    // Calculate required sTokens for redemption
-    const requiredSTokenWei = BigInt(sharesAmount);
-
-    // Check if we need to unstake
-    const unstakedSTokenWei = BigInt(unstakedSTokenBalance);
-
-    if (requiredSTokenWei > unstakedSTokenWei) {
-      // We need to unstake some sTokens first
-      const amountToUnstake = requiredSTokenWei - unstakedSTokenWei;
-
-      // Find the pool for this sToken
-      const poolForSToken = await findPoolByLpToken(accessToken, config.rewardsChef, sTokenAddress);
-
-      if (!poolForSToken) {
-        throw new Error(`No RewardsChef pool found for sToken ${sTokenAddress}. Cannot unstake before redemption.`);
-      }
-
-      const poolIdx = poolForSToken.poolIdx;
-
-      // Build unstaking transaction
-      const unstakeTx = await buildFunctionTx({
-        contractName: "RewardsChef",
-        contractAddress: config.rewardsChef,
-        method: "withdraw",
-        args: {
-          _pid: poolIdx,
-          _amount: amountToUnstake.toString()
-        }
-      }, userAddress, accessToken);
-
-      // Execute unstaking transaction first
-      await postAndWaitForTx(accessToken, () =>
-        strato.post(accessToken, StratoPaths.transactionParallel, unstakeTx)
-      );
-    }
-  }
 
   // Calculate minimum assets out (with 1% slippage tolerance)
   const info = await getSafetyModuleInfo(accessToken, userAddress);
