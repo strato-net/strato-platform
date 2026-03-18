@@ -187,17 +187,20 @@ const PositionCard = ({
   );
 };
 
-const TokenPairIcon = ({ pool }: { pool: Pool }) => {
+const TokenPairIcon = ({ pool, size = "sm" }: { pool: Pool; size?: "sm" | "lg" }) => {
+  const iconClass = size === "lg" ? "w-14 h-14" : "w-7 h-7";
+  const textClass = size === "lg" ? "text-lg" : "text-[10px]";
+  const overlapClass = size === "lg" ? "-space-x-4" : "-space-x-2";
   return (
-    <div className="flex items-center -space-x-2 shrink-0">
+    <div className={`flex items-center ${overlapClass} shrink-0`}>
       {pool.tokenA?.images?.[0]?.value ? (
         <img
           src={pool.tokenA.images[0].value}
           alt={pool.tokenA._symbol}
-          className="w-7 h-7 rounded-full border-2 border-background object-cover"
+          className={`${iconClass} rounded-full border-2 border-background object-cover`}
         />
       ) : (
-        <div className="w-7 h-7 rounded-full border-2 border-background bg-blue-500/20 flex items-center justify-center text-[10px] font-semibold">
+        <div className={`${iconClass} rounded-full border-2 border-background bg-blue-500/20 flex items-center justify-center ${textClass} font-semibold`}>
           {(pool.tokenA?._symbol || "A").slice(0, 1)}
         </div>
       )}
@@ -205,10 +208,10 @@ const TokenPairIcon = ({ pool }: { pool: Pool }) => {
         <img
           src={pool.tokenB.images[0].value}
           alt={pool.tokenB._symbol}
-          className="w-7 h-7 rounded-full border-2 border-background object-cover"
+          className={`${iconClass} rounded-full border-2 border-background object-cover`}
         />
       ) : (
-        <div className="w-7 h-7 rounded-full border-2 border-background bg-purple-500/20 flex items-center justify-center text-[10px] font-semibold">
+        <div className={`${iconClass} rounded-full border-2 border-background bg-purple-500/20 flex items-center justify-center ${textClass} font-semibold`}>
           {(pool.tokenB?._symbol || "B").slice(0, 1)}
         </div>
       )}
@@ -691,9 +694,7 @@ const Earn = () => {
                           <CircleArrowDown className="h-7 w-7 text-blue-600 dark:text-blue-400" />
                         </div>
                       ) : (
-                        <div className="scale-[2] origin-left pl-2">
-                          <TokenPairIcon pool={topOpportunity.pool} />
-                        </div>
+                          <TokenPairIcon pool={topOpportunity.pool} size="lg" />
                       )}
                       <div className="min-w-0">
                         <h3 className="text-[30px] leading-none font-semibold tracking-tight">{topOpportunityMeta.title}</h3>
