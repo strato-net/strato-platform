@@ -226,7 +226,7 @@ const LiquidityDepositModal = ({
       // Dual token mode: calculate maximum possible deposit based on both balances
       const tokenABalanceWei = BigInt(tokenABalance || "0");
       const tokenBBalanceWei = BigInt(tokenBBalance || "0");
-  
+      
       // Check if either token is USDST and account for fees
       const tokenAIsUSDST = selectedPool.tokenA?.address.toLowerCase() === usdstAddress.toLowerCase();
       const tokenBIsUSDST = selectedPool.tokenB?.address.toLowerCase() === usdstAddress.toLowerCase();
@@ -260,15 +260,10 @@ const LiquidityDepositModal = ({
         }
       }
 
-      if (selectedPool.isStable) {
-        // Stable pools: deposit both tokens independently (no ratio constraint)
-        setToken1Amount(formatUnits(availableTokenA, 18));
-        setToken2Amount(formatUnits(availableTokenB, 18));
-      } else {
-        // Regular pools: calculate max based on pool ratio
-        const aToBRatioWei = safeParseUnits(selectedPool.aToBRatio, 18);
-        const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
-        
+      // Calculate maximum possible deposit based on current pool ratio
+      const aToBRatioWei = safeParseUnits(selectedPool.aToBRatio, 18);
+      const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
+      
       // Calculate what Token A amount would be needed for full Token B balance
       const tokenAAmountForFullB = (availableTokenB * bToARatioWei) / BigInt(10 ** 18);
       
@@ -291,7 +286,6 @@ const LiquidityDepositModal = ({
       // Set both amounts
       setToken1Amount(formatUnits(finalTokenAAmount, 18));
       setToken2Amount(formatUnits(finalTokenBAmount, 18));
-      }
       
     } else {
       // Single token mode: original logic
