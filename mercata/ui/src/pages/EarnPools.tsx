@@ -7,7 +7,6 @@ import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidityDepositModal from "@/components/dashboard/LiquidityDepositModal";
 import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModal";
@@ -16,12 +15,6 @@ import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
-
-const parseApy = (value: string | number | undefined): number => {
-  if (!value || value === "-") return Number.NEGATIVE_INFINITY;
-  const apy = Number(value);
-  return Number.isFinite(apy) ? apy : Number.NEGATIVE_INFINITY;
-};
 
 const WAD = BigInt("1000000000000000000");
 
@@ -95,37 +88,57 @@ const TokenPairIcon = ({ pool }: { pool: Pool }) => (
 const EarnPools = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { pools, poolsLoading, fetchPools } = useSwapContext();
+  const { getPoolByAddress } = useSwapContext();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { isLoggedIn } = useUser();
 
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+  const [selectedPoolData, setSelectedPoolData] = useState<Pool | null>(null);
+  const [poolDetailsLoading, setPoolDetailsLoading] = useState(false);
   const [isPoolDepositModalOpen, setIsPoolDepositModalOpen] = useState(false);
   const [isPoolWithdrawModalOpen, setIsPoolWithdrawModalOpen] = useState(false);
   const operationInProgressRef = useRef(false);
 
   useEffect(() => {
     document.title = "STRATO Swap Pools | STRATO";
-    fetchPools();
     if (isLoggedIn) fetchUsdstBalance();
-  }, [fetchPools, fetchUsdstBalance, isLoggedIn]);
+  }, [fetchUsdstBalance, isLoggedIn]);
 
   const highlightedPool = useMemo(() => {
     const search = new URLSearchParams(location.search);
     return search.get("pool")?.toLowerCase();
   }, [location.search]);
 
-  const activePools = useMemo(
-    () =>
-      [...(pools || [])]
-        .filter((pool) => !isPoolPaused(pool) && !isPoolDisabled(pool))
-        .sort((a, b) => parseApy(b.apy) - parseApy(a.apy)),
-    [pools]
-  );
-  const highlightedPoolData = useMemo(
-    () => activePools.find((pool) => pool.address.toLowerCase() === highlightedPool),
-    [activePools, highlightedPool]
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSelectedPool = async () => {
+      if (!highlightedPool) {
+        setSelectedPoolData(null);
+        return;
+      }
+
+      setPoolDetailsLoading(true);
+      try {
+        const pool = await getPoolByAddress(highlightedPool);
+        if (cancelled) return;
+
+        const normalizedPool =
+          pool && !isPoolPaused(pool) && !isPoolDisabled(pool) ? pool : null;
+        setSelectedPoolData(normalizedPool);
+      } finally {
+        if (!cancelled) setPoolDetailsLoading(false);
+      }
+    };
+
+    loadSelectedPool();
+    return () => {
+      cancelled = true;
+    };
+  }, [getPoolByAddress, highlightedPool]);
+
+  const highlightedPoolData = selectedPoolData;
+  const pageLoading = poolDetailsLoading;
 
   const handlePoolDeposit = (pool: Pool) => {
     if (!isLoggedIn) return;
@@ -140,7 +153,16 @@ const EarnPools = () => {
   };
 
   const handlePoolActionSuccess = async () => {
-    await Promise.all([fetchPools(), isLoggedIn ? fetchUsdstBalance() : Promise.resolve()]);
+    await Promise.all([
+      highlightedPool
+        ? getPoolByAddress(highlightedPool).then((pool) => {
+            const normalizedPool =
+              pool && !isPoolPaused(pool) && !isPoolDisabled(pool) ? pool : null;
+            setSelectedPoolData(normalizedPool);
+          })
+        : Promise.resolve(),
+      isLoggedIn ? fetchUsdstBalance() : Promise.resolve(),
+    ]);
   };
 
   return (
@@ -176,13 +198,13 @@ const EarnPools = () => {
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                     <p className="text-[11px] text-muted-foreground">Pool APY</p>
                     <p className="text-sm font-semibold">
-                      {highlightedPoolData ? formatPct(highlightedPoolData.apy) : "N/A"}
+                      {pageLoading ? "Loading..." : highlightedPoolData ? formatPct(highlightedPoolData.apy) : "N/A"}
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                     <p className="text-[11px] text-muted-foreground">TVL</p>
                     <p className="text-sm font-semibold">
-                      {highlightedPoolData ? `$${formatUsd(highlightedPoolData.totalLiquidityUSD)}` : "N/A"}
+                      {pageLoading ? "Loading..." : highlightedPoolData ? `$${formatUsd(highlightedPoolData.totalLiquidityUSD)}` : "N/A"}
                     </p>
                   </div>
                 </div>
@@ -190,13 +212,7 @@ const EarnPools = () => {
             </CardContent>
           </Card>
 
-          {poolsLoading ? (
-            <Skeleton className="h-72 w-full rounded-xl" />
-          ) : activePools.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6 text-sm text-muted-foreground">No active swap pools available.</CardContent>
-            </Card>
-          ) : !highlightedPoolData ? (
+          {!pageLoading && !highlightedPoolData ? (
             <Card>
               <CardContent className="pt-6 text-sm text-muted-foreground">
                 Pool details unavailable. Please open this page from a pool row in Earn.
@@ -211,14 +227,22 @@ const EarnPools = () => {
                       <p className="text-base font-semibold">Deposit</p>
                       <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                         <Wallet className="h-3.5 w-3.5" />
-                        {`${highlightedPoolData.tokenA?._symbol || "Token A"} / ${highlightedPoolData.tokenB?._symbol || "Token B"}`}
+                        {pageLoading
+                          ? "Loading..."
+                          : `${highlightedPoolData?.tokenA?._symbol || "Token A"} / ${highlightedPoolData?.tokenB?._symbol || "Token B"}`}
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Add liquidity to {highlightedPoolData.poolName} using the same swap pool deposit flow.
+                      {pageLoading
+                        ? "Loading pool details..."
+                        : `Add liquidity to ${highlightedPoolData?.poolName || "this pool"} using the same swap pool deposit flow.`}
                     </p>
                     <div className="flex items-center justify-end">
-                      <Button onClick={() => handlePoolDeposit(highlightedPoolData)} className="h-11 sm:w-36" disabled={!isLoggedIn}>
+                      <Button
+                        onClick={() => highlightedPoolData && handlePoolDeposit(highlightedPoolData)}
+                        className="h-11 sm:w-36"
+                        disabled={!isLoggedIn || pageLoading || !highlightedPoolData}
+                      >
                         <CircleArrowDown className="mr-2 h-4 w-4" />
                         Deposit
                       </Button>
@@ -239,14 +263,14 @@ const EarnPools = () => {
                       Remove liquidity using your LP token balance for this pool.
                     </p>
                     <div className="text-sm text-muted-foreground">
-                      Withdrawable: {formatLpTokenAmount(highlightedPoolData.lpToken?.totalBalance)} LP
+                      Withdrawable: {pageLoading ? "Loading..." : `${formatLpTokenAmount(highlightedPoolData?.lpToken?.totalBalance)} LP`}
                     </div>
                     <div className="flex items-center justify-end">
                       <Button
-                        onClick={() => handlePoolWithdraw(highlightedPoolData)}
+                        onClick={() => highlightedPoolData && handlePoolWithdraw(highlightedPoolData)}
                         variant="outline"
                         className="h-11 sm:w-36"
-                        disabled={!isLoggedIn || safeBigInt(highlightedPoolData.lpToken?.totalBalance) === 0n}
+                        disabled={!isLoggedIn || pageLoading || !highlightedPoolData || safeBigInt(highlightedPoolData.lpToken?.totalBalance) === 0n}
                       >
                         <CircleArrowUp className="mr-2 h-4 w-4" />
                         Withdraw
@@ -265,49 +289,58 @@ const EarnPools = () => {
                         <p className="text-base font-semibold">Pool Stats</p>
                       </div>
                       <Badge variant="secondary" className="text-[10px]">
-                        {highlightedPoolData.isStable ? "Stable" : "Volatile"}
+                        {pageLoading ? "Loading..." : highlightedPoolData?.isStable ? "Stable" : "Volatile"}
                       </Badge>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">Your Liquidity</p>
                         <p className="text-sm font-semibold">
-                          $
-                          {formatUsd(
-                            (
-                              (safeBigInt(highlightedPoolData.lpToken?.totalBalance) * safeBigInt(highlightedPoolData.lpToken?.price)) /
-                              WAD
-                            ).toString()
-                          )}
+                          {pageLoading
+                            ? "Loading..."
+                            : `$${formatUsd(
+                                (
+                                  (safeBigInt(highlightedPoolData?.lpToken?.totalBalance) * safeBigInt(highlightedPoolData?.lpToken?.price)) /
+                                  WAD
+                                ).toString()
+                              )}`}
                         </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">Your LP Tokens</p>
-                        <p className="text-sm font-semibold">{formatLpTokenAmount(highlightedPoolData.lpToken?.totalBalance)}</p>
+                        <p className="text-sm font-semibold">
+                          {pageLoading ? "Loading..." : formatLpTokenAmount(highlightedPoolData?.lpToken?.totalBalance)}
+                        </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">Pool TVL</p>
-                        <p className="text-sm font-semibold">${formatUsd(highlightedPoolData.totalLiquidityUSD)}</p>
+                        <p className="text-sm font-semibold">
+                          {pageLoading ? "Loading..." : `$${formatUsd(highlightedPoolData?.totalLiquidityUSD || "0")}`}
+                        </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">24h Volume</p>
-                        <p className="text-sm font-semibold">${formatUsd(highlightedPoolData.tradingVolume24h || "0")}</p>
+                        <p className="text-sm font-semibold">
+                          {pageLoading ? "Loading..." : `$${formatUsd(highlightedPoolData?.tradingVolume24h || "0")}`}
+                        </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">Pool APY</p>
-                        <p className="text-sm font-semibold">{formatPct(highlightedPoolData.apy)}</p>
+                        <p className="text-sm font-semibold">
+                          {pageLoading ? "Loading..." : formatPct(highlightedPoolData?.apy)}
+                        </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">A to B Ratio</p>
-                        <p className="text-sm font-semibold">{formatRatio(highlightedPoolData.aToBRatio)}</p>
+                        <p className="text-sm font-semibold">
+                          {pageLoading ? "Loading..." : formatRatio(highlightedPoolData?.aToBRatio)}
+                        </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">B to A Ratio</p>
-                        <p className="text-sm font-semibold">{formatRatio(highlightedPoolData.bToARatio)}</p>
-                      </div>
-                      <div className="rounded-lg border border-border/60 p-3">
-                        <p className="text-xs text-muted-foreground">Active Pools</p>
-                        <p className="text-sm font-semibold">{activePools.length}</p>
+                        <p className="text-sm font-semibold">
+                          {pageLoading ? "Loading..." : formatRatio(highlightedPoolData?.bToARatio)}
+                        </p>
                       </div>
                     </div>
                   </CardContent>

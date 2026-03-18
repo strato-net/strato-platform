@@ -255,6 +255,10 @@ const Earn = () => {
     }
   }, [isLoggedIn, fetchUsdstBalance]);
 
+  useEffect(() => {
+    fetchPools();
+  }, [fetchPools]);
+
   const handlePoolDeposit = (pool: Pool) => {
     if (!isLoggedIn) return;
     setSelectedPool(pool);
@@ -322,7 +326,6 @@ const Earn = () => {
       setIsLendingSubmitting(true);
       await depositLiquidity({
         amount: safeParseUnits(lendingDepositAmount, 18).toString(),
-        stakeMToken: rewardsEnabled && stakeLendingRewards,
       });
       closeLendingDepositModal();
       toast({
