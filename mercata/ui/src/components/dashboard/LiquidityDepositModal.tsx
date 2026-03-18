@@ -270,27 +270,27 @@ const LiquidityDepositModal = ({
         const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
         
       // Calculate what Token A amount would be needed for full Token B balance
-        const tokenAAmountForFullB = (availableTokenB * bToARatioWei) / BigInt(10 ** 18);
+      const tokenAAmountForFullB = (availableTokenB * bToARatioWei) / BigInt(10 ** 18);
       
       // Calculate what Token B amount would be needed for full Token A balance  
-        const tokenBAmountForFullA = (availableTokenA * aToBRatioWei) / BigInt(10 ** 18);
-        
-        let finalTokenAAmount: bigint;
-        let finalTokenBAmount: bigint;
-        
-        if (tokenAAmountForFullB <= availableTokenA) {
+      const tokenBAmountForFullA = (availableTokenA * aToBRatioWei) / BigInt(10 ** 18);
+      
+      let finalTokenAAmount: bigint;
+      let finalTokenBAmount: bigint;
+      
+      if (tokenAAmountForFullB <= availableTokenA) {
         // Token B is the limiting factor
-          finalTokenBAmount = availableTokenB;
-          finalTokenAAmount = tokenAAmountForFullB;
-        } else {
+        finalTokenBAmount = availableTokenB;
+        finalTokenAAmount = tokenAAmountForFullB;
+      } else {
         // Token A is the limiting factor
-          finalTokenAAmount = availableTokenA;
-          finalTokenBAmount = tokenBAmountForFullA;
-        }
-        
+        finalTokenAAmount = availableTokenA;
+        finalTokenBAmount = tokenBAmountForFullA;
+      }
+       
       // Set both amounts
-        setToken1Amount(formatUnits(finalTokenAAmount, 18));
-        setToken2Amount(formatUnits(finalTokenBAmount, 18));
+      setToken1Amount(formatUnits(finalTokenAAmount, 18));
+      setToken2Amount(formatUnits(finalTokenBAmount, 18));
       }
       
     } else {
