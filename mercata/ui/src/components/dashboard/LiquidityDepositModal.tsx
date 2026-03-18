@@ -184,7 +184,7 @@ const LiquidityDepositModal = ({
       } else {
         // Dual token mode
         const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
-        const tokenAAmount = isInitialLiquidity
+        const tokenAAmount = (isInitialLiquidity || selectedPool.isStable)
           ? safeParseUnits(token1Amount, 18)
           : safeParseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
         const tokenBAmount = safeParseUnits(token2Amount, 18);
@@ -226,7 +226,7 @@ const LiquidityDepositModal = ({
       // Dual token mode: calculate maximum possible deposit based on both balances
       const tokenABalanceWei = BigInt(tokenABalance || "0");
       const tokenBBalanceWei = BigInt(tokenBBalance || "0");
-      
+
       // Check if either token is USDST and account for fees
       const tokenAIsUSDST = selectedPool.tokenA?.address.toLowerCase() === usdstAddress.toLowerCase();
       const tokenBIsUSDST = selectedPool.tokenB?.address.toLowerCase() === usdstAddress.toLowerCase();
@@ -259,33 +259,39 @@ const LiquidityDepositModal = ({
           availableTokenB = tokenBBalanceWei > remainingFee ? tokenBBalanceWei - remainingFee : BigInt(0);
         }
       }
-      
-      // Calculate maximum possible deposit based on current pool ratio
-      const aToBRatioWei = safeParseUnits(selectedPool.aToBRatio, 18);
-      const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
-      
+
+      if (selectedPool.isStable) {
+        // Stable pools: deposit both tokens independently (no ratio constraint)
+        setToken1Amount(formatUnits(availableTokenA, 18));
+        setToken2Amount(formatUnits(availableTokenB, 18));
+      } else {
+        // Regular pools: calculate max based on pool ratio
+        const aToBRatioWei = safeParseUnits(selectedPool.aToBRatio, 18);
+        const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
+        
       // Calculate what Token A amount would be needed for full Token B balance
-      const tokenAAmountForFullB = (availableTokenB * bToARatioWei) / BigInt(10 ** 18);
+        const tokenAAmountForFullB = (availableTokenB * bToARatioWei) / BigInt(10 ** 18);
       
       // Calculate what Token B amount would be needed for full Token A balance  
-      const tokenBAmountForFullA = (availableTokenA * aToBRatioWei) / BigInt(10 ** 18);
-      
-      let finalTokenAAmount: bigint;
-      let finalTokenBAmount: bigint;
-      
-      if (tokenAAmountForFullB <= availableTokenA) {
+        const tokenBAmountForFullA = (availableTokenA * aToBRatioWei) / BigInt(10 ** 18);
+        
+        let finalTokenAAmount: bigint;
+        let finalTokenBAmount: bigint;
+        
+        if (tokenAAmountForFullB <= availableTokenA) {
         // Token B is the limiting factor
-        finalTokenBAmount = availableTokenB;
-        finalTokenAAmount = tokenAAmountForFullB;
-      } else {
+          finalTokenBAmount = availableTokenB;
+          finalTokenAAmount = tokenAAmountForFullB;
+        } else {
         // Token A is the limiting factor
-        finalTokenAAmount = availableTokenA;
-        finalTokenBAmount = tokenBAmountForFullA;
-      }
-      
+          finalTokenAAmount = availableTokenA;
+          finalTokenBAmount = tokenBAmountForFullA;
+        }
+        
       // Set both amounts
-      setToken1Amount(formatUnits(finalTokenAAmount, 18));
-      setToken2Amount(formatUnits(finalTokenBAmount, 18));
+        setToken1Amount(formatUnits(finalTokenAAmount, 18));
+        setToken2Amount(formatUnits(finalTokenBAmount, 18));
+      }
       
     } else {
       // Single token mode: original logic
