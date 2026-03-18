@@ -199,11 +199,29 @@ const AssetsList = ({
                         </p>
                       </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-sm md:text-base text-foreground">
-                          {guestMode || !asset?.totalBalance || asset.totalBalance === "0"
-                            ? "-"
-                            : formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
-                        </p>
+                        {guestMode || !asset?.totalBalance || asset.totalBalance === "0" ? (
+                          <p className="font-medium text-sm md:text-base text-foreground">-</p>
+                        ) : asset.rebaseFactor ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className="font-medium text-sm md:text-base text-foreground cursor-help underline decoration-dotted decoration-muted-foreground/50">
+                                {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
+                              </p>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
+                                ≈ {formatBalance(
+                                  (BigInt(asset.totalBalance) * BigInt(asset.rebaseFactor) / (10n ** 18n)).toString(),
+                                  undefined, 18, 1, 4
+                                )} {asset._symbol?.replace(/^w/, '')} shares
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <p className="font-medium text-sm md:text-base text-foreground">
+                            {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
+                          </p>
+                        )}
                       </td>
                     </tr>
                   )

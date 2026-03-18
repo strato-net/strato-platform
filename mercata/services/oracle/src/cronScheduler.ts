@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
 import { fetchPrices, generateConstantPrices, fetchRebaseFactor } from './adapters/genericRestAdapter';
-import { pushAssetPrices } from './utils/oraclePusher';
+import { pushAssetPrices, pushRebaseFactors } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
 import { fetchPreviousPrices } from './utils/priceReader';
 import { withTimeout } from './utils/apiClient';
@@ -235,14 +235,20 @@ function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: Confi
 // Step 3: Apply Rebase Factors
 // ============================================================================
 
+interface RebaseFactorEntry {
+    targetAddress: string;
+    factor: number;
+}
+
 async function applyRebaseFactors(
     prices: AggregatedPrice[],
     configLoader: ConfigLoader,
     previousPrices: Map<string, number>
-): Promise<void> {
+): Promise<RebaseFactorEntry[]> {
+    const collectedFactors: RebaseFactorEntry[] = [];
     const allAssets = configLoader.getAllAssets();
     const rebasingEntries = Object.entries(allAssets).filter(([_, a]) => a.rebase);
-    if (rebasingEntries.length === 0) return;
+    if (rebasingEntries.length === 0) return collectedFactors;
 
     for (const [assetKey, asset] of rebasingEntries) {
         const rebase = asset.rebase!;
@@ -272,11 +278,15 @@ async function applyRebaseFactors(
                 expectedSourceCount: 1,
             });
 
+            collectedFactors.push({ targetAddress: asset.targetAssetAddress, factor });
+
             logInfo('CronScheduler', `${assetKey}: rebased price $${(rebasedPrice / 1e18).toFixed(4)} (underlying=$${(underlying.medianPrice / 1e18).toFixed(4)}, factor=${factor})`);
         } catch (err) {
             logError('CronScheduler', new Error(`${assetKey}: rebase factor fetch failed: ${(err as Error).message}`));
         }
     }
+
+    return collectedFactors;
 }
 
 // ============================================================================
@@ -302,7 +312,7 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
         aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices),
         configLoader
     );
-    await applyRebaseFactors(aggregatedPrices, configLoader, previousPrices);
+    const rebaseFactors = await applyRebaseFactors(aggregatedPrices, configLoader, previousPrices);
     
     // Partition into valid and failed prices, excluding proxy-only assets (submit: false)
     const allAssets = configLoader.getAllAssets();
@@ -321,6 +331,10 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
     logInfo('CronScheduler', `Submitting ${validPrices.length} prices: [${validPrices.map(p => p.assetKey).join(', ')}]${skipped}`);
     
     const result = await pushAssetPrices(validPrices);
+
+    if (rebaseFactors.length > 0) {
+        await pushRebaseFactors(rebaseFactors);
+    }
     
     // Log all prices (including failed ones)
     aggregatedPrices.forEach(p => logFeedUpdate(p.assetKey, p.medianPrice, p.sources, p.expectedSourceCount, result.hash, p.failed, p.error));
