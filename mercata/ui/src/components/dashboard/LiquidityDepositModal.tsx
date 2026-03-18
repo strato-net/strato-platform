@@ -184,7 +184,7 @@ const LiquidityDepositModal = ({
       } else {
         // Dual token mode
         const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
-        const tokenAAmount = isInitialLiquidity
+        const tokenAAmount = (isInitialLiquidity || selectedPool.isStable)
           ? safeParseUnits(token1Amount, 18)
           : safeParseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
         const tokenBAmount = safeParseUnits(token2Amount, 18);
