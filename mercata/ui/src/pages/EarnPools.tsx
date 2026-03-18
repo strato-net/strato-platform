@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CircleArrowDown, CircleArrowUp, Waves, ArrowLeft } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, ArrowLeft, Landmark, Wallet, Gauge } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -105,7 +105,7 @@ const EarnPools = () => {
   const operationInProgressRef = useRef(false);
 
   useEffect(() => {
-    document.title = "STRATO Earn Pools | STRATO";
+    document.title = "STRATO Swap Pools | STRATO";
     fetchPools();
     if (isLoggedIn) fetchUsdstBalance();
   }, [fetchPools, fetchUsdstBalance, isLoggedIn]);
@@ -147,7 +147,7 @@ const EarnPools = () => {
     <div className="min-h-screen bg-background">
       <DashboardSidebar />
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}>
-        <DashboardHeader title="Liquidity Pools" />
+        <DashboardHeader title="Swap Pools" />
         <main className="pb-16 md:pb-6 p-4 md:p-6 space-y-5">
           {!isLoggedIn && <GuestSignInBanner message="Sign in to deposit or withdraw liquidity from pools" />}
 
@@ -160,21 +160,30 @@ const EarnPools = () => {
             Back to Earn
           </button>
 
-          <Card className="border border-cyan-500/35 bg-gradient-to-br from-cyan-500/10 via-background to-blue-500/10">
+          <Card className="border border-border/70 bg-gradient-to-br from-blue-500/10 via-background to-background">
             <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <div className="inline-flex items-center gap-2 mb-2">
-                    <Waves className="h-4 w-4 text-cyan-500" />
-                    <Badge variant="secondary">Pool Hub</Badge>
-                  </div>
-                  <h1 className="text-2xl md:text-3xl font-semibold">STRATO Liquidity Pools</h1>
-                  <p className="text-sm text-muted-foreground mt-1">Single screen for APY, TVL, ratios, and pool actions.</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Earn Opportunity</p>
+                  <h1 className="text-2xl md:text-3xl font-semibold mt-1">
+                    {highlightedPoolData?.poolName || "Swap Pool"}
+                  </h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Supply swap liquidity and withdraw on demand.
+                  </p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">Active Pools</p>
-                    <p className="text-sm font-semibold">{activePools.length}</p>
+                    <p className="text-[11px] text-muted-foreground">Pool APY</p>
+                    <p className="text-sm font-semibold">
+                      {highlightedPoolData ? formatPct(highlightedPoolData.apy) : "N/A"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
+                    <p className="text-[11px] text-muted-foreground">TVL</p>
+                    <p className="text-sm font-semibold">
+                      {highlightedPoolData ? `$${formatUsd(highlightedPoolData.totalLiquidityUSD)}` : "N/A"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -185,7 +194,7 @@ const EarnPools = () => {
             <Skeleton className="h-72 w-full rounded-xl" />
           ) : activePools.length === 0 ? (
             <Card>
-              <CardContent className="pt-6 text-sm text-muted-foreground">No active liquidity pools available.</CardContent>
+              <CardContent className="pt-6 text-sm text-muted-foreground">No active swap pools available.</CardContent>
             </Card>
           ) : !highlightedPoolData ? (
             <Card>
@@ -194,79 +203,117 @@ const EarnPools = () => {
               </CardContent>
             </Card>
           ) : (
-            <Card className="border border-cyan-500/35 bg-gradient-to-br from-cyan-500/10 via-background to-blue-500/10">
-              <CardContent className="pt-6 space-y-5">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <TokenPairIcon pool={highlightedPoolData} />
-                    <div className="min-w-0">
-                      <p className="text-sm text-muted-foreground">Selected Pool</p>
-                      <h2 className="text-xl md:text-2xl font-semibold truncate">{highlightedPoolData.poolName}</h2>
-                      <p className="text-sm text-muted-foreground truncate">{`Earn fees on ${highlightedPoolData.poolName.replace(" Pool", "")} swaps`}</p>
+            <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+              <div className="xl:col-span-3 space-y-4">
+                <Card className="border border-border/70">
+                  <CardContent className="pt-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-base font-semibold">Deposit</p>
+                      <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Wallet className="h-3.5 w-3.5" />
+                        {`${highlightedPoolData.tokenA?._symbol || "Token A"} / ${highlightedPoolData.tokenB?._symbol || "Token B"}`}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-[10px]">
-                      {highlightedPoolData.isStable ? "Stable" : "Volatile"}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px]">
-                      APY {formatPct(highlightedPoolData.apy)}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">Your Liquidity</p>
-                    <p className="text-sm font-semibold">
-                      $
-                      {formatUsd(
-                        (
-                          (safeBigInt(highlightedPoolData.lpToken?.totalBalance) * safeBigInt(highlightedPoolData.lpToken?.price)) /
-                          WAD
-                        ).toString()
-                      )}
+                    <p className="text-sm text-muted-foreground">
+                      Add liquidity to {highlightedPoolData.poolName} using the same swap pool deposit flow.
                     </p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">Your LP Tokens</p>
-                    <p className="text-sm font-semibold">{formatLpTokenAmount(highlightedPoolData.lpToken?.totalBalance)}</p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">Pool TVL</p>
-                    <p className="text-sm font-semibold">${formatUsd(highlightedPoolData.totalLiquidityUSD)}</p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">24h Volume</p>
-                    <p className="text-sm font-semibold">${formatUsd(highlightedPoolData.tradingVolume24h || "0")}</p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">A to B Ratio</p>
-                    <p className="text-sm font-semibold">{formatRatio(highlightedPoolData.aToBRatio)}</p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">B to A Ratio</p>
-                    <p className="text-sm font-semibold">{formatRatio(highlightedPoolData.bToARatio)}</p>
-                  </div>
-                </div>
+                    <div className="flex items-center justify-end">
+                      <Button onClick={() => handlePoolDeposit(highlightedPoolData)} className="h-11 sm:w-36" disabled={!isLoggedIn}>
+                        <CircleArrowDown className="mr-2 h-4 w-4" />
+                        Deposit
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                <div className="flex items-center justify-end gap-2">
-                  <Button size="sm" onClick={() => handlePoolDeposit(highlightedPoolData)} disabled={!isLoggedIn}>
-                    <CircleArrowDown className="h-4 w-4 mr-1" />
-                    Deposit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handlePoolWithdraw(highlightedPoolData)}
-                    disabled={!isLoggedIn || safeBigInt(highlightedPoolData.lpToken?.totalBalance) === 0n}
-                  >
-                    <CircleArrowUp className="h-4 w-4 mr-1" />
-                    Withdraw
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                <Card className="border border-border/70">
+                  <CardContent className="pt-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-base font-semibold">Withdraw</p>
+                      <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Gauge className="h-3.5 w-3.5" />
+                        LP redemption
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Remove liquidity using your LP token balance for this pool.
+                    </p>
+                    <div className="text-sm text-muted-foreground">
+                      Withdrawable: {formatLpTokenAmount(highlightedPoolData.lpToken?.totalBalance)} LP
+                    </div>
+                    <div className="flex items-center justify-end">
+                      <Button
+                        onClick={() => handlePoolWithdraw(highlightedPoolData)}
+                        variant="outline"
+                        className="h-11 sm:w-36"
+                        disabled={!isLoggedIn || safeBigInt(highlightedPoolData.lpToken?.totalBalance) === 0n}
+                      >
+                        <CircleArrowUp className="mr-2 h-4 w-4" />
+                        Withdraw
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="xl:col-span-2">
+                <Card className="border border-border/70 h-full">
+                  <CardContent className="pt-5">
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Landmark className="h-4 w-4 text-blue-600" />
+                        <p className="text-base font-semibold">Pool Stats</p>
+                      </div>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {highlightedPoolData.isStable ? "Stable" : "Volatile"}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
+                      <div className="rounded-lg border border-border/60 p-3">
+                        <p className="text-xs text-muted-foreground">Your Liquidity</p>
+                        <p className="text-sm font-semibold">
+                          $
+                          {formatUsd(
+                            (
+                              (safeBigInt(highlightedPoolData.lpToken?.totalBalance) * safeBigInt(highlightedPoolData.lpToken?.price)) /
+                              WAD
+                            ).toString()
+                          )}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 p-3">
+                        <p className="text-xs text-muted-foreground">Your LP Tokens</p>
+                        <p className="text-sm font-semibold">{formatLpTokenAmount(highlightedPoolData.lpToken?.totalBalance)}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 p-3">
+                        <p className="text-xs text-muted-foreground">Pool TVL</p>
+                        <p className="text-sm font-semibold">${formatUsd(highlightedPoolData.totalLiquidityUSD)}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 p-3">
+                        <p className="text-xs text-muted-foreground">24h Volume</p>
+                        <p className="text-sm font-semibold">${formatUsd(highlightedPoolData.tradingVolume24h || "0")}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 p-3">
+                        <p className="text-xs text-muted-foreground">Pool APY</p>
+                        <p className="text-sm font-semibold">{formatPct(highlightedPoolData.apy)}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 p-3">
+                        <p className="text-xs text-muted-foreground">A to B Ratio</p>
+                        <p className="text-sm font-semibold">{formatRatio(highlightedPoolData.aToBRatio)}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 p-3">
+                        <p className="text-xs text-muted-foreground">B to A Ratio</p>
+                        <p className="text-sm font-semibold">{formatRatio(highlightedPoolData.bToARatio)}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 p-3">
+                        <p className="text-xs text-muted-foreground">Active Pools</p>
+                        <p className="text-sm font-semibold">{activePools.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           )}
         </main>
       </div>
