@@ -1,14 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Search, LineChart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
 import { Pool } from '@/interface';
-import { rewardsEnabled } from '@/lib/constants';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
@@ -136,8 +136,36 @@ const SwapPoolsSection = () => {
     };
   }, []);
 
+  const navigate = useNavigate();
+
   return (
     <div>
+      {/* Trading Desk Panel */}
+      <div className="mb-4 md:mb-6">
+        <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 md:p-3 bg-blue-500 rounded-lg shrink-0">
+                <LineChart className="text-white" size={20} />
+              </div>
+              <div>
+                <h3 className="text-base md:text-lg font-semibold">Trading Desk</h3>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Track multiple tokens and pools with advanced charting and arbitrage tools
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => navigate("/dashboard/trading-desk")}
+              className="w-full md:w-auto flex items-center justify-center gap-2"
+            >
+              <LineChart className="h-4 w-4" />
+              Open Trading Desk
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <div className="mb-4">
         <div className="relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -206,16 +234,6 @@ const SwapPoolsSection = () => {
                           <div className="flex items-center text-xs text-muted-foreground mt-1">
                             <span>Your Liquidity: {formatYourLiquidityValue(pool)}</span>
                           </div>
-                          {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
-                            <>
-                              <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
-                                <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
-                              </div>
-                              <div className="flex items-center text-xs text-muted-foreground mt-1 ml-2">
-                                <span>• Unstaked: {formatBalance(pool.lpToken.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
-                              </div>
-                            </>
-                          )}
                         </>
                       )}
                     </div>

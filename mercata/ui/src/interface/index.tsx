@@ -148,6 +148,7 @@ export interface RawWithdrawData {
     mintUSDST: boolean;
     timestamp: string;
     requestedAt: string;
+    useHotWallet?: boolean;
   };
   // Backend enriched fields
   status: string;
@@ -229,8 +230,7 @@ export interface TokenInfo {
   _totalSupply: string;
   exchangeRate?: string;
   maxWithdrawableUSDST?: string;
-  userBalanceStaked?: string; // Staked balance from RewardsChef
-  userBalanceTotal?: string; // Total = wallet + staked
+  userBalanceTotal?: string;
 }
 
 export interface LiquidityData {
@@ -373,7 +373,6 @@ export interface SafetyModuleData {
   totalAssets: string;
   totalShares: string;
   userShares: string;
-  userSharesStaked: string;
   userSharesTotal: string;
   userCooldownStart: string;
   cooldownSeconds: string;

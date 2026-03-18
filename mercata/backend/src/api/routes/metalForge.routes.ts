@@ -9,7 +9,7 @@ const router = Router();
  * /metal-forge/configs:
  *   get:
  *     summary: Get MetalForge on-chain configurations
- *     description: Returns configured metals (with mint caps) and supported payment tokens (with fees) from the MetalForge contract
+ *     description: Returns configured metals (with mint caps and fees) and supported payment tokens from the MetalForge contract
  *     tags: [MetalForge]
  *     security: []
  *     responses:
@@ -35,6 +35,8 @@ const router = Router();
  *                         type: boolean
  *                       mintCap:
  *                         type: string
+ *                       feeBps:
+ *                         type: integer
  *                       totalMinted:
  *                         type: string
  *                 payTokens:
@@ -48,10 +50,6 @@ const router = Router();
  *                         type: string
  *                       name:
  *                         type: string
- *                       isEnabled:
- *                         type: boolean
- *                       feeBps:
- *                         type: integer
  */
 router.get("/configs", authHandler.authorizeRequest(true), MetalForgeController.getConfigs);
 

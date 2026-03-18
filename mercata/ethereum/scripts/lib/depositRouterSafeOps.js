@@ -62,6 +62,12 @@ const CHAIN_CONFIG = {
     rpcEnv: "LINEA_RPC_URL",
     defaultRpcUrl: "https://rpc.linea.build",
   },
+  59141: {
+    chainId: 59141,
+    name: "lineaSepolia",
+    rpcEnv: "LINEA_SEPOLIA_RPC_URL",
+    defaultRpcUrl: "https://rpc.sepolia.linea.build",
+  },
 };
 
 function normalizeAddress(value) {

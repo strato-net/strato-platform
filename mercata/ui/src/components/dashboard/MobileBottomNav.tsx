@@ -16,7 +16,8 @@ import {
   Shield,
   UserPlus,
   Vault,
-  Gem,
+
+  ArrowDownToLine,
   X
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
@@ -25,14 +26,14 @@ import { useUser } from '@/context/UserContext';
 // Primary navigation items shown in bottom bar
 const PRIMARY_NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
-  { icon: ArrowUpDown, label: 'Deposit', path: '/dashboard/deposits' },
+  { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
   { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
 ];
 
 // Items shown in "More" drawer
 const MORE_ITEMS = [
-  { icon: Gem, label: 'Buy Metals', path: '/dashboard/buy-metals' },
+
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },

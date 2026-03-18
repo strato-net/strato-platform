@@ -1,4 +1,4 @@
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,8 +92,12 @@ const VaultTransactions = () => {
                   <TableRow key={tx.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <RefreshCw className="h-4 w-4 text-blue-600" />
-                        <Badge variant="secondary">
+                        {tx.type === "liquidation" ? (
+                          <Zap className="h-4 w-4 text-orange-600" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 text-blue-600" />
+                        )}
+                        <Badge variant={tx.type === "liquidation" ? "destructive" : "secondary"}>
                           {tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}
                         </Badge>
                       </div>
@@ -102,25 +106,36 @@ const VaultTransactions = () => {
                       {formatTimestamp(tx.timestamp)}
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-1">
-                        {tx.tokenIn && (
-                          <div className="flex items-center gap-1 text-sm">
-                            <span className="text-red-600">-</span>
-                            <span className="font-mono">{formatTokenAmount(tx.tokenIn.amount)}</span>
-                            <span className="text-muted-foreground">{tx.tokenIn.symbol}</span>
-                          </div>
-                        )}
-                        {tx.tokenOut && (
-                          <div className="flex items-center gap-1 text-sm">
-                            <span className="text-green-600">+</span>
-                            <span className="font-mono">{formatTokenAmount(tx.tokenOut.amount)}</span>
-                            <span className="text-muted-foreground">{tx.tokenOut.symbol}</span>
-                          </div>
-                        )}
-                        {!tx.tokenIn && !tx.tokenOut && (
-                          <span className="text-muted-foreground text-sm">—</span>
-                        )}
-                      </div>
+                      {tx.type === "liquidation" && tx.liquidation ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <span className="font-mono">{formatTokenAmount(tx.liquidation.collateralSeized)}</span>
+                          <span className="text-muted-foreground">{tx.liquidation.assetSymbol}</span>
+                          <span className="text-muted-foreground">seized</span>
+                          <span className="text-muted-foreground">for</span>
+                          <span className="font-mono">{formatTokenAmount(tx.liquidation.debtBurnedUSD)}</span>
+                          <span className="text-muted-foreground">USDST</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {tx.tokenIn && (
+                            <div className="flex items-center gap-1 text-sm">
+                              <span className="text-red-600">-</span>
+                              <span className="font-mono">{formatTokenAmount(tx.tokenIn.amount)}</span>
+                              <span className="text-muted-foreground">{tx.tokenIn.symbol}</span>
+                            </div>
+                          )}
+                          {tx.tokenOut && (
+                            <div className="flex items-center gap-1 text-sm">
+                              <span className="text-green-600">+</span>
+                              <span className="font-mono">{formatTokenAmount(tx.tokenOut.amount)}</span>
+                              <span className="text-muted-foreground">{tx.tokenOut.symbol}</span>
+                            </div>
+                          )}
+                          {!tx.tokenIn && !tx.tokenOut && (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

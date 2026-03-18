@@ -72,6 +72,7 @@ const GUEST_SAFE_URLS = [
   '/tokens/v2/earning-assets/public',
   '/bridge/networkConfigs',
   '/bridge/bridgeableTokens',
+  '/bridge/depositActions',
   '/bridge/withdrawalSummary',
   '/bridge/balance',
   '/bridge/transactions/withdrawal',
@@ -100,7 +101,6 @@ const GUEST_SAFE_URLS = [
   '/lending/safety/info',
   '/lending/safety/info/public',
   // Rewards page
-  '/rewards/pending',
   '/rewards/overview',
   '/rewards/activities',
   // ActivityFeed page

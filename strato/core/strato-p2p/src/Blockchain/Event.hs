@@ -389,7 +389,8 @@ handleEvents peer = awaitForever $ \case
     P2pMPNodesResponse o nds -> when (shouldRespond peer o) . yieldR $ MPNodes nds
   TimerEvt -> do
     WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
-    syncDone <- return $ Just False -- RBDB.withRedisBlockDB $ getSyncStatus
+    BestSequencedBlock _ myNumber _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+    let syncDone = if worldNumber >= 0 then Just (myNumber >= worldNumber) else Nothing
     unless (syncDone == Just True) $ do
       maybeSyncTask <- lift $ getCurrentSyncTask $ pPeerHost peer
       case maybeSyncTask of
