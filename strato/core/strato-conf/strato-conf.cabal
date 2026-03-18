@@ -16,6 +16,7 @@ library
   exposed-modules:
       Blockchain.EthConf
       Blockchain.EthConf.Model
+      Blockchain.Strato.Version
   other-modules:
       Paths_strato_conf
   hs-source-dirs:
@@ -25,11 +26,14 @@ library
     , base
     , bytestring
     , data-default
+    , file-embed
     , hedis
     , kafka-monad
     , postgresql-simple
+    , process
     , servant-client
     , strato-model
+    , template-haskell
     , text
     , yaml
   default-language: Haskell2010

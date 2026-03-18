@@ -3,9 +3,6 @@ import { constants } from "../../config/constants";
 import * as config from "../../config/config";
 import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, RawSwapEvent, OraclePriceMap } from "@mercata/shared-types";
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
-import { buildFunctionTx } from "../../utils/txBuilder";
-import { executeTransaction } from "../../utils/txHelper";
-import { waitForBalanceUpdate } from "./rewards/rewardsChef.helpers";
 import { toUTCTime } from "./cirrusHelpers";
 import JSONBig from "json-bigint";
 
@@ -456,15 +453,9 @@ export const buildSwapToken = (
 export const buildLPToken = (
   lpToken: RawLPToken,
   price: string,
-  userBalance: string,
-  stakedBalance?: string
+  userBalance: string
 ): LPToken => {
-  // Always calculate totalBalance
-  const totalBalance = stakedBalance !== undefined
-    ? (BigInt(userBalance) + BigInt(stakedBalance)).toString()
-    : userBalance;
-
-  const result: LPToken = {
+  return {
     address: lpToken.address,
     _name: lpToken._name,
     _symbol: lpToken._symbol,
@@ -473,15 +464,8 @@ export const buildLPToken = (
     balance: userBalance,
     price,
     images: lpToken.images.filter(img => img.value && img.value.trim() !== ""),
-    totalBalance
+    totalBalance: userBalance
   };
-
-  // Only add stakedBalance if pool exists in rewards program
-  if (stakedBalance !== undefined) {
-    result.stakedBalance = stakedBalance;
-  }
-
-  return result;
 };
 
 export const buildPoolList = (
@@ -489,8 +473,7 @@ export const buildPoolList = (
   priceMap: OraclePriceMap,
   volumeMap: Map<string, string>,
   factoryData: RawPoolFactory | undefined,
-  userAddress: string | undefined,
-  stakedBalanceMap?: Map<string, string>
+  userAddress: string | undefined
 ) => {
   return pools.map((pool: RawGetPool) => {
     const tokenAPrice = priceMap.get(pool.tokenA.address) || "0";
@@ -507,9 +490,6 @@ export const buildPoolList = (
     const tokenBBalance = getTokenBalance(pool.tokenB, userAddress || "");
     const lpTokenBalance = getTokenBalance(pool.lpToken, userAddress || "");
 
-    // Get staked balance for this LP token from the map (if available)
-    const stakedBalance = stakedBalanceMap?.get(pool.lpToken.address);
-
     const symbolA = pool.tokenA._symbol;
     const symbolB = pool.tokenB._symbol;
 
@@ -521,7 +501,7 @@ export const buildPoolList = (
       poolSymbol: `${symbolA}-${symbolB}`,
       tokenA: buildSwapToken(pool.tokenA, tokenAPrice, pool.tokenABalance, tokenABalance),
       tokenB: buildSwapToken(pool.tokenB, tokenBPrice, pool.tokenBBalance, tokenBBalance),
-      lpToken: buildLPToken(pool.lpToken, lpTokenPrice, lpTokenBalance, stakedBalance),
+      lpToken: buildLPToken(pool.lpToken, lpTokenPrice, lpTokenBalance),
       totalLiquidityUSD,
       tradingVolume24h: volume24h,
       apy: apy.toFixed(2),
@@ -609,41 +589,3 @@ export const buildTokenApprovalTx = (tokenAddress: string, spender: string, amou
   args: { spender, value: amount }
 });
 
-/**
- * Stakes newly minted LP tokens into RewardsChef
- */
-export const stakeNewLPTokens = async (
-  accessToken: string,
-  userAddress: string,
-  lpTokenAddress: string,
-  rewardsPoolIdx: number,
-  lpTokenBalanceBefore: string
-): Promise<void> => {
-  // Wait for Cirrus to index the new LP token balance with retry logic
-  const lpTokenBalanceAfter = await waitForBalanceUpdate(
-    accessToken,
-    lpTokenAddress,
-    userAddress,
-    lpTokenBalanceBefore,
-    10,  // max retries
-    200  // 200ms delay between retries
-  );
-
-  // Calculate newly minted LP tokens
-  const newlyMintedAmount = (BigInt(lpTokenBalanceAfter) - BigInt(lpTokenBalanceBefore)).toString();
-
-  if (BigInt(newlyMintedAmount) > 0n) {
-    // Stake the newly minted LP tokens
-    const stakingTx = await buildFunctionTx([
-      buildTokenApprovalTx(lpTokenAddress, config.rewardsChef, newlyMintedAmount),
-      {
-        contractName: "RewardsChef",
-        contractAddress: config.rewardsChef,
-        method: "deposit",
-        args: { _pid: rewardsPoolIdx, _amount: newlyMintedAmount }
-      }
-    ], userAddress, accessToken);
-
-    await executeTransaction(accessToken, stakingTx);
-  }
-};

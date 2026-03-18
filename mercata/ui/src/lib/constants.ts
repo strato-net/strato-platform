@@ -5,7 +5,6 @@ export const safetyModuleAddress = "0000000000000000000000000000000000001015"
 export const sUsdstAddress = "0000000000000000000000000000000000001016"
 export const mUsdstAddress = "000000000000000000000000000000000000100f"
 export const cataAddress = "2680dc6693021cd3fefb84351570874fbef8332a"
-export const rewardsChefAddress = "000000000000000000000000000000000000101f"
 export const rewardsAddress = "0000000000000000000000000000000000001020" // TODO: Update with actual deployed address
 export const DECIMAL = 18
 

@@ -191,7 +191,12 @@ while [ ${#} -gt 0 ]; do
 done
 
 checkDocker
-checkComposeFile
+
+# Only check for existing docker-compose.yml if node is already set up
+# Otherwise, strato-setup will generate it later
+if [ -f nodedata/.ethereumH/ethconf.yaml ]; then
+  checkComposeFile
+fi
 
 export NODE_HOST=${NODE_HOST:-localhost}
 export OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-'https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration'}
@@ -255,6 +260,67 @@ if [ ${main_port} != "80" ] && [ ${main_port} != "443" ] && [[ ${NODE_HOST} != *
   exit 8
 fi
 ## END OF PARAMETERS VALIDATION
+
+# RUN STRATO-SETUP TO GENERATE NODE CONFIG AND DOCKER-COMPOSE.YML
+if [ ! -f nodedata/.ethereumH/ethconf.yaml ]; then
+  # Clean up any partial previous run and old docker-compose.yml
+  rm -rf nodedata/
+  rm -f docker-compose.yml
+  echo -e "${Yellow}Running strato-setup to generate node configuration...${NC}"
+  
+  # Get strato image - use env var, or find locally built image, or compute from git
+  if [ -z "${STRATO_IMAGE}" ]; then
+    # Try to find a locally built strato image (may have registry prefix)
+    LOCAL_STRATO=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '/strato:\|^strato:' | head -1)
+    if [ -n "${LOCAL_STRATO}" ]; then
+      STRATO_IMAGE="${LOCAL_STRATO}"
+      echo "Found local STRATO_IMAGE: ${STRATO_IMAGE}"
+    else
+      # Fallback: compute from git tag
+      GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
+      if git describe --tags --exact-match HEAD >/dev/null 2>&1; then
+        VERSION="${GIT_TAG}"
+      else
+        VERSION="${GIT_TAG}-$(git rev-parse --short=7 HEAD)"
+      fi
+      STRATO_IMAGE="${REPO_URL}strato:${VERSION}"
+      echo "Computed STRATO_IMAGE: ${STRATO_IMAGE}"
+    fi
+  fi
+  
+  # Export STRATO_IMAGE so docker-compose can use it
+  export STRATO_IMAGE
+  
+  # Extract REPO_URL from STRATO_IMAGE if not already set
+  # e.g., "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:16.7-xxx" -> "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/"
+  if [ -z "${REPO_URL}" ] && [ -n "${STRATO_IMAGE}" ]; then
+    REPO_URL=$(echo "${STRATO_IMAGE}" | sed 's|strato:.*||')
+    echo "Derived REPO_URL: ${REPO_URL}"
+  fi
+  
+  # Create OAuth credentials file for strato-setup
+  mkdir -p "${HOME}/.secrets"
+  cat > "${HOME}/.secrets/strato_credentials.yaml" << EOF
+discoveryUrl: "${OAUTH_DISCOVERY_URL}"
+clientId: "${OAUTH_CLIENT_ID}"
+clientSecret: "${OAUTH_CLIENT_SECRET}"
+EOF
+  
+  # Run strato-setup to create node directory and docker-compose.yml
+  # Note: we use /node/nodedata (not /node/strato) because /node/strato is the bootstrap script itself
+  docker run --rm \
+    --entrypoint strato-setup \
+    -v "$(pwd)":/node \
+    -v "${HOME}/.secrets:/root/.secrets:ro" \
+    "${STRATO_IMAGE}" \
+    /node/nodedata --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}/strato/v2.3" --repoUrl="${REPO_URL:-}" \
+    --pghost=postgres --kafkahost=kafka --redisHost=redis --apiIPAddress=0.0.0.0
+  
+  # Move generated docker-compose.yml to current directory (strato-setup creates it in the node dir)
+  mv nodedata/docker-compose.yml docker-compose.yml
+  
+  echo -e "${Green}Node configuration and docker-compose.yml generated.${NC}"
+fi
 
 # COMPOSE FILE PRE-PROCESSING
 function cleanup {

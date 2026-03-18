@@ -5,12 +5,11 @@ services:
     depends_on:
       - postgrest
     build: ./mercata/backend
-    image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>}
+    image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>-<HASH_MERCATA_BACKEND>}
     init: true
+    volumes:
+      - ./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro
     environment:
-      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - NODE_URL=http://nginx  # no TLS required within the docker network
       - BASE_URL=https://${NODE_HOST}  # todo: protocol to depend on ssl=true|false
       - RPC_URL_MAINNET=${RPC_URL_MAINNET:-}
@@ -45,7 +44,7 @@ services:
     depends_on:
       - mercata-backend
     build: ./mercata/ui
-    image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
+    image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>-<HASH_MERCATA_UI>}
     environment:
       - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID:-}
       - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID:-}
@@ -64,7 +63,7 @@ services:
     - NODE_HOST=${NODE_HOST}
     - ssl=${ssl:-false}
     build: .
-    image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
+    image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>-<HASH_SMD>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -78,7 +77,6 @@ services:
     environment:
     - ADMIN_EMAIL=${ADMIN_EMAIL:-}
     - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
     - PROMETHEUS_HOST=${PROMETHEUS_HOST:-}
@@ -88,8 +86,10 @@ services:
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - MONITOR_URL=${MONITOR_URL:-}
     - vaultUrl=http://nginx
+    volumes:
+    - ./secrets/postgres_password:/run/secrets/postgres_password:ro
     build: .
-    image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
+    image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>-<HASH_APEX>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -122,12 +122,13 @@ services:
     - blocHost=${blocHost:-strato:3000}
     - PG_ENV_POSTGRES_DB=cirrus
     - PG_ENV_POSTGRES_HOST=postgres
-    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
     - PG_ENV_POSTGRES_USER=postgres
     - PG_PORT_5432_TCP_PORT=5432
     - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
+    volumes:
+    - ./secrets/postgres_password:/run/secrets/postgres_password:ro
     build: .
-    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
+    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>-<HASH_POSTGREST>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -176,9 +177,6 @@ services:
     - blockTime=${blockTime:-}
     - DOCS_HOST=${DOCS_HOST:-}
     - NGINX_TRUST_PROXY_CIDRS=${NGINX_TRUST_PROXY_CIDRS:-}
-    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_SCOPE=${OAUTH_SCOPE:-}
     - POSTGREST_HOST=${POSTGREST_HOST:-}
     - PROMETHEUS_HOST=${PROMETHEUS_HOST:-}
@@ -198,12 +196,13 @@ services:
     build: .
     extra_hosts:
     - "host.docker.internal:host-gateway"
-    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
+    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>-<HASH_NGINX>}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
     volumes:
     - ./ssl:/tmp/ssl:ro
+    - ./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -261,7 +260,7 @@ services:
     environment:
       - NODE_HOST=${NODE_HOST}
       - STRATO_HOSTNAME=${STRATO_HOSTNAME:-172.17.0.1}
-    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
+    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>-<HASH_PROMETHEUS>}
     user: "${DOCKER_UID}:${DOCKER_GID}"
     volumes:
     - ./prometheus:/prometheus
