@@ -2,6 +2,34 @@ import { bloc, cirrus } from "./mercataApiHelper";
 import { StratoPaths } from "../config/constants";
 import { StratoError } from "../errors";
 
+export const doUntil = async (
+  initialData: any,
+  predicate: (res: any) => boolean,
+  action: () => Promise<any>,
+  timeout = 60000, // default to 1 minute
+  interval = 5000 // check every 5 seconds
+): Promise<any> => {
+  if (predicate(initialData)) {
+    return initialData;
+  }
+  const start = Date.now();
+
+  while (true) {
+    const result = await action();
+
+    if (predicate(result)) {
+      return result;
+    }
+
+    if (Date.now() - start >= timeout) {
+      console.warn("Timeout reached before predicate was satisfied.");
+      return result;
+    }
+
+    await new Promise((res) => setTimeout(res, interval));
+  }
+};
+
 export const until = async (
   predicate: (res: any) => boolean,
   action: () => Promise<any>,
@@ -58,18 +86,20 @@ export const postAndWaitForTx = async (
       return result.hash;
     });
 
-    const finalResults = await until(
-      (results: any[]) => {
-        const failedTx = results.find(r => r?.status === "Failure");
-        if (failedTx) {
-          // Extract the actual error message from the failed transaction
-          const errorMessage = failedTx.txResult?.message || failedTx.error || failedTx.message || "Transaction failed";
-          const extractedMessage = extractErrorMessage(errorMessage);
-          // Blockchain errors are typically client errors (400) since they're due to user input/state
-          throw new StratoError(extractedMessage, 400);
-        }
-        return results.every(r => r?.status !== "Pending");
-      },
+    const done = (results: any[]) => {
+      const failedTx = results.find(r => r?.status === "Failure");
+      if (failedTx) {
+        // Extract the actual error message from the failed transaction
+        const errorMessage = failedTx.txResult?.message || failedTx.error || failedTx.message || "Transaction failed";
+        const extractedMessage = extractErrorMessage(errorMessage);
+        // Blockchain errors are typically client errors (400) since they're due to user input/state
+        throw new StratoError(extractedMessage, 400);
+      }
+      return results.every(r => r?.status !== "Pending");
+    };
+
+    const finalResults = done(results) ? results : await until(
+      done,
       async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,
       timeout
     );

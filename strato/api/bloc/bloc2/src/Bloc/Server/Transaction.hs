@@ -211,7 +211,7 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
             Just x -> pure (x, Nothing)  -- Already cached, no code collection
             Nothing -> do
               -- Try to get contract with code collection for file-level structs
-              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress
+              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress methodcallMethodName
               case mContractCC of
                 Just (c, cc) -> do
                   _ <- at methodcallContractAddress <?= c
@@ -345,7 +345,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
           (contract, mCodeCollection) <- case mCached of
             Just x -> pure (x, Nothing)
             Nothing -> do
-              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress
+              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress methodcallMethodName
               case mContractCC of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                 Just (c, cc) -> do
@@ -608,7 +608,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
         p <- fromFunction x
         bfp' <- if useWallet && userContractAddr /= functionpayloadContractAddress p
           then do
-            args' <- getContractWithCodeCollectionByAddress (functionpayloadContractAddress p) >>= \case
+            args' <- getContractWithCodeCollectionByAddress (functionpayloadContractAddress p) (functionpayloadMethod p) >>= \case
               Nothing -> pure $ M.elems (functionpayloadArgs p)
               Just (theContract@Contract{..}, cc) -> do
                 let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
@@ -641,7 +641,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
         bflp' <- flip (FunctionListParameters addr) resolve <$> traverse (\(FunctionPayload a m r x md) ->
             if useWallet && a /= userContractAddr
               then do
-                args' <- getContractWithCodeCollectionByAddress a >>= \case
+                args' <- getContractWithCodeCollectionByAddress a m >>= \case
                   Nothing -> pure $ M.elems r
                   Just (theContract@Contract{..}, cc) -> do
                     let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
@@ -913,7 +913,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} = do
           (contract, mCodeCollection) <- case mCached of
             Just x -> pure (x, Nothing)
             Nothing -> do
-              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress
+              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress methodcallMethodName
               case mContractCC of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show methodcallContractAddress)
                 Just (c, cc) -> do
@@ -975,7 +975,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} = do
             ]
   (contract, codeCollection) <-
     maybe (throwIO err) pure
-      =<< getContractWithCodeCollectionByAddress contractAddr
+      =<< getContractWithCodeCollectionByAddress contractAddr funcName
   case M.lookup (Text.unpack funcName) (contract ^. functions) of
     Just _ -> pure ()
     Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"

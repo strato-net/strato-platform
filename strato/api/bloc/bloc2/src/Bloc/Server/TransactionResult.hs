@@ -376,7 +376,7 @@ getReturnTypes ::
 getReturnTypes addr funcName = do
   -- Fetch contract from database
   $logDebugS "getReturnTypes" . Text.pack $ "Fetching contract for address: " ++ show addr
-  mContract <- getContractByAddress addr
+  mContract <- getContractByAddress addr (Just funcName)
   case mContract of
     Just contract -> do
       -- Extract return types

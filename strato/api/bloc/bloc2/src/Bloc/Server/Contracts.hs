@@ -137,7 +137,7 @@ getContractsContract name addr = do
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
-  getContractByAccountsFilterParams aParams >>= \case
+  getContractByAccountsFilterParams aParams Nothing >>= \case
     Nothing -> throwIO err
     Just contract -> pure contract
 
@@ -249,7 +249,7 @@ getContractsDetails' contractAddress = do
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
-  getContractByAccountsFilterParams aParams >>= \case
+  getContractByAccountsFilterParams aParams Nothing >>= \case
     Nothing -> throwIO err
     Just contract -> pure contract
 
