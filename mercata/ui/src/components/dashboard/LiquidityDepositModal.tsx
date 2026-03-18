@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,10 +14,11 @@ import { useUser } from '@/context/UserContext';
 import { formatUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE } from "@/lib/constants";
-import { Pool } from '@/interface';
+import { Pool, PoolCoin } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { isMultiTokenPool } from '@/helpers/swapCalculations';
 
 const formatNumber = (value: string | number): string => {
   try {
@@ -61,7 +62,12 @@ const LiquidityDepositModal = ({
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A&B');
 
-  const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
+  // Multi-token state
+  const [coinAmounts, setCoinAmounts] = useState<string[]>([]);
+
+  const { addLiquidityDualToken, addLiquiditySingleToken, addLiquidityMultiToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
+
+  const isMultiToken = useMemo(() => selectedPool ? isMultiTokenPool(selectedPool) : false, [selectedPool]);
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
@@ -75,12 +81,20 @@ const LiquidityDepositModal = ({
 
   useEffect(() => {
   if (selectedPool && isOpen) {
+    // Initialize multi-token amounts array
+    if (isMultiToken && selectedPool.coins) {
+      setCoinAmounts(selectedPool.coins.map(() => ''));
+    }
+
     const fetchBalances = async () => {
       try {
         setBalanceLoading(true);
-        const balances = await fetchTokenBalances(selectedPool, userAddress, usdstAddress);
-        setTokenABalance(balances.tokenABalance);
-        setTokenBBalance(balances.tokenBBalance);
+        if (!isMultiToken) {
+          const balances = await fetchTokenBalances(selectedPool, userAddress, usdstAddress);
+          setTokenABalance(balances.tokenABalance);
+          setTokenBBalance(balances.tokenBBalance);
+        }
+        // For multi-token pools, balances come from pool.coins[].balance
         setBalanceLoading(false);
       } catch (error) {
         toast({
@@ -94,11 +108,12 @@ const LiquidityDepositModal = ({
 
     fetchBalances();
   }
-}, [selectedPool?.address, isOpen, fetchTokenBalances, userAddress, toast]);  
+}, [selectedPool?.address, isOpen, fetchTokenBalances, userAddress, toast, isMultiToken]);  
 
   const handleClose = () => {
     setToken1Amount('');
     setToken2Amount('');
+    setCoinAmounts([]);
     setDepositMode('A&B');
     onClose();
   };
@@ -127,6 +142,49 @@ const LiquidityDepositModal = ({
   const handleDepositSubmit = async (values: DepositFormValues) => {
     if (!selectedPool || operationInProgressRef.current) return;
 
+    // Multi-token pool deposit
+    if (isMultiToken && selectedPool.coins) {
+      const amountsWei = coinAmounts.map(a => safeParseUnits(a || "0", 18).toString());
+      const hasAnyAmount = amountsWei.some(a => BigInt(a) > 0n);
+      if (!hasAnyAmount) {
+        toast({ title: "Error", description: "Enter at least one token amount", variant: "destructive" });
+        return;
+      }
+
+      // Validate balances
+      for (let i = 0; i < selectedPool.coins.length; i++) {
+        const amountWei = BigInt(amountsWei[i]);
+        const balance = BigInt(selectedPool.coins[i].balance || "0");
+        if (amountWei > balance) {
+          toast({ title: "Error", description: `Insufficient balance for ${selectedPool.coins[i]._symbol}`, variant: "destructive" });
+          return;
+        }
+      }
+
+      try {
+        operationInProgressRef.current = true;
+        setDepositLoading(true);
+
+        await addLiquidityMultiToken({
+          poolAddress: selectedPool.address,
+          amounts: amountsWei,
+          minMintAmount: "0"
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        handleClose();
+        toast({ title: "Success", description: `${selectedPool.poolName} deposited successfully.`, variant: "success" });
+      } catch (error) {
+        toast({ title: "Error", description: `Something went wrong - ${error}`, variant: "destructive" });
+      } finally {
+        setDepositLoading(false);
+        operationInProgressRef.current = false;
+      }
+      if (!depositLoading) onDepositSuccess();
+      return;
+    }
+
+    // Standard 2-token pool deposit
     const decimals = 18;
     const token1AmountWei = safeParseUnits(token1Amount, decimals);
     const token2AmountWei = safeParseUnits(token2Amount, decimals);
@@ -135,54 +193,37 @@ const LiquidityDepositModal = ({
 
     // Validate based on deposit mode
     if (depositMode === 'A' && (token1AmountWei > token1Balance || !token1Amount)) {
-      toast({
-        title: "Error",
-        description: "Insufficient balance for token A",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Insufficient balance for token A", variant: "destructive" });
       return;
     }
 
     if (depositMode === 'B' && (token2AmountWei > token2Balance || !token2Amount)) {
-      toast({
-        title: "Error",
-        description: "Insufficient balance for token B",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Insufficient balance for token B", variant: "destructive" });
       return;
     }
 
     if (depositMode === 'A&B' && (token1AmountWei > token1Balance || token2AmountWei > token2Balance)) {
-      toast({
-        title: "Error",
-        description: "Insufficient balance",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Insufficient balance", variant: "destructive" });
       return;
     }
 
     try {
       operationInProgressRef.current = true;
       setDepositLoading(true);
-      
-
 
       if (depositMode === 'A') {
-        // Single token mode - Token A
         await addLiquiditySingleToken({
           poolAddress: selectedPool.address,
           singleTokenAmount: token1AmountWei.toString(),
           isAToB: true,
         });
       } else if (depositMode === 'B') {
-        // Single token mode - Token B
         await addLiquiditySingleToken({
           poolAddress: selectedPool.address,
           singleTokenAmount: token2AmountWei.toString(),
           isAToB: false,
         });
       } else {
-        // Dual token mode
         const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
         const tokenAAmount = (isInitialLiquidity || selectedPool.isStable)
           ? safeParseUnits(token1Amount, 18)
@@ -199,23 +240,14 @@ const LiquidityDepositModal = ({
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       handleClose();
-      toast({
-        title: "Success",
-        description: `${selectedPool.poolName} deposited successfully.`,
-        variant: "success",
-      });
+      toast({ title: "Success", description: `${selectedPool.poolName} deposited successfully.`, variant: "success" });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: `Something went wrong - ${error}`,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: `Something went wrong - ${error}`, variant: "destructive" });
     } finally {
       setDepositLoading(false);
       operationInProgressRef.current = false;
     }
-    
-    // Call onDepositSuccess AFTER the finally block to ensure operationInProgressRef.current is false
+
     if (!depositLoading) {
       onDepositSuccess();
     }
@@ -373,16 +405,29 @@ const LiquidityDepositModal = ({
 
   const isConfirmButtonDisabled = () => {
     if (depositLoading) return true;
-    
+
     // Check USDST + voucher balance for transaction fee
     const feeAmount = safeParseUnits(DEPOSIT_FEE, 18);
     const usdstBalanceBigInt = BigInt(usdstBalance || "0");
     const voucherBalanceBigInt = BigInt(voucherBalance || "0");
-    
+
     if (feeAmount > 0n && (usdstBalanceBigInt + voucherBalanceBigInt) < feeAmount) {
       return true;
     }
-    
+
+    // Multi-token pool: at least one amount must be entered and within balance
+    if (isMultiToken && selectedPool?.coins) {
+      const hasAnyAmount = coinAmounts.some(a => a && safeParseUnits(a, 18) > 0n);
+      if (!hasAnyAmount) return true;
+      for (let i = 0; i < selectedPool.coins.length; i++) {
+        const amt = coinAmounts[i];
+        if (amt && safeParseUnits(amt, 18) > BigInt(selectedPool.coins[i].balance || "0")) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     // Check based on deposit mode
     switch (depositMode) {
       case 'A':
@@ -390,7 +435,7 @@ const LiquidityDepositModal = ({
       case 'B':
         return !token2Amount || safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0");
       case 'A&B':
-        return !token1Amount || !token2Amount || 
+        return !token1Amount || !token2Amount ||
                safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ||
                safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0");
       default:
@@ -409,10 +454,115 @@ const LiquidityDepositModal = ({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleDepositSubmit)} className="space-y-4">
+          {isMultiToken && selectedPool?.coins ? (
+            <>
+              {/* Multi-token deposit inputs */}
+              <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto">
+                {selectedPool.coins.map((coin, idx) => {
+                  const coinBalance = coin.balance || "0";
+                  const amount = coinAmounts[idx] || '';
+                  const amountWei = amount ? safeParseUnits(amount, 18) : 0n;
+                  const insufficientBalance = amountWei > BigInt(coinBalance);
+
+                  return (
+                    <div key={coin.address} className="rounded-lg border border-blue-400 p-2">
+                      <span className="text-sm text-muted-foreground">Amount</span>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="0.0"
+                          className={`flex-1 border-none text-lg font-medium p-0 h-auto focus-visible:ring-0 ${
+                            insufficientBalance ? "text-red-500" : ""
+                          }`}
+                          value={amount}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                              const newAmounts = [...coinAmounts];
+                              newAmounts[idx] = value === '.' ? '0.' : value;
+                              setCoinAmounts(newAmounts);
+                            }
+                          }}
+                        />
+                        <div className="flex items-center space-x-2 bg-muted rounded-md px-2 py-1 flex-shrink-0">
+                          {coin.images?.[0]?.value ? (
+                            <img src={coin.images[0].value} alt={coin._name} className="w-6 h-6 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium" style={{ backgroundColor: "red" }}>
+                              {coin._symbol?.slice(0, 2)}
+                            </div>
+                          )}
+                          <span className="font-medium text-sm">{coin._symbol}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="text-sm text-muted-foreground">
+                          Balance: {formatUnits(coinBalance, 18)}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-blue-500"
+                          onClick={() => {
+                            let maxBigInt = BigInt(coinBalance);
+                            if (coin.address.toLowerCase() === usdstAddress.toLowerCase()) {
+                              const fee = safeParseUnits(DEPOSIT_FEE, 18);
+                              const voucherWei = BigInt(voucherBalance || "0");
+                              if (voucherWei < fee) {
+                                const remainingFee = fee - voucherWei;
+                                maxBigInt = maxBigInt > remainingFee ? maxBigInt - remainingFee : 0n;
+                              }
+                            }
+                            const newAmounts = [...coinAmounts];
+                            newAmounts[idx] = formatUnits(maxBigInt, 18);
+                            setCoinAmounts(newAmounts);
+                          }}
+                        >
+                          Max
+                        </Button>
+                      </div>
+                      {insufficientBalance && (
+                        <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pool info */}
+              <div className="rounded-lg bg-muted/50 p-2 md:p-3">
+                <div className="flex justify-between items-center text-xs md:text-sm text-muted-foreground">
+                  <span>APY</span>
+                  <span className="font-medium">{selectedPool?.apy ? `${selectedPool.apy}%` : "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs md:text-sm mt-2 text-muted-foreground">
+                  <span>Transaction fee</span>
+                  <span>{DEPOSIT_FEE} USDST ({parseFloat(DEPOSIT_FEE) * 100} voucher)</span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Button
+                  disabled={isConfirmButtonDisabled()}
+                  type="submit"
+                  className="w-full bg-strato-blue hover:bg-strato-blue/90"
+                >
+                  {depositLoading ? (
+                    <div className="flex justify-center items-center h-12">
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                    </div>
+                  ) : (
+                    "Confirm Deposit"
+                  )}
+                </Button>
+              </div>
+            </>
+          ) : (
+          <>
           <div className="grid grid-cols-1 gap-4">
             {/* First Token */}
             <div className={`rounded-lg border p-2 transition-colors ${
-              depositMode === 'A' ? 'border-blue-400 ' : 
+              depositMode === 'A' ? 'border-blue-400 ' :
               depositMode === 'A&B' ? 'border-blue-400 ' :
               'border-border bg-muted/50'
             }`}>
@@ -697,9 +847,9 @@ const LiquidityDepositModal = ({
           </div>
 
           <div className="pt-2">
-            <Button 
-              disabled={isConfirmButtonDisabled()} 
-              type="submit" 
+            <Button
+              disabled={isConfirmButtonDisabled()}
+              type="submit"
               className="w-full bg-strato-blue hover:bg-strato-blue/90"
             >
               {depositLoading ? (
@@ -711,6 +861,8 @@ const LiquidityDepositModal = ({
               )}
             </Button>
           </div>
+          </>
+          )}
         </form>
       </DialogContent>
     </Dialog>

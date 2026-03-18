@@ -8,7 +8,8 @@ import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
-import { Pool } from '@/interface';
+import { Pool, PoolCoin } from '@/interface';
+import { isMultiTokenPool } from '@/helpers/swapCalculations';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
@@ -140,32 +141,6 @@ const SwapPoolsSection = () => {
 
   return (
     <div>
-      {/* Trading Desk Panel */}
-      <div className="mb-4 md:mb-6">
-        <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 md:p-3 bg-blue-500 rounded-lg shrink-0">
-                <LineChart className="text-white" size={20} />
-              </div>
-              <div>
-                <h3 className="text-base md:text-lg font-semibold">Trading Desk</h3>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  Track multiple tokens and pools with advanced charting and arbitrage tools
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={() => navigate("/dashboard/trading-desk")}
-              className="w-full md:w-auto flex items-center justify-center gap-2"
-            >
-              <LineChart className="h-4 w-4" />
-              Open Trading Desk
-            </Button>
-          </div>
-        </div>
-      </div>
-
       <div className="mb-4">
         <div className="relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -193,34 +168,60 @@ const SwapPoolsSection = () => {
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 gap-4">
                   <div className="flex items-center">
-                    <div className="flex items-center -space-x-2 mr-3">
-                      {pool.tokenA?.images?.[0]?.value ? (
-                        <img
-                          src={pool.tokenA.images[0].value}
-                          alt={pool.tokenA._name || pool.poolName?.split('/')[0]}
-                          className="w-8 h-8 rounded-full z-10 border-2 border-white object-cover"
-                        />
+                    <div className="relative w-12 h-8 mr-3 flex-shrink-0">
+                      {isMultiTokenPool(pool) ? (
+                        pool.coins!.map((coin: PoolCoin, idx: number) => (
+                          coin.images?.[0]?.value ? (
+                            <img
+                              key={coin.address}
+                              src={coin.images[0].value}
+                              alt={coin._name || coin._symbol}
+                              className="w-8 h-8 rounded-full border-2 border-white object-cover absolute"
+                              style={{ zIndex: pool.coins!.length - idx, left: `${pool.coins!.length <= 1 ? 0 : idx * (16 / (pool.coins!.length - 1))}px` }}
+                            />
+                          ) : (
+                            <div
+                              key={coin.address}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white absolute"
+                              style={{ backgroundColor: "red", zIndex: pool.coins!.length - idx, left: `${pool.coins!.length <= 1 ? 0 : idx * (16 / (pool.coins!.length - 1))}px` }}
+                            >
+                              {coin._symbol?.slice(0, 2)}
+                            </div>
+                          )
+                        ))
                       ) : (
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium z-10 border-2 border-white"
-                          style={{ backgroundColor: "red" }}
-                        >
-                          {pool.poolName?.slice(0, 2)}
-                        </div>
-                      )}
-                      {pool.tokenB?.images?.[0]?.value ? (
-                        <img
-                          src={pool.tokenB.images[0].value}
-                          alt={pool.tokenB._name || pool.poolName?.split('/')[1]}
-                          className="w-8 h-8 rounded-full border-2 border-white object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                          style={{ backgroundColor: "red" }}
-                        >
-                          {pool.poolName?.split('/')[1].slice(0, 2)}
-                        </div>
+                        <>
+                          {pool.tokenA?.images?.[0]?.value ? (
+                            <img
+                              src={pool.tokenA.images[0].value}
+                              alt={pool.tokenA._name || pool.poolName?.split('/')[0]}
+                              className="w-8 h-8 rounded-full border-2 border-white object-cover absolute"
+                              style={{ zIndex: 2, left: 0 }}
+                            />
+                          ) : (
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white absolute"
+                              style={{ backgroundColor: "red", zIndex: 2, left: 0 }}
+                            >
+                              {pool.poolName?.slice(0, 2)}
+                            </div>
+                          )}
+                          {pool.tokenB?.images?.[0]?.value ? (
+                            <img
+                              src={pool.tokenB.images[0].value}
+                              alt={pool.tokenB._name || pool.poolName?.split('/')[1]}
+                              className="w-8 h-8 rounded-full border-2 border-white object-cover absolute"
+                              style={{ zIndex: 1, left: '16px' }}
+                            />
+                          ) : (
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium absolute"
+                              style={{ backgroundColor: "red", zIndex: 1, left: '16px' }}
+                            >
+                              {pool.poolName?.split('/')[1]?.slice(0, 2)}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                     <div>

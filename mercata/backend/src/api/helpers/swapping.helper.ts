@@ -1,12 +1,12 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import * as config from "../../config/config";
-import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, RawSwapEvent, OraclePriceMap } from "@mercata/shared-types";
+import { SwapToken, LPToken, PoolCoin, RawGetPool, RawPoolFactory, RawToken, RawLPToken, RawSwapEvent, RawPoolCoin, RawPoolTokenBalance, OraclePriceMap } from "@mercata/shared-types";
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
 import { toUTCTime } from "./cirrusHelpers";
+import { getOraclePrices } from "../services/oracle.service";
 import JSONBig from "json-bigint";
 
-const { Pool, PoolSwap, swapHistorySelectFields, LendingRegistry } = constants;
+const { Pool, PoolSwap, StablePoolCoins, StablePoolTokenBalances, swapHistorySelectFields, swapTokenSelectFields, LendingRegistry } = constants;
 const WAD = 10n ** 18n;
 const JSONbigString = JSONBig({ storeAsString: true });
 
@@ -589,3 +589,312 @@ export const buildTokenApprovalTx = (tokenAddress: string, spender: string, amou
   args: { spender, value: amount }
 });
 
+// ============================================================================
+// MULTI-TOKEN POOL HELPERS
+// ============================================================================
+
+/**
+ * Fetches the coin addresses for a multi-token StablePool
+ * Returns an array of { coinIndex, tokenAddress } sorted by coin index
+ */
+export const fetchPoolCoins = async (
+  accessToken: string,
+  poolAddress: string
+): Promise<{ coinIndex: number; tokenAddress: string }[]> => {
+  const { data: coins } = await cirrus.get(accessToken, `/${StablePoolCoins}`, {
+    params: {
+      address: `eq.${poolAddress}`,
+      select: "key,value",
+      order: "key.asc"
+    }
+  });
+
+  return (coins as RawPoolCoin[]).map(c => ({
+    coinIndex: Number(c.key),
+    tokenAddress: c.value
+  }));
+};
+
+/**
+ * Fetches the pool balances for all coins in a multi-token StablePool
+ * Returns a map of tokenAddress -> balance
+ */
+export const fetchPoolTokenBalances = async (
+  accessToken: string,
+  poolAddress: string
+): Promise<Map<string, string>> => {
+  const { data: balances } = await cirrus.get(accessToken, `/${StablePoolTokenBalances}`, {
+    params: {
+      address: `eq.${poolAddress}`,
+      select: "key,value::text"
+    }
+  });
+
+  const balanceMap = new Map<string, string>();
+  (balances as RawPoolTokenBalance[]).forEach(b => {
+    balanceMap.set(b.key, b.value);
+  });
+  return balanceMap;
+};
+
+/**
+ * Fetches token metadata for a list of token addresses
+ */
+export const fetchTokenMetadata = async (
+  accessToken: string,
+  tokenAddresses: string[],
+  userAddress?: string
+): Promise<Map<string, RawToken>> => {
+  const { data: tokens } = await cirrus.get(accessToken, `/${constants.Token}`, {
+    params: {
+      address: `in.(${tokenAddresses.join(",")})`,
+      select: swapTokenSelectFields.join(","),
+      ...(userAddress ? { "balances.key": `eq.${userAddress}` } : {}),
+    }
+  });
+
+  const tokenMap = new Map<string, RawToken>();
+  (tokens as RawToken[]).forEach(t => {
+    tokenMap.set(t.address, t);
+  });
+  return tokenMap;
+};
+
+/**
+ * Builds PoolCoin array for a multi-token pool
+ */
+export const buildPoolCoins = (
+  coinEntries: { coinIndex: number; tokenAddress: string }[],
+  tokenMetadataMap: Map<string, RawToken>,
+  poolBalanceMap: Map<string, string>,
+  priceMap: OraclePriceMap,
+  userAddress?: string
+): PoolCoin[] => {
+  return coinEntries.map(({ coinIndex, tokenAddress }) => {
+    const token = tokenMetadataMap.get(tokenAddress);
+    const poolBalance = poolBalanceMap.get(tokenAddress) || "0";
+    const price = priceMap.get(tokenAddress) || "0";
+    const userBalance = token && userAddress
+      ? getTokenBalance(token, userAddress)
+      : "0";
+
+    return {
+      coinIndex,
+      address: tokenAddress,
+      _name: token?._name || "",
+      _symbol: token?._symbol || "",
+      customDecimals: token?.customDecimals || 18,
+      _totalSupply: token?._totalSupply || "0",
+      balance: userBalance,
+      price,
+      poolBalance,
+      images: token?.images?.filter(img => img.value && img.value.trim() !== "") || [],
+    };
+  });
+};
+
+/**
+ * Calculate LP token price for a multi-token pool using all coin balances
+ */
+export const calculateMultiTokenLPPrice = (
+  coins: PoolCoin[],
+  lpTokenTotalSupply: string
+): string => {
+  const supply = safeBigInt(lpTokenTotalSupply);
+  if (supply === 0n) return "0";
+
+  const Q = 10n ** 18n;
+  let totalValueUSD = 0n;
+
+  for (const coin of coins) {
+    const bal = safeBigInt(coin.poolBalance);
+    const price = safeBigInt(coin.price);
+    if (bal > 0n && price > 0n) {
+      totalValueUSD += safeBigIntDivide(bal * price, Q, `${coin._symbol} value`);
+    }
+  }
+
+  if (totalValueUSD === 0n) return "0";
+  return safeBigIntDivide(totalValueUSD * Q, supply, "Multi-token LP price").toString();
+};
+
+/**
+ * Calculate total liquidity USD for a multi-token pool
+ */
+export const calculateMultiTokenLiquidity = (
+  coins: PoolCoin[]
+): string => {
+  const Q = 10n ** 18n;
+  let totalValueUSD = 0n;
+
+  for (const coin of coins) {
+    const bal = safeBigInt(coin.poolBalance);
+    const price = safeBigInt(coin.price);
+    if (bal > 0n && price > 0n) {
+      totalValueUSD += safeBigIntDivide(bal * price, Q, `${coin._symbol} liquidity`);
+    }
+  }
+
+  return totalValueUSD.toString();
+};
+
+/**
+ * Resolves the coin index for a given token address within a multi-token pool
+ */
+export const resolveCoinIndex = (
+  coins: { coinIndex: number; tokenAddress: string }[],
+  tokenAddress: string
+): number => {
+  const coin = coins.find(c => c.tokenAddress.toLowerCase() === tokenAddress.toLowerCase());
+  if (coin === undefined) {
+    throw new Error(`Token ${tokenAddress} not found in pool coins`);
+  }
+  return coin.coinIndex;
+};
+
+/**
+ * Fetches coin addresses for a multi-token pool (for transaction building)
+ */
+export const fetchPoolCoinAddresses = async (
+  accessToken: string,
+  poolAddress: string
+): Promise<{ coinIndex: number; tokenAddress: string }[]> => {
+  return fetchPoolCoins(accessToken, poolAddress);
+};
+
+export interface MultiTokenStablePool {
+  address: string;
+  lpToken: string;
+  fee: string;
+  coins: { coinIndex: number; tokenAddress: string }[];
+  tokenBalances: Map<string, string>;
+}
+
+/**
+ * Dynamically discovers multi-token stable pools by querying StablePool
+ * contracts with initialA > 0 and joining coins + tokenBalances.
+ * Returns only pools with > 2 coins.
+ */
+export const fetchMultiTokenStablePools = async (
+  accessToken: string,
+): Promise<MultiTokenStablePool[]> => {
+  const { data: stablePools } = await cirrus.get(accessToken, "/BlockApps-StablePool", {
+    params: {
+      initialA: "gt.0",
+      select: "address,lpToken,fee::text,BlockApps-StablePool-coins(key,value),BlockApps-StablePool-tokenBalances(key,value::text)",
+    }
+  });
+
+  const results: MultiTokenStablePool[] = [];
+  for (const pool of stablePools as any[]) {
+    const rawCoins = pool["BlockApps-StablePool-coins"] || [];
+    if (rawCoins.length <= 2) continue;
+
+    const coins = rawCoins.map((c: any) => ({
+      coinIndex: Number(c.key),
+      tokenAddress: c.value,
+    }));
+
+    const tokenBalances = new Map<string, string>();
+    for (const b of pool["BlockApps-StablePool-tokenBalances"] || []) {
+      tokenBalances.set(b.key, b.value);
+    }
+
+    results.push({ address: pool.address, lpToken: pool.lpToken, fee: pool.fee || "0", coins, tokenBalances });
+  }
+
+  return results;
+};
+
+/**
+ * Builds a full Pool object from a multi-token StablePool's on-chain data.
+ * Used to include multi-token pools in pool lists even though they don't
+ * appear in the BlockApps-Pool table with valid tokenA/tokenB.
+ */
+export const buildMultiTokenPoolEntry = async (
+  accessToken: string,
+  stablePool: MultiTokenStablePool,
+  priceMap: OraclePriceMap,
+  volumeMap: Map<string, string>,
+  factoryData: { swapFeeRate: number; lpSharePercent: number },
+  userAddress?: string,
+): Promise<any> => {
+  const coinAddresses = stablePool.coins.map(c => c.tokenAddress);
+
+  const [tokenMetadataMap, lpTokenData] = await Promise.all([
+    fetchTokenMetadata(accessToken, coinAddresses, userAddress),
+    fetchTokenMetadata(accessToken, [stablePool.lpToken], userAddress),
+  ]);
+
+  // Fetch prices for coins not yet in priceMap
+  const missingPriceAddresses = coinAddresses.filter(addr => !priceMap.has(addr));
+  if (missingPriceAddresses.length > 0) {
+    const additionalPrices = await getOraclePrices(accessToken, {
+      select: "asset:key,price:value::text",
+      key: `in.(${missingPriceAddresses.join(',')})`
+    });
+    additionalPrices.forEach((price, addr) => priceMap.set(addr, price));
+  }
+
+  const coins = buildPoolCoins(stablePool.coins, tokenMetadataMap, stablePool.tokenBalances, priceMap, userAddress);
+  const totalLiquidityUSD = calculateMultiTokenLiquidity(coins);
+  const volume24h = volumeMap.get(stablePool.address) || "0";
+
+  const swapFeeRate = factoryData.swapFeeRate;
+  const lpSharePercent = factoryData.lpSharePercent;
+  const fees24h = calculateLPFees24h(volume24h, swapFeeRate, lpSharePercent);
+  const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
+
+  const lpTokenRaw = lpTokenData.get(stablePool.lpToken);
+  const lpTotalSupply = lpTokenRaw?._totalSupply || "0";
+  const lpPrice = calculateMultiTokenLPPrice(coins, lpTotalSupply);
+  const lpBalance = lpTokenRaw && userAddress ? getTokenBalance(lpTokenRaw, userAddress) : "0";
+
+  const symbols = coins.map(c => c._symbol).filter(Boolean);
+  const coinA = coins[0];
+  const coinB = coins[1];
+
+  return {
+    address: stablePool.address,
+    poolName: symbols.join("-"),
+    poolSymbol: symbols.join("-"),
+    tokenA: {
+      address: coinA?.address || "",
+      _name: coinA?._name || "",
+      _symbol: coinA?._symbol || "",
+      _totalSupply: coinA?._totalSupply || "0",
+      customDecimals: coinA?.customDecimals || 18,
+      balance: coinA?.balance || "0",
+      poolBalance: coinA?.poolBalance || "0",
+      price: coinA?.price || "0",
+      images: coinA?.images || [],
+    },
+    tokenB: {
+      address: coinB?.address || "",
+      _name: coinB?._name || "",
+      _symbol: coinB?._symbol || "",
+      _totalSupply: coinB?._totalSupply || "0",
+      customDecimals: coinB?.customDecimals || 18,
+      balance: coinB?.balance || "0",
+      poolBalance: coinB?.poolBalance || "0",
+      price: coinB?.price || "0",
+      images: coinB?.images || [],
+    },
+    lpToken: lpTokenRaw
+      ? buildLPToken(lpTokenRaw, lpPrice, lpBalance)
+      : { address: stablePool.lpToken, _name: "", _symbol: "", _totalSupply: lpTotalSupply, customDecimals: 18, balance: lpBalance, price: lpPrice, images: [], totalBalance: lpBalance },
+    totalLiquidityUSD,
+    tradingVolume24h: volume24h,
+    apy: apy.toFixed(2),
+    aToBRatio: "0",
+    bToARatio: "0",
+    oracleAToBRatio: "0",
+    oracleBToARatio: "0",
+    swapFeeRate,
+    lpSharePercent,
+    isStable: true,
+    isPaused: false,
+    isDisabled: false,
+    coins,
+  };
+};

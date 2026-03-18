@@ -12,6 +12,9 @@ export const SWAP_CONTRACTS = {
   Pool: `${CONTRACT_PREFIX}Pool`,
   PoolFactory: `${CONTRACT_PREFIX}PoolFactory`,
   PoolSwap: `${CONTRACT_PREFIX}Pool-Swap`,
+  StablePool: `${CONTRACT_PREFIX}StablePool`,
+  StablePoolCoins: `${CONTRACT_PREFIX}StablePool-coins`,
+  StablePoolTokenBalances: `${CONTRACT_PREFIX}StablePool-tokenBalances`,
 } as const;
 
 // ============================================================================
