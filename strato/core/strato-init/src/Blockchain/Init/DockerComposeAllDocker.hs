@@ -7,15 +7,16 @@ import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_repoUrl)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.List (foldl', isPrefixOf)
-import Language.Haskell.TH (runIO, Exp(LitE), Lit(StringL))
+import Language.Haskell.TH (runIO, addDependentFile, Exp(LitE), Lit(StringL))
 import System.IO (hPutStrLn, stderr)
 import System.Process (readProcess)
 
 templateContent :: String
-templateContent = $(runIO $ do
-  content <- readProcess "sh" ["-c",
-    "cd $(git rev-parse --show-toplevel) && cat docker-compose.allDocker.tpl.yml"
-    ] ""
+templateContent = $(do
+  gitRoot <- runIO $ filter (/= '\n') <$> readProcess "git" ["rev-parse", "--show-toplevel"] ""
+  let tplFile = gitRoot ++ "/docker-compose.allDocker.tpl.yml"
+  addDependentFile tplFile
+  content <- runIO $ readFile tplFile
   return $ LitE $ StringL content)
 
 substituteAll :: [(String, String)] -> String -> String
