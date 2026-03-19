@@ -7,7 +7,8 @@ import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_repoUrl)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.List (foldl', isPrefixOf)
-import Language.Haskell.TH (runIO, addDependentFile, Exp(LitE), Lit(StringL))
+import Language.Haskell.TH (runIO, Exp(LitE), Lit(StringL))
+import Language.Haskell.TH.Syntax (addDependentFile)
 import System.IO (hPutStrLn, stderr)
 import System.Process (readProcess)
 
