@@ -70,7 +70,7 @@ const METADATA = {
     fileNames: [],
   },
   "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca": {
-    description: "Maple Syrup USDC yield-bearing token",
+    description: "STRATO syrupUSDC is a digital asset on STRATO pegged 1:1 to syrupUSDC (syrupUSDC) on Ethereum, enabling holders to bridge their syrupUSDC into STRATO to access DeFi opportunities. syrupUSDC itself is a yield-bearing asset, meaning its balance increases over time as it accrues yield generated from onchain lending and protocol revenue. By holding STRATO syrupUSDC, users retain this native syrupUSDC yield while unlocking additional yield opportunities within the STRATO ecosystem.",
     images: [],
     files: [],
     fileNames: [],
