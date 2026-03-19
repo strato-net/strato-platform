@@ -34,11 +34,10 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.Validator
-import Control.DeepSeq  
+import Control.DeepSeq
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Binary as BIN
 import qualified Data.ByteString as BS
-import Data.Swagger hiding (Format, format)
 import Data.Text (Text)
 import Data.Time
 import Data.Word
@@ -53,23 +52,7 @@ share
   $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
 
 migrateAll :: Migration
-migrateAll = do
-  let exec = lift . lift . flip rawExecute []
-  exec "ALTER TABLE IF EXISTS block_data_ref DROP COLUMN IF EXISTS block_id;"
-  exec "ALTER TABLE IF EXISTS block_transaction DROP COLUMN IF EXISTS block_id;"
-  exec "ALTER TABLE IF EXISTS block_data ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
-  exec "ALTER TABLE IF EXISTS block_data_ref ALTER COLUMN extra_data TYPE bytea USING extra_data::bytea;"
-  exec "ALTER TABLE IF EXISTS address_state_ref DROP COLUMN IF EXISTS source;"
-  exec "ALTER TABLE IF EXISTS raw_transaction ALTER COLUMN chain_id SET DEFAULT 0;"
-  exec "ALTER TABLE IF EXISTS raw_transaction ALTER COLUMN chain_id SET NOT NULL;"
-  exec "ALTER TABLE IF EXISTS chain_info_ref ADD COLUMN IF NOT EXISTS parent_chain varchar;"
-  exec "ALTER TABLE IF EXISTS chain_info_ref ADD COLUMN IF NOT EXISTS creation_block varchar;"
-  exec "ALTER TABLE IF EXISTS chain_info_ref ADD COLUMN IF NOT EXISTS chain_nonce varchar;"
-  exec "ALTER TABLE IF EXISTS storage ADD COLUMN IF NOT EXISTS kind varchar;"
-  exec "ALTER TABLE IF EXISTS storage ALTER COLUMN key TYPE varchar;"
-  exec "ALTER TABLE IF EXISTS storage ALTER COLUMN value TYPE varchar;"
-  exec "ALTER TABLE IF EXISTS transaction_result ALTER COLUMN response TYPE bytea USING response::bytea;"
-  migrateAuto
+migrateAll = migrateAuto
 
 indexAll :: Migration
 indexAll = do
@@ -104,11 +87,6 @@ instance NFData RawTransaction
 instance NFData LogDB
 
 instance NFData EventDB
-
-instance ToSchema LogDB where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "LogDB") mempty
 
 instance BIN.Binary LogDB
 

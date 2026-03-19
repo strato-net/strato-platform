@@ -348,24 +348,6 @@ cradle:
     - path: "highway/server/test/"
       component: "blockapps-highway-server:test:highway-spec"
 
-    - path: "identity-provider/api/src"
-      component: "blockapps-identity-provider-api:lib"
-
-    - path: "identity-provider/client/src"
-      component: "blockapps-identity-provider-client:lib"
-
-    - path: "identity-provider/server/src"
-      component: "blockapps-identity-provider-server:lib"
-
-    - path: "identity-provider/server/app/Main.hs"
-      component: "blockapps-identity-provider-server:exe:identity-provider-server"
-
-    - path: "identity-provider/server/app/Options.hs"
-      component: "blockapps-identity-provider-server:exe:identity-provider-server"
-
-    - path: "identity-provider/server/test"
-      component: "blockapps-identity-provider-server:test:identity-provider-test"
-
     - path: "indexer/slipstream/src/"
       component: "slipstream:lib"
 
@@ -422,9 +404,6 @@ cradle:
 
     - path: "libs/composable-monads/composable-monads-base/src"
       component: "composable-monads-base:lib"
-
-    - path: "libs/composable-monads/identity-monad/src"
-      component: "identity-monad:lib"
 
     - path: "libs/composable-monads/kafka-monad/src"
       component: "kafka-monad:lib"
@@ -540,18 +519,6 @@ cradle:
     - path: "tools/debugger-tools/exec_src/ghc-debug.hs"
       component: "debugger-tools:exe:ghc-debug"
 
-    - path: "tools/x509-tools/exec_src/X509CertGenerator.hs"
-      component: "x509-tools:exe:x509-generator"
-
-    - path: "tools/x509-tools/exec_src/X509CertInfo.hs"
-      component: "x509-tools:exe:x509-info"
-
-    - path: "tools/x509-tools/exec_src/X509Keygen.hs"
-      component: "x509-tools:exe:x509-keygen"
-
-    - path: "tools/x509-tools/exec_src/X509SaltineDecrypt.hs"
-      component: "x509-tools:exe:x509-saltine-decrypt"
-
     - path: "vault/api/src"
       component: "blockapps-vault-wrapper-api:lib"
 
@@ -593,18 +560,3 @@ cradle:
 
     - path: "vault/server/test/"
       component: "blockapps-vault-wrapper-server:test:vault-wrapper-spec"
-
-    - path: "vault-proxy/api/src"
-      component: "blockapps-vault-proxy-api:lib"
-
-    - path: "vault-proxy/server/src"
-      component: "blockapps-vault-proxy-server:lib"
-
-    - path: "vault-proxy/server/app/Main.hs"
-      component: "blockapps-vault-proxy-server:exe:blockapps-vault-proxy-server"
-
-    - path: "vault-proxy/server/app/Options.hs"
-      component: "blockapps-vault-proxy-server:exe:blockapps-vault-proxy-server"
-
-    - path: "vault-proxy/server/test/"
-      component: "blockapps-vault-proxy-server:test:vault-proxy-spec"

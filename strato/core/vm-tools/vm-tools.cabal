@@ -1,0 +1,112 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           vm-tools
+version:        0.0.4
+synopsis:       types and tools needed to write a VM for Strato
+category:       Data Structures
+author:         Jamshid
+maintainer:     jamshidnh@gmail.com
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Bagger
+      Blockchain.Bagger.BaggerState
+      Blockchain.Bagger.Transactions
+      Blockchain.Data.BlockSummary
+      Blockchain.Data.ExecResults
+      Blockchain.DB.BlockSummaryDB
+      Blockchain.DB.ModifyStateDB
+      Blockchain.StateRootMismatch
+      Blockchain.Stream.Action
+      Blockchain.Stream.VMEvent
+      Blockchain.Timing
+      Blockchain.TxRunResultCache
+      Blockchain.MemVMContext
+      Blockchain.VMContext
+      Blockchain.VMOptions
+      Blockchain.VM.VMException
+      Blockchain.VMMetrics
+      Blockchain.Wiring
+      Executable.EVMFlags
+  other-modules:
+      Blockchain.Bagger.TransactionList
+      Paths_vm_tools
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      QuickCheck
+    , aeson
+    , base
+    , binary
+    , binary-instances
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-init
+    , blockapps-mpdbs
+    , blockstanbul
+    , bytestring
+    , common-log
+    , composable-monads-base
+    , conduit
+    , containers
+    , cross-monitoring
+    , data-default
+    , debugger
+    , deepseq
+    , directory
+    , dlist
+    , ethereum-rlp
+    , exceptions
+    , extra
+    , format
+    , generic-arbitrary
+    , hedis
+    , hflags
+    , kafka-monad
+    , lens
+    , leveldb-haskell
+    , lrucache
+    , merkle-patricia-db
+    , monad-alter
+    , mtl
+    , nibblestring
+    , ordered-containers
+    , persistent-sqlite
+    , prometheus-client
+    , quickcheck-instances
+    , resourcet
+    , seqevents
+    , solid-vm-model
+    , sql-monad
+    , strato-conf
+    , strato-model
+    , strato-redis-blockdb
+    , strato-statediff
+    , text
+    , time
+    , transformers
+    , unliftio
+  default-language: Haskell2010
+
+test-suite contextm-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_vm_tools
+  hs-source-dirs:
+      test/
+  ghc-options: -Wall -O2 -dynamic
+  build-depends:
+      base
+    , hflags
+    , hspec
+    , vm-tools
+  default-language: Haskell2010

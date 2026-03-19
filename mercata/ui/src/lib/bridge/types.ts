@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
 
 export interface BalanceResponse {
   balance: string;
@@ -6,7 +6,7 @@ export interface BalanceResponse {
 
 export interface BridgeResponse {
   success: boolean;
-  data?: WithdrawalRequestResponse;
+  data?: TransactionResponse;
 }
 
 export type NetworkSummary = {
@@ -21,14 +21,14 @@ export type BridgeContextType = {
   error: string | null;
   availableNetworks: NetworkSummary[];
   bridgeableTokens: BridgeToken[];
-  redeemableTokens: BridgeToken[];
+  depositActions: DepositAction[];
   selectedNetwork: string | null;
   selectedToken: BridgeToken | null;
-  selectedMintToken: BridgeToken | null;
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
   requestWithdrawal: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
+  requestDepositAction: (params: DepositActionRequestParams) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 
@@ -41,12 +41,20 @@ export type BridgeContextType = {
   };
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: BridgeToken | null) => void;
-  setSelectedMintToken: (token: BridgeToken | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
   // Bridge transaction functions
-  fetchDepositTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
-  fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
-  fetchRedeemableTokens: (chainId: string) => void;
+  fetchDepositTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
+  fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>, context?: string) => Promise<BridgeTransactionResponse>;
+  // Withdrawal summary
+  withdrawalSummary: WithdrawalSummaryResponse | null;
+  loadingWithdrawalSummary: boolean;
+  fetchWithdrawalSummary: (showLoading?: boolean) => Promise<void>;
+  // Deposit refresh trigger
+  depositRefreshKey: number;
+  triggerDepositRefresh: () => void;
+  // Withdrawal refresh trigger
+  withdrawalRefreshKey: number;
+  triggerWithdrawalRefresh: () => void;
 };
 
 export interface ContractValidationResult {
@@ -102,6 +110,7 @@ export interface ValidationParams {
   decimals: string;
   chainId: string;
   tokenAddress: string;
+  targetStratoToken: string;
 }
 
 export interface Permit2ApprovalResult {
@@ -143,6 +152,7 @@ export type SupportedChainId =
   | 80002
   | 10
   | 8453
+  | 84532
   | 42161
   | 42170
   | 56

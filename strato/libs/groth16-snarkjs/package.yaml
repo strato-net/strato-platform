@@ -1,0 +1,27 @@
+name: groth16-snarkjs
+version: 0.1.0
+synopsis: Groth16 prover wrapper for snarkjs CLI
+description: |
+  Wrapper for snarkjs (Node.js) Groth16 proof generation.
+  Handles witness calculation and proof generation via CLI calls.
+license: AllRightsReserved
+author: BlockApps
+maintainer: info@blockapps.net
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Groth16.Snarkjs
+  dependencies:
+    - base
+    - aeson
+    - bytestring
+    - text
+    - vector
+    - process
+    - temporary
+    - filepath
+
+ghc-options:
+  - -Wall
+  - -Werror

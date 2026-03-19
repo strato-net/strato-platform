@@ -25,7 +25,6 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.Transaction
 import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Control.Arrow ((&&&), (***))
 import Control.Monad (unless)
@@ -65,7 +64,6 @@ type API =
     :> QueryParam "minnumber" Natural
     :> QueryParam "maxnumber" Natural
     :> QueryParam "index" Int
-    :> QueryParam "chainid" ChainId
     :> QueryParam "sortby" Sortby
     :> Get '[JSON] [Block']
 
@@ -88,7 +86,6 @@ data BlocksFilterParams = BlocksFilterParams
     qbMinNumber :: Maybe Natural,
     qbMaxNumber :: Maybe Natural,
     qbIndex :: Maybe Int,
-    qbChainId :: Maybe ChainId,
     qbSortby :: Maybe Sortby
   }
   deriving (Eq, Ord)
@@ -96,7 +93,6 @@ data BlocksFilterParams = BlocksFilterParams
 blocksFilterParams :: BlocksFilterParams
 blocksFilterParams =
   BlocksFilterParams
-    Nothing
     Nothing
     Nothing
     Nothing
@@ -141,7 +137,6 @@ getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
         qbMinNumber
         qbMaxNumber
         qbIndex
-        qbChainId
         qbSortby
 
 server :: Selectable BlocksFilterParams [Block] m => ServerT API m
@@ -187,7 +182,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable BlocksFilterParams [B
                       fmap (\v -> bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)) qbBlockId,
                       fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) qbHash
                     ]
-            
+
             unless (null criteria) $
               E.where_ (foldl1 (E.&&.) criteria)
 
@@ -240,11 +235,10 @@ getBlockInfo ::
   Maybe Natural ->
   Maybe Natural ->
   Maybe Int ->
-  Maybe ChainId ->
   Maybe Sortby ->
   m [Block']
-getBlockInfo a b c d e f g h i j k l m n o p q r s t =
-  getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t)
+getBlockInfo a b c d e f g h i j k l m n o p q r s =
+  getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s)
 
 getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
 getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select (Proxy @[Block]) b

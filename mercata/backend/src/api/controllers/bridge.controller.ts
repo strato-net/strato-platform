@@ -1,14 +1,25 @@
 import { Request, Response, NextFunction } from "express";
 import { 
-  requestWithdrawal, 
+  requestWithdrawal,
+  requestDepositAction,
+  getDepositActions,
   getBridgeableTokens,
-  getRedeemableTokens,
   getNetworkConfigs,
-  getBridgeTransactions
+  getBridgeTransactions,
+  getWithdrawalSummary
 } from "../services/bridge.service";
-import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
+import { validateRequestWithdrawal, validateDepositAction, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import {
+  NetworkConfig,
+  BridgeToken,
+  BridgeTransactionResponse,
+  WithdrawalRequestParams,
+  DepositActionRequestParams,
+  TransactionResponse,
+  WithdrawalSummaryResponse
+} from "@mercata/shared-types";
+import { isUserAdmin } from "../services/user.service";
 
 class BridgeController {
   static async requestWithdrawal(
@@ -20,12 +31,46 @@ class BridgeController {
       const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
       
-      const result: WithdrawalRequestResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
+      const result: TransactionResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
 
       res.json({
         success: true,
         data: result,
       });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async requestDepositAction(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateDepositAction(body);
+   
+      const result: TransactionResponse = await requestDepositAction(accessToken, body as DepositActionRequestParams, userAddress as string);
+   
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getDepositActions(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await getDepositActions(accessToken);
+      res.json(result);
     } catch (error: any) {
       next(error);
     }
@@ -45,29 +90,9 @@ class BridgeController {
         return;
       }
       
-      const result: BridgeToken[] = await getBridgeableTokens(accessToken, chainId);
-      res.json(result);
-    } catch (error: any) {
-      next(error);
-    }
-  }
-
-  static async getRedeemableTokens(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken } = req;
-      const { chainId } = req.params;
-      
-      if (!chainId) {
-        res.status(400).json({ error: "chainId parameter is required" });
-        return;
-      }
-      
-      const result: BridgeToken[] = await getRedeemableTokens(accessToken, chainId);
-      res.json(result);
+      const bridgeRoutes: BridgeToken[] = await getBridgeableTokens(accessToken, chainId);
+      const enabledBridgeRoutes = bridgeRoutes.filter((route) => route.enabled);
+      res.json(enabledBridgeRoutes);
     } catch (error: any) {
       next(error);
     }
@@ -95,10 +120,31 @@ class BridgeController {
     try {
       const { accessToken, address: userAddress } = req;
       const { type } = req.params;
-      const queryParams = validateRawParams(req.query);
+      const rawQueryParams = validateRawParams(req.query);
+      
+      const { context, ...queryParams } = rawQueryParams;
       
       const validatedType = validateTransactionType(type);
-      const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, userAddress, queryParams);
+      
+      const isAdmin = await isUserAdmin(accessToken, userAddress);
+      
+      const addressToUse = (context === 'admin' && isAdmin) ? undefined : userAddress;
+      
+      const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams);
+      res.json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getWithdrawalSummary(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result: WithdrawalSummaryResponse = await getWithdrawalSummary(accessToken, userAddress as string);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -107,4 +153,3 @@ class BridgeController {
 }
 
 export default BridgeController;
-

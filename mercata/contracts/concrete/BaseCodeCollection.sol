@@ -14,12 +14,16 @@ import "Admin/AdminRegistry.sol";
 //Swap
 import "./Pools/Pool.sol";
 import "./Pools/PoolFactory.sol";
+import "./Pools/StablePool.sol";
+
+//Metals
+import "./Metals/MetalForge.sol";
 
 //Admin
 // import "Admin/FeeCollector.sol";
 
 //Rewards
-import "./Rewards/RewardsChef.sol";
+import "./Rewards/Rewards.sol";
 
 //Lending
 import "Lending/CollateralVault.sol";
@@ -40,9 +44,15 @@ import "CDP/CDPEngine.sol";
 import "CDP/CDPVault.sol";
 import "CDP/CDPReserve.sol";
 
+//Escrow
+import "Escrow/Escrow.sol";
+
 //Proxy
 import "Proxy/Proxy.sol";
 
+//Vault
+import "Vault/Vault.sol";
+import "Vault/VaultFactory.sol";
 //TODO
 contract record Mercata is Authorizable {
     RateStrategy public rateStrategy;
@@ -62,12 +72,15 @@ contract record Mercata is Authorizable {
     CDPRegistry public cdpRegistry;
     CDPReserve public cdpReserve;
     SafetyModule public safetyModule;
-    RewardsChef public rewardsChef;
+    Rewards public rewards;
+    Token public cataToken;
+    Escrow public escrow;
+    MetalForge public metalForge;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
         address implOwnerIgnored = address("deadbeef");
-        
+
         // Create AdminRegistry first
         address adminRegistryImpl = address(new AdminRegistry());
         adminRegistry = AdminRegistry(address(new Proxy(adminRegistryImpl, this)));
@@ -111,6 +124,7 @@ contract record Mercata is Authorizable {
 
         address priceOracleImpl = address(new PriceOracle(implOwnerIgnored));
         priceOracle = PriceOracle(address(new Proxy(priceOracleImpl, this)));
+        priceOracle.initialize();
         Ownable(priceOracle).transferOwnership(address(adminRegistry));
 
         address poolConfiguratorImpl = address(new PoolConfigurator(implOwnerIgnored));
@@ -140,13 +154,15 @@ contract record Mercata is Authorizable {
         // Create Services
         address mercataBridgeImpl = address(new MercataBridge(implOwnerIgnored));
         mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
-        mercataBridge.initialize(address(tokenFactory));
-        Ownable(mercataBridge).transferOwnership(address(adminRegistry));
 
-        // Create RewardsChef (without initialization - to be initialized in tests)
-        address rewardsChefImpl = address(new RewardsChef(implOwnerIgnored));
-        rewardsChef = RewardsChef(address(new Proxy(rewardsChefImpl, this)));
-        Ownable(rewardsChef).transferOwnership(address(adminRegistry));
+        // Use existing CATA reward token
+        cataToken = Token(address(0x2680dc6693021cd3fefb84351570874fbef8332a));
+
+        // Create Rewards contract and initialize with CATA token
+        address rewardsImpl = address(new Rewards(implOwnerIgnored));
+        rewards = Rewards(address(new Proxy(rewardsImpl, this)));
+        rewards.initialize(address(cataToken));
+        Ownable(rewards).transferOwnership(address(0x000000000000000000000000000000000000100c));
 
         // Deploy CDP registry, vault, and engine
         address cdpRegistryImpl = address(new CDPRegistry(implOwnerIgnored));
@@ -169,6 +185,23 @@ contract record Mercata is Authorizable {
 
         cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
         Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
+
+        address escrowImpl = address(new Escrow(implOwnerIgnored));
+        escrow = Escrow(address(new Proxy(escrowImpl, this)));
+        Ownable(escrow).transferOwnership(address(adminRegistry));
+
+        address metalForgeImpl = address(new MetalForge(implOwnerIgnored));
+        metalForge = MetalForge(address(new Proxy(metalForgeImpl, this)));
+        metalForge.initialize(
+            address(0x0000000000000000000000000000000000001002),
+            address(0x141e73dc8d2dbbda4fba3797527d22be4b2c4744),
+            address(0x000000000000000000000000000000000000100d),
+            address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010)
+        );
+        Ownable(metalForge).transferOwnership(address(0x000000000000000000000000000000000000100c));
+
+        mercataBridge.initialize(address(tokenFactory), address(lendingRegistry), address(metalForge));
+        Ownable(mercataBridge).transferOwnership(address(adminRegistry));
 
         adminRegistry.swapAdmin(this, msg.sender);
     }

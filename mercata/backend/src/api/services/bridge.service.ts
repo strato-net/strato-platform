@@ -1,19 +1,24 @@
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato, cirrus } from "../../utils/mercataApiHelper";
+import { strato, cirrus, bridge } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import { getTokenMetadata } from "../helpers/cirrusHelpers";
 import { 
   buildQueryParams, 
+  BridgeMappingRow,
   enrichTransactionData, 
-  executeParallelQueries, 
   enrichAssetsWithTokenData,
+  executeParallelQueries,
+  parseBridgeRouteMappings,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@mercata/shared-types";
+import { getCompletePriceMap } from "../helpers/oracle.helper";
+import { getOraclePrices } from "./oracle.service";
+import { toUTCTime } from "../helpers/cirrusHelpers";
 
-const { MercataBridge, Token, mercataBridge, USDST } = constants;
+const { MercataBridge, Token, LendingPool, LendingRegistry, mercataBridge, DECIMALS } = constants;
 
 export const requestWithdrawal = async (
   accessToken: string,
@@ -25,7 +30,7 @@ export const requestWithdrawal = async (
     stratoTokenAmount,
   }: WithdrawalRequestParams,
   userAddress: string
-): Promise<WithdrawalRequestResponse> => {
+): Promise<TransactionResponse> => {
   const tx = await buildFunctionTx(
     [
       {
@@ -42,6 +47,7 @@ export const requestWithdrawal = async (
           externalChainId,
           externalRecipient,
           externalToken,
+          stratoToken,
           stratoTokenAmount,
         },
       },
@@ -55,13 +61,31 @@ export const requestWithdrawal = async (
   );
 };
 
+export const requestDepositAction = async (
+  accessToken: string,
+  {
+    externalChainId,
+    externalTxHash,
+    action,
+    targetToken,
+  }: DepositActionRequestParams,
+  userAddress: string
+) : Promise<TransactionResponse> => {
+  const response = await bridge.post<TransactionResponse>(accessToken, `/request-deposit-action`, {
+    externalChainId,
+    externalTxHash,
+    action,
+    targetToken,
+  });
+  return response.data;
+};
+
 export const getBridgeTransactions = async (
   accessToken: string,
   type: 'withdrawal' | 'deposit',
-  userAddress: string,
+  userAddress: string | undefined,
   rawParams: Record<string, string | undefined> = {}
 ): Promise<BridgeTransactionResponse> => {
-  const externalAssets = await getBridgeAssets(accessToken);
   const config = QUERY_CONFIGS[type];
   
   const dataParams = {
@@ -82,47 +106,35 @@ export const getBridgeTransactions = async (
     return { data: [], totalCount };
   }
 
-  const enrichedData = enrichTransactionData(results, externalAssets, type);
+  const enrichedData = await enrichTransactionData(accessToken, results, type);
   
   return { data: enrichedData, totalCount };
 };
 
-export const getBridgeableTokens = async (accessToken: string, chainId: string): Promise<BridgeToken[]> => {
-  const params = {
-    select: "externalToken:key,externalChainId:key2,AssetInfo:value",
-    "value->>enabled": "eq.true",
-    "value->>stratoToken": `neq.${USDST}`,
-    key2: `eq.${chainId}`,
+export const getBridgeableTokens = async (accessToken: string, chainId?: string): Promise<BridgeToken[]> => {
+  const params: Record<string, string> = {
+    select: "collection_name,externalToken:key->>key,externalChainId:key->>key2,targetStratoToken:key->>key3,mappingValue:value",
+    collection_name: "in.(assets,assetRouteEnabled)",
     address: `eq.${mercataBridge}`
   };
-  
-  const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, { params });
-  if (!assets?.length) return [];
-  
-  const tokenAddresses = assets.map((a: any) => a.AssetInfo.stratoToken).filter(Boolean);
-  const tokenMap = await getTokenMetadata(accessToken, tokenAddresses);
-  
-  return enrichAssetsWithTokenData(assets, tokenMap);
-};
+  if (chainId) params["key->>key2"] = `eq.${chainId}`;
 
-export const getRedeemableTokens = async (accessToken: string, chainId: string): Promise<BridgeToken[]> => {
-  const params = {
-    select: "externalToken:key,externalChainId:key2,AssetInfo:value",
-    "value->>enabled": "eq.true",
-    "value->>stratoToken": `eq.${USDST}`,
-    key2: `eq.${chainId}`,
-    address: `eq.${mercataBridge}`
-  };
-  
-  const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, { params });
-  if (!assets?.length) return [];
-  
-  return assets.map((asset: any) => ({
-    ...asset.AssetInfo,
-    stratoTokenName: "USDST",
-    stratoTokenSymbol: "USDST",
-    id: `${asset.externalToken}-${asset.externalChainId}`
-  }));
+  const { data: mappings } = await cirrus.get(accessToken, "/mapping", { params });
+  if (!Array.isArray(mappings) || !mappings.length) return [];
+
+  const routes = parseBridgeRouteMappings(mappings as BridgeMappingRow[]);
+  if (!routes.length) return [];
+
+  const tokenAddressSet = new Set<string>();
+  for (const { AssetInfo } of routes) {
+    const token = AssetInfo?.stratoToken;
+    if (!token) continue;
+    const lower = token.toLowerCase();
+    tokenAddressSet.add(lower.startsWith("0x") ? lower.slice(2) : lower);
+  }
+  const tokenMap = await getTokenMetadata(accessToken, [...tokenAddressSet]);
+
+  return enrichAssetsWithTokenData(routes, tokenMap);
 };
 
 export const getNetworkConfigs = async (accessToken: string): Promise<NetworkConfig[]> => { 
@@ -139,26 +151,114 @@ export const getNetworkConfigs = async (accessToken: string): Promise<NetworkCon
   });
 };
 
-export const getBridgeAssets = async (accessToken: string) => {
-  const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, {
-    params: {
-      select: "externalToken:key,externalChainId:key2,AssetInfo:value",
-      address: `eq.${mercataBridge}`
+export const getWithdrawalSummary = async (
+  accessToken: string,
+  userAddress: string
+): Promise<WithdrawalSummaryResponse> => {
+  const routes = await getBridgeableTokens(accessToken);
+  const stratoTokens = [...new Set(routes.map((route) => route.stratoToken).filter(Boolean))];
+  const thirtyDaysAgoUTC = toUTCTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+
+  const [balances, prices, pending, completed] = await Promise.all([
+    stratoTokens.length > 0
+      ? cirrus.get(accessToken, `/${Token}-_balances`, {
+          params: {
+            select: "address,balance:value::text",
+            key: `eq.${userAddress}`,
+            address: `in.(${stratoTokens.join(",")})`
+          }
+        })
+      : Promise.resolve({ data: [] }),
+    getCompletePriceMap(accessToken),
+    cirrus.get(accessToken, `/${MercataBridge}-withdrawals`, {
+      params: {
+        select: "value->>stratoToken,value->>stratoTokenAmount",
+        address: `eq.${mercataBridge}`,
+        "value->>stratoSender": `eq.${userAddress}`,
+        "value->>bridgeStatus": "in.(1,2)"
+      }
+    }),
+    cirrus.get(accessToken, `/${MercataBridge}-withdrawals`, {
+      params: {
+        select: "value->>stratoToken,value->>stratoTokenAmount",
+        address: `eq.${mercataBridge}`,
+        "value->>stratoSender": `eq.${userAddress}`,
+        "value->>bridgeStatus": "eq.3",
+        block_timestamp: `gte.${thirtyDaysAgoUTC}`
+      }
+    })
+  ]);
+
+  let availableUSD = 0n;
+  for (const b of balances.data || []) {
+    const balance = BigInt(b.balance || "0");
+    const price = BigInt(prices.get(b.address) || "0");
+    if (balance > 0n && price > 0n) {
+      availableUSD += (balance * price) / DECIMALS / DECIMALS;
     }
-  });
+  }
 
-  if (!assets?.length) return new Map();
-
-  const tokenAddresses = assets.map((asset: any) => asset.AssetInfo.stratoToken).filter(Boolean);
-  const tokenMap = await getTokenMetadata(accessToken, tokenAddresses);
-
-  return new Map(assets.map((asset: any) => [
-    asset.externalToken,
-    {
-      ...asset.AssetInfo,
-      stratoTokenName: tokenMap.get(asset.AssetInfo.stratoToken)?.name || "",
-      stratoTokenSymbol: tokenMap.get(asset.AssetInfo.stratoToken)?.symbol || ""
+  let pendingUSD = 0n;
+  for (const p of pending.data || []) {
+    if (!p.stratoToken || !p.stratoTokenAmount) continue;
+    const amount = BigInt(p.stratoTokenAmount || "0");
+    const price = BigInt(prices.get(p.stratoToken) || "0");
+    if (amount > 0n && price > 0n) {
+      pendingUSD += (amount * price) / DECIMALS;
     }
-  ]));
+  }
+
+  let withdrawnUSD = 0n;
+  for (const w of completed.data || []) {
+    if (!w.stratoToken || !w.stratoTokenAmount) continue;
+    const amount = BigInt(w.stratoTokenAmount || "0");
+    const price = BigInt(prices.get(w.stratoToken) || "0");
+    if (amount > 0n && price > 0n) {
+      withdrawnUSD += (amount * price) / DECIMALS;
+    }
+  }
+  
+  return {
+    totalWithdrawn30d: withdrawnUSD.toString(),
+    pendingWithdrawals: pendingUSD.toString(),
+    availableToWithdraw: availableUSD.toString()
+  };
 };
 
+export const getDepositActions = async (accessToken: string): Promise<DepositAction[]> => {
+  const key = (r: any) => typeof r.key === "object" ? r.key.key : r.key;
+  const val = (r: any) => typeof r.value === "string" ? JSON.parse(r.value) : r.value ?? {};
+
+  const [{ data: mappings = [] }, { data: [pool] = [] }, prices, { data: [rateEvt] = [] }] = await Promise.all([
+    constants.metalForge
+      ? cirrus.get(accessToken, "/mapping", {
+          params: { select: "collection_name,key,value::text", collection_name: "in.(metalConfigs,isSupportedPayToken)", address: `eq.${constants.metalForge}` }
+        })
+      : Promise.resolve({ data: [] }),
+    cirrus.get(accessToken, `/${LendingRegistry}`, {
+      params: { address: `eq.${constants.lendingRegistry}`, select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken)" }
+    }),
+    getOraclePrices(accessToken),
+    cirrus.get(accessToken, `/${LendingPool}-ExchangeRateUpdated`, {
+      params: { select: "newRate::text", order: "block_timestamp.desc", limit: "1" }
+    }),
+  ]);
+
+  const metals = mappings.filter((r: any) => r.collection_name === "metalConfigs").map((r: any) => ({ addr: key(r), ...val(r) })).filter((m: any) => m.isEnabled === true);
+  const payTokens = mappings.filter((r: any) => r.collection_name === "isSupportedPayToken").filter((r: any) => r.value === true || r.value === "true").map((r: any) => ({ addr: key(r) }));
+  const { borrowableAsset, mToken } = pool?.lendingPool || {};
+  if (mToken) prices.set(mToken, rateEvt?.newRate || (10n ** 18n).toString());
+
+  const allAddrs = [...metals.map((m: any) => m.addr), ...(mToken ? [mToken] : [])];
+  const tokenMap = allAddrs.length ? await getTokenMetadata(accessToken, allAddrs) : new Map();
+
+  const toAction = (id: string, action: number, addr: string, pay: string): DepositAction => {
+    const m = tokenMap.get(addr);
+    return { id, action, stratoToken: addr, stratoTokenName: m?.name ?? "", stratoTokenSymbol: m?.symbol ?? "", stratoTokenImage: m?.image, payToken: pay, oraclePrice: prices.get(addr) };
+  };
+
+  return [
+    ...(borrowableAsset && mToken ? [toAction(`earn-${borrowableAsset}`, 1, mToken, borrowableAsset)] : []),
+    ...payTokens.flatMap((p: any) => metals.map((m: any) => toAction(`forge-${p.addr}-${m.addr}`, 2, m.addr, p.addr))),
+  ];
+};

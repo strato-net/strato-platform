@@ -23,7 +23,7 @@ import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class (blockHash)
+import Blockchain.Strato.Model.Class (blockHash, blockHeader, blockHeaderBlockNumber)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
@@ -68,7 +68,7 @@ authorize = \case
 isAuthorized :: StateMachineM m => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  authenticated <- authenticate iev --InEvent (benf is a (ChainMemberParsedSet, Bool,Int))
+  authenticated <- authenticate iev
   let raiseInProd reason = when doAuthn $ do
         $logWarnS "blockstanbul/auth" . T.pack $ reason
         throwE reason --debug statement?
@@ -90,7 +90,7 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
               "Rejecting Preprepare; signer " ++ formatAddressWithoutColor signatory
                 ++ " is not a known validator"
     IMsg (MsgAuth addr _) (Commit _ di seal) -> do
-      csOrError <- runExceptT $ verifyCommitmentSeal di seal 
+      csOrError <- runExceptT $ verifyCommitmentSeal di seal
       case csOrError of
         Left _ -> raiseInProd $ "Rejecting Commit; signature could not be recovered"
         Right signatory -> do
@@ -151,16 +151,19 @@ nextRound nt = do
   proposer .= leader
   proposal .= Nothing
   self <- use selfAddr
-  when (Just leader == fmap Validator self) $ do
+  valB <- use validatorBehavior
+  when (Just leader == fmap Validator self && valB) $ do
     lock <- use blockLock
+    v <- use view
     case lock of
-      Nothing -> yieldR MakeBlockCommand
-      Just lb -> do
-        v <- use view
-        valB <- use validatorBehavior
-        when (isJust self && valB) $ do
-          msg <- signMessage (Preprepare v lb)
+      Nothing -> use myBlock >>= \case
+        Just myBlk | blockHeaderBlockNumber (blockHeader myBlk) == fromIntegral (v ^. sequence) + 1 -> do
+          msg <- signMessage (Preprepare v myBlk)
           yieldR msg
+        _ -> pure ()
+      Just lb -> do
+        msg <- signMessage (Preprepare v lb)
+        yieldR msg
 
   prepared .= M.empty
   committed .= M.empty
@@ -189,6 +192,7 @@ commitBlock blk = do
   $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
   lastParent .= Just hsh
   clearLock
+  myBlock .= Nothing
   whenM (use hasPreprepared) $
     recordProposal
   s <- use $ view . sequence
@@ -241,7 +245,7 @@ eventLoop ctx = execStateC ctx $
             ForcedSequence s ->
               if s >= _sequence v
                 then nextRound (Sequence s)
-                else 
+                else
                   $logErrorS "blockstanbul/config_change" . T.pack $
                     printf "Refusing to move sequence backwards in time %d to %d" (_sequence v) s
         PreviousBlock blk -> do
@@ -271,15 +275,15 @@ eventLoop ctx = execStateC ctx $
             let blockWithVs = addValidators (S.toList vs) blk
             pseal <- proposerSeal blockWithVs
             commitBlock $ addProposerSeal pseal blockWithVs
-            yieldR MakeBlockCommand
           ppl <- use proposal
           leader <- use proposer
           self <- use selfAddr
+          vs <- use validators
+          let blockWithVs = addValidators (S.toList vs) blk
+          pseal <- proposerSeal blockWithVs
+          let sealedBlk = addProposerSeal pseal blockWithVs
+          myBlock ?= sealedBlk
           when (isNothing ppl && Just leader == fmap Validator self) $ do
-            vs <- use validators
-            let blockWithVs = addValidators (S.toList vs) blk
-            pseal <- proposerSeal blockWithVs
-            let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
             let realSealed = fromMaybe sealedBlk mLocked
             wantParent <- use lastParent
@@ -292,7 +296,6 @@ eventLoop ctx = execStateC ctx $
                   -- peers will be able to commit the lock and historic replay of it
                   -- could absolve us.
                   $logErrorS "blockstanbul" "Lock has wrong block number; cannot commit"
-                yieldR MakeBlockCommand
               Right () -> do
                 hasPreprepared .= True
                 proposal .= Just realSealed
@@ -301,8 +304,8 @@ eventLoop ctx = execStateC ctx $
                   msg <- signMessage (Preprepare v realSealed)
                   yieldR msg
                   yieldR $ RunPreprepare realSealed
-        PreprepareResponse decision -> case decision of 
-            AcceptPreprepare bh -> do 
+        PreprepareResponse decision -> case decision of
+            AcceptPreprepare bh -> do
               self <- use selfAddr
               valB <- use validatorBehavior
               when (isJust self && valB) $ do
@@ -436,28 +439,23 @@ sendMessages' ::
 sendMessages' wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.
-  mCtx <- getBlockstanbulContext
-  case mCtx of
-    Nothing -> do
-      $logErrorS "blockstanbul" "cannot send messages without a BlockstanbulContext"
-      return []
-    Just ctx -> do
-      let base =
-            yieldMany wms
-              .| iterMC recordInEvent
-              .| iterMC (inShortLog "blockstanbul/InShortLog")
-              .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . format)
-              .| eventLoop ctx
-              `fuseUpstream` ( iterMC recordOutEvent
-                                 .| iterMC (outShortLog "blockstanbul/OutShortLog")
-                                 .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format . fromE)
-                             )
-      (ctx', evs) <- runConduit $ fuseBoth base sinkList
-      putBlockstanbulContext ctx'
+  ctx <- getBlockstanbulContext
+  let base =
+        yieldMany wms
+          .| iterMC recordInEvent
+          .| iterMC (inShortLog "blockstanbul/InShortLog")
+          .| iterMC ($logDebugS "blockstanbul/InEvent" . T.pack . format)
+          .| eventLoop ctx
+          `fuseUpstream` ( iterMC recordOutEvent
+                             .| iterMC (outShortLog "blockstanbul/OutShortLog")
+                             .| iterMC ($logDebugS "blockstanbul/OutEvent" . T.pack . format . fromE)
+                         )
+  (ctx', evs) <- runConduit $ fuseBoth base sinkList
+  putBlockstanbulContext ctx'
 
-      recordValidator (_isValidator ctx') (_validatorBehavior ctx')
+  recordValidator (_isValidator ctx') (_validatorBehavior ctx')
 
-      return evs
+  return evs
 
 sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
 sendMessages = fmap (map fromE) . sendMessages'
@@ -472,10 +470,7 @@ sendAllMessages wms = do
     wms' -> (out ++) <$> sendAllMessages wms'
 
 currentView :: (HasBlockstanbulContext m) => m View
-currentView = maybe (View (-1) (-1)) _view <$> getBlockstanbulContext
-
-blockstanbulRunning :: HasBlockstanbulContext m => m Bool
-blockstanbulRunning = isJust <$> getBlockstanbulContext
+currentView = _view <$> getBlockstanbulContext
 
 recordInEvent :: (MonadIO m) => InEvent -> m ()
 recordInEvent ev =
@@ -503,7 +498,6 @@ recordOutEvent eev =
         OMsg _ RoundChange {} -> inc "roundchange_message"
         ToCommit {} -> inc "to_commit_block"
         FailedHistoric {} -> inc "failed_historic"
-        MakeBlockCommand -> inc "make_block_command"
         ResetTimer {} -> inc "reset_timer"
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"

@@ -13,4 +13,4 @@ COPY package*.json  /usr/src/app/
 ENV NODE_ENV=production
 RUN npm ci --only=production
 COPY . /usr/src/app
-CMD [ "sh", "-c", "/usr/src/app/docker-run.sh" ]
+CMD [ "/usr/src/app/docker-run.sh" ]

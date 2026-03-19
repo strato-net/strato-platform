@@ -29,7 +29,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&), (***))
 import Control.Monad ((<=<))
@@ -58,24 +57,23 @@ getContracts ::
   Maybe Text ->
   Maybe Integer ->
   Maybe Integer ->
-  Maybe ChainId ->
   m GetContractsResponse
-getContracts mName mOffset mLimit chainId = do
-  let addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
+getContracts mName mOffset mLimit = do
+  let addressToVal ts addr = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr
       addressesToMap =
         foldrM
           ( \(AddressStateRef' AddressStateRef {..} _) m -> case addressStateRefContractName of
               Nothing -> pure m
               Just n -> do
                 ts <- liftIO getCurrentTime
-                pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
+                pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress] m
           )
           Map.empty
-  
+
   -- Step 1: Get all unique contract names (without pagination)
   let contractLimit = fromIntegral $ fromMaybe 10 mLimit
       contractOffset = fromIntegral $ fromMaybe 0 mOffset
-  
+
   -- Get all records to extract unique contract names
   allAddrStateRefs <-
     getAccount'
@@ -85,19 +83,19 @@ getContracts mName mOffset mLimit chainId = do
           _qaOffset = Nothing,  -- No offset - get all records
           _qaLimit = Nothing    -- No limit - get all records
         }
-  
+
   -- Group by contract name to get unique contracts
   allContractsMap <- addressesToMap allAddrStateRefs
   let allContractNames = Map.keys allContractsMap
       sortedContractNames = sort allContractNames
-      
+
   -- Apply pagination to contract names (exactly 10 contracts per page)
   let paginatedContractNames = take contractLimit $ drop contractOffset sortedContractNames
-  
+
   -- Step 2: Get all instances for the paginated contract names
   -- Filter the original map to only include the paginated contracts
   let paginatedContractsMap = Map.filterWithKey (\k _ -> k `elem` paginatedContractNames) allContractsMap
-  
+
   return . GetContractsResponse $ paginatedContractsMap
 
 getContractsData ::
@@ -110,8 +108,7 @@ getContractsData (ContractName cName) = do
   svmRefs <-
     getAccount'
       accountsFilterParams
-        { _qaContractName = Just cName,
-          _qaIgnoreChain = Just True
+        { _qaContractName = Just cName
         }
   return $ (\(AddressStateRef' r _) -> addressStateRefAddress r) <$> svmRefs
 
@@ -125,18 +122,15 @@ getContractsContract ::
   ) =>
   ContractName ->
   Address ->
-  Maybe ChainId ->
   m Contract
-getContractsContract name addr chainId = do
+getContractsContract name addr = do
   let err =
         UserError $
           Text.concat
             [ "getContractsContract: Couldn't find contract details for ",
               Text.pack $ show name,
               " at address ",
-              Text.pack $ show addr,
-              " on chain ",
-              maybe "Main" (Text.pack . show) chainId
+              Text.pack $ show addr
             ]
       aParams = accountsFilterParams
           { _qaAddress = Just addr,
@@ -158,15 +152,14 @@ getContractsState ::
   ) =>
   ContractName ->
   Address ->
-  Maybe ChainId ->
   Maybe Text ->
   Maybe Integer ->
   Maybe Integer ->
   Bool ->
   m GetContractsStateResponses -- state-translation
-getContractsState _ address chainId mName mCount mOffset _ = do
+getContractsState _ address mName mCount mOffset _ = do
   $logInfoS "getContractsState" . Text.pack $ "Getting contract state for " ++ formatAddressWithoutColor address
-  contract' <- getContractsDetails' address chainId
+  contract' <- getContractsDetails' address
 
   storage' <- case mName of
     Nothing ->
@@ -196,9 +189,9 @@ getContractsState _ address chainId mName mCount mOffset _ = do
             Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (key s, value s)) $ storage',
             "End of storage"
           ]
-      return $
-        (first Text.pack <$> contractFuncs contract')
-          ++ (decodeSolidVMValues $ map (key &&& value) storage')
+      return $ case (decodeSolidVMValues $ map (key &&& value) storage') of
+        Left err -> error $ Text.unpack err
+        Right vals -> (first Text.pack <$> contractFuncs contract') ++ vals
     (StorageAddress {} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
     ([], Nothing) -> return $ (first Text.pack <$> contractFuncs contract')
@@ -229,7 +222,6 @@ postContractsBatchStates = traverse flattenRequest
       getContractsState
         postcontractsbatchstatesrequestContractName
         postcontractsbatchstatesrequestAddress
-        postcontractsbatchstatesrequestChainid
         postcontractsbatchstatesrequestVarName
         postcontractsbatchstatesrequestCount
         postcontractsbatchstatesrequestOffset
@@ -244,16 +236,13 @@ getContractsDetails' ::
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   Address ->
-  Maybe ChainId ->
   m Contract
-getContractsDetails' contractAddress chainId = do
+getContractsDetails' contractAddress = do
   let err =
         UserError $
           Text.concat
             [ "getContractsDetails': couldn't find contract details for address ",
-              Text.pack $ formatAddressWithoutColor contractAddress,
-              " on chain ",
-              maybe "Main" (Text.pack . show) chainId
+              Text.pack $ formatAddressWithoutColor contractAddress
             ]
       aParams = accountsFilterParams
           { _qaAddress = Just contractAddress,
@@ -273,7 +262,6 @@ getContractsDetails ::
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   Address ->
-  Maybe ChainId ->
   m Contract
 getContractsDetails = getContractsDetails'
 
@@ -287,10 +275,9 @@ getContractsFunctions ::
   ) =>
   ContractName ->
   Address ->
-  Maybe ChainId ->
   m [FunctionName]
-getContractsFunctions _ contractId chainId = do
-  contract <- getContractsDetails contractId chainId
+getContractsFunctions _ contractId = do
+  contract <- getContractsDetails contractId
   pure . map (FunctionName . Text.pack) . Map.keys $ _functions contract
 
 getContractsSymbols ::
@@ -303,10 +290,9 @@ getContractsSymbols ::
   ) =>
   ContractName ->
   Address ->
-  Maybe ChainId ->
   m [SymbolName]
-getContractsSymbols _ contractId chainId = do
-  contract <- getContractsDetails contractId chainId
+getContractsSymbols _ contractId = do
+  contract <- getContractsDetails contractId
   pure . map (SymbolName . Text.pack) . Map.keys $ _storageDefs contract
 
 getContractsEnum ::
@@ -320,10 +306,9 @@ getContractsEnum ::
   ContractName ->
   Address ->
   EnumName ->
-  Maybe ChainId ->
   m [EnumValue]
-getContractsEnum _ contractId (EnumName enumName) chainId = do
-  contract <- getContractsDetails contractId chainId
+getContractsEnum _ contractId (EnumName enumName) = do
+  contract <- getContractsDetails contractId
   pure . maybe [] (map (EnumValue . Text.pack) . fst) . Map.lookup (Text.unpack enumName) $ _enums contract
 
 getContractsStateMapping :: -- ( A.Selectable Account AddressState m
@@ -336,12 +321,11 @@ getContractsStateMapping :: -- ( A.Selectable Account AddressState m
   Address ->
   SymbolName ->
   Text ->
-  Maybe ChainId ->
   m GetContractsStateMappingResponse
 -- state-translation
-getContractsStateMapping _ _ _ _ _ =
-  -- address (SymbolName mappingName) keyName chainId = do
-  -- contract' <- getContractsDetails address chainId
+getContractsStateMapping _ _ _ _ =
+  -- address (SymbolName mappingName) keyName = do
+  -- contract' <- getContractsDetails address
 
   -- storage' <- getStorage'
   --   storageFilterParams{qsAddress = Just address}

@@ -13,23 +13,36 @@ import {
   buildPoolList,
   fetchPoolTokenAddresses,
   fetchPoolBalances,
-  fetchLPTokenAddress,
   buildTokenApprovalTx,
   getTradingVolume24hForPools,
   getTokenBalance,
-  stakeNewLPTokens
+  fetchPoolCoins,
+  fetchPoolTokenBalances,
+  fetchTokenMetadata,
+  buildPoolCoins,
+  calculateMultiTokenLPPrice,
+  calculateMultiTokenLiquidity,
+  resolveCoinIndex,
+  calculateLPFees24h,
+  calculatePoolAPY,
+  fetchMultiTokenStablePools,
+  buildMultiTokenPoolEntry,
+  getUserPoolLiquidityFlowTotals,
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getPools as getRewardsChefPools } from "./rewardsChef.service";
-import { getStakedBalance, findPoolByLpToken } from "../helpers/rewards/rewardsChef.helpers";
-import { getTokenBalanceForUser } from "./tokens.service";
 import {
   SwapHistoryEntry,
   PoolList,
+  Pool,
   SwapParams,
   LiquidityParams,
   RemoveLiquidityParams,
   SingleTokenLiquidityParams,
+  MultiTokenSwapParams,
+  MultiTokenLiquidityParams,
+  MultiTokenRemoveLiquidityParams,
+  MultiTokenRemoveLiquidityOneParams,
+  PoolCoin,
   SetPoolRatesParams,
   CreatePoolParams,
   TransactionResponse,
@@ -44,7 +57,7 @@ import {
   PoolWithTokenB
 } from "@mercata/shared-types";
 
-const { Pool, PoolFactory, PoolSwap, swapHistorySelectFields, swapTokenSelectFields } = constants;
+const { Pool: PoolTable, PoolFactory, PoolSwap, StablePool: StablePoolTable, swapHistorySelectFields, swapTokenSelectFields } = constants;
 
 // ============================================================================
 // READ OPERATIONS
@@ -60,13 +73,19 @@ export const getPools = async (
   const params = buildPoolParams(rawParams, userAddress);
 
   const [{data: poolData}, { data: factoryData }] = await Promise.all([
-    cirrus.get(accessToken, `/${Pool}`, { params }),
+    cirrus.get(accessToken, `/${PoolTable}`, { params }),
     cirrus.get(accessToken, `/${PoolFactory}`, {
       params: { address: "eq." + config.poolFactory, select: "swapFeeRate,lpSharePercent" }
     })
   ]);
 
-  const validatedPools = poolData as RawGetPool[];
+  // Filter out hidden pools and pools with deactivated tokens (status !== 2 = ACTIVE)
+  const ACTIVE_TOKEN_STATUS = "2";
+  const validatedPools = (poolData as RawGetPool[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenA.status === ACTIVE_TOKEN_STATUS
+      && pool.tokenB.status === ACTIVE_TOKEN_STATUS
+  );
   const validatedFactory = factoryData[0] as RawPoolFactory;
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
@@ -75,37 +94,76 @@ export const getPools = async (
   });
   const volumeMap = await getTradingVolume24hForPools(accessToken, validatedPools.map(pool => pool.address), priceMap);
 
-  // Fetch staked balances from RewardsChef if userAddress is provided
-  let stakedBalanceMap: Map<string, string> | undefined;
+  let userLiquidityFlowTotals: Map<string, { totalDepositedUsd: bigint; totalWithdrawnUsd: bigint }> | undefined;
   if (userAddress) {
-    // Get all RewardsChef pools
-    const rewardsChefPools = await getRewardsChefPools(accessToken, config.rewardsChef);
-
-    // Build a map of lpToken address -> rewards pool index
-    const lpTokenToPoolIdx = new Map<string, number>();
-    rewardsChefPools.forEach(pool => {
-      lpTokenToPoolIdx.set(pool.lpToken, pool.poolIdx);
-    });
-
-    // For each swap pool, check if it has a matching rewards pool and get staked balance
-    stakedBalanceMap = new Map<string, string>();
-    await Promise.all(
-      validatedPools.map(async (pool) => {
-        const poolIdx = lpTokenToPoolIdx.get(pool.lpToken.address);
-        if (poolIdx !== undefined) {
-          const stakedBalance = await getStakedBalance(
-            accessToken,
-            config.rewardsChef,
-            poolIdx,
-            userAddress
-          );
-          stakedBalanceMap!.set(pool.lpToken.address, stakedBalance);
-        }
-      })
+    userLiquidityFlowTotals = await getUserPoolLiquidityFlowTotals(
+      accessToken,
+      validatedPools,
+      userAddress,
+      priceMap
     );
   }
 
-  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress, stakedBalanceMap);
+  const poolList: any[] = buildPoolList(
+    validatedPools,
+    priceMap,
+    volumeMap,
+    validatedFactory,
+    userAddress
+  );
+
+  // Replace or add multi-token stable pools. These pools also appear in the BlockApps-Pool table
+  // (from Pool(pool).setFeeParameters()) but with invalid tokenA/tokenB. Replace those entries
+  // with properly built multi-token pool entries.
+  const multiTokenStablePools = await fetchMultiTokenStablePools(accessToken);
+  await Promise.all(multiTokenStablePools.map(async (stablePool) => {
+    try {
+      const poolEntry = await buildMultiTokenPoolEntry(
+        accessToken, stablePool, priceMap, volumeMap, validatedFactory, userAddress
+      );
+      const existingIdx = poolList.findIndex((p: any) => p.address === stablePool.address);
+      if (existingIdx !== -1) {
+        poolList[existingIdx] = poolEntry;
+      } else {
+        poolList.push(poolEntry);
+      }
+    } catch (err) {
+      console.error(`Failed to build multi-token pool ${stablePool.address}:`, err);
+    }
+  }));
+
+  if (!userAddress) {
+    return poolList;
+  }
+
+  return poolList.map((pool) => {
+    const flow = userLiquidityFlowTotals?.get(pool.address.toLowerCase()) || {
+      totalDepositedUsd: 0n,
+      totalWithdrawnUsd: 0n,
+    };
+    const netInvestedUsd = flow.totalDepositedUsd - flow.totalWithdrawnUsd;
+
+    let currentValueUsd = 0n;
+    try {
+      const totalBalance = BigInt(pool.lpToken?.totalBalance || "0");
+      const lpPrice = BigInt(pool.lpToken?.price || "0");
+      if (totalBalance > 0n && lpPrice > 0n) {
+        currentValueUsd = (totalBalance * lpPrice) / (10n ** 18n);
+      }
+    } catch {
+      currentValueUsd = 0n;
+    }
+
+    const userAllTimeEarningsUsd = currentValueUsd - netInvestedUsd;
+
+    return {
+      ...pool,
+      userTotalDepositedUsd: flow.totalDepositedUsd.toString(),
+      userTotalWithdrawnUsd: flow.totalWithdrawnUsd.toString(),
+      userNetInvestedUsd: netInvestedUsd.toString(),
+      userAllTimeEarningsUsd: userAllTimeEarningsUsd.toString(),
+    };
+  });
 };
 
 // --- Token Queries ---
@@ -114,16 +172,23 @@ export const getSwapableTokens = async (
   accessToken: string,
   userAddress: string
 ): Promise<SwapToken[]> => {
-  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
+  const { data: poolData } = await cirrus.get(accessToken, `/${PoolTable}`, {
     params: {
       poolFactory: "eq." + constants.poolFactory,
-      select: `tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text,tokenBBalance::text`,
+      isDisabled: "eq.false",
+      select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text,tokenBBalance::text`,
       "tokenA.balances.key": `eq.${userAddress}`,
       "tokenB.balances.key": `eq.${userAddress}`,
     }
   });
 
-  const validatedPools = poolData as PoolWithTokens[];
+  // Filter out hidden pools and pools with deactivated tokens
+  const ACTIVE_TOKEN_STATUS = "2";
+  const validatedPools = (poolData as (PoolWithTokens & { address: string })[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenA.status === ACTIVE_TOKEN_STATUS
+      && pool.tokenB.status === ACTIVE_TOKEN_STATUS
+  ) as PoolWithTokens[];
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
     select: "asset:key,price:value::text",
@@ -144,6 +209,49 @@ export const getSwapableTokens = async (
     });
   });
 
+  // Also include tokens from dynamically discovered multi-token pools
+  const multiTokenStablePools = await fetchMultiTokenStablePools(accessToken);
+  await Promise.all(multiTokenStablePools.map(async (stablePool) => {
+    try {
+      // Only include coins that have balance > 0 in the pool
+      const fundedCoins = stablePool.coins.filter(c => {
+        const balance = stablePool.tokenBalances.get(c.tokenAddress) || "0";
+        return BigInt(balance) > 0n;
+      });
+
+      // Update existing tokens that have 0 poolBalance with the multi-token pool balance
+      fundedCoins.forEach(c => {
+        const existing = tokenMap.get(c.tokenAddress);
+        if (existing && BigInt(existing.poolBalance || "0") === 0n) {
+          const poolBalance = stablePool.tokenBalances.get(c.tokenAddress) || "0";
+          tokenMap.set(c.tokenAddress, { ...existing, poolBalance });
+        }
+      });
+
+      const coinAddresses = fundedCoins.map(c => c.tokenAddress).filter(addr => !tokenMap.has(addr));
+      if (coinAddresses.length === 0) return;
+
+      const tokenMetadataMap = await fetchTokenMetadata(accessToken, coinAddresses, userAddress);
+
+      // Fetch prices for new tokens
+      const additionalPrices = await getOraclePrices(accessToken, {
+        select: "asset:key,price:value::text",
+        key: `in.(${coinAddresses.join(',')})`
+      });
+
+      coinAddresses.forEach(addr => {
+        const token = tokenMetadataMap.get(addr);
+        if (token) {
+          const price = additionalPrices.get(addr) || "0";
+          const poolBalance = stablePool.tokenBalances.get(addr) || "0";
+          tokenMap.set(addr, buildSwapToken(token, price, poolBalance, getTokenBalance(token, userAddress)));
+        }
+      });
+    } catch (err) {
+      console.error(`Failed to fetch multi-token pool coins for ${stablePool.address}:`, err);
+    }
+  }));
+
   return Array.from(tokenMap.values());
 };
 
@@ -153,26 +261,36 @@ export const getSwapableTokenPairs = async (
   userAddress: string
 ): Promise<SwapToken[]> => {
   const [{ data: poolDataA }, { data: poolDataB }] = await Promise.all([
-    cirrus.get(accessToken, `/${Pool}`, {
+    cirrus.get(accessToken, `/${PoolTable}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
-        select: `tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenBBalance::text`,
+        isDisabled: "eq.false",
+        select: `address,tokenB:tokenB_fkey(${swapTokenSelectFields.join(',')}),tokenBBalance::text`,
         tokenA: "eq." + tokenAddress,
         "tokenB.balances.key": `eq.${userAddress}`,
       }
     }),
-    cirrus.get(accessToken, `/${Pool}`, {
+    cirrus.get(accessToken, `/${PoolTable}`, {
       params: {
         poolFactory: "eq." + constants.poolFactory,
-        select: `tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text`,
+        isDisabled: "eq.false",
+        select: `address,tokenA:tokenA_fkey(${swapTokenSelectFields.join(',')}),tokenABalance::text`,
         tokenB: "eq." + tokenAddress,
         "tokenA.balances.key": `eq.${userAddress}`,
       }
     })
   ]);
 
-  const validatedPoolsA = poolDataA as PoolWithTokenB[];
-  const validatedPoolsB = poolDataB as PoolWithTokenA[];
+  // Filter out hidden pools and pools with deactivated tokens
+  const ACTIVE_TOKEN_STATUS = "2";
+  const validatedPoolsA = (poolDataA as (PoolWithTokenB & { address: string })[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenB.status === ACTIVE_TOKEN_STATUS
+  ) as PoolWithTokenB[];
+  const validatedPoolsB = (poolDataB as (PoolWithTokenA & { address: string })[]).filter(
+    pool => !config.hiddenSwapPools.has(pool.address)
+      && pool.tokenA.status === ACTIVE_TOKEN_STATUS
+  ) as PoolWithTokenA[];
 
   const allTokens: Array<{token: RawToken, poolBalance: string}> = [
     ...validatedPoolsA.map(pool => ({ token: pool.tokenB, poolBalance: pool.tokenBBalance })),
@@ -194,6 +312,60 @@ export const getSwapableTokenPairs = async (
     }
   });
 
+  // For multi-token pools: if the selected token is in a multi-token pool,
+  // add all other coins from that pool as pairable tokens (only if both have balance > 0)
+  const multiTokenStablePools = await fetchMultiTokenStablePools(accessToken);
+  for (const stablePool of multiTokenStablePools) {
+    try {
+      // Check if the selected token is in this pool and has balance > 0
+      const selectedCoin = stablePool.coins.find(
+        c => c.tokenAddress.toLowerCase() === tokenAddress.toLowerCase()
+      );
+      if (!selectedCoin) continue;
+      const selectedBalance = stablePool.tokenBalances.get(selectedCoin.tokenAddress) || "0";
+      if (BigInt(selectedBalance) === 0n) continue;
+
+      // Add other coins that have balance > 0 as pairable tokens
+      const otherFundedCoins = stablePool.coins.filter(c => {
+        if (c.tokenAddress.toLowerCase() === tokenAddress.toLowerCase()) return false;
+        const balance = stablePool.tokenBalances.get(c.tokenAddress) || "0";
+        return BigInt(balance) > 0n;
+      });
+
+      // Update existing tokens that have 0 poolBalance with the multi-token pool balance
+      otherFundedCoins.forEach(c => {
+        const existing = tokenMap.get(c.tokenAddress);
+        if (existing && BigInt(existing.poolBalance || "0") === 0n) {
+          const poolBalance = stablePool.tokenBalances.get(c.tokenAddress) || "0";
+          tokenMap.set(c.tokenAddress, { ...existing, poolBalance });
+        }
+      });
+
+      const otherCoinAddresses = otherFundedCoins
+        .map(c => c.tokenAddress)
+        .filter(addr => !tokenMap.has(addr));
+      if (otherCoinAddresses.length === 0) continue;
+
+      const tokenMetadataMap = await fetchTokenMetadata(accessToken, otherCoinAddresses, userAddress);
+
+      const additionalPrices = await getOraclePrices(accessToken, {
+        select: "asset:key,price:value::text",
+        key: `in.(${otherCoinAddresses.join(',')})`
+      });
+
+      otherCoinAddresses.forEach(addr => {
+        const token = tokenMetadataMap.get(addr);
+        if (token) {
+          const price = additionalPrices.get(addr) || "0";
+          const poolBalance = stablePool.tokenBalances.get(addr) || "0";
+          tokenMap.set(addr, buildSwapToken(token, price, poolBalance, getTokenBalance(token, userAddress)));
+        }
+      });
+    } catch (err) {
+      console.error(`Failed to fetch multi-token pool pairs for ${stablePool.address}:`, err);
+    }
+  }
+
   return Array.from(tokenMap.values());
 };
 
@@ -203,7 +375,8 @@ export const getSwapHistory = async (
   accessToken: string,
   poolAddress: string,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  senderAddress?: string
 ): Promise<SwapHistoryResponse> => {
   const offset = (page - 1) * limit;
 
@@ -211,6 +384,7 @@ export const getSwapHistory = async (
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
+        ...(senderAddress ? { sender: `eq.${senderAddress}` } : {}),
         select: swapHistorySelectFields.join(','),
         order: 'block_timestamp.desc',
         limit: limit.toString(),
@@ -220,6 +394,7 @@ export const getSwapHistory = async (
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
+        ...(senderAddress ? { sender: `eq.${senderAddress}` } : {}),
         select: "count()",
       }
     })
@@ -233,7 +408,7 @@ export const getSwapHistory = async (
   }
 
   const swapHistory: SwapHistoryEntry[] = (swapEvents as RawSwapEvent[]).map(event => {
-    const { tokenA, tokenB } = event.pool;
+    const { tokenA, tokenB, isStable } = event.pool;
     const isAToB = event.tokenIn === tokenA.address;
 
     return {
@@ -243,7 +418,7 @@ export const getSwapHistory = async (
       tokenOut: isAToB ? tokenB.symbol : tokenA.symbol,
       amountIn: event.amountIn,
       amountOut: event.amountOut,
-      impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB),
+      impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB, isStable),
       sender: event.sender
     };
   });
@@ -260,11 +435,12 @@ export const createPool = async (
   body: CreatePoolParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  const { isStable, ...restBody } = body;
   const tx = await buildFunctionTx({
     contractName: extractContractName(PoolFactory),
     contractAddress: constants.poolFactory,
-    method: "createPool",
-    args: body,
+    method: isStable ? "createStablePool" : "createPool",
+    args: restBody,
   }, userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
@@ -277,30 +453,16 @@ export const addLiquidityDualToken = async (
   params: LiquidityParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, tokenBAmount, maxTokenAAmount, deadline, stakeLPToken } = params;
+  const { poolAddress, tokenBAmount, maxTokenAAmount, deadline } = params;
 
   const pool = await fetchPoolTokenAddresses(accessToken, poolAddress);
-
-  // Prepare for LP token staking if requested
-  let lpTokenAddress: string | undefined;
-  let lpTokenBalanceBefore: string = "0";
-  let rewardsPool: Awaited<ReturnType<typeof findPoolByLpToken>>;
-
-  if (stakeLPToken) {
-    lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
-    rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
-
-    if (rewardsPool) {
-      lpTokenBalanceBefore = await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress);
-    }
-  }
 
   // Execute liquidity deposit
   const tx = await buildFunctionTx([
     buildTokenApprovalTx(pool.tokenA, poolAddress, maxTokenAAmount),
     buildTokenApprovalTx(pool.tokenB, poolAddress, tokenBAmount),
     {
-      contractName: extractContractName(Pool),
+      contractName: extractContractName(PoolTable),
       contractAddress: poolAddress,
       method: "addLiquidity",
       args: { tokenBAmount, maxTokenAAmount, deadline }
@@ -308,11 +470,6 @@ export const addLiquidityDualToken = async (
   ], userAddress, accessToken);
 
   const depositResult = await executeTransaction(accessToken, tx);
-
-  // Stake newly minted LP tokens if requested and deposit succeeded
-  if (stakeLPToken && depositResult.status === "Success" && lpTokenAddress && rewardsPool) {
-    await stakeNewLPTokens(accessToken, userAddress, lpTokenAddress, rewardsPool.poolIdx, lpTokenBalanceBefore);
-  }
 
   return depositResult;
 };
@@ -322,30 +479,16 @@ export const addLiquiditySingleToken = async (
   params: SingleTokenLiquidityParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, singleTokenAmount, isAToB, deadline, stakeLPToken } = params;
+  const { poolAddress, singleTokenAmount, isAToB, deadline } = params;
 
   const pool = await fetchPoolTokenAddresses(accessToken, poolAddress);
   const depositTokenAddress = isAToB ? pool.tokenA : pool.tokenB;
-
-  // Prepare for LP token staking if requested
-  let lpTokenAddress: string | undefined;
-  let lpTokenBalanceBefore: string = "0";
-  let rewardsPool: Awaited<ReturnType<typeof findPoolByLpToken>>;
-
-  if (stakeLPToken) {
-    lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
-    rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
-
-    if (rewardsPool) {
-      lpTokenBalanceBefore = await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress);
-    }
-  }
 
   // Execute liquidity deposit
   const tx = await buildFunctionTx([
     buildTokenApprovalTx(depositTokenAddress, poolAddress, singleTokenAmount),
     {
-      contractName: extractContractName(Pool),
+      contractName: extractContractName(PoolTable),
       contractAddress: poolAddress,
       method: "addLiquiditySingleToken",
       args: { isAToB, amountIn: singleTokenAmount, deadline }
@@ -353,11 +496,6 @@ export const addLiquiditySingleToken = async (
   ], userAddress, accessToken);
 
   const depositResult = await executeTransaction(accessToken, tx);
-
-  // Stake newly minted LP tokens if requested and deposit succeeded
-  if (stakeLPToken && depositResult.status === "Success" && lpTokenAddress && rewardsPool) {
-    await stakeNewLPTokens(accessToken, userAddress, lpTokenAddress, rewardsPool.poolIdx, lpTokenBalanceBefore);
-  }
 
   return depositResult;
 };
@@ -367,7 +505,7 @@ export const removeLiquidity = async (
   removeLiquidityParams: RemoveLiquidityParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
-  const { poolAddress, lpTokenAmount, deadline, includeStakedLPToken } = removeLiquidityParams;
+  const { poolAddress, lpTokenAmount, deadline } = removeLiquidityParams;
 
   const pool = await fetchPoolBalances(accessToken, poolAddress);
 
@@ -386,47 +524,9 @@ export const removeLiquidity = async (
 
   const txArray: any[] = [];
 
-  // If includeStakedLPToken is true, check if we need to unstake from RewardsChef first
-  if (includeStakedLPToken) {
-    const lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
-    const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
-
-    if (rewardsPool) {
-      // Get user's wallet LP token balance
-      const walletLPBalance = BigInt(await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress));
-
-      // Get staked LP token balance
-      const stakedBalance = await getStakedBalance(accessToken, config.rewardsChef, rewardsPool.poolIdx, userAddress);
-      const stakedLPBalance = BigInt(stakedBalance);
-
-      // Calculate required LP tokens and how much needs to be unstaked
-      const requiredLPTokens = lpTokenAmountBigInt;
-
-      if (requiredLPTokens > walletLPBalance) {
-        // Need to unstake some LP tokens first
-        const amountToUnstake = requiredLPTokens - walletLPBalance;
-
-        if (amountToUnstake > stakedLPBalance) {
-          throw new Error(`Insufficient LP tokens: need ${requiredLPTokens.toString()}, have ${walletLPBalance.toString()} in wallet and ${stakedLPBalance.toString()} staked`);
-        }
-
-        // Add unstake transaction
-        txArray.push({
-          contractName: "RewardsChef",
-          contractAddress: config.rewardsChef,
-          method: "withdraw",
-          args: {
-            _pid: rewardsPool.poolIdx,
-            _amount: amountToUnstake.toString()
-          }
-        });
-      }
-    }
-  }
-
   // Add removeLiquidity transaction
   txArray.push({
-    contractName: extractContractName(Pool),
+    contractName: extractContractName(PoolTable),
     contractAddress: poolAddress,
     method: "removeLiquidity",
     args: {
@@ -457,7 +557,7 @@ export const swap = async (
   const tx = await buildFunctionTx([
     buildTokenApprovalTx(tokenAddress, poolAddress, amountIn),
     {
-      contractName: extractContractName(Pool),
+      contractName: extractContractName(PoolTable),
       contractAddress: poolAddress,
       method: "swap",
       args: {
@@ -468,6 +568,114 @@ export const swap = async (
       },
     }
   ], userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+// --- Multi-Token Operations ---
+
+export const exchangeMultiToken = async (
+  accessToken: string,
+  params: MultiTokenSwapParams,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const { poolAddress, tokenIn, tokenOut, amountIn, minAmountOut, deadline } = params;
+
+  // Resolve coin indices
+  const coinEntries = await fetchPoolCoins(accessToken, poolAddress);
+  const i = resolveCoinIndex(coinEntries, tokenIn);
+  const j = resolveCoinIndex(coinEntries, tokenOut);
+
+  const tx = await buildFunctionTx([
+    buildTokenApprovalTx(tokenIn, poolAddress, amountIn),
+    {
+      contractName: extractContractName(StablePoolTable),
+      contractAddress: poolAddress,
+      method: "exchange",
+      args: {
+        i,
+        j,
+        _dx: amountIn,
+        _minDy: minAmountOut,
+        _receiver: userAddress,
+      },
+    }
+  ], userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const addLiquidityMultiToken = async (
+  accessToken: string,
+  params: MultiTokenLiquidityParams,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const { poolAddress, amounts, minMintAmount, deadline } = params;
+
+  const coinEntries = await fetchPoolCoins(accessToken, poolAddress);
+
+  // Build approval transactions for each coin being deposited
+  const approvalTxs = coinEntries
+    .filter((_, idx) => amounts[idx] && amounts[idx] !== "0" && BigInt(amounts[idx]) > 0n)
+    .map(coin => buildTokenApprovalTx(coin.tokenAddress, poolAddress, amounts[coin.coinIndex]));
+
+  const tx = await buildFunctionTx([
+    ...approvalTxs,
+    {
+      contractName: extractContractName(StablePoolTable),
+      contractAddress: poolAddress,
+      method: "addLiquidityGeneral",
+      args: {
+        _amounts: amounts,
+        _minMintAmount: minMintAmount,
+        _receiver: userAddress,
+      },
+    }
+  ], userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const removeLiquidityMultiToken = async (
+  accessToken: string,
+  params: MultiTokenRemoveLiquidityParams,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const { poolAddress, lpTokenAmount, minAmounts, deadline } = params;
+
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(StablePoolTable),
+    contractAddress: poolAddress,
+    method: "removeLiquidityGeneral",
+    args: {
+      _burnAmount: lpTokenAmount,
+      _minAmounts: minAmounts,
+      _receiver: userAddress,
+      _claimAdminFees: true,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const removeLiquidityMultiTokenOneCoin = async (
+  accessToken: string,
+  params: MultiTokenRemoveLiquidityOneParams,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const { poolAddress, lpTokenAmount, coinIndex, minReceived, deadline } = params;
+
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(StablePoolTable),
+    contractAddress: poolAddress,
+    method: "removeliquidityOneCoin",
+    args: {
+      _burnAmount: lpTokenAmount,
+      i: coinIndex,
+      _minReceived: minReceived,
+      _receiver: userAddress,
+    },
+  }, userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
@@ -495,3 +703,72 @@ export const setPoolRates = async (
 
   return executeTransaction(accessToken, tx);
 };
+
+export const pausePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(PoolTable),
+    contractAddress: poolAddress,
+    method: "setPaused",
+    args: {
+      _isPaused: true,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const unpausePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(PoolTable),
+    contractAddress: poolAddress,
+    method: "setPaused",
+    args: {
+      _isPaused: false,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const disablePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(PoolTable),
+    contractAddress: poolAddress,
+    method: "setDisabled",
+    args: {
+      _isDisabled: true,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+
+export const enablePool = async (
+  accessToken: string,
+  poolAddress: string,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(PoolTable),
+    contractAddress: poolAddress,
+    method: "setDisabled",
+    args: {
+      _isDisabled: false,
+    },
+  }, userAddress, accessToken);
+
+  return executeTransaction(accessToken, tx);
+};
+

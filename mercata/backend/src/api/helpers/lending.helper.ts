@@ -156,8 +156,14 @@ export const simulateLoan = (
   const priceUSD = toBig(borrowableAssetConfig.price); // 1e18
   const totalBorrowValueUSD = (toBig(totalAmountOwed) * priceUSD) / DECIMALS;
 
-  // 5) Total collateral value for health (USD, 18 decimals)
+  // 5) Total collateral value for health (USD, 18 decimals) - risk-adjusted by LiqThresh
   const totalCollateralValueUSD = calculateTotalCollateralValueForHealth(
+    collaterals,
+    assetConfigs
+  );
+
+  // 5b) Full supplied collateral value (USD, 18 decimals) - no LT adjustment
+  const totalCollateralValueSupplied = calculateUserCollateralValue(
     collaterals,
     assetConfigs
   );
@@ -172,7 +178,8 @@ export const simulateLoan = (
       "0", // user token balance not needed here
       collateral.amount,
       cfg.price,                  // USD 1e18
-      cfg.ltv || 0                // bps
+      cfg.ltv || 0,               // bps
+      cfg.liquidationThreshold || 0 // bps
     );
     maxBorrowingPowerUSD += toBig(metrics.maxBorrowingPower);
   }
@@ -200,6 +207,7 @@ export const simulateLoan = (
     healthFactorRaw,
     totalBorrowingPowerUSD: maxBorrowingPowerUSD.toString(),
     totalCollateralValueUSD: totalCollateralValueUSD,
+    totalCollateralValueSupplied: totalCollateralValueSupplied,
     maxAvailableToBorrowUSD: maxAvailableToBorrowUSD.toString(),
 
     // Display APR (bps → percent) if needed by callers
@@ -232,22 +240,27 @@ export const percentageToHealthFactor = (percentage: number): string => {
  * @param collateralizedAmount Amount of tokens used as collateral
  * @param assetPrice Price of the asset in USD (18 decimals)
  * @param ltv Loan-to-Value ratio in basis points (e.g., 7500 = 75%)
+ * @param liquidationThreshold Liquidation threshold in basis points (e.g., 8000 = 80%)
  * @returns Object with calculated values
  */
 export const calculateCollateralMetrics = (
   userBalance: string,
   collateralizedAmount: string,
   assetPrice: string,
-  ltv: number
+  ltv: number,
+  liquidationThreshold: number
 ): {
   userBalanceValue: string;
   collateralizedAmountValue: string;
   maxBorrowingPower: string;
+  unsuppliedBorrowingPower: string;
+  unsuppliedLTCollateralValue: string;
 } => {
   const balance = toBig(userBalance);
   const collateralized = toBig(collateralizedAmount);
   const price = toBig(assetPrice);
   const ltvBasisPoints = BigInt(ltv);
+  const ltBasisPoints = BigInt(liquidationThreshold);
 
   // Calculate values in USD (18 decimals)
   const userBalanceValue = ((balance * price) / DECIMALS).toString();
@@ -255,11 +268,19 @@ export const calculateCollateralMetrics = (
   
   // Calculate max borrowing power using LTV: (collateralizedAmount * price * ltv) / (1e18 * 10000)
   const maxBorrowingPower = ((collateralized * price * ltvBasisPoints) / (DECIMALS * 10000n)).toString();
+  
+  // Calculate unsupplied borrowing power: userBalance * price * ltv (for sorting unsupplied collaterals)
+  const unsuppliedBorrowingPower = ((balance * price * ltvBasisPoints) / (DECIMALS * 10000n)).toString();
+  
+  // Calculate unsupplied LT-weighted collateral value: userBalance * price * lt / (1e18 * 10000)
+  const unsuppliedLTCollateralValue = ((balance * price * ltBasisPoints) / (DECIMALS * 10000n)).toString();
 
   return {
     userBalanceValue,
     collateralizedAmountValue,
     maxBorrowingPower,
+    unsuppliedBorrowingPower,
+    unsuppliedLTCollateralValue,
   };
 };
 
@@ -322,6 +343,34 @@ export const calculateUtilizationRate = (
   denom = resN < denom ? (denom - resN) : cashN;
   if (denom === 0n) return 0;
   return Number((debtN * 10000n) / denom) / 100; // percent with 2 decimals
+};
+
+/**
+ * Calculate a single user's total collateral value (raw USD, no liquidation threshold adjustment)
+ * @param collaterals Array of user's collateral assets and amounts
+ * @param assetConfigs Map of asset configurations (for price)
+ * @returns Total collateral value in USD (18 decimals)
+ */
+export const calculateUserCollateralValue = (
+  collaterals: CollateralInfo[],
+  assetConfigs: Map<string, AssetConfig>
+): string => {
+  let totalValue = 0n;
+
+  for (const collateral of collaterals) {
+    const config = assetConfigs.get(collateral.asset);
+    if (!config) continue;
+
+    const collateralAmount = toBig(collateral.amount);
+    if (collateralAmount === 0n) continue;
+
+    const price = toBig(config.price);
+    if (price === 0n) continue;
+
+    totalValue += (collateralAmount * price) / DECIMALS;
+  }
+
+  return totalValue.toString();
 };
 
 /**

@@ -29,6 +29,8 @@ import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
+import           Blockchain.EthConf (ethConf, p2pConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -96,7 +98,7 @@ ethServerHandler pSource pSink seqSrc host = do
                   e' | Just HeadMacIncorrect <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "HeadMacIncorrect")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    logAndLengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                    logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
                   e' | Just NetworkIDMismatch <- fromException e' -> do
                     udpErr <- disableUDPPeerForSeconds p 86400
                     whenLeft udpErr $ \theUDPErr -> do
@@ -108,11 +110,11 @@ ethServerHandler pSource pSink seqSrc host = do
                   e' | Just PeerDisconnected <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "PeerDisconnected")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    logAndLengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                    logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
                   e' | Just CurrentlyTooManyPeers <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "CurrentlyTooManyPeers")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    logAndLengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                    logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
                   e' | Just NoPeerCertificate <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "NoPeerCertificate")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
@@ -128,7 +130,7 @@ ethServerHandler pSource pSink seqSrc host = do
                           $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                         disErr <- storeDisableException p (T.pack "TimeoutException")
                         whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                        logAndLengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                        logAndLengthenPeerDisableBy (fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) p
                       _ -> return $ Right ()
                   _ -> return $ Right ()
                 throwIO err

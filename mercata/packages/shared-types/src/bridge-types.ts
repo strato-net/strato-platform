@@ -1,3 +1,5 @@
+import {TransactionResponse} from "./common-types";
+
 // ============================================================================
 // NETWORK CONFIG TYPES
 // ============================================================================
@@ -29,12 +31,28 @@ export interface BridgeToken {
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
   externalChainId: string;       // Matches AssetInfo.externalChainId
-  permissions: number;           // Matches AssetInfo.permissions
   externalName: string;          // Matches AssetInfo.externalName
   externalToken: string;         // Matches AssetInfo.externalToken
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
+  enabled: boolean;              // effective route enabled state
+  isDefaultRoute: boolean;       // true when route token matches asset default token
+  stratoTokenImage?: string;     // First image URL from TokenFactory images
+}
+
+/**
+ * A post-deposit action (earn yield or forge metal) returned by /bridge/depositActions
+ */
+export interface DepositAction {
+  id: string;
+  action: number;                // 1 = AUTO_SAVE, 2 = AUTO_FORGE
+  stratoToken: string;           // output token address (mToken for earn, metal for forge)
+  stratoTokenSymbol: string;
+  stratoTokenName: string;
+  stratoTokenImage?: string;
+  payToken: string;              // STRATO pay token this applies to (join key to match VIA MINT routes)
+  oraclePrice?: string;          // WAD-scaled price for estimated output calc
 }
 
 // ============================================================================
@@ -66,6 +84,11 @@ export interface BridgeTransaction {
   externalName?: string;
   externalSymbol?: string;
   externalToken?: string;
+  // Deposit action outcome (only for deposits with AUTO_SAVE or AUTO_FORGE)
+  depositOutcome?: "bridge" | "save" | "forge";
+  finalToken?: string;
+  finalTokenSymbol?: string;
+  finalAmount?: string;
 }
 
 /**
@@ -97,9 +120,60 @@ export interface WithdrawalRequestParams {
 }
 
 /**
- * Response from withdrawal request
+ * Parameters for requesting a post-deposit action (auto-save, auto-forge, etc.)
+ * @param action - Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)
+ * @param targetToken - Action-specific target token (e.g. metal token address for AUTO_FORGE, unused for AUTO_SAVE)
  */
-export interface WithdrawalRequestResponse {
-  status: string;
-  hash: string;
+export interface DepositActionRequestParams {
+  externalChainId: string;
+  externalTxHash: string;
+  action: number;
+  targetToken?: string;
+}
+
+/**
+ * Response from withdrawal summary endpoint
+ */
+export interface WithdrawalSummaryResponse {
+  totalWithdrawn30d: string;      // Total withdrawn in last 30 days in wei (string format)
+  pendingWithdrawals: string;      // Pending withdrawals in wei (string format)
+  availableToWithdraw: string;     // Available balance to withdraw in wei (string format)
+}
+
+// ============================================================================
+// CRYPTO CREDIT CARD CONFIG
+// ============================================================================
+
+/**
+ * Per-card crypto credit card configuration (stored by backend, used by balance watcher).
+ * A user can have multiple cards (multiple configs).
+ */
+export interface CreditCardConfig {
+  id: string;                      // Unique card id (set by backend on create)
+  userAddress: string;            // STRATO address
+  nickname?: string;              // User-defined nickname for the card (displayed on card)
+  providerId?: string;            // Card provider id (e.g. "metamask-card", "etherfi-card") for correct logo
+  destinationChainId: string;      // External chain id (numeric string)
+  cardWalletAddress: string;       // Card wallet on destination chain
+  externalToken: string;           // External token address on destination chain (e.g. USDC)
+  thresholdAmount: string;         // Top up when balance below this (wei string)
+  topUpAmount: string;            // Amount to bridge per top-up (wei string)
+  useBorrow: boolean;              // If true, borrow USDST against collateral then bridge (v1 may be no-op)
+  checkFrequencyMinutes: number;  // How often to check balance
+  cooldownMinutes: number;        // Min minutes between top-ups
+  enabled: boolean;
+  lastTopUpAt?: string;           // ISO timestamp
+  lastCheckedAt?: string;
+  lastError?: string;
+}
+
+/**
+ * Params for executing a single top-up (operator-only).
+ */
+export interface CreditCardTopUpExecuteParams {
+  userAddress: string;
+  stratoTokenAmount: string;
+  externalChainId: string;
+  externalRecipient: string;
+  externalToken: string;
 }

@@ -16,27 +16,25 @@ import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.CirrusDefs
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
 import Blockchain.Strato.Model.Address
 import Blockchain.SyncDB
-import Control.Lens (makeLenses, over, (&), (.~), (?~))
+import Control.Lens (over, (&), (.~), (?~))
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import Core.API
 import Data.HashMap.Strict.InsOrd
-import Data.Swagger
+import Data.OpenApi
 import Servant
-import Servant.Swagger
+import Servant.OpenApi
 
-type MonadBlocAPI m = 
+type MonadBlocAPI m =
   ( MonadCoreAPI m,
     HasBlocEnv m,
     Mod.Accessible (Maybe SyncStatus) m,
     Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
     Selectable Address AddressState m,
-    Selectable Address Certificate m,
     HasCodeDB m
   )
 
@@ -63,17 +61,14 @@ bloc =
     :<|> postBlocTransactionUnsigned
     :<|> postBlocTransaction
 
-blocSwagger :: Swagger
+blocSwagger :: OpenApi
 blocSwagger =
-  toSwagger (Proxy @BlocAPI)
+  toOpenApi (Proxy @BlocAPI)
     & info . title .~ "Bloc API"
     & info . version .~ "2.2"
     & info . description ?~ "This is the V2.2 API for the BlocH"
-    & basePath ?~ "/bloc/v2.2"
 
-type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
+type BlocDocsAPI = "openapi.json" :> Get '[JSON] OpenApi
 
-makeLenses ''Swagger
-
-filterEnterprisePaths :: Swagger -> Swagger
-filterEnterprisePaths = over swaggerPaths $ filterWithKey (\k _ -> k /= "/users")
+filterEnterprisePaths :: OpenApi -> OpenApi
+filterEnterprisePaths = over (paths) $ filterWithKey (\k _ -> k /= "/users")

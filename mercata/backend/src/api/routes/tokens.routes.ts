@@ -57,6 +57,42 @@ router.get("/transferable", authHandler.authorizeRequest(true), TokensController
 
 /**
  * @openapi
+ * /tokens/stats:
+ *   get:
+ *     summary: Get token statistics including total supply and market cap
+ *     tags: [Tokens]
+ *     responses:
+ *       200:
+ *         description: Token statistics with total market cap
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalMarketCap:
+ *                   type: string
+ *                   description: Total market cap across all tokens
+ *                 tokens:
+ *                   type: array
+ *                   description: Array of tokens sorted by market cap descending
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       address:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       symbol:
+ *                         type: string
+ *                       totalSupply:
+ *                         type: string
+ *                       marketCap:
+ *                         type: string
+ */
+router.get("/stats", authHandler.authorizeRequest(true), TokensController.getStats);
+
+/**
+ * @openapi
  * /tokens/{address}:
  *   get:
  *     summary: Fetch token metadata by address
@@ -192,6 +228,70 @@ router.post("/", authHandler.authorizeRequest(), TokensController.create);
  *               additionalProperties: true
  */
 router.post("/transfer", authHandler.authorizeRequest(), TokensController.transfer);
+
+/**
+ * @openapi
+ * /tokens/bulk-transfer:
+ *   post:
+ *     summary: Transfer tokens to multiple recipients in bulk
+ *     tags: [Tokens]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - address
+ *               - transfers
+ *             properties:
+ *               address:
+ *                 type: string
+ *                 description: Token contract address
+ *               transfers:
+ *                 type: array
+ *                 description: Array of transfer items (max 100)
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - to
+ *                     - value
+ *                   properties:
+ *                     to:
+ *                       type: string
+ *                       description: Recipient address
+ *                     value:
+ *                       type: string
+ *                       description: Transfer amount (wei string)
+ *     responses:
+ *       200:
+ *         description: Bulk transfer results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       to:
+ *                         type: string
+ *                       value:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       hash:
+ *                         type: string
+ *                       error:
+ *                         type: string
+ *                 successCount:
+ *                   type: integer
+ *                 failureCount:
+ *                   type: integer
+ */
+router.post("/bulk-transfer", authHandler.authorizeRequest(), TokensController.bulkTransfer);
 
 /**
  * @openapi

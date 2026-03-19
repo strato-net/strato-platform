@@ -23,43 +23,43 @@ import BlockApps.Logging
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
-import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.EthConf
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Options
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.SyncDB
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
-import Control.Monad.Composable.Identity
 import Control.Monad.Composable.SQL
-import Control.Monad.Composable.Vault hiding (httpManager)
+import Control.Monad.Composable.Vault
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
-import Core.API
+import Core.API hiding (nodePubKey)
 import Data.Aeson
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
-import Data.Maybe (fromJust, isJust, listToMaybe)
+import Data.Maybe (listToMaybe)
 import Data.Source.Map
-import Data.Swagger hiding (Header, Http, delete)
+import Data.OpenApi hiding (Header, delete)
+import qualified Data.OpenApi as OPENAPI
 import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import HFlags
 import qualified Handlers.AccountInfo as Account
-import Handlers.Options
+import Strato.Auth.ClientCredentials (clientCredentialsConfig, discoveryUrl)
 import Instrumentation
 import Network.HTTP.Types.Status
 import Network.Wai
@@ -68,17 +68,14 @@ import Data.String (fromString)
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
 import Network.Wai.Middleware.RequestLogger
-import Options
 import SQLM
 import Servant
-import Servant.Client.Core hiding (requestMethod)
 import Servant.Multipart
-import Servant.Swagger
+import Servant.OpenApi
 import Servant.Swagger.UI
 import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client
 import System.Clock
-import Text.Regex
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
@@ -119,12 +116,6 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
 instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
   select p = lift . select p
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
-  select _ = getX509CertForAccount
-
-instance {-# OVERLAPPING #-} Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
-  select p = lift . select p
-
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible V.PublicKey (ReaderT BlocEnv m) where
   access _ = asks nodePubKey
 
@@ -147,10 +138,14 @@ newtype AccessToken = AccessToken { getAccessToken :: Maybe Text }
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m, Accessible VaultData m) => HasVault (ReaderT AccessToken m) where
   sign msgHash = do
     AccessToken jwtToken <- ask
-    blocVaultWrapper $ postSignature jwtToken (V.MsgHash msgHash)
+    case jwtToken of
+      Nothing -> error "sign: missing user access token"
+      Just token -> blocVaultWrapperWithUserToken token $ postSignature Nothing (V.MsgHash msgHash)
   getPub = do
     AccessToken jwtToken <- ask
-    fmap V.unPubKey . blocVaultWrapper $ getKey jwtToken Nothing
+    case jwtToken of
+      Nothing -> error "getPub: missing user access token"
+      Just token -> fmap V.unPubKey . blocVaultWrapperWithUserToken token $ getKey Nothing Nothing
   getShared _ = error "getShared ReaderT VaultData: unimplemented"
 
 fullServer ::
@@ -163,20 +158,19 @@ fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (Acc
 
 ----------------
 
-hoistCoreServer :: BlocEnv -> UrlMap -> Server FullAPI
+hoistCoreServer :: BlocEnv -> UrlMap -> Servant.Server FullAPI
 hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
-    convertErrors :: IdentityM (VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO)))))) a -> Handler a
+    convertErrors :: VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO))))) a -> Handler a
     convertErrors x = Handler $ do
-      y <- liftIO 
+      y <- liftIO
         . try
         . runLoggingT
         . runSQLM
         . runCirrusM
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
-        . runVaultM ("http://localhost:8013/strato/v2.3")
-        . runIdentitytM getIdentityServerUrl
+        . runVaultM (vaultUrl . urlConfig $ ethConf)
         $ x `catch` handleRuntimeError `catch` handleApiError
       case y of
         Right a -> pure a
@@ -189,42 +183,27 @@ main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
 
-  -- check if id server connection is valid; only run if using https (unless using localhost)
-  identityUrl <- parseBaseUrl getIdentityServerUrl
-  let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
-  let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
-  if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
-    then error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdentityServerUrl
-    else putStrLn "Identity server url is valid to connect to"
-
   -- check that all urls are derivable (or else crash and fail in a flaming disaster)
   let urlMap = fromList
-        [ ("vault", flags_vaultUrl),
-          ("oauthDiscovery", flags_oauthDiscoveryUrl),
-          ("notificationServer", flags_notificationServerUrl),
-          ( "fileServer",
-            case (flags_fileServerUrl, flags_network) of
-              ("", "mercata-hydrogen") -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
-              ("", 'h':'e':'l':'i':'u':'m':_) -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", "upquark") -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", "mercata") -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", "uranium") -> "https://fileserver.mercata.blockapps.net/highway"
-              ("", _) -> error "File server url was not provided and cannot be derived"
-              (fileServer, _) -> fileServer
-          ),
+        [ ("vault", vaultUrl . urlConfig $ ethConf),
+          ("oauthDiscovery", T.unpack $ discoveryUrl clientCredentialsConfig),
+          ("notificationServer", notificationServerUrl . urlConfig $ ethConf),
+          ("fileServer", fileServerUrl . urlConfig $ ethConf),
           ( "monitor",
-            case flags_network of
+            case network (networkConfig ethConf) of
               "mercata-hydrogen" -> "https://monitor.mercata-testnet2.blockapps.net:18080"
               "mercata" -> "https://monitor.mercata.blockapps.net:18080"
-              "helium" -> "https://monitor.testnet.stratomercata.com"
-              "upquark" -> "https://monitor.stratomercata.com"
+              "helium" -> "https://monitor.testnet.strato.nexus"
+              "upquark" -> "https://monitor.strato.nexus"
+              "lithium" -> "" -- local development network
               _ -> ""
           )
         ]
   _ <- traverseWithKey (\service url' -> putStrLn $ "The url for " <>  service <> " is " <> url') urlMap
 
   let theDoc =
-        toSwagger (Proxy :: Proxy FullAPI)
+        addOperationIds $
+        toOpenApi (Proxy :: Proxy FullAPI)
           & info . title .~ "Strato API"
           & info . description
             ?~ "This is the great Strato API, which let's \
@@ -241,34 +220,35 @@ main = do
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
 
   pubKey <- runLoggingT
-          . runVaultM ("http://localhost:8013/strato/v2.3")
+          . runVaultM (vaultUrl . urlConfig $ ethConf)
           . fmap V.unPubKey
           . blocVaultWrapper
           $ getKey Nothing Nothing
 
   let env =
         BlocEnv
-          { txSizeLimit = flags_txSizeLimit,
-            gasLimit = flags_gasLimit,
-            stateFetchLimit = stateFetchLimit',
-            globalNonceCounter = nonceCache,
-            userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
-            userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
-            useWalletsByDefault = flags_useWalletsByDefault,
-            nodePubKey = pubKey
+          { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
+            Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
+            Bloc.Monad.stateFetchLimit = stateFetchLimit',
+            Bloc.Monad.globalNonceCounter = nonceCache,
+            Bloc.Monad.nodePubKey = pubKey
           }
-  runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app env theDoc urlMap
+  let bindHost = ipAddress $ apiConfig ethConf
+      bindPort = 3000 :: Int
+  putStrLn $ "Starting strato-api on " ++ bindHost ++ ":" ++ show bindPort
+  let settings = setPort bindPort $ setHost (fromString bindHost) defaultSettings
+  runSettings settings $ app env theDoc urlMap
 
-app :: BlocEnv -> Swagger -> UrlMap -> Application
+app :: BlocEnv -> OpenApi -> UrlMap -> Application
 app blocEnv theDoc urlMap =
   prometheus def {prometheusInstrumentApp = False} $
     instrumentApp "core-api" $
       logStdoutDev $
         cors (const $ Just simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]})
-        --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
+        --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "openapi-ui" "openapi.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
         $
           addPathsTo404 $
-            serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+            serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "openapi-ui" "openapi.json")) $
               hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
@@ -285,14 +265,67 @@ addPathsTo404 baseApp req respond' =
                 ++ tab ("\n" ++ unlines allPaths)
                 ++ "\n"
   where
-    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)
+    allPaths = H.keys $ _openApiPaths $ toOpenApi (Proxy :: Proxy FullAPI)
+
+----------
+
+-- | Add operationId to all operations based on path and method
+-- This makes CLI tools like restish generate cleaner command names
+addOperationIds :: OpenApi -> OpenApi
+addOperationIds swagger = swagger & OPENAPI.paths %~ H.mapWithKey addIdsToPathItem
+  where
+    addIdsToPathItem :: FilePath -> PathItem -> PathItem
+    addIdsToPathItem apiPath item = item
+      & OPENAPI.get    %~ fmap (setOpId "get" apiPath)
+      & OPENAPI.put    %~ fmap (setOpId "put" apiPath)
+      & OPENAPI.post   %~ fmap (setOpId "post" apiPath)
+      & OPENAPI.delete %~ fmap (setOpId "delete" apiPath)
+      & OPENAPI.patch  %~ fmap (setOpId "patch" apiPath)
+
+    setOpId :: Text -> FilePath -> Operation -> Operation
+    setOpId method apiPath op = op & OPENAPI.operationId ?~ generateOperationId method apiPath
+
+    -- Convert "/eth/v1.2/account" + "get" -> "getAccount"
+    -- Convert "/bloc/v2.2/contracts/{contractName}" + "get" -> "getContract"
+    generateOperationId :: Text -> FilePath -> Text
+    generateOperationId method apiPath =
+      let segments = filter (not . T.null) $ T.splitOn "/" $ T.pack apiPath
+          -- Remove version segments like "v1.2", "v2.2"
+          withoutVersion = filter (not . isVersion) segments
+          -- Convert path params {foo} to "ByFoo"
+          cleaned = map cleanSegment withoutVersion
+          -- Take last 1-2 meaningful segments for the opName
+          nameParts = takeEnd 2 cleaned
+          opName = T.concat nameParts
+      in method <> capitalizeFirst opName
+
+    isVersion :: Text -> Bool
+    isVersion t = T.isPrefixOf "v" t && T.any (== '.') t
+
+    cleanSegment :: Text -> Text
+    cleanSegment seg
+      | T.isPrefixOf "{" seg && T.isSuffixOf "}" seg =
+          "By" <> capitalizeFirst (T.drop 1 $ T.dropEnd 1 seg)
+      | otherwise = capitalizeFirst seg
+
+    capitalizeFirst :: Text -> Text
+    capitalizeFirst t = case T.uncons t of
+      Nothing -> t
+      Just (c, rest) -> T.cons (toUpperChar c) rest
+      where
+        toUpperChar c
+          | c >= 'a' && c <= 'z' = toEnum (fromEnum c - 32)
+          | otherwise = c
+
+    takeEnd :: Int -> [a] -> [a]
+    takeEnd n xs = drop (length xs - n) xs
 
 ----------
 
 -- Temporary location for a couple of instance definitions needed for toSwagger, we need to find a better place
 
-instance HasSwagger a => HasSwagger (MultipartForm Mem (MultipartData Mem) :> a) where
-  toSwagger _ = toSwagger (Proxy :: Proxy a)
+instance HasOpenApi a => HasOpenApi (MultipartForm Mem (MultipartData Mem) :> a) where
+  toOpenApi _ = toOpenApi (Proxy :: Proxy a)
 
 instance ToSchema Value where
   declareNamedSchema _ =

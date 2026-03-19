@@ -37,15 +37,13 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
-import Blockchain.Data.TransactionResult
+import Blockchain.Stream.VMEvent (VMEvent(..), produceVMEvents)
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
 import Control.DeepSeq
@@ -54,7 +52,6 @@ import Control.Monad (join, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
-import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Reader (ReaderT)
 import qualified Data.ByteString as B
@@ -137,15 +134,9 @@ instance HasContext m => Mod.Modifiable (Maybe DebugSettings) m where
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ContextState (ReaderT Context m) where
   access _ = get
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemDBs (ReaderT Context m) where
-  access _ = gets $ view memDBs
-
 instance HasContext m => Mod.Modifiable MemDBs m where
   get _ = gets $ view memDBs
   put _ md = modify $ memDBs .~ md
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible IsBlockstanbul (ReaderT Context m) where
-  access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
 
 instance HasContext m => Mod.Modifiable BaggerState m where
   get _ = contextGets _baggerState
@@ -154,17 +145,11 @@ instance HasContext m => Mod.Modifiable BaggerState m where
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TRC.Cache (ReaderT Context m) where
   access _ = contextGets _txRunResultsCache
 
-instance {-# OVERLAPPING #-} HasSQL m => m `Mod.Yields` TransactionResult where
-  yield = void . putTransactionResult
+instance {-# OVERLAPPING #-} MonadIO m => m `Mod.Yields` TransactionResult where
+  yield tr = void $ produceVMEvents [NewTransactionResult tr]
 
 vmBlockHashRootKey :: B.ByteString
 vmBlockHashRootKey = "block_hash_root"
-
-vmGenesisRootKey :: B.ByteString
-vmGenesisRootKey = "genesis_root"
-
-vmBestBlockRootKey :: B.ByteString
-vmBestBlockRootKey = "best_block_root"
 
 instance HasContext m => Mod.Modifiable BlockHashRoot m where
   get _ = do
@@ -173,22 +158,6 @@ instance HasContext m => Mod.Modifiable BlockHashRoot m where
   put _ (BlockHashRoot (MP.StateRoot sr)) = do
     db <- getStateDB
     DB.put db def vmBlockHashRootKey sr
-
-instance HasContext m => Mod.Modifiable GenesisRoot m where
-  get _ = do
-    db <- getStateDB
-    GenesisRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmGenesisRootKey
-  put _ (GenesisRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmGenesisRootKey sr
-
-instance HasContext m => Mod.Modifiable BestBlockRoot m where
-  get _ = do
-    db <- getStateDB
-    BestBlockRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBestBlockRootKey
-  put _ (BestBlockRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmBestBlockRootKey sr
 
 instance HasContext m => Mod.Modifiable CurrentBlockHash m where
   get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
@@ -209,9 +178,6 @@ instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) 
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
-
-instance {-# OVERLAPPING #-} (MonadLogger m, MonadUnliftIO m) => A.Selectable Address AddressState (ReaderT Context m) where
-  select _ = getAddressStateMaybe
 
 instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
   lookup _ chainId = do
@@ -268,12 +234,6 @@ instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible SQLDB (ReaderT Context 
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Context m) where
   access _ = fmap (view $ dbs . redisPool) accessEnv
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (ReaderT Context m) where
-  access _ = do
-    mRBB <- RBDB.withRedisBlockDB getWorldBestBlockInfo
-    for mRBB $ \(BestBlock sha num) ->
-      return . WorldBestBlock $ BestBlock sha num
 
 instance (MonadLogger m, HasContext m) => Mod.Modifiable GasCap m where
   get _ = contextGets (GasCap . _vmGasCap)

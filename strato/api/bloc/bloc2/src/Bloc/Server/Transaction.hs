@@ -23,7 +23,8 @@ where
 import Bloc.API.Transaction
 import Bloc.API.Users
 import Bloc.API.Utils
-import Bloc.Database.Queries (getContractByAddress, getContractDetailsForContract)
+import Bloc.Database.Queries (getContractDetailsForContract, getContractWithCodeCollectionByAddress)
+import qualified SolidVM.Model.CodeCollection as CC
 import Bloc.Monad
 import Bloc.Server.TransactionResult
 import Bloc.Server.Utils
@@ -31,12 +32,18 @@ import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.Solidity.Contract ()
 import BlockApps.Solidity.Type
+import BlockApps.Solidity.TypeDefs (TypeDefs(..))
+import BlockApps.Solidity.Struct (Struct(..))
+import qualified Data.Map.Ordered as OMap
+import BlockApps.XAbiConverter (xabiTypeToType)
+import qualified SolidVM.Model.Type as SVMType
+import qualified Data.Bimap as Bimap
+import qualified Data.Set as Set
 import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.XabiContract
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (Transaction(..), rawTX2TX, transactionHash, transactionTo, partialTransactionHash, txAndTime2RawTX)
@@ -60,13 +67,13 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Extra
 import Control.Monad.Reader
 import Control.Monad.Trans.State.Lazy
-import Data.Bool
 import qualified Data.Cache as Cache
 import qualified Data.Cache.Internal as Cache
 import Data.Foldable
 import Data.Hashable hiding (hash)
 import Data.Int (Int32)
-import Data.List (sortOn)
+import Data.List (sortOn, stripPrefix)
+import Text.Read (readMaybe)
 import qualified Data.Map as M
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -85,6 +92,8 @@ import Handlers.Transaction
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function
+import SolidVM.Model.SolidString (labelToString, SolidString)
+import SolidVM.Model.CodeCollection.VarDef (FieldType(..))
 import qualified SolidVM.Model.Value as SMV
 import System.Clock
 import Text.Format
@@ -106,9 +115,9 @@ postBlocTransactionBody ::
   ( MonadIO m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 SourceMap m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     HasBlocEnv m,
     HasVault m
@@ -178,8 +187,8 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
 
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
-          argsAsSource <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-          
+          argsAsSource <- lift $ constructArgValuesAndSource (Just $ contractToTypeDefs contract) (Just args) xabiArgs
+
           tx <- lift . signAndPrepare addr $
               TransactionHeader
                 Nothing
@@ -198,21 +207,24 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
       forStateT Map.empty txsWithParams $
         \MethodCall{..} -> do
           mContract <- use $ at methodcallContractAddress
-          contract <- case mContract of
-            Just x -> pure x
+          (contract, mCodeCollection) <- case mContract of
+            Just x -> pure (x, Nothing)  -- Already cached, no code collection
             Nothing -> do
-              mContract' <- lift $ getContractByAddress methodcallContractAddress
-              x <- case mContract' of
+              -- Try to get contract with code collection for file-level structs
+              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress
+              case mContractCC of
+                Just (c, cc) -> do
+                  _ <- at methodcallContractAddress <?= c
+                  pure (c, Just cc)
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
-                Just x -> pure x
-              at methodcallContractAddress <?= x
           case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> pure ()
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
 
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
-          argsAsSource <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
+              typeDefs = contractToTypeDefsWithCC mCodeCollection contract
+          argsAsSource <- lift $ constructArgValuesAndSource (Just typeDefs) (Just methodcallArgs) xabiArgs
           tx <- lift . signAndPrepare addr $
             TransactionHeader
               (Just methodcallContractAddress)
@@ -242,9 +254,9 @@ postBlocTransactionUnsigned ::
   ( MonadIO m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
-    A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 SourceMap m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     HasBlocEnv m,
     HasVault m
@@ -311,8 +323,8 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
 
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
-          argsAsSource <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-          
+          argsAsSource <- lift $ constructArgValuesAndSource (Just $ contractToTypeDefs contract) (Just args) xabiArgs
+
           lift . prepareUnsignedRawTx name argsAsSource $
               TransactionHeader
                 Nothing
@@ -329,22 +341,24 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallTxParams [mapMethodCalls]
       forStateT Map.empty txsWithParams $
         \MethodCall{..} -> do
-          mContract <- use $ at methodcallContractAddress
-          contract <- case mContract of
-            Just x -> pure x
+          mCached <- use $ at methodcallContractAddress
+          (contract, mCodeCollection) <- case mCached of
+            Just x -> pure (x, Nothing)
             Nothing -> do
-              mContract' <- lift $ getContractByAddress methodcallContractAddress
-              x <- case mContract' of
+              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress
+              case mContractCC of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
-                Just x -> pure x
-              at methodcallContractAddress <?= x
+                Just (c, cc) -> do
+                  _ <- at methodcallContractAddress <?= c
+                  pure (c, Just cc)
           case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> pure ()
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
-          
+
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
-          argsAsSource <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
+              typeDefs = contractToTypeDefsWithCC mCodeCollection contract
+          argsAsSource <- lift $ constructArgValuesAndSource (Just typeDefs) (Just methodcallArgs) xabiArgs
           lift . prepareUnsignedRawTx methodcallMethodName argsAsSource $
             TransactionHeader
               (Just methodcallContractAddress)
@@ -377,7 +391,6 @@ postBlocTransactionParallel ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Address AddressState m,
-    A.Selectable Address Certificate m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
@@ -386,7 +399,7 @@ postBlocTransactionParallel ::
     HasBlocEnv m,
     HasVault m
   ) =>
-  Maybe Bool -> -- use_wallet
+  Maybe String -> -- username
   Bool -> -- resolve
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
@@ -401,7 +414,6 @@ postBlocTransaction ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Address AddressState m,
-    A.Selectable Address Certificate m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
@@ -410,7 +422,7 @@ postBlocTransaction ::
     HasBlocEnv m,
     HasVault m
   ) =>
-  Maybe Bool -> -- use_wallet
+  Maybe String -> -- username
   Bool ->
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
@@ -425,7 +437,6 @@ postBlocTransaction' ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Address AddressState m,
-    A.Selectable Address Certificate m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
@@ -435,29 +446,27 @@ postBlocTransaction' ::
     HasVault m
   ) =>
   Should CacheNonce ->
-  Maybe Bool -> -- use_wallet
+  Maybe String -> -- username
   Bool ->
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
-postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   checkIsSynced
-  userRegistry <- fmap userRegistryAddress getBlocEnv
-  userRegistryHash <- keccak256ToByteString . maybe zeroHash id . userRegistryCodeHash <$> getBlocEnv
   addr <- case mAddr of
     Nothing -> fromPublicKey <$> getPub
     Just addr' -> return addr'
-  walletFlag <- useWalletsByDefault <$> getBlocEnv
-  let useWallet = fromMaybe walletFlag mUseWallet
-  userContractAddr <- if useWallet
-    then do
-      let err = CouldNotFind $ Text.concat
-                [ "postBlocTransaction': Couldn't find common name for user address "
-                , Text.pack $ formatAddressWithoutColor addr
-                ]
-      userCert <- maybe (throwIO err) pure =<<
-        A.select (A.Proxy @Certificate) addr
-      pure $ getNewAddressWithSalt_unsafe userRegistry (certificateCommonName userCert) userRegistryHash [SMV.SString $ certificateCommonName userCert]
-    else pure addr
+  let useWallet = maybe False (not . null) mUsername
+  userContractAddr <- case (useWallet, mUsername) of
+    (True, Just u) -> do
+      let userRegistry = Address 0x720
+      ch <- A.selectWithDefault (A.Proxy @AddressState) userRegistry >>= \s ->
+        pure . keccak256ToByteString $ case addressStateCodeHash s of
+          ExternallyOwned h -> h
+          SolidVMCode _ h   -> h
+      $logInfoS "postBlocTransactions'/userRegistry" . Text.pack $ show (userRegistry, ch)
+      pure $ getNewAddressWithSalt_unsafe userRegistry u ch [SMV.SString "User", SMV.SString u]
+    _ -> pure addr
+  $logInfoS "postBlocTransactions'/userContractAddr" . Text.pack $ show (useWallet, mUsername, userContractAddr)
   let src' :: ContractPayload -> Maybe SourceMap
       src' p =
         if contractpayloadSrc p == mempty
@@ -502,21 +511,21 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                 contractName' = contractpayloadContract p
                 metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
 
-            (_, Contract {..}) <-
+            (_, theContract@Contract {..}) <-
               getContractDetailsForContract contractSrc contractName' >>= \case
                 Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
                 Just x' -> pure x'
 
             let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
                 xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
-            argsAsSource <- constructArgValuesAndSource contractArgs xabiArgs
+            argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) contractArgs xabiArgs
 
             let bcp =
                   FunctionParameters
                     addr
                     userContractAddr
                     "createContract"
-                    (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ contractSrcText), ("args", ArgString $ "(" <> Text.intercalate "," argsAsSource <> ")")])
+                    (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgArray . V.fromList $ ArgString <$> argsAsSource)])
                     (mergeTxParams (contractpayloadTxParams p) txParams)
                     (maybe (Just metadata) (\m -> Just $ metadata `Map.union` m) md)
                     resolve
@@ -548,22 +557,22 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                                   srcLength = Text.length contractSrcText
                                   cn = fromMaybe "unnamed_contract" c
                                   metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
-                              (_, Contract {..}) <-
+                              (_, theContract@Contract {..}) <-
                                 getContractDetailsForContract contractSrc c >>= \case
                                   Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
                                   Just x' -> pure x'
 
                               let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
                                   xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
-                              argsAsSource <- constructArgValuesAndSource a xabiArgs
-                              pure $ MethodCall 
-                                userContractAddr 
-                                "createContract"  
-                                (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgString $ "(" <> Text.intercalate "," argsAsSource <> ")")])
-                                (mergeTxParams x txParams) 
+                              argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) a xabiArgs
+                              pure $ MethodCall
+                                userContractAddr
+                                "createContract"
+                                (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgArray . V.fromList $ ArgString <$> argsAsSource)])
+                                (mergeTxParams x txParams)
                                 (maybe (Just metadata) (\m' -> Just $ metadata `Map.union` m') m)
                           ) ps
-            let bcp = 
+            let bcp =
                   FunctionListParameters
                     addr
                     methodList
@@ -586,7 +595,7 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                           )
                   )
                   ps
-            let bclp = 
+            let bclp =
                   ContractListParameters
                     addr
                     payloadList
@@ -597,43 +606,56 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
       [] -> return []
       [x] -> do
         p <- fromFunction x
-        let bfp = FunctionParameters
-                    addr
-                    (functionpayloadContractAddress p)
-                    (functionpayloadMethod p)
-                    (functionpayloadArgs p)
-                    (mergeTxParams (functionpayloadTxParams p) txParams)
-                    (functionpayloadMetadata p)
-                    resolve
-        let bfpWallet = FunctionParameters
-                    addr
-                    userContractAddr
-                    "callContract"
-                    (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
-                    (mergeTxParams (functionpayloadTxParams p) txParams)
-                    (functionpayloadMetadata p)
-                    resolve
-        let bfp' = bool bfp bfpWallet useWallet
+        bfp' <- if useWallet && userContractAddr /= functionpayloadContractAddress p
+          then do
+            args' <- getContractWithCodeCollectionByAddress (functionpayloadContractAddress p) >>= \case
+              Nothing -> pure $ M.elems (functionpayloadArgs p)
+              Just (theContract@Contract{..}, cc) -> do
+                let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                    xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) $
+                      Map.lookup (Text.unpack $ functionpayloadMethod p) _functions
+                map ArgString <$> constructArgValuesAndSource (Just $ contractToTypeDefsWithCC (Just cc) theContract) (Just $ functionpayloadArgs p) xabiArgs
+            pure $ FunctionParameters
+              addr
+              userContractAddr
+              "callContract"
+              (M.fromList $
+                [ ("contractToCall", ArgString . Text.pack . show $ functionpayloadContractAddress p)
+                , ("functionName", ArgString $ functionpayloadMethod p)
+                , ("args", ArgArray $ V.fromList args')
+                ])
+              (mergeTxParams (functionpayloadTxParams p) txParams)
+              (functionpayloadMetadata p)
+              resolve
+          else pure $ FunctionParameters
+            addr
+            (functionpayloadContractAddress p)
+            (functionpayloadMethod p)
+            (functionpayloadArgs p)
+            (mergeTxParams (functionpayloadTxParams p) txParams)
+            (functionpayloadMetadata p)
+            resolve
         fmap (:[]) $ postUsersContractMethod' cacheNonce bfp'
       xs -> do
         p <- mapM fromFunction xs
-        let bflp = FunctionListParameters
-                    addr
-                    (map (\(FunctionPayload a m r x md) ->
-                      MethodCall a m r (mergeTxParams x txParams) md) p)
-                    resolve
-        let bflpWallet = FunctionListParameters
-                    addr
-                    (map (\(FunctionPayload a m r x md) ->
-                            MethodCall 
-                              userContractAddr 
-                              "callContract"  
-                              (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList $ M.elems r)])
-                              (mergeTxParams x txParams) 
-                              md
-                          ) p)
-                    resolve
-        let bflp' = bool bflp bflpWallet useWallet
+        bflp' <- flip (FunctionListParameters addr) resolve <$> traverse (\(FunctionPayload a m r x md) ->
+            if useWallet && a /= userContractAddr
+              then do
+                args' <- getContractWithCodeCollectionByAddress a >>= \case
+                  Nothing -> pure $ M.elems r
+                  Just (theContract@Contract{..}, cc) -> do
+                    let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                        xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) $
+                          Map.lookup (Text.unpack m) _functions
+                    map ArgString <$> constructArgValuesAndSource (Just $ contractToTypeDefsWithCC (Just cc) theContract) (Just r) xabiArgs
+                pure $ MethodCall
+                  userContractAddr
+                  "callContract"
+                  (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList args')])
+                  (mergeTxParams x txParams)
+                  md
+              else pure $ MethodCall a m r (mergeTxParams x txParams) md
+          ) p
         postUsersContractMethodList' cacheNonce bflp'
   where
     fromTransfer = \case
@@ -746,14 +768,14 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} = do
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
-  (_, Contract {..}) <-
+  (_, theContract@Contract {..}) <-
     getContractDetailsForContract src contract >>= \case
       Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
       Just x -> pure x
 
   let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
       xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
-  argsAsSource <- constructArgValuesAndSource args xabiArgs
+  argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) args xabiArgs
 
   tx <-
     signAndPrepare fromAddr $
@@ -805,8 +827,8 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
 
       let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
           xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
-      argsAsSource <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-      
+      argsAsSource <- lift $ constructArgValuesAndSource (Just $ contractToTypeDefs contract) (Just args) xabiArgs
+
       tx <-
         lift . signAndPrepare fromAddr $
           TransactionHeader
@@ -887,22 +909,24 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} = do
       txSizeLimit <- fmap txSizeLimit getBlocEnv
       txsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall {..}) -> do
-          mContract <- use $ at methodcallContractAddress
-          contract <- case mContract of
-            Just x -> pure x
+          mCached <- use $ at methodcallContractAddress
+          (contract, mCodeCollection) <- case mCached of
+            Just x -> pure (x, Nothing)
             Nothing -> do
-              mContract' <- lift $ getContractByAddress methodcallContractAddress
-              x <- case mContract' of
+              mContractCC <- lift $ getContractWithCodeCollectionByAddress methodcallContractAddress
+              case mContractCC of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show methodcallContractAddress)
-                Just x -> pure x
-              at methodcallContractAddress <?= x
+                Just (c, cc) -> do
+                  _ <- at methodcallContractAddress <?= c
+                  pure (c, Just cc)
           case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> pure ()
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
 
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
-          argsAsSource <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
+              typeDefs = contractToTypeDefsWithCC mCodeCollection contract
+          argsAsSource <- lift $ constructArgValuesAndSource (Just typeDefs) (Just methodcallArgs) xabiArgs
           tx <- lift . signAndPrepare fromAddr $
             TransactionHeader
               (Just methodcallContractAddress)
@@ -949,16 +973,16 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} = do
             [ "postUsersContractMethod': Couldn't find contract details for contract at address ",
               Text.pack $ formatAddressWithoutColor contractAddr
             ]
-  contract <-
+  (contract, codeCollection) <-
     maybe (throwIO err) pure
-      =<< getContractByAddress contractAddr
+      =<< getContractWithCodeCollectionByAddress contractAddr
   case M.lookup (Text.unpack funcName) (contract ^. functions) of
     Just _ -> pure ()
     Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
   let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
       xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack funcName) $ contract ^. functions
-  argsAsSource <- constructArgValuesAndSource (Just args) xabiArgs
+  argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefsWithCC (Just codeCollection) contract) (Just args) xabiArgs
 
   let network = "mercata"
 
@@ -1074,16 +1098,17 @@ prepareUnsignedRawTx contractName' args th = do
 
 constructArgValuesAndSource ::
   (MonadIO m, MonadLogger m) =>
+  Maybe TypeDefs ->
   Maybe (Map Text ArgValue) ->
   Map Text Xabi.IndexedType ->
   m [Text]
-constructArgValuesAndSource args argNamesTypes = do
+constructArgValuesAndSource mTypeDefs args argNamesTypes = do
   case args of
     Nothing ->
       if Map.null argNamesTypes
         then return []
         else throwIO (UserError "no arguments provided to function.")
-    Just argsMap -> concatMap valueToTexts <$> getArgValues argsMap argNamesTypes
+    Just argsMap -> concatMap valueToTexts <$> getArgValues mTypeDefs argsMap argNamesTypes
 
 getAccountTxParams ::
   ( MonadIO m
@@ -1146,7 +1171,7 @@ genNonces cacheNonce fromAddr l items = do
       cacheKey = fromAddr
       viewNonce :: a -> Maybe Nonce
       viewNonce = txparamsNonce <=< view l
-      
+
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
   cachedItem <- case cacheNonce of
@@ -1220,27 +1245,111 @@ constructArgValues args argNamesTypes = do
       vals <- getArgValues argsMap argNamesTypes
       return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 -}
+-- | Convert a SolidVM Contract's enum and struct definitions to TypeDefs for argValueToValue
+-- Also includes file-level structs from the code collection if available
+contractToTypeDefs :: Contract -> TypeDefs
+contractToTypeDefs = contractToTypeDefsWithCC Nothing
+
+contractToTypeDefsWithCC :: Maybe CC.CodeCollection -> Contract -> TypeDefs
+contractToTypeDefsWithCC mCC contract =
+  TypeDefs
+    { enumDefs = Map.fromList $
+        -- Contract-level enums
+        [ (Text.pack $ labelToString enumName, Bimap.fromList $ zip [0..] (map (Text.pack . labelToString) enumValues))
+        | (enumName, (enumValues, _)) <- Map.toList (_enums contract)
+        ]
+        ++
+        -- File-level enums from code collection
+        [ (Text.pack $ labelToString enumName, Bimap.fromList $ zip [0..] (map (Text.pack . labelToString) enumValues))
+        | Just cc <- [mCC]
+        , (enumName, (enumValues, _)) <- Map.toList (cc ^. CC.flEnums)
+        ]
+    , structDefs = Map.fromList $
+        -- Contract-level structs
+        [ (Text.pack $ labelToString structName, convertStruct fieldList)
+        | (structName, fieldList) <- Map.toList (_structs contract)
+        ]
+        ++
+        -- File-level structs from code collection
+        [ (Text.pack $ labelToString structName, convertStruct fieldList)
+        | Just cc <- [mCC]
+        , (structName, fieldList) <- Map.toList (cc ^. CC.flStructs)
+        ]
+    }
+  where
+    -- Collect all known struct names for UnknownLabel resolution
+    knownStructs :: Set.Set String
+    knownStructs = Set.fromList $
+      map (labelToString . fst) (Map.toList (_structs contract))
+      ++ maybe [] (map (labelToString . fst) . Map.toList . (^. CC.flStructs)) mCC
+
+    -- Collect all known enum names for UnknownLabel resolution
+    knownEnums :: Set.Set String
+    knownEnums = Set.fromList $
+      map (labelToString . fst) (Map.toList (_enums contract))
+      ++ maybe [] (map (labelToString . fst) . Map.toList . (^. CC.flEnums)) mCC
+
+    convertStruct :: [(SolidString, FieldType, a)] -> Struct
+    convertStruct fieldList = Struct
+      { fields = OMap.fromList
+          [ (Text.pack $ labelToString fieldName, (Left "", convertType $ fieldTypeType ft))
+          | (fieldName, ft, _) <- fieldList
+          ]
+      , size = 0  -- Size not needed for type conversion
+      }
+    convertType :: SVMType.Type -> Type
+    convertType (SVMType.UnknownLabel name)
+      | name `Set.member` knownStructs = TypeStruct (Text.pack name)
+      | name `Set.member` knownEnums = TypeEnum (Text.pack name)
+      -- Handle primitive type names that may be stored as UnknownLabel
+      | Just n <- parseBytesN name = SimpleType $ TypeBytes (Just n)
+      | Just (s, n) <- parseIntN name = SimpleType $ TypeInt s n
+      | name == "address" = SimpleType TypeAddress
+      | name == "bool" = SimpleType TypeBool
+      | name == "string" = SimpleType TypeString
+    convertType (SVMType.Array elementType len) = 
+      case len of
+        Just l -> TypeArrayFixed (fromIntegral l) (convertType elementType)
+        Nothing -> TypeArrayDynamic (convertType elementType)
+    convertType svmType = case typeToEvmType svmType >>= (either (const Nothing) Just . xabiTypeToType) of
+      Just t -> t
+      Nothing -> SimpleType TypeString  -- Fallback for unknown types
+    
+    -- Parse "bytes32", "bytes20", etc.
+    parseBytesN :: String -> Maybe Integer
+    parseBytesN s = case stripPrefix "bytes" s of
+      Just rest -> readMaybe rest
+      Nothing -> Nothing
+    
+    -- Parse "uint256", "int128", etc.
+    parseIntN :: String -> Maybe (Bool, Maybe Integer)
+    parseIntN s
+      | Just rest <- stripPrefix "uint" s = Just (False, readMaybe rest)
+      | Just rest <- stripPrefix "int" s = Just (True, readMaybe rest)
+      | otherwise = Nothing
+
 getArgValues ::
   (MonadIO m, MonadLogger m) =>
+  Maybe TypeDefs ->
   Map Text ArgValue ->
   Map Text Xabi.IndexedType ->
   m [Value]
-getArgValues argsMap argNamesTypes = do
+getArgValues mTypeDefs argsMap argNamesTypes = do
   argsVals <-
     if not (Map.keysSet argNamesTypes `isSubsetOf` Map.keysSet argsMap)
       then do
         let argNames1 = "(" <> Text.intercalate ", " (Map.keys argNamesTypes) <> ")"
             argNames2 = "(" <> Text.intercalate ", " (Map.keys argsMap) <> ")"
         throwIO (UserError ("Argument names don't match - Expected Arguments: " <> argNames1 <> "; Received Arguments: " <> argNames2))
-      else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
+      else sequence $ Map.intersectionWith (determineValue mTypeDefs) argsMap argNamesTypes
   return $ map snd (sortOn fst (toList argsVals))
 
-determineValue :: (MonadIO m, MonadLogger m) => ArgValue -> Xabi.IndexedType -> m (Int32, Value)
-determineValue argVal (Xabi.IndexedType ix xabiType) =
+determineValue :: (MonadIO m, MonadLogger m) => Maybe TypeDefs -> ArgValue -> Xabi.IndexedType -> m (Int32, Value)
+determineValue mTypeDefs argVal (Xabi.IndexedType ix xabiType) =
   let typeM = getSolidityType argVal xabiType
    in do
         ty <- either (blocError . UserError) return typeM
-        either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)
+        either (blocError . UserError) (return . (ix,)) (argValueToValue mTypeDefs ty argVal)
 
 getSolidityType :: ArgValue -> Xabi.Type -> Either Text Type
 getSolidityType _ (Xabi.Int (Just True) b) = Right . SimpleType . TypeInt True $ fmap toInteger b

@@ -10,6 +10,6 @@ import Control.Monad
 import Control.Monad.Change.Alter
 
 runTheDAOFork :: ((Address `Alters` AddressState) m) => m ()
-runTheDAOFork = 
+runTheDAOFork =
   let recipAddr = Address 0x11c21cdf023498a02b8f66b472d6eab0302ad83a
   in void $ addToBalance recipAddr 32100000000

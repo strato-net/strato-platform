@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import { useUserTokens } from "@/context/UserTokensContext";
+import React, { useEffect, useState, useMemo } from "react";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,8 +12,11 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Token } from "@/interface";
-import { usdstAddress } from "@/lib/constants";
+import { usdstAddress, VOUCHER_TO_USDST_FACTOR } from "@/lib/constants";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+
+// Combined balance threshold for warnings (in USDST)
+const COMBINED_BALANCE_THRESHOLD = 10; // Show warning if USDST + vouchers < 10 USDST
 
 // Optimized InfoTooltip component using hook
 const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
@@ -51,28 +53,24 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 };
 
 const UsdstBalanceBox: React.FC = () => {
-  const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance } =
-    useUserTokens();
-  const { getToken } = useTokenContext();
+  const { userAddress, isLoggedIn } = useUser();
+  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance, getToken } =
+    useTokenContext();
   const location = useLocation();
   const [isMinimized, setIsMinimized] = useState(false);
   const [usdstToken, setUsdstToken] = useState<Token | null>(null);
 
   useEffect(() => {
-    if (userAddress) {
-      fetchUsdstBalance(userAddress);
+    if (isLoggedIn) {
+      fetchUsdstBalance();
     }
-  }, [userAddress, fetchUsdstBalance]);
+  }, [fetchUsdstBalance, isLoggedIn]);
 
   // Fetch USDST token info for image
   useEffect(() => {
     const fetchUsdstToken = async () => {
       try {
-        const tokenResponse = await getToken(usdstAddress);
-        const token = Array.isArray(tokenResponse)
-          ? tokenResponse[0]
-          : tokenResponse;
+        const token = await getToken(usdstAddress);
         setUsdstToken(token);
       } catch (error) {
         console.error("Error fetching USDST token:", error);
@@ -82,13 +80,20 @@ const UsdstBalanceBox: React.FC = () => {
     fetchUsdstToken();
   }, [getToken]);
 
-  const getBalanceValue = (balance: string): number => {
-    const formattedBalance = formatWeiAmount(balance);
-    return safeParseFloat(formattedBalance);
-  };
+  const combinedBalance = useMemo(() => {
+    if (loadingUsdstBalance) return 0;
+    try {
+      const usdst = safeParseFloat(formatWeiAmount(usdstBalance || "0"));
+      const vouchers = safeParseFloat(formatWeiAmount(voucherBalance || "0", 20));
+      return usdst * Number(VOUCHER_TO_USDST_FACTOR) + vouchers;
+    } catch {
+      return safeParseFloat(formatWeiAmount(usdstBalance || "0"));
+    }
+  }, [usdstBalance, voucherBalance, loadingUsdstBalance]);
 
-  const balanceValue = getBalanceValue(usdstBalance);
-  const isLowBalance = balanceValue <= 0.2 && balanceValue > 0.03;
+  
+  const balanceValue = combinedBalance;
+  const isLowBalance = balanceValue < COMBINED_BALANCE_THRESHOLD && balanceValue > 0.03;
   const isCriticalBalance = balanceValue <= 0.03;
 
   // Don't render if user is not logged in or if on homepage
@@ -97,10 +102,10 @@ const UsdstBalanceBox: React.FC = () => {
   }
 
   const getCardClasses = () => {
-    if (loadingUsdstBalance) return "border-blue-200 bg-white/95";
-    if (isCriticalBalance) return "border-red-300 bg-red-200/95";
-    if (isLowBalance) return "border-orange-300 bg-orange-200/95";
-    return "border-blue-200 bg-white/95";
+    if (loadingUsdstBalance) return "border-blue-200 dark:border-blue-800 bg-card/95";
+    if (isCriticalBalance) return "border-red-300 dark:border-red-700 bg-red-200/95 dark:bg-red-900/95";
+    if (isLowBalance) return "border-orange-300 dark:border-orange-700 bg-orange-200/95 dark:bg-orange-900/95";
+    return "border-blue-200 dark:border-blue-800 bg-card/95";
   };
 
   // Render the appropriate icon based on state and token image availability
@@ -124,7 +129,7 @@ const UsdstBalanceBox: React.FC = () => {
 
     // Don't show warning icons when loading
     if (loadingUsdstBalance) {
-      return <Coins className={`${sizeClasses[size]} text-blue-600`} />;
+      return <Coins className={`${sizeClasses[size]} text-blue-600 dark:text-blue-400`} />;
     }
 
     // Fallback to warning/normal icons
@@ -132,19 +137,19 @@ const UsdstBalanceBox: React.FC = () => {
       return (
         <AlertTriangle
           className={`${sizeClasses[size]} ${
-            isCriticalBalance ? "text-red-600" : "text-orange-600"
+            isCriticalBalance ? "text-red-600 dark:text-red-400" : "text-orange-600 dark:text-orange-400"
           }`}
         />
       );
     }
 
-    return <Coins className={`${sizeClasses[size]} text-blue-600`} />;
+    return <Coins className={`${sizeClasses[size]} text-blue-600 dark:text-blue-400`} />;
   };
 
   if (isMinimized) {
     return (
       <Card
-        className={`fixed bottom-4 right-4 z-50 w-12 h-12 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
+        className={`fixed bottom-20 md:bottom-4 right-4 z-50 w-12 h-12 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
       >
         <CardContent className="p-0 h-full flex items-center justify-center">
           <Button
@@ -162,38 +167,39 @@ const UsdstBalanceBox: React.FC = () => {
 
   return (
     <Card
-      className={`fixed bottom-4 right-4 z-50 w-60 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
+      className={`fixed bottom-20 md:bottom-4 right-4 z-50 w-60 shadow-lg ${getCardClasses()} backdrop-blur-sm`}
     >
       <CardContent className="p-3">
         <div className="flex items-center space-x-2">
           <div
             className={`p-1.5 rounded-full ${
               loadingUsdstBalance
-                ? "bg-blue-100"
+                ? "bg-blue-100 dark:bg-blue-900/50"
                 : isCriticalBalance
-                ? "bg-red-100"
+                ? "bg-red-100 dark:bg-red-900/50"
                 : isLowBalance
-                ? "bg-orange-100"
-                : "bg-blue-100"
+                ? "bg-orange-100 dark:bg-orange-900/50"
+                : "bg-blue-100 dark:bg-blue-900/50"
             }`}
           >
             {renderIcon("lg")}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
-              <p className="text-xs font-medium text-gray-600">USDST Balance</p>
-              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO Mercata network">
-                <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+              <p className="text-xs font-medium text-muted-foreground">USDST Balance</p>
+              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO network">
+                <HelpCircle className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-help" />
+
               </InfoTooltip>
             </div>
-            <p className="text-sm font-semibold text-gray-900 truncate">
+            <p className="text-sm font-semibold text-foreground truncate">
               {loadingUsdstBalance ? (
                 <span className="animate-pulse">Loading...</span>
               ) : (
                 `${formatCurrency(formatWeiAmount(usdstBalance))} USDST`
               )}
             </p>
-            <p className="text-xs text-gray-500 truncate">
+            <p className="text-xs text-muted-foreground truncate">
               {loadingUsdstBalance
                 ? "Calculating voucher credits…"
                 : `${Math.floor(parseFloat(formatWeiAmount(voucherBalance,20))).toLocaleString()} vouchers`}
@@ -202,18 +208,18 @@ const UsdstBalanceBox: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0 hover:bg-gray-100"
+            className="h-6 w-6 p-0 hover:bg-secondary"
             onClick={() => setIsMinimized(true)}
           >
-            <Minus className="h-3 w-3 text-gray-500" />
+            <Minus className="h-3 w-3 text-muted-foreground" />
           </Button>
         </div>
 
         {(isLowBalance || isCriticalBalance) && !loadingUsdstBalance && (
-          <div className="mt-2 pt-2 border-t border-gray-200">
+          <div className="mt-2 pt-2 border-t border-border">
             <div
               className={`flex items-start space-x-1 ${
-                isCriticalBalance ? "text-red-600" : "text-orange-600"
+                isCriticalBalance ? "text-red-600 dark:text-red-400" : "text-orange-600 dark:text-orange-400"
               }`}
             >
               <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />

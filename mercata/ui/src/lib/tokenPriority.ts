@@ -7,7 +7,7 @@ import { usdstAddress } from "./constants";
  *
  * Current, divides tokens into 5 priority groups:
  * 1. USDST
- * 2. Collateral tokens (GOLDST, WBTCST, etc)
+ * 2. Collateral tokens (GOLDST, WBTC, ETH, etc)
  * 3. Special LP Tokens (MUSDST, SUSDST)
  * 4. LP Tokens (contains "LP" in symbol)
  * 5. Everything else
@@ -24,12 +24,12 @@ export const getTokenPriority = (token: Token): number => {
   // Priority 1: USDST
   if (address === usdstAddress.toLowerCase()) return 1;
 
-  // Priority 2: Collateral tokens (GOLDST, WBTCST, etc)
-  const collateralTokens = ['GOLDST', 'WBTCST', 'ETHST', 'SILVST'];
+  // Priority 2: Collateral tokens (GOLDST, WBTC, etc)
+  const collateralTokens = ['GOLDST', 'WBTC', 'ETH', 'SILVST'];
   if (collateralTokens.includes(symbol)) return 2;
 
   // Priority 3: Special LP Tokens
-  const specialLpTokens = ['MUSDST', 'SUSDST'];
+  const specialLpTokens = ['MUSDST', 'SUSDST', 'lendUSDST', 'safetyUSDST'];
   if (specialLpTokens.includes(symbol)) return 3;
 
   // Priority 4: LP Tokens (contains "LP" in symbol)

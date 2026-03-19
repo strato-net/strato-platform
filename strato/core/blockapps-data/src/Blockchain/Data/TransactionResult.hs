@@ -17,14 +17,19 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Control.Arrow ((&&&))
 import Control.DeepSeq
 import Data.Binary
-import Data.Swagger hiding (Format, format)
+import Data.Function (on)
+import Data.OpenApi hiding (Format, format)
 import qualified Database.Persist.Postgresql as SQL
 import qualified Generic.Random as GR
 import Servant.Docs hiding (pretty)
 import Test.QuickCheck
 import Text.Format
+
+instance Ord TransactionResult where
+  compare = compare `on` (transactionResultBlockHash &&& transactionResultTransactionHash)
 
 instance Format TransactionResult where
   format TransactionResult {..} =

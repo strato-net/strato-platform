@@ -5,7 +5,7 @@ import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
-import { createCompletePriceMap } from "../helpers/oracle.helper";
+import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices } from "./oracle.service";
 import { getTokenDetails } from "../helpers/cirrusHelpers";
 
@@ -53,8 +53,7 @@ export const getTokens = async (
       });
 
     // Process price data
-    const rawPrices = lendingResponse.oracle?.prices || [];
-    const priceMap = await createCompletePriceMap(accessToken, rawPrices);
+    const priceMap = await getCompletePriceMap(accessToken);
 
     return (response.data as any[]).map((token) => ({
       ...token,
@@ -111,7 +110,7 @@ export const getBalance = async (
     select: rawParams.select || tokenBalanceSelectFields.join(","),
   };
 
-  const [balances, collaterals, cdps, prices] = await Promise.all([
+  const [balances, collaterals, cdps, rawPrices] = await Promise.all([
     cirrus.get(accessToken, "/" + Token + "-_balances", { params }),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
@@ -127,8 +126,7 @@ export const getBalance = async (
         "value->>collateral": `gt.0`
       }
     }),
-    // Get all oracle prices (could be optimized to filter by token addresses if needed)
-    getOraclePrices(accessToken)
+    getCompletePriceMap(accessToken)
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -152,14 +150,14 @@ export const getBalance = async (
   const allTokens = [
     ...balanceData.map((t: any) => ({
       ...t,
-      price: prices.get(t.address) || "0",
+      price: (rawPrices.get(t.address) || 0n).toString(),
       collateralBalance: (collateralMap.get(t.address) || 0n).toString(),
     })),
     ...tokensWithCollateralOnly.map((a) => ({
       address: a,
       user: address,
       balance: "0",
-      price: prices.get(a) || "0",
+      price: (rawPrices.get(a) || 0n).toString(),
       collateralBalance: (collateralMap.get(a) || 0n).toString(),
       token: tokenDetails.get(a),
     })),
@@ -239,6 +237,70 @@ export const transferToken = async (
   } catch (error) {
     throw error;
   }
+};
+
+export interface BulkTransferItem {
+  to: string;
+  value: string;
+}
+
+export interface BulkTransferResult {
+  to: string;
+  value: string;
+  status: string;
+  hash?: string;
+  error?: string;
+}
+
+/**
+ * Execute bulk transfers for a single token to multiple recipients
+ * Processes transfers sequentially to ensure proper nonce handling
+ */
+export const bulkTransferToken = async (
+  accessToken: string,
+  userAddress: string,
+  tokenAddress: string,
+  transfers: BulkTransferItem[]
+): Promise<{ results: BulkTransferResult[]; successCount: number; failureCount: number }> => {
+  const results: BulkTransferResult[] = [];
+  let successCount = 0;
+  let failureCount = 0;
+
+  for (const transfer of transfers) {
+    try {
+      const tx = await buildFunctionTx({
+        contractName: extractContractName(Token),
+        contractAddress: tokenAddress,
+        method: "transfer",
+        args: {
+          to: transfer.to,
+          value: transfer.value,
+        },
+      }, userAddress, accessToken);
+
+      const { status, hash } = await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      );
+
+      results.push({
+        to: transfer.to,
+        value: transfer.value,
+        status,
+        hash,
+      });
+      successCount++;
+    } catch (error: any) {
+      results.push({
+        to: transfer.to,
+        value: transfer.value,
+        status: "failure",
+        error: error.message || "Transfer failed",
+      });
+      failureCount++;
+    }
+  }
+
+  return { results, successCount, failureCount };
 };
 
 // Approve an allowance for a spender
@@ -340,4 +402,94 @@ export const getVoucherBalance = async (
   const rawValue = response.data?.[0]?.balance ?? "0";
   const voucherAsUsdstWei = (BigInt(rawValue) * 100n).toString();
   return voucherAsUsdstWei;
+};
+
+/**
+ * Get all tokens with their total supply for stats
+ * Includes price data for market cap calculation
+ * Returns all tokens that have an oracle price
+ */
+export const getTokenStats = async (
+  accessToken: string
+): Promise<{ tokens: any[], totalMarketCap: string }> => {
+  try {
+    const [tokensResponse, priceData] = await Promise.all([
+      cirrus.get(accessToken, `/${Token}`, {
+        params: {
+          select: "address,_name,_symbol,_totalSupply::text",
+          status: `eq.2`,
+          _totalSupply: `gt.0`
+        }
+      }),
+      getOraclePrices(accessToken)
+    ]);
+
+    if (tokensResponse.status !== 200) {
+      throw new Error(`Error fetching token stats: ${tokensResponse.statusText}`);
+    }
+
+    if (!priceData) {
+      throw new Error(`Error fetching price data, no price data found`);
+    }
+
+    const tokens = tokensResponse.data || [];
+
+    const filteredTokens = tokens.filter((token: any) => priceData.has(token.address));
+
+    const tokensWithMarketCap = filteredTokens.map((token: any) => {
+      const price = BigInt(priceData.get(token.address) || "0");
+      const totalSupply = BigInt(token._totalSupply || "0");
+      // Calculate market cap: (price * totalSupply) / 10^36
+      // Both price and totalSupply are in wei (18 decimals)
+      let marketCap = "0";
+      try {
+        if (price !== 0n && totalSupply !== 0n) {
+          // Market cap in USD = (price_wei * totalSupply_wei) / 10^36
+          // We divide by 10^36 because both values have 18 decimals
+          const marketCapWei = price * totalSupply;
+          const marketCapUSD = marketCapWei / BigInt(10) ** BigInt(36);
+          
+          // Convert to decimal string with 2 decimal places
+          const wholePart = marketCapUSD.toString();
+          const fractionalWei = marketCapWei % (BigInt(10) ** BigInt(36));
+          const fractionalPart = (fractionalWei * BigInt(100) / (BigInt(10) ** BigInt(36))).toString().padStart(2, '0');
+          
+          marketCap = `${wholePart}.${fractionalPart}`;
+        }
+      } catch (error) {
+        console.error(`Error calculating market cap for ${token._symbol}:`, error);
+        marketCap = "0.00";
+      }
+      
+      return {
+        address: token.address,
+        name: token._name,
+        symbol: token._symbol,
+        totalSupply: totalSupply.toString(),
+        marketCap: marketCap
+      };
+    });
+
+    // Sort tokens by market cap descending
+    const sortedTokens = tokensWithMarketCap.sort((a: any, b: any) => {
+      const marketCapA = parseFloat(a.marketCap);
+      const marketCapB = parseFloat(b.marketCap);
+      return marketCapB - marketCapA;
+    });
+
+    // Calculate total market cap
+    const totalMarketCap = sortedTokens.reduce((sum: number, token: any) => {
+      return sum + parseFloat(token.marketCap);
+    }, 0);
+
+    // Format total market cap with 2 decimal places
+    const formattedTotalMarketCap = totalMarketCap.toFixed(2);
+
+    return {
+      tokens: sortedTokens,
+      totalMarketCap: formattedTotalMarketCap
+    };
+  } catch (error) {
+    throw error;
+  }
 };

@@ -306,8 +306,7 @@ contractResult txHash txResult@TransactionResult {..} name = do
             getAccount'
               accountsFilterParams
                 { _qaAddress = Just address,
-                  _qaContractName = Just name',
-                  _qaIgnoreChain = Just True
+                  _qaContractName = Just name'
                 }
           case addressRefs of
             [] -> go address name (num + 1)
@@ -466,7 +465,7 @@ defaultValueForType (SVMType.Array _ Nothing) =
 defaultValueForType (SVMType.Contract _) = SimpleValue $ ValueAddress 0
 defaultValueForType (SVMType.Mapping _ _ _) =
   ValueStruct Map.empty -- Mappings represented as empty struct
-defaultValueForType (SVMType.UnknownLabel _ _) =
+defaultValueForType (SVMType.UnknownLabel _) =
   SimpleValue $ ValueInt False (Just 32) 0
 defaultValueForType SVMType.Variadic = SimpleValue $ ValueInt False Nothing 0
 defaultValueForType (SVMType.UserDefined _ actualType) =

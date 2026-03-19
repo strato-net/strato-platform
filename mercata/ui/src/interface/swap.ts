@@ -7,7 +7,6 @@ import type {
   Pool,
   SwapToken,
 } from '@mercata/shared-types';
-import { SafetyModuleData } from '.';
 
 export * from '@mercata/shared-types';
 // UI-SPECIFIC SWAP INTERFACES
@@ -21,6 +20,7 @@ export interface SwapContextState {
   swappableTokens: SwapToken[];
   pairableTokens: SwapToken[];
   userPools: Pool[];
+  pools: Pool[];
   
   // Loading states
   loading: boolean;
@@ -57,11 +57,13 @@ export interface SwapContextActions {
   fetchPairableTokens: (tokenAddress: string) => Promise<SwapToken[]>;
   
   // Pool operations
-  createPool: (data: { tokenA: string; tokenB: string }) => Promise<void>;
+  createPool: (data: { tokenA: string; tokenB: string, isStable: boolean }) => Promise<void>;
   getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<Pool>;
   getPoolByAddress: (address: string) => Promise<Pool>;
   fetchPools: () => Promise<Pool[]>;
   setPoolRates: (data: SetPoolRatesParams) => Promise<void>;
+  togglePause: (poolAddress: string, isPaused: boolean) => Promise<void>;
+  toggleDisable: (poolAddress: string, isDisabled: boolean) => Promise<void>;
   fetchUserPositions: () => Promise<void>;
   
   // Swap operations
@@ -86,6 +88,34 @@ export interface SwapContextActions {
   removeLiquidity: (data: {
     poolAddress: string;
     lpTokenAmount: string;
+  }) => Promise<void>;
+
+  // Multi-token pool operations
+  swapMultiToken: (data: {
+    poolAddress: string;
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: string;
+    minAmountOut: string;
+  }) => Promise<void>;
+  addLiquidityMultiToken: (data: {
+    poolAddress: string;
+    amounts: string[];
+    minMintAmount: string;
+    stakeLPToken?: boolean;
+  }) => Promise<void>;
+  removeLiquidityMultiToken: (data: {
+    poolAddress: string;
+    lpTokenAmount: string;
+    minAmounts: string[];
+    includeStakedLPToken?: boolean;
+  }) => Promise<void>;
+  removeLiquidityMultiTokenOneCoin: (data: {
+    poolAddress: string;
+    lpTokenAmount: string;
+    coinIndex: number;
+    minReceived: string;
+    includeStakedLPToken?: boolean;
   }) => Promise<void>;
   
   // Utility functions
@@ -118,19 +148,6 @@ export interface SwapWidgetProps {
   onAssetChange: (asset: SwapToken, isFrom: boolean) => void;
   onSwap: (params: SwapParams) => Promise<void>;
   loading?: boolean;
-}
-
-/**
- * Props for pool participation components
- */
-export interface PoolParticipationProps {
-  liquidityInfo: any;
-  loadingLiquidity: any;
-  userPools: Pool[];
-  loadingUserPools: boolean;
-  shouldPreventFlash?: boolean;
-  safetyInfo?: SafetyModuleData | null;
-  loadingSafety?: boolean;
 }
 
 /**

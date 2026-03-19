@@ -98,7 +98,7 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
 "<div>
   <Blueprint.AnchorButton className=\\"pt-intent-primary pt-icon-send-to-graph\\" onClick={[Function: onClick]} text=\\"setX\\" />
   <form>
-    <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function]} title=\\"Call \\\\'setX\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"Call 'setX' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
@@ -115,13 +115,7 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
             </label>
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <div className=\\"\\">
-              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" disabled={true} required={true}>
-                <option value=\\"Supplier1\\">
-                  Supplier1
-                </option>
-              </Field>
-            </div>
+            <Field name=\\"modalUsername\\" component=\\"input\\" type=\\"text\\" placeholder=\\"username\\" className=\\"pt-input\\" />
           </div>
         </div>
         <div className=\\"row\\">
@@ -132,17 +126,13 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" disabled={true} required={true}>
-                <option value={[undefined]}>
-                  370adf114257cb0e0025eedf0a96261b51af23e3
-                </option>
-              </Field>
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"modalAddress\\" disabled={true} placeholder=\\"370adf114257cb0e0025eedf0a96261b51af23e3\\" />
             </div>
           </div>
         </div>
         <div className=\\"row\\">
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Blueprint.Switch checked={false} onChange={[Function]} label=\\"Use Wallet\\" />
+            <Blueprint.Switch checked={false} onChange={[Function (anonymous)]} label=\\"Use Wallet\\" />
           </div>
         </div>
         <div className=\\"row\\">
@@ -205,8 +195,8 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
       </div>
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
-          <Blueprint.Button text=\\"Cancel\\" onClick={[Function]} />
-          <button className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function]}>
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function (anonymous)]} />
+          <button className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function (anonymous)]}>
             Call Method
           </button>
         </div>

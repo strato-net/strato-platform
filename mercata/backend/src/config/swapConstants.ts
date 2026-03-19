@@ -12,6 +12,9 @@ export const SWAP_CONTRACTS = {
   Pool: `${CONTRACT_PREFIX}Pool`,
   PoolFactory: `${CONTRACT_PREFIX}PoolFactory`,
   PoolSwap: `${CONTRACT_PREFIX}Pool-Swap`,
+  StablePool: `${CONTRACT_PREFIX}StablePool`,
+  StablePoolCoins: `${CONTRACT_PREFIX}StablePool-coins`,
+  StablePoolTokenBalances: `${CONTRACT_PREFIX}StablePool-tokenBalances`,
 } as const;
 
 // ============================================================================
@@ -27,6 +30,7 @@ export const SWAP_TOKEN_SELECT_FIELDS = [
   "_symbol",
   "_totalSupply::text",
   "customDecimals",
+  "status",
   `balances:${SWAP_CONTRACTS.Token}-_balances(user:key,balance:value::text)`,
   `images:${SWAP_CONTRACTS.Token}-images(value)`,
 ] as const;
@@ -45,6 +49,9 @@ export const SWAP_POOL_SELECT_FIELDS = [
   `tokenB:tokenB_fkey(${SWAP_TOKEN_SELECT_FIELDS.join(',')})`,
   "tokenBBalance::text",
   `lpToken:lpToken_fkey(${SWAP_TOKEN_SELECT_FIELDS.join(',')})`,
+  "isStable",
+  "isPaused",
+  "isDisabled",
 ] as const;
 
 /**
@@ -59,5 +66,5 @@ export const SWAP_HISTORY_SELECT_FIELDS = [
   "tokenOut", 
   "amountIn::text",
   "amountOut::text",
-  "pool:BlockApps-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol))"
+  "pool:BlockApps-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol),isStable)"
 ] as const;

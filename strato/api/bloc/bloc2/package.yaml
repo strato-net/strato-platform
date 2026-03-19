@@ -15,6 +15,7 @@ library:
   ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
   dependencies:
     - base16-bytestring
+    - bimap
     - bloc2api
     - blockapps-data
     - blockapps-datadefs
@@ -40,13 +41,14 @@ library:
     - lens
     - monad-alter
     - monad-logger
+    - ordered-containers
     - mtl
     - parsec
     - blockapps-secp256k1-haskell
     - seqevents
     - servant-client
     - servant-server
-    - servant-swagger
+    - servant-openapi3
     - solid-vm-compiler
     - solid-vm-model
     - solid-vm-parser
@@ -54,11 +56,12 @@ library:
     - sql-monad
     - strato-model
     - strato-redis-blockdb
-    - swagger2
+    - openapi3
     - text
     - time
     - transformers
     - unliftio
+    - strato-auth
     - vault-monad
     - vector
 

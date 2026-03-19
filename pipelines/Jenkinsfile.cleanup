@@ -195,62 +195,62 @@ pipeline {
           }
         }
         
-        stage('Cleanup testsync1') {
-          when {
-            beforeAgent true
-            expression {
-              if (nodesByLabel("testsync1").size() == 0) {
-                currentBuild.result = 'UNSTABLE'
-                return false
-              } else return true
-            }
-          }
-          agent { label "testsync1" }
-          steps {
-            script {
-              def diskspaceFreed = cleanOldWorkspaces(4, '/datadrive')
-              echo "Diskspace freed on testsync1: $diskspaceFreed kilobytes"
-            }
-          }
-        }
-        
-        stage('Cleanup testsync2') {
-          when {
-            beforeAgent true
-            expression {
-              if (nodesByLabel("testsync2").size() == 0) {
-                currentBuild.result = 'UNSTABLE'
-                return false
-              } else return true
-            }
-          }
-          agent { label "testsync2" }
-          steps {
-            script {
-              def diskspaceFreed = cleanOldWorkspaces(4, '/datadrive')
-              echo "Diskspace freed on testsync2: $diskspaceFreed kilobytes"
-            }
-          }
-        }
-        
-        stage('Cleanup testsync3') {
-          when {
-            beforeAgent true
-            expression {
-              if (nodesByLabel("testsync3").size() == 0) {
-                currentBuild.result = 'UNSTABLE'
-                return false
-              } else return true
-            }
-          }
-          agent { label "testsync3" }
-          steps {
-            script {
-              def diskspaceFreed = cleanOldWorkspaces(4, '/datadrive')
-              echo "Diskspace freed on testsync3: $diskspaceFreed kilobytes"
-            }
-          }
-        }
+//        stage('Cleanup testsync1') {
+//          when {
+//            beforeAgent true
+//            expression {
+//              if (nodesByLabel("testsync1").size() == 0) {
+//                currentBuild.result = 'UNSTABLE'
+//                return false
+//              } else return true
+//            }
+//          }
+//          agent { label "testsync1" }
+//          steps {
+//            script {
+//              def diskspaceFreed = cleanOldWorkspaces(4, '/datadrive')
+//              echo "Diskspace freed on testsync1: $diskspaceFreed kilobytes"
+//            }
+//          }
+//        }
+//        
+//        stage('Cleanup testsync2') {
+//          when {
+//            beforeAgent true
+//            expression {
+//              if (nodesByLabel("testsync2").size() == 0) {
+//                currentBuild.result = 'UNSTABLE'
+//                return false
+//              } else return true
+//            }
+//          }
+//          agent { label "testsync2" }
+//          steps {
+//            script {
+//              def diskspaceFreed = cleanOldWorkspaces(4, '/datadrive')
+//              echo "Diskspace freed on testsync2: $diskspaceFreed kilobytes"
+//            }
+//          }
+//        }
+//        
+//        stage('Cleanup testsync3') {
+//          when {
+//            beforeAgent true
+//            expression {
+//              if (nodesByLabel("testsync3").size() == 0) {
+//                currentBuild.result = 'UNSTABLE'
+//                return false
+//              } else return true
+//            }
+//          }
+//          agent { label "testsync3" }
+//          steps {
+//            script {
+//              def diskspaceFreed = cleanOldWorkspaces(4, '/datadrive')
+//              echo "Diskspace freed on testsync3: $diskspaceFreed kilobytes"
+//            }
+//          }
+//        }
       }
     }
   }

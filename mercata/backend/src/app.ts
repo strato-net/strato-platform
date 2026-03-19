@@ -1,14 +1,22 @@
 import express from "express";
 import cors from "cors";
 import routes from "./api/routes";
-import { initOpenIdConfig } from "./config/config";
+import { initOpenIdConfig, initNetworkConfig, initInternalAddresses } from "./config/config";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
 
 const PORT = process.env.PORT || 3001;
 
 const app = express();
 
-app.use(cors(), express.json(), express.urlencoded({ extended: true }));
+app.use(
+  cors(),
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+  express.urlencoded({ extended: true })
+);
 
 app.use("/api", routes);
 
@@ -21,6 +29,8 @@ app.use(errorHandler);
 (async () => {
   try {
     await initOpenIdConfig();
+    await initNetworkConfig();
+    await initInternalAddresses();
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });

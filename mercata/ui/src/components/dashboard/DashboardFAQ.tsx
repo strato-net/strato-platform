@@ -5,15 +5,15 @@ const DashboardFAQ = () => {
   const faqItems = [
     {
       question: "What assets can I deposit?",
-      answer: "You can deposit various assets including gold, silver, and cryptocurrencies like Ethereum. Each asset has different yield opportunities and borrowing capabilities."
+      answer: "You can deposit various assets including gold, silver, and cryptocurrencies like Ethereum and wrapped Bitcoin. Each asset has different yield opportunities and borrowing capabilities."
     },
     {
       question: "How does borrowing work?",
       answer: "You can borrow against your deposited assets. The amount you can borrow depends on the collateralization ratio of each asset. Keep your risk level below 80% to avoid liquidation."
     },
     {
-      question: "What are CATA Rewards?",
-      answer: "CATA is the governance token of STRATO Mercata. You earn CATA rewards based on your deposits and platform activity. These tokens can be used for governance voting and receive platform benefits."
+      question: "What are Reward Points?",
+      answer: "Reward Points is the reward system on STRATO. Points are rewarded based on your deposits and platform activity."
     },
     {
       question: "How secure are my assets?",
@@ -26,7 +26,7 @@ const DashboardFAQ = () => {
   ];
   
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+    <div className="bg-card text-card-foreground rounded-xl border border-border p-5 shadow-sm">
       <h2 className="font-bold text-lg mb-4">Frequently Asked Questions</h2>
       
       <Accordion type="single" collapsible className="w-full">
@@ -34,7 +34,7 @@ const DashboardFAQ = () => {
           <AccordionItem key={index} value={`item-${index}`}>
             <AccordionTrigger className="text-left font-medium">{item.question}</AccordionTrigger>
             <AccordionContent>
-              <p className="text-gray-600">{item.answer}</p>
+              <p className="text-muted-foreground">{item.answer}</p>
             </AccordionContent>
           </AccordionItem>
         ))}

@@ -121,9 +121,9 @@ functionHelperForUserDefined f = f {_funcArgs = tForm $ _funcArgs f, _funcVals =
     tForm :: [(Maybe SolidString, IndexedType)] -> [(Maybe SolidString, IndexedType)]
     tForm =
       Prelude.map
-        ( \(maybeSoldString, (IndexedType z y)) -> case (maybeSoldString, y) of
-            (xxxx, (SVMType.UserDefined _ act)) -> (xxxx, (IndexedType z act))
-            (xxxx, _) -> (xxxx, (IndexedType z y))
+        ( \(maybeSoldString, (IndexedType z y loc)) -> case (maybeSoldString, y) of
+            (xxxx, (SVMType.UserDefined _ act)) -> (xxxx, (IndexedType z act loc))
+            (xxxx, _) -> (xxxx, (IndexedType z y loc))
         )
 
 pushVar :: String -> SVMType.Type -> SSS ()
@@ -392,7 +392,7 @@ optimizeExpression (ArrayExpression x es) z = ArrayExpression x
 optimizeExpression (ObjectLiteral x m) z = ObjectLiteral x
                                        <$> traverse (flip optimizeExpression z) m
 --  Keeping each case explicitly listed here, so that none are accidentally forgotten in the future
-optimizeExpression e@NewExpression{}     _ = pure e
+optimizeExpression (NewExpression x t mSalt) z = NewExpression x t <$> traverse (flip optimizeExpression z) mSalt
 optimizeExpression e@BoolLiteral{}       _ = pure e
 optimizeExpression e@NumberLiteral{}     _ = pure e
 optimizeExpression e@DecimalLiteral{}    _ = pure e

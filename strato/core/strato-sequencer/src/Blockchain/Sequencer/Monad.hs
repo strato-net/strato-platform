@@ -9,7 +9,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
@@ -19,16 +18,20 @@ module Blockchain.Sequencer.Monad
     SequencerContext (..),
     SequencerConfig (..),
     SequencerM,
+    SequencerMTest,
     BlockPeriod (..),
     RoundPeriod (..),
     runSequencerM,
+    runSequencerMTest,
     pairToVmTx,
     createFirstTimer,
     createNewTimer,
+    createNewViewTimer,
+    updateViewTimer,
     fuseChannels,
     seenTransactionDB,
     blockstanbulContext,
-    latestRoundNumber
+    latestViewAndProposal
   )
 where
 
@@ -36,6 +39,8 @@ import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Model.SyncState
+import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.EthConf
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
@@ -49,17 +54,16 @@ import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import ClassyPrelude (atomically)
 import Conduit
-import Control.Concurrent (threadDelay)
 import Control.Concurrent.AlarmClock
 import Control.Concurrent.STM.TMChan
 import Control.Lens
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Vault (VaultM, runVaultM)
 import Control.Monad.Reader
 import Control.Monad.State
-import qualified Data.ByteString.Char8 as C8
 import Data.Conduit.TMChan
 import Data.IORef
 import Data.Maybe
@@ -67,10 +71,6 @@ import Data.String
 import qualified Data.Text as T
 import Data.Time.Clock
 import qualified Database.LevelDB as LDB
-import qualified LabeledError
-import Servant.Client
-import qualified Strato.Strato23.API.Types as VC hiding (Address (..))
-import qualified Strato.Strato23.Client as VC
 import System.Directory (createDirectoryIfMissing)
 import Text.Format
 import Prelude hiding (round)
@@ -79,8 +79,8 @@ data Modification a = Modification a | Deletion deriving (Show)
 
 data SequencerContext = SequencerContext
   { _seenTransactionDB :: !SeenTransactionDB,
-    _blockstanbulContext :: Maybe BlockstanbulContext,
-    _latestRoundNumber :: IORef RoundNumber
+    _blockstanbulContext :: BlockstanbulContext,
+    _latestViewAndProposal :: IORef (View, Maybe Block)
   }
 
 makeLenses ''SequencerContext
@@ -88,7 +88,7 @@ makeLenses ''SequencerContext
 type MonadBlockstanbul m =
   ( MonadIO m,
     HasBlockstanbulContext m,
-    Mod.Accessible (IORef RoundNumber) m,
+    Mod.Accessible (IORef (View, Maybe Block)) m,
     Mod.Accessible (TMChan RoundNumber) m,
     Mod.Accessible BlockPeriod m,
     Mod.Accessible RoundPeriod m,
@@ -111,12 +111,14 @@ data SequencerConfig = SequencerConfig
     cablePackage :: CablePackage,
     maxEventsPerIter :: Int,
     maxUsPerIter :: Int,
-    vaultClient :: Maybe ClientEnv, -- Nothing in tests
     kafkaClientId :: KafkaClientId,
     redisConn :: RBDB.RedisConnection
   }
 
-type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
+type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (VaultM (LoggingT IO)))))
+
+-- Test version without VaultM - relies on external HasVault instance for the base monad
+type SequencerMTest = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
 
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible DependentBlockDB (ReaderT SequencerConfig m) where
   access _ = asks dependentBlockDB
@@ -132,17 +134,12 @@ instance HasNamespace Checkpoint where
   type NSKey Checkpoint = ()
   namespace _ = "chkpt"
 -}
-instance (MonadIO m, Mod.Accessible DependentBlockDB m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
-  lookup _ k = lookupDependentBlockDB k
-  insert _ k v = insertDependentBlockDB k v
-  delete _ k = deleteDependentBlockDB k
-
 instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m) where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef RoundNumber) (StateT SequencerContext m) where
-  access _ = use latestRoundNumber
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (View, Maybe Block)) (StateT SequencerContext m) where
+  access _ = use latestViewAndProposal
 
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan RoundNumber) (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulTimeouts
@@ -166,7 +163,7 @@ instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
 
 instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
   getBlockstanbulContext = use blockstanbulContext
-  putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
+  putBlockstanbulContext = modify' . (.~) blockstanbulContext
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
   get _ =
@@ -182,56 +179,40 @@ instance (MonadIO m, MonadLogger m, Mod.Modifiable BestSequencedBlock m) => Mod.
   get   = lift . Mod.get
   put p = lift . Mod.put p
 
--- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key,
--- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot
--- easier than making a whole new SequencerM definition just to get a different HasVault instance
-testPriv :: PrivateKey
-testPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "testPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
-instance (MonadIO m, MonadLogger m) => HasVault (ReaderT SequencerConfig m) where
-  sign mesg = do
-    mVc <- asks vaultClient
-    case mVc of
-      Nothing -> return $ signMsg testPriv mesg
-      Just vc -> waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash mesg)) vc
+runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
+runSequencerM vaultUrl' c bc m = do
+  liftIO $ createDirectoryIfMissing False $ dbDir "h"
+  a <- runVaultM vaultUrl' . runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
+    let dbCS = depBlockDBCacheSize c
+        dbPath = depBlockDBPath c
+        stxSize = seenTransactionDBSize c
+    depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
+    latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
+    flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
+      SequencerContext
+        { _seenTransactionDB = mkSeenTxDB stxSize,
+          _blockstanbulContext = bc,
+          _latestViewAndProposal = latestVandP
+        }
+  return $ fst a
 
-  getPub = error "called getPub in SequencerM, but this should never happen"
-  getShared _ = error "called getShared in SequencerM, but this should never happen"
-
-instance (MonadIO m, HasVault m) => HasVault (StateT SequencerContext m) where
-  sign      = lift . sign
-  getPub    = lift getPub
-  getShared = lift . getShared
-
-waitOnVault :: (Show a, MonadIO m, MonadLogger m) => m (Either a b) -> m b
-waitOnVault action = do
-  $logInfoS "HasVault" "Asking the vault-proxy to sign a Blockstanbul message"
-  res <- action
-  case res of
-    Left err -> do
-      $logErrorS "HasVault" . T.pack $ "failed to get signature from vault...got: " ++ (show err)
-      liftIO $ threadDelay 2000000 -- 2 seconds
-      waitOnVault action
-    Right val -> do
-      $logInfoS "HasVault" "Got a signature from vault"
-      return val
-
-runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
-runSequencerM c mbc m = do
+-- Test version without VaultM - relies on external HasVault instance
+runSequencerMTest :: SequencerConfig -> BlockstanbulContext -> SequencerMTest a -> (LoggingT IO) a
+runSequencerMTest c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
   a <- runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
     depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
-    latestRound <- liftIO $ newIORef 0
+    latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
     flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
-          _blockstanbulContext = mbc,
-          _latestRoundNumber = latestRound
+          _blockstanbulContext = bc,
+          _latestViewAndProposal = latestVandP
         }
-
   return $ fst a
 
 pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
@@ -251,8 +232,8 @@ createNewTimer ::
   RoundNumber ->
   m ()
 createNewTimer rn = do
-  rnref <- Mod.access (Mod.Proxy @(IORef RoundNumber))
-  liftIO $ atomicModifyIORef' rnref (\x -> (max rn x, ()))
+  rnref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  liftIO $ atomicModifyIORef' rnref (\(View r s, mb) -> ((View (max rn r) s, mb), ()))
   ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
   dt <- unRoundPeriod <$> Mod.access (Mod.Proxy @(RoundPeriod))
   let act :: AlarmClock UTCTime -> IO ()
@@ -262,12 +243,37 @@ createNewTimer rn = do
         -- The first RoundChange for this message may have not
         -- been seen, so we keep firing at the same interval
         -- until an alarm lands and the round changes
-        unless (globalRN > rn) $ do
+        unless (_round (fst globalRN) > rn) $ do
           next <- addUTCTime dt <$> getCurrentTime
           setAlarm this' next
   alarm <- liftIO $ newAlarmClock act
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next
+
+createNewViewTimer :: MonadBlockstanbul m => Block -> m ()
+createNewViewTimer b = do
+  updateViewTimer
+  vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  vCur <- fst <$> liftIO (readIORef vpref)
+  let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
+  ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
+  let act :: AlarmClock UTCTime -> IO ()
+      act this' = do
+        (v', p) <- readIORef vpref
+        when (v >= v' && isNothing p) $ do
+          atomically . writeTMChan ch $ _round v'
+          next <- addUTCTime 5 <$> getCurrentTime
+          setAlarm this' next
+  alarm <- liftIO $ newAlarmClock act
+  next <- addUTCTime 2 <$> liftIO getCurrentTime
+  liftIO $ setAlarm alarm next
+
+updateViewTimer :: MonadBlockstanbul m => m ()
+updateViewTimer = do
+  v <- currentView
+  p <- _proposal <$> getBlockstanbulContext
+  vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
+  liftIO $ atomicModifyIORef' vpref (\_ -> ((v, p), ()))
 
 fuseChannels :: (MonadIO m, MonadReader SequencerConfig m) =>
                 m (ConduitM () SeqLoopEvent SequencerM ())

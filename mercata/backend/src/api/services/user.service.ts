@@ -144,6 +144,26 @@ export const castVoteOnIssue = async (
   }
 };
 
+// Dismiss an issue (only works if proposer is the only voter)
+export const dismissIssue = async (
+  accessToken: string,
+  userAddress: string,
+  issueId: string,
+): Promise<{ status: string; hash: string }> => {
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(AdminRegistry),
+    contractAddress: adminRegistry,
+    method: "dismissIssue",
+    args: { _issueId: issueId },
+  }, userAddress, accessToken);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
 // Cast a vote on an issue by issueId
 export const castVoteOnIssueById = async (
   accessToken: string,
@@ -257,10 +277,9 @@ export const getOpenIssues = async (
     const response = await cirrus.get(accessToken, "/" + AdminRegistry, {
       params: {
         address: `eq.${adminRegistry}`,
-        select: `*,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value),executed:${AdminRegistry}-IssueExecuted(*)`,
+        select: `*,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value)`,
         ['votes.value']: 'neq.""',
-        ['executed.limit']: 10,
-        ['executed.order']: 'block_timestamp.desc',
+        ['votes.value->>length']: 'is.null',
       },
     });
 
@@ -272,7 +291,7 @@ export const getOpenIssues = async (
       return {};
     }
 
-    const { admins: adminsRaw, votes, defaultVotingThresholdBps, thresholds, executed } = response.data[0];
+    const { admins: adminsRaw, votes, defaultVotingThresholdBps, thresholds } = response.data[0];
     const admins = adminsRaw.filter((admin: any) => admin.address && admin.address !== 'Unknown'); // remove blank admins
 
     const issueIds = new Set(votes.map((v: any) => v.issueId));
@@ -301,10 +320,51 @@ export const getOpenIssues = async (
       return 0;
     });
 
-    return { admins, votes, globalThreshold: defaultVotingThresholdBps, thresholds, executed, issues: uniqueIssues };
+    return { 
+      admins, 
+      votes, 
+      globalThreshold: defaultVotingThresholdBps, 
+      thresholds, 
+      issues: uniqueIssues 
+    };
   } catch (error) {
     console.log(error);
-    return [];
+    return {};
+  }
+};
+
+export const getExecutedIssues = async (
+  accessToken: string,
+  page: number = 1,
+  limit: number = 10
+): Promise<object> => {
+  try {
+    const offset = (page - 1) * limit;
+    const [executedResponse, executedCountResponse] = await Promise.all([
+      cirrus.get(accessToken, "/" + AdminRegistry + "-IssueExecuted", {
+        params: {
+          order: 'block_timestamp.desc',
+          limit: limit.toString(),
+          offset: offset.toString(),
+        },
+      }),
+      cirrus.get(accessToken, "/" + AdminRegistry + "-IssueExecuted", {
+        params: {
+          select: 'count()',
+        },
+      }),
+    ]);
+
+    const executed = executedResponse?.data || [];
+    const executedTotal = executedCountResponse?.data?.[0]?.count || 0;
+
+    return { 
+      executed, 
+      executedTotal 
+    };
+  } catch (error) {
+    console.log(error);
+    return { executed: [], executedTotal: 0 };
   }
 };
 

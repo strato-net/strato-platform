@@ -172,6 +172,7 @@ router.get("/swap-pools/positions", authHandler.authorizeRequest(), SwappingCont
  */
 router.get("/swap-pools/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);
 
+
 /**
  * @openapi
  * /swap-pools/{poolAddress}:
@@ -309,6 +310,138 @@ router.post("/swap-pools/:poolAddress/liquidity/single", authHandler.authorizeRe
 
 /**
  * @openapi
+ * /swap-pools/{poolAddress}/liquidity/multi-token:
+ *   post:
+ *     summary: Add liquidity to a multi-token stable pool
+ *     tags: [Swap]
+ *     parameters:
+ *       - name: poolAddress
+ *         in: path
+ *         required: true
+ *         description: Pool contract address
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amounts
+ *               - minMintAmount
+ *             properties:
+ *               amounts:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Token amounts indexed by coin position (decimal strings)
+ *               minMintAmount:
+ *                 type: string
+ *                 description: Minimum LP tokens to mint (decimal string)
+ *               stakeLPToken:
+ *                 type: boolean
+ *                 description: Whether to stake LP tokens in RewardsChef
+ *     responses:
+ *       200:
+ *         description: Liquidity transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ *   delete:
+ *     summary: Remove liquidity proportionally from a multi-token stable pool
+ *     tags: [Swap]
+ *     parameters:
+ *       - name: poolAddress
+ *         in: path
+ *         required: true
+ *         description: Pool contract address
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - lpTokenAmount
+ *               - minAmounts
+ *             properties:
+ *               lpTokenAmount:
+ *                 type: string
+ *                 description: LP token amount to redeem (decimal string)
+ *               minAmounts:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Minimum amounts per coin (decimal strings)
+ *               includeStakedLPToken:
+ *                 type: boolean
+ *                 description: Whether to include staked LP tokens
+ *     responses:
+ *       200:
+ *         description: Liquidity transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/swap-pools/:poolAddress/liquidity/multi-token", authHandler.authorizeRequest(), SwappingController.addLiquidityMultiToken);
+router.delete("/swap-pools/:poolAddress/liquidity/multi-token", authHandler.authorizeRequest(), SwappingController.removeLiquidityMultiToken);
+
+/**
+ * @openapi
+ * /swap-pools/{poolAddress}/liquidity/multi-token/one-coin:
+ *   delete:
+ *     summary: Remove liquidity as a single coin from a multi-token stable pool
+ *     tags: [Swap]
+ *     parameters:
+ *       - name: poolAddress
+ *         in: path
+ *         required: true
+ *         description: Pool contract address
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - lpTokenAmount
+ *               - coinIndex
+ *               - minReceived
+ *             properties:
+ *               lpTokenAmount:
+ *                 type: string
+ *                 description: LP token amount to redeem (decimal string)
+ *               coinIndex:
+ *                 type: integer
+ *                 description: Index of the coin to receive
+ *               minReceived:
+ *                 type: string
+ *                 description: Minimum amount to receive (decimal string)
+ *               includeStakedLPToken:
+ *                 type: boolean
+ *                 description: Whether to include staked LP tokens
+ *     responses:
+ *       200:
+ *         description: Liquidity transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.delete("/swap-pools/:poolAddress/liquidity/multi-token/one-coin", authHandler.authorizeRequest(), SwappingController.removeLiquidityMultiTokenOneCoin);
+
+/**
+ * @openapi
  * /swap:
  *   post:
  *     summary: Execute a token swap
@@ -348,6 +481,50 @@ router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
 
 /**
  * @openapi
+ * /swap/multi-token:
+ *   post:
+ *     summary: Execute a multi-token stable pool swap
+ *     tags: [Swap]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - poolAddress
+ *               - tokenIn
+ *               - tokenOut
+ *               - amountIn
+ *               - minAmountOut
+ *             properties:
+ *               poolAddress:
+ *                 type: string
+ *               tokenIn:
+ *                 type: string
+ *                 description: Address of the input token
+ *               tokenOut:
+ *                 type: string
+ *                 description: Address of the output token
+ *               amountIn:
+ *                 type: string
+ *                 description: Input token amount (decimal string)
+ *               minAmountOut:
+ *                 type: string
+ *                 description: Minimum acceptable output (decimal string)
+ *     responses:
+ *       200:
+ *         description: Swap transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/swap/multi-token", authHandler.authorizeRequest(), SwappingController.swapMultiToken);
+
+/**
+ * @openapi
  * /swap-history/{poolAddress}:
  *   get:
  *     summary: Retrieve swap history for a pool
@@ -371,6 +548,12 @@ router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
  *         description: Page size (defaults to 10)
  *         schema:
  *           type: integer
+ *       - name: sender
+ *         in: query
+ *         required: false
+ *         description: Filter by sender address (user who performed the swap)
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Paginated swap history
@@ -424,5 +607,69 @@ router.get("/swap-history/:poolAddress", authHandler.authorizeRequest(true), Swa
  *               additionalProperties: true
  */
 router.post("/swap-pools/set-rates", authHandler.authorizeRequest(), SwappingController.setPoolRates);
+
+/**
+ * @openapi
+ * /swap-pools/toggle-pause:
+ *   post:
+ *     summary: Toggle pause state of a swap pool (admin)
+ *     tags: [Swap]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - poolAddress
+ *               - isPaused
+ *             properties:
+ *               poolAddress:
+ *                 type: string
+ *               isPaused:
+ *                 type: boolean
+ *                 description: true to pause, false to unpause
+ *     responses:
+ *       200:
+ *         description: Transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/swap-pools/toggle-pause", authHandler.authorizeRequest(), SwappingController.togglePause);
+
+/**
+ * @openapi
+ * /swap-pools/toggle-disable:
+ *   post:
+ *     summary: Toggle disabled state of a swap pool (admin)
+ *     tags: [Swap]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - poolAddress
+ *               - isDisabled
+ *             properties:
+ *               poolAddress:
+ *                 type: string
+ *               isDisabled:
+ *                 type: boolean
+ *                 description: true to disable, false to enable
+ *     responses:
+ *       200:
+ *         description: Transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/swap-pools/toggle-disable", authHandler.authorizeRequest(), SwappingController.toggleDisable);
 
 export default router;

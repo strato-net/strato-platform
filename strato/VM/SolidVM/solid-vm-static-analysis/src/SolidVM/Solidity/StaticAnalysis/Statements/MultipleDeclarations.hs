@@ -68,8 +68,8 @@ statementHelper (WhileStatement _ body _) = do
   put $ M.intersection s sWhile
   pure $ concat [bs]
 statementHelper (ForStatement mInit _ _ body _) = do
+  s <- get  -- capture state BEFORE init (so loop variable is scoped to the loop)
   is <- maybe (pure []) simpleStatementHelper mInit
-  s <- get
   bs <- statementsHelper' body
   sFor <- get
   put $ M.intersection s sFor

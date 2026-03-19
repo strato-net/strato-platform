@@ -1,0 +1,215 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           ethereum-rlp
+version:        0.1.0
+synopsis:       Ethereum Recursive Length Prefix Encoding
+description:    RLP, as described in the Ethereum Yellowpaper
+category:       Data Structures
+author:         Jamshid
+maintainer:     jamshidnh@gmail.com
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Data.RLP
+      Blockchain.Data.Util
+  other-modules:
+      Paths_ethereum_rlp
+  hs-source-dirs:
+      library/
+  default-extensions:
+      Arrows
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveTraversable
+      EmptyDataDecls
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      LiberalTypeSynonyms
+      MagicHash
+      MultiParamTypeClasses
+      MultiWayIf
+      NoMonomorphismRestriction
+      OverloadedStrings
+      PatternGuards
+      ParallelListComp
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      TemplateHaskell
+      TupleSections
+      TypeFamilies
+      TypeOperators
+      UnboxedTuples
+  build-depends:
+      base
+    , base16-bytestring
+    , bytestring
+    , containers
+    , data-fix
+    , deepseq
+    , format
+    , text
+  default-language: Haskell2010
+
+test-suite test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Paths_ethereum_rlp
+  hs-source-dirs:
+      test/
+  default-extensions:
+      Arrows
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveTraversable
+      EmptyDataDecls
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      LiberalTypeSynonyms
+      MagicHash
+      MultiParamTypeClasses
+      MultiWayIf
+      NoMonomorphismRestriction
+      OverloadedStrings
+      PatternGuards
+      ParallelListComp
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      TemplateHaskell
+      TupleSections
+      TypeFamilies
+      TypeOperators
+      UnboxedTuples
+  build-depends:
+      HUnit
+    , base
+    , bytestring
+    , ethereum-rlp
+    , hspec
+    , test-framework
+    , test-framework-hunit
+  default-language: Haskell2010
+
+benchmark rlpserial
+  type: exitcode-stdio-1.0
+  main-is: RLPShootout.hs
+  hs-source-dirs:
+      bench/
+  default-extensions:
+      Arrows
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveTraversable
+      EmptyDataDecls
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      LiberalTypeSynonyms
+      MagicHash
+      MultiParamTypeClasses
+      MultiWayIf
+      NoMonomorphismRestriction
+      OverloadedStrings
+      PatternGuards
+      ParallelListComp
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      TemplateHaskell
+      TupleSections
+      TypeFamilies
+      TypeOperators
+      UnboxedTuples
+  build-depends:
+      base
+    , bytestring
+    , criterion
+    , ethereum-rlp
+    , random-bytestring
+  default-language: Haskell2010
+
+benchmark zipbench
+  type: exitcode-stdio-1.0
+  main-is: ZipBench.hs
+  hs-source-dirs:
+      bench/
+  default-extensions:
+      Arrows
+      BangPatterns
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFoldable
+      DeriveFunctor
+      DeriveTraversable
+      EmptyDataDecls
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      LiberalTypeSynonyms
+      MagicHash
+      MultiParamTypeClasses
+      MultiWayIf
+      NoMonomorphismRestriction
+      OverloadedStrings
+      PatternGuards
+      ParallelListComp
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      TemplateHaskell
+      TupleSections
+      TypeFamilies
+      TypeOperators
+      UnboxedTuples
+  build-depends:
+      base
+    , base16-bytestring
+    , bytestring
+    , criterion
+    , ethereum-rlp
+    , random-bytestring
+    , zlib
+  default-language: Haskell2010

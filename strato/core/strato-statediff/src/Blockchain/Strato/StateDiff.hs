@@ -1,9 +1,11 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Strato.StateDiff
   ( StateDiff (..),
@@ -20,7 +22,6 @@ where
 
 import BlockApps.Logging
 import Blockchain.DB.AddressStateDB
-import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
@@ -34,8 +35,9 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Monad (when)
-import Control.Monad.Change (Alters, Modifiable)
+import Control.Monad.Change (Alters)
 import qualified Control.Monad.Change as A
+import Data.Binary
 import Data.ByteString (ByteString)
 import Data.Function
 import Data.Kind (Type)
@@ -63,7 +65,7 @@ data StateDiff = StateDiff
     deletedAccounts :: Map Address (AccountDiff 'Eventual),
     updatedAccounts :: Map Address (AccountDiff 'Incremental)
   }
-  deriving (Generic)
+  deriving (Eq, Show, Generic)
 
 data StorageDiff (v :: Detail)
   = EVMDiff (Map Word256 (Diff Word256 v))
@@ -125,6 +127,36 @@ newtype instance Diff a 'Eventual = Value a
 -- | Not a type, but a data kind
 data Detail = Incremental | Eventual
 
+-- Standalone deriving for Diff data family
+deriving instance Eq a => Eq (Diff a 'Incremental)
+deriving instance Eq a => Eq (Diff a 'Eventual)
+deriving instance Show a => Show (Diff a 'Incremental)
+deriving instance Show a => Show (Diff a 'Eventual)
+deriving instance Generic (Diff a 'Incremental)
+deriving instance Generic (Diff a 'Eventual)
+instance Binary a => Binary (Diff a 'Incremental)
+instance Binary a => Binary (Diff a 'Eventual)
+
+-- Standalone deriving for StorageDiff
+deriving instance Eq (StorageDiff 'Incremental)
+deriving instance Eq (StorageDiff 'Eventual)
+deriving instance Show (StorageDiff 'Incremental)
+deriving instance Show (StorageDiff 'Eventual)
+deriving instance Generic (StorageDiff 'Incremental)
+deriving instance Generic (StorageDiff 'Eventual)
+instance Binary (StorageDiff 'Incremental)
+instance Binary (StorageDiff 'Eventual)
+
+-- Standalone deriving for AccountDiff
+deriving instance Eq (AccountDiff 'Incremental)
+deriving instance Eq (AccountDiff 'Eventual)
+deriving instance Show (AccountDiff 'Incremental)
+deriving instance Show (AccountDiff 'Eventual)
+instance Binary (AccountDiff 'Incremental)
+instance Binary (AccountDiff 'Eventual)
+
+instance Binary StateDiff
+
 -- | A class for condensing information in a diff
 class Detailed (t :: Detail -> Type) where
   incrementalToEventual :: t 'Incremental -> t 'Eventual
@@ -173,8 +205,7 @@ stateDiff ::
   ( MonadLogger m,
     HasCodeDB m,
     HasHashDB m,
-    HasStateDB m,
-    Modifiable BestBlockRoot m
+    HasStateDB m
   ) =>
   Maybe Word256 ->
   Integer ->
@@ -183,7 +214,6 @@ stateDiff ::
   StateRoot ->
   ConduitT i StateDiff m ()
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
-  lift $ putChainBestBlock chainId blockHash blockNumber
   mOldSR <- lift $ A.lookup (A.Proxy @MP.StateRoot) chainId
   lift $ A.insert (A.Proxy @MP.StateRoot) chainId newRoot
   stateDiff' chainId blockNumber blockHash oldRoot newRoot
@@ -206,8 +236,20 @@ stateDiff' chainId blockNumber blockHash oldRoot newRoot = do
     .| (await >>= go (0 :: Integer) [])
     .| awaitForever (\i -> collectModes i emitDiff)
   where
+    -- NOTE: The `go` function batches individual account diffs into one StateDiff message.
+    -- This was originally set to 100 when StateDiffs went directly to SQL (no message size limits).
+    -- Now that StateDiffs flow through Kafka, the batch size is set to 1 to avoid exceeding
+    -- Kafka's message size limit (~1MB) - contracts with large storage can exceed this easily.
+    --
+    -- With batch size 1, `go` is effectively a pass-through and this batching logic is unnecessary.
+    -- A cleaner solution would be:
+    --   1. Remove `go` entirely from the producer - send individual account diffs as separate messages
+    --   2. Move batching to the consumer (strato-index) - Kafka's consume already batches reads,
+    --      so the indexer could merge multiple messages into one SQL transaction
+    -- This would be more "Kafka-native" (many small messages) and let the consumer optimize SQL
+    -- batching based on what it receives, rather than having the producer guess at batch sizes.
     go _ diffs Nothing = yield $ reverse diffs
-    go 100 diffs d = yield (reverse diffs) >> go 0 [] d
+    go 1 diffs d = yield (reverse diffs) >> go 0 [] d
     go n diffs (Just d) = await >>= go (n + 1) (d : diffs)
     collectModes diffs f = do
       (c, d, u) <- coll [] [] [] diffs

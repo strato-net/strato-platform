@@ -1,0 +1,87 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockstanbul
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Blockstanbul
+      Blockchain.Blockstanbul.Authentication
+      Blockchain.Blockstanbul.BenchmarkLib
+      Blockchain.Blockstanbul.EventLoop
+      Blockchain.Blockstanbul.Messages
+      Blockchain.Blockstanbul.Metrics
+      Blockchain.Blockstanbul.Options
+      Blockchain.Blockstanbul.StateMachine
+  other-modules:
+      Paths_blockstanbul
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -Werror
+  build-depends:
+      QuickCheck
+    , aeson
+    , base
+    , binary
+    , blockDB
+    , blockapps-data
+    , bytestring
+    , common-log
+    , conduit
+    , containers
+    , cross-monitoring
+    , cryptonite
+    , data-default
+    , deepseq
+    , ethereum-rlp
+    , extra
+    , format
+    , generic-arbitrary
+    , hflags
+    , lens
+    , monad-alter
+    , mtl
+    , prometheus-client
+    , strato-model
+    , text
+    , transformers
+  default-language: Haskell2010
+
+test-suite blockstanbul-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      AuthenticationSpec
+      MessageSpec
+      Spec
+      StateMachineSpec
+      Paths_blockstanbul
+  hs-source-dirs:
+      test/
+  ghc-options: -Wall -Werror -dynamic
+  build-depends:
+      base
+    , common-log
+    , hflags
+    , hspec
+  default-language: Haskell2010
+
+benchmark one-node
+  type: exitcode-stdio-1.0
+  main-is: OneNode.hs
+  other-modules:
+      Paths_blockstanbul
+  hs-source-dirs:
+      bench/
+  ghc-options: -Wall -Werror -dynamic
+  build-depends:
+      base
+    , blockstanbul
+    , transformers
+  default-language: Haskell2010

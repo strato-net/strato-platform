@@ -40,6 +40,7 @@ export function validateCreatePoolsArgs(args: any) {
   const schema = Joi.object({
     tokenA: validateAddressField("tokenA"),
     tokenB: validateAddressField("tokenB"),
+    isStable: Joi.boolean(),
   });
 
   const { error } = schema.validate(args);
@@ -52,7 +53,6 @@ export function validateAddLiquidityDualTokenArgs(args: any) {
   const schema = Joi.object({
     tokenBAmount: numericStringField("TokenBAmount").required(),
     maxTokenAAmount: numericStringField("MaxTokenAAmount").required(),
-    stakeLPToken: Joi.boolean().optional(),
   });
 
   const { error } = schema.validate(args);
@@ -65,7 +65,6 @@ export function validateAddLiquiditySingleTokenArgs(args: any) {
   const schema = Joi.object({
     singleTokenAmount: numericStringField("SingleTokenAmount").required(),
     isAToB: Joi.boolean().required(),
-    stakeLPToken: Joi.boolean().optional(),
   });
 
   const { error } = schema.validate(args);
@@ -77,7 +76,6 @@ export function validateAddLiquiditySingleTokenArgs(args: any) {
 export function validateRemoveLiquidityArgs(args: any) {
   const schema = Joi.object({
     lpTokenAmount: numericStringField("LpTokenAmount"),
-    includeStakedLPToken: Joi.boolean().optional(),
   });
 
   const { error } = schema.validate(args);
@@ -131,6 +129,85 @@ export function validateSwapHistoryArgs(args: any) {
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Swap History Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateTogglePauseArgs(args: any) {
+  const schema = Joi.object({
+    poolAddress: validateAddressField("poolAddress"),
+    isPaused: Joi.boolean().required(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Toggle Pause Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateToggleDisableArgs(args: any) {
+  const schema = Joi.object({
+    poolAddress: validateAddressField("poolAddress"),
+    isDisabled: Joi.boolean().required(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Toggle Disable Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateMultiTokenSwapArgs(args: any) {
+  const schema = Joi.object({
+    poolAddress: validateAddressField("poolAddress"),
+    tokenIn: validateAddressField("tokenIn"),
+    tokenOut: validateAddressField("tokenOut"),
+    amountIn: numericStringField("AmountIn"),
+    minAmountOut: numericStringField("MinAmountOut"),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Multi-Token Swap Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateMultiTokenAddLiquidityArgs(args: any) {
+  const schema = Joi.object({
+    amounts: Joi.array().items(numericStringField("amount")).min(1).required(),
+    minMintAmount: numericStringField("MinMintAmount", { allowZero: true }),
+    stakeLPToken: Joi.boolean().optional(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Multi-Token Add Liquidity Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateMultiTokenRemoveLiquidityArgs(args: any) {
+  const schema = Joi.object({
+    lpTokenAmount: numericStringField("LpTokenAmount"),
+    minAmounts: Joi.array().items(numericStringField("minAmount", { allowZero: true })).min(1).required(),
+    includeStakedLPToken: Joi.boolean().optional(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Multi-Token Remove Liquidity Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateMultiTokenRemoveLiquidityOneArgs(args: any) {
+  const schema = Joi.object({
+    lpTokenAmount: numericStringField("LpTokenAmount"),
+    coinIndex: Joi.number().integer().min(0).required(),
+    minReceived: numericStringField("MinReceived"),
+    includeStakedLPToken: Joi.boolean().optional(),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Multi-Token Remove Liquidity One Coin Argument Validation Error: " + error.message);
   }
 }
 

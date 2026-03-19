@@ -6,9 +6,9 @@ export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
 ];
 
-// DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId)
+// DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)
 export const DEPOSIT_EVENT_SIGNATURE =
-  "0x97968ffb53b74828f5a31cffca247ee14443247de34e1220399e6f9f56b9d33e";
+  "0x55426533b384af6fcfee0e834a6407e3ffc370a0b1b53400c4e6ec92d7f1f750";
 
 // Transfer(address,address,uint256)
 export const TRANSFER_EVENT_SIGNATURE =
@@ -33,6 +33,7 @@ const config = {
   },
   safe: {
     address: process.env.SAFE_ADDRESS,
+    hotWalletAddress: process.env.SAFE_HOT_WALLET_ADDRESS,
     safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
     safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
     apiKey: process.env.SAFE_API_KEY,
@@ -41,7 +42,7 @@ const config = {
     contractAddress:
       process.env.VOUCHER_CONTRACT_ADDRESS ||
       "000000000000000000000000000000000000100e",
-    mintCount: 10,
+    mintCount: 25,
   },
   polling: {
     bridgeInInterval: 1 * 60 * 1000, // 5 minutes (was 100 seconds)

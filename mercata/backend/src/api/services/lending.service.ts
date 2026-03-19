@@ -1,4 +1,4 @@
-import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
+import { cirrus, strato } from "../../utils/mercataApiHelper";
 
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
@@ -7,8 +7,6 @@ import * as config from "../../config/config";
 import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-import { getPools } from "./rewardsChef.service";
-import { waitForBalanceUpdate, getStakedBalance, findPoolByLpToken } from "../helpers/rewards/rewardsChef.helpers";
 import {
   simulateLoan,
   CollateralInfo,
@@ -32,8 +30,127 @@ const {
   Token,
   CollateralVault,
   PriceOracle,
-  RewardsChef,
 } = constants;
+
+// Extract constants for consistency with CDP service
+const RAY = BigInt(10) ** BigInt(27);
+const WAD = BigInt(10) ** BigInt(18);
+
+const normalizeAddress = (value: string | undefined | null): string =>
+  (value || "").toLowerCase().replace(/^0x/, "");
+
+const parseEventAttributes = (attributes: unknown): Record<string, any> => {
+  if (!attributes) return {};
+  if (typeof attributes === "string") {
+    try {
+      return JSON.parse(attributes);
+    } catch {
+      return {};
+    }
+  }
+  if (typeof attributes === "object") {
+    return attributes as Record<string, any>;
+  }
+  return {};
+};
+
+const parseBigIntLike = (value: unknown): bigint => {
+  if (value === null || value === undefined) return 0n;
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? BigInt(Math.trunc(value)) : 0n;
+
+  const raw = String(value).trim();
+  if (!raw) return 0n;
+  try {
+    return BigInt(raw);
+  } catch {
+    try {
+      if (/e/i.test(raw)) {
+        const asNumber = Number(raw);
+        return Number.isFinite(asNumber) ? BigInt(Math.trunc(asNumber)) : 0n;
+      }
+    } catch {
+      return 0n;
+    }
+    return 0n;
+  }
+};
+
+const getLendingUserFlowTotals = async (
+  accessToken: string,
+  lendingPoolAddress: string,
+  userAddress: string
+): Promise<{ totalDepositedUsd: bigint; totalWithdrawnUsd: bigint }> => {
+  const normalizedUser = normalizeAddress(userAddress);
+  const pageSize = 1000;
+  let offset = 0;
+  let totalDepositedUsd = 0n;
+  let totalWithdrawnUsd = 0n;
+
+  if (!lendingPoolAddress || !normalizedUser) {
+    return { totalDepositedUsd, totalWithdrawnUsd };
+  }
+
+  try {
+    while (true) {
+      const response = await cirrus.get(accessToken, "/event", {
+        params: {
+          address: `eq.${lendingPoolAddress}`,
+          event_name: "in.(Deposited,Withdrawn)",
+          select: "event_name,attributes,transaction_sender,block_timestamp",
+          order: "block_timestamp.asc",
+          limit: `${pageSize}`,
+          offset: `${offset}`,
+        },
+      });
+
+      const events = response?.data || [];
+      if (!Array.isArray(events) || events.length === 0) break;
+
+      for (const event of events) {
+        const attrs = parseEventAttributes(event.attributes);
+        const actor = normalizeAddress(
+          attrs.user ||
+          attrs.account ||
+          attrs.sender ||
+          event.transaction_sender
+        );
+        if (!actor || actor !== normalizedUser) continue;
+
+        const amount = parseBigIntLike(attrs.amount);
+        if (amount <= 0n) continue;
+
+        if (event.event_name === "Deposited") {
+          totalDepositedUsd += amount;
+        } else if (event.event_name === "Withdrawn") {
+          totalWithdrawnUsd += amount;
+        }
+      }
+
+      if (events.length < pageSize) break;
+      offset += pageSize;
+    }
+  } catch (error) {
+    console.warn("Failed to compute lending flow totals:", error);
+  }
+
+  return { totalDepositedUsd, totalWithdrawnUsd };
+};
+
+
+// Helper function for fixed-point exponentiation (matches contract's _rpow)
+const rpow = (x: bigint, n: bigint, ray: bigint): bigint => {
+  let z = n % 2n !== 0n ? x : ray;
+  let xCopy = x;
+  let nCopy = n;
+  for (nCopy = nCopy / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / ray;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / ray;
+    }
+  }
+  return z;
+};
 
 /**
  * Get the latest exchange rate for the lending pool from Cirrus events
@@ -64,12 +181,18 @@ export const getExchangeRateFromCirrus = async (
     const latestEvent = events[0];
     const exchangeRate = latestEvent?.newRate || oneToOne;
 
-    return exchangeRate;
+    return getMTokenExchangeRate(latestEvent).toString();
   } catch (error) {
     console.error(`Error fetching exchange rate from Cirrus for lending pool: `, error);
     return oneToOne;
   }
 };
+
+export const getMTokenExchangeRate = (
+  event: any
+): bigint => {
+  return event?.newRate || (10n ** 18n);
+}
 
 
 /**
@@ -107,8 +230,7 @@ export const getPool = async (
 export const depositLiquidity = async (
   accessToken: string,
   userAddress: string,
-  amount: string,
-  stakeMToken: boolean,
+  amount: string
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset }, mToken: { mToken } } = await getPool(
     accessToken,
@@ -117,12 +239,9 @@ export const depositLiquidity = async (
     } as Record<string, string>
   );
 
-  if (!liquidityPool || !lendingPool || !borrowableAsset || (stakeMToken && !mToken)) {
+  if (!liquidityPool || !lendingPool || !borrowableAsset || !mToken) {
     throw new Error("Liquidity pool, lending pool, borrowable asset or mToken address not found");
   }
-
-  // Get user's mToken balance before deposit
-  const mTokenBalanceBefore = stakeMToken ? await getTokenBalanceForUser(accessToken, mToken, userAddress) : "0";
 
   // First transaction: deposit liquidity
   const depositTx: FunctionInput[] = [
@@ -145,128 +264,20 @@ export const depositLiquidity = async (
     strato.post(accessToken, StratoPaths.transactionParallel, builtDepositTx)
   );
 
-  // If staking is requested and deposit was successful, execute staking transaction
-  if (stakeMToken && depositResult.status === "Success") {
-    // Wait for Cirrus to index the new mToken balance with retry logic
-    const mTokenBalanceAfter = await waitForBalanceUpdate(
-      accessToken,
-      mToken,
-      userAddress,
-      mTokenBalanceBefore,
-      10,  // max retries
-      200  // 200ms delay between retries
-    );
-
-    const newlyMintedAmount = (BigInt(mTokenBalanceAfter) - BigInt(mTokenBalanceBefore)).toString();
-
-    if (BigInt(newlyMintedAmount) > 0n) {
-      // Find the pool for this mToken
-      const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
-
-      if (!rewardsPool) {
-        throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot stake after deposit.`);
-      }
-
-      const stakingTx: FunctionInput[] = [
-        // First approve mToken for RewardsChef
-        {
-          contractName: extractContractName(Token),
-          contractAddress: mToken,
-          method: "approve",
-          args: { spender: config.rewardsChef, value: newlyMintedAmount },
-        },
-        // Then deposit into RewardsChef
-        {
-          contractName: extractContractName(RewardsChef),
-          contractAddress: config.rewardsChef,
-          method: "deposit",
-          args: { _pid: rewardsPool.poolIdx, _amount: newlyMintedAmount },
-        },
-      ];
-
-      const builtStakingTx = await buildFunctionTx(stakingTx, userAddress, accessToken);
-      const stakingResult = await postAndWaitForTx(accessToken, () =>
-        bloc.post(accessToken, StratoPaths.transactionParallel, builtStakingTx)
-      );
-
-      // Fail the entire operation if staking fails
-      if (stakingResult.status !== "Success") {
-        throw new Error("Deposit succeeded but staking failed");
-      }
-    }
-  }
-
   return depositResult;
 };
 
 export const withdrawLiquidity = async (
   accessToken: string,
   userAddress: string,
-  amount: string,
-  includeStakedMToken: boolean = false
+  amount: string
 ) => {
   const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
 
-  // If includeStakedMToken is enabled, we might need to unstake first
-  if (includeStakedMToken) {
-    // Get mToken address first
-    const { mToken: { mToken } } = await getPool(accessToken, {
-      select: "mToken:lendingPool_fkey(mToken)"
-    });
-    if (!mToken) {
-      throw new Error("mToken address not found");
-    }
-
-    // Get current mUSDST balance in wallet
-    const unstakedMTokenBalance = await getTokenBalanceForUser(accessToken, mToken, userAddress);
-
-    // Get exchange rate to convert withdrawal amount (USDST) to required mTokens
-    const exchangeRateResponse = await getExchangeRateFromCirrus(accessToken);
-    const exchangeRate = exchangeRateResponse || "1000000000000000000"; // Default 1:1 if not available
-
-    // Convert withdrawal amount (USDST) to required mTokens
-    // Use ceiling division to ensure we unstake enough mTokens to cover the withdrawal
-    const amountWei = BigInt(amount);
-    const exchangeRateWei = BigInt(exchangeRate);
-    const numerator = amountWei * (10n ** 18n);
-    const requiredMTokenWei = (numerator + exchangeRateWei - 1n) / exchangeRateWei; // Ceiling division
-
-    // Check if we need to unstake
-    const unstakedMTokenWei = BigInt(unstakedMTokenBalance);
-
-    if (requiredMTokenWei > unstakedMTokenWei) {
-      // We need to unstake some mTokens first
-      const amountToUnstake = requiredMTokenWei - unstakedMTokenWei;
-
-      // Find the pool for this mToken
-      const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
-
-      if (!rewardsPool) {
-        throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot unstake before withdrawal.`);
-      }
-
-      // Build unstaking transaction
-      const unstakeTx = await buildFunctionTx({
-        contractName: extractContractName(RewardsChef),
-        contractAddress: config.rewardsChef,
-        method: "withdraw",
-        args: {
-          _pid: rewardsPool.poolIdx,
-          _amount: amountToUnstake.toString()
-        }
-      }, userAddress, accessToken);
-
-      // Execute unstaking transaction first
-      await postAndWaitForTx(accessToken, () =>
-        strato.post(accessToken, StratoPaths.transactionParallel, unstakeTx)
-      );
-    }
-  }
-
-  // Now proceed with the normal withdrawal
+  // Build withdrawal transaction
   const builtTx = await buildFunctionTx({
     contractName: extractContractName(LendingPool),
     contractAddress: lendingPool,
@@ -498,11 +509,12 @@ export const collateralAndBalance = async (
       const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
 
       // Calculate metrics using the helper function
-      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower} = calculateCollateralMetrics(
+      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower, unsuppliedBorrowingPower, unsuppliedLTCollateralValue} = calculateCollateralMetrics(
         userBalance,
         collateralizedAmount,
         assetPrice,
-        ltv
+        ltv,
+        liquidationThreshold
       );
 
       return {
@@ -515,12 +527,106 @@ export const collateralAndBalance = async (
         isCollateralized: collateral?.amount > 0,
         canSupply: BigInt(userBalance) > 0n,
         maxBorrowingPower,
+        unsuppliedBorrowingPower,
+        unsuppliedLTCollateralValue,
         assetPrice,
         ltv,
         liquidationThreshold,
         isPaused,
       };
     });
+};
+
+export const getPublicCollateralInfo = async (
+  accessToken: string,
+) => {
+  const registry = await getPool(accessToken, {
+    select:
+      `lendingPool:lendingPool_fkey(` +
+        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
+        `borrowableAsset,_paused` +
+      `),` +
+      `oracle:priceOracle_fkey(` +
+        `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
+      `)`
+  });
+
+  if (!registry.lendingPool) {
+    throw new Error("Lending pool not found");
+  }
+
+  const isPaused = registry.lendingPool._paused;
+  const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
+  
+  // Fetch token metadata only (no user balances)
+  let tokenMap = new Map();
+  if (assets.length > 0) {
+    const tokens = await getTokens(accessToken, {
+      address: `in.(${assets.join(",")})`,
+      select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value)`
+    });
+    tokenMap = new Map(tokens.map((t: any) => [t.address, { address: t.address, balance: "0", token: t }]));
+  }
+
+  // Create maps for asset configs and prices
+  const assetConfigMap = new Map();
+  const priceMap = new Map();
+
+  // Build asset config map
+  (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
+    assetConfigMap.set(config.asset, config.AssetConfig);
+  });
+
+  // Build price map
+  (registry.oracle?.prices || []).forEach((price: any) => {
+    priceMap.set(price.asset, price.price);
+  });
+
+  // Filter assets that have token data
+  const filteredAssets = assets.filter((asset: string) => {
+      const token = tokenMap.get(asset) as any;
+      return token;
+  });
+
+  const result = filteredAssets.map((asset: string) => {
+      const token = tokenMap.get(asset) as any;
+      const assetConfig = assetConfigMap.get(asset);
+      const assetPrice = priceMap.get(asset) || "0";
+
+      const userBalance = "0";
+      const collateralizedAmount = "0";
+      const ltv = assetConfig?.ltv || 0;
+      const liquidationThreshold = assetConfig?.liquidationThreshold || 0;
+
+      // Calculate metrics using the helper function (all zeros for guests)
+      const {userBalanceValue, collateralizedAmountValue, maxBorrowingPower, unsuppliedBorrowingPower, unsuppliedLTCollateralValue} = calculateCollateralMetrics(
+        userBalance,
+        collateralizedAmount,
+        assetPrice,
+        ltv,
+        liquidationThreshold
+      );
+
+      return {
+        address: asset,
+        ...token?.token,
+        userBalance,
+        userBalanceValue,
+        collateralizedAmount,
+        collateralizedAmountValue,
+        isCollateralized: false,
+        canSupply: false,
+        maxBorrowingPower,
+        unsuppliedBorrowingPower,
+        unsuppliedLTCollateralValue,
+        assetPrice,
+        ltv,
+        liquidationThreshold,
+        isPaused,
+      };
+    });
+
+  return result;
 };
 
 export const liquidityAndBalance = async (
@@ -542,8 +648,7 @@ export const liquidityAndBalance = async (
       `oracle:priceOracle_fkey(address,` +
         `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
       `),` +
-      `liquidityPool:liquidityPool_fkey(address)`
-  ,
+      `liquidityPool:liquidityPool_fkey(address)`,
     "lendingPool.userLoan.key": `eq.${userAddress}`
   });
 
@@ -634,23 +739,12 @@ export const liquidityAndBalance = async (
   const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
 
   // Total collateral value across all users (USD 1e18)
-  const totalCollateralValue = await Promise.resolve(
-    calculateTotalCollateralValue(
-      registry.lendingPool?.assetConfigs || [],
-      allCollaterals,
-      priceMap,
-      borrowableAsset
-    )
+  const totalCollateralValue = calculateTotalCollateralValue(
+    registry.lendingPool?.assetConfigs || [],
+    allCollaterals,
+    priceMap,
+    borrowableAsset
   );
-
-  // Get user's staked balance from RewardsChef
-  // Find the pool for this mToken
-  const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, mToken);
-
-  // If no pool found, staked balance is 0
-  const stakedMTokenBalance = rewardsPool
-    ? await getStakedBalance(accessToken, config.rewardsChef, rewardsPool.poolIdx, userAddress)
-    : "0";
 
   // User's withdrawable underlying (min of user mToken value and pool cash)
   const userMTokenBalance = BigInt(mTokenBalance);
@@ -662,6 +756,19 @@ export const liquidityAndBalance = async (
   const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity
     ? userUSDSTValue.toString()
     : poolAvailableLiquidity.toString();
+
+  const userMTokenBalanceTotal = BigInt(mTokenBalance);
+  const userUSDSTValueTotal = userMTokenBalanceTotal > 0n
+    ? ((userMTokenBalanceTotal * BigInt(exchangeRate)) / WAD)
+    : 0n;
+
+  const { totalDepositedUsd, totalWithdrawnUsd } = await getLendingUserFlowTotals(
+    accessToken,
+    registry.lendingPool?.address || "",
+    userAddress
+  );
+  const userNetInvestedUsd = totalDepositedUsd - totalWithdrawnUsd;
+  const userAllTimeEarningsUsd = userUSDSTValueTotal - userNetInvestedUsd;
 
   // Clean token objects
   const { balances: _, ...borrowableTokenClean } = borrowableToken || {};
@@ -678,8 +785,7 @@ export const liquidityAndBalance = async (
     withdrawable: {
       ...mTokenInfoClean,
       userBalance: mTokenBalance, // This is the unstaked (wallet) balance
-      userBalanceStaked: stakedMTokenBalance, // Staked balance from RewardsChef
-      userBalanceTotal: (BigInt(mTokenBalance) + BigInt(stakedMTokenBalance)).toString(), // Total = wallet + staked
+      userBalanceTotal: mTokenBalance,
       maxWithdrawableUSDST,
       withdrawValue: userUSDSTValue.toString(),
     },
@@ -696,6 +802,164 @@ export const liquidityAndBalance = async (
     borrowIndex: borrowIndexStr.toString(),
     reservesAccrued: reservesAccruedStr.toString(),
     // New index-based fields for UI:
+    totalAmountOwed: totalAmountOwedClamped,
+    totalAmountOwedPreview: totalAmountOwedPreviewClamped,
+    // Compat:
+    totalBorrowPrincipal,
+    // Pause status
+    isPaused,
+    userTotalDepositedUsd: totalDepositedUsd.toString(),
+    userTotalWithdrawnUsd: totalWithdrawnUsd.toString(),
+    userNetInvestedUsd: userNetInvestedUsd.toString(),
+    userAllTimeEarningsUsd: userAllTimeEarningsUsd.toString(),
+  };
+};
+
+export const getPublicLiquidityInfo = async (
+  accessToken: string,
+) => {
+  // Build query - no userLoan filter for public data
+  const queryParams: Record<string, string> = {
+    select:
+      `lendingPool:lendingPool_fkey(` +
+        `address,borrowableAsset,mToken,_paused,` +
+        `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
+        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value)` +
+      `),` +
+      `collateralVault:collateralVault_fkey(` +
+        `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
+      `),` +
+      `oracle:priceOracle_fkey(address,` +
+        `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
+      `),` +
+      `liquidityPool:liquidityPool_fkey(address)`
+  };
+
+  // Fetch pool data (no userLoan)
+  const registry = await getPool(accessToken, queryParams);
+
+  const { borrowableAsset, mToken, assetConfigs, _paused } = registry.lendingPool || {};
+  const allCollaterals = registry.collateralVault?.userCollaterals || [];
+  const isPaused = _paused;
+
+  if (!borrowableAsset || !mToken) {
+    throw new Error("Lending pool, borrowable asset, or mToken not found");
+  }
+
+  // Fetch token metadata - only pool balances (no user balances)
+  const tokenData = await getTokens(accessToken, {
+    address: `in.(${borrowableAsset},${mToken})`,
+    select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
+    "balances.key": `eq.${registry.liquidityPool?.address || ''}`
+  });
+
+  // Extract token data
+  const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
+  const mTokenInfo = tokenData.find(token => token.address === mToken);
+
+  // User balances are always "0" for guests
+  const borrowableBalance = "0";
+  const mTokenBalance = "0";
+
+  // Supply/token state
+  const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
+  const availableLiquidity = borrowableToken?.balances?.find((b: any) => b.user === registry.liquidityPool?.address)?.balance || "0";
+
+  // Asset config for borrowable asset
+  const borrowableAssetConfig = assetConfigs?.find((c: any) => c.asset === borrowableAsset)?.AssetConfig || {};
+
+  // Build price map (USD 1e18)
+  const priceMap = new Map<string, string>();
+  (registry.oracle?.prices || []).forEach((p: any) => {
+    priceMap.set(p.asset, p.price);
+  });
+  if (!priceMap.has(borrowableAsset)) {
+    priceMap.set(borrowableAsset, borrowableToken?.price?.toString() || "0");
+  }
+  if (!priceMap.has(mToken)) {
+    priceMap.set(mToken, mTokenInfo?.price?.toString() || "0");
+  }
+
+  // Index/scaled-debt state from Cirrus
+  const borrowIndexStr     = registry.lendingPool?.borrowIndex     || "0";
+  const totalScaledDebtStr = registry.lendingPool?.totalScaledDebt || "0";
+  const reservesAccruedStr = registry.lendingPool?.reservesAccrued || "0";
+  const lastAccrualStr     = registry.lendingPool?.lastAccrual     || "0";
+  const badDebtStr         = registry.lendingPool?.badDebt         || "0";
+
+  const interestRateBps = borrowableAssetConfig?.interestRate || 0;
+
+  // User's scaled debt is always "0" for guests
+  const userScaledDebtStr = "0";
+
+  // Current and projected user debt are always "0" for guests
+  const totalAmountOwed = "0";
+  const totalAmountOwedPreview = "0";
+  const totalAmountOwedClamped = "0";
+  const totalAmountOwedPreviewClamped = "0";
+
+  // System totals and exchange rate
+  const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
+
+  // Get exchange rate from Cirrus events instead of calculating manually
+  const exchangeRate = await getExchangeRateFromCirrus(accessToken);
+
+  const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
+
+  // Utilization rate: U = debt / (cash + debt − reserves)
+  let denom = BigInt(availableLiquidity) + BigInt(systemTotalDebt);
+  denom = BigInt(reservesAccruedStr || "0") < denom ? (denom - BigInt(reservesAccruedStr || "0")) : BigInt(availableLiquidity);
+  const utilizationRate = denom === 0n ? 0 : Number((BigInt(systemTotalDebt) * 10000n) / denom) / 100;
+
+  // APY from flat APR; supply APY scaled by utilization
+  const apyData = calculateAPYs(interestRateBps, (borrowableAssetConfig?.reserveFactor as number) || 1000);
+  const supplyAPY = apyData.supplyAPY * (utilizationRate / 100);
+
+  // Total collateral value across all users (USD 1e18)
+  const totalCollateralValue = calculateTotalCollateralValue(
+    registry.lendingPool?.assetConfigs || [],
+    allCollaterals,
+    priceMap,
+    borrowableAsset
+  );
+
+  // User's withdrawable underlying is always "0" for guests
+  const userMTokenBalance = 0n;
+  const userUSDSTValue = 0n;
+  const maxWithdrawableUSDST = "0";
+
+  // Clean token objects
+  const { balances: _, ...borrowableTokenClean } = borrowableToken || {};
+  const { balances: __, ...mTokenInfoClean } = mTokenInfo || {};
+
+  // Back-compat field
+  const totalBorrowPrincipal = systemTotalDebt;
+
+  return {
+    supplyable: {
+      ...borrowableTokenClean,
+      userBalance: borrowableBalance, // "0" for guests
+    },
+    withdrawable: {
+      ...mTokenInfoClean,
+      userBalance: mTokenBalance, // "0" for guests
+      userBalanceTotal: "0", // "0" for guests
+      maxWithdrawableUSDST, // "0" for guests
+      withdrawValue: "0", // "0" for guests
+    },
+    totalUSDSTSupplied,
+    totalBorrowed: systemTotalDebt,
+    utilizationRate,
+    availableLiquidity,
+    totalCollateralValue,
+    supplyAPY: Math.floor(supplyAPY * 100) / 100,
+    maxSupplyAPY: Math.floor(apyData.supplyAPY * 100) / 100,
+    borrowAPY: Math.floor(apyData.borrowAPY * 100) / 100,
+    exchangeRate,
+    // Additional pool metrics
+    borrowIndex: borrowIndexStr.toString(),
+    reservesAccrued: reservesAccruedStr.toString(),
+    // New index-based fields for UI (always "0" for guests):
     totalAmountOwed: totalAmountOwedClamped,
     totalAmountOwedPreview: totalAmountOwedPreviewClamped,
     // Compat:
@@ -1290,6 +1554,159 @@ export const listLoansForLiquidation = async (
   return results;
 };
 
+/**
+ * Get interest accrued for lending pool
+ * Uses compound interest formula matching contract's _accrue() function
+ */
+/**
+ * Get estimated protocol revenue from lending pool interest.
+ * 
+ * Revenue calculation:
+ * - Total interest accrues on borrowed debt
+ * - Only `reserveFactor` portion of interest goes to `reservesAccrued`
+ * - Of `reservesAccrued`, only `(10000 - safetyShareBps)` portion goes to FeeCollector as revenue
+ * 
+ * Formula: revenue = interest × (reserveFactor / 10000) × ((10000 - safetyShareBps) / 10000)
+ */
+export const getLendingInterestAccrued = async (
+  accessToken: string,
+): Promise<{
+  totalDailyRevenueUSD: string;
+  totalWeeklyRevenueUSD: string;
+  totalMonthlyRevenueUSD: string;
+  totalYtdRevenueUSD: string;
+  totalAllTimeRevenueUSD: string;
+  borrowableAsset: {
+    asset: string;
+    symbol: string;
+    totalDebtUSD: string;
+    annualRatePercent: number;
+    dailyRevenueUSD: string;
+    weeklyRevenueUSD: string;
+    monthlyRevenueUSD: string;
+    ytdRevenueUSD: string;
+    allTimeRevenueUSD: string;
+  };
+}> => {
+  const registry = await getPool(accessToken, {
+    select:
+      `lendingPool:lendingPool_fkey(` +
+        `address,borrowableAsset,safetyShareBps,` +
+        `borrowIndex::text,totalScaledDebt::text,` +
+        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value)` +
+      `)`
+  });
+
+  if (!registry?.lendingPool?.borrowableAsset) {
+    throw new Error("Lending pool or borrowable asset not found");
+  }
+
+  const { borrowableAsset, borrowIndex: borrowIndexStr, totalScaledDebt: totalScaledDebtStr, safetyShareBps: safetyShareBpsNum } = registry.lendingPool;
+  const totalScaledDebt = BigInt(totalScaledDebtStr || "0");
+  const borrowIndex = BigInt(borrowIndexStr || RAY.toString());
+  const safetyShareBps = BigInt(safetyShareBpsNum || 0);
+
+  // Get asset config
+  const borrowableAssetConfig = registry.lendingPool.assetConfigs
+    ?.find((cfg: any) => cfg.asset?.toLowerCase() === borrowableAsset.toLowerCase())
+    ?.AssetConfig;
+
+  if (!borrowableAssetConfig?.perSecondFactorRAY) {
+    throw new Error("Borrowable asset configuration not found");
+  }
+
+  const perSecondFactorRAY = BigInt(borrowableAssetConfig.perSecondFactorRAY);
+  if (perSecondFactorRAY === 0n || perSecondFactorRAY === RAY) {
+    throw new Error("perSecondFactorRAY not set or invalid");
+  }
+
+  const reserveFactorBps = BigInt(borrowableAssetConfig.reserveFactor || 0);
+
+  // Get token symbol
+  const tokenRows = await getTokens(accessToken, {
+    address: `eq.${borrowableAsset}`,
+    select: "address,_symbol"
+  });
+  const symbol = tokenRows?.[0]?._symbol || "UNKNOWN";
+
+  // Calculate actual debt and annual rate
+  const actualDebtUSD = (totalScaledDebt * borrowIndex) / RAY;
+  const annualRatePercent = (borrowableAssetConfig.interestRate || 0) / 100;
+
+  // Helper: Calculate compound interest for a time period
+  // Formula: idx1 = (idx0 * rpow(perSec, dt, RAY)) / RAY, Interest = (totalScaledDebt * (idx1 - idx0)) / RAY
+  const calculateCompoundInterest = (seconds: bigint): bigint => {
+    if (totalScaledDebt === 0n || seconds === 0n) return 0n;
+    const idx1 = (borrowIndex * rpow(perSecondFactorRAY, seconds, RAY)) / RAY;
+    return (totalScaledDebt * (idx1 - borrowIndex)) / RAY;
+  };
+
+  // Helper: Convert interest to protocol revenue (FeeCollector portion)
+  // revenue = interest × (reserveFactor / 10000) × ((10000 - safetyShareBps) / 10000)
+  const interestToRevenue = (interest: bigint): bigint => {
+    if (interest === 0n) return 0n;
+    const treasuryShareBps = 10000n - safetyShareBps;
+    // revenue = interest * reserveFactorBps * treasuryShareBps / 100_000_000
+    return (interest * reserveFactorBps * treasuryShareBps) / 100_000_000n;
+  };
+
+  // Calculate time periods
+  const secondsPerDay = 86400n;
+  const secondsPerWeek = 604800n;
+  const secondsPerMonth = 2592000n;
+  const now = Math.floor(Date.now() / 1000);
+  const startOfYearTimestamp = Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000);
+  const secondsElapsedYTD = BigInt(now - startOfYearTimestamp);
+
+  // Calculate interest for each period, then convert to revenue
+  const dailyInterest = calculateCompoundInterest(secondsPerDay);
+  const weeklyInterest = calculateCompoundInterest(secondsPerWeek);
+  const monthlyInterest = calculateCompoundInterest(secondsPerMonth);
+  
+  // YTD: Work backwards to find borrowIndex at start of year
+  const ytdInterest = totalScaledDebt > 0n && secondsElapsedYTD > 0n
+    ? (() => {
+        const rpowResult = rpow(perSecondFactorRAY, secondsElapsedYTD, RAY);
+        const borrowIndexAtStartOfYear = (borrowIndex * RAY) / rpowResult;
+        return (totalScaledDebt * (borrowIndex - borrowIndexAtStartOfYear)) / RAY;
+      })()
+    : 0n;
+
+  // All-time interest (actual accrued)
+  const allTimeInterest = totalScaledDebt > 0n 
+    ? (totalScaledDebt * (borrowIndex - RAY)) / RAY
+    : 0n;
+
+  // Convert interest to revenue
+  const dailyRevenueUSD = interestToRevenue(dailyInterest);
+  const weeklyRevenueUSD = interestToRevenue(weeklyInterest);
+  const monthlyRevenueUSD = interestToRevenue(monthlyInterest);
+  const ytdRevenueUSD = interestToRevenue(ytdInterest);
+  const allTimeRevenueUSD = interestToRevenue(allTimeInterest);
+
+  // Format values as strings
+  const formatValue = (val: bigint) => val.toString();
+
+  return {
+    totalDailyRevenueUSD: formatValue(dailyRevenueUSD),
+    totalWeeklyRevenueUSD: formatValue(weeklyRevenueUSD),
+    totalMonthlyRevenueUSD: formatValue(monthlyRevenueUSD),
+    totalYtdRevenueUSD: formatValue(ytdRevenueUSD),
+    totalAllTimeRevenueUSD: formatValue(allTimeRevenueUSD),
+    borrowableAsset: {
+      asset: borrowableAsset,
+      symbol,
+      totalDebtUSD: formatValue(actualDebtUSD),
+      annualRatePercent,
+      dailyRevenueUSD: formatValue(dailyRevenueUSD),
+      weeklyRevenueUSD: formatValue(weeklyRevenueUSD),
+      monthlyRevenueUSD: formatValue(monthlyRevenueUSD),
+      ytdRevenueUSD: formatValue(ytdRevenueUSD),
+      allTimeRevenueUSD: formatValue(allTimeRevenueUSD)
+    }
+  };
+};
+
 export const listLiquidatableLoans = async (accessToken: string): Promise<LiquidationEntry[]> => {
   return listLoansForLiquidation(accessToken);
 };
@@ -1355,3 +1772,4 @@ export const unpauseLendingPool = async (
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
+

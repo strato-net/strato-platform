@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType } from '@/interface';
 import {api} from '@/lib/axios';
+import { useUser } from '@/context/UserContext';
 
 // ============================================================================
 // TYPES
@@ -11,6 +12,8 @@ import {api} from '@/lib/axios';
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
 
 export const SwapProvider = ({ children }: { children: ReactNode }) => {
+  const { isLoggedIn } = useUser();
+  
   // ============================================================================
   // STATE
   // ============================================================================
@@ -19,6 +22,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [swappableTokens, setSwappableTokens] = useState<SwapToken[]>([]);
   const [pairableTokens, setPairableTokens] = useState<SwapToken[]>([]);
   const [userPools, setUserPools] = useState<Pool[]>([]);
+  const [pools, setPools] = useState<Pool[]>([]);
   
   // Loading states
   const [loading, setLoading] = useState<boolean>(false); // For POST operations
@@ -103,7 +107,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Pool operations
-  const createPool = useCallback(async (data: { tokenA: string; tokenB: string }) => {
+  const createPool = useCallback(async (data: { tokenA: string; tokenB: string, isStable: boolean }) => {
     setLoading(true);
     try {
       await api.post('/swap-pools', data);
@@ -117,24 +121,53 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data } = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
       const poolData: Pool | null = data?.[0] || null;
-      if (!poolData) return null;
 
-      setPool(poolData);
+      if (poolData) {
+        setPool(poolData);
 
-      const read = (addr?: string) => {
-        if (!addr) return { balance: "0", poolBalance: "0", price: "0" };
-        const token = poolData.tokenA?.address === addr ? poolData.tokenA : poolData.tokenB?.address === addr ? poolData.tokenB : null;
-        return token ? { balance: token.balance || "0", poolBalance: token.poolBalance || "0", price: token.price || "0" } : { balance: "0", poolBalance: "0", price: "0" };
-      };
+        const read = (addr?: string) => {
+          if (!addr) return { balance: "0", poolBalance: "0", price: "0" };
+          // For multi-token pools, check coins array first
+          if (poolData.coins && poolData.coins.length > 2) {
+            const coin = poolData.coins.find(c => c.address === addr);
+            if (coin) return { balance: coin.balance || "0", poolBalance: coin.poolBalance || "0", price: coin.price || "0" };
+          }
+          const token = poolData.tokenA?.address === addr ? poolData.tokenA : poolData.tokenB?.address === addr ? poolData.tokenB : null;
+          return token ? { balance: token.balance || "0", poolBalance: token.poolBalance || "0", price: token.price || "0" } : { balance: "0", poolBalance: "0", price: "0" };
+        };
 
-      setFromAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
-      setToAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
+        setFromAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
+        setToAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
 
-      return poolData;
+        return poolData;
+      }
+
+      // No 2-token pool — check for a multi-token pool where both tokens have balance > 0
+      const multiPool = pools.find(p =>
+        p.coins && p.coins.length > 2 &&
+        p.coins.some(c => c.address === tokenA && BigInt(c.poolBalance || "0") > 0n) &&
+        p.coins.some(c => c.address === tokenB && BigInt(c.poolBalance || "0") > 0n)
+      );
+      if (multiPool) {
+        setPool(multiPool);
+        setFromAsset(prev => {
+          if (!prev) return prev;
+          const coin = multiPool.coins!.find(c => c.address === prev.address);
+          return coin ? { ...prev, balance: coin.balance || "0", poolBalance: coin.poolBalance || "0", price: coin.price || "0" } : prev;
+        });
+        setToAsset(prev => {
+          if (!prev) return prev;
+          const coin = multiPool.coins!.find(c => c.address === prev.address);
+          return coin ? { ...prev, balance: coin.balance || "0", poolBalance: coin.poolBalance || "0", price: coin.price || "0" } : prev;
+        });
+        return multiPool;
+      }
+
+      return null;
     } finally {
       setPoolLoading(false);
     }
-  }, [setPool, setFromAsset, setToAsset]);
+  }, [setPool, setFromAsset, setToAsset, pools]);
 
   const getPoolByAddress = useCallback(async (address: string) => {
     try {
@@ -150,6 +183,26 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       const response = await api.post('/swap-pools/set-rates', data);
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const togglePause = useCallback(async (poolAddress: string, isPaused: boolean) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/swap-pools/toggle-pause', { poolAddress, isPaused });
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const toggleDisable = useCallback(async (poolAddress: string, isDisabled: boolean) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/swap-pools/toggle-disable', { poolAddress, isDisabled });
       return response.data;
     } finally {
       setLoading(false);
@@ -189,10 +242,13 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     setPoolsLoading(true);
     setError(null);
     try {
-      const res = await api.get('/swap-pools');
-      return res.data || [];
+      const res = await api.get<Pool[]>('/swap-pools');
+      const list = res.data || [];
+      setPools(list);
+      return list;
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch LP tokens');
+      setPools([]);
       return [];
     } finally {
       setPoolsLoading(false);
@@ -204,14 +260,12 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     poolAddress: string;
     tokenBAmount: string;
     maxTokenAAmount: string;
-    stakeLPToken?: boolean;
   }) => {
     setLoading(true);
     try {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity`, {
         tokenBAmount: data.tokenBAmount,
         maxTokenAAmount: data.maxTokenAAmount,
-        stakeLPToken: data.stakeLPToken
       });
       return response.data;
     } finally {
@@ -223,14 +277,12 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     poolAddress: string;
     singleTokenAmount: string;
     isAToB: boolean;
-    stakeLPToken?: boolean;
   }) => {
     setLoading(true);
     try {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity/single`, {
         singleTokenAmount: data.singleTokenAmount,
         isAToB: data.isAToB,
-        stakeLPToken: data.stakeLPToken
       });
       return response.data;
     } finally {
@@ -241,14 +293,92 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const removeLiquidity = useCallback(async (data: {
     poolAddress: string;
     lpTokenAmount: string;
-    includeStakedLPToken?: boolean;
   }) => {
     setLoading(true);
     try {
       const response = await api.delete(`/swap-pools/${data.poolAddress}/liquidity`, {
         data: {
           lpTokenAmount: data.lpTokenAmount,
-          includeStakedLPToken: data.includeStakedLPToken
+        }
+      });
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Multi-token pool operations
+  const swapMultiToken = useCallback(async (data: {
+    poolAddress: string;
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: string;
+    minAmountOut: string;
+  }) => {
+    setLoading(true);
+    try {
+      const res = await api.post("/swap/multi-token", data);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const addLiquidityMultiToken = useCallback(async (data: {
+    poolAddress: string;
+    amounts: string[];
+    minMintAmount: string;
+    stakeLPToken?: boolean;
+  }) => {
+    setLoading(true);
+    try {
+      const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity/multi-token`, {
+        amounts: data.amounts,
+        minMintAmount: data.minMintAmount,
+        stakeLPToken: data.stakeLPToken,
+      });
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const removeLiquidityMultiToken = useCallback(async (data: {
+    poolAddress: string;
+    lpTokenAmount: string;
+    minAmounts: string[];
+    includeStakedLPToken?: boolean;
+  }) => {
+    setLoading(true);
+    try {
+      const response = await api.delete(`/swap-pools/${data.poolAddress}/liquidity/multi-token`, {
+        data: {
+          lpTokenAmount: data.lpTokenAmount,
+          minAmounts: data.minAmounts,
+          includeStakedLPToken: data.includeStakedLPToken,
+        }
+      });
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const removeLiquidityMultiTokenOneCoin = useCallback(async (data: {
+    poolAddress: string;
+    lpTokenAmount: string;
+    coinIndex: number;
+    minReceived: string;
+    includeStakedLPToken?: boolean;
+  }) => {
+    setLoading(true);
+    try {
+      const response = await api.delete(`/swap-pools/${data.poolAddress}/liquidity/multi-token/one-coin`, {
+        data: {
+          lpTokenAmount: data.lpTokenAmount,
+          coinIndex: data.coinIndex,
+          minReceived: data.minReceived,
+          includeStakedLPToken: data.includeStakedLPToken,
         }
       });
       return response.data;
@@ -314,8 +444,14 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   // INITIALIZATION
   // ============================================================================
   useEffect(() => {
-    fetchSwappableTokens();
-  }, [fetchSwappableTokens]);
+    // Pool data is public - always fetch for all users
+    fetchPools();
+    
+    // User-specific token data - only fetch when logged in
+    if (isLoggedIn) {
+      fetchSwappableTokens();
+    }
+  }, [fetchSwappableTokens, fetchPools, isLoggedIn]);
 
   // ============================================================================
   // PROVIDER
@@ -349,6 +485,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         addLiquidityDualToken,
         addLiquiditySingleToken,
         removeLiquidity,
+        swapMultiToken,
+        addLiquidityMultiToken,
+        removeLiquidityMultiToken,
+        removeLiquidityMultiTokenOneCoin,
         fetchTokenBalances,
         userPools,
         fetchUserPositions,
@@ -356,7 +496,10 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         swapHistory,
         swapHistoryCount,
         swapHistoryLoading,
-        setPoolRates
+        setPoolRates,
+        togglePause,
+        toggleDisable,
+        pools
       }}
     >
       {children}

@@ -1,37 +1,39 @@
 #strato-version:<VERSION>
 #strato-getting-started-min-version:4.4.0
-version: "3"
-volumes:
-  pgdata:
-    driver: local
-  prometheusdata:
-    driver: local
-  kafkadata:
-    driver: local
-  redisdata:
-    driver: local
-  stratodata:
-    driver: local
-  zookeeperdata:
-    driver: local
 services:
   mercata-backend:
     depends_on:
       - postgrest
     build: ./mercata/backend
-    image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>}
+    image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>-<HASH_MERCATA_BACKEND>}
+    init: true
+    volumes:
+      - ./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro
     environment:
-      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - NODE_URL=http://nginx  # no TLS required within the docker network
       - BASE_URL=https://${NODE_HOST}  # todo: protocol to depend on ssl=true|false
-      - POOL_FACTORY=${POOL_FACTORY}
-      - LENDING_REGISTRY=${LENDING_REGISTRY}
-      - TOKEN_FACTORY=${TOKEN_FACTORY}
-      - ADMIN_REGISTRY=${ADMIN_REGISTRY}
-      - MERCATA_BRIDGE=${MERCATA_BRIDGE}
-      - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
+      - RPC_URL_MAINNET=${RPC_URL_MAINNET:-}
+      - RPC_URL_MAINNET_FALLBACK=${RPC_URL_MAINNET_FALLBACK:-}
+      - RPC_URL_SEPOLIA=${RPC_URL_SEPOLIA:-}
+      - RPC_URL_SEPOLIA_FALLBACK=${RPC_URL_SEPOLIA_FALLBACK:-}
+      - RPC_URL_BASE=${RPC_URL_BASE:-}
+      - RPC_URL_BASE_FALLBACK=${RPC_URL_BASE_FALLBACK:-}
+      - RPC_URL_BASE_SEPOLIA=${RPC_URL_BASE_SEPOLIA:-}
+      - RPC_URL_BASE_SEPOLIA_FALLBACK=${RPC_URL_BASE_SEPOLIA_FALLBACK:-}
+      - POOL_FACTORY=${POOL_FACTORY:-}
+      - LENDING_REGISTRY=${LENDING_REGISTRY:-}
+      - TOKEN_FACTORY=${TOKEN_FACTORY:-}
+      - ADMIN_REGISTRY=${ADMIN_REGISTRY:-}
+      - MERCATA_BRIDGE=${MERCATA_BRIDGE:-}
+      - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID:-}
+      - STRATO_HOSTNAME=${STRATO_HOSTNAME}
+      - STRATO_PORT_API=${STRATO_PORT_API:-}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - ONRAMP_HOT_WALLET_ADDRESS=${ONRAMP_HOT_WALLET_ADDRESS:-}
+      - BA_USERNAME=${BA_USERNAME:-}
+      - BA_PASSWORD=${BA_PASSWORD:-}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -42,7 +44,10 @@ services:
     depends_on:
       - mercata-backend
     build: ./mercata/ui
-    image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>}
+    image: ${MERCATAUI_IMAGE:-<REPO_URL>mercata-ui:<VERSION>-<HASH_MERCATA_UI>}
+    environment:
+      - LUCKY_ORANGE_SITE_ID=${LUCKY_ORANGE_SITE_ID:-}
+      - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID:-}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -58,7 +63,7 @@ services:
     - NODE_HOST=${NODE_HOST}
     - ssl=${ssl:-false}
     build: .
-    image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
+    image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>-<HASH_SMD>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -70,19 +75,21 @@ services:
     - postgres
     - prometheus
     environment:
-    - ADMIN_EMAIL=${ADMIN_EMAIL}
+    - ADMIN_EMAIL=${ADMIN_EMAIL:-}
     - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
-    - PROMETHEUS_HOST=${PROMETHEUS_HOST}
-    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
-    - STRATO_HOSTNAME=${STRATO_HOSTNAME}
-    - STRATO_PORT_API=${STRATO_PORT_API}
+    - PROMETHEUS_HOST=${PROMETHEUS_HOST:-}
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+    - STRATO_HOSTNAME=${STRATO_HOSTNAME:-172.17.0.1}
+    - STRATO_PORT_API=${STRATO_PORT_API:-3000}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
-    - MONITOR_URL=${MONITOR_URL}
+    - MONITOR_URL=${MONITOR_URL:-}
+    - vaultUrl=http://nginx
+    volumes:
+    - ./secrets/postgres_password:/run/secrets/postgres_password:ro
     build: .
-    image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
+    image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>-<HASH_APEX>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -92,14 +99,20 @@ services:
   redis:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
+    user: "${DOCKER_UID}:${DOCKER_GID}"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
     logging:
       driver: "json-file"
       options:
         max-size: "100m"
         max-file: "3"
     volumes:
-      - redisdata:/data
+      - ./redis:/data
     ports:
     - 6379:6379
   postgrest:
@@ -109,12 +122,13 @@ services:
     - blocHost=${blocHost:-strato:3000}
     - PG_ENV_POSTGRES_DB=cirrus
     - PG_ENV_POSTGRES_HOST=postgres
-    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
     - PG_ENV_POSTGRES_USER=postgres
     - PG_PORT_5432_TCP_PORT=5432
     - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
+    volumes:
+    - ./secrets/postgres_password:/run/secrets/postgres_password:ro
     build: .
-    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
+    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>-<HASH_POSTGREST>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -123,10 +137,13 @@ services:
         max-file: "3"
   postgres:
     environment:
-      - POSTGRES_PASSWORD=${postgres_password:-api}
+      - POSTGRES_DB=eth
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
     image: postgres:14.18
+    user: "${DOCKER_UID}:${DOCKER_GID}"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./postgres:/var/lib/postgresql/data
+      - ./secrets/postgres_password:/run/secrets/postgres_password:ro
     command:
       - "postgres"
       - "-c"
@@ -134,6 +151,11 @@ services:
       - "-c"
       - "shared_buffers=512MB"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
     logging:
       driver: "json-file"
       options:
@@ -151,38 +173,36 @@ services:
     - mercata-backend
     - mercata-ui
     environment:
-    - APEX_HOST=${APEX_HOST}
-    - blockTime=${blockTime}
-    - debugPort=${debugPort}
-    - debugWSPort=${debugWSPort}
-    - DOCS_HOST=${DOCS_HOST}
-    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_SCOPE=${OAUTH_SCOPE}
-    - POSTGREST_HOST=${POSTGREST_HOST}
-    - PROMETHEUS_HOST=${PROMETHEUS_HOST}
-    - SERVE_LOGS=${SERVE_LOGS}
-    - SMD_DEV_MODE=${SMD_DEV_MODE}
-    - SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP}
-    - SMD_HOST=${SMD_HOST}
-    - ssl=${ssl}
-    - sslCertFileType=${sslCertFileType}
-    - STATS_ENABLED=${STATS_ENABLED}
-    - STRATO_HOSTNAME=${STRATO_HOSTNAME}
-    - STRATO_PORT_API=${STRATO_PORT_API}
-    - STRATO_PORT_API2=${STRATO_PORT_API2}
-    - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
+    - APEX_HOST=${APEX_HOST:-}
+    - blockTime=${blockTime:-}
+    - DOCS_HOST=${DOCS_HOST:-}
+    - NGINX_TRUST_PROXY_CIDRS=${NGINX_TRUST_PROXY_CIDRS:-}
+    - OAUTH_SCOPE=${OAUTH_SCOPE:-}
+    - POSTGREST_HOST=${POSTGREST_HOST:-}
+    - PROMETHEUS_HOST=${PROMETHEUS_HOST:-}
+    - SERVE_LOGS=${SERVE_LOGS:-}
+    - SMD_DEV_MODE=${SMD_DEV_MODE:-}
+    - SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-}
+    - SMD_HOST=${SMD_HOST:-}
+    - ssl=${ssl:-}
+    - sslCertFileType=${sslCertFileType:-}
+    - STATS_ENABLED=${STATS_ENABLED:-}
+    - STRATO_HOSTNAME=${STRATO_HOSTNAME:-172.17.0.1}
+    - STRATO_PORT_API=${STRATO_PORT_API:-3000}
+    - STRATO_PORT_API2=${STRATO_PORT_API2:-}
+    - STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
-    - VM_DEBUGGER=${VM_DEBUGGER}
+    - VAULT_URL=${VAULT_URL}
     build: .
     extra_hosts:
     - "host.docker.internal:host-gateway"
-    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
+    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>-<HASH_NGINX>}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
     volumes:
     - ./ssl:/tmp/ssl:ro
+    - ./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -199,37 +219,35 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-  zookeeper:
-    image: zookeeper:3.9.3
-    restart: unless-stopped
-    volumes:
-      - zookeeperdata:/data
-    environment:
-      ZOO_DATA_LOG_DIR: /data
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
   kafka:
-    depends_on:
-    - zookeeper
     environment:
-      KAFKA_ADVERTISED_HOST_NAME: localhost
-      KAFKA_ADVERTISED_PORT: 9092
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LOG_DIRS: /kafka/kafka-logs
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_LOG_CLEANER_ENABLE: "true"
-      KAFKA_LOG_DIRS: '/kafka/kafka-logs'
-      KAFKA_LOG_RETENTION_HOURS: 168  # Set to 7 days
+      KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
-      KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647 # Leaving as infinite for now
+      KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
       KAFKA_MAX_REQUEST_SIZE: ${KAFKA_MAX_REQUEST_SIZE:-2500000}
       KAFKA_MESSAGE_MAX_BYTES: ${KAFKA_MESSAGE_MAX_BYTES:-2500000}
-    image: registry-aws.blockapps.net:5000/blockapps-repo/kafka:2.12-2.0.1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    image: apache/kafka:3.9.2
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
     volumes:
-    - kafkadata:/kafka
+    - ./kafka:/kafka
     logging:
       driver: "json-file"
       options:
@@ -241,10 +259,11 @@ services:
     build: .
     environment:
       - NODE_HOST=${NODE_HOST}
-      - STRATO_HOSTNAME=${STRATO_HOSTNAME}
-    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
+      - STRATO_HOSTNAME=${STRATO_HOSTNAME:-172.17.0.1}
+    image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>-<HASH_PROMETHEUS>}
+    user: "${DOCKER_UID}:${DOCKER_GID}"
     volumes:
-    - prometheusdata:/prometheus
+    - ./prometheus:/prometheus
     restart: unless-stopped
     logging:
       driver: "json-file"

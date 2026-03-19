@@ -139,8 +139,8 @@ showSolidException (UserDefinedError a b) = printf "%s is an user defined error 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
 
-typeError :: (Show v) => String -> v -> a
-typeError = toThrower TypeError
+typeError :: String -> String -> a
+typeError msg detail = throw $ TypeError msg detail
 
 todo :: (Show v) => String -> v -> a
 todo = toThrower TODO

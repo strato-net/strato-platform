@@ -187,7 +187,7 @@ anyImmutableError _ = False
 
 specificTypeError :: String -> Selector HandledException
 specificTypeError str (HE (Blockchain.SolidVM.Exception.TypeError _ mes)) = mes == str
-specificTypeError _ _ = False 
+specificTypeError _ _ = False
 
 failedToAttainRunTimCodeError :: Selector HandledException
 failedToAttainRunTimCodeError (HE Blockchain.SolidVM.Exception.FailedToAttainRunTimCode {}) = True
@@ -438,7 +438,7 @@ runArgsWithSender acc args bs = do
           }
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-  
+
   insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 1)
 
   newAddress <- getNewAddress acc
@@ -1079,7 +1079,7 @@ contract qq {
   }
 }|]
         )
-        `shouldThrow` failedRequirementMsg "SString \"Who is John Galt?\""
+        `shouldThrow` failedRequirementMsg "Who is John Galt?"
 
     it "can handle failed requirement without message" $
       runTest
@@ -4665,7 +4665,7 @@ contract qq{
   it "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-  
+
   constructor () public {
     }
 }
@@ -5017,7 +5017,7 @@ contract qq {
   it "Can get just the contract if empty string is fed to the code function. using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-  
+
   constructor () public {
     }
 }
@@ -6560,7 +6560,7 @@ contract qq {
   constructor() {
     Divisor d =  new Divisor();
     try d.doTheDivide() returns (uint v) {
-        } catch Error(string memory amsg) { 
+        } catch Error(string memory amsg) {
             // This is executed in case
             // revert was called inside getData
             // and a reason string was provided.
@@ -8019,7 +8019,7 @@ contract qq {
 }
 |]
     getFields ["x"] `shouldReturn` [BInteger 4]
-    
+
   it "can use libraries" . runTest $ do
     runBS
       [r|
@@ -8233,7 +8233,7 @@ contract qq {
 }
 |]
       getFields ["b"] `shouldReturn` [BInteger 1]
-  
+
   it "can index access a contract array from the builtin getter" . runTest $ do
       runBS [r|
 contract SomeContract {
@@ -8291,7 +8291,7 @@ contract qq {
 }
 |]
       getFields ["b"] `shouldReturn` [BInteger 3]
-    
+
   it "can't access a contract array without any parameters" $ runTest ( do
       runBS [r|
 contract SomeContract {
@@ -8348,7 +8348,7 @@ contract qq {
     delete b;
   }
 }|]
-      getFields ["res", "arr2"] `shouldReturn` [BDefault, BDefault]) 
+      getFields ["res", "arr2"] `shouldReturn` [BDefault, BDefault])
 
   it "can error handle using delete keyword on local variables" $ runTest ( do
       runBS [r|
@@ -8362,9 +8362,9 @@ contract qq {
     delete b;
     delete yy;
   }
-}|]) `shouldThrow` anyTODO 
+}|]) `shouldThrow` anyTODO
 
-  it "can successfully use the 'blockhash' built-in" $ runTest ( do 
+  it "can successfully use the 'blockhash' built-in" $ runTest ( do
     runBS [r|
 contract qq {
   string hsh = blockhash(block.number);
@@ -8372,14 +8372,14 @@ contract qq {
 }|]
     getFields ["hsh"] `shouldReturn` [BString $ keccak256ToByteString $ unsafeCreateKeccak256FromWord256 0x0])
 
-  it "can error handle the 'blockhash' built-in - less than 0 argument" $ runTest ( do 
+  it "can error handle the 'blockhash' built-in - less than 0 argument" $ runTest ( do
     runBS [r|
 contract qq {
   string hsh = blockhash(-1);
   constructor() {}
 }|]) `shouldThrow` anyInvalidArgumentsError
 
-  it "can error handle the 'blockhash' built-in - non-existent block number" $ runTest ( do 
+  it "can error handle the 'blockhash' built-in - non-existent block number" $ runTest ( do
     runBS [r|
 contract qq {
   string hsh = blockhash(900000);
@@ -8398,7 +8398,7 @@ contract qq {
   decimal[] decimalArray;
   decimal elementOne;
   decimal elementTwo;
-  
+
   constructor() {
     copyOfX = x;
     funcResult = test(x);
@@ -8444,7 +8444,7 @@ contract qq {
   }
 }
 |]
-    getFields ["x", "y", "sum", "diff", "product", "quotient", "negative"] 
+    getFields ["x", "y", "sum", "diff", "product", "quotient", "negative"]
       `shouldReturn` [BDecimal "1.123123",
                       BDecimal "2.0",
                       BDecimal "3.123123",
@@ -8471,7 +8471,7 @@ contract qq {
   }
 }
 |]
-    getFields ["x", "sum", "diff", "product", "quotient"] 
+    getFields ["x", "sum", "diff", "product", "quotient"]
       `shouldReturn` [BDecimal "2.0",
                       BDecimal "5.3",
                       BDecimal "1.3",
@@ -8508,7 +8508,7 @@ contract qq {
   }
 }
 |]
-    getFields ["x", "sum", "sumTwo", "sumThree", "diff", "diffTwo", "product", "productTwo", "quotient", "quotientTwo", "quotientThree"] 
+    getFields ["x", "sum", "sumTwo", "sumThree", "diff", "diffTwo", "product", "productTwo", "quotient", "quotientTwo", "quotientThree"]
       `shouldReturn` [BInteger 2,
                       BDecimal "5.3",
                       BDecimal "4.3",
@@ -8544,7 +8544,7 @@ contract qq {
   }
 }
 |]
-    getFields ["x", "y", "testOne", "testTwo", "testThree", "testFour", "testFive", "testSix"] 
+    getFields ["x", "y", "testOne", "testTwo", "testThree", "testFour", "testFive", "testSix"]
       `shouldReturn` [BDecimal "2.1",
                       BDecimal "3.2",
                       BBool True,
@@ -8577,7 +8577,7 @@ contract qq {
   }
 }
 |]
-    getFields ["x"] 
+    getFields ["x"]
       `shouldReturn` [BDecimal "15.4"])
 
   it "cannot use int without casting in arithmetic expressions involving decimals" $ runTest ( do
@@ -8644,7 +8644,7 @@ contract qq {
   }
 }|]
       `shouldReturn` Just "(0.5)"
-      
+
   it "can use decimal numbers with the modulo operator" $ runTest ( do
     runBS [r|
 contract qq {
@@ -8657,11 +8657,11 @@ contract qq {
   }
 }
 |]
-    getFields ["x", "y", "modulo"] 
+    getFields ["x", "y", "modulo"]
       `shouldReturn` [BDecimal "1.123123",
                       BDecimal "2.0",
                       BDecimal "1.123123"])
---test for modulo 
+--test for modulo
   it "can use different numbers with the modulo operator" $ runTest ( do
     runBS [r|
 contract qq {
@@ -8679,14 +8679,14 @@ contract qq {
   }
 }
 |]
-    getFields ["xDec", "yDec", "moduloDec", "xInt", "yInt", "moduloInt"] 
+    getFields ["xDec", "yDec", "moduloDec", "xInt", "yInt", "moduloInt"]
       `shouldReturn` [BDecimal "5.75",
                       BDecimal "1.5",
                       BDecimal "1.25",
                       BInteger 7,
                       BInteger 3,
                       BInteger 1])
---test for modulo assign                      
+--test for modulo assign
   it "can use different numbers with the modulo assign operator" $ runTest ( do
     runBS [r|
 contract qq {
@@ -8706,14 +8706,14 @@ contract qq {
   }
 }
 |]
-    getFields ["xDec", "yDec", "moduloDec", "xInt", "yInt", "moduloInt"] 
+    getFields ["xDec", "yDec", "moduloDec", "xInt", "yInt", "moduloInt"]
       `shouldReturn` [BDecimal "1.25",
                       BDecimal "1.5",
                       BDecimal "1.25",
                       BInteger 1,
                       BInteger 3,
                       BInteger 1])
-                      
+
   it "can cast decimals to int or uint" $ runTest ( do
     runBS [r|
 contract qq {
@@ -8768,7 +8768,7 @@ contract qq {
 }
 |]
     getFields ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
-      `shouldReturn` [BInteger 2, 
+      `shouldReturn` [BInteger 2,
                       BDecimal "2.0",
                       BDecimal "0.9",
                       BDecimal "0.90",
@@ -8801,15 +8801,15 @@ contract qq {
 }
 |]
     getFields ["a", "b", "c", "d", "e", "f"]
-      `shouldReturn` [BDecimal "5.282", 
-                      BDecimal "5.2", 
-                      BDecimal "3.25", 
+      `shouldReturn` [BDecimal "5.282",
+                      BDecimal "5.2",
+                      BDecimal "3.25",
                       BDecimal "6.2",
                       BDecimal "3.24000",
                       BDecimal "3.24000000000000000000000000000000000000000000"])
 
-  it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
-    let getAddressFromResult :: ExecResults -> Maybe Address 
+  it "can error handle improperly referenced overloaded contracts" $ runTest ( do
+    let getAddressFromResult :: ExecResults -> Maybe Address
         getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
@@ -8856,7 +8856,7 @@ contract qq {
 
 contract A {
   int y = 5;
-  
+
   function getY() private returns (int) {
     return y;
   }
@@ -8893,8 +8893,8 @@ contract qq {
     getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "y") `shouldReturn` BString "hi"
     getSolidStorageKeyVal' (b^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 4
 
-  it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
-    let getAddressFromResult :: ExecResults -> Maybe Address 
+  it "can error handle improperly referenced overloaded contracts" $ runTest ( do
+    let getAddressFromResult :: ExecResults -> Maybe Address
         getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
@@ -8924,7 +8924,7 @@ contract qq {
 }|]) `shouldThrow` anyTypeError
 
   it "can access maps" $ runTest ( do
-    runBS [r| 
+    runBS [r|
 
 contract Map {
   mapping(uint => uint) public myMap;

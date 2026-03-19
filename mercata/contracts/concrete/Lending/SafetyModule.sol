@@ -17,7 +17,7 @@ contract record SafetyModule is Ownable {
     event Staked(address indexed user, uint assetsIn, uint sharesOut);
     event UnstakeCooldown(address indexed user, uint start, uint end);
     event Redeemed(address indexed user, uint sharesIn, uint assetsOut);
-    event RewardNotified(uint amount);
+    event RewardNotified(address indexed sender, uint amount);
     event ShortfallCovered(uint amount);
     event ParamsUpdated(uint cooldown, uint window, uint maxSlashBps);
     event TokensUpdated(address _asset, address _sToken);
@@ -40,7 +40,7 @@ contract record SafetyModule is Ownable {
 
     // Policy
     uint public MAX_SLASH_BPS = 3000; // 30% per event
-    
+
     // Internal asset tracking to prevent donation attacks
     uint256 private _managedAssets;
 
@@ -111,17 +111,17 @@ contract record SafetyModule is Ownable {
     // ─────────────────────────────────────────
     // Views / math
     // Vault TVL in underlying (uses internal tracking to prevent donation attacks)
-    function totalAssets() public view returns (uint) 
-    { 
+    function totalAssets() public view returns (uint)
+    {
         require(asset != address(0), "SM:asset not set");
-        return _managedAssets; 
+        return _managedAssets;
     }
 
     // Total shares outstanding (assumes sToken implements ERC20 totalSupply)
-    function totalShares() public view returns (uint) 
-    { 
+    function totalShares() public view returns (uint)
+    {
         require(sToken != address(0), "SM:sToken not set");
-        return IERC20(sToken).totalSupply(); 
+        return IERC20(sToken).totalSupply();
     }
 
     /// @notice Current sUSDST price in USDST units (1e18 = 1.0).
@@ -135,7 +135,7 @@ contract record SafetyModule is Ownable {
         if (s == 0) return 1e18;
         return (totalAssets() * 1e18) / s;
     }
-    
+
     /// @notice Pure estimate of shares minted for depositing `assetsIn` right now.
     /// @dev
     ///  - Uses the CURRENT ratio only; ignores transfer fees and donation guard.
@@ -149,7 +149,7 @@ contract record SafetyModule is Ownable {
         uint s = totalShares();
         uint a = totalAssets();
         if (s == 0) return assetsIn;           // initial 1:1
-        require(a > 0, "SM:price=0");          // shares exist but vault has no assets 
+        require(a > 0, "SM:price=0");          // shares exist but vault has no assets
         return (assetsIn * s) / a;             // floor by design
     }
 
@@ -163,7 +163,7 @@ contract record SafetyModule is Ownable {
     function previewRedeem(uint sharesIn) external view returns (uint) {
         require(sharesIn > 0, "SM:zero");
         uint s = totalShares();
-        require(s > 0, "SM:no shares"); 
+        require(s > 0, "SM:no shares");
         return (sharesIn * totalAssets()) / s;
     }
 
@@ -183,7 +183,7 @@ contract record SafetyModule is Ownable {
         if (s == 0) {
             require(beforeBal == 0, "SM:init stray funds"); // donation guard
         } else {
-            require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0) 
+            require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0)
         }
 
         uint256 bal = IERC20(asset).balanceOf(address(this));
@@ -256,13 +256,32 @@ contract record SafetyModule is Ownable {
         require(delta > 0, "SM:no delta");
         _managedAssets += delta;
 
-        emit RewardNotified(delta);
+        emit RewardNotified(msg.sender, delta);
+    }
+
+    /// @notice Record tokens already transferred by LendingPool during reserve sweep
+    /// @dev Only callable by LendingPool. Validates exact amount arrived by checking delta.
+    /// @param expectedAmount The amount LendingPool intended to transfer
+    /// @param balanceBefore The SafetyModule balance before the transfer
+    function recordTransfer(uint256 expectedAmount, uint256 balanceBefore) external {
+        require(msg.sender == address(lendingPool), "SM: only LendingPool");
+        require(expectedAmount > 0, "SM: zero amount");
+
+        uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
+        uint256 actualReceived = balanceAfter - balanceBefore;
+
+        // Validate THIS transaction's delta matches expected
+        require(actualReceived == expectedAmount, "SM: unexpected balance change");
+
+        _managedAssets += actualReceived;
+
+        emit RewardNotified(msg.sender, actualReceived);
     }
 
     /// @notice Slash vault to cover protocol shortfall.
     /// @dev Data plane: send USDST to LiquidityPool.
     /// Control plane: tell LendingPool to consume badDebt (accounting).
- 
+
     function coverShortfall(uint256 amount) external onlyOwner returns (uint256 covered) {
         require(amount > 0, "SM:zero");
 
@@ -292,7 +311,7 @@ contract record SafetyModule is Ownable {
 
         emit ShortfallCovered(delta);
     }
-    
+
     // ─────────────────────────────────────────
     // Admin
 

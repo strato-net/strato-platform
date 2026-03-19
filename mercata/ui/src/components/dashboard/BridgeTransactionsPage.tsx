@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeftRight } from 'lucide-react';
 import { Tabs } from 'antd';
 import 'antd/dist/reset.css';
 import './BridgeTransactionsPage.css';
@@ -8,7 +7,7 @@ import WithdrawTransactionDetails from './WithdrawTransactionDetails';
 import { useBridgeContext } from '@/context/BridgeContext';
 import { BridgeTransactionTab } from '@mercata/shared-types';
 
-const BridgeTransactionsPage = () => {
+const BridgeTransactionsPage = ({ isAdmin = false }: { isAdmin?: boolean }) => {
   const { loadNetworksAndTokens, targetTransactionTab, setTargetTransactionTab } = useBridgeContext();
   const [transactionType, setTransactionType] = useState<BridgeTransactionTab>('DepositRecorded');
 
@@ -34,55 +33,51 @@ const BridgeTransactionsPage = () => {
       key: 'WithdrawalInitiated',
       label: 'Withdrawal',
     },
-    {
-      key: 'RedemptionInitiated',
-      label: 'Redemption',
-    },
-    { key: 'USDSTDeposit',
-      label: 'USDST',
-    },
   ];
 
   return (
     <>
-      <div className="container mx-auto max-w-full py-8 px-4">
-        <div className="w-full overflow-x-hidden">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-4">
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-2">
-                  <ArrowLeftRight className="h-6 w-6 text-blue-600" />
-                  <h1 className="text-2xl font-semibold text-gray-900">Bridge Transactions</h1>
-                </div>
-                <div className="w-full sm:w-[400px] bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
-                  <Tabs
-                    activeKey={transactionType}
-                    items={mainItems}
-                    onChange={(value) => setTransactionType(value as BridgeTransactionTab)}
-                    className="custom-tabs"
-                    style={{
-                      '--ant-primary-color': '#3b82f6',
-                      '--ant-primary-color-hover': '#2563eb',
-                    } as React.CSSProperties}
-                  />
-                </div>
-              </div>
+      <style>{`
+        .custom-tabs .ant-tabs-tab {
+          justify-content: center !important;
+        }
+        .custom-tabs .ant-tabs-tab-btn {
+          justify-content: center !important;
+          text-align: center !important;
+          width: 100% !important;
+          color: hsl(var(--muted-foreground)) !important;
+        }
+        .custom-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+          color: hsl(var(--primary)) !important;
+          text-shadow: none !important;
+        }
+        .custom-tabs .ant-tabs-ink-bar {
+          background: hsl(var(--primary)) !important;
+        }
+      `}</style>
+      <div className="w-full">
+        <div className="bg-card rounded-xl shadow-sm p-3 md:p-4 border border-border">
+          <div className="space-y-4">
+            {/* Tabs */}
+            <div className="w-full bg-muted/50 p-1 md:p-1.5 rounded-lg md:rounded-xl border border-border">
+              <Tabs
+                activeKey={transactionType}
+                items={mainItems}
+                onChange={(value) => setTransactionType(value as BridgeTransactionTab)}
+                className="custom-tabs"
+                style={{
+                  '--ant-primary-color': 'hsl(var(--primary))',
+                  '--ant-primary-color-hover': 'hsl(var(--primary))',
+                } as React.CSSProperties}
+              />
+            </div>
 
+            {/* Transaction Details */}
+            <div className="overflow-x-auto">
               {transactionType === 'DepositRecorded' ? (
-                <DepositTransactionDetails key="deposit" mintUSDST={false} />
-              ):
-              transactionType === 'WithdrawalInitiated' ? (
-                <WithdrawTransactionDetails key="withdrawal" mintUSDST={false} />
-              ):
-              transactionType === 'RedemptionInitiated' ? (
-                <WithdrawTransactionDetails key="redemption" mintUSDST={true} />
-              ):
-              transactionType === 'USDSTDeposit' ? (
-                <DepositTransactionDetails key="usdst" mintUSDST={true} />
-              ):
-              // default to bridge out
-              (
-                <WithdrawTransactionDetails key="default" mintUSDST={false} />
+                <DepositTransactionDetails key="deposit" context={isAdmin ? 'admin' : undefined} />
+              ) : (
+                <WithdrawTransactionDetails key="withdrawal" context={isAdmin ? 'admin' : undefined} />
               )}
             </div>
           </div>

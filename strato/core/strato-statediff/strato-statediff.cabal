@@ -1,0 +1,60 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-statediff
+version:        0.1.0.0
+author:         BlockApps
+maintainer:     blockapps
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Strato.StateDiff
+      Blockchain.Strato.StateDiff.Database
+  other-modules:
+      Paths_strato_statediff
+  hs-source-dirs:
+      src/
+  default-extensions:
+      MultiParamTypeClasses
+      FlexibleContexts
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      GADTs
+      RecordWildCards
+      FunctionalDependencies
+      DataKinds
+      ExplicitForAll
+      NamedFieldPuns
+      OverloadedStrings
+      TypeFamilies
+      ViewPatterns
+  ghc-options: -Wall -Werror -fno-warn-orphans -fno-warn-unused-imports
+  build-depends:
+      base
+    , binary
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-mpdbs
+    , bytestring
+    , common-log
+    , conduit
+    , containers
+    , ethereum-rlp
+    , format
+    , kafka-monad
+    , merkle-patricia-db
+    , monad-alter
+    , nibblestring
+    , persistent
+    , persistent-postgresql
+    , solid-vm-model
+    , strato-conf
+    , strato-model
+    , text
+    , unliftio
+  default-language: Haskell2010

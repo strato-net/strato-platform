@@ -1,10 +1,12 @@
-import { config } from "../config";
+import { ethers } from "ethers";
+import { config, getChainRpcUrl, ERC20_ABI, ZERO_ADDRESS } from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
 import { NonEmptyArray, WithdrawalInfo, DepositArgs, ConfirmDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
+import { ensureHexPrefix } from "../utils/utils";
 
 export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
   const externalChainIds = depositArgs.map((deposit) => deposit.externalChainId);
@@ -13,6 +15,7 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
   const externalTokenAmounts = depositArgs.map((deposit) => deposit.externalTokenAmount);
   const externalTxHashes = depositArgs.map((deposit) => deposit.externalTxHash);
   const stratoRecipients = depositArgs.map((deposit) => deposit.stratoRecipient);
+  const targetStratoTokens = depositArgs.map((deposit) => deposit.targetStratoToken);
 
   try {
     await execute({
@@ -26,6 +29,7 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
         externalTokenAmounts,
         stratoRecipients,
         externalSenders,
+        targetStratoTokens,
       },
     });
 
@@ -37,7 +41,10 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
     const errorMessage = (error as Error).message;
     
     // Check if this is a duplicate key error (expected when multiple servers process same deposits)
-    if (errorMessage.includes("MB: dup key")) {
+    if (
+      errorMessage.includes("MB: dup key") ||
+      errorMessage.includes("MB: duplicate deposit")
+    ) {
       logInfo(
         "BridgeService",
         `Deposits already processed by another server: ${depositArgs.length} deposits (${externalTxHashes.join(", ")})`,
@@ -248,4 +255,3 @@ export const handleRejectedWithdrawalBatch = async (
     throw error;
   }
 };
-

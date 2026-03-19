@@ -71,9 +71,6 @@ namespaceToKeyPrefix ns = case ns of
   Children           -> "c:"
   Canonical          -> "q:"
   Validators         -> "validators"
-  X509Certificates   -> "x509:"
-  ParsedSetWhitePage -> "potu:"
-  ParsedSetToX509    -> "psx509:"
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
@@ -243,8 +240,10 @@ checkAndUpdateSyncStatus = do
 
   case (status, nodeNumber, worldNumber) of
     (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
+    (Just True, Just ntd, Just wtd) -> when (ntd < wtd) (void $ putSyncStatus False)
     (Nothing, Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
     (Nothing, Nothing, Just _) -> void $ putSyncStatus False
+    (_, Just _, Nothing) -> void $ putSyncStatus True
     _ -> pure ()
 
 getSyncStatusNow :: Redis (Maybe Bool)
@@ -262,7 +261,7 @@ getSyncStatusNow = do
           (Just False, Just ntd, Just wtd) -> ntd >= wtd
           (Nothing, Just ntd, Just wtd)    -> ntd >= wtd
           (Nothing, Nothing, Just _)       -> False
-          _                                -> True
+          _                                -> False
 
 syncStatusKey :: S8.ByteString
 syncStatusKey = "<sync_status>"

@@ -58,7 +58,7 @@ matchType c = M.WhenMatched $ \k t u ->
     then Right $ Just t
     else Left (TypeError ("Overlapping definitions for " ++ labelToString k ++ " in contract " ++ labelToString (_contractName c))
                          ("at " ++ show (_varContext t) ++ " and " ++ show (_varContext u)), _varContext t)
-  where typesMatch t u = and $ (\f -> f t u) <$> [(==) `on` _varType, (==) `on` _varVisibility, (==) `on` (fmap (() <$) . _varInitialVal), (==) `on` _isImmutable, (==) `on` _isRecord]
+  where typesMatch t u = and $ (\f -> f t u) <$> [(==) `on` _varType, (==) `on` _varVisibility, (==) `on` (fmap (() <$) . _varInitialVal), (==) `on` _isImmutable]
 
 addInheritedObjects :: CodeCollection -> Contract -> SolidEither Contract
 addInheritedObjects cc c = do
@@ -127,7 +127,7 @@ resolveLabelsInContract cc c =
   c {_storageDefs = fmap (resolveLabelsInDef (cc ^. contracts) (c ^. userDefined) (c ^. enums) (c ^. structs)) $ c ^. storageDefs}
 
 resolveLabelsInDef :: Map SolidString Contract -> Map String String -> Map SolidString a -> Map SolidString b -> VariableDecl -> VariableDecl
-resolveLabelsInDef contractDefs userDefineDefs enumDefs structDefs x@VariableDecl {_varType = SVMType.UnknownLabel labelName _} =
+resolveLabelsInDef contractDefs userDefineDefs enumDefs structDefs x@VariableDecl {_varType = SVMType.UnknownLabel labelName} =
   case ( labelName `M.member` contractDefs,
          labelName `M.member` userDefineDefs,
          labelName `M.member` structDefs,
@@ -136,6 +136,6 @@ resolveLabelsInDef contractDefs userDefineDefs enumDefs structDefs x@VariableDec
     (_, _, _, True) -> x {_varType = SVMType.Enum Nothing labelName Nothing}
     (_, _, True, _) -> x {_varType = SVMType.Struct Nothing labelName}
     (True, _, _, _) -> x {_varType = SVMType.Contract labelName}
-    _ -> x {_varType = SVMType.UnknownLabel labelName Nothing}
+    _ -> x {_varType = SVMType.UnknownLabel labelName}
 -- _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
 resolveLabelsInDef _ _ _ _ x = x

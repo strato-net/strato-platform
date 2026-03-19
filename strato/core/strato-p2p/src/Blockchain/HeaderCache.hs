@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
@@ -14,7 +15,8 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.Transaction
-import Blockchain.Options
+import Blockchain.EthConf (ethConf, p2pConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Verification
@@ -38,7 +40,8 @@ instance MonadP2P m => HasHeaderCache m where
 
   addToHeaderCache headers = do
     alreadyRequestedRemainingHeaders <- getRemainingBHeaders
-    putRemainingBHeaders $ alreadyRequestedRemainingHeaders ++ headers
+    let !combined = alreadyRequestedRemainingHeaders ++ headers
+    length combined `seq` putRemainingBHeaders combined
 
   getBodiesToFetch = do
     alreadyRequestedHeaders <- getBlockHeaders -- check what already requested
@@ -56,9 +59,9 @@ instance MonadP2P m => HasHeaderCache m where
           return newNeededHeaders
         (first, rest) -> do
           let (newNeededHeaders, remainingHeaders) = splitNeededHeaders first
-              newRemainingHeaders = remainingHeaders ++ rest
+              !newRemainingHeaders = remainingHeaders ++ rest
           $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putRemainingBHeaders called: range = " ++ showRanges (map BlockHeader.number newRemainingHeaders)
-          putRemainingBHeaders newRemainingHeaders -- save it to handle later
+          length newRemainingHeaders `seq` putRemainingBHeaders newRemainingHeaders
           $logInfoS "handleEvents/BlockHeaders" $
             "Not requesting BlockBodies because cache is currently in use, but will request after next batch of BlockBodies arrives."
           return newNeededHeaders
@@ -86,8 +89,8 @@ instance MonadP2P m => HasHeaderCache m where
 splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
 splitNeededHeaders neededHeaders =
   let txsLens = BlockHeader.extraData2TxsLen <$> BlockHeader.extraData <$> neededHeaders
-      txsLensInSums = scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
+      txsLensInSums = scanl (+) (0) $ fromMaybe (Conf.averageTxsPerBlock (p2pConfig ethConf)) <$> txsLens
       txsLensInLimit = case txsLensInSums of
         [] -> []
-        (_:xs) -> takeWhile (< flags_maxHeadersTxsLens) xs
+        (_:xs) -> takeWhile (< Conf.maxHeadersTxsLens (p2pConfig ethConf)) xs
    in splitAt (length txsLensInLimit) neededHeaders

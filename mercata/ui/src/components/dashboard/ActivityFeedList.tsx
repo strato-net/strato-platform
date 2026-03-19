@@ -79,7 +79,7 @@ const ActivityFeedList = () => {
 
   // Load filter options once
   useEffect(() => {
-    if (!isLoggedIn || filterOptionsLoaded) return;
+    if (filterOptionsLoaded) return;
     
     const loadOptions = async () => {
       try {
@@ -92,14 +92,10 @@ const ActivityFeedList = () => {
     };
     
     loadOptions();
-  }, [isLoggedIn, filterCache, filterOptionsLoaded]);
+  }, [filterCache, filterOptionsLoaded]);
 
   useEffect(() => {
     const fetchEvents = async () => {
-      if (!isLoggedIn) {
-        return;
-      }
-      
       setLoading(true);
       try {
         const offset = (currentPage - 1) * itemsPerPage;
@@ -134,7 +130,7 @@ const ActivityFeedList = () => {
     }, 300); // 300ms delay
 
     return () => clearTimeout(timeoutId);
-  }, [currentPage, isLoggedIn, filters]);
+  }, [currentPage, filters]);
 
   // Memoized utility functions to prevent unnecessary re-renders
   const formatAddress = useCallback((address: string | null) => {
@@ -143,7 +139,10 @@ const ActivityFeedList = () => {
   }, []);
 
   const formatTimestamp = useCallback((timestamp: string) => {
-    return new Date(timestamp).toLocaleString();
+    if (!timestamp || timestamp === 'N/A') return 'N/A';
+    
+    const date = new Date(timestamp.replace(' UTC', 'Z').replace(' ', 'T'));
+    return isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
   }, []);
 
   const getEventIcon = useCallback((eventName: string) => {
@@ -162,13 +161,13 @@ const ActivityFeedList = () => {
   const getEventColor = useCallback((eventName: string) => {
     switch (eventName.toLowerCase()) {
       case 'transfer':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
       case 'mint':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
       case 'burn':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   }, []);
 
@@ -339,7 +338,7 @@ const ActivityFeedList = () => {
 
   // Memoized event card renderer to prevent unnecessary re-renders
   const renderEventCard = useCallback((event: Event) => (
-    <Card key={event.id} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow">
+    <Card key={event.id} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow overflow-hidden">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -348,17 +347,17 @@ const ActivityFeedList = () => {
             </div>
             <div>
               <CardTitle className="text-base sm:text-lg font-semibold">{event?.event_name ? event?.event_name : 'N/A'}</CardTitle>
-              <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
                 <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>{event?.contract_name ? event?.contract_name : 'N/A'}</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 sm:block sm:text-right">
-            <Badge variant="outline" className="text-xs inline-flex">
+          <div className="flex flex-col gap-1 sm:block sm:text-right">
+            <Badge variant="outline" className="text-xs inline-flex w-fit">
               Block #{event?.block_number ? event?.block_number : 'N/A'}
             </Badge>
-            <div className="text-xs text-gray-500 sm:mt-1">
+            <div className="text-xs text-muted-foreground">
               {formatTimestamp(event?.block_timestamp ? event?.block_timestamp : 'N/A')}
             </div>
           </div>
@@ -369,12 +368,12 @@ const ActivityFeedList = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
+              <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               <span className="font-medium">Sender:</span>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <code className="text-xs bg-gray-100 px-2 py-1 rounded cursor-help">
+                    <code className="text-xs bg-muted px-2 py-1 rounded cursor-help">
                       {event?.transaction_sender ? formatAddress(event?.transaction_sender) : 'N/A'}
                     </code>
                   </TooltipTrigger>
@@ -390,7 +389,7 @@ const ActivityFeedList = () => {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <code className="text-xs bg-gray-100 px-2 py-1 rounded cursor-help">
+                    <code className="text-xs bg-muted px-2 py-1 rounded cursor-help">
                       {event?.address ? formatAddress(event?.address) : 'N/A'}
                     </code>
                   </TooltipTrigger>
@@ -402,13 +401,13 @@ const ActivityFeedList = () => {
             </div>
           </div>
           
-          <div className="space-y-2">
-            <div className="text-xs sm:text-sm font-medium text-gray-700">Event Attributes:</div>
+          <div className="space-y-2 overflow-hidden">
+            <div className="text-xs sm:text-sm font-medium text-foreground">Event Attributes:</div>
             <div className="space-y-1">
               {Object.entries(event?.attributes).map(([key, value]) => (
-                <div key={key} className="flex justify-between text-xs sm:text-sm">
-                  <span className="text-gray-600 capitalize">{key}:</span>
-                  <span className="font-mono text-xs">
+                <div key={key} className="flex justify-between gap-2 text-xs sm:text-sm">
+                  <span className="text-muted-foreground capitalize shrink-0">{key}:</span>
+                  <span className="font-mono text-xs truncate">
                     {key.toLowerCase().includes('value') 
                       ? formatValue(value)
                       : key.toLowerCase().includes('address') || key.toLowerCase().includes('from') || key.toLowerCase().includes('to')
@@ -439,7 +438,7 @@ const ActivityFeedList = () => {
   ), [formatAddress, formatTimestamp, getEventIcon, getEventColor, formatValue]);
 
   return (
-    <div>
+    <div className="overflow-x-hidden">
       <ActivityFeedFilters 
         filters={filters}
         onFiltersChange={handleFiltersChange}
@@ -459,7 +458,7 @@ const ActivityFeedList = () => {
       
       <div className="mb-4 sm:mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div className="text-xs sm:text-sm text-gray-600">
+          <div className="text-xs sm:text-sm text-muted-foreground">
             Showing {paginationInfo.startItem}-{paginationInfo.endItem} of {totalEvents} events
             {loading && (
               <span className="ml-2 inline-flex items-center gap-1 text-blue-600">
@@ -486,7 +485,7 @@ const ActivityFeedList = () => {
       <div className="space-y-4">
         {events.length === 0 && !loading ? (
           <Card>
-            <CardContent className="p-6 text-center text-gray-500">
+            <CardContent className="p-6 text-center text-muted-foreground">
               No events found
             </CardContent>
           </Card>
@@ -500,7 +499,7 @@ const ActivityFeedList = () => {
         
         {loading && events.length > 0 && (
           <div className="flex items-center justify-center py-4">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>Loading new events...</span>
             </div>
@@ -509,7 +508,7 @@ const ActivityFeedList = () => {
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-6 sm:mt-8 pb-12 sm:pb-0">
+        <div className="mt-6 sm:mt-8">
           <Pagination>
             <PaginationContent className="flex flex-wrap sm:flex-nowrap justify-center gap-0 sm:gap-1">
               <PaginationItem>
@@ -523,7 +522,7 @@ const ActivityFeedList = () => {
                 if (item.type === 'ellipsis') {
                   return (
                     <PaginationItem key={`ellipsis-${index}`} className="hidden sm:flex">
-                      <span className="px-3 py-2 text-sm text-gray-500">...</span>
+                      <span className="px-3 py-2 text-sm text-muted-foreground">...</span>
                     </PaginationItem>
                   );
                 }

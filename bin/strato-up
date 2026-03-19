@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Ensure credentials exist
+strato-login --check || strato-login
+
+# Setup node (creates if needed, skips if exists with no flags, errors if exists with flags)
+strato-setup "$@"
+
+cd "$1"
+
+echo "Starting convoke..."
+# stdout goes to log, stderr goes to both log and terminal
+nohup convoke > logs/convoke.log 2> >(tee -a logs/convoke.log >&2) &
+echo "CONVOKE_PID=$!" > .strato.pid
+
+echo "STRATO started in: $(pwd)"

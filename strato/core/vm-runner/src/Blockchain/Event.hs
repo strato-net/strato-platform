@@ -49,7 +49,6 @@ data VmInEventBatch = InBatch
     tLen :: {-# UNPACK #-} !Int,
     blocks :: [OutputBlock],
     bLen :: {-# UNPACK #-} !Int,
-    createBlock :: !Bool,
     privateTxs :: [OutputTx],
     mpNodesReqs :: [(TXOrigin, [StateRoot])],
     mpNodesResps :: [[NodeData]],
@@ -58,21 +57,20 @@ data VmInEventBatch = InBatch
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] 0 [] 0 False [] [] [] Nothing Nothing
+newInBatch = InBatch [] [] 0 [] 0 [] [] [] Nothing Nothing
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
   VmJsonRpcCommand j -> b {rpcCommands = j : rpcCommands b}
   VmTx ts t -> b {txPairs = (ts, t) : txPairs b, tLen = tLen b + 1}
   VmBlock ob -> b {blocks = ob : blocks b, bLen = bLen b + 1}
-  VmCreateBlockCommand -> b {createBlock = True}
   VmGetMPNodesRequest o srs -> b {mpNodesReqs = (o, srs) : mpNodesReqs b}
   VmMPNodesReceived nds -> b {mpNodesResps = nds : mpNodesResps b}
   VmRunPreprepare b' -> b {preprepareBlock = Just b'}
   VmSelfAddress sa -> b {selfAddress = Just sa}
   VmFlushMempool _ -> b  -- Flush mempool events are handled immediately, not batched
-  
-data BlockDelta a = BlockDelta 
+
+data BlockDelta a = BlockDelta
   { _inBlock :: a
   , _derived :: a
   }

@@ -1,23 +1,18 @@
 import { apiPost } from './apiClient';
 import { oauthClient } from './oauth';
 import { logError, logInfo } from './logger';
-import { TransactionResult, CallListArg } from '../types';
-import { checkBalances } from './balanceChecker';
+import { TransactionResult, CallListArg, AggregatedPrice } from '../types';
 import { GAS_PARAMS, TIMEOUTS, RETRY_DELAYS } from './constants';
+import { txMetricsService } from './txMetricsService';
 
-export async function getUpdateInterval(): Promise<number> {
-    const minutes = parseInt(process.env.UPDATE_INTERVAL_MINUTES || '15');
-    if (minutes < 1 || minutes > 60) {
-        throw new Error(`Invalid UPDATE_INTERVAL_MINUTES: ${minutes}. Must be 1-60.`);
-    }
-    return minutes * 60;
-}
 
 async function callListAndWait(callListArgs: CallListArg[]): Promise<TransactionResult> {
     const accessToken = await oauthClient().getAccessToken();
-    
+    const submitTime = Date.now();
+
+    const submitEndpoint = `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel?resolve=true`;
     const response = await apiPost(
-        `${process.env.STRATO_NODE_URL}/bloc/v2.2/transaction/parallel`,
+        submitEndpoint,
         {
             txs: callListArgs.map(callArg => ({
                 type: "FUNCTION",
@@ -37,11 +32,53 @@ async function callListAndWait(callListArgs: CallListArg[]): Promise<Transaction
             },
             timeout: TIMEOUTS.SUBMIT
         },
-        { logPrefix: 'OraclePusher' }
+        {
+            logPrefix: 'OraclePusher',
+            apiUrl: submitEndpoint,
+            method: 'POST'
+        }
     );
 
     const txHash = extractTransactionHash(response.data);
-    return await waitForTransaction(txHash);
+
+    // Evaluate immediate status from resolve=true; fallback to polling on Pending or undefined
+    const getImmediateResult = (data: unknown): TransactionResult | undefined => {
+        const first: any = Array.isArray(data) ? (data as any[])[0] : data;
+        const status: string | undefined = first?.status;
+
+        switch (status) {
+            case 'Success':
+                return { status: 'Success', hash: txHash, timestamp: Date.now().toString() };
+            case 'Failed':
+            case 'Failure': {
+                const errorMessage = first?.txResult?.message ?? first?.error ?? 'Unknown error';
+                throw new Error(`Transaction failed: ${errorMessage}`);
+            }
+            case 'Pending':
+            case undefined:
+            default:
+                // Pending, undefined, or any unknown status: fall back to polling
+                return undefined;
+        }
+    };
+
+    const immediate = getImmediateResult(response.data);
+    if (!immediate) {
+        logInfo('OraclePusher', `Tx is slow - the result was not available within 10 seconds, polling for transaction ${txHash}`);
+    }
+    const result = immediate ?? await waitForTransaction(txHash);
+    
+    const duration = Date.now() - submitTime;
+    logInfo('OraclePusher', `Tx submission time: ${duration} ms`);
+    
+    // Record metrics (errors are handled inside txMetricsService)
+    await txMetricsService.recordTxMetric({
+        txHash,
+        duration: duration,
+        status: result.status,
+    });
+    
+    return result;
 }
 
 function extractTransactionHash(data: any): string {
@@ -59,16 +96,14 @@ function extractTransactionHash(data: any): string {
     throw new Error('No transaction hash returned from STRATO');
 }
 
-export async function pushAssetPrices(assets: string[], prices: number[]): Promise<TransactionResult> {
-    logInfo('OraclePusher', 'Submitting prices');
-    
-    // Check balances before submitting
-    await checkBalances();
-    
+export async function pushAssetPrices(validPrices: AggregatedPrice[]): Promise<TransactionResult> {
     const callListArgs: CallListArg[] = [{
         contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
         method: "setAssetPrices",
-        args: { assets, priceValues: prices },
+        args: { 
+            assets: validPrices.map(p => p.targetAddress), 
+            priceValues: validPrices.map(p => p.medianPrice) 
+        },
     }];
 
     const result = await callListAndWait(callListArgs);
@@ -78,13 +113,14 @@ export async function pushAssetPrices(assets: string[], prices: number[]): Promi
 
 async function waitForTransaction(txHash: string): Promise<TransactionResult> {
     const startTime = Date.now();
-    
+
+    const statusEndpoint = `${process.env.STRATO_NODE_URL}/bloc/v2.2/transactions/results`;
     while (Date.now() - startTime < TIMEOUTS.WAIT) {
         try {
             const accessToken = await oauthClient().getAccessToken();
-            
+
             const response = await apiPost(
-                `${process.env.STRATO_NODE_URL}/bloc/v2.2/transactions/results`,
+                statusEndpoint,
                 [txHash],
                 {
                     headers: {
@@ -93,7 +129,11 @@ async function waitForTransaction(txHash: string): Promise<TransactionResult> {
                     },
                     timeout: TIMEOUTS.STATUS
                 },
-                { logPrefix: 'OraclePusher' }
+                {
+                    logPrefix: 'OraclePusher',
+                    apiUrl: statusEndpoint,
+                    method: 'POST'
+                }
             );
 
             const txData = response.data[0];

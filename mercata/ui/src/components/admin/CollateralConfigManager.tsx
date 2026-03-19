@@ -5,11 +5,17 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Plus, Settings, AlertTriangle, Pause, Play, Edit, Save, X, Loader2
+  Plus, Settings, AlertTriangle, Pause, Play, Edit, Save, X, Loader2, ChevronDown, Ban
 } from 'lucide-react';
 import { cdpService, AssetConfig } from '@/services/cdpService';
 import { toast } from 'sonner';
 import { Form, Input, Switch, Button as AntButton } from 'antd';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { handleRecipientAddress, handleAdminNumericInputChange } from '@/utils/transferValidation';
 
@@ -84,8 +90,9 @@ const CollateralConfigManager = () => {
   const loadAssets = useCallback(async () => {
     try {
       setLoading(true);
-      const supportedAssets = await cdpService.getSupportedAssets();
-      setAssets(supportedAssets);
+      // Use getAllCollateralConfigs to get all assets (including unsupported) for admin view
+      const allAssets = await cdpService.getAllCollateralConfigs();
+      setAssets(allAssets);
     } catch (error) {
       console.error('Failed to load assets:', error);
       toast.error('Failed to load assets');
@@ -214,6 +221,20 @@ const CollateralConfigManager = () => {
     }
   }, [loadAssets]);
 
+  const handleToggleDisable = useCallback(async (asset: string, supported: boolean) => {
+    try {
+      setLoading(true);
+      await cdpService.setAssetSupported(asset, supported);
+      toast.success(`Asset ${supported ? 'enabled' : 'disabled'} successfully`);
+      await loadAssets();
+    } catch (error) {
+      console.error('Failed to toggle asset support:', error);
+      toast.error('Failed to toggle asset support');
+    } finally {
+      setLoading(false);
+    }
+  }, [loadAssets]);
+
   const handleToggleGlobalPause = useCallback(async () => {
     try {
       setLoading(true);
@@ -233,7 +254,7 @@ const CollateralConfigManager = () => {
     const num = parseFloat(value);
     switch (type) {
       case 'percentage': return `${num.toFixed(2)}%`;
-      case 'usd': return `$${(num / 1e18).toFixed(2)}`;
+      case 'usd': return `$${(num / 1e18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       case 'bps': return `${(num / 100).toFixed(2)}%`;
       default: return value;
     }
@@ -260,18 +281,19 @@ const CollateralConfigManager = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5" />
-              <span>System Control</span>
+      <Card className="dark:bg-card">
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="flex items-center justify-between gap-2 dark:text-foreground">
+            <span className="flex items-center gap-1.5 md:space-x-2 shrink-0">
+              <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="text-base md:text-xl whitespace-nowrap">System Control</span>
             </span>
             <Button
               onClick={handleToggleGlobalPause}
               disabled={loading}
               variant={globalPaused ? "destructive" : "default"}
-              className="flex items-center space-x-2"
+              size="sm"
+              className={`flex items-center gap-1 md:space-x-2 text-xs md:text-sm ${!globalPaused ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -280,17 +302,17 @@ const CollateralConfigManager = () => {
               ) : (
                 <Pause className="h-4 w-4" />
               )}
-              <span>{globalPaused ? 'Unpause System' : 'Pause System'}</span>
+              <span className="whitespace-nowrap">{globalPaused ? 'Unpause System' : 'Pause System'}</span>
             </Button>
           </CardTitle>
           <CardDescription>
             {globalPaused ? (
-              <span className="text-red-600 font-medium flex items-center space-x-2">
+              <span className="text-red-600 dark:text-red-400 font-medium flex items-center space-x-2">
                 <ExclamationCircleOutlined />
                 <span>CDP system is paused - All operations are blocked</span>
               </span>
             ) : (
-              <span className="text-green-600 font-medium flex items-center space-x-2">
+              <span className="text-green-600 dark:text-green-400 font-medium flex items-center space-x-2">
                 <CheckCircleOutlined />
                 <span>CDP system is active - All operations are allowed</span>
               </span>
@@ -300,25 +322,25 @@ const CollateralConfigManager = () => {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="add" className="flex items-center space-x-2">
+        <TabsList className="grid w-full grid-cols-2 h-auto dark:bg-muted">
+          <TabsTrigger value="add" className="flex items-center gap-1 md:space-x-2 text-xs md:text-sm py-2 data-[state=active]:bg-background dark:data-[state=active]:bg-card">
             <Plus className="h-4 w-4" />
-            <span>Add/Edit Config</span>
+            <span className="whitespace-nowrap">Add/Edit Config</span>
           </TabsTrigger>
-          <TabsTrigger value="manage" className="flex items-center space-x-2">
+          <TabsTrigger value="manage" className="flex items-center gap-1 md:space-x-2 text-xs md:text-sm py-2 data-[state=active]:bg-background dark:data-[state=active]:bg-card">
             <Settings className="h-4 w-4" />
-            <span>Manage Assets</span>
+            <span className="whitespace-nowrap">Manage Assets</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="add" className="space-y-6">
-          <Card>
+          <Card className="dark:bg-card">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
+              <CardTitle className="flex items-center space-x-2 dark:text-foreground">
                 <Settings className="h-5 w-5" />
                 <span>Collateral Asset Configuration</span>
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="dark:text-muted-foreground">
                 Configure risk parameters for collateral assets in the CDP system
               </CardDescription>
             </CardHeader>
@@ -332,7 +354,7 @@ const CollateralConfigManager = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Form.Item
                     name="asset"
-                    label="Asset Address"
+                    label={<span className="dark:text-foreground">Asset Address</span>}
                     // rules={formRules.asset}
                     validateStatus={inputErrors.asset ? 'error' : ''}
                     help={inputErrors.asset}
@@ -340,7 +362,7 @@ const CollateralConfigManager = () => {
                     <Input 
                       placeholder="0x..." 
                       disabled={editingAsset !== null}
-                      className="w-full"
+                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
                       onChange={(e) => handleRecipientAddress(
                         e,
                         (value) => form.setFieldValue('asset', value),
@@ -351,15 +373,15 @@ const CollateralConfigManager = () => {
 
                   <Form.Item
                     name="liquidationRatio"
-                    label="Liquidation Ratio (e.g., 1.5 = 150%)"
-                    extra="Range: 1.0-5.0 (100%-500%)"
+                    label={<span className="dark:text-foreground">Liquidation Ratio (e.g., 1.5 = 150%)</span>}
+                    extra={<span className="dark:text-muted-foreground">Range: 1.0-5.0 (100%-500%)</span>}
                     // rules={formRules.liquidationRatio}
                     validateStatus={inputErrors.liquidationRatio ? 'error' : ''}
                     help={inputErrors.liquidationRatio}
                   >
                     <Input 
                       placeholder="1.5"
-                      className="w-full"
+                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
                       inputMode="decimal"
                       onChange={(e) => handleNumericInputChange('liquidationRatio', e.target.value, "5", 2, "1")}
                     />
@@ -367,14 +389,14 @@ const CollateralConfigManager = () => {
 
                   <Form.Item
                     name="minCR"
-                    label="Min Collateral Ratio (e.g., 1.6 = 160%)"
-                    extra="Range: 1.0-5.0 (100%-500%), must be >= Liquidation Ratio"
+                    label={<span className="dark:text-foreground">Min Collateral Ratio (e.g., 1.6 = 160%)</span>}
+                    extra={<span className="dark:text-muted-foreground">Range: 1.0-5.0 (100%-500%), must be &gt;= Liquidation Ratio</span>}
                     validateStatus={inputErrors.minCR ? 'error' : ''}
                     help={inputErrors.minCR}
                   >
                     <Input 
                       placeholder="1.6"
-                      className="w-full"
+                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
                       inputMode="decimal"
                       onChange={(e) => handleNumericInputChange('minCR', e.target.value, "5", 2, "1")}
                     />
@@ -382,15 +404,15 @@ const CollateralConfigManager = () => {
 
                   <Form.Item
                     name="liquidationPenaltyBps"
-                    label="Liquidation Penalty (Basis Points)"
+                    label={<span className="dark:text-foreground">Liquidation Penalty (Basis Points)</span>}
                     // rules={formRules.liquidationPenaltyBps}
-                    extra="Range: 500-3000 bps (5%-30%)"
+                    extra={<span className="dark:text-muted-foreground">Range: 500-3000 bps (5%-30%)</span>}
                     validateStatus={inputErrors.liquidationPenaltyBps ? 'error' : ''}
                     help={inputErrors.liquidationPenaltyBps}
                   >
                     <Input 
                       placeholder="1000"
-                      className="w-full"
+                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
                       inputMode="numeric"
                       onChange={(e) => handleNumericInputChange('liquidationPenaltyBps', e.target.value, "3000", 0, "500")}
                     />
@@ -398,15 +420,15 @@ const CollateralConfigManager = () => {
 
                   <Form.Item
                     name="closeFactorBps"
-                    label="Close Factor (Basis Points)"
+                    label={<span className="dark:text-foreground">Close Factor (Basis Points)</span>}
                     // rules={formRules.closeFactorBps}
-                    extra="Range: 5000-10000 bps (50%-100%)"
+                    extra={<span className="dark:text-muted-foreground">Range: 5000-10000 bps (50%-100%)</span>}
                     validateStatus={inputErrors.closeFactorBps ? 'error' : ''}
                     help={inputErrors.closeFactorBps}
                   >
                     <Input 
                       placeholder="5000"
-                      className="w-full"
+                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
                       inputMode="numeric"
                       onChange={(e) => handleNumericInputChange('closeFactorBps', e.target.value, "10000", 0, "5000")}
                     />
@@ -414,15 +436,15 @@ const CollateralConfigManager = () => {
 
                   <Form.Item
                     name="stabilityFeeRate"
-                    label="Stability Fee Rate (RAY)"
+                    label={<span className="dark:text-foreground">Stability Fee Rate (RAY)</span>}
                     // rules={formRules.stabilityFeeRate}
-                    extra="Range: 0-100% annual rate (0% = 1.0 RAY minimum)"
+                    extra={<span className="dark:text-muted-foreground">Range: 0-100% annual rate (0% = 1.0 RAY minimum)</span>}
                     validateStatus={inputErrors.stabilityFeeRate ? 'error' : ''}
                     help={inputErrors.stabilityFeeRate}
                   >
                     <Input 
                       placeholder="1.0"
-                      className="w-full"
+                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
                       inputMode="decimal"
                       onChange={(e) => handleNumericInputChange('stabilityFeeRate', e.target.value, "100", 18, "0")}
                     />
@@ -430,15 +452,15 @@ const CollateralConfigManager = () => {
 
                   <Form.Item
                     name="debtFloor"
-                    label="Debt Floor (USD)"
-                    extra="Range: 0+ USD (2 decimal places)"
+                    label={<span className="dark:text-foreground">Debt Floor (USD)</span>}
+                    extra={<span className="dark:text-muted-foreground">Range: 0+ USD (2 decimal places)</span>}
                     // rules={[...formRules.debtFloor, { validator: validateDebtFloor }]}
                     validateStatus={inputErrors.debtFloor ? 'error' : ''}
                     help={inputErrors.debtFloor}
                   >
                     <Input 
                       placeholder="100"
-                      className="w-full"
+                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
                       inputMode="decimal"
                       onChange={(e) => handleNumericInputChange('debtFloor', e.target.value, "1000000", 2, "0")}
                     />
@@ -446,15 +468,15 @@ const CollateralConfigManager = () => {
 
                   <Form.Item
                     name="debtCeiling"
-                    label="Debt Ceiling (USD)"
+                    label={<span className="dark:text-foreground">Debt Ceiling (USD)</span>}
                     // rules={[...formRules.debtCeiling, { validator: validateDebtCeiling }]}
-                    extra="Range: 0+ USD (2 decimal places)"
+                    extra={<span className="dark:text-muted-foreground">Range: 0+ USD (2 decimal places)</span>}
                     validateStatus={inputErrors.debtCeiling ? 'error' : ''}
                     help={inputErrors.debtCeiling}
                   >
                     <Input 
                       placeholder="Enter debt ceiling (e.g., 1000000 for $1M)"
-                      className="w-full"
+                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
                       inputMode="decimal"
                       onChange={(e) => handleNumericInputChange('debtCeiling', e.target.value, "1000000000", 2, "0")}
                     />
@@ -462,15 +484,15 @@ const CollateralConfigManager = () => {
 
                   <Form.Item
                     name="unitScale"
-                    label="Token Decimals"
+                    label={<span className="dark:text-foreground">Token Decimals</span>}
                     // rules={formRules.unitScale}
-                    extra="Range: 0-18 (decimal places, e.g., 18 for standard ERC20)"
+                    extra={<span className="dark:text-muted-foreground">Range: 0-18 (decimal places, e.g., 18 for standard ERC20)</span>}
                     validateStatus={inputErrors.unitScale ? 'error' : ''}
                     help={inputErrors.unitScale}
                   >
                     <Input 
                       placeholder="Enter decimal places (e.g., 18 for standard ERC20)"
-                      className="w-full"
+                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
                       inputMode="numeric"
                       onChange={(e) => handleNumericInputChange('unitScale', e.target.value, "18", 0, "0")}
                     />
@@ -479,10 +501,10 @@ const CollateralConfigManager = () => {
                   {/* Pause Status */}
                   <Form.Item
                     name="isPaused"
-                    label="Pause Asset"
+                    label={<span className="dark:text-foreground">Pause Asset</span>}
                     valuePropName="checked"
                   >
-                    <Switch />
+                    <Switch className="dark:bg-input" />
                   </Form.Item>
                 </div>
 
@@ -517,18 +539,18 @@ const CollateralConfigManager = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="manage" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="h-5 w-5" />
-                <span>Manage Collateral Assets</span>
+        <TabsContent value="manage" className="space-y-4 md:space-y-6">
+          <Card className="overflow-hidden">
+            <CardHeader className="px-4 md:px-6">
+              <CardTitle className="flex items-center gap-1.5 md:space-x-2 text-base md:text-xl">
+                <Settings className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="whitespace-nowrap">Manage Collateral Assets</span>
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs md:text-sm">
                 View and manage existing collateral asset configurations
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 md:px-6">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-strato-blue" />
@@ -541,76 +563,128 @@ const CollateralConfigManager = () => {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   {assets.map((asset) => (
-                    <Card key={asset.asset} className="border-l-4 border-l-strato-blue">
-                      <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                              <h3 className="font-semibold">{asset.symbol}</h3>
-                              <Badge variant={asset.isPaused ? "destructive" : "default"}>
-                                {asset.isPaused ? 'Paused' : 'Active'}
-                              </Badge>
-                              <Badge variant="outline">
+                    <Card key={asset.asset} className="border-l-4 border-l-strato-blue overflow-hidden">
+                      <CardContent className="pt-4 md:pt-6 px-3 md:px-6">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div className="space-y-1 md:space-y-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 md:space-x-2">
+                              <h3 className="font-semibold text-sm md:text-base">{asset.symbol}</h3>
+                              {asset.isPaused && asset.isSupported && (
+                                <Badge variant="destructive" className="text-[10px] md:text-xs">Paused</Badge>
+                              )}
+                              {!asset.isPaused && asset.isSupported && (
+                                <Badge variant="default" className="text-[10px] md:text-xs">Active</Badge>
+                              )}
+                              <Badge variant={asset.isSupported ? "outline" : "destructive"} className="text-[10px] md:text-xs">
                                 {asset.isSupported ? 'Supported' : 'Not Supported'}
                               </Badge>
                             </div>
-                            <p className="text-sm text-gray-500 font-mono">{asset.asset}</p>
+                            <p className="text-xs md:text-sm text-muted-foreground font-mono truncate">{asset.asset}</p>
                           </div>
                           
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleEditAsset(asset)}
                               disabled={loading}
+                              className="text-xs"
                             >
-                              <Edit className="h-4 w-4 mr-1" />
+                              <Edit className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                               Edit
                             </Button>
                             
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleTogglePause(asset.asset, !asset.isPaused)}
-                              disabled={loading}
-                            >
-                              {asset.isPaused ? (
-                                <>
-                                  <Play className="h-4 w-4 mr-1" />
-                                  Unpause
-                                </>
-                              ) : (
-                                <>
-                                  <Pause className="h-4 w-4 mr-1" />
-                                  Pause
-                                </>
-                              )}
-                            </Button>
+                            {!asset.isSupported ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleToggleDisable(asset.asset, true)}
+                                disabled={loading}
+                                className="text-xs"
+                              >
+                                <Play className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                                Enable
+                              </Button>
+                            ) : (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={loading}
+                                    className="text-xs"
+                                  >
+                                    <Settings className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                                    Actions
+                                    <ChevronDown className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {asset.isPaused ? (
+                                    <DropdownMenuItem
+                                      onClick={() => handleTogglePause(asset.asset, false)}
+                                      disabled={loading}
+                                    >
+                                      <Play className="h-4 w-4 mr-2" />
+                                      Unpause
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      onClick={() => handleTogglePause(asset.asset, true)}
+                                      disabled={loading}
+                                    >
+                                      <Pause className="h-4 w-4 mr-2" />
+                                      Pause
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => handleToggleDisable(asset.asset, false)}
+                                    disabled={loading}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Disable
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </div>
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                           <div>
-                            <p className="text-sm text-gray-500">Liquidation Ratio</p>
+                            <p className="text-sm text-muted-foreground">Liquidation Ratio</p>
                             <p className="font-semibold">{formatValue(asset.liquidationRatio.toString(), 'percentage')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Min CR</p>
+                            <p className="text-sm text-muted-foreground">Min CR</p>
                             <p className="font-semibold">{formatValue((asset.minCR || asset.liquidationRatio).toString(), 'percentage')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Penalty</p>
+                            <p className="text-sm text-muted-foreground">Stability Fee Rate</p>
+                            <p className="font-semibold">{asset.stabilityFeeRate.toFixed(2)}%</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Penalty</p>
                             <p className="font-semibold">{formatValue(asset.liquidationPenaltyBps.toString(), 'bps')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Close Factor</p>
+                            <p className="text-sm text-muted-foreground">Close Factor</p>
                             <p className="font-semibold">{formatValue(asset.closeFactorBps.toString(), 'bps')}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Debt Floor</p>
+                            <p className="text-sm text-muted-foreground">Debt Floor</p>
                             <p className="font-semibold">{formatValue(asset.debtFloor, 'usd')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Debt Ceiling</p>
+                            <p className="font-semibold">{formatValue(asset.debtCeiling, 'usd')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Token Decimals</p>
+                            <p className="font-semibold">{Math.log10(Number(asset.unitScale))}</p>
                           </div>
                         </div>
                       </CardContent>

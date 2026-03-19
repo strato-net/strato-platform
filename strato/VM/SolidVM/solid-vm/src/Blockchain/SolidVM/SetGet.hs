@@ -13,9 +13,20 @@ module Blockchain.SolidVM.SetGet
   ( setVar,
     weakGetVar,
     getVar,
+    getIntEither,
+    getIntValEither,
     getInt,
+    getIntVal,
+    int,
     getRealNum,
     getBool,
+    getBoolVal,
+    getAddress,
+    getAddressVal,
+    getString,
+    getStringVal,
+    getBytes,
+    getBytesVal,
     deleteVar,
     toBasic,
     fromBasic,
@@ -24,9 +35,15 @@ module Blockchain.SolidVM.SetGet
   )
 where
 
+import qualified Blockchain.Data.BlockHeader as BlockHeader
+import Blockchain.Data.Util
 import Blockchain.DB.SolidStorageDB
+import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
+import Blockchain.EthConf (ethConf, networkConfig)
+import qualified Blockchain.EthConf.Model as Conf
+import Blockchain.Strato.Model.Address
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
@@ -45,6 +62,7 @@ import qualified SolidVM.Model.Storable as MS
 import SolidVM.Model.Value
 import Text.Format
 import Text.Printf
+import Text.Read (readMaybe)
 import UnliftIO
 
 fromBasic :: MS.BasicValue -> Value
@@ -53,6 +71,7 @@ fromBasic = \case
   MS.BString s -> case decodeUtf8' s of
     Right t -> SString $ T.unpack t
     Left _ -> SString $ BC.unpack s
+  MS.BBytes bs -> SBytes bs
   MS.BDecimal v -> SDecimal $ read $ BC.unpack v
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a False
@@ -60,8 +79,8 @@ fromBasic = \case
   MS.BEnumVal k v num -> SEnumVal k v num
   MS.BDefault -> SNULL
 
-toBasic :: Value -> Maybe MS.BasicValue
-toBasic = \case
+toBasic :: Integer -> Value -> Maybe MS.BasicValue
+toBasic currentBlockNum = \case
   SInteger i -> Just $ MS.BInteger i
   SString s -> Just . MS.BString . encodeUtf8 $ T.pack s
   SDecimal v -> Just $ MS.BDecimal $ BC.pack $ show v
@@ -69,8 +88,12 @@ toBasic = \case
   SAddress a _ -> Just $ MS.BAddress a
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
-  SUserDefined _ _ x -> toBasic x
-  SBytes bs -> Just $ MS.BString bs
+  SUserDefined _ _ x -> toBasic currentBlockNum x
+  SBytes bs -> Just $ MS.BBytes bs
+  SNULL ->
+    let heliumToBasicForkBlock = 33918 :: Integer
+        snullToBasicEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumToBasicForkBlock)
+     in if snullToBasicEnabled then Just MS.BDefault else Nothing
   _ -> Nothing
 
 setVar :: MonadSM m => Variable -> Value -> m ()
@@ -114,11 +137,13 @@ setVal (STuple dstVector) (STuple srcVector) =
 setVal dst@(SReference (AddressPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
-  let basicSrc = case src of
-        SString s -> Just . MS.BString . UTF8.fromString $ s
-        _ -> toBasic src
+  basicSrc <- case src of
+    SString s -> pure . Just . MS.BString . UTF8.fromString $ s
+    _ -> do
+      currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
+      pure $ toBasic currentBlockNum src
   case basicSrc of
-    Nothing -> typeError "non basic solidity type cannot be stored atomically" src
+    Nothing -> typeError "non basic solidity type cannot be stored atomically" $ show src
     Just b -> do
       markDiffForAction addr path b
       putSolidStorageKeyVal' addr path b
@@ -178,14 +203,24 @@ getVar (Constant (SPush v (Just var))) = do
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
 
+getIntEither :: MonadSM m => Variable -> m (Either Value Integer)
+getIntEither p = getIntValEither <$> getVar p
+
+getIntValEither :: Value -> Either Value Integer
+getIntValEither = \case
+  SInteger s -> Right s
+  SNULL -> Right 0
+  SReference{} -> Right 0
+  v -> Left v
+
 getInt :: MonadSM m => Variable -> m Integer
-getInt p = do
-  v <- getVar p
-  case v of
-    SInteger s -> return s
-    SNULL -> return 0
-    SReference{} -> pure 0
-    _ -> typeError "getInt" (p, v)
+getInt = either (typeError "getInt" . show) pure <=< getIntEither
+
+getIntVal :: MonadSM m => Value -> m Integer
+getIntVal = either (typeError "getIntVal" . show) pure . getIntValEither
+
+int :: MonadSM m => Value -> m Integer
+int = getIntVal
 
 getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
 getRealNum p = do
@@ -195,17 +230,63 @@ getRealNum p = do
     SDecimal s -> return $ Right s
     SNULL -> return $ Left 0
     SReference{} -> pure $ Left 0
-    _ -> typeError "getRealNum" (p, v)
+    _ -> typeError "getRealNum" $ show (p, v)
 
 getBool :: MonadSM m => Variable -> m Bool
-getBool p = do
-  v <- getVar p
-  case v of
-    SBool b -> return b
-    SInteger i -> return $ i /= 0
-    SNULL -> return False
-    SReference{} -> pure False
-    _ -> typeError "getBool" (p, v)
+getBool = getBoolVal <=< getVar
+
+getBoolVal :: MonadSM m => Value -> m Bool
+getBoolVal = \case
+  SBool b -> return b
+  SInteger i -> return $ i /= 0
+  SNULL -> return False
+  SReference{} -> pure False
+  v -> typeError "getBool" $ show v
+
+getAddress :: MonadSM m => Variable -> m Address
+getAddress = getAddressVal <=< getVar
+
+getAddressVal :: MonadSM m => Value -> m Address
+getAddressVal = \case
+  SInteger i -> pure $ fromIntegral i
+  SAddress a _ -> pure a
+  SContract _ a -> pure a
+  SString s -> case readMaybe s of
+    Nothing -> typeError "getAddress" $ show s
+    Just a -> pure a
+  SBytes b -> pure $ addressFromByteString b
+  SNULL -> pure 0
+  SReference{} -> pure 0
+  v -> typeError "getAddress" $ show v
+
+getString :: MonadSM m => Variable -> m String
+getString = getStringVal <=< getVar
+
+getStringVal :: MonadSM m => Value -> m String
+getStringVal = \case
+  SString s -> pure s
+  SBytes b -> case decodeUtf8' b of
+    Left _ -> pure $ BC.unpack b
+    Right r -> pure $ T.unpack r
+  SNULL -> pure ""
+  SReference{} -> pure ""
+  v -> typeError "getString" $ show v
+
+getBytes :: MonadSM m => Variable -> m BC.ByteString
+getBytes = getBytesVal <=< getVar
+
+getBytesVal :: MonadSM m => Value -> m BC.ByteString
+getBytesVal = \case
+  SInteger i -> pure $ integer2Bytes i
+  SAddress a _ -> pure $ addressToByteString a
+  SContract _ a -> pure $ addressToByteString a
+  SString s -> case B16.decode $ BC.pack s of
+    Right r -> pure r
+    _ -> pure . encodeUtf8 $ T.pack s
+  SBytes b -> pure b
+  SNULL -> pure BC.empty
+  SReference{} -> pure BC.empty
+  v -> typeError "getAddress" $ show v
 
 deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference (AddressPath addr path))) = do
@@ -262,7 +343,7 @@ showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
 showSM (SContractFunction address functionName) = do
   contractName <- CC._contractName <$> getCurrentContract
   return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
-showSM (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse showSM xs
+showSM (SVariadic xs) = ("variadic(" ++) . (++ ")") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x
 
 jsonSM :: MonadSM m => Value -> m String
@@ -307,4 +388,4 @@ jsonSM = go False
     go b (SContract _ address) = return . bool id show b $ show address
     go _ (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse (go True) xs
     go _ (SDecimal v) = return $ show v
-    go _ _ = return "undefined"
+    go _ _ = return "0"

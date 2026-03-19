@@ -45,6 +45,7 @@ module Blockchain.SolidVM.SM
     getBSum,
     addEvent,
     addDelegatecall,
+    getUsername,
     addNewCodeCollection,
     getContractNameAndHash,
     getCodeAndCollection,
@@ -61,6 +62,7 @@ import BlockApps.Logging
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
+import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
@@ -101,6 +103,7 @@ import qualified Data.Set as S
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as DT
 import Debugger
 import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
@@ -183,7 +186,7 @@ type MonadSM m =
     Mod.Modifiable Action m,
     Mod.Modifiable (Q.Seq Event) m,
     Mod.Modifiable (Q.Seq Action.Delegatecall) m,
-    Mod.Modifiable [(Text, CodeCollection)] m,
+    Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) m,
     Mod.Modifiable (Maybe DebugSettings) m,
     MonadUnliftIO m, --todo: remove
     MonadCatch m,
@@ -424,7 +427,7 @@ instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Action.Delegatecall) (SM m) wh
   get _ = gets (Action._delegatecalls . _action)
   put _ q = modify $ action . Action.delegatecalls .~ q
 
-instance MonadUnliftIO m => Mod.Modifiable ([(Text, CodeCollection)]) (SM m) where
+instance MonadUnliftIO m => Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) (SM m) where
   get _ = gets (Action._newCodeCollections . _action)
   put _ q = modify $ action . Action.newCodeCollections .~ q
 
@@ -512,7 +515,7 @@ startingAction env' =
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
-      _newCodeCollections = [],
+      _newCodeCollections = OMap.empty,
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
@@ -554,23 +557,28 @@ getVariableOfName name = do
                           CC._usings = M.empty,
                           CC._contractType = currentContract x ^. CC.contractType,
                           CC._importedFrom = Nothing,
-                          CC._isContractRecord = currentContract x ^. CC.isContractRecord,
                           CC._contractContext = currentContract x ^. CC.contractContext
                         }
                   }
               else x
       vars = NE.head $ localVariables currentCallInfo
       t s v = ('x' : s, v) `seq` v
+      curContract = currentContract currentCallInfo
 
   -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
   let maybeLocalValue = M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name . Just) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
+      maybeContractFunction =
+        (t "constant function" . Constant . SFunction name $ Just curContract)
+        <$ (M.lookup name $ curContract ^. CC.functions)
 
       maybeFreeFunction :: Maybe Variable
-      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name . Just) $ M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs
+      maybeFreeFunction =
+        (\f -> t "free function" . Constant . SFunction name . Just $
+          curContract & CC.functions %~ M.insert name f)
+        <$> (M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs)
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction =
@@ -585,6 +593,7 @@ getVariableOfName name = do
                        "byte",
                        "bytes",
                        "string",
+                       "variadic",
                        "log",
                        "keccak256",
                        "ripemd160",
@@ -592,6 +601,7 @@ getVariableOfName name = do
                        "ecAdd",
                        "ecMul",
                        "ecPairing",
+                       "poseidon",
                        "payable",
                        "require",
                        "revert",
@@ -603,6 +613,9 @@ getVariableOfName name = do
                        "derive",
                        "sha256",
                        "ecrecover",
+                       "verifyP256",
+                       "base64encode",
+                       "base64urlencode",
                        "blockhash",
                        "addmod",
                        "mulmod",
@@ -618,7 +631,7 @@ getVariableOfName name = do
 
       maybeBuiltinVariable :: Maybe Variable
       maybeBuiltinVariable =
-        toMaybe (name `elem` ["msg", "block", "tx", "super", "now"]) $
+        toMaybe (name `elem` ["msg", "block", "tx", "super", "now", "abi"]) $
           t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
@@ -629,12 +642,14 @@ getVariableOfName name = do
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        let cc = codeCollection currentCallInfo
+        let constMap = cc ^. CC.flConstants
         CC.ConstantDecl {..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
         return $
-          coerceType ctract _constType $ case _constInitialVal of
+          coerceType ctract cc _constType $ case _constInitialVal of
             CC.NumberLiteral _ x _ -> SInteger x
-            x -> todo "constant initial val" x
+            CC.AddressLiteral _ a -> SAddress a False
+            _ -> SDeferredConstant name  -- Complex expression, evaluate on access
 
       maybeStructDef :: Maybe Variable
       maybeStructDef =
@@ -687,7 +702,7 @@ getVariableOfName name = do
       maybeThis,
       maybeConstant,
       --, maybeUserDefined
-      unknownVariable ("getVariableOfName " ++ (show (currentContract currentCallInfo ^. CC.storageDefs))) name
+      unknownVariable "not found" name
     ]
 
 withCallInfo ::
@@ -820,7 +835,7 @@ getCurrentContract = do
   case cs of
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
-    
+
 getCurrentAddress :: MonadSM m => m Address
 getCurrentAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
@@ -898,11 +913,25 @@ markDiffForAction owner key' val' = do
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
 
-addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> T.Text -> m ()
-addDelegatecall s c o a n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a n)
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> Maybe T.Text -> T.Text -> m ()
+addDelegatecall s c o n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o n)
 
-addNewCodeCollection :: Mod.Modifiable [(Text, CodeCollection)] m => Text -> CodeCollection -> m ()
-addNewCodeCollection userName cc = Mod.modify_ (Mod.Proxy @([(Text, CodeCollection)])) $ pure . ((userName, cc):)
+getUsername :: MonadSM m => m Text
+getUsername = do
+  let go []     = pure "BlockApps"
+      go (x:xs) = do
+        userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
+        case userNameValue of
+          MS.BString userNameString -> pure $ DT.decodeUtf8 userNameString
+          _ -> go xs
+
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  go $ currentAddress <$> cs
+
+addNewCodeCollection :: MonadSM m => Keccak256 -> CodeCollection -> m ()
+addNewCodeCollection ch cc = do
+  username <- getUsername
+  Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((username, ch), cc))
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
@@ -924,7 +953,7 @@ getContractNameAndHash address' = do
 
   case codeHash of
     SolidVMCode cn ch' -> return (stringToLabel cn, ch')
-    ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
+    _ -> missingCodeCollection ("contract call to address 0x" ++ formatAddressWithoutColor address' ++ " failed") ("no contract deployed at this address" :: String)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
@@ -948,8 +977,7 @@ getMapNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
       listOfMappings = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Mapping _ _ _ -> True; _ -> False) storageDefsList
-      listOfMappingsWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfMappings
-   in T.pack . fst <$> listOfMappingsWithRecords
+   in T.pack . fst <$> listOfMappings
 
 --also needs to be changed for testnet3 to be only record
 getArrayNamesFromContract :: CC.Contract -> [T.Text]
@@ -957,4 +985,4 @@ getArrayNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
       listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
-   in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
+   in T.pack . fst <$> listOfArrays

@@ -9,59 +9,94 @@ import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 import { ensureHexPrefix } from '@/utils/numberUtils';
 import { usdstAddress } from '@/lib/constants';
+import { useIsMobile } from '@/hooks/use-mobile';
 
-const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
+const normalizeStratoAccount = (account?: string) => (account || '').replace(/^0x/i, '');
+
+const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
+  const isMobile = useIsMobile();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [withdrawalStatus, setWithdrawalStatus] = useState<number | null>(null);
-  const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
+  const [withdrawalStatus, setWithdrawalStatus] = useState<number>(0);
+  const [selectedChainId, setSelectedChainId] = useState<number>(0);
+  const [selectedType, setSelectedType] = useState<'bridge' | 'convert' | ''>('');
   const [transactions, setTransactions] = useState<any[]>([]);
 
+  const [isLoading, setIsLoading] = useState(false);
   const {
-    loading: isLoading,
     fetchWithdrawTransactions,
     availableNetworks,
+    withdrawalRefreshKey,
   } = useBridgeContext();
 
   useEffect(() => {
     const loadTransactions = async () => {
+      setIsLoading(true);
       try {
         const params: Record<string, string> = {
           limit: ITEMS_PER_PAGE.toString(),
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
           order: 'block_timestamp.desc',
         };
-        
-        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
-        
-        if (withdrawalStatus !== null) {
+
+        if (selectedType === 'convert') {
+          (params as any)["value->>stratoToken"] = `eq.${usdstAddress}`;
+        } else if (selectedType === 'bridge') {
+          (params as any)["value->>stratoToken"] = `neq.${usdstAddress}`;
+        }
+
+        if (withdrawalStatus !== 0) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
         }
-        
-        if (selectedChainId !== null) {
+
+        if (selectedChainId !== 0) {
           (params as any)["value->>externalChainId"] = `eq.${selectedChainId}`;
         }
-        
-        const result = await fetchWithdrawTransactions(params);
+
+        const result = await fetchWithdrawTransactions(params, context);
         setTransactions(result.data);
         setTotalCount(result.totalCount);
       } catch (error) {
         console.error('Error loading transactions:', error);
         setTransactions([]);
         setTotalCount(0);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadTransactions();
-  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions]);
+  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType, withdrawalRefreshKey]);
 
   const columns = [
     {
       title: 'From (STRATO)',
       key: 'from',
       render: (_: any, record: any) => {
-        const addr = ensureHexPrefix(record?.WithdrawalInfo?.stratoSender) || '';
-        return addr ? renderTruncatedAddressWithCopy(addr, handleCopyToClipboard) : '-';
+        const rawAddr = record?.WithdrawalInfo?.stratoSender || '';
+        const displayAddr = normalizeStratoAccount(rawAddr);
+        const linkAddr = ensureHexPrefix(rawAddr) || '';
+        const chainIdStr = record?.WithdrawalInfo?.externalChainId ? String(record.WithdrawalInfo.externalChainId) : '1';
+        const txUrl = getExplorerUrl(chainIdStr, '0x');
+        const base = txUrl.split('/tx/')[0];
+        const addressUrl = linkAddr ? `${base}/address/${linkAddr}` : '';
+
+        return displayAddr ? (
+          <div className="group relative flex items-center gap-2">
+            <a
+              href={addressUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800"
+            >
+              {`${displayAddr.slice(0, 6)}...${displayAddr.slice(-4)}`}
+            </a>
+            <CopyOutlined
+              className="text-muted-foreground hover:text-blue-500 cursor-pointer transition-colors"
+              onClick={() => handleCopyToClipboard(displayAddr)}
+            />
+          </div>
+        ) : '-';
       },
       width: 100,
     },
@@ -79,7 +114,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
         const addressUrl = `${base}/address/${addr}`;
         return (
           <div>
-            <div className="text-xs text-gray-500 mb-1">{chainName}</div>
+            <div className="text-xs text-muted-foreground mb-1">{chainName}</div>
             {addr ? (
               <div className="group relative flex items-center gap-2">
                 <a
@@ -91,7 +126,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
                   {`${addr.slice(0, 6)}...${addr.slice(-4)}`}
                 </a>
                 <CopyOutlined
-                  className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
+                  className="text-muted-foreground hover:text-blue-500 cursor-pointer transition-colors"
                   onClick={() => handleCopyToClipboard(addr)}
                 />
               </div>
@@ -102,39 +137,24 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
       width: 120,
     },
     {
-      title: "Token (External)",
-      key: 'ethTokenSymbol',
-      render: (_: any, record: any) => {
-        const symbol =
-          record?.externalSymbol ||
-          (record?.externalName === 'Ether' ? 'ETH' : record?.externalName) ||
-          '-';
-        return (
-          <div className="flex flex-col gap-1">
-            <span className="text-sm text-gray-700">{symbol}</span>
-          </div>
-        );
-      },
-      width: 150,
-    },
-    {
-      title: 'Token (STRATO)',
-      key: 'tokenSymbol',
+      title: "Sent",
+      key: "sent",
       render: (_: any, record: any) => {
         const symbol = record?.stratoTokenSymbol || '-';
-        return (
-          <div className="flex flex-col gap-1">
-            <span className="text-sm text-gray-700">{mintUSDST ? 'USDST' : symbol}</span>
-          </div>
-        );
+        const amount = formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18);
+        return <span className="text-sm text-foreground">{amount} {symbol}</span>;
       },
-      width: 150,
+      width: 140,
     },
     {
-      title: 'Amount',
-      key: 'amount',
-      render: (_: any, record: any) => formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18),
-      width: 80,
+      title: "Received",
+      key: "received",
+      render: (_: any, record: any) => {
+        const symbol = record?.externalSymbol || (record?.externalName === 'Ether' ? 'ETH' : record?.externalName) || '-';
+        const amount = formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18);
+        return <span className="text-sm text-foreground">{amount} {symbol}</span>;
+      },
+      width: 140,
     },
     {
       title: 'Status',
@@ -170,7 +190,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
           );
         }
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
             <AlertCircle className="h-3 w-3 mr-1" />
             Unknown
           </span>
@@ -188,36 +208,59 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
   ];
 
   return (
-    <div className="space-y-4">
-      <Card className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
-        <Space size="large">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+    <div className="space-y-4 ant-table-themed">
+      <Card className="bg-card rounded-xl shadow-sm border border-border">
+        <Space 
+          size="large" 
+          direction={isMobile ? "vertical" : "horizontal"} 
+          className={isMobile ? "w-full" : ""}
+          style={isMobile ? { width: '100%' } : {}}
+        >
+          <div className={isMobile ? "w-full" : ""}>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Type
+            </label>
+            <Select
+              value={selectedType || ''}
+              onChange={(v) => {
+                setSelectedType(v === '' ? '' : v as 'bridge' | 'convert');
+                setCurrentPage(1);
+              }}
+              style={{ width: isMobile ? '100%' : 150 }}
+              options={[
+                { value: '', label: 'All Types' },
+                { value: 'bridge', label: 'Bridge' },
+                { value: 'convert', label: 'Convert' },
+              ]}
+            />
+          </div>
+          <div className={isMobile ? "w-full" : ""}>
+            <label className="block text-sm font-medium text-foreground mb-1">
               Status Filter
             </label>
             <Select
-              value={withdrawalStatus}
+              value={withdrawalStatus || 0}
               onChange={(v) => {
-                setWithdrawalStatus(v);
+                setWithdrawalStatus(v || 0);
                 setCurrentPage(1);
               }}
-              style={{ width: 150 }}
+              style={{ width: isMobile ? '100%' : 150 }}
               options={BRIDGE_STATUS_OPTIONS}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className={isMobile ? "w-full" : ""}>
+            <label className="block text-sm font-medium text-foreground mb-1">
               Chain Filter
             </label>
             <Select
-              value={selectedChainId}
+              value={selectedChainId || 0}
               onChange={(v) => {
-                setSelectedChainId(v);
+                setSelectedChainId(v || 0);
                 setCurrentPage(1);
               }}
-              style={{ width: 150 }}
+              style={{ width: isMobile ? '100%' : 150 }}
               options={[
-                { value: null, label: 'All Chains' },
+                { value: 0, label: 'All Chains' },
                 ...availableNetworks.map((n) => ({ value: parseInt(n.chainId), label: n.chainName }))
               ]}
             />
@@ -225,11 +268,12 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
         </Space>
       </Card>
       
-      <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
           loading={isLoading}
+          scroll={isMobile ? { x: 'max-content' } : undefined}
           pagination={{
             current: currentPage,
             total: totalCount,
@@ -237,24 +281,25 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
             onChange: (page) => setCurrentPage(page),
             showSizeChanger: false,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+            simple: isMobile,
           }}
           locale={{
             emptyText: (
-              <div className="py-12 text-center text-gray-500">
+              <div className="py-12 text-center text-muted-foreground">
                 <div className="flex flex-col items-center justify-center gap-2">
-                  <FrownOutlined style={{ fontSize: 48, color: "#bdbdbd" }} />
-                  <span className="text-lg font-semibold text-gray-400">
+                  <FrownOutlined style={{ fontSize: 48, color: "currentColor" }} />
+                  <span className="text-lg font-semibold text-muted-foreground">
                     Sorry, no data found
                   </span>
                 </div>
               </div>
             ),
           }}
-          rowKey={(_, index) => `${index}`}
+          rowKey={(_, index) => index}
         />
       </div>
     </div>
   );
 };
 
-export default WithdrawTransactionDetails; 
+export default WithdrawTransactionDetails;

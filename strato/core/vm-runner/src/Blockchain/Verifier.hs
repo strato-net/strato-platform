@@ -14,7 +14,7 @@ import Blockchain.Data.Transaction
 import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Event 
+import Blockchain.Event
 import qualified Control.Monad.Change.Alter as A
 import Data.Maybe (catMaybes)
 
@@ -33,10 +33,10 @@ checkParentChildValidity Block {blockBlockData = c} parentBSum = do
 
 
 verifyOmmersRoot :: HasStateDB m => Block -> m (Maybe BlockVerificationFailureDetails)
-verifyOmmersRoot Block {blockBlockData = bd, blockBlockUncles = bu} = 
+verifyOmmersRoot Block {blockBlockData = bd, blockBlockUncles = bu} =
   let inBlockOmmersHash = getBlockOmmersHash bd
       derivedOmmersHash = hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
-  in if inBlockOmmersHash /= derivedOmmersHash 
+  in if inBlockOmmersHash /= derivedOmmersHash
         then return $ Just $ UnclesMismatch (BlockDelta inBlockOmmersHash derivedOmmersHash)
         else return Nothing
 

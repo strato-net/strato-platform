@@ -60,7 +60,8 @@ function _M.is_browser_request()
     local api_client_patterns = {
         "curl/", "Wget/", "python%-requests/", "python%-urllib", "Go%-http%-client",
         "PostmanRuntime/", "insomnia/", "HTTPie/", "node%-fetch", "axios/",
-        "okhttp/", "Java/", "Apache%-HttpClient", "Dart/", "Ruby", "PHP/", "RestSharp/"
+        "okhttp/", "Java/", "Apache%-HttpClient", "Dart/", "Ruby", "PHP/", "RestSharp/",
+        "restish", "Stripe/"
     }
 
     for _, pattern in ipairs(api_client_patterns) do

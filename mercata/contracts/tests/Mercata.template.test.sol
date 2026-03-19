@@ -46,7 +46,7 @@ contract Describe_BadDebt_Basic is Authorizable {
     function it_ac_can_activate_tokens() public {
         // Set tokens to active status
         Token(USDST).setStatus(2);
-        
+
         // Basic checks - tokens activated successfully
         require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
     }
@@ -64,13 +64,13 @@ contract Describe_BadDebt_Basic is Authorizable {
         configurator.configureAsset(
             USDST,
             0,
-            0, 
+            0,
             11000,
             500,
             1000,
             1000000001547125956666413085
         );
-        
+
         // Verify that assets are properly configured in the pool
         require(pool.configuredAssets(0) == USDST, "USDST not correctly configured in configured assets");
     }

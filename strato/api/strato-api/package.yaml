@@ -11,8 +11,6 @@ executables:
   strato-api:
     main:                Main.hs
     source-dirs:         exec_src
-    other-modules:
-    - Options
     dependencies:
     - aeson
     - bloc2api
@@ -32,7 +30,6 @@ executables:
     - ethereum-discovery
     - format
     - http-types
-    - identity-monad
     - insert-ordered-containers
     - lens
     - monad-alter
@@ -41,14 +38,15 @@ executables:
     - servant-client-core
     - servant-multipart
     - servant-server
-    - servant-swagger
+    - servant-openapi3
     - servant-swagger-ui
     - solid-vm-model
+    - strato-auth
     - strato-conf
     - sql-monad
     - strato-model
     - strato-redis-blockdb
-    - swagger2
+    - openapi3
     - text
     - transformers
     - unliftio

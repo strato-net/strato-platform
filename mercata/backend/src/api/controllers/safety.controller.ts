@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getSafetyModuleInfo,
+  getPublicSafetyModuleInfo,
   stakeSafetyModule,
   startCooldownSafetyModule,
   redeemSafetyModule,
@@ -23,6 +24,20 @@ class SafetyController {
     }
   }
 
+  static async getPublicInfo(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const info = await getPublicSafetyModuleInfo(accessToken);
+      res.status(RestStatus.OK).json(info);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async stake(
     req: Request,
     res: Response,
@@ -30,19 +45,14 @@ class SafetyController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
-      const { amount, stakeSToken } = body;
+      const { amount } = body;
 
       if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid amount" });
         return;
       }
 
-      if (stakeSToken === undefined || typeof stakeSToken !== 'boolean') {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "stakeSToken is required and must be a boolean" });
-        return;
-      }
-
-      const result = await stakeSafetyModule(accessToken, userAddress as string, { amount, stakeSToken });
+      const result = await stakeSafetyModule(accessToken, userAddress as string, { amount });
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -70,19 +80,14 @@ class SafetyController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
-      const { sharesAmount, includeStakedSToken } = body;
+      const { sharesAmount } = body;
 
       if (!sharesAmount || isNaN(Number(sharesAmount)) || Number(sharesAmount) <= 0) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid shares amount" });
         return;
       }
 
-      if (includeStakedSToken === undefined || typeof includeStakedSToken !== 'boolean') {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "includeStakedSToken is required and must be a boolean" });
-        return;
-      }
-
-      const result = await redeemSafetyModule(accessToken, userAddress as string, { sharesAmount, includeStakedSToken });
+      const result = await redeemSafetyModule(accessToken, userAddress as string, { sharesAmount });
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

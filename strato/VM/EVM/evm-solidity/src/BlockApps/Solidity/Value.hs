@@ -46,7 +46,7 @@ valueInt256 = ValueInt False (Just 32)
 
 valueBytes :: ByteString -> SimpleValue
 valueBytes = ValueBytes Nothing
----use this, then wrap in mapping 
+---use this, then wrap in mapping
 data Value
   = SimpleValue SimpleValue
   | ValueArrayDynamic (I.IntMap Value) -- A sparse representation makes updates more efficient than O(n)
@@ -254,7 +254,7 @@ valueToText = \case
     let pairs = map (\(sv, v) -> simpleValueToText sv <> ": " <> valueToText v) $ Map.toList m
      in "{" <> Text.intercalate "," pairs <> "}"
   ValueContract addr -> Text.pack $ show addr
-  ValueEnum {} -> error "ValueEnum to text"
+  ValueEnum _ _ numVal -> Text.pack $ show numVal  -- Integer for coerceType
   ValueFunction {} -> error "ValueFunction to text"
   ValueStruct m ->
     "{" <> Text.intercalate "," (map (\(k, v) -> Text.concat [k, ":", valueToText v]) $ Map.toList m) <> "}"
@@ -272,8 +272,8 @@ simpleValueToText sv = case sv of
   ValueAddress addr -> Text.pack $ "\"" ++ formatAddressWithoutColor addr ++ "\""
   ValueString tx -> '"' `Text.cons` escapeStringValue tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
-  ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
-  ValueDecimal v -> Text.pack $ show v 
+  ValueBytes _ b -> "hex\"" <> Text.decodeUtf8 (Base16.encode b) <> "\""
+  ValueDecimal v -> Text.pack $ show v
 
 textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
 textToValue defs str = \case
@@ -308,8 +308,8 @@ textToValue defs str = \case
 
 unEscapeStringValue :: Text -> Text
 unEscapeStringValue = Text.replace "\\\"" "\""
-                    . Text.replace "\\\\" "\\"  
-  
+                    . Text.replace "\\\\" "\\"
+
 textToSimpleValue :: Text -> SimpleType -> Either Text SimpleValue
 textToSimpleValue str = \case
   TypeBool -> case Text.toLower str of

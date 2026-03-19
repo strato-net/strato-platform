@@ -15,10 +15,17 @@ library:
   # # 
 
   dependencies:
+    - aeson
     - base
     - bytestring
-    - containers
+    - data-default
+    - file-embed
     - hedis
     - kafka-monad
     - postgresql-simple
+    - process
+    - servant-client
+    - strato-model
+    - template-haskell
+    - text
     - yaml

@@ -39,7 +39,8 @@ import Blockchain.Timing
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
-import Blockchain.VMOptions
+import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.Verification as V
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -52,12 +53,12 @@ import qualified Data.Binary as Bin
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
+import Data.Function (on)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
-import Executable.EVMFlags (flags_maxTxsPerBlock)
 import Text.Format
 
 {-# NOINLINE baggerBlockHash #-}
@@ -66,7 +67,6 @@ baggerBlockHash = hash "This is the bagger block hash. It is a dummy value used 
 
 type MonadBagger m =
   ( VMBase m,
-    Mod.Accessible IsBlockstanbul m,
     Mod.Accessible TRC.Cache m,
     Mod.Modifiable B.BaggerState m,
     Mod.Yields m TransactionResult
@@ -82,8 +82,6 @@ data TxMiningResult = TxMiningResult
 
 type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> Address -> m TxMiningResult
 
-isBlockstanbul :: (Functor m, Mod.Accessible IsBlockstanbul m) => m Bool
-isBlockstanbul = unIsBlockstanbul <$> Mod.access (Mod.Proxy @IsBlockstanbul)
 
 getBaggerState :: Mod.Modifiable B.BaggerState m => m B.BaggerState
 getBaggerState = Mod.get (Mod.Proxy @B.BaggerState)
@@ -158,7 +156,7 @@ cacheRunResults bd (sr, gasRemaining, trrs) = do
   liftIO $ TRC.insert cache bhash (sr, gasRemaining, trrs)
 
 getCachedRunResults :: MonadBagger m => BlockHeader -> m (Maybe (StateRoot, Integer, [TxRunResult]))
-getCachedRunResults bd = do 
+getCachedRunResults bd = do
     cache <- Mod.access (Mod.Proxy @TRC.Cache)
     let pHash = blockHeaderPartialHash bd
     mres <- liftIO $ TRC.lookup cache pHash
@@ -234,13 +232,21 @@ flush scope = do
   txsDroppedCallback rejections txShas
   return flushedTxs
 
+-- This will be rounded in RLPEncode, but just for consistency.
+--
+-- Really, it should just be Int and then we wouldn't need to worry about leap
+-- seconds.
+currentTimeRounded :: MonadIO m => m UTCTime
+currentTimeRounded = posixSecondsToUTCTime
+                   . fromInteger
+                   . round
+                   . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
+
 processNewBestBlock :: MonadBagger m => Keccak256 -> BlockHeader -> [Keccak256] -> m ()
 processNewBestBlock bh bd txShas = do
   $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
   state <- getBaggerState
-  -- This will be rounded in RLPEncode, but just for consistency.
-  -- Really, it should just be Int and then we wouldn't need to worry about leap seconds.
-  time <- posixSecondsToUTCTime . fromInteger . round . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
+  time <- currentTimeRounded
   let pHashes = B.privateHashes $ B.miningCache state
       shaSet = S.fromList txShas
       f = not . (`S.member` shaSet) . txHash . otBaseTx
@@ -266,11 +272,13 @@ processNewBestBlock bh bd txShas = do
     demoteUnexecutables
     promoteExecutables
 
+-- | The makeNewBlock function can be called multiple times before a block is
+-- actually proposed.
 makeNewBlock :: MonadBagger m => MineTransactions m -> Address -> m OutputBlock
 makeNewBlock mineTransactions mSelfAddress = do
   state <- getBaggerState
   let seen' = B.seen state
-  let cache = B.miningCache state
+  cache <- getCacheWithUpdatedTimestamp
   let lastExec = B.lastExecutedTxs cache
   let lastExecLen = length lastExec
   let lastExecGuardLen = length [t | t <- lastExec, otHash (trrTransaction t) `S.member` seen']
@@ -288,7 +296,7 @@ makeNewBlock mineTransactions mSelfAddress = do
           let lastSR = B.lastExecutedStateRoot cache
           let lastSHA = B.bestBlockSHA cache
           let lastHead = B.bestBlockHeader cache
-          let promoted = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
+          let promoted = take ((fromInteger (Conf.maxTxsPerBlock (quarryConfig ethConf))) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
           let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty
           let remGas = B.remainingGas cache
@@ -305,7 +313,7 @@ makeNewBlock mineTransactions mSelfAddress = do
                     txsDroppedCallback [f] []
                     let theRejectedTx = rejectedTx f
                     purgeFromPending theRejectedTx
-                    return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx)
+                    return (nsr, nbg, lastExec ++ rtx, filter (on (/=) otSigner theRejectedTx) urtx)
                   x -> error (show x)
 
             let !newMiningCache =
@@ -329,6 +337,39 @@ makeNewBlock mineTransactions mSelfAddress = do
       processNewBestBlock sha header txShas
       !nb <- makeNewBlock mineTransactions mSelfAddress
       return nb
+  where
+    --  We update startTimestamp in 'makeNewBlock' despite 'processNewBestBlock'
+    --  already setting it to the current timestamp. The reason is as follows:
+    --  There's a time gap between the call to processNewBestBlock and the call to
+    --  makeNewBlock. The gap can be arbitrarily long, because until at least one
+    --  transaction is submitted to any of the nodes, the gap continues to grow.
+    getCacheWithUpdatedTimestamp = do
+      state <- getBaggerState
+      let cache0 = B.miningCache state
+      let lastExec = B.lastExecutedTxs cache0
+      now <- currentTimeRounded
+      case lastExec of
+        --  When lastExecutedTxs is empty (fresh state), the block building
+        --  process is just starting. At this point, we want to set the
+        --  startTimestamp to the current time.
+        [] -> return $ cache0 { B.startTimestamp = now }
+
+        --  If lastExecutedTxs is NOT empty, it means makeNewBlock was already
+        --  called before and started building a block (executed some
+        --  transactions), but the block hasn't been proposed/committed yet.
+        --
+        --  This means that when this happens, the newly promoted transactions
+        --  will have slightly different block.timestamp, then the last executed
+        --  transactions. This should not have implications on the system, since
+        --  the time window for a node to propose a block is small, but we still
+        --  want to alert the node operator with a warning when this happens.
+        _ -> do
+          let timeDiff = diffUTCTime (B.startTimestamp cache0) now
+          $logWarnS "Bagger.makeNewBlock" . T.pack $
+            "The 'makeNewBlock' was called another time before the block was proposed. " ++
+            "The time difference between calls is " ++
+            show timeDiff
+          return cache0
 
 setCalculateIntrinsicGas :: MonadBagger m => (Integer -> OutputTx -> Integer) -> m ()
 setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s {B.calculateIntrinsicGas = cig}) <$> getBaggerState
@@ -505,9 +546,9 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
       txn = TD.transactionNonce bt
       txFee = B.calculateIntrinsicTxFee state t
       txSize = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt
-  when (intrinsicGas >= flags_gasLimit)
+  when (intrinsicGas >= Conf.gasLimit (networkConfig ethConf))
     . throwE
-    $ GasLimitExceeded Validation Incoming intrinsicGas flags_gasLimit t
+    $ GasLimitExceeded Validation Incoming intrinsicGas (Conf.gasLimit (networkConfig ethConf)) t
   (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
   when (addressNonce > txn)
     . throwE
@@ -515,9 +556,9 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   when (addressBalance < txFee)
     . throwE
     $ BalanceTooLow Validation Incoming txFee addressBalance t
-  when (txSize >= toInteger flags_txSizeLimit)
+  when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
     . throwE
-    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger flags_txSizeLimit) t
+    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
   when (otHash t `S.member` knownFailedTxs) $ do
     liftIO $ putStrLn $ "################################ otHash = " ++ format (otHash t)
     throwE $ KnownFailedTX Validation Incoming t
@@ -548,7 +589,6 @@ buildFromMiningCache :: MonadBagger m => m OutputBlock
 buildFromMiningCache = do
   $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
   state <- getBaggerState
-  isPBFT <- isBlockstanbul
   let cache = B.miningCache state
   let uncles = []
   let parentHash = B.bestBlockSHA cache
@@ -560,8 +600,7 @@ buildFromMiningCache = do
   let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
-  when isPBFT $
-    cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
+  cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
   return
     OutputBlock
       { obOrigin = TO.Quarry,

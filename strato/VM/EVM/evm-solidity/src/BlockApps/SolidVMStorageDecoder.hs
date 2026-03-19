@@ -36,8 +36,8 @@ import SolidVM.Model.Storable
 import Text.Printf
 import Text.Read
 
-decodeSolidVMValues :: [(StoragePath, BasicValue)] -> [(T.Text, SolidityValue)]
-decodeSolidVMValues pathValues = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
+decodeSolidVMValues :: [(StoragePath, BasicValue)] -> Either T.Text [(T.Text, SolidityValue)]
+decodeSolidVMValues pathValues = bimap (T.pack . printf "decodeSolidVMValues: %s" . show) id $ do
   totalStorage <- bimap show HM.toList $ synthesize pathValues
   mapMaybeM (bimapValue bsToText) totalStorage
 
@@ -47,19 +47,19 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> [(T.Text, Value)]
-decodeCacheValuesWith f hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesWith: %s" . show) id $ do
+decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> Either T.Text [(T.Text, Value)]
+decodeCacheValuesWith f hxs = bimap (T.pack . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesWith: %s" . show) id $ do
   let pathValues' = filter (uncurry f) $ M.toList hxs
   finalState <- bimap show HM.toList $ synthesize pathValues'
   mapM (bimapM bsToText return) finalState
 
-decodeCacheValues :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
+decodeCacheValues :: M.Map StoragePath BasicValue -> Either T.Text [(T.Text, Value)]
 decodeCacheValues = decodeCacheValuesWith (const . isBasic)
   where isBasic (StoragePath ([Field _])) = True
         isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
         isBasic _ = False
 
-decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
+decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> Either T.Text [(T.Text, Value)]
 decodeCacheValuesForCollections = decodeCacheValuesWith (\_ _ -> True)
 
 bsToText :: B.ByteString -> Either String T.Text
@@ -177,6 +177,10 @@ applyDelta' [Field n] bv _ = do
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
 applyDelta' sp@[Index _] BDefault _ = Right $ constructFromNothing' sp BDefault
 applyDelta' sp@[Index _] _ _ = Right $ constructFromNothing' sp BDefault
+-- Handle case where BDefault created a SimpleValue but we now have nested fields
+applyDelta' (Field n : sp) bv (SimpleValue _) = do
+  n' <- first (UnicodeError n) $ decodeUtf8' n
+  Right . ValueStruct . M.singleton n' $ constructFromNothing' sp bv
 applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 
 constructFromNothing :: StoragePath -> BasicValue -> V.Value
@@ -220,6 +224,7 @@ fromBasic = \case
   BBool b -> SimpleValue $ ValueBool b
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
+  BBytes bs -> SimpleValue $! V.ValueBytes Nothing bs
   BDecimal v -> SimpleValue $! ValueDecimal v
   BAddress a -> SimpleValue $! ValueAddress a
   BContract _ c -> ValueContract c

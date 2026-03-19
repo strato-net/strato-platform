@@ -5,16 +5,19 @@ import {
   getBalance,
   createToken,
   transferToken,
+  bulkTransferToken,
   approveToken,
   transferFromToken,
   setTokenStatus,
   getVoucherBalance,
   getTransferableTokens,
+  getTokenStats,
 } from "../services/tokens.service";
 import {
   validateAddressArgs,
   validateCreateTokensArgs,
   validateTransferItemArgs,
+  validateBulkTransferArgs,
   validateApproveArgs,
   validateTransferFromArgs,
   validateQueryParams,
@@ -52,25 +55,6 @@ class TokensController {
       const tokens = await getTokens(
         accessToken,
         query as Record<string, string | undefined>
-      );
-      res.status(RestStatus.OK).json(tokens);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async getActive(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query } = req;
-      validateQueryParams(query);
-
-      const tokens = await getTokens(
-        accessToken,
-        { ...query, status: "eq.2" } as Record<string, string | undefined>
       );
       res.status(RestStatus.OK).json(tokens);
     } catch (error) {
@@ -145,6 +129,24 @@ class TokensController {
     }
   }
 
+  static async bulkTransfer(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateBulkTransferArgs(body);
+
+      const result = await bulkTransferToken(
+        accessToken,
+        userAddress as string,
+        body.address,
+        body.transfers
+      );
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   static async approve(req: Request, res: Response, next: NextFunction) {
     try {
       const { accessToken, body, address: userAddress } = req;
@@ -194,6 +196,21 @@ class TokensController {
 
       const balance = await getVoucherBalance(accessToken, userAddress);
       res.status(RestStatus.OK).json({ balance });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getStats(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+
+      const stats = await getTokenStats(accessToken);
+      res.status(RestStatus.OK).json(stats);
     } catch (error) {
       next(error);
     }

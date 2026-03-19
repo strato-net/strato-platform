@@ -14,9 +14,12 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import           Blockchain.Strato.Model.Validator
+import           Blockchain.Stream.Action          (Delegatecall(..))
 import qualified Data.Aeson                        as JSON
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString.Lazy              as BL
+import qualified Data.Map.Strict                   as M
+import qualified Data.Sequence                     as S
 import           Data.String
 import qualified Data.Text as Text
 import           Data.Text.Encoding
@@ -26,10 +29,13 @@ import           Text.Printf
 
 -- | Inserts a Governance contract into the genesis block with the BlockApps root cert as owner
 insertMercataGovernanceContract :: Address -> [Validator] -> [Address] -> GenesisInfo -> GenesisInfo
-insertMercataGovernanceContract owner validators admins gi =
+insertMercataGovernanceContract owner validatorList admins gi =
   gi
     { addressInfo = initialAccounts ++ [govLogicAcct, govStorageAcct],
-      codeInfo = initialCode ++ [CodeInfo governanceSrc (Just "MercataGovernance")]
+      codeInfo = initialCode ++ [CodeInfo governanceSrc (Just "MercataGovernance")],
+      delegatecalls = M.union (delegatecalls gi) . M.fromList . map (fmap S.singleton) $
+        [ (govStorageAddr, Delegatecall govStorageAddr govLogicAddr (Just "BlockApps") "MercataGovernance")
+        ]
     }
   where
     initialAccounts = addressInfo gi
@@ -37,7 +43,7 @@ insertMercataGovernanceContract owner validators admins gi =
 
     governanceSrc = decodeUtf8 mercataGovernanceContract
 
-    valIx = zip [0 ..] validators
+    valIx = zip [0 ..] validatorList
     adminIx = zip [0 ..] admins
     govLogicAddr = 0xff
     govLogicAcct =
@@ -46,13 +52,14 @@ insertMercataGovernanceContract owner validators admins gi =
         0
         (SolidVMCode "MercataGovernance" (KECCAK256.hash mercataGovernanceContract))
         []
+    govStorageAddr = 0x100
     govStorageAcct =
       SolidVMContractWithStorage
-        0x100
+        govStorageAddr
         0
         (SolidVMCode "Proxy" (KECCAK256.hash mercataGovernanceContract))
         $ [ ("_owner", BAddress owner)
-          , ("validators.length", BInteger . toInteger $ length validators)
+          , ("validators.length", BInteger . toInteger $ length validatorList)
           , ("admins.length", BInteger . toInteger $ length admins)
           , ("logicContract", BAddress govLogicAddr)
           ]

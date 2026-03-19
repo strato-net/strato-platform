@@ -11,6 +11,14 @@ import {
   swap,
   getSwapHistory,
   setPoolRates,
+  pausePool,
+  unpausePool,
+  disablePool,
+  enablePool,
+  exchangeMultiToken,
+  addLiquidityMultiToken,
+  removeLiquidityMultiToken,
+  removeLiquidityMultiTokenOneCoin,
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -25,7 +33,14 @@ import {
   validateQueryParams,
   validateSwapHistoryArgs,
   validateSetPoolRatesArgs,
+  validateTogglePauseArgs,
+  validateToggleDisableArgs,
+  validateMultiTokenSwapArgs,
+  validateMultiTokenAddLiquidityArgs,
+  validateMultiTokenRemoveLiquidityArgs,
+  validateMultiTokenRemoveLiquidityOneArgs,
 } from "../validators/swapping.validator";
+import { validateAddressField } from "../validators/common.validators";
 
 class SwappingController {
   // Getters
@@ -42,11 +57,13 @@ class SwappingController {
         address: "eq." + params.poolAddress,
       });
 
-      if (!pools || pools.length === 0) {
+      const pool = pools.find(p => p.address.toLowerCase() === params.poolAddress.toLowerCase());
+
+      if (!pool) {
         throw new Error("Pool not found");
       }
 
-      res.status(RestStatus.OK).json(pools[0]);
+      res.status(RestStatus.OK).json(pool);
     } catch (error) {
       next(error);
     }
@@ -222,11 +239,35 @@ class SwappingController {
       const { accessToken, params, address: userAddress } = req;
       validateTokenPairArgs(params);
 
+      const addr1 = params.tokenAddress1.toLowerCase();
+      const addr2 = params.tokenAddress2.toLowerCase();
+
       const pools = await getPools(accessToken, userAddress, {
         tokenA: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
         tokenB: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
       });
-      res.status(RestStatus.OK).json(pools);
+
+      // Filter to only pools where both requested tokens have pool balance > 0
+      const filteredPools = pools.filter(pool => {
+        // Multi-token pool: check coins array
+        if (pool.coins && pool.coins.length > 2) {
+          const coin1 = pool.coins.find((c: any) => c.address.toLowerCase() === addr1);
+          const coin2 = pool.coins.find((c: any) => c.address.toLowerCase() === addr2);
+          return coin1 && coin2
+            && BigInt(coin1.poolBalance || "0") > 0n
+            && BigInt(coin2.poolBalance || "0") > 0n;
+        }
+        // 2-token pool: check tokenA and tokenB
+        const tokenAAddr = pool.tokenA?.address?.toLowerCase();
+        const tokenBAddr = pool.tokenB?.address?.toLowerCase();
+        const hasToken1 = tokenAAddr === addr1 || tokenBAddr === addr1;
+        const hasToken2 = tokenAAddr === addr2 || tokenBAddr === addr2;
+        if (!hasToken1 || !hasToken2) return false;
+        return BigInt(pool.tokenA?.poolBalance || "0") > 0n
+            && BigInt(pool.tokenB?.poolBalance || "0") > 0n;
+      });
+
+      res.status(RestStatus.OK).json(filteredPools);
     } catch (error) {
       next(error);
     }
@@ -244,7 +285,12 @@ class SwappingController {
 
       const page = query.page ? parseInt(query.page as string, 10) : 1;
       const limit = query.limit ? parseInt(query.limit as string, 10) : 10;
-      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, page, limit);
+      const sender = query.sender as string | undefined;
+      if (sender) {
+        const { error } = validateAddressField("sender").validate(sender);
+        if (error) throw new Error("sender Validation Error: " + error.message);
+      }
+      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, page, limit, sender);
       res.status(RestStatus.OK).json(swapHistory);
     } catch (error) {
       next(error);
@@ -267,6 +313,111 @@ class SwappingController {
       next(error);
     }
   }
+
+  static async togglePause(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateTogglePauseArgs(body);
+
+      const result = body.isPaused
+        ? await pausePool(accessToken, body.poolAddress, userAddress as string)
+        : await unpausePool(accessToken, body.poolAddress, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async toggleDisable(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateToggleDisableArgs(body);
+
+      const result = body.isDisabled
+        ? await disablePool(accessToken, body.poolAddress, userAddress as string)
+        : await enablePool(accessToken, body.poolAddress, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Multi-token pool operations
+  static async swapMultiToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateMultiTokenSwapArgs(body);
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await exchangeMultiToken(accessToken, { ...body, deadline }, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async addLiquidityMultiToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params, address: userAddress } = req;
+      validateMultiTokenAddLiquidityArgs(body);
+      validatePoolAddressArgs(params);
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await addLiquidityMultiToken(
+        accessToken,
+        { ...body, poolAddress: params.poolAddress, deadline },
+        userAddress as string
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async removeLiquidityMultiToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params, address: userAddress } = req;
+      validateMultiTokenRemoveLiquidityArgs(body);
+      validatePoolAddressArgs(params);
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await removeLiquidityMultiToken(
+        accessToken,
+        { ...body, poolAddress: params.poolAddress, deadline },
+        userAddress as string
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async removeLiquidityMultiTokenOneCoin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params, address: userAddress } = req;
+      validateMultiTokenRemoveLiquidityOneArgs(body);
+      validatePoolAddressArgs(params);
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await removeLiquidityMultiTokenOneCoin(
+        accessToken,
+        { ...body, poolAddress: params.poolAddress, deadline },
+        userAddress as string
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }
 
 export default SwappingController;

@@ -1,0 +1,284 @@
+#!/bin/bash
+# strato-call: Call Solidity contract functions with tab completion support
+#
+# Usage:
+#   strato-call <contract-or-alias> <function-name> [arg1=value1] [arg2=value2] ...
+#
+# Examples:
+#   strato-call usdst balanceOf accountAddress=f1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14
+#   strato-call 937efa7e3a77e20bbdbd7c0d32b6514f368c1010 transfer to=... value=...
+#
+# Tab completion:
+#   - First argument: contract aliases or addresses
+#   - Second argument: function names for that contract
+#   - Subsequent: parameter hints
+#
+# Contract aliases are defined in ~/.config/strato-call/contracts.json
+
+set -e
+
+# Config directory
+CONFIG_DIR="${HOME}/.config/strato-call"
+CONTRACTS_FILE="${CONFIG_DIR}/contracts.json"
+
+# Check dependencies
+if ! command -v restish &> /dev/null; then
+    echo "Error: restish not found. Install it first." >&2
+    exit 1
+fi
+
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq not found. Install it first." >&2
+    exit 1
+fi
+
+# Initialize config directory
+init_config() {
+    if [ ! -d "$CONFIG_DIR" ]; then
+        mkdir -p "$CONFIG_DIR"
+    fi
+    if [ ! -f "$CONTRACTS_FILE" ]; then
+        echo '{}' > "$CONTRACTS_FILE"
+    fi
+}
+
+# Resolve alias to address
+resolve_contract() {
+    local input="$1"
+    # If it looks like an address (40 hex chars), return as-is
+    if [[ "$input" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        echo "$input"
+        return
+    fi
+    # Try to look up in aliases
+    local addr=$(jq -r ".[\"$input\"].address // empty" "$CONTRACTS_FILE" 2>/dev/null)
+    if [ -n "$addr" ]; then
+        echo "$addr"
+        return
+    fi
+    # Return as-is and let the API fail if invalid
+    echo "$input"
+}
+
+# Get contract name from registry or API
+get_contract_name() {
+    local addr="$1"
+    # First check local registry
+    local name=$(jq -r "to_entries[] | select(.value.address == \"$addr\") | .value.name // .key" "$CONTRACTS_FILE" 2>/dev/null | head -1)
+    if [ -n "$name" ]; then
+        echo "$name"
+        return
+    fi
+    # Fall back to API query
+    echo "Contract"
+}
+
+# Helper functions
+show_usage() {
+    echo "strato-call - Call Solidity contract functions with tab completion"
+    echo ""
+    echo "Usage:"
+    echo "  strato-call <contract> <function> [arg1=val1] [arg2=val2] ..."
+    echo ""
+    echo "Arguments are auto-detected:"
+    echo "  key=123        -> number"
+    echo "  key=hello      -> string"
+    echo "  key={...}      -> JSON object"
+    echo "  key=[...]      -> JSON array"
+    echo ""
+    echo "Commands:"
+    echo "  --list-functions <contract>          List functions for a contract"
+    echo "  --function-info <contract> <func>    Show function parameters"
+    echo "  --register <alias> <address> [name]  Register a contract alias"
+    echo "  --unregister <alias>                 Remove a contract alias"
+    echo "  --list-contracts                     List registered contracts"
+    echo ""
+    echo "Examples:"
+    echo "  strato-call usdst balanceOf accountAddress=f1ba16..."
+    echo "  strato-call usdst transfer to=abc123 value=1000000000000000000"
+    echo "  strato-call mycontract setData 'data={\"enabled\":true}'"
+    echo "  strato-call --register usdst 937efa7e3a77e20bbdbd7c0d32b6514f368c1010 USDST"
+}
+
+list_functions() {
+    local input="$1"
+    local contract_addr=$(resolve_contract "$input")
+    local contract_name=$(get_contract_name "$contract_addr")
+    
+    restish strato get-by-contract-address-functions "$contract_name" "$contract_addr" 2>/dev/null | jq -r '.[]' | grep -v "^_" | sort
+}
+
+register_contract() {
+    local alias="$1"
+    local address="$2"
+    local name="${3:-$alias}"
+    
+    init_config
+    
+    # Validate address format
+    if [[ ! "$address" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        echo "Error: Invalid address format. Expected 40 hex characters." >&2
+        exit 1
+    fi
+    
+    local updated=$(jq ". + {\"$alias\": {\"address\": \"$address\", \"name\": \"$name\"}}" "$CONTRACTS_FILE")
+    echo "$updated" > "$CONTRACTS_FILE"
+    echo "Registered contract '$alias' -> $address ($name)"
+}
+
+unregister_contract() {
+    local alias="$1"
+    init_config
+    
+    local updated=$(jq "del(.[\"$alias\"])" "$CONTRACTS_FILE")
+    echo "$updated" > "$CONTRACTS_FILE"
+    echo "Unregistered contract '$alias'"
+}
+
+list_contracts() {
+    init_config
+    
+    if [ "$(jq 'length' "$CONTRACTS_FILE")" -eq 0 ]; then
+        echo "No contracts registered."
+        echo ""
+        echo "Register a contract with:"
+        echo "  strato-call --register <alias> <address> [name]"
+        return
+    fi
+    
+    echo "Registered contracts:"
+    jq -r 'to_entries[] | "  \(.key): \(.value.address) (\(.value.name))"' "$CONTRACTS_FILE"
+}
+
+function_info() {
+    local input="$1"
+    local func_name="$2"
+    local contract_addr=$(resolve_contract "$input")
+    
+    # Get contract details and extract function info
+    local details=$(restish strato get-by-contract-address-details "$contract_addr" 2>/dev/null)
+    
+    # Extract function arguments
+    echo "$details" | jq -r "._functions.\"$func_name\"._funcArgs | to_entries[] | \"\(.value[0]): \(.value[1].type.tag)\"" 2>/dev/null || echo "No parameters or function not found"
+}
+
+call_function() {
+    local input="$1"
+    local func_name="$2"
+    shift 2
+    local contract_addr=$(resolve_contract "$input")
+    
+    # Build args JSON
+    # Auto-detects value type:
+    #   key=123       -> number
+    #   key=hello     -> string
+    #   key={...}     -> JSON object (parsed)
+    #   key=[...]     -> JSON array (parsed)
+    local args_json="{}"
+    for arg in "$@"; do
+        local key="${arg%%=*}"
+        local value="${arg#*=}"
+        
+        if [[ "$value" =~ ^\{.*\}$ ]] || [[ "$value" =~ ^\[.*\]$ ]]; then
+            # Looks like JSON object or array - parse it
+            args_json=$(echo "$args_json" | jq --argjson v "$value" ". + {\"$key\": \$v}")
+        elif [[ "$value" =~ ^[0-9]+$ ]]; then
+            # Number
+            args_json=$(echo "$args_json" | jq ". + {\"$key\": $value}")
+        else
+            # String
+            args_json=$(echo "$args_json" | jq --arg v "$value" ". + {\"$key\": \$v}")
+        fi
+    done
+    
+    # Build the request
+    local request=$(jq -n \
+        --arg addr "$contract_addr" \
+        --arg method "$func_name" \
+        --argjson args "$args_json" \
+        '{
+            "txs": [{
+                "type": "FUNCTION",
+                "payload": {
+                    "contractAddress": $addr,
+                    "method": $method,
+                    "args": $args
+                }
+            }]
+        }')
+    
+    # Make the call
+    echo "$request" | restish strato post-bloc-transaction --resolve
+}
+
+# Initialize config on first use
+init_config
+
+# Main logic
+case "${1:-}" in
+    --help|-h)
+        show_usage
+        exit 0
+        ;;
+    --list-functions)
+        if [ -z "${2:-}" ]; then
+            echo "Error: Contract address or alias required" >&2
+            exit 1
+        fi
+        list_functions "$2"
+        exit 0
+        ;;
+    --function-info)
+        if [ -z "${2:-}" ] || [ -z "${3:-}" ]; then
+            echo "Error: Contract address/alias and function name required" >&2
+            exit 1
+        fi
+        function_info "$2" "$3"
+        exit 0
+        ;;
+    --register)
+        if [ -z "${2:-}" ] || [ -z "${3:-}" ]; then
+            echo "Error: Alias and address required" >&2
+            echo "Usage: strato-call --register <alias> <address> [name]"
+            exit 1
+        fi
+        register_contract "$2" "$3" "${4:-}"
+        exit 0
+        ;;
+    --unregister)
+        if [ -z "${2:-}" ]; then
+            echo "Error: Alias required" >&2
+            exit 1
+        fi
+        unregister_contract "$2"
+        exit 0
+        ;;
+    --list-contracts)
+        list_contracts
+        exit 0
+        ;;
+    --complete-contracts)
+        # For shell completion - output contract aliases
+        jq -r 'keys[]' "$CONTRACTS_FILE" 2>/dev/null || true
+        exit 0
+        ;;
+    --complete-functions)
+        # For shell completion - output function names
+        if [ -n "${2:-}" ]; then
+            list_functions "$2" 2>/dev/null || true
+        fi
+        exit 0
+        ;;
+    "")
+        show_usage
+        exit 1
+        ;;
+    *)
+        if [ -z "${2:-}" ]; then
+            echo "Error: Function name required" >&2
+            show_usage
+            exit 1
+        fi
+        call_function "$@"
+        ;;
+esac

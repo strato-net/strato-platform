@@ -1,0 +1,96 @@
+// Rewards contract ABI
+export const REWARDS_ABI = [
+  {
+    inputs: [],
+    name: "PRECISION_MULTIPLIER",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "rewardToken",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalRewardsEmission",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "lastBlockHandled",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    name: "activities",
+    outputs: [
+      { internalType: "string", name: "name", type: "string" },
+      { internalType: "uint8", name: "activityType", type: "uint8" },
+      { internalType: "uint256", name: "emissionRate", type: "uint256" },
+      { internalType: "uint256", name: "accRewardPerStake", type: "uint256" },
+      { internalType: "uint256", name: "lastUpdateTime", type: "uint256" },
+      { internalType: "uint256", name: "totalStake", type: "uint256" },
+      { internalType: "address", name: "allowedCaller", type: "address" },
+      { internalType: "address", name: "sourceContract", type: "address" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    name: "activityIds",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "", type: "uint256" },
+      { internalType: "address", name: "", type: "address" },
+    ],
+    name: "userInfo",
+    outputs: [
+      { internalType: "uint256", name: "stake", type: "uint256" },
+      { internalType: "uint256", name: "userIndex", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "", type: "address" }],
+    name: "unclaimedRewards",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256[]", name: "activityIds", type: "uint256[]" }],
+    name: "claimRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "claimAllRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "massUpdateActivitiesIndices",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+

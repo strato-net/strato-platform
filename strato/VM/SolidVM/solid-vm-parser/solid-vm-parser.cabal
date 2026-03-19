@@ -1,0 +1,87 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           solid-vm-parser
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      SolidVM.Solidity.Parse.File
+      SolidVM.Solidity.Parse.Lexer
+      SolidVM.Solidity.Parse.Statement
+      SolidVM.Solidity.Parse.Pragmas
+      SolidVM.Solidity.Parse.ParserTypes
+      SolidVM.Solidity.Parse.UnParser
+      SolidVM.Solidity.Parse.Declarations
+      SolidVM.Solidity.Xabi
+  other-modules:
+      SolidVM.Solidity.Parse.Alias
+      SolidVM.Solidity.Parse.Expression
+      SolidVM.Solidity.Parse.Imports
+      SolidVM.Solidity.Parse.Parser
+      SolidVM.Solidity.Parse.Types
+      Paths_solid_vm_parser
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      Decimal
+    , QuickCheck
+    , aeson
+    , aeson-casing
+    , base
+    , bytestring
+    , containers
+    , deepseq
+    , extra
+    , lens
+    , openapi3
+    , parsec
+    , quickcheck-instances
+    , semver-range
+    , solid-vm-model
+    , source-tools
+    , strato-model
+    , text
+  default-language: Haskell2010
+
+executable parse-solidvm
+  main-is: Parse.hs
+  hs-source-dirs:
+      exec_src
+  ghc-options: -Wall -O2 -threaded -rtsopts
+  build-depends:
+      base
+    , containers
+    , parsec
+    , solid-vm-parser
+  default-language: Haskell2010
+
+test-suite solid-vm-spec
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      ParserSpec
+      PragmaSpec
+      Spec
+      Paths_solid_vm_parser
+  hs-source-dirs:
+      tests/
+  ghc-options: -dynamic
+  build-depends:
+      HUnit
+    , base
+    , hflags
+    , hspec
+    , parsec
+    , raw-strings-qq
+    , solid-vm-model
+    , solid-vm-parser
+    , source-tools
+    , vm-tools
+  default-language: Haskell2010

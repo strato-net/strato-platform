@@ -1,4 +1,5 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
+import * as config from "./config";
 import {
   SWAP_CONTRACTS,
   SWAP_TOKEN_SELECT_FIELDS,
@@ -28,11 +29,16 @@ export const constants = (() => {
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
+  const CreditCardTopUp = `${CONTRACT_PREFIX}CreditCardTopUp`;
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
-  const RewardsChef = `${CONTRACT_PREFIX}RewardsChef`;
+  const Rewards = `${CONTRACT_PREFIX}Rewards`;
   const Voucher = `${CONTRACT_PREFIX}Voucher`;
+  const Vault = `${CONTRACT_PREFIX}Vault`;
+  const VaultFactory = `${CONTRACT_PREFIX}VaultFactory`;
+  const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
+  const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
   const Event = "event";
     
   const tokenSelectFields = [
@@ -133,12 +139,26 @@ export const constants = (() => {
     PoolConfigurator,
     AdminRegistry,
     MercataBridge,
+    CreditCardTopUp,
     CDPEngine,
     CDPVault,
     CDPRegistry,
-    RewardsChef,
+    Rewards,
     Voucher,
+    Vault,
+    VaultFactory,
+    MetalForge,
+    SafetyModule,
+    get metalForge() { return config.metalForge; },
+    get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
+    get vault() { return config.vault; },  // Use getter to get current value after init
+    priceOracle,
+    liquidityPool,
+    lendingPool,
+    safetyModule,
+    sToken,
     mercataBridge,
+    get creditCardTopUp() { return config.creditCardTopUp; },  // Use getter to get current value after init
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,
@@ -146,6 +166,9 @@ export const constants = (() => {
     Pool: SWAP_CONTRACTS.Pool,
     PoolFactory: SWAP_CONTRACTS.PoolFactory,
     PoolSwap: SWAP_CONTRACTS.PoolSwap,
+    StablePool: SWAP_CONTRACTS.StablePool,
+    StablePoolCoins: SWAP_CONTRACTS.StablePoolCoins,
+    StablePoolTokenBalances: SWAP_CONTRACTS.StablePoolTokenBalances,
     swapTokenSelectFields: SWAP_TOKEN_SELECT_FIELDS,
     swapSelectFields: SWAP_POOL_SELECT_FIELDS,
     swapHistorySelectFields: SWAP_HISTORY_SELECT_FIELDS,

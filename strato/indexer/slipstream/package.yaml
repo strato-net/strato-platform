@@ -29,12 +29,14 @@ library:
     - binary
     - bloc2
     - blockapps-data
+    - blockapps-datadefs
     - blockapps-mpdbs
     - classy-prelude
     - conduit
     - containers
     - cross-monitoring
     - deepseq
+    - esqueleto
     - extra
     - filepath
     - format
@@ -42,8 +44,10 @@ library:
     - kafka-monad
     - network
     - persistent
+    - persistent-postgresql
     - postgresql-simple
     - prometheus-client
+    - resource-pool
     - solid-vm-model
     - scientific
     - source-tools
@@ -73,8 +77,10 @@ executables:
       - postgresql-simple
       - slipstream
       - sql-monad
+      - strato-conf
       - text
       - transformers
+      - unliftio
       - wai-middleware-prometheus
       - warp
 

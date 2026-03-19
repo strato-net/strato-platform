@@ -30,7 +30,7 @@ import Control.Monad.Composable.SQL
 import Data.Aeson
 import Data.Foldable (for_)
 import Data.Maybe
-import Data.Swagger hiding (name)
+import Data.OpenApi hiding (name, server)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Database.Esqueleto.Internal.Internal as E
@@ -152,7 +152,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable StorageFilterParams [
                     -- Note: a join is done in StorageInfo
                     fmap (\v -> addrStRef E.^. AddressStateRefAddress E.==. E.val v) qsAddress
                   ]
-          
+
           unless (null criteria2) $
             E.where_ (foldl1 (E.&&.) criteria2)
 

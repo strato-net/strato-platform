@@ -1,18 +1,20 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CircleArrowDown, CircleArrowUp, Search, HelpCircle } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Search, LineChart ,HelpCircle} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUser } from '@/context/UserContext';
-import { useUserTokens } from '@/context/UserTokensContext';
+import { useTokenContext } from '@/context/TokenContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
-import { Pool } from '@/interface';
-import { rewardsEnabled } from '@/lib/constants';
+import { Pool, PoolCoin } from '@/interface';
+import { isMultiTokenPool } from '@/helpers/swapCalculations';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 import { useMobileTooltip } from '@/hooks/use-mobile-tooltip';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 
 // Mobile-only button tooltip component
 const MobileButtonTooltip = ({ containerClass, content }: { containerClass: string; content: string }) => {
@@ -37,6 +39,7 @@ const MobileButtonTooltip = ({ containerClass, content }: { containerClass: stri
   );
 };
 
+
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
@@ -48,18 +51,20 @@ const SwapPoolsSection = () => {
   const operationInProgressRef = useRef(false);
 
   const { fetchPools, getPoolByAddress } = useSwapContext();
-  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useUserTokens();
-  const { userAddress } = useUser();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
+  const { isLoggedIn } = useUser();
+  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   useEffect(() => {
     fetchAndEnrichPools();
   }, [fetchPools]);
 
   useEffect(() => {
-    if (userAddress) {
-      fetchUsdstBalance(userAddress);
+    // Only fetch user balance when logged in
+    if (isLoggedIn) {
+      fetchUsdstBalance();
     }
-  }, [userAddress, fetchUsdstBalance]);
+  }, [fetchUsdstBalance, isLoggedIn]);
 
   useEffect(() => {
     if (selectedPool && isDepositModalOpen) {
@@ -69,7 +74,7 @@ const SwapPoolsSection = () => {
           if (updatedPool) {
             setSelectedPool(updatedPool);
           }
-          await fetchUsdstBalance(userAddress);
+          await fetchUsdstBalance();
         } catch (error) {
           console.error('Error polling pool:', error);
         }
@@ -128,23 +133,27 @@ const SwapPoolsSection = () => {
   const handleDepositSuccess = async () => {
     // Refresh all data after successful deposit
     await fetchAndEnrichPools();
-    if (userAddress) {
-      await fetchUsdstBalance(userAddress);
-    }
+    await fetchUsdstBalance();
   };
 
   const handleWithdrawSuccess = async () => {
     // Refresh all data after successful withdrawal
     await fetchAndEnrichPools();
-    if (userAddress) {
-      await fetchUsdstBalance(userAddress);
-    }
+    await fetchUsdstBalance();
   };
 
 
   const filteredPools = pools.filter(pool => 
-    pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
+    !pool.isDisabled && pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const formatYourLiquidityValue = (pool: Pool): string => {
+    const totalBalance = BigInt(pool.lpToken.totalBalance || "0");
+    const price = BigInt(pool.lpToken.price || "0");
+    if (price === 0n || totalBalance === 0n) return "$0.00";
+    const valueInWei = (totalBalance * price) / BigInt(10**18);
+    return formatBalance(valueInWei, undefined, 18, 2, 2, true);
+  };
 
   useEffect(() => {
     return () => {
@@ -154,11 +163,13 @@ const SwapPoolsSection = () => {
     };
   }, []);
 
+  const navigate = useNavigate();
+
   return (
     <div>
       <div className="mb-4">
         <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search pairs..."
             value={searchQuery}
@@ -181,96 +192,125 @@ const SwapPoolsSection = () => {
           filteredPools.map((pool, id) => (
             <Card key={id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 gap-4">
                   <div className="flex items-center">
-                    <div className="flex items-center -space-x-2 mr-3">
-                      {pool.tokenA?.images?.[0]?.value ? (
-                        <img
-                          src={pool.tokenA.images[0].value}
-                          alt={pool.tokenA._name || pool.poolName?.split('/')[0]}
-                          className="w-8 h-8 rounded-full z-10 border-2 border-white object-cover"
-                        />
+                    <div className="relative w-12 h-8 mr-3 flex-shrink-0">
+                      {isMultiTokenPool(pool) ? (
+                        pool.coins!.map((coin: PoolCoin, idx: number) => (
+                          coin.images?.[0]?.value ? (
+                            <img
+                              key={coin.address}
+                              src={coin.images[0].value}
+                              alt={coin._name || coin._symbol}
+                              className="w-8 h-8 rounded-full border-2 border-white object-cover absolute"
+                              style={{ zIndex: pool.coins!.length - idx, left: `${pool.coins!.length <= 1 ? 0 : idx * (16 / (pool.coins!.length - 1))}px` }}
+                            />
+                          ) : (
+                            <div
+                              key={coin.address}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white absolute"
+                              style={{ backgroundColor: "red", zIndex: pool.coins!.length - idx, left: `${pool.coins!.length <= 1 ? 0 : idx * (16 / (pool.coins!.length - 1))}px` }}
+                            >
+                              {coin._symbol?.slice(0, 2)}
+                            </div>
+                          )
+                        ))
                       ) : (
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium z-10 border-2 border-white"
-                          style={{ backgroundColor: "red" }}
-                        >
-                          {pool.poolName?.slice(0, 2)}
-                        </div>
-                      )}
-                      {pool.tokenB?.images?.[0]?.value ? (
-                        <img
-                          src={pool.tokenB.images[0].value}
-                          alt={pool.tokenB._name || pool.poolName?.split('/')[1]}
-                          className="w-8 h-8 rounded-full border-2 border-white object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                          style={{ backgroundColor: "red" }}
-                        >
-                          {pool.poolName?.split('/')[1].slice(0, 2)}
-                        </div>
+                        <>
+                          {pool.tokenA?.images?.[0]?.value ? (
+                            <img
+                              src={pool.tokenA.images[0].value}
+                              alt={pool.tokenA._name || pool.poolName?.split('/')[0]}
+                              className="w-8 h-8 rounded-full border-2 border-white object-cover absolute"
+                              style={{ zIndex: 2, left: 0 }}
+                            />
+                          ) : (
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white absolute"
+                              style={{ backgroundColor: "red", zIndex: 2, left: 0 }}
+                            >
+                              {pool.poolName?.slice(0, 2)}
+                            </div>
+                          )}
+                          {pool.tokenB?.images?.[0]?.value ? (
+                            <img
+                              src={pool.tokenB.images[0].value}
+                              alt={pool.tokenB._name || pool.poolName?.split('/')[1]}
+                              className="w-8 h-8 rounded-full border-2 border-white object-cover absolute"
+                              style={{ zIndex: 1, left: '16px' }}
+                            />
+                          ) : (
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium absolute"
+                              style={{ backgroundColor: "red", zIndex: 1, left: '16px' }}
+                            >
+                              {pool.poolName?.split('/')[1]?.slice(0, 2)}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                     <div>
                       <h3 className="font-medium">{pool.poolName}</h3>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                      <div className="flex items-center text-xs text-muted-foreground mt-1">
+                        <span>TVL: {formatBalance(pool.totalLiquidityUSD, undefined, 18, 0, 0, true)}</span>
                       </div>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
-                      </div>
-                      {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
+                      {/* User-specific data - only show when logged in */}
+                      {isLoggedIn && (
                         <>
-                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
-                            <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
-                          </div>
-                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
-                            <span>• Unstaked: {formatBalance(pool.lpToken.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                          <div className="flex items-center text-xs text-muted-foreground mt-1">
+                            <span>Your Liquidity: {formatYourLiquidityValue(pool)}</span>
                           </div>
                         </>
                       )}
                     </div>
                   </div>
+                  {pool.isPaused && (
+                    <div className="flex flex-1 items-center justify-center">
+                      <span className="text-xs text-muted-foreground">Pool is paused by admin at this time.</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
                     <div className="text-left sm:text-right">
-                      <div className="text-sm text-gray-500">APY</div>
+                      <div className="text-sm text-muted-foreground">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="flex items-center space-x-1">
-                        <Button
-                          size="sm"
-                          className="bg-strato-blue hover:bg-strato-blue/90"
-                          onClick={() => handleOpenDepositModal(pool)}
-                        >
-                          <CircleArrowDown className="mr-1 h-4 w-4" />
-                          <span className="hidden sm:inline">Deposit</span>
-                          <span className="sm:hidden">+</span>
-                        </Button>
-                        <MobileButtonTooltip 
-                          containerClass={`deposit-tooltip-${id}`}
-                          content="Deposit liquidity to this pool"
-                        />
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
-                          onClick={() => handleOpenWithdrawModal(pool)}
-                          disabled={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
-                          title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
-                        >
-                          <CircleArrowUp className="mr-1 h-4 w-4" />
-                          <span className="hidden sm:inline">Withdraw</span>
-                          <span className="sm:hidden">-</span>
-                        </Button>
-                        <MobileButtonTooltip 
-                          containerClass={`withdraw-tooltip-${id}`}
-                          content="Withdraw liquidity from this pool"
-                        />
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex space-x-2">
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            size="sm"
+                            className="bg-strato-blue hover:bg-strato-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => handleOpenDepositModal(pool)}
+                            disabled={!isLoggedIn || pool.isPaused}
+                          >
+                            <CircleArrowDown className="mr-1 h-4 w-4" />
+                            <span className="hidden sm:inline">Deposit</span>
+                            <span className="sm:hidden">+</span>
+                          </Button>
+                          <MobileButtonTooltip 
+                            containerClass={`deposit-tooltip-${id}`}
+                            content="Deposit liquidity to this pool"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
+                            onClick={() => handleOpenWithdrawModal(pool)}
+                            disabled={!isLoggedIn || BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
+                            title={!isLoggedIn ? "Sign in to withdraw" : BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
+                          >
+                            <CircleArrowUp className="mr-1 h-4 w-4" />
+                            <span className="hidden sm:inline">Withdraw</span>
+                            <span className="sm:hidden">-</span>
+                          </Button>
+                          <MobileButtonTooltip 
+                            containerClass={`withdraw-tooltip-${id}`}
+                            content="Withdraw liquidity from this pool"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>

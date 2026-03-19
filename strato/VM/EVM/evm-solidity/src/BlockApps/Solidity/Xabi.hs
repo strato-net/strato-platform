@@ -20,7 +20,7 @@ import Data.Aeson.Types
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (listToMaybe, maybeToList)
-import Data.Swagger
+import Data.OpenApi
 import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Generics
@@ -356,10 +356,6 @@ instance ToSchema Using where
 
 soliditySchemaOptions :: SchemaOptions
 soliditySchemaOptions =
-  SchemaOptions
-    { fieldLabelModifier = camelCase . dropFPrefix,
-      constructorTagModifier = id,
-      datatypeNameModifier = id,
-      allNullaryToStringTag = True,
-      unwrapUnaryRecords = True
+  defaultSchemaOptions
+    { Data.OpenApi.fieldLabelModifier = camelCase . dropFPrefix
     }

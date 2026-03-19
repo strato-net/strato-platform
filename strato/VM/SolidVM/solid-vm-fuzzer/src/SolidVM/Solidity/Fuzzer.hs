@@ -143,9 +143,9 @@ accessible Nothing         = True
 accessible _               = False
 
 emptyOrBool :: [(a, IndexedType)] -> Bool
-emptyOrBool []                                = True
-emptyOrBool [(_, IndexedType _ SVMType.Bool)] = True
-emptyOrBool _                                 = False
+emptyOrBool []                                  = True
+emptyOrBool [(_, IndexedType _ SVMType.Bool _)] = True
+emptyOrBool _                                   = False
 
 test :: VMBase m => Address -> SolidString -> Func -> FuzzerM m FuzzerResult
 test addr fName f =
@@ -172,7 +172,7 @@ generateArgs = traverse generateArg
     generateArg SVMType.Bool = bool "false" "true" <$> (generate arbitrary :: IO Bool)
     generateArg (SVMType.UserDefined _ a) = generateArg a
     generateArg (SVMType.Address _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
-    generateArg (SVMType.UnknownLabel _ _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
+    generateArg (SVMType.UnknownLabel _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
     generateArg (SVMType.Struct _ _) = pure "<struct>" -- haha lol
     generateArg (SVMType.Enum _ _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Integer)
     generateArg (SVMType.Array t l) = do

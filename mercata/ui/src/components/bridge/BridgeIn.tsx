@@ -1,26 +1,18 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { DepositAction } from "@mercata/shared-types";
+import { metalForgeService, MetalConfig, PayTokenConfig } from "@/services/metalForgeService";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
-import { ensureHexPrefix } from "@/utils/numberUtils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   useAccount,
   useChainId,
   useBalance,
+  useReadContract,
   useWriteContract,
   useSwitchChain,
   useSignTypedData,
 } from "wagmi";
-import { createPublicClient, http } from "viem";
 import {
   NATIVE_TOKEN_ADDRESS,
   resolveViemChain,
@@ -28,24 +20,100 @@ import {
   ERC20_ABI,
   PERMIT2_ADDRESS,
 } from "@/lib/bridge/constants";
-import { bridgeContractService } from "@/lib/bridge/contractService";
-import { safeParseUnits, formatBalance } from "@/utils/numberUtils";
+import {
+  getTokenConfig,
+  checkPermit2Approval,
+  waitForTransaction,
+  getPermit2Nonce,
+  createPermit2Message,
+  getPermit2Domain,
+  getPermit2Types,
+  simulateDeposit,
+  validateRouterContract,
+} from "@/lib/bridge/contractService";
+import { normalizeError } from "@/lib/bridge/utils";
+import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits } from "@/utils/numberUtils";
+import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useUser } from "@/context/UserContext";
+import { useTokenContext } from "@/context/TokenContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import { BridgeContext } from "@/lib/bridge/types";
 import {
-  normalizeError,
-  formatTxHash,
-  getExplorerUrl,
-} from "@/lib/bridge/utils";
-import { DECIMAL_PATTERN } from "@/lib/constants";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
+import { redirectToLogin } from "@/lib/auth";
+import { Link } from "react-router-dom";
+import { ArrowDownToLine, Gem, CheckCircle2, TrendingUp } from "lucide-react";
+import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 
-const BridgeIn: React.FC = () => {
-  // ============================================
+const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
+
+const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+
+const calcMetalAmount = (payAmount: string, metal: MetalConfig, payToken: PayTokenConfig): bigint => {
+  try {
+    const input = safeParseUnits(payAmount, 18);
+    const principal = input - (input * BigInt(metal.feeBps || "0") / 10000n);
+    const fundsUSD = (principal * BigInt(payToken.price || "0")) / WAD;
+    const metalPrice = BigInt(metal.price);
+    return metalPrice > 0n ? (fundsUSD * WAD) / metalPrice : 0n;
+  } catch { return 0n; }
+};
+
+const CrossfadePanel = ({ active, children }: { active: boolean; children: React.ReactNode }) => (
+  <div className={`transition-opacity duration-300 ${active ? "opacity-100" : "opacity-0 absolute inset-0 pointer-events-none"}`}>
+    {children}
+  </div>
+);
+
+const CardSkeleton = ({ id }: { id: string }) => (
+  <div key={id} className="relative text-left rounded-md border-2 border-border p-3 animate-pulse">
+    <div className="flex items-center gap-2 mb-1">
+      <div className="w-6 h-6 rounded-full bg-muted shrink-0" />
+      <div className="h-[1.25rem] w-16 bg-muted rounded" />
+    </div>
+    <div className="h-[1rem] w-12 bg-muted rounded" />
+    <div className="h-[14px] w-16 bg-muted/50 rounded mt-0.5" />
+    <div className="h-[0.875rem] w-14 bg-muted rounded mt-1" />
+  </div>
+);
+
+const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled, apyBadge }: {
+  active: boolean; image?: string; symbol: string; estimated: string;
+  label: string; onClick: () => void; disabled: boolean;
+  apyBadge: React.ReactNode;
+}) => (
+  <button type="button" onClick={onClick} disabled={disabled}
+    className={`relative text-left rounded-md border-2 p-3 transition-colors ${
+      active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
+    }`}>
+    {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /></div>}
+    <div className="flex items-center gap-2 mb-1">
+      {image
+        ? <img src={image} alt={symbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
+        : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(symbol || "?").charAt(0)}</span>}
+      <p className="text-sm font-semibold text-foreground">{symbol}</p>
+    </div>
+    <p className="text-xs text-muted-foreground">{"\u2248"} {estimated}</p>
+    {apyBadge}
+    <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
+  </button>
+);
+
+interface BridgeInProps {
+  guestMode?: boolean;
+}
+
+const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
   // Hooks & Context
-  // ============================================
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
@@ -53,26 +121,27 @@ const BridgeIn: React.FC = () => {
   const { signTypedDataAsync } = useSignTypedData();
   const { toast } = useToast();
   const { userAddress } = useUser();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
+  const { activeTokens, fetchTokens } = useUserTokens();
   const {
     availableNetworks,
     bridgeableTokens,
+    depositActions,
     selectedNetwork,
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
+    requestDepositAction,
+    triggerDepositRefresh,
   } = useBridgeContext();
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
 
-  // ============================================
-  // State Management
-  // ============================================
+  // State
+  const [fundingMode, setFundingMode] = useState<"bridge" | "metals">("bridge");
   const [amount, setAmount] = useState("");
-  const [tokenBalance, setTokenBalance] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
-  const [approvalState, setApprovalState] = useState<"idle" | "approving" | "approved">("idle");
-  const [errors, setErrors] = useState({ amount: "", network: "" });
-  const inFlightRef = useRef(false);
-
-  // State for minimum deposit amount
+  const [amountError, setAmountError] = useState("");
+  const [networkError, setNetworkError] = useState("");
   const [minDepositInfo, setMinDepositInfo] = useState<{ 
     amount: string; 
     amountWei: bigint; 
@@ -82,45 +151,121 @@ const BridgeIn: React.FC = () => {
     amountWei: 0n,
     loading: false
   });
-  
-  // State for token permission status
   const [isTokenPermitted, setIsTokenPermitted] = useState(true);
+  const [selectedAction, setSelectedAction] = useState<DepositAction | null>(null);
+  const [metalsConfig, setMetalsConfig] = useState<{ metals: MetalConfig[]; payTokens: PayTokenConfig[] } | null>(null);
+  const [selectedPayToken, setSelectedPayToken] = useState<PayTokenConfig | null>(null);
+  const [selectedMetal, setSelectedMetal] = useState<MetalConfig | null>(null);
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState<DepositStep>("confirm_tx");
+  const [progressTxHash, setProgressTxHash] = useState<string>();
+  const [progressError, setProgressError] = useState<string>();
+  const [progressIsNative, setProgressIsNative] = useState(true);
+  const [metalsFeeError, setMetalsFeeError] = useState("");
 
-  // ============================================
-  // Derived State & Computed Values
-  // ============================================
-  const selectedNetworkConfig = availableNetworks.find(
-    (n) => n.chainName === selectedNetwork,
+  const prevRouteCountRef = React.useRef<number>(1);
+  const prevCardsRef = React.useRef<{ routes: typeof bridgeableTokens; actions: typeof depositActions }>({ routes: [], actions: [] });
+  const prevExternalTokenRef = React.useRef<string | null>(null);
+
+  useEffect(() => {
+    if (fundingMode !== "metals" || metalsConfig) return;
+    metalForgeService.getConfigs().then(cfg => {
+      setMetalsConfig(cfg);
+      const enabledMetals = cfg.metals.filter(m => m.isEnabled);
+      if (cfg.payTokens.length) setSelectedPayToken(cfg.payTokens[0]);
+      if (enabledMetals.length) setSelectedMetal(enabledMetals[0]);
+    }).catch(() => {});
+  }, [fundingMode]);
+
+  // Computed values
+  const currentNetwork = useMemo(() => {
+    return availableNetworks.find((n) => n.chainName === selectedNetwork) || null;
+  }, [availableNetworks, selectedNetwork]);
+
+  const { sourceTokenRoutes, matchingActions } = useMemo(() => {
+    if (!selectedToken) return { sourceTokenRoutes: prevCardsRef.current.routes, matchingActions: prevCardsRef.current.actions };
+    const routes = bridgeableTokens.filter((token) =>
+      token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
+    );
+    if (routes.length > 0) prevRouteCountRef.current = routes.length;
+    const mintStratoTokens = new Set(routes.filter(r => !r.isDefaultRoute).map(r => normAddr(r.stratoToken)));
+    const actions = depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
+    if (routes.length > 0) prevCardsRef.current = { routes, actions };
+    return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
+  }, [bridgeableTokens, selectedToken, depositActions]);
+
+  const getApy = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const entry of tokenApys) {
+      const best = entry.apys.reduce((max, a) => parseFloat(a.apy) > parseFloat(max) ? a.apy : max, "0");
+      if (parseFloat(best) > 0) m.set(normAddr(entry.token), best);
+    }
+    return (addr: string) => m.get(normAddr(addr));
+  }, [tokenApys]);
+
+  const ApyBadge = ({ addr }: { addr: string }) => (
+    <div className="h-[14px] mt-0.5">
+      {!tokenApysLoaded
+        ? <p className="text-[10px] font-medium text-green-500/40 flex items-center gap-0.5 animate-pulse blur-[2px]"><TrendingUp className="w-3 h-3" />0.00% APY</p>
+        : getApy(addr) && (
+          <p className="text-[10px] font-medium text-green-500 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />{getApy(addr)}% APY</p>
+        )
+      }
+    </div>
   );
-  const activeChainId = selectedNetworkConfig?.chainId;
-  const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
-  const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
-  const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n ? true : false;
 
-  // ============================================
-  // Balance Hooks
-  // ============================================
+  const metalsPayBalanceWei = useMemo(() => {
+    if (!selectedPayToken) return "0";
+    const tok = activeTokens.find((t: any) => normAddr(t.address) === normAddr(selectedPayToken.address));
+    return tok?.balance || "0";
+  }, [selectedPayToken, activeTokens]);
+
+  const metalsMaxAmount = useMemo(() => computeMaxTransferable(
+    metalsPayBalanceWei,
+    normAddr(selectedPayToken?.address || "") === normAddr(usdstAddress),
+    voucherBalance, usdstBalance, METAL_BUY_FEE_WEI, setMetalsFeeError
+  ), [metalsPayBalanceWei, selectedPayToken?.address, voucherBalance, usdstBalance]);
+
+  const metalsPayBalance = useMemo(() => {
+    return metalsPayBalanceWei !== "0" ? formatBalance(metalsPayBalanceWei) : "0.00";
+  }, [metalsPayBalanceWei]);
+
+  const uniqueExternalTokens = useMemo(() => {
+    const seen = new Set<string>();
+    return bridgeableTokens.filter((token) => {
+      const key = (token.externalToken || "").toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [bridgeableTokens]);
+
+  const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
+  const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
+  const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
+
   const {
     data: nativeBalance,
     refetch: refetchNative,
-    isError: nativeError,
     isLoading: nativeLoading,
   } = useBalance({
     address,
     chainId: expectedChainId || undefined,
     query: {
       enabled: isConnected && !!address && !!expectedChainId && isNativeToken,
+      refetchInterval: 15000,
     },
   });
 
   const {
-    data: tokenBalanceData,
+    data: tokenRawBalance,
     refetch: refetchToken,
-    isError: tokenError,
     isLoading: tokenLoading,
-  } = useBalance({
-    address,
-    token: ensureHexPrefix(selectedToken?.externalToken),
+  } = useReadContract({
+    address: ensureHexPrefix(selectedToken?.externalToken) as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
     chainId: expectedChainId || undefined,
     query: {
       enabled:
@@ -129,35 +274,108 @@ const BridgeIn: React.FC = () => {
         !!expectedChainId &&
         !!selectedToken &&
         !isNativeToken,
+      refetchInterval: 15000,
     },
   });
 
-  const isBalanceLoading =
-    isConnected &&
-    !!address &&
-    !!expectedChainId &&
-    (nativeLoading || tokenLoading);
+  const isBalanceLoading = isConnected && !!address && !!expectedChainId && (nativeLoading || tokenLoading);
 
-  // ============================================
-  // Utility Functions
-  // ============================================
-  
-  /**
-   * Fetches minimum deposit amount from router contract
-   */
+  const maxAmount = useMemo(() => {
+    if (isNativeToken) {
+      if (!nativeBalance?.value) return "0";
+      return nativeBalance.value.toString();
+    } else {
+      if (!tokenRawBalance) return "0";
+      return tokenRawBalance.toString();
+    }
+  }, [isNativeToken, nativeBalance?.value, tokenRawBalance]);
+
+  const formatBalanceDisplay = useCallback(
+    (valueWei: string) => {
+      const decimals = parseInt(selectedToken?.externalDecimals || "18");
+      const num = Number(formatUnits(valueWei, decimals));
+      return num.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 6,
+      });
+    },
+    [selectedToken?.externalDecimals]
+  );
+
+  const isButtonDisabled = guestMode || isLoading || !amount || !!amountError
+    || !selectedToken || !isConnected || !currentNetwork || !isCorrectNetwork
+    || isBalanceLoading || !isTokenPermitted;
+
+  // Effects
+  useEffect(() => {
+    if (!selectedNetwork && availableNetworks.length) {
+      setSelectedNetwork(availableNetworks[0].chainName);
+    }
+    if (!selectedToken && bridgeableTokens.length) {
+      setSelectedToken(bridgeableTokens[0]);
+    } else if (
+      selectedToken &&
+      !bridgeableTokens.some((t) => t.id === selectedToken.id)
+    ) {
+      setSelectedToken(bridgeableTokens[0] || null);
+    }
+
+    const currentExternal = (selectedToken?.externalToken || "").toLowerCase();
+    const prevExternal = prevExternalTokenRef.current;
+    if (prevExternal !== null && prevExternal !== currentExternal) {
+      setAmount("");
+      setAmountError("");
+      setSelectedAction(null);
+    }
+    prevExternalTokenRef.current = currentExternal;
+  }, [
+    availableNetworks,
+    bridgeableTokens,
+    selectedNetwork,
+    selectedToken,
+    setSelectedNetwork,
+    setSelectedToken,
+  ]);
+
+  useEffect(() => {
+    if (selectedToken && currentNetwork) {
+      fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
+    }
+  }, [selectedToken, currentNetwork]);
+
+  useEffect(() => {
+    const handleNetworkSwitch = async () => {
+      if (!selectedNetwork || !isConnected || !expectedChainId) {
+        setNetworkError("");
+        return;
+      }
+      if (chainId !== expectedChainId) {
+        try {
+          await switchChain({ chainId: expectedChainId });
+          setNetworkError("");
+        } catch {
+          setNetworkError(`Please switch to ${selectedNetwork}`);
+        }
+      } else {
+        setNetworkError("");
+      }
+    };
+    handleNetworkSwitch();
+  }, [chainId, isConnected, selectedNetwork, expectedChainId, switchChain]);
+
+  // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
-    if (!tokenAddress || !selectedNetworkConfig) return;
+    if (!tokenAddress || !currentNetwork) return;
     
     setMinDepositInfo(prev => ({ ...prev, loading: true }));
     
     try {
-      const tokenConfig = await bridgeContractService.getTokenConfig({
+      const tokenConfig = await getTokenConfig({
         tokenAddress,
-        chainId: parseInt(selectedNetworkConfig.chainId),
-        depositRouterAddress: selectedNetworkConfig.depositRouter,
+        chainId: parseInt(currentNetwork.chainId),
+        depositRouterAddress: currentNetwork.depositRouter,
       });
 
-      // Store both formatted amount and wei value
       const minAmountWei = tokenConfig.minAmount ? BigInt(tokenConfig.minAmount) : 0n;
       const formattedMinAmount = minAmountWei > 0n ? 
         formatBalance(minAmountWei, undefined, decimals) : "0";
@@ -168,8 +386,7 @@ const BridgeIn: React.FC = () => {
         loading: false
       });
       setIsTokenPermitted(tokenConfig.isPermitted);
-    } catch (error) {
-      console.error("Error fetching min deposit amount:", error);
+    } catch {
       setMinDepositInfo({ 
         amount: "0", 
         amountWei: 0n,
@@ -179,616 +396,605 @@ const BridgeIn: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    setAmount("");
-    setErrors((e) => ({ ...e, amount: "" }));
-    setApprovalState("idle");
-    
-    // Fetch minimum deposit amount for selected token
-    if (selectedToken && selectedNetworkConfig) {
-      fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
-    }
-  }, [selectedToken, selectedNetworkConfig]);
-
-  useEffect(() => {
-    const handleNetworkSwitch = async () => {
-      if (
-        isConnected &&
-        selectedNetwork &&
-        expectedChainId &&
-        chainId !== expectedChainId
-      ) {
-        setErrors((e) => ({
-          ...e,
-          network: `Switching to ${selectedNetwork} network...`,
-        }));
-        try {
-          await switchChain({ chainId: expectedChainId });
-        } catch {
-          setErrors((e) => ({
-            ...e,
-            network: `Please manually switch to ${selectedNetwork} network`,
-          }));
-        }
-      } else {
-        setErrors((e) => ({
-          ...e,
-          network:
-            isConnected && !selectedNetwork ? "Please select a network" : "",
-        }));
-      }
-    };
-    handleNetworkSwitch();
-  }, [chainId, isConnected, selectedNetwork, expectedChainId, switchChain]);
-
-  useEffect(() => {
-    const balance = isNativeToken ? nativeBalance : tokenBalanceData;
-
-    if (balance) {
-      setTokenBalance(
-        formatBalance(balance.value, undefined, balance.decimals),
-      );
-    }
-  }, [isNativeToken, nativeBalance, tokenBalanceData]);
-
-  /**
-   * Validates user input amount against balance and minimum requirements
-   */
-  const validateAmount = (value: string): boolean => {
-    if (!value) {
-      setErrors((e) => ({ ...e, amount: "" }));
-      return true;
-    }
-
-    const num = parseFloat(value);
-    if (isNaN(num) || num <= 0) {
-      setErrors((e) => ({
-        ...e,
-        amount:
-          num <= 0
-            ? "Amount must be greater than 0"
-            : "Please enter a valid number",
-      }));
-      return false;
-    }
-
-    // Check minimum amount using stored wei value
-    if (minDepositInfo.amountWei > 0n) {
-      const inputAmountWei = safeParseUnits(value, parseInt(selectedToken?.externalDecimals || "18"));
+  const handleAmountChange = useCallback(
+    (value: string) => {
+      const isBridge = fundingMode === "bridge";
+      const decimals = isBridge ? parseInt(selectedToken?.externalDecimals || "18") : 18;
+      const max = isBridge ? maxAmount : metalsMaxAmount;
+      handleAmountInputChange(value, setAmount, setAmountError, max, decimals);
       
-      if (inputAmountWei < minDepositInfo.amountWei) {
-        setErrors((e) => ({
-          ...e,
-          amount: `Amount must be at least ${minDepositInfo.amount} ${selectedToken?.externalSymbol}`,
-        }));
-        return false;
+      if (isBridge && value && minDepositInfo.amountWei > 0n) {
+        const inputAmountWei = safeParseUnits(value, decimals);
+        if (inputAmountWei < minDepositInfo.amountWei) {
+          setAmountError(`Amount must be at least ${minDepositInfo.amount} ${selectedToken?.externalSymbol}`);
+        }
       }
-    }
+    },
+    [fundingMode, maxAmount, metalsMaxAmount, selectedToken?.externalDecimals, selectedToken?.externalSymbol, minDepositInfo.amountWei, minDepositInfo.amount]
+  );
 
-    const tokenDecimals = parseInt(selectedToken?.externalDecimals || "18");
-    const decimalIndex = value.indexOf('.');
-    
-    if (decimalIndex !== -1) {
-      const decimalPlaces = value.length - decimalIndex - 1;
-      if (decimalPlaces > tokenDecimals) {
-        setErrors(e => ({ ...e, amount: `Maximum ${tokenDecimals} decimal places allowed` }));
-        return false;
-      }
-    }
-
-    const balanceMatch = tokenBalance.match(/^([\d,]+\.?\d*)/);
-    const bal = balanceMatch
-      ? parseFloat(balanceMatch[1].replace(/,/g, ""))
-      : 0;
-
-    if (num > bal) {
-      setErrors((e) => ({
-        ...e,
-        amount: `Insufficient balance. Maximum: ${tokenBalance} ${selectedToken?.externalSymbol}`,
-      }));
-      return false;
-    }
-
-    setErrors((e) => ({ ...e, amount: "" }));
-    return true;
-  };
-
-  // ============================================
-  // Event Handlers
-  // ============================================
-  
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (DECIMAL_PATTERN.test(value)) {
-      setAmount(value);
-      validateAmount(value);
-    }
-  };
-
-  // ============================================
-  // Bridge Flow Functions
-  // ============================================
-  
-  /**
-   * Validates configuration and prepares bridge context
-   */
-  const preflight = (): BridgeContext => {
-    if (
-      !selectedToken ||
-      !amount ||
-      !isConnected ||
-      !isCorrectNetwork ||
-      !address ||
-      !userAddress
-    ) {
-      throw new Error(
-        !userAddress ? "User address not available" : "Invalid configuration",
-      );
-    }
-
-    if (!selectedNetworkConfig) {
-      throw new Error("Selected network configuration not found");
-    }
-
-    const depositAmount = safeParseUnits(
-      amount,
-      parseInt(selectedToken.externalDecimals || "18"),
-    );
-    const isNative = BigInt(selectedToken?.externalToken || "0") === 0n ? true : false;
-
-    return {
-      selectedToken,
-      selectedNetwork,
-      amount,
-      userAddress,
-      address,
-      activeChainId,
-      depositRouter: selectedNetworkConfig.depositRouter,
-      depositAmount,
-      isNative,
-    };
-  };
-
-  const validateOnChain = async (ctx: BridgeContext) => {
-    const validation = await bridgeContractService.validateRouterContract({
-      depositRouterAddress: ctx.depositRouter,
-      amount: ctx.amount,
-      decimals: ctx.selectedToken.externalDecimals,
-      chainId: ctx.activeChainId,
-      tokenAddress: ctx.isNative ? NATIVE_TOKEN_ADDRESS : ensureHexPrefix(ctx.selectedToken.externalToken)
-    });
-
-    if (!validation.isValid) {
-      throw new Error(validation.error || "Validation failed");
-    }
-  };
-
-  const ensureAllowanceOrPermit = async (ctx: BridgeContext) => {
-    const approval = await bridgeContractService.checkPermit2Approval({
-      token: ctx.selectedToken.externalToken,
-      owner: ctx.address,
-      amount: ctx.depositAmount,
-      chainId: ctx.activeChainId,
-    });
-
-    if (!approval.isApproved) {
-      setApprovalState("approving");
-      toast({
-        title: "Approval Required",
-        description: "Approving Permit2 to spend your tokens...",
-      });
-
-      try {
-        const approveTx = await writeContractAsync({
-          address: ensureHexPrefix(ctx.selectedToken.externalToken),
-          abi: ERC20_ABI,
-          functionName: "approve",
-          args: [
-            PERMIT2_ADDRESS as `0x${string}`,
-            BigInt(2) ** BigInt(256) - BigInt(1),
-          ],
-          chain: await resolveViemChain(ctx.activeChainId),
-          account: ctx.address as `0x${string}`,
-        });
-
-        await bridgeContractService.waitForTransaction(
-          approveTx,
-          ctx.activeChainId,
-        );
-
-        setApprovalState("approved");
-        const approvalExplorerUrl = getExplorerUrl(
-          ctx.activeChainId,
-          approveTx,
-        );
-        toast({
-          title: "Approval Successful",
-          description: (
-            <div>
-              <p>Now processing your bridge transaction...</p>
-              <a
-                href={approvalExplorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline text-sm"
-              >
-                View Approval on Explorer →
-              </a>
-            </div>
-          ),
-        });
-      } catch (error) {
-        setApprovalState("idle");
-        throw error;
-      }
-    }
-  };
-
-  const buildPermit = async (ctx: BridgeContext) => {
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 900); // 15 minutes
-    const nonce = bridgeContractService.getPermit2Nonce();
-    const permitMessage = bridgeContractService.createPermit2Message({
-      token: ctx.selectedToken.externalToken,
-      amount: ctx.depositAmount,
-      spender: ctx.depositRouter,
-      nonce,
-      deadline,
-    });
+  const buildPermit = async ({
+    tokenAddress,
+    amount,
+    spender,
+    chainId,
+    owner,
+  }: {
+    tokenAddress: string;
+    amount: bigint;
+    spender: string;
+    chainId: string;
+    owner: string;
+  }) => {
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 900);
+    const nonce = getPermit2Nonce();
 
     const signature = await signTypedDataAsync({
-      domain: bridgeContractService.getPermit2Domain(ctx.activeChainId),
-      types: bridgeContractService.getPermit2Types(),
+      domain: getPermit2Domain(chainId),
+      types: getPermit2Types(),
       primaryType: "PermitTransferFrom",
-      message: permitMessage,
-      account: ctx.address as `0x${string}`,
+      message: createPermit2Message({
+        token: tokenAddress,
+        amount,
+        spender,
+        nonce,
+        deadline,
+      }),
+      account: owner as `0x${string}`,
     });
 
     return { signature, nonce, deadline };
   };
 
-  const simulateAndSend = async (
-    ctx: BridgeContext,
-    permitData?: { signature: string; nonce: bigint; deadline: bigint },
-  ): Promise<`0x${string}`> => {
-    const chain = await resolveViemChain(ctx.activeChainId);
-    const client = createPublicClient({ chain, transport: http() });
-
-    if (ctx.isNative) {
-      // Simulate ETH deposit
-      await client.simulateContract({
-        address: ctx.depositRouter as `0x${string}`,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "depositETH",
-        args: [ensureHexPrefix(ctx.userAddress)],
-        value: ctx.depositAmount,
-        account: ctx.address as `0x${string}`,
-      });
-
-      // Send ETH deposit
-      const txHash = await writeContractAsync({
-        address: ctx.depositRouter as `0x${string}`,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "depositETH",
-        args: [ensureHexPrefix(ctx.userAddress)],
-        value: ctx.depositAmount,
-        chain,
-        account: ctx.address as `0x${string}`,
-      });
-      return txHash as `0x${string}`;
-    } else {
-      if (!permitData) {
-        throw new Error("Permit data is required for ERC20 deposits");
-      }
-
-      // Simulate ERC20 deposit
-      await client.simulateContract({
-        address: ctx.depositRouter as `0x${string}`,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "deposit",
-        args: [
-          ensureHexPrefix(ctx.selectedToken.externalToken),  
-          ctx.depositAmount,
-          ensureHexPrefix(ctx.userAddress),
-          permitData!.nonce,
-          permitData!.deadline,
-          permitData!.signature as `0x${string}`
-        ],
-        account: ctx.address as `0x${string}`,
-      });
-
-      // Send ERC20 deposit
-      const txHash = await writeContractAsync({
-        address: ctx.depositRouter as `0x${string}`,
-        abi: DEPOSIT_ROUTER_ABI,
-        functionName: "deposit",
-        args: [
-          ensureHexPrefix(ctx.selectedToken.externalToken),
-          ctx.depositAmount,
-          ensureHexPrefix(ctx.userAddress),
-          permitData!.nonce,
-          permitData!.deadline,
-          permitData!.signature as `0x${string}`
-        ],
-        chain,
-        account: ctx.address as `0x${string}`,
-      });
-      return txHash as `0x${string}`;
+  const handleBuyMetals = async () => {
+    if (isLoading || !selectedPayToken || !selectedMetal || !amount || !userAddress) {
+      toast({ title: "Missing info", description: "Please select a token and enter an amount", variant: "destructive" });
+      return;
     }
-  };
-
-  const waitAndFinalize = async (ctx: BridgeContext, txHash: `0x${string}`) => {
-    const success = await bridgeContractService.waitForTransaction(
-      txHash,
-      ctx.activeChainId,
-    );
-    if (!success) {
-      throw new Error("Transaction reverted");
-    }
-  };
-
-  // ============================================
-  // Main Bridge Handler
-  // ============================================
-  
-  const handleBridge = async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
     setIsLoading(true);
-    toast({ title: "Preparing transaction...", description: "Please wait" });
+    try {
+      const payAmountWei = safeParseUnits(amount, 18).toString();
+      const metalAmount = calcMetalAmount(amount, selectedMetal, selectedPayToken);
+      const minMetalOut = (metalAmount * 9900n / 10000n).toString();
+
+      await metalForgeService.buy(selectedMetal.address, selectedPayToken.address, payAmountWei, minMetalOut);
+      toast({ title: "Success", description: `Purchased ${selectedMetal.symbol}` });
+      setAmount("");
+      fetchTokens();
+      fetchUsdstBalance();
+    } catch (error: any) {
+      toast({ title: "Transaction failed", description: error?.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBridge = async () => {
+    if (isLoading) return;
+
+    if (!selectedToken || !amount || !isConnected || !isCorrectNetwork || !address || !userAddress || !currentNetwork) {
+      toast({
+        title: "Invalid configuration",
+        description: "Please check your network, wallet connection, and token selection.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    setProgressError(undefined);
+    
+    const isNative = BigInt(selectedToken.externalToken || "0") === 0n;
+    setProgressIsNative(isNative);
+    
+    setProgressModalOpen(true);
 
     try {
-      // Validate
-      const ctx = preflight();
-      await validateOnChain(ctx);
+      const activeChainId = currentNetwork.chainId;
+      const depositRouter = currentNetwork.depositRouter;
+      const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
+      
+      // Set initial step based on token type
+      if (!isNative) {
+        // ERC20 tokens need approval
+        setCurrentStep("approve");
+      } else {
+        // Native tokens (ETH) go straight to confirm
+        setCurrentStep("confirm_tx");
+      }
+      const depositAmount = safeParseUnits(
+        amount,
+        parseInt(selectedToken.externalDecimals || "18"),
+      );
+
+      const validation = await validateRouterContract({
+        depositRouterAddress: depositRouter,
+        amount,
+        decimals: selectedToken.externalDecimals,
+        chainId: activeChainId,
+        tokenAddress: isNative ? NATIVE_TOKEN_ADDRESS : ensureHexPrefix(selectedToken.externalToken),
+        targetStratoToken,
+      });
+
+      if (!validation.isValid) {
+        throw new Error(validation.error || "Validation failed");
+      }
+
       let permitData:
         | { signature: string; nonce: bigint; deadline: bigint }
         | undefined;
-      if (!ctx.isNative) {
-        await ensureAllowanceOrPermit(ctx);
-        permitData = await buildPermit(ctx);
+      if (!isNative) {
+        // Step: Approve Token
+        setCurrentStep("approve");
+        
+        const approval = await checkPermit2Approval({
+          token: selectedToken.externalToken,
+          owner: address,
+          amount: depositAmount,
+          chainId: activeChainId,
+        });
+
+        if (!approval.isApproved) {
+          toast({
+            title: "Approval Required",
+            description: "Approving Permit2 to spend your tokens...",
+          });
+
+          const approveTx = await writeContractAsync({
+            address: ensureHexPrefix(selectedToken.externalToken),
+            abi: ERC20_ABI,
+            functionName: "approve",
+            args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
+            chain: await resolveViemChain(activeChainId),
+            account: address as `0x${string}`,
+          });
+
+          await waitForTransaction(approveTx, activeChainId);
+          
+          toast({
+            title: "Approval Successful",
+            description: "Approval confirmed. Processing transaction...",
+          });
+        }
+        
+        // Move to sign_permit step after approval completes (or if already approved)
+        setCurrentStep("sign_permit");
+        
+        // Build permit (this involves message signing, not a transaction)
+        permitData = await buildPermit({
+          tokenAddress: selectedToken.externalToken,
+          amount: depositAmount,
+          spender: depositRouter,
+          chainId: activeChainId,
+          owner: address,
+        });
+        
+        // Move to confirm_tx step after permit is signed
+        setCurrentStep("confirm_tx");
       }
 
-      const txHash = await simulateAndSend(ctx, permitData);
-      const explorerUrl = getExplorerUrl(ctx.activeChainId, txHash);
-      toast({
-        title: "Transaction Sent",
-        description: (
-          <div>
-            <p>Transaction submitted: {formatTxHash(txHash)}</p>
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 underline text-sm"
-            >
-              View on Explorer →
-            </a>
-          </div>
-        ),
+      await simulateDeposit({
+        depositRouter,
+        isNative,
+        tokenAddress: isNative ? undefined : selectedToken.externalToken,
+        amount: depositAmount,
+        userAddress,
+        targetStratoToken,
+        account: address,
+        chainId: activeChainId,
+        permitData,
       });
 
-      await waitAndFinalize(ctx, txHash);
+      // Step: Confirm Transaction (for native tokens, this is already set above)
+      if (isNative && currentStep !== "confirm_tx") {
+        setCurrentStep("confirm_tx");
+      }
+      const chain = await resolveViemChain(activeChainId);
 
-      toast({
-        title: "Bridge Initiated",
-        description:
-          "Your deposit has been submitted successfully. The relayer will process it shortly.",
-      });
-
-      // Trigger wagmi balance refetch
-      if (ctx.isNative) {
-        refetchNative();
+      let txHash: `0x${string}`;
+      if (isNative) {
+        txHash = await writeContractAsync({
+          address: depositRouter as `0x${string}`,
+          abi: DEPOSIT_ROUTER_ABI,
+          functionName: "depositETH",
+          args: [ensureHexPrefix(userAddress), targetStratoToken],
+          value: depositAmount,
+          chain,
+          account: address as `0x${string}`,
+        });
       } else {
-        refetchToken();
+        if (!permitData) {
+          throw new Error("Permit data is required for ERC20 deposits");
+        }
+        txHash = await writeContractAsync({
+          address: depositRouter as `0x${string}`,
+          abi: DEPOSIT_ROUTER_ABI,
+          functionName: "deposit",
+          args: [
+            ensureHexPrefix(selectedToken.externalToken),
+            depositAmount,
+            ensureHexPrefix(userAddress),
+            targetStratoToken,
+            permitData.nonce,
+            permitData.deadline,
+            permitData.signature as `0x${string}`,
+          ],
+          chain,
+          account: address as `0x${string}`,
+        });
       }
-    } catch (error: any) {
+
+      setProgressTxHash(txHash);
+      
+      // Step: Waiting for Transaction
+      setCurrentStep("waiting_tx");
+      const success = await waitForTransaction(txHash, activeChainId);
+      if (!success) {
+        throw new Error(`Transaction reverted on ${selectedNetwork} network. No funds were deposited on STRATO. Please try again.`);
+      }
+
+      const externalDecimals = parseInt(selectedToken.externalDecimals || "18");
+      const decimalDiff = 18 - externalDecimals;
+      const amount18Decimals = decimalDiff >= 0 
+        ? (depositAmount * BigInt(10 ** decimalDiff)).toString()
+        : depositAmount.toString();
+
+      const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+      const action = selectedAction?.action || 0;
+      existing.push({
+        externalChainId: parseInt(activeChainId),
+        externalTxHash: txHash,
+        type: action === 1 ? 'saving' : action === 2 ? 'forge' : 'bridge',
+        finalTokenSymbol: selectedAction?.stratoTokenSymbol,
+        DepositInfo: {
+          externalSender: address,
+          stratoRecipient: userAddress,
+          stratoToken: selectedToken.stratoToken,
+          stratoTokenAmount: amount18Decimals,
+          bridgeStatus: "1",
+        },
+        block_timestamp: new Date().toISOString(),
+        stratoTokenSymbol: selectedToken.stratoTokenSymbol,
+        externalName: selectedToken.externalName,
+        externalSymbol: selectedToken.externalSymbol,
+      });
+      localStorage.setItem('pendingDeposits', JSON.stringify(existing));
+      triggerDepositRefresh();
+
+      if (action > 0 && selectedAction) {
+        setCurrentStep("waiting_autosave");
+        await requestDepositAction({
+          externalChainId: activeChainId,
+          externalTxHash: txHash,
+          action,
+          targetToken: action === 2 ? selectedAction.stratoToken : undefined,
+        });
+      }
+
+      // Step: Complete
+      setCurrentStep("complete");
+      setAmount("");
+
+      await Promise.all([
+        isNative ? refetchNative() : refetchToken(),
+        fetchUsdstBalance(),
+      ]);
+    } catch (error: unknown) {
       const bridgeError = normalizeError(error);
+      setCurrentStep("error");
+      setProgressError(bridgeError.userMessage);
       toast({
         title: "Transaction Failed",
         description: bridgeError.userMessage,
         variant: "destructive",
+        duration: 3000,
       });
     } finally {
-      inFlightRef.current = false;
       setIsLoading(false);
-      setApprovalState("idle");
     }
   };
 
-  // ============================================
-  // Render
-  // ============================================
+  const networkNames = availableNetworks.map((n) => n.chainName).join(" or ");
+
+  const fundTokenLabel = (token: { externalSymbol?: string; externalName?: string } | null): string => {
+    if (!token) return "Select asset";
+    return token.externalSymbol || token.externalName || "Select asset";
+  };
   
   return (
-    <div className="space-y-6">
-      <BridgeWalletStatus />
+      <div className="space-y-7">
+        {/* STEP 1 */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">1</span>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How Are You Funding?</h3>
+          </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex-1 space-y-1.5">
-          <Label>From Network</Label>
-          <Select
-            value={selectedNetwork || ""}
-            onValueChange={(v) => {
-              setSelectedNetwork(v);
-              setSelectedToken(null);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select network" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableNetworks.map((n) => (
-                <SelectItem key={n.chainId} value={n.chainName}>
-                  {n.chainName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex-1 space-y-1.5">
-          <Label>To Network</Label>
-          <Input value="STRATO" disabled className="bg-gray-50" />
-        </div>
-      </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => { if (guestMode) redirectToLogin(); else setFundingMode("bridge"); }}
+              className={`relative rounded-md border-2 p-3 text-left transition-colors ${
+                fundingMode === "bridge"
+                  ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                  : "border-border hover:bg-muted/30"
+              }`}
+            >
+              {fundingMode === "bridge" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
+              <ArrowDownToLine className={`w-5 h-5 mb-2 ${fundingMode === "bridge" ? "text-blue-500" : "text-muted-foreground"}`} />
+              <p className="text-sm font-semibold">{guestMode ? "Connect" : "Bridge In"}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">From {networkNames}</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (guestMode) redirectToLogin(); else { setFundingMode("metals"); fetchTokens(); } }}
+              className={`relative rounded-md border-2 p-3 text-left transition-colors ${
+                fundingMode === "metals"
+                  ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                  : "border-border hover:bg-muted/30"
+              }`}
+            >
+              {fundingMode === "metals" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
+              <Gem className={`w-5 h-5 mb-2 ${fundingMode === "metals" ? "text-blue-500" : "text-muted-foreground"}`} />
+              <p className="text-sm font-semibold">Buy Metals</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Gold, Silver & more</p>
+            </button>
+          </div>
 
-      <div className="space-y-1.5">
-        <Label>Select Asset</Label>
-        <Select
-          value={selectedToken?.externalSymbol || ""}
-          onValueChange={(v) =>
-            setSelectedToken(
-              bridgeableTokens.find((t) => t.externalSymbol === v) || null,
-            )
-          }
-          disabled={bridgeableTokens.length === 0}
-        >
-          <SelectTrigger>
-            <SelectValue>
-              {selectedToken
-                ? `${selectedToken.externalName} (${selectedToken.externalSymbol})`
-                : "Select asset"}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {bridgeableTokens.map((t) => (
-              <SelectItem key={t.id} value={t.externalSymbol}>
-                {t.externalName} ({t.externalSymbol})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label>Amount</Label>
-        <Input
-          type="text"
-          inputMode="decimal"
-          pattern="[0-9]*\.?[0-9]*"
-          placeholder={
-            isConnected
-              ? isBalanceLoading
-                ? "Loading..."
-                : "0.00"
-              : "Connect wallet"
-          }
-          className={errors.amount ? "border-red-500" : ""}
-          value={amount}
-          onChange={handleAmountChange}
-          disabled={!isConnected || isBalanceLoading}
-        />
-        
-        {errors.amount && (
-          <p className="text-sm text-red-500">{errors.amount}</p>
-        )}
-        {isConnected && !isBalanceLoading && tokenBalance !== "0" && (
-          <PercentageButtons
-            value={amount}
-            maxValue={safeParseUnits(
-              tokenBalance,
-              parseInt(selectedToken?.externalDecimals || "18"),
-            ).toString()}
-            onChange={(v) => {
-              setAmount(v);
-              validateAmount(v);
-            }}
-            className="mt-2"
-            decimals={parseInt(selectedToken?.externalDecimals || "18")}
-          />
-        )}
-
-        {isConnected &&
-          (isBalanceLoading ? (
-            <div className="flex items-center gap-2 mt-1">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <span className="text-sm text-gray-500">Fetching balance...</span>
-            </div>
-          ) : tokenBalance ? (
-            <div className="space-y-2 mt-1">
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-gray-500">
-                  Balance: {tokenBalance} {selectedToken?.externalSymbol}
-                </p>
-                {selectedToken && selectedNetworkConfig && (
-                  <div className="flex items-center gap-1">
-                    {minDepositInfo.loading ? (
-                      <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-                    ) : (
-                      <span className="text-xs text-gray-500">
-                        Min: {minDepositInfo.amount} {selectedToken.externalSymbol}
-                      </span>
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            fundingMode === "bridge" ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0"
+          }`}>
+            <p className="text-xs font-medium text-muted-foreground mb-2">Choose Network</p>
+            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${availableNetworks.length || 1}, 1fr)` }}>
+              {availableNetworks.map((network) => {
+                const active = selectedNetwork === network.chainName;
+                return (
+                  <button
+                    key={network.chainId}
+                    type="button"
+                    onClick={() => setSelectedNetwork(network.chainName)}
+                    disabled={guestMode || isLoading}
+                    className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${
+                      active
+                        ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                        : "border-border text-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {active && (
+                      <div className="absolute top-1 right-1">
+                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                      </div>
                     )}
-                  </div>
+                    {network.chainName}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* STEP 2 */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Send</h3>
+            </div>
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              fundingMode === "bridge" ? "max-w-[300px] opacity-100" : "max-w-0 opacity-0"
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
+                  <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
+                  <BridgeWalletStatus guestMode={guestMode} />
+                </div>
+                {isConnected && address && (
+                  <button
+                    type="button"
+                    className="text-[11px] text-muted-foreground font-mono hover:text-foreground transition-colors"
+                    onClick={() => {
+                      navigator.clipboard.writeText(address);
+                      toast({ title: "Copied", description: "Address copied to clipboard", duration: 1500 });
+                    }}
+                  >
+                    {address.slice(0, 6)}...{address.slice(-4)}
+                  </button>
                 )}
               </div>
             </div>
-          ) : null)}
-      </div>
+          </div>
 
-      <div className="text-sm text-gray-500 space-y-1">
-        {[
-          "Transaction time varies by network congestion",
-        ].map((text, i) => (
-          <p key={i}>• {text}</p>
-        ))}
-      </div>
+          <div className="relative">
+            <CrossfadePanel active={fundingMode === "metals"}>
+              <div className="rounded-md border-2 border-border p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Select value={selectedPayToken?.address || ""}
+                    onValueChange={(val) => setSelectedPayToken(metalsConfig?.payTokens.find(t => t.address === val) || null)}
+                    disabled={fundingMode !== "metals" || !metalsConfig?.payTokens.length || guestMode || isLoading}>
+                    <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
+                      <SelectValue placeholder="Token" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(metalsConfig?.payTokens || []).map((t) => (
+                        <SelectItem key={t.address} value={t.address}>{t.symbol}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
+                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
+                    value={amount} onChange={(e) => handleAmountChange(e.target.value)}
+                    disabled={fundingMode !== "metals" || guestMode || isLoading} />
+                </div>
+                {amountError && fundingMode === "metals" && <p className="text-xs text-red-500">{amountError}</p>}
+                {metalsFeeError && fundingMode === "metals" && <p className="text-xs text-yellow-600">{metalsFeeError}</p>}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs text-muted-foreground">
+                    Balance: <span className="text-foreground font-medium">{metalsPayBalance || "0.00"} {selectedPayToken?.symbol || ""}</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <PercentageButtons value={amount} maxValue={metalsMaxAmount} onChange={handleAmountChange}
+                      decimals={18} disabled={fundingMode !== "metals" || guestMode || isLoading}
+                      className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
+                  </div>
+                </div>
+              </div>
+            </CrossfadePanel>
+            <CrossfadePanel active={fundingMode === "bridge"}>
+              <div className="rounded-md border-2 border-border p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Select value={(selectedToken?.externalToken || "").toLowerCase()}
+                    onValueChange={(val) => {
+                      const match = bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
+                        || bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
+                      setSelectedToken(match);
+                    }}
+                    disabled={!uniqueExternalTokens.length || guestMode || isLoading}>
+                    <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
+                      <SelectValue placeholder="Token" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {uniqueExternalTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
+                        <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
+                          {fundTokenLabel(t)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
+                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
+                    value={amount} onChange={(e) => handleAmountChange(e.target.value)}
+                    disabled={guestMode || !isConnected || isLoading} />
+                </div>
+                {amountError && <p className="text-xs text-red-500">{amountError}</p>}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs text-muted-foreground">
+                    Balance: <span className="text-foreground font-medium">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <PercentageButtons value={amount} maxValue={maxAmount} onChange={handleAmountChange}
+                      decimals={parseInt(selectedToken?.externalDecimals || "18")}
+                      disabled={guestMode || !isConnected || isLoading}
+                      className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
+                  </div>
+                </div>
+              </div>
+            </CrossfadePanel>
+          </div>
+        </section>
 
-      <div className="flex justify-end">
-        <Button
-          onClick={handleBridge}
-          disabled={
-            isLoading ||
-            !amount ||
-            !selectedToken ||
-            !isConnected ||
-            !isCorrectNetwork ||
-            !isTokenPermitted
-          }
-          className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-        >
-          {isLoading && approvalState === "approving" && "Approving..."}
-          {isLoading && approvalState === "approved" && "Bridging..."}
-          {isLoading && approvalState === "idle" && "Processing..."}
-          {!isLoading && !isConnected && "Connect Wallet"}
-          {!isLoading && isConnected && !selectedNetwork && "Select Network"}
-          {!isLoading &&
-            isConnected &&
-            selectedNetwork &&
-            !selectedToken &&
-            "Select Asset"}
-          {!isLoading &&
-            isConnected &&
-            selectedToken &&
-            !amount &&
-            "Enter Amount"}
-          {!isLoading &&
-            isConnected &&
-            selectedToken &&
-            amount &&
-            !isCorrectNetwork &&
-            `Switch to ${selectedNetwork}`}
-          {!isLoading &&
-            isConnected &&
-            selectedToken &&
-            amount &&
-            isCorrectNetwork &&
-            !isTokenPermitted &&
-            "Token Not Permitted"}
-          {!isLoading &&
-            isConnected &&
-            selectedToken &&
-            amount &&
-            isCorrectNetwork &&
-            isTokenPermitted &&
-            "Bridge Assets"}
-        </Button>
-      </div>
+        {/* STEP 3 */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+          </div>
 
-      {errors.network && (
-        <p className="text-sm text-red-500">{errors.network}</p>
-      )}
-    </div>
-  );
+          <div className="relative">
+            <CrossfadePanel active={fundingMode === "metals"}>
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((metalsConfig?.metals.filter(m => m.isEnabled).length || 2), 3)}, 1fr)` }}>
+                {!metalsConfig
+                  ? Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={`ms-${i}`} id={`ms-${i}`} />)
+                  : metalsConfig.metals.filter(m => m.isEnabled).map((metal) => {
+                      const metalWei = amount && selectedPayToken ? calcMetalAmount(amount, metal, selectedPayToken) : 0n;
+                      return (
+                        <TokenCard key={metal.address}
+                          active={selectedMetal?.address === metal.address}
+                          image={metal.imageUrl} symbol={metal.symbol}
+                          estimated={metalWei > 0n ? formatUnits(metalWei, 18) : "0"}
+                          label={`${Number(metal.feeBps) / 100}% fee`}
+                          onClick={() => setSelectedMetal(metal)}
+                          disabled={guestMode || isLoading}
+                          apyBadge={<ApyBadge addr={metal.address} />}
+                        />
+                      );
+                    })
+                }
+              </div>
+            </CrossfadePanel>
+            <CrossfadePanel active={fundingMode === "bridge"}>
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((sourceTokenRoutes.length + matchingActions.length) || prevRouteCountRef.current, 3)}, 1fr)` }}>
+                {sourceTokenRoutes.length > 0 ? (<>
+                  {sourceTokenRoutes.map((rt) => (
+                    <TokenCard key={rt.id}
+                      active={rt.id === selectedToken?.id && !selectedAction}
+                      image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
+                      estimated={amount || "0"}
+                      label={rt.isDefaultRoute ? "VIA WRAP" : "VIA MINT"}
+                      onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
+                      disabled={guestMode || isLoading}
+                      apyBadge={<ApyBadge addr={rt.stratoToken} />}
+                    />
+                  ))}
+                  {matchingActions.map((action) => {
+                    let est = amount || "0";
+                    if (action.action === 2 && action.oraclePrice && amount) {
+                      try {
+                        const price = BigInt(action.oraclePrice);
+                        if (price > 0n) est = formatUnits((safeParseUnits(amount, 18) * WAD) / price, 18);
+                      } catch { /* keep */ }
+                    }
+                    return (
+                      <TokenCard key={action.id}
+                        active={selectedAction?.id === action.id}
+                        image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
+                        estimated={est}
+                        label={action.action === 1 ? "EARN YIELD" : "BUY METAL"}
+                        onClick={() => {
+                          const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
+                          if (mintRoute) setSelectedToken(mintRoute);
+                          setSelectedAction(action);
+                        }}
+                        disabled={guestMode || isLoading}
+                        apyBadge={<ApyBadge addr={action.stratoToken} />}
+                      />
+                    );
+                  })}
+                </>) : (
+                  Array.from({ length: prevRouteCountRef.current }).map((_, i) => <CardSkeleton key={`bs-${i}`} id={`bs-${i}`} />)
+                )}
+              </div>
+            </CrossfadePanel>
+          </div>
+        </section>
+
+        <div className="space-y-2">
+          <Button
+            onClick={fundingMode === "metals" ? handleBuyMetals : handleBridge}
+            disabled={fundingMode === "metals" ? (isLoading || !selectedPayToken || !selectedMetal || !amount || guestMode) : isButtonDisabled}
+            className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
+          >
+            {isLoading ? "Processing..." : fundingMode === "metals" ? `Buy ${selectedMetal?.symbol || "Metal"}` : "Deposit"}
+          </Button>
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${
+            fundingMode === "bridge" ? "max-h-[30px] opacity-100" : "max-h-0 opacity-0"
+          }`}>
+            <Link to="/dashboard/withdrawals" className="text-xs text-blue-500 hover:text-blue-400">
+              Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
+            </Link>
+          </div>
+        </div>
+
+        {networkError && (
+          <p className="text-sm text-red-500">{networkError}</p>
+        )}
+
+        <DepositProgressModal
+          open={progressModalOpen}
+          currentStep={currentStep}
+          txHash={progressTxHash}
+          chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
+          isEasySavings={(selectedAction?.action || 0) > 0}
+          isNative={progressIsNative}
+          error={progressError}
+          onClose={() => {
+            setProgressModalOpen(false);
+            setCurrentStep("confirm_tx");
+            setProgressTxHash(undefined);
+            setProgressError(undefined);
+          }}
+        />
+      </div>
+    );
 };
 
 export default BridgeIn;

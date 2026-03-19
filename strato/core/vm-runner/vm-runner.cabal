@@ -1,0 +1,151 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           vm-runner
+version:        0.0.4
+synopsis:       The executable that runs VMs for transactions
+category:       Data Structures
+author:         Jamshid
+maintainer:     jamshidnh@gmail.com
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.BlockChain
+      Blockchain.Event
+      Executable.EthereumVM
+      Executable.EthereumVM2
+  other-modules:
+      Blockchain.Bootstrap
+      Blockchain.JsonRpcCommand
+      Blockchain.TheDAOFork
+      Blockchain.Verifier
+      Blockchain.VMConstants
+      Executable.EVMCheckpoint
+      Paths_vm_runner
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      base
+    , binary
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-mpdbs
+    , blockstanbul
+    , bytestring
+    , common-log
+    , composable-monads-base
+    , conduit
+    , containers
+    , cross-monitoring
+    , dlist
+    , ethereum-rlp
+    , exceptions
+    , extra
+    , format
+    , kafka-monad
+    , lens
+    , merkle-patricia-db
+    , monad-alter
+    , ordered-containers
+    , persistent-postgresql
+    , prometheus-client
+    , redis-monad
+    , seqevents
+    , solid-vm
+    , solid-vm-compiler
+    , solid-vm-model
+    , sql-monad
+    , strato-conf
+    , strato-genesis
+    , strato-index
+    , strato-model
+    , strato-redis-blockdb
+    , strato-statediff
+    , text
+    , time
+    , transformers
+    , unliftio
+    , vm-tools
+  default-language: Haskell2010
+
+executable vm-runner
+  main-is: Main.hs
+  hs-source-dirs:
+      exec_src
+  ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
+  build-depends:
+      async
+    , base
+    , blockapps-init
+    , common-log
+    , hflags
+    , process-monitor
+    , strato-model
+    , vm-runner
+    , vm-tools
+    , wai-middleware-prometheus
+    , warp
+  default-language: Haskell2010
+
+test-suite ethereum-vm-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_vm_runner
+  hs-source-dirs:
+      test/
+  ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -dynamic
+  build-depends:
+      base
+    , base16-bytestring
+    , blockapps-data
+    , blockapps-mpdbs
+    , blockstanbul
+    , bytestring
+    , common-log
+    , containers
+    , hflags
+    , hspec
+    , hspec-expectations-lifted
+    , labeled-error
+    , merkle-patricia-db
+    , monad-alter
+    , strato-model
+    , vm-runner
+    , vm-tools
+  default-language: Haskell2010
+
+benchmark extractbench
+  type: exitcode-stdio-1.0
+  main-is: ExtractBench.hs
+  hs-source-dirs:
+      bench/
+  ghc-options: -dynamic
+  build-depends:
+      base
+    , bytestring
+    , criterion
+  default-language: Haskell2010
+
+benchmark microbench
+  type: exitcode-stdio-1.0
+  main-is: Microbench.hs
+  hs-source-dirs:
+      bench/
+  ghc-options: -dynamic
+  build-depends:
+      base
+    , bytestring
+    , containers
+    , criterion
+    , deepseq
+    , strato-model
+    , vector
+  default-language: Haskell2010

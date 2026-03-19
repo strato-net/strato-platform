@@ -7,6 +7,23 @@ import { BridgeError } from "./types";
  * Normalizes errors from various sources into a consistent BridgeError format
  */
 export function normalizeError(error: any): BridgeError {
+  // Handle user rejections first (before other error processing)
+  const errorMessage = error?.message || error?.shortMessage || "";
+  const errorName = error?.name || "";
+  
+  if (
+    errorMessage.includes("User rejected") ||
+    errorMessage.includes("User denied") ||
+    errorMessage.includes("denied transaction") ||
+    errorName === "UserRejectedRequestError"
+  ) {
+    return {
+      code: "USER_REJECTED",
+      message: error.message || errorMessage,
+      userMessage: "Transaction cancelled. You can try again when ready.",
+    };
+  }
+
   // Handle viem errors
   if (error?.shortMessage) {
     return {
@@ -40,15 +57,6 @@ export function normalizeError(error: any): BridgeError {
     };
   }
 
-  // Handle user rejections
-  if (error?.message?.includes("User rejected")) {
-    return {
-      code: "USER_REJECTED",
-      message: error.message,
-      userMessage: "Transaction cancelled by user",
-    };
-  }
-
   // Handle contract reverts with custom errors
   if (error?.data) {
     try {
@@ -73,7 +81,7 @@ export function normalizeError(error: any): BridgeError {
   return {
     code: "UNKNOWN_ERROR",
     message: error?.message || "Unknown error occurred",
-    userMessage: "An unexpected error occurred. Please try again.",
+    userMessage: error?.message || "An unexpected error occurred. Please try again.",
   };
 }
 
@@ -86,6 +94,8 @@ function getFriendlyMessage(errorName: string, data?: `0x${string}`): string {
       return "This token is not currently supported for bridging.";
     case "BelowMinimum":
       return "Amount is below minimum required. Please try a larger amount.";
+    case "NotPermitted":
+      return "This token route is not permitted for deposits.";
     case "InvalidAddress":
       return "Invalid address provided. Please check your wallet connection.";
     case "ETHTransferFailed":
@@ -147,6 +157,8 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
       return `https://optimistic.etherscan.io/tx/${txHash}`;
     case 8453: // Base
       return `https://basescan.org/tx/${txHash}`;
+    case 84532: // Base Sepolia
+      return `https://sepolia.basescan.org/tx/${txHash}`;
     case 42161: // Arbitrum
       return `https://arbiscan.io/tx/${txHash}`;
     case 56: // BSC
@@ -159,9 +171,9 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
 }
 
 /**
- * Gets chain name from chain ID
+ * Gets chain name from chain ID (supports both number and string)
  */
-export function getChainName(chainId: number): string {
+export function getChainName(chainId: number | string): string {
   const chainEntries = Object.entries(SUPPORTED_CHAINS);
   const chainEntry = chainEntries.find(([_, id]) => id === chainId);
   return chainEntry ? chainEntry[0] : "Unknown Chain";
@@ -171,7 +183,7 @@ export function getChainName(chainId: number): string {
  * Bridge status options for filter dropdowns
  */
 export const BRIDGE_STATUS_OPTIONS = [
-  { value: null, label: "All Statuses" },
+  { value: 0, label: "All Statuses" },
   { value: 1, label: "Initiated" },
   { value: 2, label: "Pending Review" },
   { value: 3, label: "Completed" },
@@ -200,3 +212,13 @@ export const handleCopyToClipboard = async (text: string): Promise<void> => {
     message.error("Failed to copy");
   }
 };
+
+export function mergePendingDeposits(apiDeposits: any[]): {
+  remaining: any[];
+} {
+  const pendingRaw = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+  const apiTxHashes = new Set(apiDeposits.map((tx: any) => tx?.externalTxHash));
+  const remaining = pendingRaw.filter((p: any) => !apiTxHashes.has(p?.externalTxHash));
+  localStorage.setItem('pendingDeposits', JSON.stringify(remaining));
+  return { remaining };
+}

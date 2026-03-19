@@ -120,14 +120,11 @@ const CollateralModal = ({
         // If user selected at least the max, invoke on-chain max-withdraw to avoid drift issues
         if (amtWei >= maxDisplayAmount && maxDisplayAmount > 0n) {
           onAction('ALL');
-          setAmount("");
           return;
         }
       }
     } catch {}
     onAction(amount);
-    setAmount("");
-    setAmountError("");
   };
 
   // Clear input when modal closes
@@ -228,12 +225,12 @@ const CollateralModal = ({
         <div className="space-y-6 py-4">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-500">{getBalanceText()}</span>
+              <span className="text-sm text-muted-foreground">{getBalanceText()}</span>
               <span className="font-medium">{getBalanceValue()}</span>
             </div>
             {!isSupply && (
               <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Max withdrawable now</span>
+                <span className="text-sm text-muted-foreground">Max withdrawable now</span>
                 <span className="font-medium">{formatUnits(maxDisplayAmount)}</span>
               </div>
             )}
@@ -243,7 +240,7 @@ const CollateralModal = ({
             <label className="text-sm font-medium">
               {getAmountLabel()} ({asset?._name})
             </label>
-            <div className="flex justify-between items-center text-xs text-gray-500">
+            <div className="flex justify-between items-center text-xs text-muted-foreground">
               <div>
                 <button
                   type="button"
@@ -251,7 +248,7 @@ const CollateralModal = ({
                     const max = formatUnits(maxAmount);
                     setAmount(max);
                   }}
-                  className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
+                  className="px-2 py-1 mr-1 bg-muted hover:bg-muted/80 rounded-full text-foreground text-xs font-medium transition"
                 >
                   Max :
                 </button>
@@ -274,7 +271,7 @@ const CollateralModal = ({
                   handleAmountInputChange(value, setAmount, setAmountError, maxAmount);
                 }}
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                 {asset?._symbol}
               </span>
             </div>
@@ -340,9 +337,9 @@ const CollateralModal = ({
           <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} className="pb-0" />
 
           {/* Transaction Fee Display */}
-          <div className="px-4 bg-gray-50 rounded-md">
+          <div className="px-4 bg-muted/50 rounded-md">
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-600">Transaction Fee</span>
+              <span className="text-muted-foreground">Transaction Fee</span>
               <span className="font-medium">{transactionFee} USDST ({parseFloat(transactionFee) * 100} voucher)</span>
             </div>
             {(() => {
