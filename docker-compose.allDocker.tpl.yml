@@ -1,5 +1,5 @@
 #strato-version:<VERSION>
-#bootstrap-docker-min-version:1
+#bootstrap-docker-min-version:2
 version: "3"
 volumes:
   pgdata:
