@@ -1,6 +1,7 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -46,6 +47,7 @@ import Data.List (sort)
 import Handlers.AccountInfo
 import Handlers.Storage
 import SQLM
+import SolidVM.Model.CodeCollection (CodeCollection)
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function
 import UnliftIO
@@ -123,7 +125,7 @@ getContractsContract ::
   ContractName ->
   Address ->
   m Contract
-getContractsContract name addr = do
+getContractsContract name addr = withCodeCollectionCache $ do
   let err =
         UserError $
           Text.concat
@@ -157,7 +159,7 @@ getContractsState ::
   Maybe Integer ->
   Bool ->
   m GetContractsStateResponses -- state-translation
-getContractsState _ address mName mCount mOffset _ = do
+getContractsState _ address mName mCount mOffset _ = withCodeCollectionCache $ do
   $logInfoS "getContractsState" . Text.pack $ "Getting contract state for " ++ formatAddressWithoutColor address
   contract' <- getContractsDetails' address
 
@@ -216,7 +218,7 @@ postContractsBatchStates ::
   ) =>
   [PostContractsBatchStatesRequest] ->
   m [GetContractsStateResponses]
-postContractsBatchStates = traverse flattenRequest
+postContractsBatchStates = withCodeCollectionCache . traverse flattenRequest
   where
     flattenRequest PostContractsBatchStatesRequest {..} =
       getContractsState
@@ -229,11 +231,10 @@ postContractsBatchStates = traverse flattenRequest
 
 getContractsDetails' ::
   ( MonadIO m,
-    A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m
+    (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   Address ->
   m Contract
@@ -255,11 +256,10 @@ getContractsDetails' contractAddress = do
 
 getContractsDetails ::
   ( MonadIO m,
-    A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m
+    (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   Address ->
   m Contract
@@ -276,7 +276,7 @@ getContractsFunctions ::
   ContractName ->
   Address ->
   m [FunctionName]
-getContractsFunctions _ contractId = do
+getContractsFunctions _ contractId = withCodeCollectionCache $ do
   contract <- getContractsDetails contractId
   pure . map (FunctionName . Text.pack) . Map.keys $ _functions contract
 
@@ -291,7 +291,7 @@ getContractsSymbols ::
   ContractName ->
   Address ->
   m [SymbolName]
-getContractsSymbols _ contractId = do
+getContractsSymbols _ contractId = withCodeCollectionCache $ do
   contract <- getContractsDetails contractId
   pure . map (SymbolName . Text.pack) . Map.keys $ _storageDefs contract
 
@@ -307,7 +307,7 @@ getContractsEnum ::
   Address ->
   EnumName ->
   m [EnumValue]
-getContractsEnum _ contractId (EnumName enumName) = do
+getContractsEnum _ contractId (EnumName enumName) = withCodeCollectionCache $ do
   contract <- getContractsDetails contractId
   pure . maybe [] (map (EnumValue . Text.pack) . fst) . Map.lookup (Text.unpack enumName) $ _enums contract
 

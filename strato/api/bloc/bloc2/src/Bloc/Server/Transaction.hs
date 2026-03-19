@@ -1,6 +1,7 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -23,7 +24,7 @@ where
 import Bloc.API.Transaction
 import Bloc.API.Users
 import Bloc.API.Utils
-import Bloc.Database.Queries (getContractDetailsForContract, getContractWithCodeCollectionByAddress)
+import Bloc.Database.Queries (getContractDetailsForContract, getContractWithCodeCollectionByAddress, withCodeCollectionCache)
 import qualified SolidVM.Model.CodeCollection as CC
 import Bloc.Monad
 import Bloc.Server.TransactionResult
@@ -65,8 +66,8 @@ import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Extra
-import Control.Monad.Reader
-import Control.Monad.Trans.State.Lazy
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.State.Lazy (gets)
 import qualified Data.Cache as Cache
 import qualified Data.Cache.Internal as Cache
 import Data.Foldable
@@ -127,7 +128,7 @@ postBlocTransactionBody ::
   -- | tx hash & raw tx data
   m [BlocTransactionBodyResult]
 postBlocTransactionBody (PostBlocTransactionRequest _ [] _ _) = return []
-postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
+postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs) = withCodeCollectionCache $ do
   addr <- case mAddr of
     Nothing -> fromPublicKey <$> getPub
     Just addr' -> return addr'
@@ -266,7 +267,7 @@ postBlocTransactionUnsigned ::
   -- | tx hash & raw tx data
   m [BlocTransactionUnsignedResult]
 postBlocTransactionUnsigned (PostBlocTransactionRequest _ [] _ _) = return []
-postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
+postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams msrcs) = withCodeCollectionCache $ do
   addr <- case mAddr of -- This is just to get the user's nonce if they didn't supply one
     Nothing -> fromPublicKey <$> getPub
     Just addr' -> return addr'
@@ -450,7 +451,7 @@ postBlocTransaction' ::
   Bool ->
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
-postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = withCodeCollectionCache $ do
   checkIsSynced
   addr <- case mAddr of
     Nothing -> fromPublicKey <$> getPub
@@ -715,8 +716,7 @@ data TransactionHeader = TransactionHeader
 postUsersSend' ::
   ( MonadUnliftIO m,
     HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable Keccak256 CC.CodeCollection m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -751,7 +751,7 @@ postUsersContractSolidVM' ::
     MonadLogger m,
     HasCodeDB m,
     A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable Keccak256 CC.CodeCollection m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -800,7 +800,7 @@ postUsersUploadListSolidVM' ::
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable Keccak256 CC.CodeCollection m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
@@ -848,8 +848,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
 postUsersSendList' ::
   ( MonadUnliftIO m,
     HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable Keccak256 CC.CodeCollection m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
@@ -889,11 +888,10 @@ postUsersContractMethodList' ::
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
-    A.Selectable Address AddressState m,
+    A.Selectable Keccak256 CC.CodeCollection m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
     HasBlocEnv m,
     HasVault m
@@ -951,11 +949,10 @@ postUsersContractMethod' ::
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
-    A.Selectable Address AddressState m,
+    A.Selectable Keccak256 CC.CodeCollection m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
     HasBlocEnv m,
     HasVault m
@@ -1382,8 +1379,7 @@ getSolidityType _ Xabi.Decimal = Right . SimpleType $ TypeDecimal
 getResultAndRespond ::
   ( MonadUnliftIO m,
     HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable Keccak256 CC.CodeCollection m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,

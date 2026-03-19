@@ -11,7 +11,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans -Wno-simplifiable-class-constraints #-}
 
 module Bloc.Database.Queries
   ( sourceToContractDetails,
@@ -23,10 +24,11 @@ module Bloc.Database.Queries
     getCodeCollectionByCodePtr,
     getContractWithCodeCollectionByCodePtr,
     evmContractSolidVMError,
+    withCodeCollectionCache,
   )
 where
 
-import Blockchain.DB.CodeDB
+import Blockchain.DB.CodeDB (HasCodeDB, DBCode)
 import Blockchain.Data.AddressStateDB (AddressState)
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs (AddressStateRef(..))
@@ -41,6 +43,7 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import Data.Foldable (foldl')
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
@@ -60,11 +63,55 @@ import UnliftIO
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
-getContractByAddress ::
+-- | Fallback instance: when no ReaderT IORef cache layer is present, code collections
+-- are not available. The OVERLAPPING ReaderT IORef instance provides actual loading and caching.
+instance {-# INCOHERENT #-}
+  ( Monad m
+  ) => (Keccak256 `A.Selectable` CodeCollection) m where
+  select _ _ = pure Nothing
+
+-- | Lift HasCodeDB (Alters) through ReaderT IORef cache
+instance {-# OVERLAPPING #-}
+  ( Monad m,
+    (Keccak256 `A.Alters` DBCode) m
+  ) => (Keccak256 `A.Alters` DBCode) (ReaderT (IORef (Map.Map Keccak256 CodeCollection)) m) where
+  lookup p k = lift $ A.lookup p k
+  insert p k v = lift $ A.insert p k v
+  delete p k = lift $ A.delete p k
+
+-- | Cache-through instance: checks the IORef map first, loads and caches on miss
+instance {-# OVERLAPPING #-}
   ( MonadIO m,
     HasCodeDB m,
     A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` SourceMap) m
+  ) => (Keccak256 `A.Selectable` CodeCollection) (ReaderT (IORef (Map.Map Keccak256 CodeCollection)) m) where
+  select _ ch = do
+    ref <- ask
+    cache <- liftIO $ readIORef ref
+    case Map.lookup ch cache of
+      Just cc -> pure $ Just cc
+      Nothing -> do
+        mSrcMap <- lift $ A.select (A.Proxy @SourceMap) ch
+        case mSrcMap of
+          Nothing -> pure Nothing
+          Just srcMap -> do
+            eCC <- lift $ sourceToContractDetails False srcMap
+            case eCC of
+              Left _ -> pure Nothing
+              Right (_, cc) -> do
+                liftIO $ modifyIORef' ref (Map.insert ch cc)
+                pure $ Just cc
+
+withCodeCollectionCache :: MonadIO m => ReaderT (IORef (Map.Map Keccak256 CodeCollection)) m a -> m a
+withCodeCollectionCache action = do
+  ref <- liftIO $ newIORef Map.empty
+  runReaderT action ref
+
+getContractByAddress ::
+  ( MonadIO m,
+    HasCodeDB m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
@@ -80,8 +127,7 @@ getContractByAddress a mFuncName = getContractByAccountsFilterParams
 getContractWithCodeCollectionByAddress ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
@@ -126,8 +172,7 @@ getContractWithCodeCollectionByAddress a fn = runMaybeT $ do
 getContractByAccountsFilterParams ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
@@ -184,9 +229,7 @@ getContractByAccountsFilterParams aParams mFuncName = runMaybeT $ do
 
 getContractDetailsByCodeHash ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m
+    (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   CodePtr ->
   m (Either Text (CodePtr, Contract))
@@ -201,10 +244,7 @@ getContractDetailsByCodeHash codePtr = runExceptT $ do
   pure $ force details
 
 getCodeCollectionByCodePtr ::
-  ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m
+  ( (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   CodePtr ->
   m (Either Text CodeCollection)
@@ -213,9 +253,7 @@ getCodeCollectionByCodePtr = runExceptT . fmap snd . getCodeHashAndCollection Fa
 -- | Get both the contract and code collection (for file-level struct access)
 getContractWithCodeCollectionByCodePtr ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m
+    (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   CodePtr ->
   m (Either Text (Contract, CodeCollection))
@@ -230,23 +268,19 @@ getContractWithCodeCollectionByCodePtr codePtr = runExceptT $ do
   pure $ force (contract, cc)
 
 getCodeHashAndCollection ::
-  ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m
+  ( (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   Bool ->
   CodePtr ->
   ExceptT Text m (Keccak256, CodeCollection)
-getCodeHashAndCollection typeCheck codePtr = do
+getCodeHashAndCollection _typeCheck codePtr = do
       ch <- case codePtr of
         ExternallyOwned _ -> throwE $ "EVM contracts no longer supported"
         SolidVMCode _ ch -> pure ch
-      srcMap <-
-        lift (A.select (A.Proxy @SourceMap) ch) >>= \case
-          Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
-          Just s -> pure s
-      either (throwE . Text.pack . show) pure =<< lift (sourceToContractDetails typeCheck srcMap)
+      cc <- lift (A.select (A.Proxy @CodeCollection) ch) >>= \case
+        Nothing -> throwE $ "Could not find code collection for code hash " <> Text.pack (format ch)
+        Just cc -> pure cc
+      pure (ch, cc)
 
 evmContractSolidVMError :: Text
 evmContractSolidVMError =
