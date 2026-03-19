@@ -41,6 +41,15 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(vault.previewMint(1e18) == 1e18, "initial mint should be 1:1");
     }
 
+    function it_cannot_be_initialized_twice() public {
+        bool reverted = false;
+        try vault.initialize(USDST, "Save USDST 2", "saveUSDST2") {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "second initialize should revert");
+    }
+
     function it_prevents_donation_attacks_from_changing_total_assets() public {
         User attacker = new User();
         User victim = new User();
@@ -83,6 +92,20 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(vault.previewDeposit(10e18) < 10e18, "post-reward deposits should mint fewer shares");
     }
 
+    function it_reverts_reward_notification_when_no_shares_exist() public {
+        Token(USDST).mint(address(this), 20e18);
+        Token(USDST).approve(address(vault), 20e18);
+
+        bool reverted = false;
+        try vault.notifyReward(20e18) {
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "notifyReward should revert when no shares exist");
+        require(vault.totalAssets() == 0, "managed assets should remain zero");
+    }
+
     function it_allows_withdrawal_of_principal_plus_rewards() public {
         User saver = new User();
 
@@ -101,6 +124,28 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(saverBalanceAfter == saverBalanceBefore + 60e18, "redeem should return principal plus rewards");
         require(vault.totalSupply() == 0, "all shares should be burned");
         require(vault.totalAssets() == 0, "managed assets should be empty");
+    }
+
+    function it_reverts_reward_notification_after_vault_has_been_fully_redeemed() public {
+        User saver = new User();
+
+        Token(USDST).mint(address(saver), 50e18);
+        saver.do(USDST, "approve", address(vault), INFINITY);
+        saver.do(address(vault), "deposit(uint256,address)", 50e18, address(saver));
+        saver.do(address(vault), "redeem(uint256,address,address)", 50e18, address(saver), address(saver));
+
+        Token(USDST).mint(address(this), 10e18);
+        Token(USDST).approve(address(vault), 10e18);
+
+        bool reverted = false;
+        try vault.notifyReward(10e18) {
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "notifyReward should revert after full redeem");
+        require(vault.totalSupply() == 0, "supply should remain zero");
+        require(vault.totalAssets() == 0, "managed assets should remain zero");
     }
 
     function it_distributes_rewards_proportionally_to_multiple_users() public {
@@ -260,10 +305,35 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(saverGot == 100e18, "saver gets full principal after recovery");
     }
 
+    function it_caps_max_withdraw_by_live_balance_when_balance_drops_below_managed_assets() public {
+        User saver = new User();
+
+        Token(USDST).mint(address(saver), 100e18);
+        saver.do(USDST, "approve", address(vault), INFINITY);
+        saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
+
+        // Simulate unexpected live-balance loss while internal accounting stays unchanged.
+        Token(USDST).burn(address(vault), 40e18);
+
+        require(vault.totalAssets() == 100e18, "managed assets unchanged");
+        require(IERC20(USDST).balanceOf(address(vault)) == 60e18, "live balance reduced");
+        require(vault.maxWithdraw(address(saver)) == 60e18, "maxWithdraw should cap to live balance");
+    }
+
+    function it_blocks_underlying_rescue() public {
+        bool reverted = false;
+        try vault.rescueToken(USDST, address(this), 1) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "underlying rescue should revert");
+    }
+
     function it_blocks_operations_when_paused() public {
         User saver = new User();
         Token(USDST).mint(address(saver), 100e18);
         saver.do(USDST, "approve", address(vault), INFINITY);
+        saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
 
         vault.pause();
 
@@ -279,10 +349,16 @@ contract Describe_SaveUSDSTVault is Authorizable {
         }
         require(reverted, "deposit should revert when paused");
 
-        vault.unpause();
+        reverted = false;
+        try saver.do(address(vault), "redeem(uint256,address,address)", 100e18, address(saver), address(saver)) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "redeem should revert when paused");
 
-        saver.do(address(vault), "deposit(uint256,address)", 100e18, address(saver));
-        require(IERC20(address(vault)).balanceOf(address(saver)) == 100e18, "deposit works after unpause");
+        vault.unpause();
+        saver.do(address(vault), "redeem(uint256,address,address)", 100e18, address(saver), address(saver));
+        require(IERC20(address(vault)).balanceOf(address(saver)) == 0, "redeem works after unpause");
     }
 
     function it_supports_allowance_based_redeem() public {
@@ -392,5 +468,33 @@ contract Describe_SaveUSDSTVault is Authorizable {
         u2.do(address(vault), "deposit(uint256,address)", dep2, address(u2));
         uint rate3 = vault.exchangeRate();
         require(rate3 >= rate2 - 1, "rate must not decrease after deposit (within 1 wei rounding)");
+    }
+
+    /// @notice maxWithdraw should never exceed both live balance and the owner's economic claim.
+    function property_max_withdraw_is_bounded(uint seedDeposit, uint seedReward, uint seedBurn) public {
+        uint dep = ((seedDeposit % 500000) + 1) * 1e12;
+        uint rew = ((seedReward % 200000) + 1) * 1e12;
+
+        User u = new User();
+        Token(USDST).mint(address(u), dep);
+        u.do(USDST, "approve", address(vault), INFINITY);
+        u.do(address(vault), "deposit(uint256,address)", dep, address(u));
+
+        Token(USDST).mint(address(this), rew);
+        Token(USDST).approve(address(vault), rew);
+        vault.notifyReward(rew);
+
+        uint liveBalanceBeforeBurn = IERC20(USDST).balanceOf(address(vault));
+        uint burnAmt = seedBurn % (liveBalanceBeforeBurn + 1);
+        if (burnAmt > 0) {
+            Token(USDST).burn(address(vault), burnAmt);
+        }
+
+        uint maxW = vault.maxWithdraw(address(u));
+        uint liveBalance = IERC20(USDST).balanceOf(address(vault));
+        uint claim = vault.convertToAssets(IERC20(address(vault)).balanceOf(address(u)));
+
+        require(maxW <= liveBalance, "maxWithdraw exceeds live balance");
+        require(maxW <= claim, "maxWithdraw exceeds economic claim");
     }
 }
