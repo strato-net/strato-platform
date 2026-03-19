@@ -85,7 +85,7 @@ generateDockerCompose = do
             , ("STRATO_HOSTNAME", stratoHostname)
             , ("STRATO_PORT_API", "3000")
             , ("STRATO_PORT_VAULT_PROXY", "8013")
-            , ("vaultUrl", "http://nginx")
+            , ("vaultUrl", vault)
             ]
         , volumes = Just
             [ "./logs:/logs"
@@ -170,15 +170,22 @@ generateDockerCompose = do
             , ("VAULT_URL", vault)
             ]
         , extra_hosts = Just ["host.docker.internal:host-gateway"]
-        , ports = Just [portNum ++ ":80", "443:443"]
+        , ports = Just [portNum ++ ":" ++ portNum, "443:443"]
         , volumes = Just
             [ "./logs:/logs"
             , "./ssl:/tmp/ssl:ro"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
+            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /docker-run.sh >> /logs/nginx.log 2>&1"]
         , restart = Just "unless-stopped"
+        , healthcheck = Just Healthcheck
+            { test = ["CMD", "curl", "-sf", "http://localhost:" ++ portNum ++ "/_ping"]
+            , interval = Just "5s"
+            , timeout = Just "1s"
+            , retries = Nothing
+            }
         , logging = noLogging
         }
 
