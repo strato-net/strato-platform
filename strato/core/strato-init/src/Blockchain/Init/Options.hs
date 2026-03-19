@@ -52,7 +52,9 @@ defineFlag "composeOnly" (False :: Bool) "Only generate docker-compose.yml to st
 
 defineFlag "includeBuild" (False :: Bool) "Include build directives in generated docker-compose.yml"
 
-defineFlag "skipGenesis" (False :: Bool) "Skip genesis block generation (for useCustomGenesis=true where genesis is provided externally for single node tests)"
+-- For useCustomGenesis=true: skip genesis + LevelDB trie so custom genesis can be provided externally.
+-- Used in CI/CD single-node builds. Without this, default trie conflicts with custom genesis stateRoot.
+defineFlag "skipGenesis" (False :: Bool) "Skip genesis block generation (for useCustomGenesis=true)"
 
 -- P2P config flags
 defineFlag "maxConn" (1000 :: Int) "Maximum number of P2P client connections"
