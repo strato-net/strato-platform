@@ -384,25 +384,28 @@ vault-nginx:
 	@echo Now building vault-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
-docker-compose:
-	@echo Now generating docker-compose yml files...
-	@echo Creating the image-push-ready docker-compose.push.yml...
-	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.tpl.yml > docker-compose.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.tpl.yml > docker-compose.push.ecr.yml
-	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.allDocker.tpl.yml > docker-compose.allDocker.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.allDocker.tpl.yml > docker-compose.allDocker.push.ecr.yml
+docker-compose: strato_docker
+	@echo Generating docker-compose files...
+	@echo Generating docker-compose.yml via strato-setup...
+	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
+	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_URL) --includeBuild \
+	    > docker-compose.push.yml
+	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
+	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_URL) \
+	    > docker-compose.yml
+	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
+	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_AWS_ECR_URL) --includeBuild \
+	    > docker-compose.push.ecr.yml
+	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
+	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_AWS_ECR_URL) \
+	    > docker-compose.ecr.yml
+	@echo Generating vault, highway, bridge compose files...
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.ecr.yml
-
-	@echo Creating the final docker-compose.yml...
-	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
-	awk '/build: ./{getline} 1' docker-compose.allDocker.push.yml > docker-compose.allDocker.yml
-	awk '/build: ./{getline} 1' docker-compose.push.ecr.yml > docker-compose.ecr.yml
-	awk '/build: ./{getline} 1' docker-compose.allDocker.push.ecr.yml > docker-compose.allDocker.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
