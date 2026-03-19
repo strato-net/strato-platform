@@ -32,24 +32,32 @@ clientSecret: "${OAUTH_CLIENT_SECRET}"
 EOF
   fi
 
-  # Build strato-setup flags
-  SETUP_FLAGS="--network=${network:-helium} \
-    --vaultUrl=${VAULT_URL:-https://vault.blockapps.net:8093}/strato/v2.3 \
-    --pghost=${postgres_host:-postgres} \
-    --kafkahost=${kafkaHost:-kafka} \
-    --redisHost=${redisHost:-redis} \
-    --apiIPAddress=0.0.0.0"
-
   # useCustomGenesis mode (used in Jenkinsfile.autobuild for single-node builds/tests):
-  # --skipGenesis skips default genesis + LevelDB trie population.
-  # The strato container (normal mode) waits for custom genesis.json to be placed via bind mount.
-  # Without --skipGenesis, the default trie would conflict with the custom genesis stateRoot.
+  # Wait for custom genesis.json BEFORE running strato-setup, so strato-setup finds it
+  # and populates the LevelDB Merkle Patricia Trie from it (instead of generating a default genesis).
+  # The bootstrap script exits early when useCustomGenesis=true, allowing the Jenkinsfile
+  # to copy the genesis file into the nodedata bind mount while this init container waits.
   if [[ ${useCustomGenesis:-false} = "true" ]]; then
-    SETUP_FLAGS="${SETUP_FLAGS} --skipGenesis"
+    set +x
+    echo -e "${BYellow}useCustomGenesis=true - waiting for genesis.json to be placed...${NC}"
+    echo "Place the genesis file into the nodedata bind mount: cp genesis-block.json nodedata/genesis.json"
+    while [ ! -f /var/lib/strato/genesis.json ]; do
+      sleep 1
+    done
+    echo -e "${Green}genesis.json found!${NC}"
+    set -x
   fi
 
   # Run strato-setup to create node directory, ethconf, secrets, genesis
-  strato-setup /var/lib/strato ${SETUP_FLAGS}
+  # If genesis.json already exists (useCustomGenesis), strato-setup reads it and populates the trie.
+  # If not, strato-setup generates the default genesis and populates the trie.
+  strato-setup /var/lib/strato \
+    --network="${network:-helium}" \
+    --vaultUrl="${VAULT_URL:-https://vault.blockapps.net:8093}/strato/v2.3" \
+    --pghost="${postgres_host:-postgres}" \
+    --kafkahost="${kafkaHost:-kafka}" \
+    --redisHost="${redisHost:-redis}" \
+    --apiIPAddress=0.0.0.0
 
   echo -e "${Green}Node initialization complete.${NC}"
   exit 0
@@ -120,21 +128,6 @@ fi
 if [ ! -f commands.txt ]; then
   echo -e "${Red}ERROR: commands.txt not found. The strato-init service must run first.${NC}"
   exit 1
-fi
-
-# useCustomGenesis: wait for custom genesis.json to be placed via nodedata bind mount.
-# The init container skipped genesis generation (--skipGenesis), so genesis.json must be
-# provided externally (e.g. `cp genesis-block.json nodedata/genesis.json` from the host).
-# Used in Jenkinsfile.autobuild for single-node builds/tests.
-if [[ ${useCustomGenesis:-false} = "true" && ! -f "genesis.json" ]]; then
-  set +x
-  echo -e "${BYellow}useCustomGenesis is set to true - waiting for genesis.json...${NC}"
-  echo "Place the genesis file into the nodedata bind mount: cp genesis-block.json nodedata/genesis.json"
-  while [ ! -f "genesis.json" ]; do
-    sleep 1
-  done
-  echo -e "${Green}genesis.json found! Continuing...${NC}"
-  set -x
 fi
 
 echo -e "${Green}Starting STRATO processes via convoke...${NC}"

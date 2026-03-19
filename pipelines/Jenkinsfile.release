@@ -131,7 +131,7 @@ pipeline {
             
             sh 'sed -i "s|useCustomGenesis=false|useCustomGenesis=true|" run.sh'
             sh './run.sh'
-            sh 'docker cp genesis-block.json strato-strato-1:/var/lib/strato/genesis.json'
+            sh 'sudo cp genesis-block.json nodedata/genesis.json'
             sh 'docker ps'
 
             // Few quick tests

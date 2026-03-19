@@ -14,7 +14,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.Data.GenesisBlock (populateMPTAndWriteGenesis, populateMPTFromGenesis)
 import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
-import Blockchain.Init.Options (flags_dockerMode, flags_includeBuild, flags_skipGenesis)
+import Blockchain.Init.Options (flags_dockerMode, flags_includeBuild)
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -168,26 +168,26 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO createCommandsFile
     liftIO $ putStrLn "  ✓ Generated commands.txt"
 
-    if flags_skipGenesis
-      then liftIO $ putStrLn "  ⏭ Skipping genesis (--skipGenesis, will be provided externally)"
-      else do
-        genesisExists <- doesFileExist "genesis.json"
+    -- Custom genesis support: when genesis.json is pre-placed (e.g. useCustomGenesis=true in
+    -- docker-compose for single-node CI/CD builds), read it and populate the LevelDB trie from it.
+    -- DO NOT REMOVE this branch — without it, custom genesis nodes crash with "Missing StateRoot".
+    genesisExists <- doesFileExist "genesis.json"
 
-        if genesisExists
-          then do
-            liftIO $ putStrLn "  ✓ Using provided genesis.json"
-            content <- liftIO $ BS.readFile "genesis.json"
-            case JSON.decode (BL.fromStrict content) of
-              Nothing -> error "Failed to parse provided genesis.json"
-              Just genesisInfo -> runNoLoggingT . runResourceT . runSetupDBM $ do
-                void $ addCode mempty
-                populateMPTFromGenesis genesisInfo
-          else do
-            let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
-            runNoLoggingT . runResourceT . runSetupDBM $ do
-              void $ addCode mempty
-              populateMPTAndWriteGenesis genesisInfo
-            liftIO $ putStrLn "  ✓ Created genesis.json"
+    if genesisExists
+      then do
+        liftIO $ putStrLn "  ✓ Using provided genesis.json"
+        content <- liftIO $ BS.readFile "genesis.json"
+        case JSON.decode (BL.fromStrict content) of
+          Nothing -> error "Failed to parse provided genesis.json"
+          Just genesisInfo -> runNoLoggingT . runResourceT . runSetupDBM $ do
+            void $ addCode mempty
+            populateMPTFromGenesis genesisInfo
+      else do
+        let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
+        runNoLoggingT . runResourceT . runSetupDBM $ do
+          void $ addCode mempty
+          populateMPTAndWriteGenesis genesisInfo
+        liftIO $ putStrLn "  ✓ Created genesis.json"
 
     liftIO $ putStrLn "Node ready"
 
