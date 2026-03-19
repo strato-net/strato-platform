@@ -307,6 +307,13 @@ EOF
   echo -e "${Green}Node configuration generated.${NC}"
 fi
 
+# Export postgres password so docker-compose can substitute ${postgres_password:-api}
+# (strato-setup generates a random password in nodedata/secrets/postgres_password,
+#  and bakes it into ethconf.yaml — docker-compose needs the same value)
+if [ -f nodedata/secrets/postgres_password ]; then
+  export postgres_password=$(cat nodedata/secrets/postgres_password)
+fi
+
 # COMPOSE FILE PRE-PROCESSING
 function cleanup {
   rm docker-compose-temp.yml
