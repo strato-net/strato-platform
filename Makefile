@@ -203,7 +203,7 @@ docker: build_all_docker docker-compose
 
 all_develop: build_develop docker-compose
 
-mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
+mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle
 
 build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
