@@ -119,10 +119,13 @@ pipeline {
 
         dir("bootstrap-docker") {
           sh './strato --wipe'
-          
+
           sh 'sed -i "s|useCustomGenesis=false|useCustomGenesis=true|" run.sh'
+          // Pre-place custom genesis BEFORE docker compose up, so the init container
+          // finds it and populates the LevelDB trie from it (avoids deadlock — docker compose
+          // up -d blocks on depends_on:service_completed_successfully).
+          sh 'mkdir -p nodedata && cp genesis-block.json nodedata/genesis.json'
           sh './run.sh'
-          sh 'sudo cp genesis-block.json nodedata/genesis.json'
           sh 'docker ps'
 
           // Few quick tests

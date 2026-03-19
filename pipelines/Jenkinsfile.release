@@ -128,10 +128,11 @@ pipeline {
 
           dir("bootstrap-docker") {
             sh './strato --wipe'
-            
+
             sh 'sed -i "s|useCustomGenesis=false|useCustomGenesis=true|" run.sh'
+            // Pre-place custom genesis before docker compose up (see Jenkinsfile.autobuild for details)
+            sh 'mkdir -p nodedata && sudo cp genesis-block.json nodedata/genesis.json'
             sh './run.sh'
-            sh 'sudo cp genesis-block.json nodedata/genesis.json'
             sh 'docker ps'
 
             // Few quick tests

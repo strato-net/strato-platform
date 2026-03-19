@@ -32,25 +32,11 @@ clientSecret: "${OAUTH_CLIENT_SECRET}"
 EOF
   fi
 
-  # useCustomGenesis mode (used in Jenkinsfile.autobuild for single-node builds/tests):
-  # Wait for custom genesis.json BEFORE running strato-setup, so strato-setup finds it
-  # and populates the LevelDB Merkle Patricia Trie from it (instead of generating a default genesis).
-  # The bootstrap script exits early when useCustomGenesis=true, allowing the Jenkinsfile
-  # to copy the genesis file into the nodedata bind mount while this init container waits.
-  if [[ ${useCustomGenesis:-false} = "true" ]]; then
-    set +x
-    echo -e "${BYellow}useCustomGenesis=true - waiting for genesis.json to be placed...${NC}"
-    echo "Place the genesis file into the nodedata bind mount: cp genesis-block.json nodedata/genesis.json"
-    while [ ! -f /var/lib/strato/genesis.json ]; do
-      sleep 1
-    done
-    echo -e "${Green}genesis.json found!${NC}"
-    set -x
-  fi
-
-  # Run strato-setup to create node directory, ethconf, secrets, genesis
-  # If genesis.json already exists (useCustomGenesis), strato-setup reads it and populates the trie.
-  # If not, strato-setup generates the default genesis and populates the trie.
+  # Run strato-setup to create node directory, ethconf, secrets, genesis.
+  # If genesis.json is pre-placed in nodedata (useCustomGenesis mode), strato-setup reads it
+  # and populates the LevelDB trie from it. Otherwise generates the default genesis + trie.
+  # Note: for useCustomGenesis, genesis.json must be placed BEFORE docker compose up
+  # (see Jenkinsfile.autobuild) to avoid deadlock with depends_on:service_completed_successfully.
   strato-setup /var/lib/strato \
     --network="${network:-helium}" \
     --vaultUrl="${VAULT_URL:-https://vault.blockapps.net:8093}/strato/v2.3" \
