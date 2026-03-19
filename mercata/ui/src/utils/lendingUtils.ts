@@ -293,6 +293,7 @@ export const calculateHFSliderExtrema = (
   DEFAULT_MAX_HEALTH_FACTOR: number = 3.00,
   DEFAULT_MIN_HEALTH_FACTOR: number = 1.07,
   BASICALLY_INFINITE_HEALTH: number = 999999,
+  HARD_MAX_HEALTH_FACTOR: number = 10.0,
 ) : { min: Number, max: Number } => {
   // If no data is available, use the defaults
   if (!loanData || !collaterals || collaterals.length === 0) {
@@ -308,11 +309,17 @@ export const calculateHFSliderExtrema = (
   const isInfiniteHF = !isFinite(currentHF) || currentHF >= BASICALLY_INFINITE_HEALTH;
   
   // If no loan, max is DEFAULT_MAX_HEALTH_FACTOR; otherwise use max of default and current HF
-  const maxHF = hasLoan && !isInfiniteHF
+  const computedMaxHF = hasLoan && !isInfiniteHF
     ? Math.max(DEFAULT_MAX_HEALTH_FACTOR, currentHF)
     : DEFAULT_MAX_HEALTH_FACTOR;
-  
-  return { min: centCeil(minHF), max: Math.round(maxHF * 100) / 100 };
+
+  // Guard UX: very large current HF values (e.g. 1000+) make slider unusable.
+  // Keep a practical upper bound while still honoring protocol minimum.
+  const minRounded = Number(centCeil(minHF));
+  const maxBound = Math.max(HARD_MAX_HEALTH_FACTOR, minRounded);
+  const maxHF = Math.min(computedMaxHF, maxBound);
+
+  return { min: minRounded, max: Math.round(maxHF * 100) / 100 };
 };
 
 // Determine the error message to display, suggesting options for the user while avoiding unavailable solutions.
