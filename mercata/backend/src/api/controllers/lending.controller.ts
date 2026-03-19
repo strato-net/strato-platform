@@ -67,8 +67,7 @@ class LendingController {
 
       const result = await depositLiquidity(accessToken,
 	                                    userAddress as string,
-					    body.amount,
-					    body.stakeMToken);
+					    body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {

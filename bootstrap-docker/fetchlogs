@@ -25,7 +25,7 @@ def fetch_logs():
         'strato': '/var/lib/strato/logs'
     }
     if not os.path.isfile('./docker-compose.yml'):
-        sys.stderr.write('ERROR: docker-compose.yml does not exist. Download or build the platform and copy docker-compose.allDocker.yml as ./docker-compose.yml - see ../README.md.')
+        sys.stderr.write('ERROR: docker-compose.yml does not exist. Run ./strato --compose to download it - see ../README.md.')
         sys.exit(6)
     try:
         compose_ps_output = subprocess.check_output(

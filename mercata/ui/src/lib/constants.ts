@@ -5,9 +5,9 @@ export const safetyModuleAddress = "0000000000000000000000000000000000001015"
 export const sUsdstAddress = "0000000000000000000000000000000000001016"
 export const mUsdstAddress = "000000000000000000000000000000000000100f"
 export const cataAddress = "2680dc6693021cd3fefb84351570874fbef8332a"
-export const rewardsChefAddress = "000000000000000000000000000000000000101f"
 export const rewardsAddress = "0000000000000000000000000000000000001020" // TODO: Update with actual deployed address
 export const DECIMAL = 18
+export const WAD = 10n ** 18n;
 
 // ============================================
 // Feature Flags
@@ -48,6 +48,7 @@ export const WITHDRAW_USDST_FEE = "0.02"; // USDST fee for withdraw USDST transa
 export const BRIDGE_OUT_FEE = "0.02"; // USDST fee for bridge out transactions
 export const SAFETY_STAKE_FEE = "0.02"; // USDST fee for SafetyModule stake transactions
 export const SAFETY_REDEEM_FEE = "0.01"; // USDST fee for SafetyModule redeem transactions
+export const METAL_BUY_FEE = "0.02"; // USDST fee for metal buy (approve + mintMetal = 2 calls)
 
 // ============================================
 // Withdrawal limits

@@ -15,6 +15,7 @@ import {
   Droplets,
   Shield,
   UserPlus,
+  HandCoins,
   Vault,
 
   ArrowDownToLine,
@@ -22,8 +23,20 @@ import {
 } from 'lucide-react';
 import { Drawer, DrawerClose, DrawerContent } from '@/components/ui/drawer';
 import { useUser } from '@/context/UserContext';
+import { LucideIcon } from 'lucide-react';
 
-// Primary navigation items shown in bottom bar
+interface MoreNavItem {
+  icon: LucideIcon;
+  label: string;
+  path: string;
+  adminOnly?: boolean;
+}
+
+interface MoreNavCategory {
+  label?: string;
+  items: MoreNavItem[];
+}
+
 const PRIMARY_NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
   { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
@@ -31,19 +44,38 @@ const PRIMARY_NAV_ITEMS = [
   { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
 ];
 
-// Items shown in "More" drawer
-const MORE_ITEMS = [
-
-  { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
-  { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
-  { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
-  { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
-  { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
-  { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
-  { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
-  { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
-  { icon: UserPlus, label: 'My Referrals', path: '/dashboard/referrals' },
-  { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
+const MORE_CATEGORIES: MoreNavCategory[] = [
+  {
+    label: 'TRADE',
+    items: [
+      { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
+      { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
+    ],
+  },
+  {
+    label: 'SPEND',
+    items: [
+      { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
+    ],
+  },
+  {
+    label: 'EARN',
+    items: [
+      { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+    ],
+  },
+  {
+    label: 'PRO',
+    items: [
+      { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
+      { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
+      { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+      { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
+      { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
+      { icon: UserPlus, label: 'My Referrals', path: '/dashboard/referrals' },
+      { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
+    ],
+  },
 ];
 
 const MobileBottomNav = () => {
@@ -55,14 +87,12 @@ const MobileBottomNav = () => {
   const isActive = (path: string) =>
     path === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(path);
 
-  const isMoreActive = MORE_ITEMS.some(item => isActive(item.path));
+  const isMoreActive = MORE_CATEGORIES.some(cat => cat.items.some(item => isActive(item.path)));
 
   const handleMoreItemClick = (path: string) => {
     setIsMoreOpen(false);
     navigate(path);
   };
-
-  const filteredMoreItems = MORE_ITEMS.filter(item => !item.adminOnly || isAdmin);
 
   return (
     <>
@@ -111,19 +141,32 @@ const MobileBottomNav = () => {
 
           {/* Menu Items */}
           <div className="px-3 pb-4">
-            {filteredMoreItems.map(({ icon: Icon, label, path }) => (
-              <button
-                key={path}
-                onClick={() => handleMoreItemClick(path)}
-                className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${isActive(path)
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                    : 'text-foreground hover:bg-muted'
-                  }`}
-              >
-                <Icon size={20} />
-                <span className="text-sm font-medium">{label}</span>
-              </button>
-            ))}
+            {MORE_CATEGORIES.map((category, idx) => {
+              const visibleItems = category.items.filter(item => !item.adminOnly || isAdmin);
+              if (visibleItems.length === 0) return null;
+              return (
+                <div key={idx} className={idx > 0 ? 'mt-3' : ''}>
+                  {category.label && (
+                    <div className="px-4 py-1.5 text-[11px] font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase">
+                      {category.label}
+                    </div>
+                  )}
+                  {visibleItems.map(({ icon: Icon, label, path }) => (
+                    <button
+                      key={path}
+                      onClick={() => handleMoreItemClick(path)}
+                      className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${isActive(path)
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                          : 'text-foreground hover:bg-muted'
+                        }`}
+                    >
+                      <Icon size={20} />
+                      <span className="text-sm font-medium">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </DrawerContent>
       </Drawer>

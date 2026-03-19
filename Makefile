@@ -1,14 +1,12 @@
 REPO_URL ?= 
-ifeq ($(REPO),private)
+ifeq ($(REPO),dev)
   REPO_URL=registry-aws.blockapps.net:5000/blockapps/
 endif
-ifeq ($(REPO),public)
+ifeq ($(REPO),release)
   REPO_URL=registry-aws.blockapps.net:5000/blockapps-repo/
 endif
 $(info REPO_URL is "${REPO_URL}" (REPO: "${REPO}"))
 REPO_AWS_ECR_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
-# TODO: merge two REPO vars
-REPO_AWS_ECR_URL_MERCATA=406773134706.dkr.ecr.us-east-1.amazonaws.com/mercata/
 $(info REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}")
 
 STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
@@ -25,9 +23,23 @@ else
 endif
 
 ifndef VERSION
-  GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
-  # Use git tag for VERSION - content hash provides uniqueness
-  VERSION := $(GIT_TAG)
+  # REPO=release: use VERSION file directly (e.g., "16.7")
+  # Otherwise (dev/CI builds): append short commit hash for per-build uniqueness (e.g., "16.7-abc1234")
+  ifeq ($(REPO),release)
+    VERSION := $(shell cat VERSION)
+  else
+	# INTENT: deterministic version for image tagging
+	#
+	# AVOID `git describe --tags --abbrev=0`:
+	# - branch/merge dependent
+	# - may return outdated/pre-release tags (e.g. `16.7-rc1` < `16.7`) or custom dev tags
+	#
+	# APPROACH:
+	# - VERSION file = source of truth
+	# - short commit SHA for uniqueness
+	#
+    VERSION := $(shell cat VERSION)-$(shell git rev-parse --short=7 HEAD)
+  endif
 else
   $(info VERSION is "$(VERSION)" (overriden with env var))
 endif
@@ -301,7 +313,7 @@ build_common_with_tests: generate-version-file
 	mkdir -p ${VAULTDIR}
 	cd strato && stack install ${NIX_FLAG} \
 	  --test --no-run-tests
-		
+
 build_common_profiled: generate-version-file
 	@echo building haskell libraries and creating directories (profiled)
 	mkdir -p ${HIGHWAYDIR}
@@ -332,7 +344,7 @@ hoogle_generate:
 	cd strato && \
 		stack haddock --haddock-internal && \
 		stack hoogle generate -- --local
-	
+
 hoogle_serve:
 	@echo serving the pregenerated STRATO documentation...
 	cd strato && \
@@ -384,9 +396,22 @@ vault-nginx:
 	@echo Now building vault-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
-docker-compose:
-	@echo Now generating docker-compose yml files...
-	@echo Creating the image-push-ready docker-compose.push.yml...
+docker-compose: strato_docker
+	@echo Generating docker-compose files...
+	@echo Generating docker-compose.yml via strato-setup...
+	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
+	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_URL) --includeBuild \
+	    > docker-compose.push.yml
+	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
+	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_URL) \
+	    > docker-compose.yml
+	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
+	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_AWS_ECR_URL) --includeBuild \
+	    > docker-compose.push.ecr.yml
+	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
+	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_AWS_ECR_URL) \
+	    > docker-compose.ecr.yml
+	@echo Generating vault, highway, bridge compose files...
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
@@ -394,7 +419,6 @@ docker-compose:
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.ecr.yml
 
-	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml

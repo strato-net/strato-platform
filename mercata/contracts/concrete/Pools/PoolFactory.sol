@@ -31,6 +31,9 @@ contract record PoolFactory is Ownable {
     /// @notice Event emitted when pools are migrated
     event PoolsMigrated(address oldFactory, address newFactory, uint256 poolCount);
 
+    /// @notice Event emitted when stable pools are merged into a new multi-token pool
+    event PoolsMerged(address[] oldPools, address newPool);
+
     /// @notice Event emitted when the admin registry is updated
     event AdminRegistryUpdated(address newRegistry);
 
@@ -303,6 +306,77 @@ contract record PoolFactory is Ownable {
         return pool;
     }
 
+    /// @notice Create a new pool for multiple tokens
+    /// @dev After pool creation, the pool should be whitelisted for mint and burn of the LP tokenby the admin registry
+    function createMultiTokenStablePool(
+        address[] tokens,
+        uint[] rateMultipliers,
+        uint[] assetTypes,
+        address[] oracles
+    ) external onlyOwner returns (address pool) {
+        for (uint i = 0; i < tokens.length; i++) {
+            require(TokenFactory(tokenFactory).isTokenActive(tokens[i]), "Token not active");
+            require(tokens[i] != address(0), "Zero address");
+            for (uint j = 0; j < tokens.length; j++) {
+                if (i != j) {
+                    require(tokens[i] != tokens[j], "Identical addresses");
+                    // require(pools[tokens[i]][tokens[j]] == address(0), "Pool exists");
+                }
+            }
+        }
+
+        // deploy new lp token
+        string lpName = ERC20(tokens[0]).name() + "Multi-Token Stable LP Token";
+        string lpSymbol = ERC20(tokens[0]).symbol() + "-MTSLP";
+
+        address lpTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+            lpName,
+            "Liquidity Provider Token",
+            [],
+            [],
+            [],
+            lpSymbol,
+            0,
+            18,
+            this
+        );
+
+        // deploy new pool first
+        _updatePoolImplementation();
+        _updateStablePoolImplementation();
+        pool = address(new Proxy(poolImplementation, address(this)));
+        Pool(pool).setFeeParameters(swapFeeRate, lpSharePercent); // Get StablePool to show up in Pool table
+        Proxy(pool).setLogicContract(stablePoolImplementation);
+        StablePool(pool).initialize(
+            100,
+            swapFeeRate * 1e6, // 0.3% * FEE_DENOMINATOR
+            1e10,
+            block.timestamp,
+            tokens,
+            rateMultipliers,
+            assetTypes,
+            oracles,
+            lpTokenAddress
+        );
+        address thisOwner = owner();
+        Ownable(pool).transferOwnership(thisOwner);
+        Ownable(lpTokenAddress).transferOwnership(thisOwner);
+
+        for (uint i = 0; i < tokens.length; i++) {
+            for (uint j = 0; j < tokens.length; j++) {
+                if (i != j) {
+                    // update pool registry
+                    // pools[tokens[i]][tokens[j]] = pool;
+
+                    emit NewPool(tokens[i], tokens[j], pool);
+                }
+            }
+        }
+        allPools.push(pool);
+
+        return pool;
+    }
+
     /// @notice Transfer all pools to a new factory
     /// @param newFactory Address of the new factory
     function transferPoolsToFactory(address newFactory) external onlyOwner {
@@ -338,6 +412,262 @@ contract record PoolFactory is Ownable {
             }
         }
         emit PoolsMigrated(address(0), address(this), poolAddresses.length);
+    }
+
+    /// @notice Merge multiple StablePool instances into a single multi-token StablePool
+    /// @param poolAddresses Array of StablePool addresses to merge
+    /// @param allLpHolders Flat array of all LP holder addresses across all pools, concatenated in pool order
+    /// @param holdersPerPool Array where holdersPerPool[i] is the number of LP holders for pool i
+    /// @return newPool The address of the newly created merged pool
+    /// @dev After calling this function, the admin must whitelist the new pool for mint/burn
+    ///      on the new LP token via the AdminRegistry, just as with any new pool creation.
+    ///      Old pools will be drained but not disabled - the admin should disable them separately.
+    function mergeStablePools(
+        address[] poolAddresses,
+        address[] allLpHolders,
+        uint[] holdersPerPool
+    ) external onlyOwner returns (address newPool) {
+        require(poolAddresses.length >= 2, "Need at least 2 pools to merge");
+        require(poolAddresses.length == holdersPerPool.length, "Mismatched array lengths");
+
+        // Validate that holdersPerPool sums to allLpHolders.length
+        uint totalHolders = 0;
+        for (uint i = 0; i < holdersPerPool.length; i++) {
+            totalHolders += holdersPerPool[i];
+        }
+        require(totalHolders == allLpHolders.length, "holdersPerPool sum does not match allLpHolders length");
+
+        // 1. Collect all unique tokens and their properties from the pools being merged
+        address[] uniqueTokens;
+        uint[] uniqueRateMultipliers;
+        uint[] uniqueAssetTypes;
+        address[] uniqueOracles;
+
+        for (uint i = 0; i < poolAddresses.length; i++) {
+            StablePool pool = StablePool(poolAddresses[i]);
+            require(StablePool(poolAddresses[i]).getPoolFactory() == address(this), "Pool does not belong to this factory");
+
+            uint numCoins = pool.getNumCoins();
+            for (uint j = 0; j < numCoins; j++) {
+                address tokenAddr = address(pool.coins(j));
+                bool found = false;
+                for (uint k = 0; k < uniqueTokens.length; k++) {
+                    if (uniqueTokens[k] == tokenAddr) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    uniqueTokens.push(tokenAddr);
+                    uniqueRateMultipliers.push(pool.rateMultipliers(tokenAddr));
+                    uniqueAssetTypes.push(pool.getAssetType(j));
+                    uniqueOracles.push(address(pool.rateOracles(tokenAddr)));
+                }
+            }
+        }
+
+        require(uniqueTokens.length >= 2, "Need at least 2 unique tokens");
+        require(uniqueTokens.length <= 8, "Too many unique tokens (max 8)");
+
+        // 2. Calculate each pool's value contribution BEFORE draining
+        //    Value is measured as the sum of user token balances weighted by rate multipliers
+        uint[] poolValues;
+        uint totalValue = 0;
+
+        for (uint i = 0; i < poolAddresses.length; i++) {
+            StablePool pool = StablePool(poolAddresses[i]);
+            uint numCoins = pool.getNumCoins();
+            uint value = 0;
+
+            for (uint j = 0; j < numCoins; j++) {
+                address tokenAddr = address(pool.coins(j));
+                uint userBalance = pool.tokenBalances(tokenAddr) - pool.adminBalances(tokenAddr);
+                // Use the new pool's rate multiplier for consistent cross-pool comparison
+                for (uint k = 0; k < uniqueTokens.length; k++) {
+                    if (uniqueTokens[k] == tokenAddr) {
+                        value += (userBalance * uniqueRateMultipliers[k]) / 1e18;
+                        break;
+                    }
+                }
+            }
+
+            require(value > 0, "Pool has no value to migrate");
+            poolValues.push(value);
+            totalValue += value;
+        }
+
+        // 3. Create the new multi-token stable pool
+        //    LP token ownership is kept at this factory so we can mint LP tokens directly
+        string lpName = "Merged Stable LP Token";
+        string lpSymbol = "MSLP";
+
+        address lpTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
+            lpName,
+            "Liquidity Provider Token",
+            [],
+            [],
+            [],
+            lpSymbol,
+            0,
+            18,
+            this
+        );
+
+        _updatePoolImplementation();
+        _updateStablePoolImplementation();
+        newPool = address(new Proxy(poolImplementation, address(this)));
+        Pool(newPool).setFeeParameters(swapFeeRate, lpSharePercent);
+        Proxy(newPool).setLogicContract(stablePoolImplementation);
+        StablePool(newPool).initialize(
+            100,
+            swapFeeRate * 1e6,
+            1e10,
+            block.timestamp,
+            uniqueTokens,
+            uniqueRateMultipliers,
+            uniqueAssetTypes,
+            uniqueOracles,
+            lpTokenAddress
+        );
+
+        address thisOwner = owner();
+        Ownable(newPool).transferOwnership(thisOwner);
+        // NOTE: LP token ownership is NOT transferred yet - factory needs it to mint
+
+        // 4. Drain all old pools and transfer tokens to the new pool
+        for (uint i = 0; i < poolAddresses.length; i++) {
+            StablePool(poolAddresses[i]).migrateAllTokens(address(this));
+        }
+
+        for (uint t = 0; t < uniqueTokens.length; t++) {
+            uint balance = ERC20(uniqueTokens[t]).balanceOf(address(this));
+            if (balance > 0) {
+                ERC20(uniqueTokens[t]).transfer(newPool, balance);
+            }
+        }
+
+        // 5. Sync the new pool's internal state with the received tokens
+        StablePool(newPool).syncAfterMigration();
+
+        // 6. Calculate total LP supply using the D invariant of the new pool
+        //    This matches the behavior of addLiquidityGeneral for the first deposit
+        uint totalNewLP = StablePool(newPool).computeInvariant();
+        require(totalNewLP > 0, "New pool invariant is zero");
+
+        // 7. Mint new LP tokens to old LP holders proportionally
+        //    Each pool gets a share of new LP tokens based on its value contribution.
+        //    Within each pool, LP tokens are distributed proportional to old LP balances.
+        uint holderOffset = 0;
+        for (uint i = 0; i < poolAddresses.length; i++) {
+            StablePool pool = StablePool(poolAddresses[i]);
+            Token oldLpToken = pool.lpToken();
+            uint oldTotalSupply = oldLpToken.totalSupply();
+            require(oldTotalSupply > 0, "Pool has no LP tokens");
+
+            uint poolLPShare = (totalNewLP * poolValues[i]) / totalValue;
+
+            for (uint h = 0; h < holdersPerPool[i]; h++) {
+                address holder = allLpHolders[holderOffset + h];
+                uint holderBalance = oldLpToken.balanceOf(holder);
+                if (holderBalance > 0) {
+                    uint holderNewLP = (poolLPShare * holderBalance) / oldTotalSupply;
+                    if (holderNewLP > 0) {
+                        Token(lpTokenAddress).mint(holder, holderNewLP);
+                    }
+                }
+            }
+            holderOffset += holdersPerPool[i];
+        }
+
+        // 8. Transfer LP token ownership to admin (same pattern as createMultiTokenStablePool)
+        Ownable(lpTokenAddress).transferOwnership(thisOwner);
+
+        // 9. Clear old pool entries from the pools mapping and allPools array
+        for (uint i = 0; i < poolAddresses.length; i++) {
+            StablePool pool = StablePool(poolAddresses[i]);
+            uint numCoins = pool.getNumCoins();
+            for (uint j = 0; j < numCoins; j++) {
+                for (uint k = j + 1; k < numCoins; k++) {
+                    address tokenJ = address(pool.coins(j));
+                    address tokenK = address(pool.coins(k));
+                    if (pools[tokenJ][tokenK] == poolAddresses[i]) {
+                        pools[tokenJ][tokenK] = address(0);
+                    }
+                    if (pools[tokenK][tokenJ] == poolAddresses[i]) {
+                        pools[tokenK][tokenJ] = address(0);
+                    }
+                }
+            }
+            // Remove from allPools by swapping with last element
+            for (uint a = 0; a < allPools.length; a++) {
+                if (allPools[a] == poolAddresses[i]) {
+                    allPools[a] = allPools[allPools.length - 1];
+                    allPools[allPools.length - 1] = address(0);
+                    allPools.length--;
+                    break;
+                }
+            }
+        }
+
+        // 10. Register the new pool in the pools mapping and allPools array
+        for (uint i = 0; i < uniqueTokens.length; i++) {
+            for (uint j = 0; j < uniqueTokens.length; j++) {
+                if (i != j) {
+                    pools[uniqueTokens[i]][uniqueTokens[j]] = newPool;
+                    pools[uniqueTokens[j]][uniqueTokens[i]] = newPool;
+                    if (i < j) {
+                        emit NewPool(uniqueTokens[i], uniqueTokens[j], newPool);
+                    }
+                }
+            }
+        }
+        allPools.push(newPool);
+
+        emit PoolsMerged(poolAddresses, newPool);
+
+        return newPool;
+    }
+
+    /// @notice Add a new coin to an existing StablePool
+    /// @param poolAddress The address of the StablePool to add the coin to
+    /// @param _coin The address of the new token to add
+    /// @param _rateMultiplier The rate multiplier for the new token
+    /// @param _assetType The asset type (1=normal, 2=rebasing)
+    /// @param _oracle The price oracle address for the new token (address(0) if none)
+    /// @param _initialAmount The initial deposit amount (depositor must have approved the pool)
+    /// @param _depositor The address providing the initial deposit
+    /// @return mintAmount The amount of LP tokens minted to the depositor
+    function addCoinToStablePool(
+        address poolAddress,
+        address _coin,
+        uint _rateMultiplier,
+        uint _assetType,
+        address _oracle,
+        uint _initialAmount,
+        address _depositor
+    ) external onlyOwner returns (uint mintAmount) {
+        require(poolAddress != address(0), "Zero pool address");
+        require(_coin != address(0), "Zero token address");
+        require(TokenFactory(tokenFactory).isTokenActive(_coin), "Token not active");
+
+        StablePool pool = StablePool(poolAddress);
+        require(pool.getPoolFactory() == address(this), "Pool does not belong to this factory");
+
+        mintAmount = pool.addCoin(_coin, _rateMultiplier, _assetType, _oracle, _initialAmount, _depositor);
+
+        // Update pool registry: add mappings for the new coin paired with all existing coins
+        uint numCoins = pool.getNumCoins();
+        for (uint i = 0; i < numCoins; i++) {
+            address existingCoin = address(pool.coins(i));
+            if (existingCoin != _coin) {
+                pools[existingCoin][_coin] = poolAddress;
+                pools[_coin][existingCoin] = poolAddress;
+            }
+        }
+
+        emit NewPool(_coin, address(pool.coins(0)), poolAddress);
+
+        return mintAmount;
     }
 
     function updatePoolImplementation() external onlyOwner {
