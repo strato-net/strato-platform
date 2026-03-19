@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+BOOTSTRAP_DOCKER_VERSION=1
+
 Green='\033[0;32m'
 Red='\033[0;31m'
 Yellow='\033[0;33m'
@@ -43,6 +45,15 @@ function checkComposeFile {
     echo -e "${Red}Wrong docker-compose.yml provided - no 'strato' service found in it.${NC}"
     exit 4
   fi
+
+  # Check bootstrap-docker version compatibility
+  min_version=$(grep -oP '#bootstratp-docker-min-version:\K.*' docker-compose.yml 2>/dev/null || true)
+  if [ -n "$min_version" ]; then
+    if [ "$(printf '%s\n' "$min_version" "$BOOTSTRAP_DOCKER_VERSION" | sort -V | head -1)" != "$min_version" ]; then
+      echo -e "${Red}This docker-compose.yml requires bootstrap-docker version >= ${min_version}, but this is version ${BOOTSTRAP_DOCKER_VERSION}. Please update the strato bootstrap scripts.${NC}"
+      exit 3
+    fi
+  fi
 }
 
 function help {
@@ -67,6 +78,7 @@ The flags are mutually exclusive:
 function wipe {
   echo -e "${Yellow}Removing STRATO containers and wiping out volumes${NC}"
   ${docker_compose} down -v -t 0 --remove-orphans
+  sudo rm -rf nodedata/
 }
 
 function down {
@@ -81,7 +93,7 @@ function getCompose {
 }
 
 function pullImages {
-  COMPOSE_PROFILES=fullnode ${docker_compose} pull
+  ${docker_compose} pull
 }
 
 function getMetadata {
@@ -258,62 +270,6 @@ if [ ${main_port} != "80" ] && [ ${main_port} != "443" ] && [[ ${NODE_HOST} != *
 fi
 ## END OF PARAMETERS VALIDATION
 
-# RUN STRATO-SETUP TO GENERATE NODE CONFIG
-if [ ! -f nodedata/.ethereumH/ethconf.yaml ]; then
-  # Clean up any partial previous run
-  rm -rf nodedata/
-  echo -e "${Yellow}Running strato-setup to generate node configuration...${NC}"
-
-  # Get strato image - use env var, or find locally built image, or compute from git
-  if [ -z "${STRATO_IMAGE}" ]; then
-    # Try to find a locally built strato image (may have registry prefix)
-    LOCAL_STRATO=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '/strato:\|^strato:' | head -1)
-    if [ -n "${LOCAL_STRATO}" ]; then
-      STRATO_IMAGE="${LOCAL_STRATO}"
-      echo "Found local STRATO_IMAGE: ${STRATO_IMAGE}"
-    else
-      # Fallback: compute from git tag
-      GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
-      if git describe --tags --exact-match HEAD >/dev/null 2>&1; then
-        VERSION="${GIT_TAG}"
-      else
-        VERSION="${GIT_TAG}-$(git rev-parse --short=7 HEAD)"
-      fi
-      STRATO_IMAGE="${REPO_URL}strato:${VERSION}"
-      echo "Computed STRATO_IMAGE: ${STRATO_IMAGE}"
-    fi
-  fi
-
-  # Export STRATO_IMAGE so docker-compose can use it
-  export STRATO_IMAGE
-
-  # Create OAuth credentials file for strato-setup
-  mkdir -p "${HOME}/.secrets"
-  cat > "${HOME}/.secrets/strato_credentials.yaml" << EOF
-discoveryUrl: "${OAUTH_DISCOVERY_URL}"
-clientId: "${OAUTH_CLIENT_ID}"
-clientSecret: "${OAUTH_CLIENT_SECRET}"
-EOF
-
-  # Run strato-setup to create node directory (config only — docker-compose.yml is pre-placed or downloaded)
-  docker run --rm \
-    --entrypoint strato-setup \
-    -v "$(pwd)":/node \
-    -v "${HOME}/.secrets:/root/.secrets:ro" \
-    "${STRATO_IMAGE}" \
-    /node/nodedata --network="${network}" --vaultUrl="${VAULT_URL}/strato/v2.3" \
-    --pghost=postgres --kafkahost=kafka --redisHost=redis --apiIPAddress=0.0.0.0
-
-  echo -e "${Green}Node configuration generated.${NC}"
-fi
-
-# Export postgres password so docker-compose can substitute ${postgres_password:-api}
-# (strato-setup generates a random password in nodedata/secrets/postgres_password,
-#  and bakes it into ethconf.yaml — docker-compose needs the same value)
-if [ -f nodedata/secrets/postgres_password ]; then
-  export postgres_password=$(cat nodedata/secrets/postgres_password)
-fi
-
 # COMPOSE FILE PRE-PROCESSING
 function cleanup {
   rm docker-compose-temp.yml
@@ -331,7 +287,7 @@ else
 fi
 # END OF COMPOSE FILE PRE-PROCESSING
 
-${docker_compose} -f docker-compose-temp.yml --profile fullnode up -d --remove-orphans
+${docker_compose} -f docker-compose-temp.yml up -d --remove-orphans
 
 if [[ "$useCustomGenesis" = true ]]; then
   echo -e "${BYellow}useCustomGenesis is set to 'true' - using custom genesis block. 'strato' container will wait until the file is added to /var/lib/strato/genesis.json within the strato container. See the container log for details: \`sudo docker logs strato${CNAME_SEP}strato${CNAME_SEP}1\`${NC}"

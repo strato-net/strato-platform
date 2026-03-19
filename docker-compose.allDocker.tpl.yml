@@ -1,5 +1,5 @@
 #strato-version:<VERSION>
-#strato-getting-started-min-version:4.4.0
+#bootstrap-docker-min-version:1
 version: "3"
 volumes:
   pgdata:
@@ -11,10 +11,34 @@ volumes:
   redisdata:
     driver: local
 services:
+  strato-init:
+    image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>-<HASH_STRATO>}
+    command: ["--init"]
+    environment:
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - VAULT_URL=${VAULT_URL}
+    - network=${network}
+    - postgres_password=${postgres_password}
+    - postgres_host=postgres
+    - kafkaHost=kafka
+    - redisHost=redis
+    - useCustomGenesis=${useCustomGenesis}
+    volumes:
+      - ./nodedata:/var/lib/strato
+    restart: "no"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "1"
   mercata-backend:
     depends_on:
-      - strato
-      - postgrest
+      strato:
+        condition: service_started
+      postgrest:
+        condition: service_started
     build: ./mercata/backend
     image: ${MERCATABACKEND_IMAGE:-<REPO_URL>mercata-backend:<VERSION>-<HASH_MERCATA_BACKEND>}
     init: true
@@ -91,7 +115,6 @@ services:
     environment:
     - ADMIN_EMAIL=${ADMIN_EMAIL}
     - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
     - PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
@@ -100,6 +123,8 @@ services:
     - STRATO_PORT_API=${STRATO_PORT_API:-3000}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - MONITOR_URL=${MONITOR_URL}
+    volumes:
+    - ./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>-<HASH_APEX>}
     restart: unless-stopped
@@ -121,9 +146,14 @@ services:
       - redisdata:/data
   strato:
     depends_on:
-    - kafka
-    - postgres
-    - redis
+      strato-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
     environment:
     - addBootnodes=${addBootnodes}
     - API_DEBUG_LOG=${API_DEBUG_LOG:-false}
@@ -160,7 +190,6 @@ services:
     - OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}
     - P2P_DEBUG_LOG=${P2P_DEBUG_LOG}
     - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
@@ -207,10 +236,11 @@ services:
     - blocHost=${blocHost:-strato:3000}
     - PG_ENV_POSTGRES_DB=cirrus
     - PG_ENV_POSTGRES_HOST=postgres
-    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
     - PG_ENV_POSTGRES_USER=postgres
     - PG_PORT_5432_TCP_PORT=5432
     - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
+    volumes:
+    - ./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro
     build: .
     image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>-<HASH_POSTGREST>}
     restart: unless-stopped
@@ -220,12 +250,16 @@ services:
         max-size: "100m"
         max-file: "3"
   postgres:
+    depends_on:
+      strato-init:
+        condition: service_completed_successfully
     environment:
       - POSTGRES_DB=eth
-      - POSTGRES_PASSWORD=${postgres_password:-api}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
     image: postgres:14.18
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro
     command:
       - "postgres"
       - "-c"
