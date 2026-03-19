@@ -9,9 +9,10 @@ import {
   BridgeInfo,
 } from "../types";
 
-const { bridge } = config;
+const { bridge, oracle } = config;
 const { address: bridgeAddress } = bridge;
 const MERCATA_URL = "BlockApps-MercataBridge";
+const ORACLE_URL = "BlockApps-PriceOracle";
 
 // Get all enabled chains from the bridge contract
 export const getEnabledChains = async (): Promise<Map<number, ChainInfo>> => {
@@ -173,6 +174,30 @@ export const getBridgeInfo = async (): Promise<BridgeInfo | null> => {
   });
 
   return normalize(data[0]);
+};
+
+// Get rebase factors from PriceOracle for given STRATO token addresses
+export const getRebaseFactors = async (
+  stratoTokenAddresses: string[]
+): Promise<Map<string, bigint>> => {
+  if (!stratoTokenAddresses.length || !oracle.address) return new Map();
+
+  const data = await cirrus.get(`/${ORACLE_URL}-rebaseFactors`, {
+    params: {
+      key: `in.(${stratoTokenAddresses.join(",")})`,
+      address: `eq.${oracle.address}`,
+      select: "key,value::text",
+    },
+  }).catch(() => []);
+
+  if (!Array.isArray(data) || !data.length) return new Map();
+
+  const result = new Map<string, bigint>();
+  for (const { key, value } of data) {
+    const factor = BigInt(value || "0");
+    if (factor > 0n) result.set(key, factor);
+  }
+  return result;
 };
 
 // Get safeTxHash from WithdrawalPending events for multiple withdrawal IDs

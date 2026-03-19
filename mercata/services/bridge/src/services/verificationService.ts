@@ -1,8 +1,9 @@
-import { config, ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE } from "../config";
+import { config, ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE, WAD } from "../config";
 import { 
   getTransactionReceiptsBatch, 
   getInternalTransactionsBatch 
 } from "./rpcService";
+import { getRebaseFactors } from "./cirrusService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
 import { DepositInfo } from "../types";
 
@@ -27,7 +28,7 @@ const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: 
     return false;
   });
 
-const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string) => {
+const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string, rebaseFactor?: bigint) => {
   if (Number(deposit.externalChainId) !== chainId) {
     return new Error(`Chain mismatch for token ${normalizeAddress(deposit.externalToken)}. Expected: ${chainId}, Got: ${deposit.externalChainId}`);
   }
@@ -41,7 +42,8 @@ const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string) =>
     externalToken,
     depositRouter,
     stratoTokenAmount: safeToBigInt(deposit.stratoTokenAmount),
-    externalDecimals: deposit.externalDecimals
+    externalDecimals: deposit.externalDecimals,
+    rebaseFactor,
   };
 };
 
@@ -73,7 +75,12 @@ const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
       return false;
     }
     
-    const convertedAmount = convertToStratoDecimals(decoded.amount, ctx.externalDecimals)
+    const convertedAmount = convertToStratoDecimals(decoded.amount, ctx.externalDecimals);
+
+    if (ctx.rebaseFactor && ctx.rebaseFactor > 0n) {
+      const rebasedAmount = (convertedAmount * WAD) / ctx.rebaseFactor;
+      return rebasedAmount === ctx.stratoTokenAmount;
+    }
     
     return convertedAmount === ctx.stratoTokenAmount;
   });
@@ -112,6 +119,10 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
     return results;
   }
 
+  // Fetch rebase factors for all deposits' STRATO tokens
+  const allStratoTokens = [...new Set(deposits.map(d => d.stratoToken).filter(Boolean))];
+  const rebaseFactorMap = allStratoTokens.length > 0 ? await getRebaseFactors(allStratoTokens) : new Map<string, bigint>();
+
   // Process each chain's deposits in batches
   for (const [chainId, chainDeposits] of depositsByChain) {
     // Dedupe txHashes
@@ -139,7 +150,8 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
         }
 
         // Early guard + context object
-        const ctx = validateDeposit(deposit, chainId, safe);
+        const rebaseFactor = rebaseFactorMap.get(deposit.stratoToken);
+        const ctx = validateDeposit(deposit, chainId, safe, rebaseFactor);
         if (ctx instanceof Error) {
           results.set(deposit.externalTxHash, ctx);
           continue;

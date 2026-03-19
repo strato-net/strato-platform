@@ -1,6 +1,7 @@
 // Constants
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const STRATO_DECIMALS = 18;
+export const WAD = 10n ** 18n;
 
 export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
@@ -27,6 +28,9 @@ const config = {
   },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
+  },
+  oracle: {
+    address: process.env.PRICE_ORACLE_ADDRESS,
   },
   usdst: {
     address: process.env.USDST_ADDRESS || '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
@@ -105,6 +109,7 @@ const requiredEnvVars = [
   "CLIENT_ID",
   "OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
+  "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
   "SAFE_PROPOSER_PRIVATE_KEY",
