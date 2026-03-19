@@ -26,33 +26,39 @@ generateDockerCompose = do
       vault = vaultUrl (urlConfig conf)
       userGid = uid ++ ":" ++ gid
 
-  let stdLogging = Just Logging
-        { driver = "json-file"
-        , options = Just LoggingOptions
-            { max_size = Just "100m"
-            , max_file = Just "3"
-            }
+  -- Disable Docker logging since we redirect stdout/stderr to files
+  let noLogging = Just Logging
+        { driver = "none"
+        , options = Nothing
         }
 
   let mercataBackend = def
         { image = "mercata-backend:" ++ stratoVersionTag ++ "-" ++ hashMercataBackend
         , depends_on = Just ["postgrest"]
         , init = Just True
-        , volumes = Just ["./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"]
+        , volumes = Just
+            [ "./logs:/logs"
+            , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
+            ]
         , environment = Just $ Map.fromList
             [ ("NODE_URL", "http://nginx")
             , ("BASE_URL", "https://" ++ nodeHost)
             , ("STRATO_HOSTNAME", stratoHostname)
             ]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
         , restart = Just "unless-stopped"
-        , logging = stdLogging
+        , logging = noLogging
         }
 
   let mercataUi = def
         { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ hashMercataUi
         , depends_on = Just ["mercata-backend"]
+        , volumes = Just ["./logs:/logs"]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-ui.log 2>&1"]
         , restart = Just "unless-stopped"
-        , logging = stdLogging
+        , logging = noLogging
         }
 
   let smd = def
@@ -62,8 +68,11 @@ generateDockerCompose = do
             [ ("NODE_HOST", nodeHost)
             , ("ssl", "false")
             ]
+        , volumes = Just ["./logs:/logs"]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
         , restart = Just "unless-stopped"
-        , logging = stdLogging
+        , logging = noLogging
         }
 
   let apex = def
@@ -78,15 +87,21 @@ generateDockerCompose = do
             , ("STRATO_PORT_VAULT_PROXY", "8013")
             , ("vaultUrl", "http://nginx")
             ]
-        , volumes = Just ["./secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just
+            [ "./logs:/logs"
+            , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
+            ]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec docker-entrypoint.sh /usr/src/app/docker-run.sh >> /logs/apex.log 2>&1"]
         , restart = Just "unless-stopped"
-        , logging = stdLogging
+        , logging = noLogging
         }
 
   let redis = def
         { image = "redis:3.2"
         , user = Just userGid
-        , command = Just ["redis-server", "--appendonly", "yes"]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec docker-entrypoint.sh redis-server --appendonly yes >> /logs/redis.log 2>&1"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
             { test = ["CMD", "redis-cli", "ping"]
@@ -94,8 +109,8 @@ generateDockerCompose = do
             , timeout = Just "2s"
             , retries = Just 10
             }
-        , logging = stdLogging
-        , volumes = Just ["./redis:/data"]
+        , logging = noLogging
+        , volumes = Just ["./logs:/logs", "./redis:/data"]
         , ports = Just ["6379:6379"]
         }
 
@@ -110,9 +125,14 @@ generateDockerCompose = do
             , ("PG_PORT_5432_TCP_PORT", "5432")
             , ("POSTGREST_LOG_LEVEL", "error")
             ]
-        , volumes = Just ["./secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just
+            [ "./logs:/logs"
+            , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
+            ]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec sh /doit.sh >> /logs/postgrest.log 2>&1"]
         , restart = Just "unless-stopped"
-        , logging = stdLogging
+        , logging = noLogging
         }
 
   let postgres = def
@@ -123,10 +143,12 @@ generateDockerCompose = do
             , ("POSTGRES_PASSWORD_FILE", "/run/secrets/postgres_password")
             ]
         , volumes = Just
-            [ "./postgres:/var/lib/postgresql/data"
+            [ "./logs:/logs"
+            , "./postgres:/var/lib/postgresql/data"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
-        , command = Just ["postgres", "-c", "max_connections=300", "-c", "shared_buffers=512MB"]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=300 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
             { test = ["CMD-SHELL", "pg_isready -U postgres"]
@@ -134,7 +156,7 @@ generateDockerCompose = do
             , timeout = Just "2s"
             , retries = Just 10
             }
-        , logging = stdLogging
+        , logging = noLogging
         , ports = Just ["5432:5432"]
         }
 
@@ -150,18 +172,24 @@ generateDockerCompose = do
         , extra_hosts = Just ["host.docker.internal:host-gateway"]
         , ports = Just [portNum ++ ":80", "443:443"]
         , volumes = Just
-            [ "./ssl:/tmp/ssl:ro"
+            [ "./logs:/logs"
+            , "./ssl:/tmp/ssl:ro"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
             ]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec /docker-run.sh >> /logs/nginx.log 2>&1"]
         , restart = Just "unless-stopped"
-        , logging = stdLogging
+        , logging = noLogging
         }
 
   let docs = def
         { image = "swaggerapi/swagger-ui:v5.29.2"
         , environment = Just $ Map.fromList [("API_URL", "/docs/swagger.yaml")]
+        , volumes = Just ["./logs:/logs"]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec /docker-entrypoint.sh nginx -g 'daemon off;' >> /logs/docs.log 2>&1"]
         , restart = Just "unless-stopped"
-        , logging = stdLogging
+        , logging = noLogging
         }
 
   let kafka = def
@@ -193,8 +221,10 @@ generateDockerCompose = do
             , timeout = Just "10s"
             , retries = Just 10
             }
-        , volumes = Just ["./kafka:/kafka"]
-        , logging = stdLogging
+        , volumes = Just ["./logs:/logs", "./kafka:/kafka"]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec /__cacert_entrypoint.sh /etc/kafka/docker/run >> /logs/kafka.log 2>&1"]
+        , logging = noLogging
         , ports = Just ["9092:9092"]
         }
 
@@ -205,13 +235,16 @@ generateDockerCompose = do
             [ ("NODE_HOST", nodeHost)
             , ("STRATO_HOSTNAME", stratoHostname)
             ]
-        , volumes = Just ["./prometheus:/prometheus"]
+        , volumes = Just ["./logs:/logs", "./prometheus:/prometheus"]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec /entrypoint.sh >> /logs/prometheus.log 2>&1"]
         , restart = Just "unless-stopped"
-        , logging = stdLogging
+        , logging = noLogging
         }
 
   let composeFile = ComposeFile
-        { services = Map.fromList
+        { namedVolumes = Nothing
+        , services = Map.fromList
             [ ("mercata-backend", mercataBackend)
             , ("mercata-ui", mercataUi)
             , ("smd", smd)
@@ -227,3 +260,4 @@ generateDockerCompose = do
         }
 
   Yaml.encodeFile "docker-compose.yml" composeFile
+  putStrLn "  ✓ Generated docker-compose.yml"

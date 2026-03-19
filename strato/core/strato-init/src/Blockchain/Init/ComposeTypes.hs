@@ -10,6 +10,7 @@ module Blockchain.Init.ComposeTypes
   , Healthcheck(..)
   , Logging(..)
   , LoggingOptions(..)
+  , VolumeConfig(..)
   ) where
 
 import Data.Aeson ()
@@ -59,6 +60,7 @@ data Service = Service
   , environment :: Maybe (Map String String)  -- Map format: KEY: value
   , volumes :: Maybe [String]
   , ports :: Maybe [String]
+  , entrypoint :: Maybe [String]
   , command :: Maybe [String]
   , user :: Maybe String
   , restart :: Maybe String
@@ -71,10 +73,25 @@ data Service = Service
 
 deriveJSON defaultOptions { omitNothingFields = True } ''Service
 
--- | Top-level docker-compose.yml structure
-data ComposeFile = ComposeFile
-  { services :: Map String Service
+-- | Volume configuration for named volumes
+data VolumeConfig = VolumeConfig
+  { volume_driver :: Maybe String
   } deriving stock (Show, Eq, Generic)
     deriving anyclass (Default)
 
-deriveJSON defaultOptions { omitNothingFields = True } ''ComposeFile
+deriveJSON defaultOptions 
+  { omitNothingFields = True
+  , fieldLabelModifier = \s -> if s == "volume_driver" then "driver" else s
+  } ''VolumeConfig
+
+-- | Top-level docker-compose.yml structure
+data ComposeFile = ComposeFile
+  { namedVolumes :: Maybe (Map String VolumeConfig)
+  , services :: Map String Service
+  } deriving stock (Show, Eq, Generic)
+    deriving anyclass (Default)
+
+deriveJSON defaultOptions 
+  { omitNothingFields = True
+  , fieldLabelModifier = \s -> if s == "namedVolumes" then "volumes" else s
+  } ''ComposeFile
