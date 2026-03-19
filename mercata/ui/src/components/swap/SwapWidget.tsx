@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePoolPolling } from "@/hooks/useSmartPolling";
-import { calculateSwapOutput, calculateSwapInput, calculateImpact } from "@/helpers/swapCalculations";
+import { calculateSwapOutput, calculateSwapInput, calculateImpact, isMultiTokenPool, getMultiTokenExchangeRate, calculateMultiTokenSwapOutput, calculateMultiTokenSwapInput } from "@/helpers/swapCalculations";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
@@ -45,33 +45,51 @@ const isValidInputAmount = (amount: string): boolean => {
   return amount && amount !== "." && amount !== "0." && !isNaN(Number(amount));
 };
 
-const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) => {
-  if (!pool || !fromAsset?.address) return { 
-    exchangeRateRaw: undefined, 
-    exchangeRate: undefined, 
+const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null, toAsset: SwapToken | null) => {
+  if (!pool || !fromAsset?.address || !toAsset?.address) return {
+    exchangeRateRaw: undefined,
+    exchangeRate: undefined,
     oracleExchangeRate: undefined,
     invertedExchangeRate: undefined,
     invertedOracleExchangeRate: undefined,
     isFractionalRate: false,
     isFractionalOracleRate: false
   };
-  
+
+  // Multi-token pool: use oracle-based rates from coins
+  if (isMultiTokenPool(pool)) {
+    const rate = getMultiTokenExchangeRate(pool, fromAsset.address, toAsset.address);
+    const invertedRate = getMultiTokenExchangeRate(pool, toAsset.address, fromAsset.address);
+    const cleanRate = rate && rate !== "0" ? rate : undefined;
+    const isFractional = cleanRate ? parseFloat(cleanRate) < 1 : false;
+
+    return {
+      exchangeRateRaw: cleanRate,
+      exchangeRate: cleanRate ? formatAmount(cleanRate) : undefined,
+      oracleExchangeRate: cleanRate ? formatAmount(cleanRate) : undefined,
+      invertedExchangeRate: invertedRate && invertedRate !== "0" ? formatAmount(invertedRate) : undefined,
+      invertedOracleExchangeRate: invertedRate && invertedRate !== "0" ? formatAmount(invertedRate) : undefined,
+      isFractionalRate: isFractional,
+      isFractionalOracleRate: isFractional
+    };
+  }
+
   const isAToB = pool.tokenA?.address === fromAsset.address;
   const poolRate = isAToB ? pool.aToBRatio : pool.bToARatio;
   const oracleRate = isAToB ? pool.oracleAToBRatio : pool.oracleBToARatio;
-  
+
   // Strip commas from raw rate in case backend sends pre-formatted data
   const cleanRate = poolRate && poolRate !== "0" ? String(poolRate).replace(/,/g, '') : undefined;
   const cleanOracleRate = oracleRate && oracleRate !== "0" ? String(oracleRate).replace(/,/g, '') : undefined;
-  
+
   // Get inverted rates for display when rate is fractional
   const invertedPoolRate = isAToB ? pool.bToARatio : pool.aToBRatio;
   const invertedOracleRate = isAToB ? pool.oracleBToARatio : pool.oracleAToBRatio;
-  
+
   // Check if rates are fractional (less than 1) - these are harder to understand
   const isFractionalRate = cleanRate ? parseFloat(cleanRate) < 1 : false;
   const isFractionalOracleRate = cleanOracleRate ? parseFloat(cleanOracleRate) < 1 : false;
-  
+
   return {
     exchangeRateRaw: cleanRate,
     exchangeRate: poolRate && poolRate !== "0" ? formatAmount(poolRate) : undefined,
@@ -505,7 +523,7 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // ========================================================================
   // CONTEXT & HOOKS
   // ========================================================================
-  const { swappableTokens, pairableTokens, pairablesLoading, fetchPairableTokens, swap, getPoolByTokenPair, fromAsset, toAsset, pool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory } = useSwapContext();
+  const { swappableTokens, pairableTokens, pairablesLoading, fetchPairableTokens, swap, swapMultiToken, getPoolByTokenPair, getPoolByAddress, fromAsset, toAsset, pool, setPool, poolLoading, loading: swapLoading, setFromAsset, setToAsset, refreshSwapHistory, pools } = useSwapContext();
 
   // ========================================================================
   // DERIVED STATE
@@ -545,7 +563,9 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // ========================================================================
   
   // Exchange rates (both pool and oracle)
-  const { exchangeRateRaw, exchangeRate, oracleExchangeRate, invertedExchangeRate, invertedOracleExchangeRate, isFractionalRate, isFractionalOracleRate } = calculateExchangeRates(pool, fromAsset);
+  const isMultiToken = pool ? isMultiTokenPool(pool) : false;
+
+  const { exchangeRateRaw, exchangeRate, oracleExchangeRate, invertedExchangeRate, invertedOracleExchangeRate, isFractionalRate, isFractionalOracleRate } = calculateExchangeRates(pool, fromAsset, toAsset);
 
   // Price impact calculation - use raw rate for calculations
   const priceImpact = useMemo(() => {
@@ -654,7 +674,6 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
   // Fetch pool immediately when both assets are selected
   useEffect(() => {
     if (fromAsset?.address && toAsset?.address) {
-      // Fetch pool immediately when both assets are selected
       getPoolByTokenPair(fromAsset.address, toAsset.address);
       startPolling();
     } else {
@@ -687,22 +706,29 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
 
     if (!inputAsset?.address || !outputAsset?.address || !pool) return;
 
-    // Check if pool has liquidity
-    const inputPoolBalance = pool.tokenA?.address === inputAsset.address
-      ? pool.tokenA.poolBalance || "0"
-      : pool.tokenB?.address === inputAsset.address
-        ? pool.tokenB.poolBalance || "0"
-        : "0";
+    // For multi-token pools, check liquidity using coins array
+    if (isMultiToken) {
+      const inputCoin = pool.coins?.find(c => c.address === inputAsset.address);
+      const outputCoin = pool.coins?.find(c => c.address === outputAsset.address);
+      if (!inputCoin || !outputCoin) return;
+      if (BigInt(inputCoin.poolBalance || "0") === 0n || BigInt(outputCoin.poolBalance || "0") === 0n) return;
+    } else {
+      // Check if pool has liquidity (2-token pool)
+      const inputPoolBalance = pool.tokenA?.address === inputAsset.address
+        ? pool.tokenA.poolBalance || "0"
+        : pool.tokenB?.address === inputAsset.address
+          ? pool.tokenB.poolBalance || "0"
+          : "0";
 
-    const outputPoolBalance = pool.tokenA?.address === outputAsset.address
-      ? pool.tokenA.poolBalance || "0"
-      : pool.tokenB?.address === outputAsset.address
-        ? pool.tokenB.poolBalance || "0"
-        : "0";
+      const outputPoolBalance = pool.tokenA?.address === outputAsset.address
+        ? pool.tokenA.poolBalance || "0"
+        : pool.tokenB?.address === outputAsset.address
+          ? pool.tokenB.poolBalance || "0"
+          : "0";
 
-    // If either pool balance is 0, no liquidity available - don't clear amounts, just don't calculate
-    if (BigInt(inputPoolBalance) === 0n || BigInt(outputPoolBalance) === 0n) {
-      return;
+      if (BigInt(inputPoolBalance) === 0n || BigInt(outputPoolBalance) === 0n) {
+        return;
+      }
     }
 
     try {
@@ -712,16 +738,27 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
       }
 
       const parsedValue = safeParseUnits(inputAmount);
-      const isAToB = pool.tokenA?.address === fromAsset?.address;
 
-      if (isFromInput) {
-        // Forward calculation: input -> output
-        const swapAmount = calculateSwapOutput(parsedValue.toString(), pool, isAToB);
-        handleAmountInputChange(formatUnits(swapAmount), setToAmount, setToAmountError, toAsset?.poolBalance || "0");
+      if (isMultiToken) {
+        // Multi-token pool: use oracle-based calculation
+        if (isFromInput) {
+          const swapAmount = calculateMultiTokenSwapOutput(parsedValue.toString(), pool, fromAsset!.address, toAsset!.address);
+          handleAmountInputChange(formatUnits(swapAmount), setToAmount, setToAmountError, toAsset?.poolBalance || "0");
+        } else {
+          const requiredInput = calculateMultiTokenSwapInput(parsedValue.toString(), pool, fromAsset!.address, toAsset!.address);
+          handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+        }
       } else {
-        // Reverse calculation: output -> input
-        const requiredInput = calculateSwapInput(parsedValue.toString(), pool, isAToB);
-        handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+        // Standard 2-token pool
+        const isAToB = pool.tokenA?.address === fromAsset?.address;
+
+        if (isFromInput) {
+          const swapAmount = calculateSwapOutput(parsedValue.toString(), pool, isAToB);
+          handleAmountInputChange(formatUnits(swapAmount), setToAmount, setToAmountError, toAsset?.poolBalance || "0");
+        } else {
+          const requiredInput = calculateSwapInput(parsedValue.toString(), pool, isAToB);
+          handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
+        }
       }
     } catch (err) {
       // Show the exact error message
@@ -793,18 +830,27 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
     if (!fromAsset || !toAsset || !pool) return;
 
     try {
-      const isAToB = pool.tokenA?.address === fromAsset.address;
-
       if (!fromAmount || isNaN(Number(fromAmount)) || toAmountMinWei === 0n) {
         throw new Error("Invalid amount values");
       }
 
-      await swap({
-        poolAddress: pool.address,
-        isAToB,
-        amountIn: safeParseUnits(fromAmount).toString(),
-        minAmountOut: toAmountMinWei.toString(),
-      });
+      if (isMultiToken) {
+        await swapMultiToken({
+          poolAddress: pool.address,
+          tokenIn: fromAsset.address,
+          tokenOut: toAsset.address,
+          amountIn: safeParseUnits(fromAmount).toString(),
+          minAmountOut: toAmountMinWei.toString(),
+        });
+      } else {
+        const isAToB = pool.tokenA?.address === fromAsset.address;
+        await swap({
+          poolAddress: pool.address,
+          isAToB,
+          amountIn: safeParseUnits(fromAmount).toString(),
+          minAmountOut: toAmountMinWei.toString(),
+        });
+      }
 
       toast({
         title: "Success",
@@ -829,7 +875,9 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
         refreshLoans(),          // Refresh LendingContext
         refreshCollateral(),     // Refresh LendingContext
         // Refetch pool data to get updated balances and exchange rates
-        fromAsset?.address && toAsset?.address ? getPoolByTokenPair(fromAsset.address, toAsset.address) : Promise.resolve(),
+        isMultiToken
+          ? getPoolByAddress(pool.address).then(p => p && setPool(p))
+          : fromAsset?.address && toAsset?.address ? getPoolByTokenPair(fromAsset.address, toAsset.address) : Promise.resolve(),
       ]);
     }
   };

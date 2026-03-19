@@ -1,9 +1,22 @@
+import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, Download, Coins, UserPlus, Vault } from 'lucide-react';
+import { LayoutDashboard, Wallet, Book, ArrowRightLeft, Send, Shield, X, Activity, BarChart3, Droplets, Download, Coins, UserPlus, Vault, CreditCard, HandCoins, ArrowDownToLine } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
+
+interface MobileNavItem {
+  icon: ReactNode;
+  label: string;
+  path: string;
+  adminOnly?: boolean;
+}
+
+interface MobileNavCategory {
+  label?: string;
+  items: MobileNavItem[];
+}
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -16,23 +29,47 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
   const { resolvedTheme } = useTheme();
   const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
 
-  const allNavItems = [
-    { icon: <LayoutDashboard size={20} />, label: 'Portfolio', path: '/dashboard' },
-    { icon: <Wallet size={20} />, label: 'Deposits', path: '/dashboard/deposits' },
-    { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
-    { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
-    { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
-    { icon: <Vault size={20} />, label: 'Vault', path: '/dashboard/vault' },
-    { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
-    { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
-    { icon: <UserPlus size={20} />, label: 'My Referrals', path: '/dashboard/referrals' },
-    { icon: <BarChart3 size={20} />, label: 'STRATO Stats', path: '/dashboard/stats' },
-    { icon: <Download size={20} />, label: 'Withdrawals', path: '/dashboard/withdrawals' },
-    { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
-    { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },
+  const navCategories: MobileNavCategory[] = [
+    {
+      items: [
+        { icon: <LayoutDashboard size={20} />, label: 'Portfolio', path: '/dashboard' },
+      ],
+    },
+    {
+      label: 'TRADE',
+      items: [
+        { icon: <ArrowDownToLine size={20} />, label: 'Fund', path: '/dashboard/deposits' },
+        { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
+        { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
+        { icon: <Send size={20} />, label: 'Transfer', path: '/dashboard/transfer' },
+        { icon: <Download size={20} />, label: 'Withdrawals', path: '/dashboard/withdrawals' },
+      ],
+    },
+    {
+      label: 'SPEND',
+      items: [
+        { icon: <CreditCard size={20} />, label: 'Card', path: '/dashboard/credit-card' },
+      ],
+    },
+    {
+      label: 'EARN',
+      items: [
+        { icon: <HandCoins size={20} />, label: 'Earn', path: '/dashboard/earn' },
+      ],
+    },
+    {
+      label: 'PRO',
+      items: [
+        { icon: <Vault size={20} />, label: 'Vault', path: '/dashboard/vault' },
+        { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
+        { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
+        { icon: <BarChart3 size={20} />, label: 'STRATO Stats', path: '/dashboard/stats' },
+        { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
+        { icon: <UserPlus size={20} />, label: 'My Referrals', path: '/dashboard/referrals' },
+        { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
+      ],
+    },
   ];
-
-  const navItems = allNavItems.filter(item => item.label !== 'Admin' || isAdmin);
 
   const isActive = (itemPath: string) => {
     if (itemPath === '/dashboard') return location.pathname === '/dashboard';
@@ -71,27 +108,40 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
 
         <div className="flex flex-col flex-1 overflow-y-auto py-4">
           <nav className="flex-1">
-            <ul className="space-y-1">
-              {navItems.map((item, index) => {
-                const active = isActive(item.path);
-                return (
-                  <li key={index}>
-                    <Link
-                      to={item.path}
-                      onClick={onClose}
-                        className={`flex items-center px-4 py-2.5 rounded-md mx-2 transition-colors duration-200 ${active
-                          ? 'bg-muted text-primary font-semibold border-l-4 border-primary'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        }`}
-                      >
-                        <span className={`flex-shrink-0 ${active ? 'text-primary' : ''}`}>{item.icon}</span>
-                      <span className={`ml-3 ${active ? 'font-semibold' : ''}`}>{item.label}</span>
-                    </Link>
-                  </li>
-              )})}
-            </ul>
+            {navCategories.map((category, idx) => {
+              const visibleItems = category.items.filter(item => !item.adminOnly || isAdmin);
+              if (visibleItems.length === 0) return null;
+              return (
+                <div key={idx} className={idx > 0 ? 'mt-4' : ''}>
+                  {category.label && (
+                    <div className="px-4 py-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                      {category.label}
+                    </div>
+                  )}
+                  <ul className="space-y-1">
+                    {visibleItems.map((item, index) => {
+                      const active = isActive(item.path);
+                      return (
+                        <li key={index}>
+                          <Link
+                            to={item.path}
+                            onClick={onClose}
+                            className={`flex items-center px-4 py-2.5 rounded-md mx-2 transition-colors duration-200 ${active
+                              ? 'bg-muted text-primary font-semibold border-l-4 border-primary'
+                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                            }`}
+                          >
+                            <span className={`flex-shrink-0 ${active ? 'text-primary' : ''}`}>{item.icon}</span>
+                            <span className={`ml-3 ${active ? 'font-semibold' : ''}`}>{item.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
           </nav>
-
         </div>
       </div>
     </>

@@ -32,6 +32,10 @@ import Claim from "./pages/Claim";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
+import Earn from "./pages/Earn";
+import EarnVault from "./pages/EarnVault";
+import EarnLending from "./pages/EarnLending";
+import EarnPools from "./pages/EarnPools";
 import OnrampPage from "./pages/OnrampPage";
 import CreditCardPage from "./pages/CreditCard";
 
@@ -246,6 +250,38 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Vault />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-vault"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnVault />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <Earn />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-lending"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnLending />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-pools"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnPools />
                                               </GuestAccessibleRoute>
                                             }
                                           />

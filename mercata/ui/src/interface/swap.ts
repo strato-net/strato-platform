@@ -89,6 +89,34 @@ export interface SwapContextActions {
     poolAddress: string;
     lpTokenAmount: string;
   }) => Promise<void>;
+
+  // Multi-token pool operations
+  swapMultiToken: (data: {
+    poolAddress: string;
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: string;
+    minAmountOut: string;
+  }) => Promise<void>;
+  addLiquidityMultiToken: (data: {
+    poolAddress: string;
+    amounts: string[];
+    minMintAmount: string;
+    stakeLPToken?: boolean;
+  }) => Promise<void>;
+  removeLiquidityMultiToken: (data: {
+    poolAddress: string;
+    lpTokenAmount: string;
+    minAmounts: string[];
+    includeStakedLPToken?: boolean;
+  }) => Promise<void>;
+  removeLiquidityMultiTokenOneCoin: (data: {
+    poolAddress: string;
+    lpTokenAmount: string;
+    coinIndex: number;
+    minReceived: string;
+    includeStakedLPToken?: boolean;
+  }) => Promise<void>;
   
   // Utility functions
   fetchTokenBalances: (pool: Pool, userAddress: string, usdstAddress: string) => Promise<{

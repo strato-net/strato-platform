@@ -14,7 +14,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.Data.GenesisBlock (populateMPTAndWriteGenesis, populateMPTFromGenesis)
 import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
-import Blockchain.Init.Options (flags_dockerMode)
+import Blockchain.Init.Options (flags_dockerMode, flags_includeBuild)
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -27,6 +27,7 @@ import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
 import qualified Data.Yaml as YAML
+import System.Environment (lookupEnv)
 import System.FilePath ((</>))
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
@@ -120,11 +121,14 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ mapM_ (createDirectoryIfMissing True)
       ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
 
-    -- Generate random postgres password (needed by genEthConf)
+    -- Set postgres password: use env var if provided, otherwise generate random
     let pgPasswordFile = "secrets" </> "postgres_password"
     pgPasswordExists <- doesFileExist pgPasswordFile
     unless pgPasswordExists $ liftIO $ do
-      password <- generatePassword 32
+      envPassword <- lookupEnv "postgres_password"
+      password <- case envPassword of
+        Just pw | not (null pw) -> return pw
+        _ -> generatePassword 32
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
 
@@ -158,12 +162,15 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
     -- Generate docker-compose.yml
     liftIO $ case flags_dockerMode of
-      "allDocker" -> generateDockerComposeAllDocker
+      "allDocker" -> generateDockerComposeAllDocker False flags_includeBuild
       _ -> generateDockerCompose
 
     liftIO createCommandsFile
     liftIO $ putStrLn "  ✓ Generated commands.txt"
 
+    -- Custom genesis support: when genesis.json is pre-placed (e.g. useCustomGenesis=true in
+    -- docker-compose for single-node CI/CD builds), read it and populate the LevelDB trie from it.
+    -- DO NOT REMOVE this branch — without it, custom genesis nodes crash with "Missing StateRoot".
     genesisExists <- doesFileExist "genesis.json"
 
     if genesisExists
