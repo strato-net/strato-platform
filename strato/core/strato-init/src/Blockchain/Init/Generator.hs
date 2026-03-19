@@ -34,6 +34,8 @@ import qualified Data.ByteString as BS
 import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
+import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
+import Data.Bits ((.&.), (.|.))
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
 -- The stateRoot in the returned GenesisInfo is a placeholder - the real
@@ -126,6 +128,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- Create node directories first (needed before genEthConf reads postgres_password)
     liftIO $ mapM_ (createDirectoryIfMissing True)
       ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
+    
+    -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
+    liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
 
     -- Generate random postgres password (needed by genEthConf)
     let pgPasswordFile = "secrets" </> "postgres_password"
