@@ -79,6 +79,10 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
         if (!vaultInitialized || paused()) return 0;
         uint256 assets = _convertToAssets(balanceOf(ownerAddress), false);
         uint256 available = _managedAssets;
+        uint256 liveBalance = IERC20(assetToken).balanceOf(address(this));
+        if (liveBalance < available) {
+            available = liveBalance;
+        }
         return assets < available ? assets : available;
     }
 
@@ -145,6 +149,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function notifyReward(uint256 amount) external onlyOwner {
         _requireInitialized();
         require(amount > 0, "SaveUSDST: zero reward");
+        require(totalSupply() > 0, "SaveUSDST: no shares");
 
         uint256 beforeBalance = IERC20(assetToken).balanceOf(address(this));
         require(IERC20(assetToken).transferFrom(_msgSender(), address(this), amount), "SaveUSDST: reward transfer failed");
