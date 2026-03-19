@@ -42,27 +42,14 @@ EOF
 
   # useCustomGenesis mode (used in Jenkinsfile.autobuild for single-node builds/tests):
   # --skipGenesis skips default genesis + LevelDB trie population.
-  # Init container then waits for custom genesis.json via bind mount (cp on host).
-  # Without this, the default trie would conflict with the custom genesis stateRoot.
-
+  # The strato container (normal mode) waits for custom genesis.json to be placed via bind mount.
+  # Without --skipGenesis, the default trie would conflict with the custom genesis stateRoot.
   if [[ ${useCustomGenesis:-false} = "true" ]]; then
     SETUP_FLAGS="${SETUP_FLAGS} --skipGenesis"
   fi
 
   # Run strato-setup to create node directory, ethconf, secrets, genesis
   strato-setup /var/lib/strato ${SETUP_FLAGS}
-
-  # Wait for custom genesis via bind mount (blocks init, preventing dependent services from starting).
-  if [[ ${useCustomGenesis:-false} = "true" && ! -f /var/lib/strato/genesis.json ]]; then
-    set +x
-    echo -e "${BYellow}useCustomGenesis is set to true - waiting for genesis.json...${NC}"
-    echo "Place the genesis file into the nodedata bind mount: cp genesis-block.json nodedata/genesis.json"
-    while [ ! -f /var/lib/strato/genesis.json ]; do
-      sleep 1
-    done
-    echo -e "${Green}genesis.json found!${NC}"
-    set -x
-  fi
 
   echo -e "${Green}Node initialization complete.${NC}"
   exit 0
@@ -107,18 +94,6 @@ echo "Working directory: $(pwd)"
 echo "Node contents:"
 ls -la
 
-# Wait for custom genesis if requested
-if [[ ${useCustomGenesis:-false} = "true" && ! -f "genesis.json" ]] ; then
-  set +x
-  echo "useCustomGenesis is set to true - waiting for genesis.json..."
-  echo "Use: docker cp myGenesisFile.json strato-strato-1:/var/lib/strato/genesis.json"
-  while [ ! -f "genesis.json" ]; do
-    sleep 1
-  done
-  echo "File genesis.json found! Continuing..."
-  set -x
-fi
-
 # Write OAuth credentials for the Haskell processes
 if [[ -n ${OAUTH_CLIENT_ID} && -n ${OAUTH_CLIENT_SECRET} ]]; then
   mkdir -p ~/.secrets
@@ -145,6 +120,21 @@ fi
 if [ ! -f commands.txt ]; then
   echo -e "${Red}ERROR: commands.txt not found. The strato-init service must run first.${NC}"
   exit 1
+fi
+
+# useCustomGenesis: wait for custom genesis.json to be placed via nodedata bind mount.
+# The init container skipped genesis generation (--skipGenesis), so genesis.json must be
+# provided externally (e.g. `cp genesis-block.json nodedata/genesis.json` from the host).
+# Used in Jenkinsfile.autobuild for single-node builds/tests.
+if [[ ${useCustomGenesis:-false} = "true" && ! -f "genesis.json" ]]; then
+  set +x
+  echo -e "${BYellow}useCustomGenesis is set to true - waiting for genesis.json...${NC}"
+  echo "Place the genesis file into the nodedata bind mount: cp genesis-block.json nodedata/genesis.json"
+  while [ ! -f "genesis.json" ]; do
+    sleep 1
+  done
+  echo -e "${Green}genesis.json found! Continuing...${NC}"
+  set -x
 fi
 
 echo -e "${Green}Starting STRATO processes via convoke...${NC}"
