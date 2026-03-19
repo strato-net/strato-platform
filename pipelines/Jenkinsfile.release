@@ -67,7 +67,7 @@ pipeline {
             sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
             sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
             
-            sh 'cp ../docker-compose.allDocker.yml docker-compose.yml'
+            sh 'cp ../docker-compose.yml .'
             sh 'cp ../docker-compose.vault.yml .'
             sh 'cp ../docker-compose.highway.yml .'
             script {
@@ -175,11 +175,9 @@ pipeline {
             dir ('strato-worktree') {
               script {
                 def WORKDIR = pwd()
-                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                  sh """#!/bin/bash -lex
-                    find mercata/contracts/tests -name '*.test.sol' -print0 | xargs -0 -I {} sh -c 'echo "Running test: {}" && cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
-                  """
-                }
+                sh """#!/bin/bash -lex
+                  find mercata/contracts/tests -name '*.test.sol' -print0 | xargs -0 -I {} sh -c 'echo "Running test: {}" && cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
+                """
               }
             }
           }
@@ -199,12 +197,12 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-              docker compose -f docker-compose.allDocker.push.yml push 2>&1
+              docker compose -f docker-compose.push.yml push 2>&1
               # docker compose -f docker-compose.vault.push.yml push 2>&1
               # docker compose -f docker-compose.highway.push.yml push 2>&1
               #
               # AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
-              # docker compose -f docker-compose.allDocker.push.ecr.yml push 2>&1
+              # docker compose -f docker-compose.push.ecr.yml push 2>&1
               # docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
               # docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
             '''
@@ -243,10 +241,10 @@ pipeline {
               github-release delete $STRATOGS_RELEASE_FLAGS || true
               github-release release $STRATOGS_RELEASE_FLAGS --name "${RELEASE_VERSION}"
               sleep 5
-              github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.yml" --file ./docker-compose.allDocker.yml
+              github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.yml" --file ./docker-compose.yml
               # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
               # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
-              # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.ecr.yml" --file ./docker-compose.allDocker.ecr.yml
+              # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.ecr.yml" --file ./docker-compose.ecr.yml
               # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
               # github-release upload $STRATOGS_RELEASE_FLAGS --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
             '''
@@ -258,10 +256,10 @@ pipeline {
               github-release delete $STRATOPLATFORM_RELEASE_FLAGS || true
               github-release release $STRATOPLATFORM_RELEASE_FLAGS --name "${RELEASE_VERSION}" --generate-release-notes
               sleep 5
-              github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.yml" --file ./docker-compose.allDocker.yml
+              github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.yml" --file ./docker-compose.yml
               # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
               # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
-              # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.ecr.yml" --file ./docker-compose.allDocker.ecr.yml
+              # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.ecr.yml" --file ./docker-compose.ecr.yml
               # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
               # github-release upload $STRATOPLATFORM_RELEASE_FLAGS --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
             '''

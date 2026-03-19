@@ -27,7 +27,7 @@ pipeline {
         dir("strato-getting-started") {
           sh "cp ~/ssl/server.pem ssl/certs/"
           sh "cp ~/ssl/server.key ssl/private/"
-          sh "aws s3 cp s3://blockapps-build-artifacts/${STRATO_VERSION}/docker-compose.allDocker.yml ./docker-compose.yml"
+          sh "aws s3 cp s3://blockapps-build-artifacts/${STRATO_VERSION}/docker-compose.yml ./docker-compose.yml"
           withCredentials([usernamePassword(credentialsId: 'mercata-mainnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
             writeFile file: "strato-run.sh", text: """#!/bin/bash
                 NODE_HOST=\$(</host) \\

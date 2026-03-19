@@ -31,22 +31,51 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-const PRIMARY_NAV_ITEMS: NavItem[] = [
-  { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
-  { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
-  { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
-  { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
-  { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
-  { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
-  { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
-  { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
-  { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
-  { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
-  { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
-  { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
-  { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
-  { icon: UserPlus, label: 'My Referrals', path: '/dashboard/referrals' },
-  { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
+interface NavCategory {
+  label?: string;
+  items: NavItem[];
+}
+
+const NAV_CATEGORIES: NavCategory[] = [
+  {
+    items: [
+      { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
+    ],
+  },
+  {
+    label: 'TRADE',
+    items: [
+      { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
+      { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
+      { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
+      { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
+      { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
+    ],
+  },
+  {
+    label: 'SPEND',
+    items: [
+      { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
+    ],
+  },
+  {
+    label: 'EARN',
+    items: [
+      { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+    ],
+  },
+  {
+    label: 'PRO',
+    items: [
+      { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
+      { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
+      { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+      { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
+      { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
+      { icon: UserPlus, label: 'My Referrals', path: '/dashboard/referrals' },
+      { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
+    ],
+  },
 ];
 
 const DashboardSidebar = () => {
@@ -99,12 +128,22 @@ const DashboardSidebar = () => {
       </div>
 
       <nav className="flex-1 py-4 px-3 overflow-y-auto">
-        {/* Navigation */}
-        <ul className="space-y-1">
-          {PRIMARY_NAV_ITEMS
-            .filter(item => !item.adminOnly || isAdmin)
-            .map(renderNavItem)}
-        </ul>
+        {NAV_CATEGORIES.map((category, idx) => {
+          const visibleItems = category.items.filter(item => !item.adminOnly || isAdmin);
+          if (visibleItems.length === 0) return null;
+          return (
+            <div key={idx} className={idx > 0 ? 'mt-4' : ''}>
+              {category.label && (
+                <div className="px-4 py-1.5 text-[11px] font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase">
+                  {category.label}
+                </div>
+              )}
+              <ul className="space-y-1">
+                {visibleItems.map(renderNavItem)}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
     </aside>
   );
