@@ -53,15 +53,15 @@ const NAV_CATEGORIES: NavCategory[] = [
     ],
   },
   {
-    label: 'EARN',
-    items: [
-      { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
-    ],
-  },
-  {
     label: 'SPEND',
     items: [
       { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
+    ],
+  },
+  {
+    label: 'EARN',
+    items: [
+      { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
     ],
   },
   {
