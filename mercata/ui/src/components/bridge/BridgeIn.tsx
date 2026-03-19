@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DepositAction } from "@mercata/shared-types";
@@ -51,7 +51,7 @@ import {
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, Gem, CheckCircle2, TrendingUp } from "lucide-react";
+import { ArrowDownToLine, Gem, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
@@ -75,7 +75,7 @@ const CrossfadePanel = ({ active, children }: { active: boolean; children: React
 );
 
 const CardSkeleton = ({ id }: { id: string }) => (
-  <div key={id} className="relative text-left rounded-md border-2 border-border p-3 animate-pulse">
+  <div key={id} className="relative text-left rounded-md border-2 border-border p-3 animate-pulse snap-start">
     <div className="flex items-center gap-2 mb-1">
       <div className="w-6 h-6 rounded-full bg-muted shrink-0" />
       <div className="h-[1.25rem] w-16 bg-muted rounded" />
@@ -92,7 +92,7 @@ const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled,
   apyBadge: React.ReactNode;
 }) => (
   <button type="button" onClick={onClick} disabled={disabled}
-    className={`relative text-left rounded-md border-2 p-3 transition-colors ${
+    className={`relative text-left rounded-md border-2 p-3 transition-colors snap-start ${
       active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
     }`}>
     {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /></div>}
@@ -108,11 +108,73 @@ const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled,
   </button>
 );
 
+const ScrollRow = ({ children }: { children: React.ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+  const count = React.Children.count(children);
+
+  const check = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 2);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    if (count <= 3) return;
+    check();
+    const el = ref.current;
+    if (!el) return;
+    el.addEventListener("scroll", check, { passive: true });
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", check); ro.disconnect(); };
+  }, [check, count]);
+
+  const scroll = (dir: number) => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.floor(el.clientWidth / 3), behavior: "smooth" });
+  };
+
+  const needsScroll = count > 3;
+  const gridStyle: React.CSSProperties = needsScroll
+    ? {
+        gridTemplateColumns: `repeat(${count}, calc((100% - 16px) / 3))`,
+        overflowX: "auto",
+        scrollbarWidth: "none",
+      }
+    : {
+        gridTemplateColumns: `repeat(${count || 1}, minmax(0, 1fr))`,
+      };
+
+  return (
+    <div className="relative group">
+      <div ref={ref} className="grid gap-2 snap-x" style={gridStyle}>
+        {children}
+      </div>
+      {needsScroll && ([
+        { dir: -1, enabled: canLeft, pos: "left-0", grad: "bg-gradient-to-r", Icon: ChevronLeft },
+        { dir: 1, enabled: canRight, pos: "right-0", grad: "bg-gradient-to-l", Icon: ChevronRight },
+      ] as const).map(({ dir, enabled, pos, grad, Icon }) => (
+        <button key={dir} type="button" onClick={() => scroll(dir)} disabled={!enabled}
+          className={`absolute ${pos} top-0 bottom-0 w-7 flex items-center justify-center ${grad} from-card to-transparent z-10 transition-opacity ${enabled ? "opacity-100" : "opacity-30 pointer-events-none"}`}>
+          <Icon className="w-4 h-4 text-muted-foreground" />
+        </button>
+      ))}
+    </div>
+  );
+};
+
 interface BridgeInProps {
   guestMode?: boolean;
+  fundingMode?: "bridge" | "metals";
+  onFundingModeChange?: (mode: "bridge" | "metals") => void;
+  onMetalPurchase?: () => void;
 }
 
-const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
+const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: externalFundingMode, onFundingModeChange, onMetalPurchase }) => {
   // Hooks & Context
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -136,8 +198,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
   } = useBridgeContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
 
-  // State
-  const [fundingMode, setFundingMode] = useState<"bridge" | "metals">("bridge");
+  // State -- fundingMode can be controlled externally or managed internally
+  const [internalMode, setInternalMode] = useState<"bridge" | "metals">("bridge");
+  const fundingMode = externalFundingMode ?? internalMode;
+  const setFundingMode = onFundingModeChange ?? setInternalMode;
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [amountError, setAmountError] = useState("");
@@ -462,6 +526,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
       setAmount("");
       fetchTokens();
       fetchUsdstBalance();
+      onMetalPurchase?.();
     } catch (error: any) {
       toast({ title: "Transaction failed", description: error?.message || "Unknown error", variant: "destructive" });
     } finally {
@@ -891,7 +956,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
 
           <div className="relative">
             <CrossfadePanel active={fundingMode === "metals"}>
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((metalsConfig?.metals.filter(m => m.isEnabled).length || 2), 3)}, 1fr)` }}>
+              <ScrollRow>
                 {!metalsConfig
                   ? Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={`ms-${i}`} id={`ms-${i}`} />)
                   : metalsConfig.metals.filter(m => m.isEnabled).map((metal) => {
@@ -909,12 +974,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                       );
                     })
                 }
-              </div>
+              </ScrollRow>
             </CrossfadePanel>
             <CrossfadePanel active={fundingMode === "bridge"}>
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((sourceTokenRoutes.length + matchingActions.length) || prevRouteCountRef.current, 3)}, 1fr)` }}>
-                {sourceTokenRoutes.length > 0 ? (<>
-                  {sourceTokenRoutes.map((rt) => (
+              <ScrollRow>
+                {sourceTokenRoutes.length > 0 ? [
+                  ...sourceTokenRoutes.map((rt) => (
                     <TokenCard key={rt.id}
                       active={rt.id === selectedToken?.id && !selectedAction}
                       image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
@@ -924,8 +989,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                       disabled={guestMode || isLoading}
                       apyBadge={<ApyBadge addr={rt.stratoToken} />}
                     />
-                  ))}
-                  {matchingActions.map((action) => {
+                  )),
+                  ...matchingActions.map((action) => {
                     let est = amount || "0";
                     if (action.action === 2 && action.oraclePrice && amount) {
                       try {
@@ -948,11 +1013,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                         apyBadge={<ApyBadge addr={action.stratoToken} />}
                       />
                     );
-                  })}
-                </>) : (
+                  }),
+                ] : (
                   Array.from({ length: prevRouteCountRef.current }).map((_, i) => <CardSkeleton key={`bs-${i}`} id={`bs-${i}`} />)
                 )}
-              </div>
+              </ScrollRow>
             </CrossfadePanel>
           </div>
         </section>
