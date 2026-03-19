@@ -32,14 +32,21 @@ clientSecret: "${OAUTH_CLIENT_SECRET}"
 EOF
   fi
 
+  # Build strato-setup flags
+  SETUP_FLAGS="--network=${network:-helium} \
+    --vaultUrl=${VAULT_URL:-https://vault.blockapps.net:8093}/strato/v2.3 \
+    --pghost=${postgres_host:-postgres} \
+    --kafkahost=${kafkaHost:-kafka} \
+    --redisHost=${redisHost:-redis} \
+    --apiIPAddress=0.0.0.0"
+
+  # Skip genesis generation if custom genesis will be provided externally
+  if [[ ${useCustomGenesis:-false} = "true" ]]; then
+    SETUP_FLAGS="${SETUP_FLAGS} --skipGenesis"
+  fi
+
   # Run strato-setup to create node directory, ethconf, secrets, genesis
-  strato-setup /var/lib/strato \
-    --network="${network:-helium}" \
-    --vaultUrl="${VAULT_URL:-https://vault.blockapps.net:8093}/strato/v2.3" \
-    --pghost="${postgres_host:-postgres}" \
-    --kafkahost="${kafkaHost:-kafka}" \
-    --redisHost="${redisHost:-redis}" \
-    --apiIPAddress=0.0.0.0
+  strato-setup /var/lib/strato ${SETUP_FLAGS}
 
   echo -e "${Green}Node initialization complete.${NC}"
   exit 0

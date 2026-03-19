@@ -52,6 +52,8 @@ defineFlag "composeOnly" (False :: Bool) "Only generate docker-compose.yml to st
 
 defineFlag "includeBuild" (False :: Bool) "Include build directives in generated docker-compose.yml"
 
+defineFlag "skipGenesis" (False :: Bool) "Skip genesis block generation (for useCustomGenesis=true where genesis is provided externally for single node tests)"
+
 -- P2P config flags
 defineFlag "maxConn" (1000 :: Int) "Maximum number of P2P client connections"
 defineFlag "connectionTimeout" (3600 :: Int) "Number of seconds to tolerate a useless peer"

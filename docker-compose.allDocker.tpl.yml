@@ -24,6 +24,7 @@ services:
     - postgres_host=postgres
     - kafkaHost=kafka
     - redisHost=redis
+    - useCustomGenesis=${useCustomGenesis}
     volumes:
       - ./nodedata:/var/lib/strato
     restart: "no"
