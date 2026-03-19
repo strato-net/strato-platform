@@ -8,9 +8,11 @@ import Blockchain.Init.BuildMetadata
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.Options (flags_repoUrl)
 import Blockchain.Strato.Version (stratoVersionTag)
+import qualified Data.ByteString as BS
 import Data.Default (def)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
+import System.IO (hPutStrLn, stderr)
 
 generateDockerComposeAllDocker :: IO ()
 generateDockerComposeAllDocker = do
@@ -355,5 +357,5 @@ generateDockerComposeAllDocker = do
             ]
         }
 
-  Yaml.encodeFile "docker-compose.yml" composeFile
-  putStrLn "  ✓ Generated docker-compose.yml (allDocker)"
+  BS.putStr $ Yaml.encode composeFile
+  hPutStrLn stderr "  ✓ Generated docker-compose.yml (allDocker)"
