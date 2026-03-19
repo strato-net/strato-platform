@@ -53,7 +53,7 @@ pipeline {
           // May be we should use all available caches instead? commenting out the rm 
           // sh 'rm -rf .docker-work'
           sh 'make clean-docker-sentinels'
-          sh 'REPO=public make docker'
+          sh 'REPO=release make docker'
         }
       }
     }

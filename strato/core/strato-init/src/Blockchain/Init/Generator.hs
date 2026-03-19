@@ -27,6 +27,7 @@ import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
 import qualified Data.Yaml as YAML
+import System.Environment (lookupEnv)
 import System.FilePath ((</>))
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
@@ -120,11 +121,14 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ mapM_ (createDirectoryIfMissing True)
       ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
 
-    -- Generate random postgres password (needed by genEthConf)
+    -- Set postgres password: use env var if provided, otherwise generate random
     let pgPasswordFile = "secrets" </> "postgres_password"
     pgPasswordExists <- doesFileExist pgPasswordFile
     unless pgPasswordExists $ liftIO $ do
-      password <- generatePassword 32
+      envPassword <- lookupEnv "postgres_password"
+      password <- case envPassword of
+        Just pw | not (null pw) -> return pw
+        _ -> generatePassword 32
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
 

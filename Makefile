@@ -1,14 +1,12 @@
 REPO_URL ?= 
-ifeq ($(REPO),private)
+ifeq ($(REPO),dev)
   REPO_URL=registry-aws.blockapps.net:5000/blockapps/
 endif
-ifeq ($(REPO),public)
+ifeq ($(REPO),release)
   REPO_URL=registry-aws.blockapps.net:5000/blockapps-repo/
 endif
 $(info REPO_URL is "${REPO_URL}" (REPO: "${REPO}"))
 REPO_AWS_ECR_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
-# TODO: merge two REPO vars
-REPO_AWS_ECR_URL_MERCATA=406773134706.dkr.ecr.us-east-1.amazonaws.com/mercata/
 $(info REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}")
 
 STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
@@ -25,9 +23,23 @@ else
 endif
 
 ifndef VERSION
-  GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
-  # Use git tag for VERSION - content hash provides uniqueness
-  VERSION := $(GIT_TAG)
+  # REPO=release: use VERSION file directly (e.g., "16.7")
+  # Otherwise (dev/CI builds): append short commit hash for per-build uniqueness (e.g., "16.7+abc1234")
+  ifeq ($(REPO),release)
+    VERSION := $(shell cat VERSION)
+  else
+	# INTENT: deterministic version for image tagging
+	#
+	# AVOID `git describe --tags --abbrev=0`:
+	# - branch/merge dependent
+	# - may return outdated/pre-release tags (e.g. `16.7-rc1` < `16.7`) or custom dev tags
+	#
+	# APPROACH:
+	# - VERSION file = source of truth
+	# - + short commit SHA for uniqueness
+	#
+    VERSION := $(shell cat VERSION)+$(shell git rev-parse --short=7 HEAD)
+  endif
 else
   $(info VERSION is "$(VERSION)" (overriden with env var))
 endif
