@@ -78,7 +78,7 @@ The flags are mutually exclusive:
 function wipe {
   echo -e "${Yellow}Removing STRATO containers and wiping out volumes${NC}"
   ${docker_compose} down -v -t 0 --remove-orphans
-  rm -rf nodedata/
+  sudo rm -rf nodedata/
 }
 
 function down {
