@@ -197,19 +197,17 @@ $(DOCKER_SENTINELS)/bridge-nginx: | $(DOCKER_SENTINELS)
 clean-docker-sentinels:
 	rm -rf $(DOCKER_SENTINELS)
 
-all: mercata
+all: platform_local
 
-docker: build_all_docker docker-compose
+platform_local: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose-local
+
+docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
 
 all_develop: build_develop docker-compose
 
-mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
-
-build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
-
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose highway highway-nginx mercata oracle strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose docker-compose-local highway highway-nginx platform_local oracle strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels
 
 apex: $(DOCKER_SENTINELS)/apex
 nginx: $(DOCKER_SENTINELS)/nginx
@@ -396,9 +394,19 @@ vault-nginx:
 	@echo Now building vault-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
+# Local/dev compose generation — runs strato-setup on the host (no strato container needed).
+# strato-setup is installed to ~/.local/bin by `stack install` in build_common.
+docker-compose-local: build_common
+	@echo Generating local docker-compose.yml via strato-setup on host...
+	strato-setup --composeOnly --dockerMode=local --repoUrl=$(REPO_URL) --includeBuild \
+	    > docker-compose.push.yml
+	strato-setup --composeOnly --dockerMode=local --repoUrl=$(REPO_URL) \
+	    > docker-compose.yml
+
+# allDocker compose generation — runs strato-setup in a temporary strato container.
+# Used in CI/CD where strato-setup is not available on the host.
 docker-compose: strato_docker
-	@echo Generating docker-compose files...
-	@echo Generating docker-compose.yml via strato-setup...
+	@echo Generating docker-compose files via strato-setup in container...
 	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
 	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_URL) --includeBuild \
 	    > docker-compose.push.yml
