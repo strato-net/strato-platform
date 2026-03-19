@@ -50,14 +50,15 @@ export const tokenFactory = process.env.TOKEN_FACTORY || "0000000000000000000000
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
-export const rewardsChef = process.env.REWARDS_CHEF || "000000000000000000000000000000000000101f";
+
 export const safetyModule = process.env.SAFETY_MODULE || "0000000000000000000000000000000000001015";
 export const sToken = process.env.SUSDST_ADDRESS || "0000000000000000000000000000000000001016";
 
 // Hidden swap pools - these pools are filtered out from API responses
 export const hiddenSwapPools: Set<string> = new Set([
-  "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user 
+  "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user
 ]);
+
 
 /*
    Network-specific defaults;

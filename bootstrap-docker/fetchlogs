@@ -25,7 +25,7 @@ def fetch_logs():
         'strato': '/var/lib/strato/logs'
     }
     if not os.path.isfile('./docker-compose.yml'):
-        sys.stderr.write('ERROR: docker-compose.yml does not exist. Download or build the platform and copy docker-compose.allDocker.yml as ./docker-compose.yml - see ../README.md.')
+        sys.stderr.write('ERROR: docker-compose.yml does not exist. Run ./strato --compose to download it - see ../README.md.')
         sys.exit(6)
     try:
         compose_ps_output = subprocess.check_output(
@@ -60,6 +60,14 @@ def fetch_logs():
                 sys.stderr.write('%s\n' % error_message)
                 create_text_file(os.path.join(current_container_logs_dir, '%s_error.txt' % container_subname),
                                  error_message)
+            # Also capture docker logs (container stdout/stderr) for containers with internal log files
+            try:
+                subprocess.check_output(
+                    'docker logs -t %s > %s 2>&1' % (container_name, os.path.join(current_container_logs_dir, 'docker_logs.txt')),
+                    shell=True
+                )
+            except Exception as e:
+                sys.stderr.write('Warning: Unable to fetch docker logs for %s: %s\n' % (container_name, e))
         else:
             # Copying logfile returned with `"docker inspect --format='{{.LogPath}}' %s" % container_name` does not work
             # since: 1. it returns non-existing log filenames in some cases 2. sudo is mandatory to access file directly

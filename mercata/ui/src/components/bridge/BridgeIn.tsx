@@ -33,11 +33,12 @@ import {
 } from "@/lib/bridge/contractService";
 import { normalizeError } from "@/lib/bridge/utils";
 import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits } from "@/utils/numberUtils";
-import { handleAmountInputChange } from "@/utils/transferValidation";
+import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import {
@@ -51,8 +52,11 @@ import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link } from "react-router-dom";
 import { ArrowDownToLine, Gem, CheckCircle2, TrendingUp } from "lucide-react";
+import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 
-const WAD = 10n ** 18n;
+const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
+
+const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
 
 const calcMetalAmount = (payAmount: string, metal: MetalConfig, payToken: PayTokenConfig): bigint => {
   try {
@@ -117,7 +121,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
   const { signTypedDataAsync } = useSignTypedData();
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { fetchUsdstBalance, activeTokens } = useTokenContext();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
+  const { activeTokens, fetchTokens } = useUserTokens();
   const {
     availableNetworks,
     bridgeableTokens,
@@ -156,6 +161,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
   const [progressTxHash, setProgressTxHash] = useState<string>();
   const [progressError, setProgressError] = useState<string>();
   const [progressIsNative, setProgressIsNative] = useState(true);
+  const [metalsFeeError, setMetalsFeeError] = useState("");
 
   const prevRouteCountRef = React.useRef<number>(1);
   const prevCardsRef = React.useRef<{ routes: typeof bridgeableTokens; actions: typeof depositActions }>({ routes: [], actions: [] });
@@ -182,21 +188,19 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
       token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
     );
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
-    const normalize = (addr: string) => (addr || "").toLowerCase().replace(/^0x/, "");
-    const mintStratoTokens = new Set(routes.filter(r => !r.isDefaultRoute).map(r => normalize(r.stratoToken)));
-    const actions = depositActions.filter(a => a.payToken && mintStratoTokens.has(normalize(a.payToken)));
+    const mintStratoTokens = new Set(routes.filter(r => !r.isDefaultRoute).map(r => normAddr(r.stratoToken)));
+    const actions = depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
     if (routes.length > 0) prevCardsRef.current = { routes, actions };
     return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
   }, [bridgeableTokens, selectedToken, depositActions]);
 
   const getApy = useMemo(() => {
-    const norm = (addr: string) => (addr || "").toLowerCase().replace(/^0x/, "");
     const m = new Map<string, string>();
     for (const entry of tokenApys) {
       const best = entry.apys.reduce((max, a) => parseFloat(a.apy) > parseFloat(max) ? a.apy : max, "0");
-      if (parseFloat(best) > 0) m.set(norm(entry.token), best);
+      if (parseFloat(best) > 0) m.set(normAddr(entry.token), best);
     }
-    return (addr: string) => m.get(norm(addr));
+    return (addr: string) => m.get(normAddr(addr));
   }, [tokenApys]);
 
   const ApyBadge = ({ addr }: { addr: string }) => (
@@ -210,12 +214,21 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
     </div>
   );
 
-  const metalsPayBalance = useMemo(() => {
-    if (!selectedPayToken) return null;
-    const norm = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
-    const tok = activeTokens.find((t: any) => norm(t.address) === norm(selectedPayToken.address));
-    return tok?.balance ? formatBalance(tok.balance) : "0.00";
+  const metalsPayBalanceWei = useMemo(() => {
+    if (!selectedPayToken) return "0";
+    const tok = activeTokens.find((t: any) => normAddr(t.address) === normAddr(selectedPayToken.address));
+    return tok?.balance || "0";
   }, [selectedPayToken, activeTokens]);
+
+  const metalsMaxAmount = useMemo(() => computeMaxTransferable(
+    metalsPayBalanceWei,
+    normAddr(selectedPayToken?.address || "") === normAddr(usdstAddress),
+    voucherBalance, usdstBalance, METAL_BUY_FEE_WEI, setMetalsFeeError
+  ), [metalsPayBalanceWei, selectedPayToken?.address, voucherBalance, usdstBalance]);
+
+  const metalsPayBalance = useMemo(() => {
+    return metalsPayBalanceWei !== "0" ? formatBalance(metalsPayBalanceWei) : "0.00";
+  }, [metalsPayBalanceWei]);
 
   const uniqueExternalTokens = useMemo(() => {
     const seen = new Set<string>();
@@ -385,23 +398,19 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
 
   const handleAmountChange = useCallback(
     (value: string) => {
-      const tokenDecimals = parseInt(selectedToken?.externalDecimals || "18");
-      handleAmountInputChange(
-        value,
-        setAmount,
-        setAmountError,
-        maxAmount,
-        tokenDecimals
-      );
+      const isBridge = fundingMode === "bridge";
+      const decimals = isBridge ? parseInt(selectedToken?.externalDecimals || "18") : 18;
+      const max = isBridge ? maxAmount : metalsMaxAmount;
+      handleAmountInputChange(value, setAmount, setAmountError, max, decimals);
       
-      if (value && minDepositInfo.amountWei > 0n) {
-        const inputAmountWei = safeParseUnits(value, tokenDecimals);
-      if (inputAmountWei < minDepositInfo.amountWei) {
+      if (isBridge && value && minDepositInfo.amountWei > 0n) {
+        const inputAmountWei = safeParseUnits(value, decimals);
+        if (inputAmountWei < minDepositInfo.amountWei) {
           setAmountError(`Amount must be at least ${minDepositInfo.amount} ${selectedToken?.externalSymbol}`);
         }
       }
     },
-    [maxAmount, selectedToken?.externalDecimals, selectedToken?.externalSymbol, minDepositInfo.amountWei, minDepositInfo.amount]
+    [fundingMode, maxAmount, metalsMaxAmount, selectedToken?.externalDecimals, selectedToken?.externalSymbol, minDepositInfo.amountWei, minDepositInfo.amount]
   );
 
   const buildPermit = async ({
@@ -451,6 +460,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
       await metalForgeService.buy(selectedMetal.address, selectedPayToken.address, payAmountWei, minMetalOut);
       toast({ title: "Success", description: `Purchased ${selectedMetal.symbol}` });
       setAmount("");
+      fetchTokens();
+      fetchUsdstBalance();
     } catch (error: any) {
       toast({ title: "Transaction failed", description: error?.message || "Unknown error", variant: "destructive" });
     } finally {
@@ -716,7 +727,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
             </button>
             <button
               type="button"
-              onClick={() => { if (guestMode) redirectToLogin(); else setFundingMode("metals"); }}
+              onClick={() => { if (guestMode) redirectToLogin(); else { setFundingMode("metals"); fetchTokens(); } }}
               className={`relative rounded-md border-2 p-3 text-left transition-colors ${
                 fundingMode === "metals"
                   ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
@@ -815,12 +826,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false }) => {
                     disabled={fundingMode !== "metals" || guestMode || isLoading} />
                 </div>
                 {amountError && fundingMode === "metals" && <p className="text-xs text-red-500">{amountError}</p>}
+                {metalsFeeError && fundingMode === "metals" && <p className="text-xs text-yellow-600">{metalsFeeError}</p>}
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-xs text-muted-foreground">
                     Balance: <span className="text-foreground font-medium">{metalsPayBalance || "0.00"} {selectedPayToken?.symbol || ""}</span>
                   </span>
                   <div className="flex items-center gap-1">
-                    <PercentageButtons value={amount} maxValue={metalsPayBalance || "0"} onChange={handleAmountChange}
+                    <PercentageButtons value={amount} maxValue={metalsMaxAmount} onChange={handleAmountChange}
                       decimals={18} disabled={fundingMode !== "metals" || guestMode || isLoading}
                       className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
                   </div>

@@ -33,6 +33,8 @@ contract record StablePool is Ownable {
 
     event SetNewMATime(uint maExpTime, uint DMaTime);
 
+    event CoinAdded(address indexed coin, uint assetType, uint rateMultiplier, address oracle, uint initialAmount, uint lpMinted);
+
     uint constant MAX_COINS = 8;
 
     uint constant PRECISION = 1e18;
@@ -45,9 +47,9 @@ contract record StablePool is Ownable {
 
     bool private poolContainsRebasingTokens;
 
-    mapping (address => uint) record tokenBalances;
+    mapping (address => uint) public record tokenBalances;
 
-    mapping (address => uint) record adminBalances;
+    mapping (address => uint) public record adminBalances;
 
     uint constant FEE_DENOMINATOR = 1e10;
 
@@ -75,9 +77,9 @@ contract record StablePool is Ownable {
 
     uint constant MIN_RAMP_TIME = 86400;
 
-    mapping (address => uint) record rateMultipliers;
+    mapping (address => uint) public record rateMultipliers;
 
-    mapping (address => PriceOracle) record rateOracles;
+    mapping (address => PriceOracle) public record rateOracles;
 
     uint[] callAmount;
 
@@ -115,6 +117,10 @@ contract record StablePool is Ownable {
 
     bool public isStable = true;
 
+    bool public isPaused = false;
+
+    bool public isDisabled = false;
+
     // ============ STATE VARIABLES ============
     /// @notice Reentrancy guard to prevent recursive calls
     bool private locked;
@@ -133,6 +139,28 @@ contract record StablePool is Ownable {
             || msg.sender == owner(), // admin override would be useful here - ariya
             "Caller is not PoolFactory");
         _;
+    }
+
+    modifier whenNotPaused() {
+        require(!isPaused, "Pool is paused");
+        _;
+    }
+
+    modifier whenNotDisabled() {
+        require(!isDisabled, "Pool is disabled");
+        _;
+    }
+
+    // ============ OWNER FUNCTIONS ============
+
+    function setPaused(bool _isPaused) external onlyOwner {
+        require(!isDisabled, "Pool pause cannot be set while isDisabled = true");
+        isPaused = _isPaused;
+    }
+
+    function setDisabled(bool _isDisabled) external onlyOwner {
+        isPaused = _isDisabled ? true : isPaused;
+        isDisabled = _isDisabled;
     }
 
     // ============ CONSTRUCTOR ============
@@ -190,6 +218,8 @@ contract record StablePool is Ownable {
         bToARatio = 0.0;
         lpToken = Token(_lpTokenAddr);
         isStable = true;
+        isPaused = false;
+        isDisabled = false;
 
         poolFactory = PoolFactory(msg.sender);
 
@@ -327,7 +357,7 @@ contract record StablePool is Ownable {
         return result;
     }
 
-    function exchange(uint i, uint j, uint _dx, uint _minDy, address _receiver) external nonReentrant returns (uint) {
+    function exchange(uint i, uint j, uint _dx, uint _minDy, address _receiver) external whenNotPaused nonReentrant returns (uint) {
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
         return _exchange(msg.sender, i, j, _dx, _minDy, receiver, false);
     }
@@ -337,7 +367,7 @@ contract record StablePool is Ownable {
         uint256 amountIn,
         uint256 minAmountOut,
         uint256 deadline
-    ) external nonReentrant returns (uint) {
+    ) external whenNotPaused nonReentrant returns (uint) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
         uint i = isAToB ? 0 : 1;
@@ -345,13 +375,13 @@ contract record StablePool is Ownable {
         return _exchange(msg.sender, i, j, amountIn, minAmountOut, msg.sender, false);
     }
 
-    function exchangeReceived(uint i, uint j, uint _dx, uint _minDy, address _receiver) external nonReentrant returns (uint) {
+    function exchangeReceived(uint i, uint j, uint _dx, uint _minDy, address _receiver) external whenNotPaused nonReentrant returns (uint) {
         require(!poolContainsRebasingTokens, "Cannot call exchangeReceived when the pool contains rebasing tokens");
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
         return _exchange(msg.sender, i, j, _dx, _minDy, receiver, true);
     }
 
-    function addLiquidityGeneral(uint[] _amounts, uint _minMintAmount, address _receiver) external nonReentrant returns (uint) {
+    function addLiquidityGeneral(uint[] _amounts, uint _minMintAmount, address _receiver) external whenNotPaused nonReentrant returns (uint) {
         return _addLiquidityGeneral(_amounts, _minMintAmount, _receiver);
     }
 
@@ -446,7 +476,7 @@ contract record StablePool is Ownable {
         uint256 tokenBAmount,
         uint256 maxTokenAAmount,
         uint256 deadline
-    ) external nonReentrant returns (uint256) {
+    ) external whenNotPaused nonReentrant returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         uint[] amounts;
@@ -462,7 +492,7 @@ contract record StablePool is Ownable {
         bool isAToB,
         uint256 amountIn,
         uint256 deadline
-    ) external nonReentrant returns (uint256 liquidityMinted) {
+    ) external whenNotPaused nonReentrant returns (uint256 liquidityMinted) {
         require(amountIn > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
         require(lpToken.totalSupply() > 0, "POOL_EMPTY");
@@ -479,7 +509,7 @@ contract record StablePool is Ownable {
         return _addLiquidityGeneral(amounts, 1, msg.sender);
     }
 
-    function removeliquidityOneCoin(uint _burnAmount, uint i, uint _minReceived, address _receiver) external nonReentrant returns (uint) {
+    function removeliquidityOneCoin(uint _burnAmount, uint i, uint _minReceived, address _receiver) external whenNotDisabled nonReentrant returns (uint) {
         require(i < coins.length, "Cannot remove 0 liquidity");
         require(_burnAmount > 0, "Cannot remove 0 liquidity");
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
@@ -507,7 +537,7 @@ contract record StablePool is Ownable {
         return dy;
     }
 
-    function removeLiquidityImbalance(uint[] _amounts, uint _maxBurnAmount, address _receiver) external nonReentrant returns (uint) {
+    function removeLiquidityImbalance(uint[] _amounts, uint _maxBurnAmount, address _receiver) external whenNotDisabled nonReentrant returns (uint) {
         address receiver = _receiver == address(0) ? msg.sender : _receiver;
         uint amp = _A();
         uint[] rates = _storedRates();
@@ -580,7 +610,7 @@ contract record StablePool is Ownable {
         uint256 minTokenBAmount,
         uint256 minTokenAAmount,
         uint256 deadline
-    ) external returns (uint256, uint256) {
+    ) external whenNotDisabled returns (uint256, uint256) {
         require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = lpToken.totalSupply();
@@ -595,7 +625,7 @@ contract record StablePool is Ownable {
         return (rets[1], rets[0]);
     }
 
-    function removeLiquidityGeneral(uint _burnAmount, uint[] _minAmounts, address _receiver, bool _claimAdminFees) external nonReentrant returns (uint[]) {
+    function removeLiquidityGeneral(uint _burnAmount, uint[] _minAmounts, address _receiver, bool _claimAdminFees) external whenNotDisabled nonReentrant returns (uint[]) {
         return _removeLiquidityGeneral(_burnAmount, _minAmounts, _receiver, _claimAdminFees);
     }
 
@@ -1146,5 +1176,166 @@ contract record StablePool is Ownable {
         DMaTime = _DMaTime;
 
         emit SetNewMATime(_maExpTime, _DMaTime);
+    }
+
+    // ============ ADD COIN ============
+
+    /// @notice Add a new coin to the pool with initial liquidity
+    /// @param _coin The address of the new token to add
+    /// @param _rateMultiplier The rate multiplier for the new token
+    /// @param _assetType The asset type (1=normal, 2=rebasing)
+    /// @param _oracle The price oracle address for the new token (address(0) if none)
+    /// @param _initialAmount The initial deposit amount for the new token
+    /// @param _depositor The address providing the initial deposit (must have approved this pool)
+    /// @return mintAmount The amount of LP tokens minted to the depositor
+    function addCoin(
+        address _coin,
+        uint _rateMultiplier,
+        uint _assetType,
+        address _oracle,
+        uint _initialAmount,
+        address _depositor
+    ) external onlyPoolFactory nonReentrant returns (uint) {
+        require(coins.length < MAX_COINS, "Max coins reached");
+        require(_coin != address(0), "Zero token address");
+        require(_initialAmount > 0, "Initial amount must be > 0");
+        require(_depositor != address(0), "Zero depositor address");
+        require(_rateMultiplier > 0, "Rate multiplier must be > 0");
+
+        // Check coin not already in pool
+        for (uint i = 0; i < coins.length; i++) {
+            require(address(coins[i]) != _coin, "Coin already in pool");
+        }
+
+        // Calculate existing pool value before adding coin
+        uint totalSupply = lpToken.totalSupply();
+        require(totalSupply > 0, "Pool must have existing liquidity");
+
+        uint existingValue = 0;
+        for (uint i = 0; i < coins.length; i++) {
+            address tokenAddr = address(coins[i]);
+            uint balance = tokenBalances[tokenAddr] - adminBalances[tokenAddr];
+            existingValue += (balance * rateMultipliers[tokenAddr]) / PRECISION;
+        }
+        require(existingValue > 0, "Pool has no value");
+
+        // Add coin metadata
+        coins.push(Token(_coin));
+        assetTypes.push(_assetType);
+        poolContainsRebasingTokens = poolContainsRebasingTokens || (_assetType == 2);
+        tokenBalances[_coin] = 0;
+        adminBalances[_coin] = 0;
+        rateMultipliers[_coin] = _rateMultiplier;
+        rateOracles[_coin] = PriceOracle(_oracle);
+
+        // Extend internal arrays
+        callAmount.push(0);
+        scaleFactor.push(0);
+        lastPricesPacked.push(pack2(1e18, 1e18));
+
+        // Transfer in initial deposit (new coin is at index coins.length - 1)
+        uint dx = _transferIn(coins.length - 1, _initialAmount, _depositor, false);
+
+        // Calculate LP tokens to mint proportional to value added
+        uint newValue = (dx * _rateMultiplier) / PRECISION;
+        uint mintAmount = (totalSupply * newValue) / existingValue;
+        require(mintAmount > 0, "Deposit too small to mint LP tokens");
+
+        lpToken.mint(_depositor, mintAmount);
+
+        // Update oracle state with new pool composition
+        uint amp = _A();
+        uint[] rates = _storedRates();
+        uint[] balances = _balances();
+        uint[] xp = _xpMem(rates, balances);
+        uint d = getD(xp, amp);
+
+        lastDPacked = pack2(d, d);
+        uint[2] maLastTimeUnpacked = unpack2(maLastTime);
+        if (maLastTimeUnpacked[1] < block.timestamp) {
+            maLastTimeUnpacked[1] = block.timestamp;
+            maLastTime = pack2(maLastTimeUnpacked[0], maLastTimeUnpacked[1]);
+        }
+
+        upkeepOracles(xp, amp, d);
+        _updateRatios(rates, xp, amp, d);
+
+        emit CoinAdded(_coin, _assetType, _rateMultiplier, _oracle, dx, mintAmount);
+
+        return mintAmount;
+    }
+
+    // ============ MIGRATION HELPERS ============
+
+    /// @notice Returns the pool factory address
+    function getPoolFactory() external view returns (address) {
+        return address(poolFactory);
+    }
+
+    /// @notice Returns the number of tokens in the pool
+    function getNumCoins() external view returns (uint) {
+        return coins.length;
+    }
+
+    /// @notice Returns the asset type for a given coin index
+    /// @param i The index of the coin
+    function getAssetType(uint i) external view returns (uint) {
+        require(i < coins.length, "Invalid coin index");
+        return assetTypes[i];
+    }
+
+    /// @notice Computes the current D invariant of the pool
+    /// @return The D invariant value
+    function computeInvariant() external view returns (uint) {
+        uint amp = _A();
+        uint[] rates = _storedRates();
+        uint[] balances = _balances();
+        uint[] xp = _xpMem(rates, balances);
+        return getD(xp, amp);
+    }
+
+    /// @notice Migrates all user tokens out of the pool to a receiver
+    /// @param receiver The address to receive the tokens
+    /// @dev Withdraws admin fees first, then transfers all remaining tokens
+    /// @dev Only callable by the pool factory or pool owner
+    function migrateAllTokens(address receiver) external onlyPoolFactory {
+        require(receiver != address(0), "Cannot migrate to address 0");
+        _withdrawAdminFees();
+        for (uint i = 0; i < coins.length; i++) {
+            address tokenAddr = address(coins[i]);
+            uint balance = tokenBalances[tokenAddr];
+            if (balance > 0) {
+                _transferOut(i, balance, receiver);
+            }
+        }
+    }
+
+    /// @notice Syncs internal pool state after tokens have been transferred in via migration
+    /// @dev Updates tokenBalances from actual ERC20 balances and initializes oracle state
+    /// @dev Only callable by the pool factory or pool owner
+    function syncAfterMigration() external onlyPoolFactory {
+        for (uint i = 0; i < coins.length; i++) {
+            address tokenAddr = address(coins[i]);
+            uint balance = ERC20(tokenAddr).balanceOf(address(this));
+            tokenBalances[tokenAddr] = balance;
+            if (i == 0) tokenABalance = balance;
+            else if (i == 1) tokenBBalance = balance;
+        }
+
+        uint amp = _A();
+        uint[] rates = _storedRates();
+        uint[] balances = _balances();
+        uint[] xp = _xpMem(rates, balances);
+        uint d = getD(xp, amp);
+
+        lastDPacked = pack2(d, d);
+        uint[2] maLastTimeUnpacked = unpack2(maLastTime);
+        if (maLastTimeUnpacked[1] < block.timestamp) {
+            maLastTimeUnpacked[1] = block.timestamp;
+            maLastTime = pack2(maLastTimeUnpacked[0], maLastTimeUnpacked[1]);
+        }
+
+        _updateRatios(rates, xp, amp, d);
+        upkeepOracles(xp, amp, d);
     }
 }

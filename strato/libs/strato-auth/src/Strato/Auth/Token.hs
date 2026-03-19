@@ -44,13 +44,14 @@ getToken discUrl = do
 -- Retries up to 4 times with exponential backoff on network failures
 -- (e.g. connection timeout, DNS failure, TLS errors).
 refreshToken :: T.Text -> IO T.Text
-refreshToken discUrl = withFileLock lockFilePath Exclusive $ \_ ->
-  withRetry "OAuth token fetch" 4 $ do
-    let ClientCredentialsConfig{..} = clientCredentialsConfig
-    tokenEndpoint <- getTokenEndpoint discUrl
-    TokenResponse{..} <- fetchToken tokenEndpoint clientId clientSecret
-    writeCachedToken trAccessToken trExpiresIn
-    pure trAccessToken
+refreshToken discUrl =
+  withFileLock lockFilePath Exclusive $ \_ ->
+    withRetry "OAuth token fetch" 4 $ do
+      let ClientCredentialsConfig{..} = clientCredentialsConfig
+      tokenEndpoint <- getTokenEndpoint discUrl
+      TokenResponse{..} <- fetchToken tokenEndpoint clientId clientSecret
+      writeCachedToken trAccessToken trExpiresIn
+      pure trAccessToken
 
 readCachedToken :: IO (Maybe T.Text)
 readCachedToken =

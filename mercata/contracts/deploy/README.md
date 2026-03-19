@@ -135,7 +135,6 @@ UPGRADES=(
   101c Token Tokens/Token.sol '{"initialOwner": "deadbeef"}'
   101d Pool Pools/Pool.sol '{"initialOwner": "deadbeef"}'
   101e Token Tokens/Token.sol '{"initialOwner": "deadbeef"}'
-  101f RewardsChef Rewards/RewardsChef.sol '{"initialOwner": "deadbeef"}'
 )
 
 # Process in groups of 4

@@ -24,7 +24,7 @@ export interface VaultAsset {
 
 export interface VaultTransaction {
   id: string;
-  type: "swap";
+  type: "swap" | "liquidation";
   timestamp: string;
   tokenIn?: {
     address: string;
@@ -35,6 +35,13 @@ export interface VaultTransaction {
     address: string;
     symbol: string;
     amount: string;
+  };
+  liquidation?: {
+    borrower: string;
+    asset: string;
+    assetSymbol: string;
+    collateralSeized: string;
+    debtBurnedUSD: string;
   };
 }
 

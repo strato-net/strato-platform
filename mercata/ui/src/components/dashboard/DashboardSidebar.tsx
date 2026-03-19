@@ -15,6 +15,7 @@ import {
   Shield,
   UserPlus,
   LucideIcon,
+  HandCoins,
   Vault,
   CreditCard,
   ArrowDownToLine
@@ -37,6 +38,7 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
   { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
   { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
+  { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
   { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },

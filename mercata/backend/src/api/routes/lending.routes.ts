@@ -266,14 +266,10 @@ router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
  *             type: object
  *             required:
  *               - amount
- *               - stakeMToken
  *             properties:
  *               amount:
  *                 type: string
  *                 description: Liquidity amount to deposit (decimal string)
- *               stakeMToken:
- *                 type: boolean
- *                 description: Whether to automatically stake the resulting mTokens
  *     responses:
  *       200:
  *         description: Deposit transaction payload
@@ -654,14 +650,10 @@ router.get("/safety/info/public", authHandler.authorizeRequest(true), SafetyCont
  *             type: object
  *             required:
  *               - amount
- *               - stakeSToken
  *             properties:
  *               amount:
  *                 type: string
  *                 description: Amount of USDST to stake (decimal string)
- *               stakeSToken:
- *                 type: boolean
- *                 description: Whether to immediately stake the received sUSDST
  *     responses:
  *       200:
  *         description: Stake transaction payload
@@ -704,14 +696,10 @@ router.post("/safety/cooldown", authHandler.authorizeRequest(), SafetyController
  *             type: object
  *             required:
  *               - sharesAmount
- *               - includeStakedSToken
  *             properties:
  *               sharesAmount:
  *                 type: string
  *                 description: Amount of sUSDST to redeem (decimal string)
- *               includeStakedSToken:
- *                 type: boolean
- *                 description: Whether to include staked sUSDST when redeeming
  *     responses:
  *       200:
  *         description: Redemption transaction payload

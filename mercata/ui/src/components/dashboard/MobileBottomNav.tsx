@@ -15,6 +15,7 @@ import {
   Droplets,
   Shield,
   UserPlus,
+  HandCoins,
   Vault,
 
   ArrowDownToLine,
@@ -36,6 +37,7 @@ const MORE_ITEMS = [
 
   { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
   { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
+  { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
   { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
   { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
   { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
