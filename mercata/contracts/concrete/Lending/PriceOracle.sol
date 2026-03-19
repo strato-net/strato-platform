@@ -211,7 +211,7 @@ contract record PriceOracle is Ownable {
 
     /**
      * @dev Set rebase factors for multiple assets in batch.
-     *      Used for xStock tokens where factor = getCurrentMultiplier() from Ethereum.
+     *      STRATO tokens do not rebase, but these factors refer to the external asset's multiplier/index.
      */
     function setRebaseFactors(address[] calldata assets, uint256[] calldata factors) external onlyOwner {
         require(assets.length == factors.length, "Arrays length mismatch");
