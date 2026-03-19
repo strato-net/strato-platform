@@ -48,8 +48,13 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
     {
       label: 'EARN',
       items: [
-        { icon: <CreditCard size={20} />, label: 'Card', path: '/dashboard/credit-card' },
         { icon: <HandCoins size={20} />, label: 'Earn', path: '/dashboard/earn' },
+      ],
+    },
+    {
+      label: 'SPEND',
+      items: [
+        { icon: <CreditCard size={20} />, label: 'Card', path: '/dashboard/credit-card' },
       ],
     },
     {

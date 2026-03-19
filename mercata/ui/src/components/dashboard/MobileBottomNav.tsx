@@ -55,8 +55,13 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'EARN',
     items: [
-      { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
       { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+    ],
+  },
+  {
+    label: 'SPEND',
+    items: [
+      { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
     ],
   },
   {
