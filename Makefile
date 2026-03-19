@@ -129,7 +129,7 @@ $(DOCKER_SENTINELS)/nginx: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/apex: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,apex,$(VERSION)-$(HASH_APEX)); then \
 		echo "Building apex ($(VERSION)-$(HASH_APEX))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(VERSION)-$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(HASH_APEX) $(MAKE) --directory=apex/; \
+		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(VERSION)-$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(VERSION) $(MAKE) --directory=apex/; \
 		echo "$(VERSION)-$(HASH_APEX)" > $@; \
 	else \
 		echo "apex up to date"; \
@@ -167,7 +167,7 @@ $(DOCKER_SENTINELS)/prometheus: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/smd: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,smd-ui,$(VERSION)-$(HASH_SMD)); then \
 		echo "Building smd ($(VERSION)-$(HASH_SMD))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(VERSION)-$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(HASH_SMD) $(MAKE) --directory=smd-ui/; \
+		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(VERSION)-$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(VERSION) $(MAKE) --directory=smd-ui/; \
 		echo "$(VERSION)-$(HASH_SMD)" > $@; \
 	else \
 		echo "smd up to date"; \
@@ -197,19 +197,17 @@ $(DOCKER_SENTINELS)/bridge-nginx: | $(DOCKER_SENTINELS)
 clean-docker-sentinels:
 	rm -rf $(DOCKER_SENTINELS)
 
-all: mercata
+all: local
 
-docker: build_all_docker docker-compose
+local: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle
+
+docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
 
 all_develop: build_develop docker-compose
 
-mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
-
-build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
-
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose highway highway-nginx mercata oracle strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels
 
 apex: $(DOCKER_SENTINELS)/apex
 nginx: $(DOCKER_SENTINELS)/nginx
@@ -397,8 +395,7 @@ vault-nginx:
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose: strato_docker
-	@echo Generating docker-compose files...
-	@echo Generating docker-compose.yml via strato-setup...
+	@echo Generating docker-compose files via strato-setup in container...
 	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
 	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_URL) --includeBuild \
 	    > docker-compose.push.yml
