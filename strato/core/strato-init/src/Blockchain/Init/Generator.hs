@@ -35,7 +35,7 @@ import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
 import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
-import Data.Bits ((.&.), (.|.))
+import Data.Bits ((.|.))
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
 -- The stateRoot in the returned GenesisInfo is a placeholder - the real
