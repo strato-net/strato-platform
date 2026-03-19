@@ -42,6 +42,7 @@ import CreditCardPage from "./pages/CreditCard";
 // Import dashboard components
 
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
+import MetalTransactionsPage from "./pages/MetalTransactionsPage";
 import WithdrawalsPage from "./pages/WithdrawalsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -325,6 +326,15 @@ const App = () => {
                                             element={
                                               <ProtectedRoute>
                                                 <BridgeTransactionsPage />
+                                              </ProtectedRoute>
+                                            }
+                                          />
+
+                                          <Route
+                                            path="/metal-transactions"
+                                            element={
+                                              <ProtectedRoute>
+                                                <MetalTransactionsPage />
                                               </ProtectedRoute>
                                             }
                                           />

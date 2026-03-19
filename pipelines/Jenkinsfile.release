@@ -210,6 +210,7 @@ pipeline {
 
             // Merge release code to master
             sh 'git checkout VERSION'
+            sh 'git checkout BUILD_METADATA'
             // Make sure no master branch exists with random/old code, we want code from origin/master
             sh 'git branch -D master || true'
             sh 'git checkout master'

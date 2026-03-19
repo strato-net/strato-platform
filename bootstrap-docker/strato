@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-BOOTSTRAP_DOCKER_VERSION=1
+BOOTSTRAP_DOCKER_VERSION=2
 
 Green='\033[0;32m'
 Red='\033[0;31m'
@@ -40,14 +40,14 @@ function checkComposeFile {
   else
     echo -e "${Yellow}Using the existing docker-compose.yml${NC}"
   fi
-  
+
   if ! grep -q '^[[:space:]]*strato:' docker-compose.yml; then
     echo -e "${Red}Wrong docker-compose.yml provided - no 'strato' service found in it.${NC}"
     exit 4
   fi
 
   # Check bootstrap-docker version compatibility
-  min_version=$(grep -oP '#bootstratp-docker-min-version:\K.*' docker-compose.yml 2>/dev/null || true)
+  min_version=$(grep -oP '#bootstrap-docker-min-version:\K.*' docker-compose.yml 2>/dev/null || true)
   if [ -n "$min_version" ]; then
     if [ "$(printf '%s\n' "$min_version" "$BOOTSTRAP_DOCKER_VERSION" | sort -V | head -1)" != "$min_version" ]; then
       echo -e "${Red}This docker-compose.yml requires bootstrap-docker version >= ${min_version}, but this is version ${BOOTSTRAP_DOCKER_VERSION}. Please update the strato bootstrap scripts.${NC}"
@@ -57,15 +57,15 @@ function checkComposeFile {
 }
 
 function help {
-  echo -e "${Yellow}STRATO Mercata run script${NC}
-Kickstart a STRATO Mercata node.
+  echo -e "${Yellow}STRATO  run script${NC}
+Kickstart a STRATO node.
 
 ${Yellow}Optional flags:${NC}
 The flags are mutually exclusive:
 --help|-h     - this help.
 --down        - remove strato containers and leave all volumes intact.
 --wipe        - stop and remove STRATO containers and wipe out volumes.
---compose     - fetch the docker-compose.yml of the latest STRATO Mercata release
+--compose     - fetch the docker-compose.yml of the latest STRATO release
 --pull        - pull images used in docker-compose.yml
 --get-address - get the address of the running node.
 --get-pubkey  - get the public key of the running node.
@@ -87,8 +87,8 @@ function down {
 }
 
 function getCompose {
-  echo -e "${Yellow}Fetching the docker-compose.yml of the latest STRATO Mercata release...${NC}"
-  curl -fLo docker-compose.yml https://github.com/blockapps/strato-getting-started/releases/download/$(curl -s -L https://github.com/blockapps/strato-getting-started/releases/latest | grep -om1 '"/blockapps/strato-getting-started/releases/tag/[^"]*' | grep -oE "[^/]+$")/docker-compose.yml
+  echo -e "${Yellow}Fetching the docker-compose.yml of the latest STRATO release...${NC}"
+  curl -fLo docker-compose.yml https://github.com/strato-net/strato-platform/releases/download/$(curl -s -L https://github.com/strato-net/strato-platform/releases/latest | grep -om1 '"/strato-net/strato-platform/releases/tag/[^"]*' | grep -oE "[^/]+$")/docker-compose.yml
   echo -e "${Yellow}docker-compose.yml downloaded successfully.${NC}"
 }
 

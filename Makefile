@@ -129,7 +129,7 @@ $(DOCKER_SENTINELS)/nginx: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/apex: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,apex,$(VERSION)-$(HASH_APEX)); then \
 		echo "Building apex ($(VERSION)-$(HASH_APEX))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(VERSION)-$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(HASH_APEX) $(MAKE) --directory=apex/; \
+		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(VERSION)-$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(VERSION) $(MAKE) --directory=apex/; \
 		echo "$(VERSION)-$(HASH_APEX)" > $@; \
 	else \
 		echo "apex up to date"; \
@@ -167,7 +167,7 @@ $(DOCKER_SENTINELS)/prometheus: | $(DOCKER_SENTINELS)
 $(DOCKER_SENTINELS)/smd: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,smd-ui,$(VERSION)-$(HASH_SMD)); then \
 		echo "Building smd ($(VERSION)-$(HASH_SMD))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(VERSION)-$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(HASH_SMD) $(MAKE) --directory=smd-ui/; \
+		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(VERSION)-$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(VERSION) $(MAKE) --directory=smd-ui/; \
 		echo "$(VERSION)-$(HASH_SMD)" > $@; \
 	else \
 		echo "smd up to date"; \
