@@ -24,7 +24,7 @@ endif
 
 ifndef VERSION
   # REPO=release: use VERSION file directly (e.g., "16.7")
-  # Otherwise (dev/CI builds): append short commit hash for per-build uniqueness (e.g., "16.7+abc1234")
+  # Otherwise (dev/CI builds): append short commit hash for per-build uniqueness (e.g., "16.7-abc1234")
   ifeq ($(REPO),release)
     VERSION := $(shell cat VERSION)
   else
@@ -36,9 +36,9 @@ ifndef VERSION
 	#
 	# APPROACH:
 	# - VERSION file = source of truth
-	# - + short commit SHA for uniqueness
+	# - short commit SHA for uniqueness
 	#
-    VERSION := $(shell cat VERSION)+$(shell git rev-parse --short=7 HEAD)
+    VERSION := $(shell cat VERSION)-$(shell git rev-parse --short=7 HEAD)
   endif
 else
   $(info VERSION is "$(VERSION)" (overriden with env var))

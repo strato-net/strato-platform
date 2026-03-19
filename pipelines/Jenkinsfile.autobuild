@@ -182,7 +182,7 @@ pipeline {
                     docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
                     docker compose -f docker-compose.bridge.push.ecr.yml push 2>&1
                   '''
-                  stash includes: 'bootstrap-docker/**', name: 'bootstrapDocker'
+                  stash includes: 'bootstrap-docker/**', excludes: 'bootstrap-docker/nodedata/**', name: 'bootstrapDocker'
                   //stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
