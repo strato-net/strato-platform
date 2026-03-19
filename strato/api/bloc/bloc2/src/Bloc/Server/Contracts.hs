@@ -363,7 +363,7 @@ postContractsCompile ::
 postContractsCompile = traverse compileOneContract
   where
     compileOneContract PostCompileRequest {..} = do
-      eContract <- sourceToContractDetails postcompilerequestSource
+      eContract <- sourceToContractDetails True postcompilerequestSource
       case eContract of
         Left anns -> throwIO . UserError . Text.pack $ show anns
         Right (srcHash, _) -> pure $ PostCompileResponse (fromMaybe "" postcompilerequestContractName) srcHash

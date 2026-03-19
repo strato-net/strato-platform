@@ -194,7 +194,7 @@ getContractDetailsByCodeHash codePtr = runExceptT $ do
   nameStr <- case codePtr of
     SolidVMCode n _ -> pure n
     _ -> throwE "EVM contracts no longer supported"
-  (cHash, cc) <- getCodeHashAndCollection codePtr
+  (cHash, cc) <- getCodeHashAndCollection False codePtr
   details <- case Map.lookup nameStr $ _contracts cc of
     Nothing -> throwE $ "Could not find contract " <> (Text.pack nameStr) <> " in code collection " <> Text.pack (format codePtr)
     Just d -> pure (SolidVMCode nameStr cHash, d)
@@ -208,7 +208,7 @@ getCodeCollectionByCodePtr ::
   ) =>
   CodePtr ->
   m (Either Text CodeCollection)
-getCodeCollectionByCodePtr = runExceptT . fmap snd . getCodeHashAndCollection
+getCodeCollectionByCodePtr = runExceptT . fmap snd . getCodeHashAndCollection False
 
 -- | Get both the contract and code collection (for file-level struct access)
 getContractWithCodeCollectionByCodePtr ::
@@ -223,7 +223,7 @@ getContractWithCodeCollectionByCodePtr codePtr = runExceptT $ do
   nameStr <- case codePtr of
     SolidVMCode n _ -> pure n
     _ -> throwE "EVM contracts no longer supported"
-  (_, cc) <- getCodeHashAndCollection codePtr
+  (_, cc) <- getCodeHashAndCollection False codePtr
   contract <- case Map.lookup nameStr $ _contracts cc of
     Nothing -> throwE $ "Could not find contract " <> (Text.pack nameStr) <> " in code collection " <> Text.pack (format codePtr)
     Just d -> pure d
@@ -235,9 +235,10 @@ getCodeHashAndCollection ::
     A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
+  Bool ->
   CodePtr ->
   ExceptT Text m (Keccak256, CodeCollection)
-getCodeHashAndCollection codePtr = do
+getCodeHashAndCollection typeCheck codePtr = do
       ch <- case codePtr of
         ExternallyOwned _ -> throwE $ "EVM contracts no longer supported"
         SolidVMCode _ ch -> pure ch
@@ -245,7 +246,7 @@ getCodeHashAndCollection codePtr = do
         lift (A.select (A.Proxy @SourceMap) ch) >>= \case
           Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
           Just s -> pure s
-      either (throwE . Text.pack . show) pure =<< lift (sourceToContractDetails srcMap)
+      either (throwE . Text.pack . show) pure =<< lift (sourceToContractDetails typeCheck srcMap)
 
 evmContractSolidVMError :: Text
 evmContractSolidVMError =
@@ -266,7 +267,7 @@ getContractDetailsForContract ::
 getContractDetailsForContract src mContract = do
   eCodeCollection <-
     if hasAnyNonEmptySources src
-      then sourceToContractDetails src
+      then sourceToContractDetails True src
       else throwIO . UserError $ "No source code given for contract"
   case eCodeCollection of
     Left annotations -> throwIO . UserError . Text.pack $ "Detected errors during compilation: " ++ show annotations
@@ -282,6 +283,7 @@ sourceToContractDetails ::
     HasCodeDB m,
     A.Selectable Address AddressState m
   ) =>
+  Bool ->
   SourceMap ->
   m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
 sourceToContractDetails = createMetadataNoCompile
@@ -292,10 +294,11 @@ createMetadataNoCompile ::
     HasCodeDB m,
     A.Selectable Address AddressState m
   ) =>
+  Bool ->
   SourceMap ->
   m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
-createMetadataNoCompile sourceList = do
+createMetadataNoCompile typeCheck sourceList = do
   let isRunningTests = False
-  compiledSource <- compileSourceWithAnnotations isRunningTests True (Map.fromList $ unSourceMap sourceList)
+  compiledSource <- compileSourceWithAnnotations isRunningTests typeCheck (Map.fromList $ unSourceMap sourceList)
   let srcHash = hash . Text.encodeUtf8 $ serializeSourceMap sourceList
   pure $ (srcHash,) <$> compiledSource
