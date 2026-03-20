@@ -196,7 +196,7 @@ pipeline {
                 ]) {
                   sh '''#!/bin/bash -le
                     set -x
-                    version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
+                    version=$(shell cat VERSION)-$(shell git rev-parse --short=7 HEAD)
                     AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
                     aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
                     aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
