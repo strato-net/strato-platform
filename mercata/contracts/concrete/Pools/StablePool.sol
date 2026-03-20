@@ -246,6 +246,10 @@ contract record StablePool is Ownable {
         }
     }
 
+    function setFee(uint _fee) external onlyOwner {
+        fee = _fee;
+    }
+
     function _transferIn(uint coinIndex, uint dx, address sender, bool expectOptimisticTransfer) internal returns (uint) {
         require(coinIndex < coins.length, "Invalid coin index");
         address tokenAddr = address(coins[coinIndex]);
