@@ -34,9 +34,11 @@ import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Text.RawString.QQ
 import Turtle (chmod, roo)
+import qualified Turtle.Prelude
 import UnliftIO.Directory
-import System.Posix.Files (setFileMode, setOwnerAndGroup, ownerModes, groupModes, otherModes)
+import System.Posix.Files (setFileMode, setOwnerAndGroup, ownerModes, groupModes, otherModes, getFileStatus, fileOwner, fileGroup, fileMode)
 import Data.Bits ((.|.))
+import Control.Exception (try, SomeException)
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
 -- The stateRoot in the returned GenesisInfo is a placeholder - the real
@@ -141,9 +143,29 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       password <- case envPassword of
         Just pw | not (null pw) -> return pw
         _ -> generatePassword 32
+      putStrLn $ "  Creating postgres password file: " ++ pgPasswordFile
       writeFile pgPasswordFile password
-      void $ chmod roo pgPasswordFile
-      setOwnerAndGroup pgPasswordFile 999 999  -- postgres user can read it
+      
+      -- chmod with error checking
+      chmodResult <- try (chmod roo pgPasswordFile) :: IO (Either SomeException Turtle.Prelude.Permissions)
+      case chmodResult of
+        Left err -> error $ "FATAL: chmod failed on " ++ pgPasswordFile ++ ": " ++ show err
+        Right _ -> putStrLn "  ✓ chmod 0400 succeeded"
+      
+      -- chown with error checking
+      chownResult <- try $ setOwnerAndGroup pgPasswordFile 999 999 :: IO (Either SomeException ())
+      case chownResult of
+        Left err -> error $ "FATAL: chown 999:999 failed on " ++ pgPasswordFile ++ ": " ++ show err
+        Right _ -> putStrLn "  ✓ chown 999:999 succeeded"
+      
+      -- Verify the file state
+      status <- getFileStatus pgPasswordFile
+      let uid = fileOwner status
+          gid = fileGroup status
+          mode = fileMode status
+      putStrLn $ "  Verified: owner=" ++ show uid ++ " group=" ++ show gid ++ " mode=" ++ show mode
+      when (uid /= 999 || gid /= 999) $
+        error $ "FATAL: postgres_password has wrong ownership: " ++ show uid ++ ":" ++ show gid ++ " (expected 999:999)"
 
     -- Copy OAuth credentials from ~/.secrets/
     liftIO $ do

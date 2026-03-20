@@ -45,6 +45,13 @@ EOF
     --redisHost="${redisHost:-redis}" \
     --apiIPAddress=0.0.0.0
 
+  # Debug: show secrets directory state for diagnosing postgres password issues
+  echo -e "${Yellow}=== DEBUG: secrets directory state ===${NC}"
+  ls -la /var/lib/strato/secrets/
+  echo -e "${Yellow}=== DEBUG: postgres_password file contents ===${NC}"
+  cat /var/lib/strato/secrets/postgres_password && echo "(end of file)"
+  echo -e "${Yellow}=== DEBUG: end ===${NC}"
+
   echo -e "${Green}Node initialization complete.${NC}"
   exit 0
 fi
