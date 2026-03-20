@@ -42,7 +42,6 @@ pipeline {
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
-        sh 'git checkout BUILD_METADATA'
         sh 'make clean-docker-sentinels'
         sh 'REPO=dev make docker'
       }
