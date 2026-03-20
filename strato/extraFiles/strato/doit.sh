@@ -58,7 +58,8 @@ fi
 
 # ─── NORMAL STRATO MODE ─────────────────────────────────────────────────────
 
-echo 'export PS1="⛓ \w> "' >> /root/.bashrc
+# Set prompt for interactive debugging
+echo 'export PS1="⛓ \w> "' >> ~/.bashrc
 
 # Environment variable defaults
 : ${postgres_host:=postgres}
