@@ -134,9 +134,8 @@ generateDockerComposeAllDocker = do
 
   let stratoInit = def
         { image = "${STRATO_IMAGE:-" ++ repoUrl ++ "strato:" ++ stratoVersion ++ "-" ++ hashStrato ++ "}"
-        , user = Just "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec /strato/doit.sh --init >> /logs/strato-init.log 2>&1"]
+        , command = Just ["/strato/doit.sh --init >> /logs/strato-init.log 2>&1 ; RC=$? ; chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} /var/lib/strato /logs ; exit $RC"]
         , environment = Just $ Map.fromList
             [ ("OAUTH_DISCOVERY_URL", "${OAUTH_DISCOVERY_URL}")
             , ("OAUTH_CLIENT_ID", "${OAUTH_CLIENT_ID}")
