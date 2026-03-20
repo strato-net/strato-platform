@@ -6,6 +6,7 @@ services:
   bridge:
     environment:
     - BRIDGE_ADDRESS=${BRIDGE_ADDRESS}
+    - PRICE_ORACLE_ADDRESS=${PRICE_ORACLE_ADDRESS}
     - NODE_URL=${NODE_URL}
     - BA_USERNAME=${BA_USERNAME}
     - BA_PASSWORD=${BA_PASSWORD}
