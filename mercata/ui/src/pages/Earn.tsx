@@ -374,7 +374,6 @@ const Earn = () => {
     return rows.sort((a, b) => b.apySortValue - a.apySortValue);
   }, [activeFilter, liquidityInfo?.supplyAPY, sortedPools, vaultState.apy]);
 
-  const topApy = formatApyDisplay(vaultState.apy);
   const topOpportunity = useMemo<OpportunityRow>(() => {
     const candidates: OpportunityRow[] = [
       { kind: "vault", apySortValue: parseApy(vaultState.apy) },
@@ -818,8 +817,8 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${topApy.className}`}>
-                                  {topApy.label === "-" ? "-" : topApy.label}
+                                <p className="text-sm font-semibold">
+                                  {vaultState.apy && vaultState.apy !== "-" ? `${Number(vaultState.apy).toFixed(2)}%` : "N/A"}
                                 </p>
                                 <p className="text-xs text-muted-foreground">APY</p>
                               </td>
