@@ -370,6 +370,7 @@ generateDockerComposeAllDocker = do
   let prometheus = def
         { image = "${PROMETHEUS_IMAGE:-" ++ repoUrl ++ "prometheus:" ++ stratoVersion ++ "-" ++ hashPrometheus ++ "}"
         , build = Just "."
+        , user = Just "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
         , depends_on = Just $ DependsOnMap $ Map.fromList
             [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" }) ]
         , environment = Just $ Map.fromList
