@@ -134,7 +134,8 @@ generateDockerComposeAllDocker = do
 
   let stratoInit = def
         { image = "${STRATO_IMAGE:-" ++ repoUrl ++ "strato:" ++ stratoVersion ++ "-" ++ hashStrato ++ "}"
-        , command = Just ["--init"]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec /strato/doit.sh --init >> /logs/strato-init.log 2>&1"]
         , environment = Just $ Map.fromList
             [ ("OAUTH_DISCOVERY_URL", "${OAUTH_DISCOVERY_URL}")
             , ("OAUTH_CLIENT_ID", "${OAUTH_CLIENT_ID}")
@@ -147,7 +148,7 @@ generateDockerComposeAllDocker = do
             , ("redisHost", "redis")
             , ("useCustomGenesis", "${useCustomGenesis}")
             ]
-        , volumes = Just ["./nodedata:/var/lib/strato"]
+        , volumes = Just ["./logs:/logs", "./nodedata:/var/lib/strato"]
         , restart = Just "no"
         , logging = noLogging
         }
