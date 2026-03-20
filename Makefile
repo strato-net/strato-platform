@@ -311,7 +311,7 @@ build_common_with_tests: generate-version-file
 	mkdir -p ${VAULTDIR}
 	cd strato && stack install ${NIX_FLAG} \
 	  --test --no-run-tests
-		
+
 build_common_profiled: generate-version-file
 	@echo building haskell libraries and creating directories (profiled)
 	mkdir -p ${HIGHWAYDIR}
@@ -342,7 +342,7 @@ hoogle_generate:
 	cd strato && \
 		stack haddock --haddock-internal && \
 		stack hoogle generate -- --local
-	
+
 hoogle_serve:
 	@echo serving the pregenerated STRATO documentation...
 	cd strato && \
@@ -415,6 +415,7 @@ docker-compose: strato_docker
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.ecr.yml
+
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml

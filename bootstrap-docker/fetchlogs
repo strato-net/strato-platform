@@ -37,6 +37,28 @@ def fetch_logs():
         sys.stderr.write('ERROR: Unable to fetch the currently running containers:\n%s' % e)
         sys.exit(7)
 
+    # Check if logs directory exists (new logging approach mounts ./logs:/logs)
+    host_logs_dir = './logs'
+    use_host_logs = os.path.isdir(host_logs_dir)
+    if use_host_logs:
+        sys.stdout.write('Found host logs directory at %s\n' % host_logs_dir)
+        # List contents for debugging
+        try:
+            log_files = os.listdir(host_logs_dir)
+            sys.stdout.write('Log files in directory: %s\n' % log_files)
+            # Copy all log files from host logs directory first
+            for log_file in log_files:
+                src = os.path.join(host_logs_dir, log_file)
+                if os.path.isfile(src):
+                    dst = os.path.join(temp_dir_path, log_file)
+                    try:
+                        shutil.copy(src, dst)
+                        sys.stdout.write('Copied %s\n' % log_file)
+                    except Exception as e:
+                        sys.stderr.write('Warning: Could not copy %s: %s\n' % (log_file, e))
+        except Exception as e:
+            sys.stdout.write('Warning: Could not list log directory: %s\n' % e)
+
     for container_name in running_containers:
         container_name_split = container_name.split(CNAME_SEP)
         if len(container_name_split) > 3:
@@ -69,18 +91,43 @@ def fetch_logs():
             except Exception as e:
                 sys.stderr.write('Warning: Unable to fetch docker logs for %s: %s\n' % (container_name, e))
         else:
-            # Copying logfile returned with `"docker inspect --format='{{.LogPath}}' %s" % container_name` does not work
-            # since: 1. it returns non-existing log filenames in some cases 2. sudo is mandatory to access file directly
+            # First try to copy from host logs directory (new logging approach)
+            host_log_file = os.path.join(host_logs_dir, '%s.log' % container_subname)
+            if use_host_logs and os.path.isfile(host_log_file):
+                try:
+                    shutil.copy(host_log_file, os.path.join(temp_dir_path, container_subname))
+                    continue
+                except Exception as e:
+                    sys.stderr.write('Warning: Unable to copy host log file %s: %s\n' % (host_log_file, e))
+            
+            # Check if we already have this log from host directory
+            existing_log = os.path.join(temp_dir_path, '%s.log' % container_subname)
+            if os.path.isfile(existing_log):
+                sys.stdout.write('Log for %s already collected from host directory\n' % container_subname)
+                continue
+            
+            # Fall back to docker logs (may fail if logging driver is "none")
             try:
                 subprocess.check_output(
                     'docker logs -t %s > %s 2>&1' % (container_name, os.path.join(temp_dir_path, container_subname)),
                     shell=True
                 )
             except Exception as e:
-                error_message = 'ERROR: Unable to fetch logs of %s container with error:\n%s' % (container_name, e)
-                sys.stderr.write('%s\n' % error_message)
-                create_text_file(os.path.join(temp_dir_path, '%s_error.txt' % container_subname), error_message)
-                deferred_errors.append(error_message)
+                # Try docker cp from /logs/ inside container as last resort
+                try:
+                    subprocess.check_output(
+                        'docker cp %s:/logs/%s.log %s 2>/dev/null' % (container_name, container_subname, os.path.join(temp_dir_path, container_subname)),
+                        shell=True
+                    )
+                except Exception:
+                    # Only report as error if we don't have host logs enabled (old setup)
+                    if not use_host_logs:
+                        error_message = 'ERROR: Unable to fetch logs of %s container with error:\n%s' % (container_name, e)
+                        sys.stderr.write('%s\n' % error_message)
+                        create_text_file(os.path.join(temp_dir_path, '%s_error.txt' % container_subname), error_message)
+                        deferred_errors.append(error_message)
+                    else:
+                        sys.stderr.write('Warning: No logs found for %s (may not have started)\n' % container_subname)
 
     if args.db_dump:
         postgres_container_name = [cname for cname in running_containers if '%(sep)spostgres%(sep)s' % {'sep': CNAME_SEP} in cname][0]

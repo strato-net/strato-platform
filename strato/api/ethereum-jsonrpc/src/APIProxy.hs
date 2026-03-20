@@ -8,7 +8,7 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import Network.HTTP.Client
 
 apiBaseUrl :: String
-apiBaseUrl = "http://localhost:3000/eth/v1.2/"
+apiBaseUrl = "http://172.17.0.1:3000/eth/v1.2/"
 
 call :: String -> IO String
 call command = do

@@ -43,6 +43,7 @@ defineFlag "fileServerUrl" "" "URL of the file server for marketplace (derived f
 defineFlag "notificationServerUrl" "" "URL of the notification server for marketplace"
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
+defineFlag "jsonrpc" (False :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for MetaMask integration"
 
 defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
 
@@ -70,5 +71,4 @@ defineFlag "mempoolLivenessCutoff" (60 :: Integer) "Max age of a transaction in 
 -- Consensus timing flags
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (120 :: Int) "Maximum seconds that one validator will remain the proposer"
-
 $(return [])

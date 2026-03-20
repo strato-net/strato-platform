@@ -10,9 +10,12 @@ module Blockchain.Init.ComposeTypes
   , Healthcheck(..)
   , Logging(..)
   , LoggingOptions(..)
+  , VolumeConfig(..)
+  , DependsOn(..)
+  , DependsOnCondition(..)
   ) where
 
-import Data.Aeson ()
+import Data.Aeson (ToJSON(..), FromJSON(..), Value(..))
 import Data.Aeson.TH
 import Data.Default
 import Data.Map (Map)
@@ -46,19 +49,47 @@ data Healthcheck = Healthcheck
   , interval :: Maybe String
   , timeout :: Maybe String
   , retries :: Maybe Int
+  , start_period :: Maybe String
   } deriving stock (Show, Eq, Generic)
     deriving anyclass (Default)
 
 deriveJSON defaultOptions { omitNothingFields = True } ''Healthcheck
 
+-- | Condition for depends_on with long syntax
+data DependsOnCondition = DependsOnCondition
+  { condition :: String  -- "service_started", "service_completed_successfully", "service_healthy"
+  } deriving stock (Show, Eq, Generic)
+    deriving anyclass (Default)
+
+deriveJSON defaultOptions { omitNothingFields = True } ''DependsOnCondition
+
+-- | DependsOn can be either a simple list or a map with conditions
+data DependsOn
+  = DependsOnList [String]
+  | DependsOnMap (Map String DependsOnCondition)
+  deriving stock (Show, Eq, Generic)
+
+instance Default DependsOn where
+  def = DependsOnList []
+
+instance ToJSON DependsOn where
+  toJSON (DependsOnList xs) = toJSON xs
+  toJSON (DependsOnMap m) = toJSON m
+
+instance FromJSON DependsOn where
+  parseJSON v@(Array _) = DependsOnList <$> parseJSON v
+  parseJSON v@(Object _) = DependsOnMap <$> parseJSON v
+  parseJSON _ = fail "depends_on must be array or object"
+
 -- | Service definition
 data Service = Service
   { image :: String
   , build :: Maybe String
-  , depends_on :: Maybe [String]
+  , depends_on :: Maybe DependsOn
   , environment :: Maybe (Map String String)  -- Map format: KEY: value
   , volumes :: Maybe [String]
   , ports :: Maybe [String]
+  , entrypoint :: Maybe [String]
   , command :: Maybe [String]
   , user :: Maybe String
   , restart :: Maybe String
@@ -71,10 +102,25 @@ data Service = Service
 
 deriveJSON defaultOptions { omitNothingFields = True } ''Service
 
--- | Top-level docker-compose.yml structure
-data ComposeFile = ComposeFile
-  { services :: Map String Service
+-- | Volume configuration for named volumes
+data VolumeConfig = VolumeConfig
+  { volume_driver :: Maybe String
   } deriving stock (Show, Eq, Generic)
     deriving anyclass (Default)
 
-deriveJSON defaultOptions { omitNothingFields = True } ''ComposeFile
+deriveJSON defaultOptions 
+  { omitNothingFields = True
+  , fieldLabelModifier = \s -> if s == "volume_driver" then "driver" else s
+  } ''VolumeConfig
+
+-- | Top-level docker-compose.yml structure
+data ComposeFile = ComposeFile
+  { namedVolumes :: Maybe (Map String VolumeConfig)
+  , services :: Map String Service
+  } deriving stock (Show, Eq, Generic)
+    deriving anyclass (Default)
+
+deriveJSON defaultOptions 
+  { omitNothingFields = True
+  , fieldLabelModifier = \s -> if s == "namedVolumes" then "volumes" else s
+  } ''ComposeFile

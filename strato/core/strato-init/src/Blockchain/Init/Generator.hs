@@ -14,8 +14,9 @@ import Blockchain.DB.CodeDB
 import Blockchain.Data.GenesisBlock (populateMPTAndWriteGenesis, populateMPTFromGenesis)
 import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
-import Blockchain.Init.Options (flags_dockerMode, flags_includeBuild)
+import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
+import Blockchain.Init.Options (flags_jsonrpc)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Strato.Model.Validator
@@ -34,6 +35,8 @@ import qualified Data.ByteString as BS
 import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
+import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
+import Data.Bits ((.|.))
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
 -- The stateRoot in the returned GenesisInfo is a placeholder - the real
@@ -73,7 +76,9 @@ createGenesisInfo network =
 
 createCommandsFile :: IO ()
 createCommandsFile =
-  writeFile "commands.txt" [r|ethereum-discover +RTS -T -RTS
+  writeFile "commands.txt" $ baseCommands ++ jsonrpcCommand
+  where
+    baseCommands = [r|ethereum-discover +RTS -T -RTS
 
 strato-p2p +RTS -T -RTS
 
@@ -91,6 +96,10 @@ strato-api +RTS -T -N1 -RTS
 
 strato-network-monitor
 |]
+    jsonrpcCommand =
+      if flags_jsonrpc
+        then "\nethereum-jsonrpc +RTS -T -RTS\n"
+        else ""
 
 
 
@@ -120,6 +129,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- Create node directories first (needed before genEthConf reads postgres_password)
     liftIO $ mapM_ (createDirectoryIfMissing True)
       ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
+    
+    -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
+    liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
 
     -- Set postgres password: use env var if provided, otherwise generate random
     let pgPasswordFile = "secrets" </> "postgres_password"
@@ -129,21 +141,24 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       password <- case envPassword of
         Just pw | not (null pw) -> return pw
         _ -> generatePassword 32
+      putStrLn $ "  Creating postgres password file: " ++ pgPasswordFile
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
 
-    -- Copy OAuth credentials from ~/.secrets/
-    liftIO $ do
+    -- OAuth credentials: check if already placed (e.g. by doit.sh --init in container),
+    -- otherwise copy from ~/.secrets/ (local dev)
+    let destOauth = "secrets" </> "oauth_credentials.yaml"
+    destOauthExists <- doesFileExist destOauth
+    unless destOauthExists $ liftIO $ do
       home <- getHomeDirectory
       let sourceOauth = home </> ".secrets" </> "strato_credentials.yaml"
-          destOauth = "secrets" </> "oauth_credentials.yaml"
       sourceExists <- doesFileExist sourceOauth
       if sourceExists
         then do
           copyFile sourceOauth destOauth
           void $ chmod roo destOauth
         else
-          error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
+          error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml or secrets/oauth_credentials.yaml. Run 'strato-login' first."
 
     ethconf <- liftIO genEthConf
 
@@ -162,7 +177,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
     -- Generate docker-compose.yml
     liftIO $ case flags_dockerMode of
-      "allDocker" -> generateDockerComposeAllDocker False flags_includeBuild
+      "allDocker" -> generateDockerComposeAllDocker
       _ -> generateDockerCompose
 
     liftIO createCommandsFile
