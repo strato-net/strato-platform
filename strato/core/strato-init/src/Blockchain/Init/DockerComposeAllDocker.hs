@@ -158,6 +158,7 @@ generateDockerComposeAllDocker = do
   let strato = def
         { image = "${STRATO_IMAGE:-" ++ repoUrl ++ "strato:" ++ stratoVersion ++ "-" ++ hashStrato ++ "}"
         , build = Just "."
+        , user = Just "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
         , depends_on = Just $ DependsOnMap $ Map.fromList
             [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" })
             , ("kafka", DependsOnCondition { condition = "service_started" })
