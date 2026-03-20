@@ -32,7 +32,7 @@ generateDockerComposeAllDocker = do
   let mercataBackend = def
         { image = "${MERCATABACKEND_IMAGE:-" ++ repoUrl ++ "mercata-backend:" ++ stratoVersion ++ "-" ++ hashMercataBackend ++ "}"
         , build = Just "./mercata/backend"
-        , depends_on = Just ["strato", "postgrest"]
+        , depends_on = Just $ DependsOnList ["strato", "postgrest"]
         , init = Just True
         , environment = Just $ Map.fromList
             [ ("OAUTH_DISCOVERY_URL", "${OAUTH_DISCOVERY_URL}")
@@ -73,7 +73,7 @@ generateDockerComposeAllDocker = do
   let mercataUi = def
         { image = "${MERCATAUI_IMAGE:-" ++ repoUrl ++ "mercata-ui:" ++ stratoVersion ++ "-" ++ hashMercataUi ++ "}"
         , build = Just "./mercata/ui"
-        , depends_on = Just ["mercata-backend"]
+        , depends_on = Just $ DependsOnList ["mercata-backend"]
         , environment = Just $ Map.fromList
             [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID}")
             , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID}")
@@ -88,7 +88,7 @@ generateDockerComposeAllDocker = do
   let smd = def
         { image = "${SMD_IMAGE:-" ++ repoUrl ++ "smd:" ++ stratoVersion ++ "-" ++ hashSmd ++ "}"
         , build = Just "."
-        , depends_on = Just ["apex", "postgrest", "prometheus", "strato"]
+        , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus", "strato"]
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", "${NODE_HOST}")
             , ("ssl", "${ssl:-false}")
@@ -103,7 +103,7 @@ generateDockerComposeAllDocker = do
   let apex = def
         { image = "${APEX_IMAGE:-" ++ repoUrl ++ "apex:" ++ stratoVersion ++ "-" ++ hashApex ++ "}"
         , build = Just "."
-        , depends_on = Just ["postgres", "prometheus", "strato"]
+        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "strato"]
         , environment = Just $ Map.fromList
             [ ("ADMIN_EMAIL", "${ADMIN_EMAIL}")
             , ("postgres_host", "postgres")
@@ -118,7 +118,7 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh /usr/src/app/docker-run.sh >> /logs/apex.log 2>&1"]
-        , volumes = Just ["./logs:/logs", "./secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just ["./logs:/logs", "./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -132,10 +132,35 @@ generateDockerComposeAllDocker = do
         , logging = noLogging
         }
 
+  let stratoInit = def
+        { image = "${STRATO_IMAGE:-" ++ repoUrl ++ "strato:" ++ stratoVersion ++ "-" ++ hashStrato ++ "}"
+        , command = Just ["--init"]
+        , environment = Just $ Map.fromList
+            [ ("OAUTH_DISCOVERY_URL", "${OAUTH_DISCOVERY_URL}")
+            , ("OAUTH_CLIENT_ID", "${OAUTH_CLIENT_ID}")
+            , ("OAUTH_CLIENT_SECRET", "${OAUTH_CLIENT_SECRET}")
+            , ("VAULT_URL", "${VAULT_URL}")
+            , ("network", "${network}")
+            , ("postgres_password", "${postgres_password}")
+            , ("postgres_host", "postgres")
+            , ("kafkaHost", "kafka")
+            , ("redisHost", "redis")
+            , ("useCustomGenesis", "${useCustomGenesis}")
+            ]
+        , volumes = Just ["./nodedata:/var/lib/strato"]
+        , restart = Just "no"
+        , logging = noLogging
+        }
+
   let strato = def
         { image = "${STRATO_IMAGE:-" ++ repoUrl ++ "strato:" ++ stratoVersion ++ "-" ++ hashStrato ++ "}"
         , build = Just "."
-        , depends_on = Just ["kafka", "postgres", "redis"]
+        , depends_on = Just $ DependsOnMap $ Map.fromList
+            [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" })
+            , ("kafka", DependsOnCondition { condition = "service_started" })
+            , ("postgres", DependsOnCondition { condition = "service_started" })
+            , ("redis", DependsOnCondition { condition = "service_started" })
+            ]
         , environment = Just $ Map.fromList
             [ ("addBootnodes", "${addBootnodes}")
             , ("API_DEBUG_LOG", "${API_DEBUG_LOG:-false}")
@@ -203,7 +228,7 @@ generateDockerComposeAllDocker = do
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /strato/doit.sh >> /logs/strato.log 2>&1"]
         , ports = Just ["30303:30303", "30303:30303/udp"]
-        , volumes = Just ["./logs:/logs", "./nodedata:/var/lib/strato", "./secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just ["./logs:/logs", "./nodedata:/var/lib/strato", "./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -211,7 +236,7 @@ generateDockerComposeAllDocker = do
   let postgrest = def
         { image = "${POSTGREST_IMAGE:-" ++ repoUrl ++ "postgrest:" ++ stratoVersion ++ "-" ++ hashPostgrest ++ "}"
         , build = Just "."
-        , depends_on = Just ["postgres"]
+        , depends_on = Just $ DependsOnList ["postgres"]
         , environment = Just $ Map.fromList
             [ ("blocHost", "${blocHost:-strato:3000}")
             , ("PG_ENV_POSTGRES_DB", "cirrus")
@@ -222,20 +247,23 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec sh /doit.sh >> /logs/postgrest.log 2>&1"]
-        , volumes = Just ["./logs:/logs", "./secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just ["./logs:/logs", "./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
 
   let postgres = def
         { image = "postgres:14.18"
+        , depends_on = Just $ DependsOnMap $ Map.fromList
+            [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" })
+            ]
         , environment = Just $ Map.fromList
             [ ("POSTGRES_DB", "eth")
             , ("POSTGRES_PASSWORD_FILE", "/run/secrets/postgres_password")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=300 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
-        , volumes = Just ["./logs:/logs", "pgdata:/var/lib/postgresql/data", "./secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just ["./logs:/logs", "pgdata:/var/lib/postgresql/data", "./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -243,7 +271,7 @@ generateDockerComposeAllDocker = do
   let nginx = def
         { image = "${NGINX_IMAGE:-" ++ repoUrl ++ "nginx:" ++ stratoVersion ++ "-" ++ hashNginx ++ "}"
         , build = Just "."
-        , depends_on = Just ["apex", "docs", "postgrest", "prometheus", "smd", "strato", "mercata-backend", "mercata-ui"]
+        , depends_on = Just $ DependsOnList ["apex", "docs", "postgrest", "prometheus", "smd", "strato", "mercata-backend", "mercata-ui"]
         , environment = Just $ Map.fromList
             [ ("APEX_HOST", "${APEX_HOST}")
             , ("blockTime", "${blockTime}")
@@ -303,7 +331,7 @@ generateDockerComposeAllDocker = do
 
   let kafka = def
         { image = "registry-aws.blockapps.net:5000/blockapps-repo/kafka:2.12-2.0.1"
-        , depends_on = Just ["zookeeper"]
+        , depends_on = Just $ DependsOnList ["zookeeper"]
         , environment = Just $ Map.fromList
             [ ("KAFKA_ADVERTISED_HOST_NAME", "kafka")
             , ("KAFKA_ADVERTISED_PORT", "9092")
@@ -346,6 +374,7 @@ generateDockerComposeAllDocker = do
             , ("smd", smd)
             , ("apex", apex)
             , ("redis", redis)
+            , ("strato-init", stratoInit)
             , ("strato", strato)
             , ("postgrest", postgrest)
             , ("postgres", postgres)

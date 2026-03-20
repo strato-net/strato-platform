@@ -34,7 +34,7 @@ generateDockerCompose = do
 
   let mercataBackend = def
         { image = "mercata-backend:" ++ stratoVersionTag ++ "-" ++ hashMercataBackend
-        , depends_on = Just ["postgrest"]
+        , depends_on = Just $ DependsOnList ["postgrest"]
         , init = Just True
         , volumes = Just
             [ "./logs:/logs"
@@ -53,7 +53,7 @@ generateDockerCompose = do
 
   let mercataUi = def
         { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ hashMercataUi
-        , depends_on = Just ["mercata-backend"]
+        , depends_on = Just $ DependsOnList ["mercata-backend"]
         , volumes = Just ["./logs:/logs"]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-ui.log 2>&1"]
@@ -63,7 +63,7 @@ generateDockerCompose = do
 
   let smd = def
         { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
-        , depends_on = Just ["apex", "postgrest", "prometheus"]
+        , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", nodeHost)
             , ("ssl", "false")
@@ -77,7 +77,7 @@ generateDockerCompose = do
 
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
-        , depends_on = Just ["postgres", "prometheus"]
+        , depends_on = Just $ DependsOnList ["postgres", "prometheus"]
         , environment = Just $ Map.fromList
             [ ("postgres_host", "postgres")
             , ("postgres_port", "5432")
@@ -116,7 +116,7 @@ generateDockerCompose = do
 
   let postgrest = def
         { image = "postgrest:" ++ stratoVersionTag ++ "-" ++ hashPostgrest
-        , depends_on = Just ["postgres"]
+        , depends_on = Just $ DependsOnList ["postgres"]
         , environment = Just $ Map.fromList
             [ ("blocHost", "strato:3000")
             , ("PG_ENV_POSTGRES_DB", "cirrus")
@@ -162,7 +162,7 @@ generateDockerCompose = do
 
   let nginx = def
         { image = "nginx:" ++ stratoVersionTag ++ "-" ++ hashNginx
-        , depends_on = Just ["apex", "docs", "postgrest", "prometheus", "smd", "mercata-backend", "mercata-ui"]
+        , depends_on = Just $ DependsOnList ["apex", "docs", "postgrest", "prometheus", "smd", "mercata-backend", "mercata-ui"]
         , environment = Just $ Map.fromList
             [ ("STRATO_HOSTNAME", stratoHostname)
             , ("STRATO_PORT_API", "3000")
