@@ -39,7 +39,7 @@ export interface BridgeToken {
   enabled: boolean;              // effective route enabled state
   isDefaultRoute: boolean;       // true when route token matches asset default token
   stratoTokenImage?: string;     // First image URL from TokenFactory images
-  rebaseFactor?: string;         // getCurrentMultiplier() from PriceOracle.rebaseFactors; present for xStock tokens
+  rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
 }
 
 /**
