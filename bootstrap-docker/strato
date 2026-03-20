@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-BOOTSTRAP_DOCKER_VERSION=2
+BOOTSTRAP_DOCKER_VERSION=3
 
 Green='\033[0;32m'
 Red='\033[0;31m'
