@@ -105,8 +105,15 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     const apy = computePoolAPY(p, prices, volumeMap);
     if (apy === ZERO_APY) continue;
     const meta = `${p.tokenA._symbol}-${p.tokenB._symbol}`;
-    add(p.tokenA.address, { source: "swap", apy, meta });
-    add(p.tokenB.address, { source: "swap", apy, meta });
+    const poolAddress = String(p.address ?? "").toLowerCase().replace(/^0x/, "");
+    const row = {
+      source: "swap" as const,
+      apy,
+      meta,
+      ...(poolAddress ? { poolAddress } : {}),
+    };
+    add(p.tokenA.address, row);
+    add(p.tokenB.address, row);
   }
 
   if (vaultAPY && vaultAPY !== "-" && parseFloat(vaultAPY) > 0) {
