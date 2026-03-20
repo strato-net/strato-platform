@@ -4,9 +4,11 @@ module Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker) w
 
 import Prelude hiding (init)
 
+import Blockchain.EthConf (ethConf)
+import Blockchain.EthConf.Model (apiConfig, httpPort)
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.ComposeTypes
-import Blockchain.Init.Options (flags_repoUrl)
+import Blockchain.Init.Options (flags_composeOnly, flags_repoUrl)
 import Blockchain.Strato.Version (stratoVersionTag)
 import qualified Data.ByteString as BS
 import Data.Default (def)
@@ -16,7 +18,9 @@ import System.IO (hPutStrLn, stderr)
 
 generateDockerComposeAllDocker :: IO ()
 generateDockerComposeAllDocker = do
-  let repoUrl = flags_repoUrl
+  let conf = ethConf
+      portNum = show $ httpPort (apiConfig conf)
+      repoUrl = flags_repoUrl
       stratoVersion = stratoVersionTag
       noLogging = Just Logging { driver = "none", options = Nothing }
 
@@ -132,33 +136,12 @@ generateDockerComposeAllDocker = do
         , logging = noLogging
         }
 
-  let stratoInit = def
-        { image = "${STRATO_IMAGE:-" ++ repoUrl ++ "strato:" ++ stratoVersion ++ "-" ++ hashStrato ++ "}"
-        , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec /strato/doit.sh --init >> /logs/strato-init.log 2>&1"]
-        , environment = Just $ Map.fromList
-            [ ("OAUTH_DISCOVERY_URL", "${OAUTH_DISCOVERY_URL}")
-            , ("OAUTH_CLIENT_ID", "${OAUTH_CLIENT_ID}")
-            , ("OAUTH_CLIENT_SECRET", "${OAUTH_CLIENT_SECRET}")
-            , ("VAULT_URL", "${VAULT_URL}")
-            , ("network", "${network}")
-            , ("postgres_password", "${postgres_password}")
-            , ("postgres_host", "postgres")
-            , ("kafkaHost", "kafka")
-            , ("redisHost", "redis")
-            , ("useCustomGenesis", "${useCustomGenesis}")
-            ]
-        , volumes = Just ["./logs:/logs", "./nodedata:/var/lib/strato"]
-        , restart = Just "no"
-        , logging = noLogging
-        }
-
   let strato = def
         { image = "${STRATO_IMAGE:-" ++ repoUrl ++ "strato:" ++ stratoVersion ++ "-" ++ hashStrato ++ "}"
         , build = Just "."
+        , user = Just "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
         , depends_on = Just $ DependsOnMap $ Map.fromList
-            [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" })
-            , ("kafka", DependsOnCondition { condition = "service_started" })
+            [ ("kafka", DependsOnCondition { condition = "service_started" })
             , ("postgres", DependsOnCondition { condition = "service_started" })
             , ("redis", DependsOnCondition { condition = "service_started" })
             ]
@@ -255,9 +238,6 @@ generateDockerComposeAllDocker = do
 
   let postgres = def
         { image = "postgres:14.18"
-        , depends_on = Just $ DependsOnMap $ Map.fromList
-            [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" })
-            ]
         , environment = Just $ Map.fromList
             [ ("POSTGRES_DB", "eth")
             , ("POSTGRES_PASSWORD_FILE", "/run/secrets/postgres_password")
@@ -300,11 +280,11 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /docker-run.sh >> /logs/nginx.log 2>&1"]
-        , ports = Just ["${HTTP_PORT:-80}:80", "${HTTPS_PORT:-443}:443"]
+        , ports = Just [portNum ++ ":" ++ portNum, "443:443"]
         , volumes = Just ["./logs:/logs", "./ssl:/tmp/ssl:ro", "./nodedata/secrets:/run/secrets:ro", "./nodedata/.ethereumH:/config:ro"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
-            { test = ["CMD", "curl", "--silent", "--output", "/dev/null", "--fail", "localhost:${HTTP_PORT:-80}/_ping"]
+            { test = ["CMD", "curl", "--silent", "--output", "/dev/null", "--fail", "localhost:" ++ portNum ++ "/_ping"]
             , interval = Just "5s"
             , timeout = Just "1s"
             , retries = Nothing
@@ -363,6 +343,7 @@ generateDockerComposeAllDocker = do
   let prometheus = def
         { image = "${PROMETHEUS_IMAGE:-" ++ repoUrl ++ "prometheus:" ++ stratoVersion ++ "-" ++ hashPrometheus ++ "}"
         , build = Just "."
+        , user = Just "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", "${NODE_HOST}")
             , ("STRATO_HOSTNAME", "${STRATO_HOSTNAME:-strato}")
@@ -382,7 +363,6 @@ generateDockerComposeAllDocker = do
             , ("smd", smd)
             , ("apex", apex)
             , ("redis", redis)
-            , ("strato-init", stratoInit)
             , ("strato", strato)
             , ("postgrest", postgrest)
             , ("postgres", postgres)
@@ -394,5 +374,7 @@ generateDockerComposeAllDocker = do
             ]
         }
 
-  BS.putStr $ Yaml.encode composeFile
+  if flags_composeOnly
+    then BS.putStr $ Yaml.encode composeFile
+    else Yaml.encodeFile "docker-compose.yml" composeFile
   hPutStrLn stderr "  ✓ Generated docker-compose.yml (allDocker)"
