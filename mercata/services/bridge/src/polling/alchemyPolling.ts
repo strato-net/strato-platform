@@ -88,7 +88,8 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
       const targetTokens = [...new Set(filteredDeposits.map(d => d.targetStratoToken))];
       const factors = await getRebaseFactors(targetTokens);
       for (const deposit of filteredDeposits) {
-        const factor = factors.get(deposit.targetStratoToken);
+        const stratoKey = deposit.targetStratoToken.toLowerCase().replace(/^0x/, "");
+        const factor = factors.get(stratoKey);
         if (factor) {
           const original = BigInt(deposit.externalTokenAmount);
           const adjusted = (original * WAD) / factor;

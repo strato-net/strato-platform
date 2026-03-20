@@ -176,15 +176,17 @@ export const getBridgeInfo = async (): Promise<BridgeInfo | null> => {
   return normalize(data[0]);
 };
 
-// Get rebase factors from PriceOracle for given STRATO token addresses
+// Get rebase factors from PriceOracle for given STRATO token addresses.
+// Keys are returned in STRATO convention (lowercase, no 0x prefix).
 export const getRebaseFactors = async (
   stratoTokenAddresses: string[]
 ): Promise<Map<string, bigint>> => {
-  if (!stratoTokenAddresses.length || !oracle.address) return new Map();
+  const normalized = stratoTokenAddresses.map(a => a.toLowerCase().replace(/^0x/, ""));
+  if (!normalized.length || !oracle.address) return new Map();
 
   const data = await cirrus.get(`/${ORACLE_URL}-rebaseFactors`, {
     params: {
-      key: `in.(${stratoTokenAddresses.join(",")})`,
+      key: `in.(${normalized.join(",")})`,
       address: `eq.${oracle.address}`,
       select: "key,value::text",
     },
