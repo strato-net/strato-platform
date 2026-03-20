@@ -5,6 +5,7 @@ import {
 } from "./rpcService";
 import { getRebaseFactors } from "./cirrusService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
+import { logInfo } from "../utils/logger";
 import { DepositInfo } from "../types";
 
 const decodeTransferLog = (log: any, sig: string) => {
@@ -68,17 +69,24 @@ const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null =
 const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
   const sig = TRANSFER_EVENT_SIGNATURE.toLowerCase();
   const logs = Array.isArray(receipt.logs) ? receipt.logs : [];
+
+  logInfo("Verification", `ERC20 check: token=${ctx.externalToken} safe=${ctx.safe} expected=${ctx.stratoTokenAmount} decimals=${ctx.externalDecimals} rebaseFactor=${ctx.rebaseFactor ?? 'none'} logCount=${logs.length}`);
   
   const validTransfer = logs.some(log => {
     const decoded = decodeTransferLog(log, sig);
-    if (!decoded || decoded.tokenAddr !== ctx.externalToken || decoded.toAddr !== ctx.safe) {
+    if (!decoded) return false;
+
+    if (decoded.tokenAddr !== ctx.externalToken || decoded.toAddr !== ctx.safe) {
+      logInfo("Verification", `  skip log: addr=${decoded.tokenAddr} to=${decoded.toAddr} amount=${decoded.amount}`);
       return false;
     }
     
     const convertedAmount = convertToStratoDecimals(decoded.amount, ctx.externalDecimals);
+    logInfo("Verification", `  match log: amount=${decoded.amount} converted=${convertedAmount} stored=${ctx.stratoTokenAmount}`);
 
     if (ctx.rebaseFactor && ctx.rebaseFactor > 0n) {
       const rebasedAmount = (convertedAmount * WAD) / ctx.rebaseFactor;
+      logInfo("Verification", `  rebased=${rebasedAmount} match=${rebasedAmount === ctx.stratoTokenAmount}`);
       return rebasedAmount === ctx.stratoTokenAmount;
     }
     
