@@ -11,6 +11,7 @@ import Blockchain.Init.ComposeTypes
 import Blockchain.Init.Options (flags_composeOnly, flags_repoUrl)
 import Blockchain.Strato.Version (stratoVersionTag)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as C8
 import Data.Default (def)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
@@ -374,7 +375,10 @@ generateDockerComposeAllDocker = do
             ]
         }
 
+  let header = C8.pack "#bootstrap-docker-min-version:3\n"
+      yamlBytes = Yaml.encode composeFile
+      output = BS.append header yamlBytes
   if flags_composeOnly
-    then BS.putStr $ Yaml.encode composeFile
-    else Yaml.encodeFile "docker-compose.yml" composeFile
+    then BS.putStr output
+    else BS.writeFile "docker-compose.yml" output
   hPutStrLn stderr "  ✓ Generated docker-compose.yml (allDocker)"
