@@ -13,7 +13,7 @@ import { Loader2, AlertCircle, Info, CreditCard, ArrowDown, Wallet, ExternalLink
 
 const ONRAMP_NODES: Record<string, string[]> = {
   testnet: ["https://buildtest.testnet.strato.nexus", "localhost:3000"],
-  mainnet: ["https://app.strato.nexus, https://hasan.stratomercata.com"],
+  mainnet: ["https://app.strato.nexus, https://workspace-hasan-j37a91h.blockapps.net"],
 };
 
 type SessionStatus =
