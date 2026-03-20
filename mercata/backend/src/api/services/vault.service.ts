@@ -101,6 +101,7 @@ export interface VaultInfo {
 export interface UserPosition {
   userShares: string;
   userValueUsd: string;
+  allTimeDeposits: string;
   allTimeEarnings: string;
 }
 
@@ -945,6 +946,7 @@ export const getUserPosition = async (
     return {
       userShares: "0",
       userValueUsd: "0",
+      allTimeDeposits: "0",
       allTimeEarnings: "0",
     };
   }
@@ -955,6 +957,7 @@ export const getUserPosition = async (
     return {
       userShares: "0",
       userValueUsd: "0",
+      allTimeDeposits: "0",
       allTimeEarnings: "0",
     };
   }
@@ -989,6 +992,7 @@ export const getUserPosition = async (
   return {
     userShares,
     userValueUsd,
+    allTimeDeposits: totalDepositedUsd.toString(),
     allTimeEarnings,
   };
 };

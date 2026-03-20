@@ -1,4 +1,4 @@
-import { Wallet, Coins, Loader2, TrendingUp } from "lucide-react";
+import { Wallet, Loader2, TrendingUp, ArrowDownToLine } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useVaultContext } from "@/context/VaultContext";
@@ -55,6 +55,7 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
   const {
     userShares,
     userValueUsd,
+    allTimeDeposits,
     allTimeEarnings,
     paused,
     loadingUser,
@@ -128,22 +129,22 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-muted/50 rounded-lg p-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <Coins className="h-4 w-4" />
+                  <Wallet className="h-4 w-4" />
                   Your Shares
                 </div>
                 <div className="text-2xl font-bold">
-                  {formatShares(userShares)}
+                  {formatShares(userShares)} <span className="text-base text-muted-foreground">(${formatUsd(userValueUsd)})</span>
                 </div>
                 <div className="text-xs text-muted-foreground">{shareTokenSymbol}</div>
               </div>
 
               <div className="bg-muted/50 rounded-lg p-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <Wallet className="h-4 w-4" />
-                  USD Value
+                  <ArrowDownToLine className="h-4 w-4" />
+                  All-Time Deposits
                 </div>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  ${formatUsd(userValueUsd)}
+                <div className="text-2xl font-bold">
+                  ${formatUsd(allTimeDeposits)}
                 </div>
               </div>
 

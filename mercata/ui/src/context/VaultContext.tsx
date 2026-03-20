@@ -69,6 +69,7 @@ export interface VaultState {
   // User position
   userShares: string;
   userValueUsd: string;
+  allTimeDeposits: string;
   allTimeEarnings: string;
 
   // Bot transactions
@@ -122,6 +123,7 @@ const defaultVaultState: VaultState = {
   assets: [],
   userShares: "0",
   userValueUsd: "0",
+  allTimeDeposits: "0",
   allTimeEarnings: "0",
   transactions: [],
   loading: true,
@@ -201,6 +203,7 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
           ...prev,
           userShares: res.data.userShares || "0",
           userValueUsd: res.data.userValueUsd || "0",
+          allTimeDeposits: res.data.allTimeDeposits || "0",
           allTimeEarnings: res.data.allTimeEarnings || "0",
           loadingUser: false,
         }));
