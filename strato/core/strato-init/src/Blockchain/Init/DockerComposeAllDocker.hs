@@ -125,6 +125,8 @@ generateDockerComposeAllDocker = do
 
   let redis = def
         { image = "redis:3.2"
+        , depends_on = Just $ DependsOnMap $ Map.fromList
+            [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" }) ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh redis-server --appendonly yes >> /logs/redis.log 2>&1"]
         , volumes = Just ["./logs:/logs", "redisdata:/data"]
@@ -315,6 +317,8 @@ generateDockerComposeAllDocker = do
 
   let docs = def
         { image = "swaggerapi/swagger-ui:v5.29.2"
+        , depends_on = Just $ DependsOnMap $ Map.fromList
+            [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" }) ]
         , environment = Just $ Map.fromList
             [ ("API_URL", "/docs/swagger.yaml")
             ]
@@ -327,6 +331,8 @@ generateDockerComposeAllDocker = do
 
   let zookeeper = def
         { image = "zookeeper:3.9.3"
+        , depends_on = Just $ DependsOnMap $ Map.fromList
+            [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" }) ]
         , environment = Just $ Map.fromList
             [ ("ZOO_DATA_LOG_DIR", "/data")
             ]
@@ -363,6 +369,8 @@ generateDockerComposeAllDocker = do
   let prometheus = def
         { image = "${PROMETHEUS_IMAGE:-" ++ repoUrl ++ "prometheus:" ++ stratoVersion ++ "-" ++ hashPrometheus ++ "}"
         , build = Just "."
+        , depends_on = Just $ DependsOnMap $ Map.fromList
+            [ ("strato-init", DependsOnCondition { condition = "service_completed_successfully" }) ]
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", "${NODE_HOST}")
             , ("STRATO_HOSTNAME", "${STRATO_HOSTNAME:-strato}")

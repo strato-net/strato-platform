@@ -288,6 +288,9 @@ else
 fi
 # END OF COMPOSE FILE PRE-PROCESSING
 
+mkdir -p nodedata/
+mkdir -p logs/
+
 ${docker_compose} -f docker-compose-temp.yml up -d --remove-orphans
 
 if [[ "$useCustomGenesis" = true ]]; then
