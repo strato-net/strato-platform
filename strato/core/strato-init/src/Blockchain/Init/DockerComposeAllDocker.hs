@@ -136,6 +136,7 @@ generateDockerComposeAllDocker = do
         { image = "${STRATO_IMAGE:-" ++ repoUrl ++ "strato:" ++ stratoVersion ++ "-" ++ hashStrato ++ "}"
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /strato/doit.sh --init >> /logs/strato-init.log 2>&1"]
+        , user = Just "999:999"  -- Run as postgres user so files are readable by postgres container
         , environment = Just $ Map.fromList
             [ ("OAUTH_DISCOVERY_URL", "${OAUTH_DISCOVERY_URL}")
             , ("OAUTH_CLIENT_ID", "${OAUTH_CLIENT_ID}")
