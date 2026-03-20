@@ -172,7 +172,7 @@ generateDockerCompose = do
             , ("VAULT_URL", vault)
             ]
         , extra_hosts = Just ["host.docker.internal:host-gateway"]
-        , ports = Just [portNum ++ ":" ++ portNum, "443:443"]
+        , ports = Just [portNum ++ ":" ++ 80, "443:443"]
         , volumes = Just
             [ "./logs:/logs"
             , "./ssl:/tmp/ssl:ro"

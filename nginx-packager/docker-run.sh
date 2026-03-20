@@ -31,9 +31,6 @@ STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
 VAULT_URL=${VAULT_URL:-https://vault.blockapps.net:8093}
 
-# Read HTTP port from ethconf.yaml (single source of truth)
-HTTP_PORT=$(yq '.apiConfig.httpPort' /config/ethconf.yaml)
-
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
