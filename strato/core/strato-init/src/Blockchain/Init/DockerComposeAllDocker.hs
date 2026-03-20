@@ -301,7 +301,7 @@ generateDockerComposeAllDocker = do
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /docker-run.sh >> /logs/nginx.log 2>&1"]
         , ports = Just ["${HTTP_PORT:-80}:80", "${HTTPS_PORT:-443}:443"]
-        , volumes = Just ["./logs:/logs", "./ssl:/tmp/ssl:ro"]
+        , volumes = Just ["./logs:/logs", "./ssl:/tmp/ssl:ro", "./nodedata/secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro", "./nodedata/.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
