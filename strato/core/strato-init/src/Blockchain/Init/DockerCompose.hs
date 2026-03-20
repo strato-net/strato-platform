@@ -108,6 +108,7 @@ generateDockerCompose = do
             , interval = Just "2s"
             , timeout = Just "2s"
             , retries = Just 10
+            , start_period = Nothing
             }
         , logging = noLogging
         , volumes = Just ["./logs:/logs", "./redis:/data"]
@@ -155,6 +156,7 @@ generateDockerCompose = do
             , interval = Just "2s"
             , timeout = Just "2s"
             , retries = Just 10
+            , start_period = Nothing
             }
         , logging = noLogging
         , ports = Just ["5432:5432"]
@@ -185,6 +187,7 @@ generateDockerCompose = do
             , interval = Just "5s"
             , timeout = Just "1s"
             , retries = Nothing
+            , start_period = Nothing
             }
         , logging = noLogging
         }
@@ -227,6 +230,7 @@ generateDockerCompose = do
             , interval = Just "5s"
             , timeout = Just "10s"
             , retries = Just 10
+            , start_period = Nothing
             }
         , volumes = Just ["./logs:/logs", "./kafka:/kafka"]
         , entrypoint = Just ["/bin/sh", "-c"]

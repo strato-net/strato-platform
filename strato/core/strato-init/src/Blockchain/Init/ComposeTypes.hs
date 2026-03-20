@@ -49,6 +49,7 @@ data Healthcheck = Healthcheck
   , interval :: Maybe String
   , timeout :: Maybe String
   , retries :: Maybe Int
+  , start_period :: Maybe String
   } deriving stock (Show, Eq, Generic)
     deriving anyclass (Default)
 

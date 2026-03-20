@@ -303,6 +303,13 @@ generateDockerComposeAllDocker = do
         , ports = Just ["${HTTP_PORT:-80}:80", "${HTTPS_PORT:-443}:443"]
         , volumes = Just ["./logs:/logs", "./ssl:/tmp/ssl:ro", "./nodedata/secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro", "./nodedata/.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , restart = Just "unless-stopped"
+        , healthcheck = Just Healthcheck
+            { test = ["CMD", "curl", "--silent", "--output", "/dev/null", "--fail", "localhost:${HTTP_PORT:-80}/_ping"]
+            , interval = Just "5s"
+            , timeout = Just "1s"
+            , retries = Nothing
+            , start_period = Just "180s"
+            }
         , logging = noLogging
         }
 
