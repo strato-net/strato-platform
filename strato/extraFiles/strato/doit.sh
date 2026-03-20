@@ -22,10 +22,10 @@ if [ "$1" = "--init" ]; then
     exit 0
   fi
 
-  # Create OAuth credentials from env vars for strato-setup
+  # Create OAuth credentials in nodedata for strato-setup to find
   if [[ -n ${OAUTH_CLIENT_ID} && -n ${OAUTH_CLIENT_SECRET} ]]; then
-    mkdir -p ~/.secrets
-    cat > ~/.secrets/strato_credentials.yaml << EOF
+    mkdir -p /var/lib/strato/secrets
+    cat > /var/lib/strato/secrets/oauth_credentials.yaml << EOF
 discoveryUrl: "${OAUTH_DISCOVERY_URL:-https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration}"
 clientId: "${OAUTH_CLIENT_ID}"
 clientSecret: "${OAUTH_CLIENT_SECRET}"
