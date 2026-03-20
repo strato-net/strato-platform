@@ -118,7 +118,7 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh /usr/src/app/docker-run.sh >> /logs/apex.log 2>&1"]
-        , volumes = Just ["./logs:/logs", "./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just ["./logs:/logs", "./nodedata/secrets:/run/secrets:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -228,7 +228,7 @@ generateDockerComposeAllDocker = do
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /strato/doit.sh >> /logs/strato.log 2>&1"]
         , ports = Just ["30303:30303", "30303:30303/udp"]
-        , volumes = Just ["./logs:/logs", "./nodedata:/var/lib/strato", "./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just ["./logs:/logs", "./nodedata:/var/lib/strato", "./nodedata/secrets:/run/secrets:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -247,7 +247,7 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec sh /doit.sh >> /logs/postgrest.log 2>&1"]
-        , volumes = Just ["./logs:/logs", "./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just ["./logs:/logs", "./nodedata/secrets:/run/secrets:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -263,7 +263,7 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=300 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
-        , volumes = Just ["./logs:/logs", "pgdata:/var/lib/postgresql/data", "./nodedata/secrets/postgres_password:/run/secrets/postgres_password:ro"]
+        , volumes = Just ["./logs:/logs", "pgdata:/var/lib/postgresql/data", "./nodedata/secrets:/run/secrets:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
