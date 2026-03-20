@@ -35,7 +35,7 @@ import qualified Data.ByteString as BS
 import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
-import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
+import System.Posix.Files (setFileMode, setOwnerAndGroup, ownerModes, groupModes, otherModes)
 import Data.Bits ((.|.))
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
@@ -143,6 +143,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
         _ -> generatePassword 32
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
+      setOwnerAndGroup pgPasswordFile 999 999  -- postgres user can read it
 
     -- Copy OAuth credentials from ~/.secrets/
     liftIO $ do
