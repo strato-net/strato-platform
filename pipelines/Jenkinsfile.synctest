@@ -71,7 +71,7 @@ pipeline {
     }
     stage('Deploy Mainnet') {
       steps {
-        sh 'rm -rf strato-getting-started'
+        sh 'sudo rm -rf strato-getting-started'
         sh 'git clone https://github.com/blockapps/strato-getting-started'
         dir("strato-getting-started") {
           sh "sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/"
