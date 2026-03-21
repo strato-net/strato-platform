@@ -320,6 +320,68 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(vault.maxWithdraw(address(saver)) == 60e18, "maxWithdraw should cap to live balance");
     }
 
+    function it_socializes_live_balance_loss_pro_rata_across_redeemers() public {
+        User alice = new User();
+        User bob = new User();
+
+        Token(USDST).mint(address(alice), 50e18);
+        alice.do(USDST, "approve", address(vault), INFINITY);
+        alice.do(address(vault), "deposit(uint256,address)", 50e18, address(alice));
+
+        Token(USDST).mint(address(bob), 50e18);
+        bob.do(USDST, "approve", address(vault), INFINITY);
+        bob.do(address(vault), "deposit(uint256,address)", 50e18, address(bob));
+
+        Token(USDST).burn(address(vault), 40e18);
+
+        require(vault.totalAssets() == 100e18, "managed assets unchanged after loss");
+        require(IERC20(USDST).balanceOf(address(vault)) == 60e18, "live balance should reflect loss");
+        require(vault.exchangeRate() == 6e17, "exchange rate should use redeemable assets");
+        require(vault.previewRedeem(50e18) == 30e18, "half the shares should redeem half the live balance");
+        require(vault.previewWithdraw(30e18) == 50e18, "withdrawing redeemable assets should burn a fair share amount");
+        require(vault.maxWithdraw(address(alice)) == 30e18, "single user should only withdraw their pro-rata share");
+        require(vault.maxRedeem(address(alice)) == 50e18, "full share redemption should remain available");
+
+        uint aliceBefore = IERC20(USDST).balanceOf(address(alice));
+        alice.do(address(vault), "redeem(uint256,address,address)", 50e18, address(alice), address(alice));
+        uint aliceGot = IERC20(USDST).balanceOf(address(alice)) - aliceBefore;
+        require(aliceGot == 30e18, "alice should absorb her pro-rata loss");
+
+        uint bobBefore = IERC20(USDST).balanceOf(address(bob));
+        bob.do(address(vault), "redeem(uint256,address,address)", 50e18, address(bob), address(bob));
+        uint bobGot = IERC20(USDST).balanceOf(address(bob)) - bobBefore;
+        require(bobGot == 30e18, "bob should absorb the same pro-rata loss");
+
+        require(vault.totalSupply() == 0, "all shares should be burned");
+        require(vault.totalAssets() == 0, "managed assets should reset when the vault is emptied");
+        require(IERC20(USDST).balanceOf(address(vault)) == 0, "live balance should be empty after final redeem");
+    }
+
+    function it_blocks_new_deposits_when_existing_shares_are_fully_insolvent() public {
+        User incumbent = new User();
+        User newcomer = new User();
+
+        Token(USDST).mint(address(incumbent), 100e18);
+        incumbent.do(USDST, "approve", address(vault), INFINITY);
+        incumbent.do(address(vault), "deposit(uint256,address)", 100e18, address(incumbent));
+
+        Token(USDST).burn(address(vault), 100e18);
+
+        Token(USDST).mint(address(newcomer), 10e18);
+        newcomer.do(USDST, "approve", address(vault), INFINITY);
+
+        bool reverted = false;
+        try newcomer.do(address(vault), "deposit(uint256,address)", 10e18, address(newcomer)) {
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "deposit should revert when outstanding shares have no redeemable assets");
+        require(vault.totalSupply() == 100e18, "existing shares should remain outstanding");
+        require(vault.totalAssets() == 100e18, "managed accounting should remain unchanged");
+        require(IERC20(USDST).balanceOf(address(vault)) == 0, "live balance should remain zero");
+    }
+
     function it_blocks_underlying_rescue() public {
         bool reverted = false;
         try vault.rescueToken(USDST, address(this), 1) {

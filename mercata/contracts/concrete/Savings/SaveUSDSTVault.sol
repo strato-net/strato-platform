@@ -77,13 +77,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
 
     function maxWithdraw(address ownerAddress) public view returns (uint256) {
         if (!vaultInitialized || paused()) return 0;
-        uint256 assets = _convertToAssets(balanceOf(ownerAddress), false);
-        uint256 available = _managedAssets;
-        uint256 liveBalance = IERC20(assetToken).balanceOf(address(this));
-        if (liveBalance < available) {
-            available = liveBalance;
-        }
-        return assets < available ? assets : available;
+        return _convertToAssets(balanceOf(ownerAddress), false);
     }
 
     function maxRedeem(address ownerAddress) public view returns (uint256) {
@@ -142,7 +136,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function exchangeRate() external view returns (uint256) {
         _requireInitialized();
         if (totalSupply() == 0) return 1e18;
-        return (totalAssets() * 1e18) / totalSupply();
+        return (_pricingAssets() * 1e18) / totalSupply();
     }
 
     /// @notice Pull USDST from the owner and credit it as savings rewards.
@@ -189,6 +183,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal {
         require(assets > 0, "SaveUSDST: zero assets");
         require(shares > 0, "SaveUSDST: zero shares");
+        require(totalSupply() == 0 || _pricingAssets() > 0, "SaveUSDST: insolvent");
 
         uint256 beforeBalance = IERC20(assetToken).balanceOf(address(this));
         require(IERC20(assetToken).transferFrom(caller, address(this), assets), "SaveUSDST: deposit transfer failed");
@@ -219,6 +214,8 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
             _spendAllowance(ownerAddress, caller, shares);
         }
 
+        uint256 supplyBeforeBurn = totalSupply();
+        uint256 managedAssetsBefore = _managedAssets;
         _burn(ownerAddress, shares);
 
         uint256 beforeBalance = IERC20(assetToken).balanceOf(address(this));
@@ -227,7 +224,14 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
         require(delta > 0, "SaveUSDST: no withdraw delta");
 
         require(delta <= _managedAssets, "SaveUSDST: managed underflow");
-        _managedAssets -= delta;
+        if (totalSupply() == 0) {
+            _managedAssets = 0;
+        } else {
+            uint256 managedReduction = _mulDiv(shares, managedAssetsBefore, supplyBeforeBurn, false);
+            require(managedReduction > 0, "SaveUSDST: zero managed reduction");
+            require(managedReduction <= _managedAssets, "SaveUSDST: managed underflow");
+            _managedAssets -= managedReduction;
+        }
 
         emit Withdraw(caller, receiver, ownerAddress, delta, shares);
     }
@@ -235,17 +239,19 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function _convertToShares(uint256 assets, bool roundUp) internal view returns (uint256) {
         _requireInitialized();
         uint256 supply = totalSupply();
+        uint256 pricingAssets = _pricingAssets();
         if (assets == 0) return 0;
-        if (supply == 0 || _managedAssets == 0) return assets;
-        return _mulDiv(assets, supply, _managedAssets, roundUp);
+        if (supply == 0 || pricingAssets == 0) return assets;
+        return _mulDiv(assets, supply, pricingAssets, roundUp);
     }
 
     function _convertToAssets(uint256 shares, bool roundUp) internal view returns (uint256) {
         _requireInitialized();
         uint256 supply = totalSupply();
+        uint256 pricingAssets = _pricingAssets();
         if (shares == 0) return 0;
-        if (supply == 0 || _managedAssets == 0) return shares;
-        return _mulDiv(shares, _managedAssets, supply, roundUp);
+        if (supply == 0 || pricingAssets == 0) return 0;
+        return _mulDiv(shares, pricingAssets, supply, roundUp);
     }
 
     function _mulDiv(uint256 x, uint256 y, uint256 denominator, bool roundUp) internal pure returns (uint256) {
@@ -259,6 +265,15 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
 
     function _requireInitialized() internal view {
         require(vaultInitialized, "SaveUSDST: not initialized");
+    }
+
+    function _pricingAssets() internal view returns (uint256) {
+        uint256 pricingAssets = _managedAssets;
+        uint256 liveBalance = IERC20(assetToken).balanceOf(address(this));
+        if (liveBalance < pricingAssets) {
+            pricingAssets = liveBalance;
+        }
+        return pricingAssets;
     }
 
     function _tryGetAssetDecimals(address token) internal view returns (uint8) {
