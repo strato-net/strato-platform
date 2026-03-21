@@ -50,6 +50,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
 
     function totalAssets() public view returns (uint256) {
         _requireInitialized();
+        // Raw managed accounting is exposed separately from redeemable pricing.
         return _managedAssets;
     }
 
@@ -183,6 +184,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal {
         require(assets > 0, "SaveUSDST: zero assets");
         require(shares > 0, "SaveUSDST: zero shares");
+        // Do not let new deposits recapitalize an outstanding share supply at a misleading 1:1 price.
         require(totalSupply() == 0 || _pricingAssets() > 0, "SaveUSDST: insolvent");
 
         uint256 beforeBalance = IERC20(assetToken).balanceOf(address(this));
@@ -225,8 +227,10 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
 
         require(delta <= _managedAssets, "SaveUSDST: managed underflow");
         if (totalSupply() == 0) {
+            // Last redeemer clears the vault's accounting state.
             _managedAssets = 0;
         } else {
+            // In an impaired state, socialize losses by burning the same fraction of managed accounting as shares.
             uint256 managedReduction = _mulDiv(shares, managedAssetsBefore, supplyBeforeBurn, false);
             require(managedReduction > 0, "SaveUSDST: zero managed reduction");
             require(managedReduction <= _managedAssets, "SaveUSDST: managed underflow");
@@ -270,6 +274,7 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
     function _pricingAssets() internal view returns (uint256) {
         uint256 pricingAssets = _managedAssets;
         uint256 liveBalance = IERC20(assetToken).balanceOf(address(this));
+        // Price shares against what the vault can actually redeem, not just internal accounting.
         if (liveBalance < pricingAssets) {
             pricingAssets = liveBalance;
         }
