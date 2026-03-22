@@ -6,6 +6,20 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import { Token as TokenType, EarningAsset } from "@mercata/shared-types";
 import { formatBalance } from "@/utils/numberUtils";
 
+const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
+  const symbol = asset?._symbol?.toLowerCase?.() || "";
+  const name = asset?._name?.toLowerCase?.() || "";
+  return symbol === "saveusdst" || name.includes("save usdst") || name.includes("saveusdst");
+};
+
+const getAssetDetailHref = (asset: { address?: string; _symbol?: string; _name?: string } | null | undefined): string => {
+  if (isSaveUsdstAsset(asset)) {
+    return "/dashboard/earn-save";
+  }
+
+  return `/dashboard/deposits/${asset?.address || ""}`;
+};
+
 interface AssetsProps {
   loading: boolean;
   tokens: EarningAsset[];
@@ -139,7 +153,7 @@ const AssetsList = ({
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link
-                                    to={`/dashboard/deposits/${asset?.address || ''}`}
+                                    to={getAssetDetailHref(asset)}
                                     className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
                                   >
                                     {asset?._symbol || asset?._name || ""}
@@ -284,7 +298,7 @@ const AssetsList = ({
                             )}
                             <div className="ml-2 md:ml-3 min-w-0 flex-1">
                               <Link
-                                to={`/dashboard/deposits/${asset?.address || ''}`}
+                                to={getAssetDetailHref(asset)}
                                 className="font-medium text-sm md:text-base text-blue-600 hover:text-blue-800 underline transition-colors block truncate"
                               >
                                 {asset?._symbol || asset?._name || ""}

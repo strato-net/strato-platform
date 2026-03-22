@@ -2,12 +2,46 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.service";
+import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 
 const { Token, CollateralVault, CDPEngine, DECIMALS } = constants;
+
+const buildSaveUsdstEarningAsset = (
+  info: Awaited<ReturnType<typeof getSaveUsdstInfo>>,
+  userInfo?: Awaited<ReturnType<typeof getSaveUsdstUserInfo>>
+): EarningAsset | null => {
+  if (!info.deployed || !info.vaultAddress) return null;
+
+  const balance = userInfo?.userShares || "0";
+  const totalBalance = balance;
+  const price = info.exchangeRate || "0";
+  const redeemableValueUsd = userInfo?.redeemableAssets || "0";
+  const value = (Number(BigInt(redeemableValueUsd || "0")) / 1e18).toFixed(2);
+
+  return {
+    address: info.vaultAddress,
+    _name: "Save USDST",
+    _symbol: info.shareSymbol || "saveUSDST",
+    _owner: "",
+    _totalSupply: info.totalShares || "0",
+    customDecimals: 18,
+    description: "Native USDST savings token",
+    status: "2",
+    _paused: info.paused,
+    balance,
+    images: [],
+    attributes: [],
+    price,
+    collateralBalance: "0",
+    totalBalance,
+    isPoolToken: false,
+    value,
+  };
+};
 
 export const getTokens = async (
   accessToken: string,
@@ -47,7 +81,7 @@ export const getEarningAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices, vaultShareToken] = await Promise.all([
+  const [tokens, collaterals, cdps, rawPrices, vaultShareToken, saveUsdstInfo, saveUsdstUserInfo] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -75,6 +109,8 @@ export const getEarningAssets = async (
     }),
     getCompletePriceMap(accessToken),
     getVaultShareTokenAddress(accessToken),
+    getSaveUsdstInfo(accessToken).catch(() => null),
+    getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -85,7 +121,7 @@ export const getEarningAssets = async (
     )
   );
 
-  return (tokens.data || []).map((t: any) => {
+  const earningAssets = (tokens.data || []).map((t: any) => {
     const balance = t.balances?.[0]?.balance || "0";
     const price = rawPrices.get(t.address) || "0";
     const collateralBalance = (collateralMap.get(t.address) || 0n).toString();
@@ -112,6 +148,20 @@ export const getEarningAssets = async (
       value,
     };
   });
+
+  const saveUsdstAsset =
+    saveUsdstInfo && saveUsdstUserInfo && BigInt(saveUsdstUserInfo.userShares || "0") > 0n
+      ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo)
+      : null;
+
+  if (
+    saveUsdstAsset &&
+    !earningAssets.some((asset: EarningAsset) => asset.address.toLowerCase() === saveUsdstAsset.address.toLowerCase())
+  ) {
+    earningAssets.push(saveUsdstAsset);
+  }
+
+  return earningAssets;
 };
 
 export const getPublicEarningAssets = async (
@@ -128,13 +178,14 @@ export const getPublicEarningAssets = async (
   };
 
   // Fetch only tokens and prices (skip user-specific collateral data)
-  const [tokens, rawPrices, vaultShareToken] = await Promise.all([
+  const [tokens, rawPrices, vaultShareToken, saveUsdstInfo] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
     getCompletePriceMap(accessToken),
     getVaultShareTokenAddress(accessToken),
+    getSaveUsdstInfo(accessToken).catch(() => null),
   ]);
 
-  return (tokens.data || []).map((t: any) => {
+  const earningAssets = (tokens.data || []).map((t: any) => {
     const balance = "0";
     const price = rawPrices.get(t.address) || "0";
     const collateralBalance = "0";
@@ -156,6 +207,16 @@ export const getPublicEarningAssets = async (
       value,
     };
   });
+
+  const saveUsdstAsset = saveUsdstInfo ? buildSaveUsdstEarningAsset(saveUsdstInfo) : null;
+  if (
+    saveUsdstAsset &&
+    !earningAssets.some((asset: EarningAsset) => asset.address.toLowerCase() === saveUsdstAsset.address.toLowerCase())
+  ) {
+    earningAssets.push(saveUsdstAsset);
+  }
+
+  return earningAssets;
 };
 
 function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryElement): any {
