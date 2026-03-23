@@ -189,7 +189,7 @@ export async function validateConfig(): Promise<boolean> {
             return;
         }
         
-        const requiredSources = asset.minValidSourcesOverride || ORACLE_CONFIG.MIN_VALID_SOURCES;
+        const requiredSources = ORACLE_CONFIG.MIN_VALID_SOURCES;
         if (sources.length < requiredSources) {
             errors.push(
                 `Asset ${assetKey} has only ${sources.length} source(s), needs at least ${requiredSources}. ` +

@@ -50,13 +50,11 @@
     "SPYX": {
       "targetAssetAddress": "00000000000000000000000000000000deadbeef",
       "submit": false,
-      "minValidSourcesOverride": 2,
       "comment": "SPY stock price feed for SPYX rebase. submit=false: only used as underlying, not pushed directly."
     },
     "TSLAX": {
       "targetAssetAddress": "00000000000000000000000000000000deadbeef",
       "submit": false,
-      "minValidSourcesOverride": 2,
       "comment": "TSLA stock price feed for TSLAX rebase. submit=false: only used as underlying, not pushed directly."
     },
     "WSPYX": {

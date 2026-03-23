@@ -65,7 +65,7 @@
     "parse": "assets",
     "timestamp": "data_quote_start",
     "apiKeyEnvVar": "COINAPI_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "USDC", "USDT"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "USDC", "USDT", "TSLAX", "SPYX"]
   },
   "DefiLlama": {
     "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",

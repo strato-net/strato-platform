@@ -15,7 +15,6 @@ export interface Asset {
     weekendProxy?: string; // Proxy symbol for weekend/market-closed pricing (e.g., "PAXG" for XAU)
     equivalentAssets?: string[]; // Assets with equivalent prices (e.g., ["XAUT"] for XAU)
     submit?: boolean; // Whether to submit this asset to blockchain (default: true)
-    minValidSourcesOverride?: number; // Per-asset override for MIN_VALID_SOURCES (e.g., 1 for single-source stock feeds)
     rebase?: RebaseConfig; // Rebasing token config: price = underlyingPrice × factor / precision
 }
 
