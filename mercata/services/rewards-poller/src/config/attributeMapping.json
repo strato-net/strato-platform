@@ -150,11 +150,11 @@
   },
   "ceeb982f671b4ee2b4471e5b49f3126739537f15": {
     "Deposit": {
-      "amount": "assets",
+      "amount": "shares",
       "user": "owner"
     },
     "Withdraw": {
-      "amount": "assets",
+      "amount": "shares",
       "user": "owner"
     }
   }
