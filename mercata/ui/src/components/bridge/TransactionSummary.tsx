@@ -81,7 +81,8 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
         <div className="flex items-start gap-2 pt-1">
           <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
           <span className="text-amber-800 dark:text-amber-200">
-            Rebasing token — the received quantity may differ slightly due to multiplier changes between now and execution.
+            Rebasing token — The received token quantity may differ due to multiplier changes.<br/>
+            The amount received on {selectedNetwork || "the external network"} reflects your underlying share value.
           </span>
         </div>
       )}
