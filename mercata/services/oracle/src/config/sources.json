@@ -42,7 +42,7 @@
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
     "apiKeyEnvVar": "COINGECKO_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "TSLAX", "SPYX"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
@@ -53,7 +53,9 @@
       "SYRUPUSDC": "syrupusdc",
       "RETH": "rocket-pool-eth",
       "USDC": "usd-coin",
-      "USDT": "tether"
+      "USDT": "tether",
+      "TSLAX": "tesla-xstock",
+      "SPYX": "sp500-xstock"
     }
   },
   "CoinAPI": {
@@ -105,13 +107,13 @@
     "params": "apikey,symbol",
     "parse": "{symbol}.price",
     "apiKeyEnvVar": "TWELVEDATA_API_KEY",
-    "comment": "Also supports stocks (SPY, TSLA). TODO: add more stock-capable price feeds so xStock assets are not single-source.",
-    "assets": ["XAU", "XAG", "SPY", "TSLA"],
+    "comment": "Uses stock price feeds as a proxy for xStock assets (SPYX, TSLAX).",
+    "assets": ["XAU", "XAG", "SPYX", "TSLAX"],
     "symbolMapping": {
       "XAU": "XAU/USD",
       "XAG": "XAG/USD",
-      "SPY": "SPY",
-      "TSLA": "TSLA"
+      "SPYX": "SPY",
+      "TSLAX": "TSLA"
     }
   },
   "OANDA": {
