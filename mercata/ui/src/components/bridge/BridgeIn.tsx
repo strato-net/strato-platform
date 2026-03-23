@@ -1036,7 +1036,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-amber-800 dark:text-amber-200">
               <div className="font-medium mb-1">Rebasing Token</div>
-              <div>This token&apos;s quantity may change due to rebasing events on Ethereum. The received amount on STRATO reflects your underlying share value at the current multiplier.</div>
+              <div>
+              This token&apos;s quantity may change due to rebasing events on Ethereum.<br/>
+              The received amount on STRATO reflects your underlying share value at the current multiplier.
+              </div>
             </div>
           </div>
         )}
