@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -12,7 +13,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans -Wno-simplifiable-class-constraints #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Bloc.Database.Queries
   ( sourceToContractDetails,
@@ -62,13 +63,6 @@ import Text.Format
 import UnliftIO
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
-
--- | Fallback instance: when no ReaderT IORef cache layer is present, code collections
--- are not available. The OVERLAPPING ReaderT IORef instance provides actual loading and caching.
-instance {-# INCOHERENT #-}
-  ( Monad m
-  ) => (Keccak256 `A.Selectable` CodeCollection) m where
-  select _ _ = pure Nothing
 
 -- | Lift HasCodeDB (Alters) through ReaderT IORef cache
 instance {-# OVERLAPPING #-}

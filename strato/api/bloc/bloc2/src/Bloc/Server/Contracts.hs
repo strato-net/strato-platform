@@ -256,14 +256,15 @@ getContractsDetails' contractAddress = do
 
 getContractsDetails ::
   ( MonadIO m,
+    A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` CodeCollection) m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   Address ->
   m Contract
-getContractsDetails = getContractsDetails'
+getContractsDetails = withCodeCollectionCache . getContractsDetails'
 
 getContractsFunctions ::
   ( MonadIO m,

@@ -121,7 +121,7 @@ getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': 
 getBlocTransactionResult' hashes@(txh : _) resolve =
   if resolve
     then do
-      results <- forM hashes $ \h -> withAsync (getBlocTransactionResult h True) $ \e -> wait e
+      results <- postBlocTransactionResults' resolve hashes
       $logDebugLS "getBlocTransactionResult'/results" results
       case results of
         [] -> throwIO $ AnError "Empty list provided: results is empty"
@@ -133,7 +133,8 @@ getBlocTransactionResult' hashes@(txh : _) resolve =
 getBlocTransactionResult ::
   ( MonadIO m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` CodeCollection) m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -143,7 +144,7 @@ getBlocTransactionResult ::
   Keccak256 ->
   Bool ->
   m BlocTransactionResult
-getBlocTransactionResult txHash resolve = unsafeHead =<< postBlocTransactionResults' resolve [txHash]
+getBlocTransactionResult txHash resolve = withCodeCollectionCache $ unsafeHead =<< postBlocTransactionResults' resolve [txHash]
   where unsafeHead [] = throwIO $ AnError "getBlocTransactionResult: No results returned"
         unsafeHead (x:_) = pure x
 
