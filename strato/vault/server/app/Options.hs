@@ -12,6 +12,7 @@ defineFlag "p:password" ("api" :: String) "Postgres password"
 defineFlag "d:database" ("oauth" :: String) "Postgres database name"
 defineFlag "port" (8000 :: Int) "The port which the server runs on"
 defineFlag "keyStoreCacheTimeout" (60 :: Integer) "The number of seconds nonces are held in the global source code cache"
+defineFlag "vaultPasswordFile" ("" :: String) "Path to file containing vault encryption password"
 
 defineFlag "pw" ("" :: String) "Password for vault-proxy"
 defineFlag "key" ("" :: String) "the old blockstanbulPrivateKey to migrate"

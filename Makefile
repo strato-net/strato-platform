@@ -67,6 +67,7 @@ HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,mercata/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,mercata/services/bridge/nginx)
+HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
 # Generate BUILD_METADATA file with version and all hashes for Haskell to read
 # This file is the single source of truth for build metadata
@@ -81,6 +82,7 @@ generate-version-file:
 	@echo "HASH_POSTGREST=$(HASH_POSTGREST)" >> BUILD_METADATA
 	@echo "HASH_NGINX=$(HASH_NGINX)" >> BUILD_METADATA
 	@echo "HASH_PROMETHEUS=$(HASH_PROMETHEUS)" >> BUILD_METADATA
+	@echo "HASH_LOCAL_AUTH=$(HASH_LOCAL_AUTH)" >> BUILD_METADATA
 	@echo "Generated BUILD_METADATA file"
 
 # Sed substitutions for docker-compose templates
@@ -107,6 +109,7 @@ needs_rebuild = [ ! -f $@ ] || [ "$$(cat $@ 2>/dev/null)" != "$(2)" ] || [ -n "$
 .PHONY: $(DOCKER_SENTINELS)/postgrest $(DOCKER_SENTINELS)/nginx $(DOCKER_SENTINELS)/apex
 .PHONY: $(DOCKER_SENTINELS)/mercata-backend $(DOCKER_SENTINELS)/mercata-ui $(DOCKER_SENTINELS)/prometheus
 .PHONY: $(DOCKER_SENTINELS)/smd $(DOCKER_SENTINELS)/bridge $(DOCKER_SENTINELS)/bridge-nginx
+.PHONY: $(DOCKER_SENTINELS)/local-auth
 
 $(DOCKER_SENTINELS)/postgrest: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,postgrest-packager,$(VERSION)-$(HASH_POSTGREST)); then \
@@ -199,7 +202,7 @@ clean-docker-sentinels:
 
 all: local
 
-local: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle
+local: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle local-auth
 
 docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
 
@@ -268,6 +271,17 @@ bridge-nginx-force:
 	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./mercata/services/bridge/nginx
 	docker tag ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/bridge-nginx
+
+$(DOCKER_SENTINELS)/local-auth: | $(DOCKER_SENTINELS)
+	@if $(call needs_rebuild,local-auth,$(VERSION)-$(HASH_LOCAL_AUTH)); then \
+		echo "Building local-auth ($(VERSION)-$(HASH_LOCAL_AUTH))..."; \
+		docker build -t local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) ./local-auth; \
+		echo "$(VERSION)-$(HASH_LOCAL_AUTH)" > $@; \
+	else \
+		echo "local-auth up to date"; \
+	fi
+
+local-auth: $(DOCKER_SENTINELS)/local-auth
 
 oracle:
 	@echo Now building oracle... 
