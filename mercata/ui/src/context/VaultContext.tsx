@@ -67,6 +67,7 @@ export interface VaultState {
   totalShares: string;
   navPerShare: string;
   apy: string;
+  alpha: string;
   paused: boolean;
 
   // Per-asset data
@@ -130,6 +131,7 @@ const defaultVaultState: VaultState = {
   totalShares: "0",
   navPerShare: "0",
   apy: "0",
+  alpha: "0",
   paused: false,
   assets: [],
   userShares: "0",
@@ -182,6 +184,7 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
           totalShares: res.data.totalShares || "0",
           navPerShare: res.data.navPerShare || "0",
           apy: res.data.apy || "0",
+          alpha: res.data.alpha || "0",
           paused: res.data.paused || false,
           assets: res.data.assets || [],
           deficitAssets: res.data.deficitAssets || [],

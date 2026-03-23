@@ -74,7 +74,7 @@ const VaultOverview = () => {
   const {
     totalEquity,
     totalShares,
-    apy,
+    alpha,
     paused,
     assets,
     loading,
@@ -115,16 +115,16 @@ const VaultOverview = () => {
         />
 
         {(() => {
-          const { formatted, isPositive, isNeutral } = formatApy(apy);
+          const { formatted, isPositive, isNeutral } = formatApy(alpha);
           const valueColor = isNeutral ? "" : isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
           return (
             <AssetSummary
-              title="APY"
+              title="Alpha vs HODL"
               value={formatted}
               icon={<TrendingUp className="text-white" size={18} />}
               color="bg-orange-500"
               isLoading={loading}
-              tooltip="Annualized percentage yield based on vault performance (30 days or since first deposit for younger vaults)"
+              tooltip="Annualized outperformance vs passively holding the same portfolio (30-day trailing)"
               valueClassName={valueColor}
             />
           );
