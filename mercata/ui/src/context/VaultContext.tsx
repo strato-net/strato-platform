@@ -54,6 +54,12 @@ export interface UserTokenBalance {
   images?: { value: string }[];
 }
 
+export interface UserActivityItem {
+  type: "deposit" | "withdrawal";
+  timestamp: string;
+  valueUsd: string;
+}
+
 export interface VaultState {
   // Global metrics
   totalEquity: string;
@@ -75,10 +81,14 @@ export interface VaultState {
   // Bot transactions
   transactions: VaultTransaction[];
 
+  // User activity (deposits/withdrawals)
+  userActivity: UserActivityItem[];
+
   // Loading states
   loading: boolean;
   loadingUser: boolean;
   loadingTransactions: boolean;
+  loadingUserActivity: boolean;
   loadingBalances: boolean;
 
   // User's token balances for deposit
@@ -101,6 +111,7 @@ type VaultContextType = {
   refreshUserPosition: () => Promise<void>;
   refreshUserBalances: () => Promise<void>;
   refreshTransactions: (showLoading?: boolean) => Promise<void>;
+  refreshUserActivity: (showLoading?: boolean) => Promise<void>;
   deposit: (args: { token: string; amount: string }) => Promise<void>;
   withdraw: (args: { amountUsd: string }) => Promise<{ basket: Array<{ token: string; amount: string }> }>;
 
@@ -126,9 +137,11 @@ const defaultVaultState: VaultState = {
   allTimeDeposits: "0",
   allTimeEarnings: "0",
   transactions: [],
+  userActivity: [],
   loading: true,
   loadingUser: true,
   loadingTransactions: true,
+  loadingUserActivity: true,
   loadingBalances: true,
   userTokenBalances: [],
   deficitAssets: [],
@@ -245,6 +258,35 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
+  const fetchUserActivity = useCallback(async (showLoading: boolean = false) => {
+    if (!isLoggedIn) return;
+
+    if (showLoading) {
+      setVaultState(prev => ({ ...prev, loadingUserActivity: true }));
+    }
+
+    try {
+      const res = await api.get("/vault/user/activity", {
+        params: { limit: 20 },
+      });
+
+      if (res.data?.activity) {
+        setVaultState(prev => ({
+          ...prev,
+          userActivity: res.data.activity,
+          loadingUserActivity: false,
+        }));
+      }
+    } catch (err: any) {
+      if (err.name === "AbortError" || err.code === "ERR_CANCELED" || err.name === "CanceledError") {
+        return;
+      }
+      console.error("Error fetching user activity:", err);
+    } finally {
+      setVaultState(prev => ({ ...prev, loadingUserActivity: false }));
+    }
+  }, [isLoggedIn]);
+
   const fetchUserBalances = useCallback(async () => {
     if (!isLoggedIn) return;
 
@@ -309,7 +351,8 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
     await fetchUserPosition();
     await fetchUserBalances();
     await fetchTransactions(showLoading);
-  }, [fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions]);
+    await fetchUserActivity(showLoading);
+  }, [fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions, fetchUserActivity]);
 
   // Initialize on mount and when logged in
   useEffect(() => {
@@ -318,8 +361,9 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
     if (isLoggedIn) {
       fetchUserPosition();
       fetchUserBalances();
+      fetchUserActivity(true);
     }
-  }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions]);
+  }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions, fetchUserActivity]);
 
   // Cleanup abort controller on unmount
   useEffect(() => {
@@ -337,6 +381,7 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
       refreshUserPosition: fetchUserPosition,
       refreshUserBalances: fetchUserBalances,
       refreshTransactions: fetchTransactions,
+      refreshUserActivity: fetchUserActivity,
       deposit,
       withdraw,
       adminPause,
@@ -346,7 +391,7 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
       adminAddAsset,
       adminRemoveAsset,
     }),
-    [vaultState, refreshVault, fetchUserPosition, fetchUserBalances, fetchTransactions]
+    [vaultState, refreshVault, fetchUserPosition, fetchUserBalances, fetchTransactions, fetchUserActivity]
   );
 
   return (
