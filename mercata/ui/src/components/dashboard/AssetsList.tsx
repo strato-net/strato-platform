@@ -201,26 +201,20 @@ const AssetsList = ({
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
                         {guestMode || !asset?.totalBalance || asset.totalBalance === "0" ? (
                           <p className="font-medium text-sm md:text-base text-foreground">-</p>
-                        ) : asset.rebaseFactor ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <p className="font-medium text-sm md:text-base text-foreground cursor-help underline decoration-dotted decoration-muted-foreground/50">
-                                {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
-                              </p>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>
+                        ) : (
+                          <div>
+                            <p className="font-medium text-sm md:text-base text-foreground">
+                              {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
+                            </p>
+                            {asset.rebaseFactor && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
                                 ≈ {formatBalance(
                                   (BigInt(asset.totalBalance) * BigInt(asset.rebaseFactor) / (10n ** 18n)).toString(),
                                   undefined, 18, 1, 4
-                                )} {asset._symbol?.replace(/^w/, '')} shares
+                                )} {asset._symbol?.replace(/^w/, '')}
                               </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <p className="font-medium text-sm md:text-base text-foreground">
-                            {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
-                          </p>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>
