@@ -2,34 +2,6 @@ import { bloc, cirrus } from "./mercataApiHelper";
 import { StratoPaths } from "../config/constants";
 import { StratoError } from "../errors";
 
-export const doUntil = async (
-  initialData: any,
-  predicate: (res: any) => boolean,
-  action: () => Promise<any>,
-  timeout = 60000, // default to 1 minute
-  interval = 5000 // check every 5 seconds
-): Promise<any> => {
-  if (predicate(initialData)) {
-    return initialData;
-  }
-  const start = Date.now();
-
-  while (true) {
-    const result = await action();
-
-    if (predicate(result)) {
-      return result;
-    }
-
-    if (Date.now() - start >= timeout) {
-      console.warn("Timeout reached before predicate was satisfied.");
-      return result;
-    }
-
-    await new Promise((res) => setTimeout(res, interval));
-  }
-};
-
 export const until = async (
   predicate: (res: any) => boolean,
   action: () => Promise<any>,
