@@ -134,6 +134,12 @@ export interface VaultTransaction {
   };
 }
 
+export interface UserActivityItem {
+  type: "deposit" | "withdrawal";
+  timestamp: string;
+  valueUsd: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1471,5 +1477,73 @@ export const getTransactions = async (
   } catch (error) {
     console.error("Error fetching bot transactions:", error);
     return { transactions: [] };
+  }
+};
+
+/**
+ * Get user's deposit and withdrawal activity
+ */
+export const getUserActivity = async (
+  accessToken: string,
+  userAddress: string,
+  limit: number = 20
+): Promise<{ activity: UserActivityItem[] }> => {
+  const vaultAddress = await getVaultAddress(accessToken);
+
+  if (!vaultAddress) {
+    return { activity: [] };
+  }
+
+  try {
+    const [{ data: depositEvents }, { data: withdrawEvents }] = await Promise.all([
+      cirrus.get(accessToken, `/${Vault}-Deposited`, {
+        params: {
+          select: "depositValueUSD::text,block_timestamp",
+          address: `eq.${vaultAddress}`,
+          user: `eq.${userAddress}`,
+          order: "block_timestamp.desc",
+          limit: limit.toString(),
+        },
+      }),
+      cirrus.get(accessToken, `/${Vault}-Withdrawn`, {
+        params: {
+          select: "withdrawValueUSD::text,block_timestamp",
+          address: `eq.${vaultAddress}`,
+          user: `eq.${userAddress}`,
+          order: "block_timestamp.desc",
+          limit: limit.toString(),
+        },
+      }),
+    ]);
+
+    const activity: UserActivityItem[] = [];
+
+    for (const evt of depositEvents || []) {
+      activity.push({
+        type: "deposit",
+        timestamp: evt.block_timestamp || "",
+        valueUsd: evt.depositValueUSD || "0",
+      });
+    }
+
+    for (const evt of withdrawEvents || []) {
+      activity.push({
+        type: "withdrawal",
+        timestamp: evt.block_timestamp || "",
+        valueUsd: evt.withdrawValueUSD || "0",
+      });
+    }
+
+    activity.sort((a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    if (activity.length > limit) {
+      activity.length = limit;
+    }
+
+    return { activity };
+  } catch (error) {
+    console.error("Error fetching user activity:", error);
+    return { activity: [] };
   }
 };

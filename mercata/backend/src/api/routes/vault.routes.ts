@@ -110,6 +110,52 @@ router.get("/user", authHandler.authorizeRequest(), VaultController.getUserPosit
 
 /**
  * @openapi
+ * /vault/user/activity:
+ *   get:
+ *     summary: Get user's vault deposit/withdrawal activity
+ *     description: Retrieve the authenticated user's deposit and withdrawal history
+ *     tags:
+ *       - Vault
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Maximum number of activity items to return
+ *     responses:
+ *       200:
+ *         description: User activity retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 activity:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       type:
+ *                         type: string
+ *                         enum: [deposit, withdrawal]
+ *                       timestamp:
+ *                         type: string
+ *                       assetSymbol:
+ *                         type: string
+ *                       amountIn:
+ *                         type: string
+ *                       sharesMinted:
+ *                         type: string
+ *                       sharesBurned:
+ *                         type: string
+ *                       valueUsd:
+ *                         type: string
+ */
+router.get("/user/activity", authHandler.authorizeRequest(), VaultController.getUserActivity);
+
+/**
+ * @openapi
  * /vault/balances:
  *   get:
  *     summary: Get user's token balances for vault assets
