@@ -17,6 +17,8 @@ executable ethereum-jsonrpc
       APIProxy
       Binary
       Commands
+      Model.HexData
+      Model.TxCallObject
       RPC
       Server
       Paths_ethereum_jsonrpc
@@ -36,6 +38,7 @@ executable ethereum-jsonrpc
     , http-types
     , json-rpc-server
     , kafka-monad
+    , milena
     , mtl
     , seqevents
     , strato-conf
