@@ -35,6 +35,9 @@ import "Lending/PriceOracle.sol";
 import "Lending/RateStrategy.sol";
 import "Lending/SafetyModule.sol";
 
+//Savings
+import "Savings/SaveUSDSTVault.sol";
+
 //Bridging
 import "./Bridge/MercataBridge.sol";
 
@@ -72,6 +75,7 @@ contract record Mercata is Authorizable {
     CDPRegistry public cdpRegistry;
     CDPReserve public cdpReserve;
     SafetyModule public safetyModule;
+    SaveUSDSTVault public saveUSDSTVault;
     Rewards public rewards;
     Token public cataToken;
     Escrow public escrow;
@@ -163,6 +167,12 @@ contract record Mercata is Authorizable {
         rewards = Rewards(address(new Proxy(rewardsImpl, this)));
         rewards.initialize(address(cataToken));
         Ownable(rewards).transferOwnership(address(0x000000000000000000000000000000000000100c));
+
+        // Create native USDST savings vault
+        address saveUSDSTVaultImpl = address(new SaveUSDSTVault(implOwnerIgnored));
+        saveUSDSTVault = SaveUSDSTVault(address(new Proxy(saveUSDSTVaultImpl, this)));
+        saveUSDSTVault.initialize(address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), "Save USDST", "saveUSDST");
+        Ownable(saveUSDSTVault).transferOwnership(address(adminRegistry));
 
         // Deploy CDP registry, vault, and engine
         address cdpRegistryImpl = address(new CDPRegistry(implOwnerIgnored));

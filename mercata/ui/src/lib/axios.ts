@@ -104,6 +104,7 @@ const GUEST_SAFE_URLS = [
   // Rewards page
   '/rewards/overview',
   '/rewards/activities',
+  '/earn/save-usdst/info',
   // ActivityFeed page
   '/events',
   // Transfer page

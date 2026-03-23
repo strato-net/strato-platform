@@ -33,6 +33,7 @@ import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
+import EarnSave from "./pages/EarnSave";
 import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
@@ -267,6 +268,14 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Earn />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-save"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnSave />
                                               </GuestAccessibleRoute>
                                             }
                                           />
