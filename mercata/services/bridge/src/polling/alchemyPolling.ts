@@ -1,7 +1,8 @@
-import { config } from "../config";
+import { config, WAD } from "../config";
 import {
   getEnabledChains,
   getBridgeInfo,
+  getRebaseFactors,
 } from "../services/cirrusService";
 import { depositBatch } from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
@@ -82,7 +83,23 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
     );
     const failedParses = validDeposits.length - filteredDeposits.length;
 
-    // Process valid deposits first
+    // Apply rebase factor for xStock tokens (divide by currentMultiplier to get underlying shares)
+    if (filteredDeposits.length > 0) {
+      const targetTokens = [...new Set(filteredDeposits.map(d => d.targetStratoToken))];
+      const factors = await getRebaseFactors(targetTokens);
+      for (const deposit of filteredDeposits) {
+        const stratoKey = deposit.targetStratoToken.toLowerCase().replace(/^0x/, "");
+        const factor = factors.get(stratoKey);
+        if (factor) {
+          const original = BigInt(deposit.externalTokenAmount);
+          const adjusted = (original * WAD) / factor;
+          logInfo("AlchemyPolling", `Rebasing deposit ${deposit.externalTxHash}: ${original} → ${adjusted} (factor=${factor})`);
+          deposit.externalTokenAmount = adjusted.toString();
+        }
+      }
+    }
+
+    // Process valid deposits
     if (filteredDeposits.length > 0) {
       await depositBatch(filteredDeposits as NonEmptyArray<DepositArgs>);
       depositsProcessed = true;

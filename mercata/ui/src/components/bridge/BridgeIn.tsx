@@ -51,7 +51,7 @@ import {
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, Gem, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowDownToLine, Gem, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
@@ -979,17 +979,26 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             <CrossfadePanel active={fundingMode === "bridge"}>
               <ScrollRow>
                 {sourceTokenRoutes.length > 0 ? [
-                  ...sourceTokenRoutes.map((rt) => (
-                    <TokenCard key={rt.id}
-                      active={rt.id === selectedToken?.id && !selectedAction}
-                      image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
-                      estimated={amount || "0"}
-                      label={rt.isDefaultRoute ? "VIA WRAP" : "VIA MINT"}
-                      onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
-                      disabled={guestMode || isLoading}
-                      apyBadge={<ApyBadge addr={rt.stratoToken} />}
-                    />
-                  )),
+                  ...sourceTokenRoutes.map((rt) => {
+                    let est = amount || "0";
+                    if (rt.rebaseFactor && amount) {
+                      try {
+                        const factor = BigInt(rt.rebaseFactor);
+                        if (factor > 0n) est = formatUnits((safeParseUnits(amount, 18) * WAD) / factor, 18);
+                      } catch { /* keep original */ }
+                    }
+                    return (
+                      <TokenCard key={rt.id}
+                        active={rt.id === selectedToken?.id && !selectedAction}
+                        image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
+                        estimated={est}
+                        label={rt.isDefaultRoute ? "VIA WRAP" : "VIA MINT"}
+                        onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
+                        disabled={guestMode || isLoading}
+                        apyBadge={<ApyBadge addr={rt.stratoToken} />}
+                      />
+                    );
+                  }),
                   ...matchingActions.map((action) => {
                     let est = amount || "0";
                     if (action.action === 2 && action.oraclePrice && amount) {
@@ -1021,6 +1030,19 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             </CrossfadePanel>
           </div>
         </section>
+
+        {fundingMode === "bridge" && selectedToken?.rebaseFactor && (
+          <div className="flex items-start gap-3 p-3 bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-amber-800 dark:text-amber-200">
+              <div className="font-medium mb-1">Rebasing Token</div>
+              <div>
+              This token&apos;s quantity may change due to rebasing events on Ethereum.<br/>
+              The received amount on STRATO reflects your underlying share value at the current multiplier.
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Button

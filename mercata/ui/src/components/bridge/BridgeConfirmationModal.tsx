@@ -2,6 +2,8 @@ import React from "react";
 import { Modal } from "antd";
 import { BridgeToken } from "@mercata/shared-types";
 import { ArrowRight, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { formatUnits, safeParseUnits } from "@/utils/numberUtils";
+import { WAD } from "@/lib/constants";
 
 interface BridgeConfirmationModalProps {
   open: boolean;
@@ -88,8 +90,21 @@ const BridgeConfirmationModal: React.FC<BridgeConfirmationModalProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Amount:</span>
-              <span className="font-medium text-foreground">{amount}</span>
+              <span className="font-medium text-foreground">{amount} {selectedToken?.rebaseFactor && selectedToken?.stratoTokenSymbol}</span>
             </div>
+            {selectedToken?.rebaseFactor && amount && (() => {
+              try {
+                const factor = BigInt(selectedToken.rebaseFactor!);
+                if (factor <= 0n) return null;
+                const rebased = formatUnits((safeParseUnits(amount, 18) * factor) / WAD, 18);
+                return (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Receive:</span>
+                    <span className="font-medium text-foreground">≈ {rebased} {selectedToken.externalSymbol}</span>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Networks:</span>
               <span className="font-medium text-foreground">{fromNetwork} → {toNetwork}</span>

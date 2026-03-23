@@ -13,7 +13,7 @@ import BridgeWalletStatus from "./BridgeWalletStatus";
 import NetworkSelector from "./NetworkSelector";
 import TokenSelector from "./TokenSelector";
 import TransactionSummary from "./TransactionSummary";
-import { BRIDGE_OUT_FEE, usdstAddress, DECIMAL, MIN_USDST_WITHDRAWAL } from "@/lib/constants";
+import { BRIDGE_OUT_FEE, usdstAddress, DECIMAL, MIN_USDST_WITHDRAWAL, WAD } from "@/lib/constants";
 import {
   handleAmountInputChange,
   computeMaxTransferable,
@@ -337,19 +337,31 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
             </div>
           ) : (
             maxAmount && (
-              <div className="flex items-center gap-3">
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  Max: {formatBalance(
-                    maxAmount,
-                    undefined,
-                    DECIMAL,
-                    2,
-                    6
-                  )}
-                </p>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  Min: {isSaving ? MIN_USDST_WITHDRAWAL : "0"}
-                </p>
+              <div>
+                <div className="flex items-center gap-3">
+                  <p className="text-xs md:text-sm text-muted-foreground">
+                    Max: {formatBalance(
+                      maxAmount,
+                      undefined,
+                      DECIMAL,
+                      2,
+                      6
+                    )}
+                  </p>
+                  <p className="text-xs md:text-sm text-muted-foreground">
+                    Min: {isSaving ? MIN_USDST_WITHDRAWAL : "0"}
+                  </p>
+                </div>
+                {selectedToken?.rebaseFactor && BigInt(maxAmount) > 0n && (() => {
+                  try {
+                    const equiv = (BigInt(maxAmount) * BigInt(selectedToken.rebaseFactor!) / WAD).toString();
+                    return (
+                      <p className="text-xs text-muted-foreground mt-0.5 text-right">
+                        ≈ {formatBalance(equiv, undefined, DECIMAL, 2, 6)} {selectedToken.externalSymbol}
+                      </p>
+                    );
+                  } catch { return null; }
+                })()}
               </div>
             )
           )}

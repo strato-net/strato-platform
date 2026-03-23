@@ -199,11 +199,23 @@ const AssetsList = ({
                         </p>
                       </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-sm md:text-base text-foreground">
-                          {guestMode || !asset?.totalBalance || asset.totalBalance === "0"
-                            ? "-"
-                            : formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
-                        </p>
+                        {guestMode || !asset?.totalBalance || asset.totalBalance === "0" ? (
+                          <p className="font-medium text-sm md:text-base text-foreground">-</p>
+                        ) : (
+                          <div>
+                            <p className="font-medium text-sm md:text-base text-foreground">
+                              {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
+                            </p>
+                            {asset.rebaseFactor && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                ≈ {formatBalance(
+                                  (BigInt(asset.totalBalance) * BigInt(asset.rebaseFactor) / (10n ** 18n)).toString(),
+                                  undefined, 18, 1, 4
+                                )} {asset._symbol?.replace(/^w/, '')}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )

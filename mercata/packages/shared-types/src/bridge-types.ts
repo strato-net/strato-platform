@@ -39,6 +39,7 @@ export interface BridgeToken {
   enabled: boolean;              // effective route enabled state
   isDefaultRoute: boolean;       // true when route token matches asset default token
   stratoTokenImage?: string;     // First image URL from TokenFactory images
+  rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
 }
 
 /**
