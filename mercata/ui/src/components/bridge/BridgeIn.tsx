@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DepositAction } from "@mercata/shared-types";
+import { ApySource, DepositAction } from "@mercata/shared-types";
 import { metalForgeService, MetalConfig, PayTokenConfig } from "@/services/metalForgeService";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -50,13 +50,46 @@ import {
 } from "@/components/ui/select";
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
-import { Link } from "react-router-dom";
-import { ArrowDownToLine, Gem, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
 
+/** Step 3 card APY row: fixed slot so cards match height with/without APY and vs skeleton */
+const STEP3_APY_ROW_CLASS = "mt-0.5 flex min-h-[18px] items-center";
+
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+
+const apySourceDisplay = (a: ApySource): string => {
+  switch (a.source) {
+    case "lending":
+      return "Lending pool";
+    case "swap":
+      return "Swap pool";
+    case "vault":
+      return "Vault";
+    case "safety":
+      return "Safety module";
+    default:
+      return a.source;
+  }
+};
+
+const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
+  switch (info.source) {
+    case "lending":
+      return "/dashboard/earn-lending";
+    case "vault":
+      return "/dashboard/earn-vault";
+    case "swap":
+      return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
+    case "safety":
+      return "/dashboard/advanced?tab=safety";
+    default:
+      return "/dashboard/earn";
+  }
+};
 
 const calcMetalAmount = (payAmount: string, metal: MetalConfig, payToken: PayTokenConfig): bigint => {
   try {
@@ -81,14 +114,15 @@ const CardSkeleton = ({ id }: { id: string }) => (
       <div className="h-[1.25rem] w-16 bg-muted rounded" />
     </div>
     <div className="h-[1rem] w-12 bg-muted rounded" />
-    <div className="h-[14px] w-16 bg-muted/50 rounded mt-0.5" />
-    <div className="h-[0.875rem] w-14 bg-muted rounded mt-1" />
+    <div className={STEP3_APY_ROW_CLASS}>
+      <div className="h-2.5 w-16 bg-muted/50 rounded" />
+    </div>
   </div>
 );
 
 const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled, apyBadge }: {
   active: boolean; image?: string; symbol: string; estimated: string;
-  label: string; onClick: () => void; disabled: boolean;
+  label?: string; onClick: () => void; disabled: boolean;
   apyBadge: React.ReactNode;
 }) => (
   <button type="button" onClick={onClick} disabled={disabled}
@@ -104,7 +138,7 @@ const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled,
     </div>
     <p className="text-xs text-muted-foreground">{"\u2248"} {estimated}</p>
     {apyBadge}
-    <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
+    {label ? <p className="text-[10px] text-muted-foreground mt-1">{label}</p> : null}
   </button>
 );
 
@@ -197,6 +231,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     triggerDepositRefresh,
   } = useBridgeContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
+  const navigate = useNavigate();
 
   // State -- fundingMode can be controlled externally or managed internally
   const [internalMode, setInternalMode] = useState<"bridge" | "metals">("bridge");
@@ -258,25 +293,57 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
   }, [bridgeableTokens, selectedToken, depositActions]);
 
-  const getApy = useMemo(() => {
-    const m = new Map<string, string>();
+  const getApyInfo = useMemo(() => {
+    const m = new Map<string, { apy: string; sourceLabel: string; source: ApySource["source"]; poolAddress?: string }>();
     for (const entry of tokenApys) {
-      const best = entry.apys.reduce((max, a) => parseFloat(a.apy) > parseFloat(max) ? a.apy : max, "0");
-      if (parseFloat(best) > 0) m.set(normAddr(entry.token), best);
+      let best: ApySource | null = null;
+      for (const a of entry.apys) {
+        if (!best || parseFloat(a.apy) > parseFloat(best.apy)) best = a;
+      }
+      if (best && parseFloat(best.apy) > 0) {
+        m.set(normAddr(entry.token), {
+          apy: best.apy,
+          sourceLabel: apySourceDisplay(best),
+          source: best.source,
+          poolAddress: best.poolAddress,
+        });
+      }
     }
     return (addr: string) => m.get(normAddr(addr));
   }, [tokenApys]);
 
-  const ApyBadge = ({ addr }: { addr: string }) => (
-    <div className="h-[14px] mt-0.5">
-      {!tokenApysLoaded
-        ? <p className="text-[10px] font-medium text-green-500/40 flex items-center gap-0.5 animate-pulse blur-[2px]"><TrendingUp className="w-3 h-3" />0.00% APY</p>
-        : getApy(addr) && (
-          <p className="text-[10px] font-medium text-green-500 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />{getApy(addr)}% APY</p>
-        )
-      }
-    </div>
-  );
+  const ApyLine = ({ addr }: { addr: string }) => {
+    const info = tokenApysLoaded ? getApyInfo(addr) : null;
+    const go = () => {
+      if (!info) return;
+      navigate(pathForApyInfo(info));
+    };
+    return (
+      <div className={STEP3_APY_ROW_CLASS}>
+        {!tokenApysLoaded ? (
+          <p className="text-[10px] font-medium text-green-500/40 animate-pulse blur-[2px] leading-none">{"\u2026"}</p>
+        ) : info ? (
+          <span
+            role="link"
+            tabIndex={0}
+            className="text-[10px] font-medium leading-snug text-green-500 cursor-pointer hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              go();
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              e.stopPropagation();
+              go();
+            }}
+          >
+            {`Earn ${info.apy}% via ${info.sourceLabel}`}
+          </span>
+        ) : null}
+      </div>
+    );
+  };
 
   const metalsPayBalanceWei = useMemo(() => {
     if (!selectedPayToken) return "0";
@@ -966,10 +1033,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                           active={selectedMetal?.address === metal.address}
                           image={metal.imageUrl} symbol={metal.symbol}
                           estimated={metalWei > 0n ? formatUnits(metalWei, 18) : "0"}
-                          label={`${Number(metal.feeBps) / 100}% fee`}
                           onClick={() => setSelectedMetal(metal)}
                           disabled={guestMode || isLoading}
-                          apyBadge={<ApyBadge addr={metal.address} />}
+                          apyBadge={<ApyLine addr={metal.address} />}
                         />
                       );
                     })
@@ -992,10 +1058,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         active={rt.id === selectedToken?.id && !selectedAction}
                         image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
                         estimated={est}
-                        label={rt.isDefaultRoute ? "VIA WRAP" : "VIA MINT"}
                         onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
                         disabled={guestMode || isLoading}
-                        apyBadge={<ApyBadge addr={rt.stratoToken} />}
+                        apyBadge={<ApyLine addr={rt.stratoToken} />}
                       />
                     );
                   }),
@@ -1012,14 +1077,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         active={selectedAction?.id === action.id}
                         image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
                         estimated={est}
-                        label={action.action === 1 ? "EARN YIELD" : "BUY METAL"}
                         onClick={() => {
                           const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
                           if (mintRoute) setSelectedToken(mintRoute);
                           setSelectedAction(action);
                         }}
                         disabled={guestMode || isLoading}
-                        apyBadge={<ApyBadge addr={action.stratoToken} />}
+                        apyBadge={<ApyLine addr={action.stratoToken} />}
                       />
                     );
                   }),
