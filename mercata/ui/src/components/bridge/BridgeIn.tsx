@@ -117,13 +117,12 @@ const CardSkeleton = ({ id }: { id: string }) => (
     <div className={STEP3_APY_ROW_CLASS}>
       <div className="h-2.5 w-16 bg-muted/50 rounded" />
     </div>
-    <div className="h-[0.875rem] w-14 bg-muted rounded mt-1" />
   </div>
 );
 
 const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled, apyBadge }: {
   active: boolean; image?: string; symbol: string; estimated: string;
-  label: string; onClick: () => void; disabled: boolean;
+  label?: string; onClick: () => void; disabled: boolean;
   apyBadge: React.ReactNode;
 }) => (
   <button type="button" onClick={onClick} disabled={disabled}
@@ -339,7 +338,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               go();
             }}
           >
-            {`Get ${info.apy}% via ${info.sourceLabel}`}
+            {`Earn ${info.apy}% via ${info.sourceLabel}`}
           </span>
         ) : null}
       </div>
@@ -1034,7 +1033,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                           active={selectedMetal?.address === metal.address}
                           image={metal.imageUrl} symbol={metal.symbol}
                           estimated={metalWei > 0n ? formatUnits(metalWei, 18) : "0"}
-                          label={`${Number(metal.feeBps) / 100}% fee`}
                           onClick={() => setSelectedMetal(metal)}
                           disabled={guestMode || isLoading}
                           apyBadge={<ApyLine addr={metal.address} />}
@@ -1060,7 +1058,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         active={rt.id === selectedToken?.id && !selectedAction}
                         image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
                         estimated={est}
-                        label={rt.isDefaultRoute ? "WRAP" : "MINT"}
                         onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
                         disabled={guestMode || isLoading}
                         apyBadge={<ApyLine addr={rt.stratoToken} />}
@@ -1080,7 +1077,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         active={selectedAction?.id === action.id}
                         image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
                         estimated={est}
-                        label={action.action === 1 ? "EARN YIELD" : "BUY METAL"}
                         onClick={() => {
                           const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
                           if (mintRoute) setSelectedToken(mintRoute);
