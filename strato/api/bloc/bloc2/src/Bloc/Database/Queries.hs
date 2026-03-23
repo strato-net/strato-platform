@@ -12,7 +12,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Bloc.Database.Queries
@@ -97,6 +96,43 @@ instance {-# OVERLAPPING #-}
                 liftIO $ modifyIORef' ref (Map.insert ch cc)
                 pure $ Just cc
 
+{-# NOINLINE proxyContractNames #-}
+proxyContractNames :: [String]
+proxyContractNames = ["Proxy", "UserRegistry", "User"]
+
+{-# NOINLINE funcSet #-}
+funcSet :: S.Set (String, Text)
+funcSet = S.fromList . concat $ zipWith (map . (,)) proxyContractNames allFunctionNames
+  where
+    proxyFunctionNames = ["setLogicContract", "transferOwnership", "renounceOwnership"]
+    userRegistryFunctionNames = ["createUser", "createUserFor", "deriveUserAddress", "canCreateUser", "initializeUser"]
+    userFunctionNames = ["addUserAddress", "revokeUserAddress", "revokeAllUserAddresses", "createContract", "createSaltedContract", "callContract"]
+    allFunctionNames = [proxyFunctionNames, proxyFunctionNames ++ userRegistryFunctionNames, proxyFunctionNames ++ userFunctionNames]
+
+getLogicCodePtr ::
+  ( MonadIO m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
+  ) =>
+  Address ->
+  m (Maybe CodePtr)
+getLogicCodePtr a = runMaybeT $ do
+  (StorageAddress _ v _) <- MaybeT
+    . fmap listToMaybe
+    . getStorage'
+    $ storageFilterParams
+        { qsAddress = Just a
+        , qsKey = Just "logicContract"
+        }
+  logicAddr <- MaybeT . pure $ case v of
+    BAddress address' -> Just address'
+    _ -> Nothing
+  (AddressStateRef' l _) <- MaybeT
+    . fmap listToMaybe
+    . getAccount'
+    $ accountsFilterParams & qaAddress ?~ logicAddr
+  MaybeT . pure $ addressStateRefCodePtr l
+
 withCodeCollectionCache :: MonadIO m => ReaderT (IORef (Map.Map Keccak256 CodeCollection)) m a -> m a
 withCodeCollectionCache action = do
   ref <- liftIO $ newIORef Map.empty
@@ -104,7 +140,6 @@ withCodeCollectionCache action = do
 
 getContractByAddress ::
   ( MonadIO m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m
@@ -120,7 +155,6 @@ getContractByAddress a mFuncName = getContractByAccountsFilterParams
 -- Also resolves proxy contracts by looking up their logicContract
 getContractWithCodeCollectionByAddress ::
   ( MonadIO m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m
@@ -132,40 +166,16 @@ getContractWithCodeCollectionByAddress a fn = runMaybeT $ do
   (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount'
     $ accountsFilterParams & qaAddress ?~ a
   codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-  -- Check if this is a proxy contract and resolve the logic contract's functions
-  let proxyContractNames = ["Proxy", "UserRegistry", "User"]
-      proxyFunctionNames = ["setLogicContract", "transferOwnership", "renounceOwnership"]
-      userRegistryFunctionNames = ["createUser", "createUserFor", "deriveUserAddress", "canCreateUser", "initializeUser"]
-      userFunctionNames = ["addUserAddress", "revokeUserAddress", "revokeAllUserAddresses", "createContract", "createSaltedContract", "callContract"]
-      allFunctionNames = [proxyFunctionNames, proxyFunctionNames ++ userRegistryFunctionNames, proxyFunctionNames ++ userFunctionNames]
-      funcSet = S.fromList . concat $ zipWith (map . (,)) proxyContractNames allFunctionNames
-      getLogicCodePtr = do
-        (StorageAddress _ v _) <- MaybeT
-          . fmap listToMaybe
-          . getStorage'
-          $ storageFilterParams
-              { qsAddress = Just a
-              , qsKey = Just "logicContract"
-              }
-        logicAddr <- MaybeT . pure $ case v of
-          BAddress address' -> Just address'
-          _ -> Nothing
-        (AddressStateRef' l _) <- MaybeT
-          . fmap listToMaybe
-          . getAccount'
-          $ accountsFilterParams & qaAddress ?~ logicAddr
-        MaybeT . pure $ addressStateRefCodePtr l
   case addressStateRefContractName r of
     -- Proxy contract, calling a logic contract function: load only logic CC
     Just name | name `elem` proxyContractNames && not (S.member (name, fn) funcSet) -> do
-      mLogicCodePtr <- lift . runMaybeT $ getLogicCodePtr
+      mLogicCodePtr <- lift $ getLogicCodePtr a
       MaybeT $ either (const Nothing) Just <$> getContractWithCodeCollectionByCodePtr (fromMaybe codePtr mLogicCodePtr)
     -- Not a proxy, or calling a proxy-native function: load only proxy CC
     _ -> MaybeT $ either (const Nothing) Just <$> getContractWithCodeCollectionByCodePtr codePtr
 
 getContractByAccountsFilterParams ::
   ( MonadIO m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m
@@ -175,41 +185,18 @@ getContractByAccountsFilterParams ::
   m (Maybe Contract)
 getContractByAccountsFilterParams aParams mFuncName = runMaybeT $ do
   (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount' aParams
-  let proxyContractNames = ["Proxy", "UserRegistry", "User"]
-      proxyFunctionNames = ["setLogicContract", "transferOwnership", "renounceOwnership"]
-      userRegistryFunctionNames = ["createUser", "createUserFor", "deriveUserAddress", "canCreateUser", "initializeUser"]
-      userFunctionNames = ["addUserAddress", "revokeUserAddress", "revokeAllUserAddresses", "createContract", "createSaltedContract", "callContract"]
-      allFunctionNames = [proxyFunctionNames, proxyFunctionNames ++ userRegistryFunctionNames, proxyFunctionNames ++ userFunctionNames]
-      funcSet = S.fromList . concat $ zipWith (map . (,)) proxyContractNames allFunctionNames
-      getLogicCodePtr = do
-        a <- MaybeT . pure $ aParams ^. qaAddress
-        (StorageAddress _ v _) <- MaybeT
-          . fmap listToMaybe
-          . getStorage'
-          $ storageFilterParams
-              { qsAddress = Just a
-              , qsKey = Just "logicContract"
-              }
-        logicContract <- MaybeT . pure $ case v of
-          BAddress address' -> Just address'
-          _ -> Nothing
-        (AddressStateRef' l _) <- MaybeT
-          . fmap listToMaybe
-          . getAccount'
-          $ accountsFilterParams
-            & qaAddress ?~ logicContract
-        MaybeT . pure $ addressStateRefCodePtr l
+  a <- MaybeT . pure $ aParams ^. qaAddress
   codePtr <- MaybeT . pure $ addressStateRefCodePtr r
   case (addressStateRefContractName r, mFuncName) of
     -- Proxy contract, calling a logic contract function: load only logic contract
     (Just name, Just fn) | name `elem` proxyContractNames && not (S.member (name, fn) funcSet) -> do
-      mLogicCodePtr <- lift . runMaybeT $ getLogicCodePtr
+      mLogicCodePtr <- lift $ getLogicCodePtr a
       MaybeT $ do
         eContract <- getContractDetailsByCodeHash $ fromMaybe codePtr mLogicCodePtr
         pure $ either (const Nothing) (Just . snd) eContract
     -- Proxy contract, no function specified: load both and merge
     (Just name, Nothing) | name `elem` proxyContractNames -> do
-      mLogicCodePtr <- lift . runMaybeT $ getLogicCodePtr
+      mLogicCodePtr <- lift $ getLogicCodePtr a
       MaybeT $ do
         let codePtrs = codePtr : maybe [] (:[]) mLogicCodePtr
         eContracts <- traverse getContractDetailsByCodeHash codePtrs

@@ -106,7 +106,6 @@ emptyBatchState = BatchState Map.empty
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' ::
   ( MonadUnliftIO m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
@@ -150,7 +149,6 @@ getBlocTransactionResult txHash resolve = withCodeCollectionCache $ unsafeHead =
 
 getBatchBlocTransactionResult' ::
   ( MonadIO m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
@@ -187,7 +185,6 @@ postBlocTransactionResults resolve hashes = do
 -- | Inner function usable when already within a StateT cache layer
 postBlocTransactionResults' ::
   ( MonadIO m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
@@ -266,7 +263,6 @@ rawTx2PostTx RawTransaction {..} =
 
 evalAndReturn ::
   ( MonadIO m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
@@ -333,7 +329,6 @@ contractResult txHash txResult@TransactionResult {..} name = do
 
 functionResult ::
   ( MonadIO m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
@@ -380,7 +375,6 @@ functionResult txHash txResult@TransactionResult {..} funcName addr = do
 
 getReturnTypes ::
   ( MonadIO m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,

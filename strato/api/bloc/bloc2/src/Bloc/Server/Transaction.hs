@@ -847,7 +847,6 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
 
 postUsersSendList' ::
   ( MonadUnliftIO m,
-    HasCodeDB m,
     A.Selectable Keccak256 CC.CodeCollection m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
@@ -891,7 +890,6 @@ postUsersContractMethodList' ::
     A.Selectable Keccak256 CC.CodeCollection m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    HasCodeDB m,
     m `Mod.Outputs` [IngestEvent],
     HasBlocEnv m,
     HasVault m

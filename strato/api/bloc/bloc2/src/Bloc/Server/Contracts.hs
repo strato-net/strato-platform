@@ -233,7 +233,6 @@ getContractsDetails' ::
   ( MonadIO m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
-    HasCodeDB m,
     (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   Address ->
