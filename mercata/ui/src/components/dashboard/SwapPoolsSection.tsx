@@ -19,18 +19,17 @@ const SwapPoolsSection = () => {
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
-  const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(false);
   const poolPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const operationInProgressRef = useRef(false);
 
-  const { fetchPools, getPoolByAddress } = useSwapContext();
+  const { pools, poolsLoading, fetchPools, getPoolByAddress } = useSwapContext();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { isLoggedIn } = useUser();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 
   useEffect(() => {
-    fetchAndEnrichPools();
+    fetchPools();
   }, [fetchPools]);
 
   useEffect(() => {
@@ -66,20 +65,6 @@ const SwapPoolsSection = () => {
     }
   }, [selectedPool?.address, isDepositModalOpen, getPoolByAddress, fetchUsdstBalance]);
 
-  const fetchAndEnrichPools = async () => {
-    if (operationInProgressRef.current) return;
-    
-    try {
-      setLoading(true);
-      const tempPools = await fetchPools();
-      setPools(tempPools);
-    } catch (err) {
-      console.error("Failed to fetch pools:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleOpenDepositModal = async (pool: Pool) => {
     if (operationInProgressRef.current) return;
     
@@ -106,13 +91,13 @@ const SwapPoolsSection = () => {
 
   const handleDepositSuccess = async () => {
     // Refresh all data after successful deposit
-    await fetchAndEnrichPools();
+    await fetchPools();
     await fetchUsdstBalance();
   };
 
   const handleWithdrawSuccess = async () => {
     // Refresh all data after successful withdrawal
-    await fetchAndEnrichPools();
+    await fetchPools();
     await fetchUsdstBalance();
   };
 

@@ -31,6 +31,9 @@ STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
 VAULT_URL=${VAULT_URL:-https://vault.blockapps.net:8093}
 
+# Read HTTP port from ethconf.yaml (single source of truth)
+HTTP_PORT=$(yq '.apiConfig.httpPort' /config/ethconf.yaml)
+
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
@@ -101,6 +104,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf
   sed -i "s|__VAULT_URL__|$VAULT_URL|g" /tmp/nginx.conf
+  sed -i "s|__HTTP_PORT__|$HTTP_PORT|g" /tmp/nginx.conf
   
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf

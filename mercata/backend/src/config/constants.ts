@@ -37,6 +37,7 @@ export const constants = (() => {
   const Voucher = `${CONTRACT_PREFIX}Voucher`;
   const Vault = `${CONTRACT_PREFIX}Vault`;
   const VaultFactory = `${CONTRACT_PREFIX}VaultFactory`;
+  const SaveUSDSTVault = `${CONTRACT_PREFIX}SaveUSDSTVault`;
   const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
   const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
   const Event = "event";
@@ -147,6 +148,7 @@ export const constants = (() => {
     Voucher,
     Vault,
     VaultFactory,
+    SaveUSDSTVault,
     MetalForge,
     SafetyModule,
     get metalForge() { return config.metalForge; },

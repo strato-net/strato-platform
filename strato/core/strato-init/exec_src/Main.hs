@@ -2,7 +2,7 @@
 
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Generator
-import Blockchain.Init.Options (flags_composeOnly, flags_includeBuild)
+import Blockchain.Init.Options (flags_composeOnly)
 import Blockchain.Strato.Model.Options (flags_network)
 import HFlags
 import System.Environment (getArgs)
@@ -17,7 +17,7 @@ main = do
 
   args <- $initHFlags "strato-setup [node-directory] [flags...]"
   if flags_composeOnly
-    then generateDockerComposeAllDocker True flags_includeBuild
+    then generateDockerComposeAllDocker
     else do
       nodeDir <- case args of
         [dir] -> return dir

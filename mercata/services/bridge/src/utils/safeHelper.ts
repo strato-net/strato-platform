@@ -6,6 +6,7 @@ import {
   config,
   ZERO_ADDRESS,
   ERC20_ABI,
+  WAD,
   getChainRpcUrl,
 } from "../config";
 import {
@@ -14,6 +15,7 @@ import {
   safeToBigInt,
 } from "./utils";
 import { logError, logInfo } from "./logger";
+import { getRebaseFactors } from "../services/cirrusService";
 import { WithdrawalInfo, SafeTransactionData, NonEmptyArray } from "../types";
 import { retry } from "./api";
 
@@ -195,6 +197,21 @@ export async function createWithdrawalProposals(
   const safeHotWalletAddress = config.safe.hotWalletAddress || "";
   const hasHotWallet = !!safeHotWalletAddress;
   const rpcUrl = getChainRpcUrl(externalChainId);
+
+  // Apply rebase multiplier for xStock withdrawals (multiply to get external rebasing amount)
+  const stratoTokens = [...new Set(withdrawals.map(w => w.stratoToken).filter(Boolean))];
+  if (stratoTokens.length > 0) {
+    const factors = await getRebaseFactors(stratoTokens);
+    for (const withdrawal of withdrawals) {
+      const factor = factors.get(withdrawal.stratoToken);
+      if (factor) {
+        const original = BigInt(withdrawal.externalTokenAmount);
+        const adjusted = (original * factor) / WAD;
+        logInfo("SafeHelper", `Rebasing withdrawal ${withdrawal.withdrawalId}: ${original} → ${adjusted} (factor=${factor})`);
+        withdrawal.externalTokenAmount = adjusted.toString();
+      }
+    }
+  }
 
   // Check which withdrawals can actually use the hot wallet (balance check)
   if (hasHotWallet) {

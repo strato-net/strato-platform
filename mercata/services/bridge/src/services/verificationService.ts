@@ -1,9 +1,11 @@
-import { config, ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE } from "../config";
+import { config, ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE, WAD } from "../config";
 import { 
   getTransactionReceiptsBatch, 
   getInternalTransactionsBatch 
 } from "./rpcService";
+import { getRebaseFactors } from "./cirrusService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
+import { logInfo } from "../utils/logger";
 import { DepositInfo } from "../types";
 
 const decodeTransferLog = (log: any, sig: string) => {
@@ -27,7 +29,7 @@ const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: 
     return false;
   });
 
-const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string) => {
+const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string, rebaseFactor?: bigint) => {
   if (Number(deposit.externalChainId) !== chainId) {
     return new Error(`Chain mismatch for token ${normalizeAddress(deposit.externalToken)}. Expected: ${chainId}, Got: ${deposit.externalChainId}`);
   }
@@ -41,7 +43,8 @@ const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string) =>
     externalToken,
     depositRouter,
     stratoTokenAmount: safeToBigInt(deposit.stratoTokenAmount),
-    externalDecimals: deposit.externalDecimals
+    externalDecimals: deposit.externalDecimals,
+    rebaseFactor,
   };
 };
 
@@ -66,14 +69,26 @@ const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null =
 const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
   const sig = TRANSFER_EVENT_SIGNATURE.toLowerCase();
   const logs = Array.isArray(receipt.logs) ? receipt.logs : [];
+
+  logInfo("Verification", `ERC20 check: token=${ctx.externalToken} safe=${ctx.safe} expected=${ctx.stratoTokenAmount} decimals=${ctx.externalDecimals} rebaseFactor=${ctx.rebaseFactor ?? 'none'} logCount=${logs.length}`);
   
   const validTransfer = logs.some(log => {
     const decoded = decodeTransferLog(log, sig);
-    if (!decoded || decoded.tokenAddr !== ctx.externalToken || decoded.toAddr !== ctx.safe) {
+    if (!decoded) return false;
+
+    if (decoded.tokenAddr !== ctx.externalToken || decoded.toAddr !== ctx.safe) {
+      logInfo("Verification", `  skip log: addr=${decoded.tokenAddr} to=${decoded.toAddr} amount=${decoded.amount}`);
       return false;
     }
     
-    const convertedAmount = convertToStratoDecimals(decoded.amount, ctx.externalDecimals)
+    const convertedAmount = convertToStratoDecimals(decoded.amount, ctx.externalDecimals);
+    logInfo("Verification", `  match log: amount=${decoded.amount} converted=${convertedAmount} stored=${ctx.stratoTokenAmount}`);
+
+    if (ctx.rebaseFactor && ctx.rebaseFactor > 0n) {
+      const rebasedAmount = (convertedAmount * WAD) / ctx.rebaseFactor;
+      logInfo("Verification", `  rebased=${rebasedAmount} match=${rebasedAmount === ctx.stratoTokenAmount}`);
+      return rebasedAmount === ctx.stratoTokenAmount;
+    }
     
     return convertedAmount === ctx.stratoTokenAmount;
   });
@@ -112,6 +127,10 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
     return results;
   }
 
+  // Fetch rebase factors for all deposits' STRATO tokens
+  const allStratoTokens = [...new Set(deposits.map(d => d.stratoToken).filter(Boolean))];
+  const rebaseFactorMap = allStratoTokens.length > 0 ? await getRebaseFactors(allStratoTokens) : new Map<string, bigint>();
+
   // Process each chain's deposits in batches
   for (const [chainId, chainDeposits] of depositsByChain) {
     // Dedupe txHashes
@@ -139,7 +158,8 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
         }
 
         // Early guard + context object
-        const ctx = validateDeposit(deposit, chainId, safe);
+        const rebaseFactor = rebaseFactorMap.get(deposit.stratoToken);
+        const ctx = validateDeposit(deposit, chainId, safe, rebaseFactor);
         if (ctx instanceof Error) {
           results.set(deposit.externalTxHash, ctx);
           continue;

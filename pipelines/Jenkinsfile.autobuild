@@ -43,6 +43,7 @@ pipeline {
       steps {
         sh 'rm -rf .docker-work'
         sh 'make clean-docker-sentinels'
+        sh "git checkout BUILD_METADATA"
         sh 'REPO=dev make docker'
       }
     }
@@ -56,7 +57,9 @@ pipeline {
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
           
+          // TEMPORARY FIX: We only use it to fetch the STRATO_IMAGE - to run strato-setup in temporary docker container. It's overwritten by ./strato
           sh 'cp ../docker-compose.yml .'
+          
           sh 'cp ../docker-compose.vault.yml .'
           sh 'cp ../docker-compose.highway.yml .'
           script {
@@ -85,6 +88,7 @@ pipeline {
                 LENDING_REGISTRY=0000000000000000000000000000000000001007 \\
                 TOKEN_FACTORY=000000000000000000000000000000000000100b \\
                 ADMIN_REGISTRY=000000000000000000000000000000000000100c \\
+                HTTP_PORT=80 \\
                 ./strato --single
             """
           }
@@ -185,7 +189,7 @@ pipeline {
                     docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
                     docker compose -f docker-compose.bridge.push.ecr.yml push 2>&1
                   '''
-                  stash includes: 'bootstrap-docker/**', excludes: 'bootstrap-docker/nodedata/**', name: 'bootstrapDocker'
+                  stash includes: 'bootstrap-docker/**', excludes: 'bootstrap-docker/nodedata/**,bootstrap-docker/logs/**', name: 'bootstrapDocker'
                   //stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
@@ -196,7 +200,7 @@ pipeline {
                 ]) {
                   sh '''#!/bin/bash -le
                     set -x
-                    version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
+                    version=$(cat VERSION)-$(git rev-parse --short=7 HEAD)
                     AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
                     aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
                     aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
@@ -347,18 +351,11 @@ pipeline {
               }
               post {
                 success {
-                  script {
-                    def VERSION = sh(
-                        returnStdout: true,
-                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" bootstrap-docker/docker-compose.yml"
-                    ).trim()
-                    slackSend(
-                        channel: '#engineering',
-                        color: 'good',
-                        message: "buildtest.testnet.strato.nexus was redeployed from develop with STRATO v.${VERSION}"
-                    )
-                  }
-
+                  slackSend(
+                      channel: '#engineering',
+                      color: 'good',
+                      message: "buildtest.testnet.strato.nexus was redeployed from develop"
+                  )
                 }
               }
             }

@@ -46,26 +46,26 @@ const MobileSidebar = ({ isOpen, onClose }: MobileSidebarProps) => {
       ],
     },
     {
+      label: 'EARN',
+      items: [
+        { icon: <HandCoins size={20} />, label: 'Earn', path: '/dashboard/earn' },
+        { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
+      ],
+    },
+    {
       label: 'SPEND',
       items: [
         { icon: <CreditCard size={20} />, label: 'Card', path: '/dashboard/credit-card' },
       ],
     },
     {
-      label: 'EARN',
-      items: [
-        { icon: <HandCoins size={20} />, label: 'Earn', path: '/dashboard/earn' },
-      ],
-    },
-    {
       label: 'PRO',
       items: [
         { icon: <Vault size={20} />, label: 'Vault', path: '/dashboard/vault' },
-        { icon: <Coins size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
-        { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
-        { icon: <BarChart3 size={20} />, label: 'STRATO Stats', path: '/dashboard/stats' },
         { icon: <Droplets size={20} />, label: 'Advanced', path: '/dashboard/advanced' },
-        { icon: <UserPlus size={20} />, label: 'My Referrals', path: '/dashboard/referrals' },
+        { icon: <UserPlus size={20} />, label: 'Referrals', path: '/dashboard/referrals' },
+        { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
+        { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/dashboard/stats' },
         { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
       ],
     },

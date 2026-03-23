@@ -53,26 +53,26 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
     ],
   },
   {
+    label: 'EARN',
+    items: [
+      { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+      { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
+    ],
+  },
+  {
     label: 'SPEND',
     items: [
       { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
     ],
   },
   {
-    label: 'EARN',
-    items: [
-      { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
-    ],
-  },
-  {
     label: 'PRO',
     items: [
       { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
-      { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
-      { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
-      { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
-      { icon: UserPlus, label: 'My Referrals', path: '/dashboard/referrals' },
+      { icon: UserPlus, label: 'Referrals', path: '/dashboard/referrals' },
+      { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+      { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
       { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
     ],
   },
@@ -129,9 +129,9 @@ const MobileBottomNav = () => {
 
       {/* More Drawer */}
       <Drawer open={isMoreOpen} onOpenChange={setIsMoreOpen}>
-        <DrawerContent className="max-h-[70vh] pb-7">
+        <DrawerContent className="max-h-[calc(100svh-1rem)] overflow-hidden pb-[calc(env(safe-area-inset-bottom)+1rem)]">
           {/* Close Button */}
-          <div className="flex justify-end px-4 pt-3">
+          <div className="flex justify-end px-4 pt-2">
             <DrawerClose asChild>
               <button className="p-1.5 rounded-md hover:bg-muted transition-colors">
                 <X size={18} className="text-muted-foreground" />
@@ -140,14 +140,14 @@ const MobileBottomNav = () => {
           </div>
 
           {/* Menu Items */}
-          <div className="px-3 pb-4">
+          <div className="min-h-0 overflow-y-auto overscroll-contain px-3 pb-3">
             {MORE_CATEGORIES.map((category, idx) => {
               const visibleItems = category.items.filter(item => !item.adminOnly || isAdmin);
               if (visibleItems.length === 0) return null;
               return (
-                <div key={idx} className={idx > 0 ? 'mt-3' : ''}>
+                <div key={idx} className={idx > 0 ? 'mt-2' : ''}>
                   {category.label && (
-                    <div className="px-4 py-1.5 text-[11px] font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase">
+                    <div className="px-4 py-1 text-[10px] font-semibold tracking-wider text-gray-400 dark:text-gray-500 uppercase">
                       {category.label}
                     </div>
                   )}
@@ -155,13 +155,13 @@ const MobileBottomNav = () => {
                     <button
                       key={path}
                       onClick={() => handleMoreItemClick(path)}
-                      className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors ${isActive(path)
+                      className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg transition-colors ${isActive(path)
                           ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                           : 'text-foreground hover:bg-muted'
                         }`}
                     >
-                      <Icon size={20} />
-                      <span className="text-sm font-medium">{label}</span>
+                      <Icon size={18} />
+                      <span className="text-[13px] font-medium">{label}</span>
                     </button>
                   ))}
                 </div>

@@ -67,7 +67,9 @@ pipeline {
             sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
             sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
             
+            // TEMPORARY FIX: We only use it to fetch the STRATO_IMAGE - to run strato-setup in temporary docker container. It's overwritten by ./strato
             sh 'cp ../docker-compose.yml .'
+
             sh 'cp ../docker-compose.vault.yml .'
             sh 'cp ../docker-compose.highway.yml .'
             script {
@@ -94,6 +96,7 @@ pipeline {
                   LENDING_REGISTRY=0000000000000000000000000000000000001007 \\
                   TOKEN_FACTORY=000000000000000000000000000000000000100b \\
                   ADMIN_REGISTRY=000000000000000000000000000000000000100c \\
+                  HTTP_PORT=80 \\
                   ./strato --single
               """
             }

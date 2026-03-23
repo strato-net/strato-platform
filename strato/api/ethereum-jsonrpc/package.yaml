@@ -17,16 +17,16 @@ executables:
       - blaze-builder
       - blockapps-data
       - bytestring
+      - case-insensitive
       - containers
       - http-client
       - http-types
       - json-rpc-server
       - kafka-monad
       - mtl
-      - random
+      - seqevents
       - strato-conf
       - strato-model
-      - seqevents
       - text
       - vector
       - wai

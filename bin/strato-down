@@ -16,7 +16,7 @@ if [[ -f .strato.pid ]]; then
     source .strato.pid
     if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
         kill "$CONVOKE_PID" 2>/dev/null || true
-        wait "$CONVOKE_PID" 2>/dev/null || true
+        tail --pid="$CONVOKE_PID" -f logs/convoke.log 2>/dev/null || true
     fi
     rm -f .strato.pid
 else

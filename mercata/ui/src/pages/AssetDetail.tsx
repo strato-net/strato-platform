@@ -209,7 +209,7 @@ const AssetDetail = () => {
   const [showPriceTooltip, setShowPriceTooltip] = useState(false);
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
-  const { getToken } = useTokenContext();
+  const { getToken, earningAssets } = useTokenContext();
   const [fetchingSingleAsset, setFetchingSingleAsset] = useState(false);
 
   const PRICE_WINDOW = 30; // Number of days to show in the price chart
@@ -408,6 +408,20 @@ const AssetDetail = () => {
                       <span className="text-muted-foreground">Balance:</span>
                       <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0"), 18)}</span>
                     </div>
+
+                    {(() => {
+                      const ea = earningAssets.find(e => e.address === asset?.address);
+                      if (!ea?.rebaseFactor) return null;
+                      const totalBalance = BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0");
+                      const equivalent = (totalBalance * BigInt(ea.rebaseFactor)) / (10n ** 18n);
+                      const symbol = (asset?.token?._symbol || asset?._symbol || "").replace(/^w/, "");
+                      return (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Equivalent {symbol}:</span>
+                          <span className="font-medium">{formatUnits(equivalent, 18)}</span>
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Owner:</span>
