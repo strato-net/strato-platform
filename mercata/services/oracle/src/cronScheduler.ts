@@ -265,7 +265,7 @@ async function applyRebaseFactors(
 
             const precision = Number(rebase.factorPrecision);
             const rebasedPrice = Math.floor(underlying.medianPrice * factor / precision);
-            const sourceName = `${rebase.underlyingAsset}×rebaseFactor(${factor / precision})`;
+            const sourceName = `${rebase.underlyingAsset}×rebaseFactor (${factor / precision})`;
 
             const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0;
             checkPriceChange(assetKey, rebasedPrice, previousPrice);
