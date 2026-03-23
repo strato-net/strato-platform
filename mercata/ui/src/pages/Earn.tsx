@@ -552,7 +552,7 @@ const Earn = () => {
     if (opportunity.kind === "saveUsdst") {
       return {
         title: "Savings Vault",
-        subtitle: "Stable USD savings with rewards-based yield today",
+        subtitle: "Stable USD savings with rewards-based yield",
         apyRaw: saveUsdstEstimatedApy,
         tvl: saveUsdstTvl,
         badge: "Savings Vault",
@@ -855,7 +855,7 @@ const Earn = () => {
                         </p>
                       <div className="mt-1 flex items-center gap-2 md:justify-end">
                           <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-md">{topOpportunityMeta.badge}</Badge>
-                          <Badge className="text-[10px] px-2 py-0.5 rounded-md bg-blue-600 hover:bg-blue-600 text-white">Featured</Badge>
+                          <Badge className="text-[10px] px-2 py-0.5 rounded-md bg-blue-600 hover:bg-blue-600 text-white">Top Ranked</Badge>
                         </div>
                       </div>
                     </div>
@@ -1008,6 +1008,7 @@ const Earn = () => {
                                       e.stopPropagation();
                                       navigate("/dashboard/earn-save");
                                     }}
+                                    disabled={guestMode}
                                   >
                                     <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
                                     Deposit
@@ -1086,6 +1087,7 @@ const Earn = () => {
                                       e.stopPropagation();
                                       handleVaultDepositClick();
                                     }}
+                                    disabled={guestMode}
                                   >
                                     <CircleArrowDown className="h-4 w-4 mr-1 shrink-0" />
                                     Deposit
