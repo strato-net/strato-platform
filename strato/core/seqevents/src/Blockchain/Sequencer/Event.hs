@@ -101,6 +101,9 @@ data JsonRpcCommand
   | JRCCall {jrcCode :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
   deriving (Eq, Read, Show, GHCG.Generic, Data)
 
+instance Format JsonRpcCommand where
+  format = show
+  
 data P2pEvent
   = P2pTx OutputTx
   | P2pBlock OutputBlock

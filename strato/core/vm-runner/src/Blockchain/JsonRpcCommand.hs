@@ -26,6 +26,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text as T
 import Prelude hiding (id)
+import Text.Format
 
 -- TODO: Add private chain functionality to JSON RPC commands
 
@@ -87,4 +88,4 @@ runJsonRpcCommand' c@JRCGetStorageAt {jrcAddress = address, jrcKey = key, jrcId 
   return (id, word256ToBytes value)
 -}
 runJsonRpcCommand' JRCGetStorageAt {} = error "unsupported RPC command call"
-runJsonRpcCommand' (JRCCall _ _ _) = error "unsupported RPC command call"
+runJsonRpcCommand' c@(JRCCall _ _ _) = error $ "unsupported RPC command call" ++ format c
