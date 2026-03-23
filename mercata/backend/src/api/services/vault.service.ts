@@ -90,6 +90,7 @@ export interface VaultInfo {
   totalShares: string;
   navPerShare: string;
   apy: string;
+  alpha: string;
   paused: boolean;
   assets: VaultAsset[];
   deficitAssets: string[];
@@ -505,13 +506,11 @@ const getFirstDepositDate = async (
 };
 
 /**
- * Get APY for the vault using time-weighted return (TWR) via NAV/share.
- * Compares current NAV/share to historical NAV/share from 30 days ago.
- * Uses history@storage for the share token's historical _totalSupply
- * and history@mapping for historical asset balances and prices.
- * APY = ((currentNAV / historicalNAV) ^ (365 / actualDays)) - 1
+ * Get vault performance metrics using time-weighted return (TWR) via NAV/share.
+ * Returns both the vault APY and the alpha (outperformance vs HODL benchmark).
+ * Alpha = vaultAPY - hodlAPY, where HODL reprices historical balances at current prices.
  */
-const getAPY = async (
+const getPerformanceMetrics = async (
   accessToken: string,
   vaultAddress: string,
   currentEquity: bigint,
@@ -519,36 +518,34 @@ const getAPY = async (
   shareTokenAddress: string,
   botExecutor: string,
   priceOracleAddress: string,
-  supportedAssets: string[]
-): Promise<string> => {
+  supportedAssets: string[],
+  currentPrices: Map<string, string>
+): Promise<{ apy: string; alpha: string }> => {
+  const noData = { apy: "-", alpha: "-" };
   try {
-    if (currentTotalShares <= 0n || currentEquity <= 0n) {
-      return "-";
-    }
+    if (currentTotalShares <= 0n || currentEquity <= 0n) return noData;
 
     const currentNAV = (currentEquity * WAD) / currentTotalShares;
 
-    // Determine the measurement period
     const firstDeposit = await getFirstDepositDate(accessToken, vaultAddress);
-    if (!firstDeposit) {
-      return "-";
-    }
+    if (!firstDeposit) return noData;
 
     const now = new Date();
     const dayAfterFirstDeposit = new Date(firstDeposit.timestamp.getTime() + 24 * 60 * 60 * 1000);
     const earliestStartDate = dayAfterFirstDeposit.toISOString().split("T")[0];
     const todayStr = now.toISOString().split("T")[0];
 
-    if (earliestStartDate >= todayStr) {
-      return "-"; // Vault less than 1 day old
-    }
+    if (earliestStartDate >= todayStr) return noData;
 
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const startDate = thirtyDaysAgo >= dayAfterFirstDeposit
       ? thirtyDaysAgo.toISOString().split("T")[0]
       : earliestStartDate;
 
-    // Get historical total supply from share token storage history
+    const startDateObj = new Date(startDate + "T00:00:00Z");
+    const actualDays = Math.max((now.getTime() - startDateObj.getTime()) / (24 * 60 * 60 * 1000), 1);
+
+    // Historical total supply
     const { data: histStorage } = await cirrus.get(accessToken, "/history@storage", {
       params: {
         address: `eq.${shareTokenAddress}`,
@@ -557,40 +554,56 @@ const getAPY = async (
         select: "data",
       },
     });
-
     const histTotalSupply = safeBigInt(histStorage?.[0]?.data?._totalSupply);
-    if (histTotalSupply <= 0n) {
-      return "-";
+    if (histTotalSupply <= 0n) return noData;
+
+    // Historical balances and prices per asset (needed for both equity and HODL)
+    let histEquity = 0n;
+    let hodlEquity = 0n;
+
+    for (const assetAddress of supportedAssets) {
+      const histBalance = await getHistoricalTokenBalance(accessToken, assetAddress, botExecutor, startDate);
+      const histBalanceBN = safeBigInt(histBalance);
+
+      const histPrice = await getHistoricalAssetPrice(accessToken, priceOracleAddress, assetAddress, startDate);
+      const histPriceBN = safeBigInt(histPrice);
+
+      if (histPriceBN > 0n) {
+        histEquity += (histBalanceBN * histPriceBN) / WAD;
+      }
+
+      // HODL: same historical balances, but at today's prices
+      const currentPriceBN = safeBigInt(currentPrices.get(assetAddress));
+      if (currentPriceBN > 0n) {
+        hodlEquity += (histBalanceBN * currentPriceBN) / WAD;
+      }
     }
 
-    // Get historical equity
-    const histEquity = await getHistoricalEquity(
-      accessToken, vaultAddress, botExecutor,
-      priceOracleAddress, supportedAssets, startDate
-    );
-    if (histEquity <= 0n) {
-      return "-";
-    }
+    if (histEquity <= 0n) return noData;
 
+    // Vault APY (NAV-based TWR)
     const histNAV = (histEquity * WAD) / histTotalSupply;
-    if (histNAV <= 0n) {
-      return "-";
-    }
+    if (histNAV <= 0n) return noData;
 
-    // Period return from NAV change
-    const periodReturnScaled = ((currentNAV - histNAV) * WAD) / histNAV;
-    const periodReturn = Number(periodReturnScaled) / 1e18;
+    const vaultReturn = Number(((currentNAV - histNAV) * WAD) / histNAV) / 1e18;
+    if (vaultReturn <= -1) return noData;
 
-    if (periodReturn <= -1) {
-      return "-";
-    }
+    const vaultApy = Math.pow(1 + vaultReturn, 365 / actualDays) - 1;
 
-    // Annualize using 30 days
-    const apy = Math.pow(1 + periodReturn, 365 / 30) - 1;
-    return (apy * 100).toFixed(2);
+    // HODL APY (passive benchmark)
+    const hodlReturn = Number(((hodlEquity - histEquity) * WAD) / histEquity) / 1e18;
+    const hodlApy = hodlReturn <= -1 ? -1 : Math.pow(1 + hodlReturn, 365 / actualDays) - 1;
+
+    // Alpha = vault outperformance vs HODL
+    const alpha = vaultApy - hodlApy;
+
+    return {
+      apy: (vaultApy * 100).toFixed(2),
+      alpha: (alpha * 100).toFixed(2),
+    };
   } catch (error) {
-    console.error("Error calculating APY:", error);
-    return "-";
+    console.error("Error calculating performance metrics:", error);
+    return noData;
   }
 };
 
@@ -805,6 +818,7 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
       totalShares: "0",
       navPerShare: "0",
       apy: "0",
+      alpha: "0",
       paused: false,
       assets: [],
       deficitAssets: [],
@@ -845,39 +859,33 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
   let withdrawableEquity = 0n;
   const assets: VaultAsset[] = [];
   const deficitAssets: string[] = [];
+  const currentPrices = new Map<string, string>();
 
   for (const assetAddress of supportedAssetAddresses) {
-    // Get token info
     const tokenInfo = await getTokenInfo(accessToken, assetAddress);
-    
-    // Get balance held by bot executor
     const balance = await getTokenBalance(accessToken, assetAddress, botExecutor);
     const balanceBN = safeBigInt(balance);
-    
-    // Get min reserve
+
     const minReserve = minReserveMap.get(assetAddress.toLowerCase()) || "0";
     const minReserveBN = safeBigInt(minReserve);
-    
-    // Calculate withdrawable
+
     const withdrawable = balanceBN > minReserveBN ? (balanceBN - minReserveBN).toString() : "0";
     const withdrawableBN = safeBigInt(withdrawable);
-    
-    // Get price
+
     const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
     const priceBN = safeBigInt(priceUsd);
-    
-    // Calculate value in USD
+    currentPrices.set(assetAddress, priceUsd);
+
     const valueUsd = priceBN > 0n ? ((balanceBN * priceBN) / WAD).toString() : "0";
     const withdrawableValueUsd = priceBN > 0n ? ((withdrawableBN * priceBN) / WAD) : 0n;
-    
+
     totalEquity += safeBigInt(valueUsd);
     withdrawableEquity += withdrawableValueUsd;
-    
-    // Check for deficit
+
     if (balanceBN < minReserveBN) {
       deficitAssets.push(assetAddress);
     }
-    
+
     assets.push({
       address: assetAddress,
       symbol: tokenInfo.symbol,
@@ -892,14 +900,14 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
   }
 
   // Calculate NAV per share
-  let navPerShare = WAD.toString(); // Default to $1 per share
+  let navPerShare = WAD.toString();
   const totalSharesBN = safeBigInt(totalShares);
   if (totalSharesBN > 0n && totalEquity > 0n) {
     navPerShare = ((totalEquity * WAD) / totalSharesBN).toString();
   }
 
-  // Calculate APY based on 30-day NAV/share performance
-  const apy = await getAPY(
+  // Calculate APY and alpha vs HODL
+  const { apy, alpha } = await getPerformanceMetrics(
     accessToken,
     vaultAddress,
     totalEquity,
@@ -907,7 +915,8 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     shareToken,
     botExecutor,
     priceOracleAddress,
-    supportedAssetAddresses
+    supportedAssetAddresses,
+    currentPrices
   );
 
   return {
@@ -916,6 +925,7 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     totalShares,
     navPerShare,
     apy,
+    alpha,
     paused,
     assets,
     deficitAssets,
