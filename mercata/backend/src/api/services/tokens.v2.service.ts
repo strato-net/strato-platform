@@ -1,6 +1,7 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
+import { getRebaseFactors } from "./oracle.service";
 import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.service";
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
@@ -81,7 +82,7 @@ export const getEarningAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices, vaultShareToken, saveUsdstInfo, saveUsdstUserInfo] = await Promise.all([
+  const [tokens, collaterals, cdps, rawPrices, vaultShareToken, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -111,6 +112,7 @@ export const getEarningAssets = async (
     getVaultShareTokenAddress(accessToken),
     getSaveUsdstInfo(accessToken).catch(() => null),
     getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
+    getRebaseFactors(accessToken),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -133,6 +135,8 @@ export const getEarningAssets = async (
           ).toFixed(2)
         : "0.00";
 
+    const rebaseFactor = rebaseFactorMap.get(t.address);
+
     return {
       ...t,
       balance,
@@ -146,6 +150,7 @@ export const getEarningAssets = async (
         (vaultShareToken && t.address === vaultShareToken) ||
         t.description === "Liquidity Provider Token",
       value,
+      ...(rebaseFactor ? { rebaseFactor } : {}),
     };
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Table, Select, Space, Card } from 'antd';
 import { CopyOutlined, FrownOutlined } from '@ant-design/icons';
@@ -27,7 +27,18 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
     fetchWithdrawTransactions,
     availableNetworks,
     withdrawalRefreshKey,
+    bridgeableTokens,
   } = useBridgeContext();
+
+  const rebaseFactorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of bridgeableTokens) {
+      if (t.rebaseFactor && t.stratoTokenSymbol) {
+        map.set(t.stratoTokenSymbol, t.rebaseFactor);
+      }
+    }
+    return map;
+  }, [bridgeableTokens]);
 
   useEffect(() => {
     const loadTransactions = async () => {
@@ -151,8 +162,15 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
       key: "received",
       render: (_: any, record: any) => {
         const symbol = record?.externalSymbol || (record?.externalName === 'Ether' ? 'ETH' : record?.externalName) || '-';
-        const amount = formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18);
-        return <span className="text-sm text-foreground">{amount} {symbol}</span>;
+        const stratoAmount = record?.WithdrawalInfo?.stratoTokenAmount || '0';
+        const factor = rebaseFactorMap.get(record?.stratoTokenSymbol || '');
+        if (factor) {
+          try {
+            const externalAmount = (BigInt(stratoAmount) * BigInt(factor) / (10n ** 18n)).toString();
+            return <span className="text-sm text-foreground">≈ {formatWeiToDecimalHP(externalAmount, 18)} {symbol}</span>;
+          } catch { /* fall through */ }
+        }
+        return <span className="text-sm text-foreground">{formatWeiToDecimalHP(stratoAmount, 18)} {symbol}</span>;
       },
       width: 140,
     },
