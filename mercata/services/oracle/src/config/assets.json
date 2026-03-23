@@ -48,13 +48,13 @@
       "targetAssetAddress": "47de839c03a3b014c0cc4f3b9352979a5038f910"
     },
     "SPY": {
-      "targetAssetAddress": "0000000000000000000000000000000000000000",
+      "targetAssetAddress": "00000000000000000000000000000000deadbeef",
       "submit": false,
       "minValidSourcesOverride": 1,
       "comment": "SPY stock price feed for SPYX rebase. submit=false: only used as underlying, not pushed directly. TODO: add more stock-capable feeds."
     },
     "TSLA": {
-      "targetAssetAddress": "0000000000000000000000000000000000000000",
+      "targetAssetAddress": "00000000000000000000000000000000deadbeef",
       "submit": false,
       "minValidSourcesOverride": 1,
       "comment": "TSLA stock price feed for TSLAX rebase. submit=false: only used as underlying, not pushed directly. TODO: add more stock-capable feeds."
