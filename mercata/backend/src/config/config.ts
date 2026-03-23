@@ -53,7 +53,7 @@ export const cdpRegistry = process.env.CDP_REGISTRY || "000000000000000000000000
 
 export const safetyModule = process.env.SAFETY_MODULE || "0000000000000000000000000000000000001015";
 export const sToken = process.env.SUSDST_ADDRESS || "0000000000000000000000000000000000001016";
-export const saveUsdstVault = process.env.SAVE_USDST_VAULT || "eee43786dfefc01add3dfddfc21e36df6350cf65";
+export const saveUsdstVault = process.env.SAVE_USDST_VAULT || "ceeb982f671b4ee2b4471e5b49f3126739537f15";
 export const featuredEarnOpportunity = process.env.FEATURED_EARN_OPPORTUNITY || "save-usdst";
 
 // Hidden swap pools - these pools are filtered out from API responses

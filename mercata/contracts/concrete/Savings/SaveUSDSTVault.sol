@@ -254,7 +254,8 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
         uint256 supply = totalSupply();
         uint256 pricingAssets = _pricingAssets();
         if (shares == 0) return 0;
-        if (supply == 0 || pricingAssets == 0) return 0;
+        if (supply == 0) return shares;
+        if (pricingAssets == 0) return 0;
         return _mulDiv(shares, pricingAssets, supply, roundUp);
     }
 
