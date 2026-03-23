@@ -42,7 +42,7 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
   // Handle back navigation - check for 'from' query param for bridge-transactions page
   const handleBackClick = () => {
     const fromPage = searchParams.get('from');
-    if (pathname === '/bridge-transactions' && fromPage) {
+    if ((pathname === '/bridge-transactions' || pathname === '/metal-transactions') && fromPage) {
       if (fromPage === 'deposits') {
         navigate('/dashboard/deposits');
       } else if (fromPage === 'withdrawals') {

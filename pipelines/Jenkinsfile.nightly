@@ -33,7 +33,7 @@ pipeline {
         dir ('strato-worktree') {
           sh 'rm -rf .docker-work'
           sh 'make clean-docker-sentinels'
-          sh 'REPO=private make docker'
+          sh 'REPO=dev make docker'
         }
       }
     }

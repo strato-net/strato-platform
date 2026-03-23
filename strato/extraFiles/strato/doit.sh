@@ -9,7 +9,11 @@ Yellow='\033[0;33m'
 BYellow='\033[1;33m'
 NC='\033[0m'
 
-echo 'export PS1="⛓ \w> "' >> /root/.bashrc
+# Node config (ethconf.yaml, secrets, genesis) is created by strato-setup
+# which runs BEFORE docker-compose up (in the bootstrap-docker/strato script).
+
+# Set prompt for interactive debugging
+echo 'export PS1="⛓ \w> "' >> ~/.bashrc
 
 # Environment variable defaults
 : ${postgres_host:=postgres}
@@ -17,7 +21,6 @@ echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 : ${postgres_user:=postgres}
 : ${kafkaHost:=kafka}
 : ${kafkaPort:=9092}
-: ${zkHost:=zookeeper}
 : ${redisHost:=redis}
 : ${redisPort:=6379}
 
@@ -39,33 +42,13 @@ do
 done
 echo 'Kafka is available'
 
-echo 'Waiting for Zookeeper to be available...'
-until nc -z ${zkHost} 2181
-do
-  echo "Waiting for Zookeeper at ${zkHost}:2181..."
-  sleep 1
-done
-echo 'Zookeeper is available'
-
-# Go to node directory (created by strato-setup which ran outside the container)
+# Go to node directory (created by strato-setup before docker-compose up)
 cd /var/lib/strato
 
 # Debug: show current state
 echo "Working directory: $(pwd)"
 echo "Node contents:"
 ls -la
-
-# Wait for custom genesis if requested
-if [[ ${useCustomGenesis:-false} = "true" && ! -f "genesis.json" ]] ; then
-  set +x
-  echo "useCustomGenesis is set to true - waiting for genesis.json..."
-  echo "Use: docker cp myGenesisFile.json strato-strato-1:/var/lib/strato/genesis.json"
-  while [ ! -f "genesis.json" ]; do
-    sleep 1
-  done
-  echo "File genesis.json found! Continuing..."
-  set -x
-fi
 
 # Write OAuth credentials for the Haskell processes
 if [[ -n ${OAUTH_CLIENT_ID} && -n ${OAUTH_CLIENT_SECRET} ]]; then
@@ -81,18 +64,6 @@ fi
 mkdir -p config
 if [ ! -f config/priv ]; then
   echo -ne "\x1d\xd8\x85\xa4\x23\xf4\xe2\x12\x74\x0f\x11\x6a\xfa\x66\xd4\x0a\xaf\xdb\xb3\xa3\x81\x07\x91\x50\x37\x18\x01\x87\x1d\x9e\xa2\x81" > config/priv
-fi
-
-# Verify node was set up by strato-setup (which should have run outside the container)
-if [ ! -f .ethereumH/ethconf.yaml ]; then
-  echo -e "${Red}ERROR: Node not initialized. Run strato-setup before starting the container.${NC}"
-  echo "Expected to find: /var/lib/strato/.ethereumH/ethconf.yaml"
-  exit 1
-fi
-
-if [ ! -f commands.txt ]; then
-  echo -e "${Red}ERROR: commands.txt not found. Run strato-setup before starting the container.${NC}"
-  exit 1
 fi
 
 echo -e "${Green}Starting STRATO processes via convoke...${NC}"

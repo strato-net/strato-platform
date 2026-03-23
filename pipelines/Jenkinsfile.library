@@ -27,7 +27,7 @@ def generateGenesisBlock() {
 /**
  * Register a STRATO key for a user
  */
-def registerStratoUserKey(OAuthDiscoveryUrl, clientId, clientSecret, username='', password='') {
+def registerStratoUserKey(OAuthDiscoveryUrl, clientId, clientSecret, username='', password='', port='80') {
   
   def oauth_token_endpoint = sh(returnStdout: true, script: "curl --fail -s ${OAuthDiscoveryUrl} | jq -r .token_endpoint ").trim()
   sh "echo ${oauth_token_endpoint} > _oauth_token_endpoint_tmp"
@@ -38,12 +38,12 @@ def registerStratoUserKey(OAuthDiscoveryUrl, clientId, clientSecret, username=''
   }
   def user_token = sh(returnStdout: true, script: "curl --fail -s -X POST ${oauth_token_endpoint} -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic ${client_b64string}' ${data_url_encoded} | jq -r .access_token ").trim()
   sh "echo ${user_token} > _user_token_tmp"
-  
+  sh "echo ${port} > _port_tmp"
   sh '''#!/bin/bash -le
       set -xe
       # make sure user is created (now or earlier):
-      docker exec strato-nginx-1 curl --fail -H "Authorization: Bearer $(<_user_token_tmp)" -X POST "localhost:80/strato/v2.3/key"
-      userPubKey=$(docker exec strato-nginx-1 curl --fail -s -H "Authorization: Bearer $(<_user_token_tmp)" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
+      docker exec strato-nginx-1 curl --fail -H "Authorization: Bearer $(<_user_token_tmp)" -X POST "localhost:$(<_port_tmp)/strato/v2.3/key"
+      userPubKey=$(docker exec strato-nginx-1 curl --fail -s -H "Authorization: Bearer $(<_user_token_tmp)" -H "Accept: application/json" "localhost:$(<_port_tmp)/strato/v2.3/key" | jq -r .pubkey)
   '''
 }
 
@@ -152,6 +152,7 @@ def spinUpFileServer() {
         ssl=true \\
         HIGHWAY_URL=https://\$(</host):44300 \\
         HTTPS_PORT=44300 \\
+        HTTP_PORT=8000 \\
         ./highway
     """
   }
@@ -190,7 +191,7 @@ def replaceServerPortsDocker() {
     fi
 
     sed -i "s/PORT:-443/PORT:-44300/" $1
-    sed -i "s/PORT:-80/PORT:-8081/" $1
+    sed -i "s/PORT:-80/PORT:-8000/" $1
 
     if [ $? -ne 0 ]; then
       echo "Error occurred while modifying the file."

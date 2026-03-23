@@ -9,10 +9,6 @@ docker-compose.push.yml
 docker-compose.push.ecr.yml
 docker-compose.yml
 docker-compose.ecr.yml
-docker-compose.allDocker.push.yml
-docker-compose.allDocker.push.ecr.yml
-docker-compose.allDocker.yml
-docker-compose.allDocker.ecr.yml
 docker-compose.bridge.push.yml
 docker-compose.bridge.push.ecr.yml
 docker-compose.bridge.yml

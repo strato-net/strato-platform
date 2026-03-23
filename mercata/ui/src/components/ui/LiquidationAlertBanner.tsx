@@ -21,11 +21,11 @@ const LiquidationAlertBanner = ({ className = '' }: LiquidationAlertBannerProps)
   const colorClasses = getRiskLevelColor(riskLevel);
 
   const handleAddCollateral = () => {
-    navigate('/dashboard/borrow?tab=borrow');
+    navigate('/dashboard/advanced?tab=borrow&subtab=borrow');
   };
 
   const handleRepayLoan = () => {
-    navigate('/dashboard/borrow?tab=repay');
+    navigate('/dashboard/advanced?tab=borrow&subtab=repay');
   };
 
   const toggleCollapse = () => {

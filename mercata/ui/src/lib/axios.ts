@@ -76,18 +76,19 @@ const GUEST_SAFE_URLS = [
   '/bridge/withdrawalSummary',
   '/bridge/balance',
   '/bridge/transactions/withdrawal',
-  // Borrow page
-  '/lending/collateral/public',
-  '/lending/loans',
+  // Borrow page (CDP)
   '/cdp/vaults',
   '/cdp/assets',
+  // Advanced page - Borrow tab (Lending Pool)
+  '/lending/collateral/public',
+  '/lending/loans',
   // StratoStats page
   '/tokens/stats',
   '/cdp/stats',
   '/cdp/interest',
   '/lending/interest',
   '/protocol-fees/revenue',
-  // Advanced page - Mint tab - Liquidations sub-tab
+  // Borrow page - Liquidations sub-tab
   '/cdp/liquidatable',
   '/cdp/config',
   '/cdp/admin/global-paused',
@@ -103,6 +104,7 @@ const GUEST_SAFE_URLS = [
   // Rewards page
   '/rewards/overview',
   '/rewards/activities',
+  '/earn/save-usdst/info',
   // ActivityFeed page
   '/events',
   // Transfer page

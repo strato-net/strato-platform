@@ -33,6 +33,7 @@ import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
+import EarnSave from "./pages/EarnSave";
 import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
@@ -42,6 +43,7 @@ import CreditCardPage from "./pages/CreditCard";
 // Import dashboard components
 
 import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
+import MetalTransactionsPage from "./pages/MetalTransactionsPage";
 import WithdrawalsPage from "./pages/WithdrawalsPage";
 import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -270,6 +272,14 @@ const App = () => {
                                             }
                                           />
                                           <Route
+                                            path="/dashboard/earn-save"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnSave />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
                                             path="/dashboard/earn-lending"
                                             element={
                                               <GuestAccessibleRoute>
@@ -325,6 +335,15 @@ const App = () => {
                                             element={
                                               <ProtectedRoute>
                                                 <BridgeTransactionsPage />
+                                              </ProtectedRoute>
+                                            }
+                                          />
+
+                                          <Route
+                                            path="/metal-transactions"
+                                            element={
+                                              <ProtectedRoute>
+                                                <MetalTransactionsPage />
                                               </ProtectedRoute>
                                             }
                                           />
