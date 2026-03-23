@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { ArrowDown, ArrowUp, Gem, Frown } from 'lucide-react';
@@ -129,7 +129,18 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
   const {
     fetchDepositTransactions, fetchWithdrawTransactions,
     availableNetworks, depositRefreshKey, withdrawalRefreshKey,
+    bridgeableTokens,
   } = useBridgeContext();
+
+  const rebaseFactorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of bridgeableTokens) {
+      if (t.rebaseFactor && t.stratoTokenSymbol) {
+        map.set(t.stratoTokenSymbol, t.rebaseFactor);
+      }
+    }
+    return map;
+  }, [bridgeableTokens]);
 
   const chainNameMap = new Map(availableNetworks.map(n => [String(n.chainId), n.chainName]));
   const isMobile = useIsMobile();
@@ -172,6 +183,14 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
 
   const isBridge = fundingMode === "bridge";
 
+  const computeRebasedAmount = (stratoAmount: string, stratoSymbol?: string): string | null => {
+    const factor = rebaseFactorMap.get(stratoSymbol || '');
+    if (!factor) return null;
+    try {
+      return (BigInt(stratoAmount) * BigInt(factor) / (10n ** 18n)).toString();
+    } catch { return null; }
+  };
+
   const renderTxRows = (txs: RecentTx[]) => (
     <div className="divide-y divide-border/40">
       {txs.map((tx, index) => {
@@ -188,13 +207,16 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
         const isW = tx._type === 'withdrawal';
         const status = getStatusLabel(tx.status);
         const hasOutcome = !isW && tx.depositOutcome && tx.depositOutcome !== "bridge" && tx.finalTokenSymbol;
+        const rebasedExt = computeRebasedAmount(tx.amount || "0", tx.stratoTokenSymbol);
+        const externalAmt = rebasedExt ? `≈ ${formatBalance(rebasedExt, undefined, 18, 2, 4)}` : amt;
+
         return <TxRow key={key}
           icon={isW ? <ArrowUp className="w-4 h-4 text-amber-500" /> : <ArrowDown className="w-4 h-4 text-emerald-500" />}
           iconBg={isW ? "bg-amber-500/15" : "bg-emerald-500/15"}
           label={isW ? "Withdrawal" : "Deposit"} status={status}
           timeLabel={`${formatTimeAgo(tx.block_timestamp)} · ${chainNameMap.get(String(tx.externalChainId)) || "Unknown Chain"}`}
-          fromAmount={amt} fromSymbol={(isW ? tx.stratoTokenSymbol : tx.externalSymbol) || "-"}
-          toAmount={hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, 18, 2, 4) : amt}
+          fromAmount={isW ? amt : externalAmt} fromSymbol={(isW ? tx.stratoTokenSymbol : tx.externalSymbol) || "-"}
+          toAmount={hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, 18, 2, 4) : (isW ? externalAmt : amt)}
           toSymbol={(hasOutcome ? tx.finalTokenSymbol : (isW ? tx.externalSymbol : tx.stratoTokenSymbol)) || "-"} />;
       })}
     </div>
