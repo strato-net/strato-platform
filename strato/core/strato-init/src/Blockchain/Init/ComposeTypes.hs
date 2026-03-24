@@ -97,6 +97,7 @@ data Service = Service
   , healthcheck :: Maybe Healthcheck
   , logging :: Maybe Logging
   , extra_hosts :: Maybe [String]
+  , shm_size :: Maybe String
   } deriving stock (Show, Eq, Generic)
     deriving anyclass (Default)
 
