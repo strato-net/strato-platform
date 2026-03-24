@@ -39,6 +39,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
+import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
@@ -2487,7 +2488,7 @@ callBuiltin "fastForward" [secs] = do
 
 callBuiltin "abiEncode" args = SBytes <$> Builtins.abiEncode args
 callBuiltin "abiEncodePacked" args = SBytes <$> Builtins.abiEncodePacked args
-callBuiltin "abiDecode" (SBytes bs : typeArgs) = return $ Builtins.abiDecode bs typeArgs
+callBuiltin "abiDecode" (SBytes bs : typeArgs) = return $ abiDecode bs typeArgs
 callBuiltin "abiDecode" args = invalidArguments "abi.decode expects (bytes, types...)" args
 
 callBuiltin x args = unknownFunction (formatBuiltinError x args) x

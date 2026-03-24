@@ -12,10 +12,10 @@ build-type:     Simple
 library
   exposed-modules:
       Blockchain.SolidVM
+      Blockchain.SolidVM.Builtins
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
   other-modules:
-      Blockchain.SolidVM.Builtins
       Blockchain.SolidVM.Environment
       Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.SetGet
@@ -43,6 +43,7 @@ library
     , deepseq
     , elliptic-curve
     , ethereum-rlp
+    , evm-solidity
     , exceptions
     , extra
     , format
