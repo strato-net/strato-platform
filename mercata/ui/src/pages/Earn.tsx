@@ -100,16 +100,21 @@ const formatApyDisplay = (value: string | number | undefined): { label: string; 
     return { label: "--", className: "text-foreground" };
   }
 
-  if (apy <= 0 || Math.abs(apy) < 0.005) {
-    return { label: "--", className: "text-foreground" };
+  if (apy > 0) {
+    return {
+      label: `+${apy.toFixed(2)}%`,
+      className: "text-foreground",
+    };
   }
 
-  const sign = apy >= 0 ? "+" : "-";
-  const className = apy >= 0
-    ? "text-green-600 dark:text-green-400"
-    : "text-foreground";
+  if (apy < 0) {
+    return {
+      label: `${apy.toFixed(2)}%`,
+      className: "text-foreground",
+    };
+  }
 
-  return { label: `${sign}${Math.abs(apy).toFixed(2)}%`, className };
+  return { label: "0.00%", className: "text-foreground" };
 };
 
 const getEstimatedIncentiveApy = (
