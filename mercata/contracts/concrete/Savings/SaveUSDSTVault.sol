@@ -145,7 +145,6 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
         _requireInitialized();
         require(expectedAmount > 0, "SaveUSDST: zero reward");
         require(totalSupply() > 0, "SaveUSDST: no shares");
-        require(balanceBefore >= _managedAssets, "SaveUSDST: bad before balance");
 
         uint256 balanceAfter = IERC20(assetToken).balanceOf(address(this));
         require(balanceAfter >= balanceBefore, "SaveUSDST: balance decreased");
