@@ -172,7 +172,7 @@ contract record Mercata is Authorizable {
         address saveUSDSTVaultImpl = address(new SaveUSDSTVault(implOwnerIgnored));
         saveUSDSTVault = SaveUSDSTVault(address(new Proxy(saveUSDSTVaultImpl, this)));
         saveUSDSTVault.initialize(address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), "Save USDST", "saveUSDST");
-        Ownable(saveUSDSTVault).transferOwnership(address(adminRegistry));
+        Ownable(saveUSDSTVault).transferOwnership(address(0x000000000000000000000000000000000000100c));
 
         // Deploy CDP registry, vault, and engine
         address cdpRegistryImpl = address(new CDPRegistry(implOwnerIgnored));

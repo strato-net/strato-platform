@@ -41,6 +41,7 @@ const buildSaveUsdstEarningAsset = (
     totalBalance,
     isPoolToken: false,
     value,
+    apy: info.apy || "0",
   };
 };
 

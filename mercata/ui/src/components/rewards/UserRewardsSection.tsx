@@ -13,6 +13,7 @@ import { formatBalance, calculateTokenValue, safeParseUnits } from "@/utils/numb
 import { Loader2, Coins, TrendingUp, Info, Clock, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useUser } from "@/context/UserContext";
 import { useOracleContext } from "@/context/OracleContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -81,6 +82,7 @@ export const UserRewardsSection = ({
   onClaimSuccess,
 }: UserRewardsSectionProps) => {
   const { toast } = useToast();
+  const { saveUsdstInfo } = useSaveUsdstContext();
   const { userAddress } = useUser();
   const { getPrice } = useOracleContext();
   const [claimingActivityIds, setClaimingActivityIds] = useState<number[]>([]);
@@ -433,20 +435,22 @@ export const UserRewardsSection = ({
                       <p className="text-sm text-muted-foreground mb-1">Estimated Rewards/Day</p>
                       <p className="text-lg font-semibold">{estimatedPerDayFormatted}</p>
                       {(() => {
-                        // Show pts/$1/day based on *user* stake USD (personal normalization)
-                        if (!activity || estimatedPerDayFormatted === "?" || !userInfo) return null;
+                        if (!activity?.emissionRate) return null;
 
-                        const userStakeUsd =
-                          userInfo.stakeUsd !== null && userInfo.stakeUsd !== undefined
-                            ? BigInt(userInfo.stakeUsd)
-                            : (activity.stakeUnitPriceUsd
-                                ? (BigInt(userInfo.stake || "0") * BigInt(activity.stakeUnitPriceUsd)) / BigInt(10 ** 18)
-                                : (activity.stakeDenomination === "usd_notional" ? BigInt(userInfo.stake || "0") : 0n));
+                        const lowerName = activity.name?.toLowerCase?.() || "";
+                        const normalizedSource = activity.sourceContract?.toLowerCase?.() || "";
+                        const normalizedSaveUsdstSource = saveUsdstInfo?.vaultAddress?.toLowerCase?.() || "";
+                        const fallbackStakeUsd =
+                          lowerName.includes("save usdst") ||
+                          lowerName.includes("saveusdst") ||
+                          (normalizedSaveUsdstSource && normalizedSource === normalizedSaveUsdstSource)
+                            ? (saveUsdstInfo?.tvlUsd || saveUsdstInfo?.pricingAssets || saveUsdstInfo?.totalAssets || null)
+                            : null;
 
-                        if (userStakeUsd === 0n) return null;
+                        const totalStakeUsd = BigInt(activity.totalStakeUsd || fallbackStakeUsd || "0");
+                        if (totalStakeUsd === 0n) return null;
 
-                        const estimatedPerDayBig = BigInt(estimatedPerDay || "0");
-                        const ptsPerDollarPerDay = (estimatedPerDayBig * BigInt(10 ** 18)) / userStakeUsd;
+                        const ptsPerDollarPerDay = (BigInt(activity.emissionRate) * 86400n * BigInt(10 ** 18)) / totalStakeUsd;
                         const formatted = formatRoundedWithCommas(
                           roundByMagnitude(formatBalance(ptsPerDollarPerDay.toString(), "", 18, 18, 18))
                         );
