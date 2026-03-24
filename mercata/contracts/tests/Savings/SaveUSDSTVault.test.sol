@@ -553,5 +553,10 @@ contract Describe_SaveUSDSTVault is Authorizable {
 
         require(maxW <= liveBalance, "maxWithdraw exceeds live balance");
         require(maxW <= claim, "maxWithdraw exceeds economic claim");
+
+        // Needed because state persists across test runs
+        if (burnAmt > 0) {
+            Token(USDST).mint(address(vault), burnAmt);
+        }
     }
 }
