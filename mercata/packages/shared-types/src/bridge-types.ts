@@ -54,6 +54,8 @@ export interface DepositAction {
   stratoTokenImage?: string;
   payToken: string;              // STRATO pay token this applies to (join key to match VIA MINT routes)
   oraclePrice?: string;          // WAD-scaled price for estimated output calc
+  /** Metal forge fee in basis points; AUTO_FORGE (action 2) only, from MetalForge metalConfigs */
+  feeBps?: string;
 }
 
 // ============================================================================

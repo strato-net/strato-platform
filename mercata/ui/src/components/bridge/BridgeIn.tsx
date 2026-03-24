@@ -32,7 +32,7 @@ import {
   validateRouterContract,
 } from "@/lib/bridge/contractService";
 import { normalizeError } from "@/lib/bridge/utils";
-import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits } from "@/utils/numberUtils";
+import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateDecimals } from "@/utils/numberUtils";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useEarnContext } from "@/context/EarnContext";
@@ -61,21 +61,6 @@ const STEP3_APY_ROW_CLASS = "mt-0.5 flex min-h-[18px] items-center";
 
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
 
-const apySourceDisplay = (a: ApySource): string => {
-  switch (a.source) {
-    case "lending":
-      return "Lending pool";
-    case "swap":
-      return "Swap pool";
-    case "vault":
-      return "Vault";
-    case "safety":
-      return "Safety module";
-    default:
-      return a.source;
-  }
-};
-
 const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
   switch (info.source) {
     case "lending":
@@ -101,6 +86,44 @@ const calcMetalAmount = (payAmount: string, metal: MetalConfig, payToken: PayTok
   } catch { return 0n; }
 };
 
+/** WAD-scaled oracle USD price per metal unit → formatted $ */
+const fmtSpotDollarWei = (weiStr: string): string | null => {
+  try {
+    const v = BigInt(weiStr);
+    if (v <= 0n) return null;
+    const s = formatUnits(v, 18);
+    const n = parseFloat(s);
+    if (!Number.isFinite(n)) return null;
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+  } catch {
+    return null;
+  }
+};
+
+/** Effective USD per metal unit after mint fee spread: spot * 10000 / (10000 - feeBps) */
+const effectiveDollarWei = (spotWeiStr: string, feeBps: string): string | null => {
+  try {
+    const spot = BigInt(spotWeiStr);
+    const bps = BigInt(feeBps || "0");
+    if (spot <= 0n || bps >= 10000n) return null;
+    const eff = (spot * 10000n) / (10000n - bps);
+    return fmtSpotDollarWei(eff.toString());
+  } catch {
+    return null;
+  }
+};
+
+const metalPriceRowLabels = (oracleWei: string | undefined, feeBps: string | undefined): { spot: string; effective: string } => {
+  const spot = oracleWei ? fmtSpotDollarWei(oracleWei) : null;
+  const eff = oracleWei && feeBps != null && feeBps !== "" ? effectiveDollarWei(oracleWei, feeBps) : null;
+  return { spot: spot ?? "—", effective: eff ?? "—" };
+};
+
 const CrossfadePanel = ({ active, children }: { active: boolean; children: React.ReactNode }) => (
   <div className={`transition-opacity duration-300 ${active ? "opacity-100" : "opacity-0 absolute inset-0 pointer-events-none"}`}>
     {children}
@@ -111,19 +134,25 @@ const CardSkeleton = ({ id }: { id: string }) => (
   <div key={id} className="relative text-left rounded-md border-2 border-border p-3 animate-pulse snap-start">
     <div className="flex items-center gap-2 mb-1">
       <div className="w-6 h-6 rounded-full bg-muted shrink-0" />
-      <div className="h-[1.25rem] w-16 bg-muted rounded" />
+      <div>
+        <div className="h-[1.25rem] w-16 bg-muted rounded" />
+        <div className="h-[14px] w-20 bg-muted/50 rounded mt-0.5" />
+      </div>
     </div>
-    <div className="h-[1rem] w-12 bg-muted rounded" />
+    <div className="h-[1rem] w-20 bg-muted rounded" />
     <div className={STEP3_APY_ROW_CLASS}>
-      <div className="h-2.5 w-16 bg-muted/50 rounded" />
+      <div className="h-5 w-24 bg-muted/40 rounded-full" />
     </div>
+    <div className="h-[14px] w-28 bg-muted/30 rounded mt-0.5" />
   </div>
 );
 
-const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled, apyBadge }: {
+const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBadge, effectivePrice, spotLabel }: {
   active: boolean; image?: string; symbol: string; estimated: string;
-  label?: string; onClick: () => void; disabled: boolean;
+  onClick: () => void; disabled: boolean;
   apyBadge: React.ReactNode;
+  effectivePrice?: string;
+  spotLabel?: string;
 }) => (
   <button type="button" onClick={onClick} disabled={disabled}
     className={`relative text-left rounded-md border-2 p-3 transition-colors snap-start ${
@@ -134,54 +163,58 @@ const TokenCard = ({ active, image, symbol, estimated, label, onClick, disabled,
       {image
         ? <img src={image} alt={symbol} className="w-6 h-6 rounded-full object-cover shrink-0" />
         : <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">{(symbol || "?").charAt(0)}</span>}
-      <p className="text-sm font-semibold text-foreground">{symbol}</p>
+      <div>
+        <p className="text-sm font-semibold text-foreground leading-tight">{symbol}</p>
+        <p className="min-h-[14px] text-[11px] text-muted-foreground leading-tight">{effectivePrice ? `${effectivePrice}/unit` : "\u00A0"}</p>
+      </div>
     </div>
-    <p className="text-xs text-muted-foreground">{"\u2248"} {estimated}</p>
+    <p className="text-xs text-muted-foreground">{"\u2248"} {estimated} {symbol}</p>
     {apyBadge}
-    {label ? <p className="text-[10px] text-muted-foreground mt-1">{label}</p> : null}
+    <p className="min-h-[14px] text-[10px] text-muted-foreground mt-0.5">{spotLabel || "\u00A0"}</p>
   </button>
 );
+
+/** Responsive visible-card count based on container width: 5 desktop / 4 tablet / 3 mobile */
+const colsForWidth = (w: number) => (w >= 700 ? 5 : w >= 480 ? 4 : 3);
 
 const ScrollRow = ({ children }: { children: React.ReactNode }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  const [cols, setCols] = useState(3);
   const count = React.Children.count(children);
 
-  const check = useCallback(() => {
+  const update = useCallback(() => {
     const el = ref.current;
     if (!el) return;
+    setCols(colsForWidth(el.clientWidth));
     setCanLeft(el.scrollLeft > 2);
     setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
   }, []);
 
   useEffect(() => {
-    if (count <= 3) return;
-    check();
+    update();
     const el = ref.current;
     if (!el) return;
-    el.addEventListener("scroll", check, { passive: true });
-    const ro = new ResizeObserver(check);
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => { el.removeEventListener("scroll", check); ro.disconnect(); };
-  }, [check, count]);
+    return () => { el.removeEventListener("scroll", update); ro.disconnect(); };
+  }, [update]);
 
   const scroll = (dir: number) => {
     const el = ref.current;
     if (!el) return;
-    el.scrollBy({ left: dir * Math.floor(el.clientWidth / 3), behavior: "smooth" });
+    el.scrollBy({ left: dir * Math.floor(el.clientWidth / cols), behavior: "smooth" });
   };
 
-  const needsScroll = count > 3;
-  const gridStyle: React.CSSProperties = needsScroll
-    ? {
-        gridTemplateColumns: `repeat(${count}, calc((100% - 16px) / 3))`,
-        overflowX: "auto",
-        scrollbarWidth: "none",
-      }
-    : {
-        gridTemplateColumns: `repeat(${count || 1}, minmax(0, 1fr))`,
-      };
+  const needsScroll = count > cols;
+  const gapPx = (cols - 1) * 8;
+  const colWidth = `calc((100% - ${gapPx}px) / ${cols})`;
+  const gridStyle: React.CSSProperties = {
+    gridTemplateColumns: `repeat(${count || 1}, ${colWidth})`,
+    ...(needsScroll ? { overflowX: "auto", scrollbarWidth: "none" } as const : {}),
+  };
 
   return (
     <div className="relative group">
@@ -294,19 +327,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [bridgeableTokens, selectedToken, depositActions]);
 
   const getApyInfo = useMemo(() => {
-    const m = new Map<string, { apy: string; sourceLabel: string; source: ApySource["source"]; poolAddress?: string }>();
+    const m = new Map<string, { apy: string; source: ApySource["source"]; poolAddress?: string }>();
     for (const entry of tokenApys) {
       let best: ApySource | null = null;
       for (const a of entry.apys) {
         if (!best || parseFloat(a.apy) > parseFloat(best.apy)) best = a;
       }
       if (best && parseFloat(best.apy) > 0) {
-        m.set(normAddr(entry.token), {
-          apy: best.apy,
-          sourceLabel: apySourceDisplay(best),
-          source: best.source,
-          poolAddress: best.poolAddress,
-        });
+        m.set(normAddr(entry.token), { apy: best.apy, source: best.source, poolAddress: best.poolAddress });
       }
     }
     return (addr: string) => m.get(normAddr(addr));
@@ -318,6 +346,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       if (!info) return;
       navigate(pathForApyInfo(info));
     };
+
     return (
       <div className={STEP3_APY_ROW_CLASS}>
         {!tokenApysLoaded ? (
@@ -326,7 +355,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           <span
             role="link"
             tabIndex={0}
-            className="text-[10px] font-medium leading-snug text-green-500 cursor-pointer hover:underline"
+            className="inline-flex items-center gap-0.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-500 cursor-pointer hover:bg-green-500/20 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               go();
@@ -338,7 +367,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               go();
             }}
           >
-            {`Earn ${info.apy}% via ${info.sourceLabel}`}
+            {`Earn up to ${info.apy}%`} {"\u2192"}
           </span>
         ) : null}
       </div>
@@ -1028,13 +1057,16 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   ? Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={`ms-${i}`} id={`ms-${i}`} />)
                   : metalsConfig.metals.filter(m => m.isEnabled).map((metal) => {
                       const metalWei = amount && selectedPayToken ? calcMetalAmount(amount, metal, selectedPayToken) : 0n;
+                      const prices = metalPriceRowLabels(metal.price, metal.feeBps);
                       return (
                         <TokenCard key={metal.address}
                           active={selectedMetal?.address === metal.address}
                           image={metal.imageUrl} symbol={metal.symbol}
-                          estimated={metalWei > 0n ? formatUnits(metalWei, 18) : "0"}
+                          estimated={metalWei > 0n ? truncateDecimals(formatUnits(metalWei, 18), 6) : "0"}
                           onClick={() => setSelectedMetal(metal)}
                           disabled={guestMode || isLoading}
+                          effectivePrice={prices.effective}
+                          spotLabel={`Spot ${prices.spot} \u00B7 ${Number(metal.feeBps) / 100}% fee`}
                           apyBadge={<ApyLine addr={metal.address} />}
                         />
                       );
@@ -1047,10 +1079,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                 {sourceTokenRoutes.length > 0 ? [
                   ...sourceTokenRoutes.map((rt) => {
                     let est = amount || "0";
+                    const routePrice = rt.rebaseFactor
+                      ? fmtSpotDollarWei(rt.rebaseFactor)
+                      : "$1.00";
                     if (rt.rebaseFactor && amount) {
                       try {
                         const factor = BigInt(rt.rebaseFactor);
-                        if (factor > 0n) est = formatUnits((safeParseUnits(amount, 18) * WAD) / factor, 18);
+                        if (factor > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / factor, 18), 6);
                       } catch { /* keep original */ }
                     }
                     return (
@@ -1060,6 +1095,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         estimated={est}
                         onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
                         disabled={guestMode || isLoading}
+                        effectivePrice={routePrice}
                         apyBadge={<ApyLine addr={rt.stratoToken} />}
                       />
                     );
@@ -1069,9 +1105,19 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                     if (action.action === 2 && action.oraclePrice && amount) {
                       try {
                         const price = BigInt(action.oraclePrice);
-                        if (price > 0n) est = formatUnits((safeParseUnits(amount, 18) * WAD) / price, 18);
+                        if (price > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / price, 18), 6);
                       } catch { /* keep */ }
                     }
+                    const isForge = action.action === 2;
+                    const forgePrices = isForge
+                      ? metalPriceRowLabels(action.oraclePrice, action.feeBps)
+                      : undefined;
+                    const earnPrice = !isForge && action.oraclePrice
+                      ? fmtSpotDollarWei(action.oraclePrice)
+                      : undefined;
+                    const forgeSpotLabel = forgePrices && action.feeBps
+                      ? `Spot ${forgePrices.spot} \u00B7 ${Number(action.feeBps) / 100}% fee`
+                      : undefined;
                     return (
                       <TokenCard key={action.id}
                         active={selectedAction?.id === action.id}
@@ -1083,6 +1129,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                           setSelectedAction(action);
                         }}
                         disabled={guestMode || isLoading}
+                        effectivePrice={forgePrices?.effective ?? earnPrice}
+                        spotLabel={forgeSpotLabel}
                         apyBadge={<ApyLine addr={action.stratoToken} />}
                       />
                     );
