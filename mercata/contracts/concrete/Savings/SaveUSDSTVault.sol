@@ -140,17 +140,16 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
         return (_pricingAssets() * 1e18) / totalSupply();
     }
 
-    /// @notice Record prefunded USDST rewards that have already arrived in the vault.
-    function recordRewardTransfer(uint256 expectedAmount, uint256 balanceBefore) external onlyOwner returns (uint256 credited) {
+    /// @notice Credit prefunded USDST rewards that have already arrived in the vault.
+    function recordRewardTransfer(uint256 expectedAmount) external onlyOwner returns (uint256 credited) {
         _requireInitialized();
         require(expectedAmount > 0, "SaveUSDST: zero reward");
         require(totalSupply() > 0, "SaveUSDST: no shares");
 
-        uint256 balanceAfter = IERC20(assetToken).balanceOf(address(this));
-        require(balanceAfter >= balanceBefore, "SaveUSDST: balance decreased");
-        credited = balanceAfter - balanceBefore;
-        require(credited == expectedAmount, "SaveUSDST: unexpected balance change");
+        uint256 balance = IERC20(assetToken).balanceOf(address(this));
+        require(balance >= _managedAssets + expectedAmount, "SaveUSDST: insufficient stray");
 
+        credited = expectedAmount;
         _managedAssets += credited;
         emit RewardNotified(_msgSender(), credited);
     }

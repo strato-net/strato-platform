@@ -34,9 +34,8 @@ contract Describe_SaveUSDSTVault is Authorizable {
     }
 
     function recordRewardTransfer(uint amount) internal {
-        uint balanceBefore = IERC20(USDST).balanceOf(address(vault));
         Token(USDST).transfer(address(vault), amount);
-        vault.recordRewardTransfer(amount, balanceBefore);
+        vault.recordRewardTransfer(amount);
     }
 
     function it_initializes_as_an_exchange_rate_vault() public {
@@ -99,11 +98,10 @@ contract Describe_SaveUSDSTVault is Authorizable {
 
     function it_reverts_reward_notification_when_no_shares_exist() public {
         Token(USDST).mint(address(this), 20e18);
-        uint balanceBefore = IERC20(USDST).balanceOf(address(vault));
         Token(USDST).transfer(address(vault), 20e18);
 
         bool reverted = false;
-        try vault.recordRewardTransfer(20e18, balanceBefore) {
+        try vault.recordRewardTransfer(20e18) {
         } catch {
             reverted = true;
         }
@@ -140,11 +138,10 @@ contract Describe_SaveUSDSTVault is Authorizable {
         saver.do(address(vault), "redeem(uint256,address,address)", 50e18, address(saver), address(saver));
 
         Token(USDST).mint(address(this), 10e18);
-        uint balanceBefore = IERC20(USDST).balanceOf(address(vault));
         Token(USDST).transfer(address(vault), 10e18);
 
         bool reverted = false;
-        try vault.recordRewardTransfer(10e18, balanceBefore) {
+        try vault.recordRewardTransfer(10e18) {
         } catch {
             reverted = true;
         }
@@ -556,5 +553,10 @@ contract Describe_SaveUSDSTVault is Authorizable {
 
         require(maxW <= liveBalance, "maxWithdraw exceeds live balance");
         require(maxW <= claim, "maxWithdraw exceeds economic claim");
+
+        // Needed because state persists across test runs
+        if (burnAmt > 0) {
+            Token(USDST).mint(address(vault), burnAmt);
+        }
     }
 }
