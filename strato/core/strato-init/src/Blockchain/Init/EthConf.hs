@@ -22,7 +22,8 @@ getApiIPAddress :: String
 getApiIPAddress
   | flags_apiIPAddress /= "127.0.0.1" = flags_apiIPAddress  -- User provided explicit value
   | os == "linux" = "172.17.0.1"                            -- Linux Docker bridge
-  | otherwise = "host.docker.internal"                      -- macOS/Windows Docker
+  | os == "darwin" = "0.0.0.0"                              -- macOS
+  | otherwise = "host.docker.internal"                      -- Windows Docker
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
