@@ -338,7 +338,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               go();
             }}
           >
-            {`Earn ${info.apy}% via ${info.sourceLabel}`}
+            {`Up to ${info.apy}% APY via ${info.sourceLabel}`}
           </span>
         ) : null}
       </div>
