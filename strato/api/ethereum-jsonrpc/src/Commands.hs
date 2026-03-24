@@ -11,8 +11,8 @@ import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runKafkaMConfigured, ethConf)
 import Blockchain.EthConf.Model (networkConfig, networkID, network)
-import Blockchain.Sequencer.Event (JsonRpcCommand(..), VmEvent(..))
-import Blockchain.Sequencer.Kafka (writeSeqVmEvents)
+import Blockchain.Sequencer.Event (JsonRpcCommand(..), VmTask(..))
+import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Control.Monad.IO.Class
 import Control.Monad.Composable.Kafka (fetchItems, execKafka)
@@ -239,7 +239,7 @@ getAccountField addressString field = do
 emitJsonRpcCommand :: JsonRpcCommand -> IO ()
 emitJsonRpcCommand c = do
   putStrLn $ "emitJsonRpcCommand: " ++ show c
-  _ <- runKafkaMConfigured "ethereum-jsonrpc" $ writeSeqVmEvents [VmJsonRpcCommand c]
+  _ <- runKafkaMConfigured "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
   return ()
 
 waitForResponse :: String -> Int -> Offset -> IO B.ByteString

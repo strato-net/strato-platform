@@ -12,7 +12,7 @@ import Blockchain.EthConf (runKafkaMConfigured)
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents, assertSequencerTopicsCreation)
+import Blockchain.Sequencer.Kafka (writeSeqVmTasks, writeSeqP2pEvents, assertSequencerTopicsCreation)
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad.Composable.Kafka
@@ -45,6 +45,6 @@ initKafka :: OutputBlock -> IO ()
 initKafka shortCircuit = do
         runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do
           _ <- assertSequencerTopicsCreation
-          _ <- writeSeqVmEvents [VmBlock shortCircuit]
+          _ <- writeSeqVmTasks [VmBlock shortCircuit]
           _ <- writeSeqP2pEvents [P2pBlock shortCircuit]
           return ()

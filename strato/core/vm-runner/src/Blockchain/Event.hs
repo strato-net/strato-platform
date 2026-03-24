@@ -41,7 +41,7 @@ import qualified Data.ByteString as B
 import qualified Data.DList as DL
 import Data.Map (Map)
 
-type VmInEvent = VmEvent
+type VmInEvent = VmTask
 
 data VmInEventBatch = InBatch
   { rpcCommands :: [JsonRpcCommand],

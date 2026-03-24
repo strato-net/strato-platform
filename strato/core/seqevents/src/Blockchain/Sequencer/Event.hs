@@ -7,7 +7,7 @@ module Blockchain.Sequencer.Event (
   IngestEvent(..),
   FlushMempoolRequest(..),
   FlushMempoolScope(..),
-  VmEvent(..),
+  VmTask(..),
   P2pEvent(..),
   Timestamp,
   SeqLoopEvent(..),
@@ -132,7 +132,7 @@ instance ShowConstructor P2pEvent where
   showConstructor P2pGetMPNodes{} = "P2pGetMPNodes"
   showConstructor P2pMPNodesResponse{} = "P2pMPNodesResponse"
 
-data VmEvent
+data VmTask
   = VmTx Timestamp OutputTx
   | VmBlock OutputBlock
   | VmJsonRpcCommand JsonRpcCommand
@@ -143,7 +143,7 @@ data VmEvent
   | VmFlushMempool FlushMempoolRequest
   deriving (Eq, Show, GHCG.Generic)
 
-instance Format VmEvent where
+instance Format VmTask where
   format (VmTx ts o) = show ts ++ " " ++ format o
   format (VmBlock o) = format o
   format (VmGetMPNodesRequest o srs) = show o ++ " requested: " ++ format srs
@@ -151,7 +151,7 @@ instance Format VmEvent where
   format (VmFlushMempool req) = format req
   format x = show x
 
-instance ShowConstructor VmEvent where
+instance ShowConstructor VmTask where
   showConstructor VmTx{} = "VmTx"
   showConstructor VmBlock{} = "VmBlock"
   showConstructor VmJsonRpcCommand{} = "VmJsonRpcCommand"
@@ -167,4 +167,4 @@ instance Binary JsonRpcCommand
 
 instance Binary P2pEvent
 
-instance Binary VmEvent
+instance Binary VmTask
