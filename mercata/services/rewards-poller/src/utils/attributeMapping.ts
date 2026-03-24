@@ -12,6 +12,7 @@ const PriceOracleBatchUpdateEvents = `${MERCATA_PREFIX}PriceOracle-BatchPricesUp
 const PRICE_CONVERSION_MAP: Record<string, string> = {
   Swap: "tokenIn",
   DepositCompleted: "stratoToken",
+  WithdrawalCompleted: "stratoToken",
 };
 
 const toBigIntSafeString = (value: string | number): string => {
@@ -186,7 +187,7 @@ export const extractAmountFromAttributes = async (
       return null;
     }
 
-    if (eventName === "DepositCompleted") {
+    if (eventName === "DepositCompleted" || eventName === "WithdrawalCompleted") {
       const isUsdt =
         tokenAddress.toLowerCase() === config.usdst.address.toLowerCase();
 
