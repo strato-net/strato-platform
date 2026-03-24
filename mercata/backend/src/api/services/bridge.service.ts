@@ -15,7 +15,7 @@ import {
 } from "../helpers/bridge.helper";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@mercata/shared-types";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
-import { getOraclePrices } from "./oracle.service";
+import { getOraclePrices, getRebaseFactors } from "./oracle.service";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 
 const { MercataBridge, Token, LendingPool, LendingRegistry, mercataBridge, DECIMALS } = constants;
@@ -132,9 +132,17 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
     const lower = token.toLowerCase();
     tokenAddressSet.add(lower.startsWith("0x") ? lower.slice(2) : lower);
   }
-  const tokenMap = await getTokenMetadata(accessToken, [...tokenAddressSet]);
+  const [tokenMap, rebaseFactorMap] = await Promise.all([
+    getTokenMetadata(accessToken, [...tokenAddressSet]),
+    getRebaseFactors(accessToken),
+  ]);
 
-  return enrichAssetsWithTokenData(routes, tokenMap);
+  const tokens = enrichAssetsWithTokenData(routes, tokenMap);
+  for (const token of tokens) {
+    const factor = rebaseFactorMap.get(token.stratoToken.toLowerCase().replace(/^0x/, ''));
+    if (factor) token.rebaseFactor = factor;
+  }
+  return tokens;
 };
 
 export const getNetworkConfigs = async (accessToken: string): Promise<NetworkConfig[]> => { 

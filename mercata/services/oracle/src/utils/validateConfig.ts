@@ -165,6 +165,14 @@ export async function validateConfig(): Promise<boolean> {
             return;
         }
         
+        // Rebasing assets derive their price from underlyingAsset × factor, not from sources
+        if (asset.rebase) {
+            if (!assetsConfig.assets[asset.rebase.underlyingAsset]) {
+                errors.push(`Asset ${assetKey} rebase.underlyingAsset '${asset.rebase.underlyingAsset}' not found in assets.json`);
+            }
+            return;
+        }
+        
         // Skip minimum source check for constant-priced assets
         if (asset.constantPrice !== undefined) {
             if (!sources.includes('constant')) {
@@ -181,9 +189,10 @@ export async function validateConfig(): Promise<boolean> {
             return;
         }
         
-        if (sources.length < ORACLE_CONFIG.MIN_VALID_SOURCES) {
+        const requiredSources = ORACLE_CONFIG.MIN_VALID_SOURCES;
+        if (sources.length < requiredSources) {
             errors.push(
-                `Asset ${assetKey} has only ${sources.length} source(s), needs at least ${ORACLE_CONFIG.MIN_VALID_SOURCES}. ` +
+                `Asset ${assetKey} has only ${sources.length} source(s), needs at least ${requiredSources}. ` +
                 `Sources: [${sources.join(', ')}]`
             );
         }
