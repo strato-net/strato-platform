@@ -17,9 +17,9 @@ import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Control.Monad.IO.Class
 import Control.Monad.Composable.Kafka (fetchItems, execKafka)
 import Control.Monad.Except
-import Model.HexData (HexData(..))
-import qualified Model.TxCallObject as TxCall
-import Model.TxCallObject (TxCallObject)
+import Blockchain.Sequencer.HexData (HexData(..))
+import qualified Blockchain.Sequencer.TxCallObject as TxCall
+import Blockchain.Sequencer.TxCallObject (TxCallObject)
 import Network.Kafka (getLastOffset, KafkaTime(..))
 import Network.Kafka.Protocol (Offset(..))
 import qualified Data.Aeson as JSON
@@ -313,7 +313,7 @@ eth_call = toMethod "eth_call" f (Required "txObject" :+: Required "blockTag" :+
           rpcId = "eth_call_" ++ take 16 (BC.unpack $ B16.encode callData)
       liftIO $ putStrLn $ "eth_call: block=" ++ blockTag ++ " data=" ++ show callData
       liftIO $ putStrLn $ "eth_call: submitting JRCCall to vm-runner, id=" ++ rpcId
-      result <- liftIO $ callVM $ JRCCall callData rpcId blockTag
+      result <- liftIO $ callVM $ JRCCall txObj rpcId blockTag
       liftIO $ putStrLn $ "eth_call: vm-runner returned: " ++ show result
       return $ "0x" ++ BC.unpack (B16.encode result)
 

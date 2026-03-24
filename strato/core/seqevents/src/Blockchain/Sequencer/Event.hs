@@ -19,6 +19,7 @@ import qualified Blockchain.Data.Block as BDB
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Model.WrappedBlock (OutputBlock(..), OutputTx(..), IngestBlock(..), IngestTx(..))
+import Blockchain.Sequencer.TxCallObject (TxCallObject)
 import qualified Blockchain.Strato.Model.Address as A
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
@@ -98,7 +99,7 @@ data JsonRpcCommand
   | JRCGetCode {jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String}
   | JRCGetTransactionCount {jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String}
   | JRCGetStorageAt {jrcAddress :: A.Address, jrcKey :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
-  | JRCCall {jrcCode :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
+  | JRCCall {jrcCallObj :: TxCallObject, jrcId :: String, jrcBlockString :: String}
   deriving (Eq, Read, Show, GHCG.Generic, Data)
 
 instance Format JsonRpcCommand where

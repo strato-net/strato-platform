@@ -17,8 +17,6 @@ executable ethereum-jsonrpc
       APIProxy
       Binary
       Commands
-      Model.HexData
-      Model.TxCallObject
       RPC
       Server
       Paths_ethereum_jsonrpc

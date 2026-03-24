@@ -13,15 +13,19 @@ library
   exposed-modules:
       Blockchain.Sequencer.Constants
       Blockchain.Sequencer.Event
+      Blockchain.Sequencer.HexData
       Blockchain.Sequencer.Kafka
       Blockchain.Sequencer.Kafka.Metrics
+      Blockchain.Sequencer.TxCallObject
   other-modules:
       Paths_seqevents
   hs-source-dirs:
       src/
   ghc-options: -fconstraint-solver-iterations=8
   build-depends:
-      base
+      aeson
+    , base
+    , base16-bytestring
     , binary
     , blockDB
     , blockapps-data

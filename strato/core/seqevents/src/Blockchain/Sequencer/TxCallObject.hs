@@ -1,16 +1,19 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Model.TxCallObject
+module Blockchain.Sequencer.TxCallObject
   ( TxCallObject (..),
   )
 where
 
+import Blockchain.Sequencer.HexData (HexData(..))
 import Blockchain.Strato.Model.Address (Address(..))
 import Data.Aeson (FromJSON (..), ToJSON (..), genericToJSON, defaultOptions, Options(..), (.:?), (.!=), withObject)
+import Data.Binary
+import Data.Data (Data)
 import Data.Text (Text)
 import GHC.Generics (Generic)
-import Model.HexData (HexData(..))
 
 data TxCallObject = TxCallObject
   { from :: Address,
@@ -20,7 +23,9 @@ data TxCallObject = TxCallObject
     value :: Text,
     data_ :: HexData
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Read, Eq, Data, Generic)
+
+instance Binary TxCallObject
 
 stripUnderscore :: String -> String
 stripUnderscore s = if last s == '_' then init s else s

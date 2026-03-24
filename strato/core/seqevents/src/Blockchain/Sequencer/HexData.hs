@@ -1,19 +1,26 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Model.HexData
+module Blockchain.Sequencer.HexData
   ( HexData (..),
   )
 where
 
 import Data.Aeson (FromJSON (..), ToJSON (..), withText)
+import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import Data.Data (Data)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import GHC.Generics (Generic)
 
 newtype HexData = HexData { unHexData :: B.ByteString }
-  deriving (Show, Eq)
+  deriving (Show, Read, Eq, Data, Generic)
+
+instance Binary HexData
 
 strip0x :: Text -> Text
 strip0x t = case T.stripPrefix "0x" t of
