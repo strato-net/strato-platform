@@ -19,7 +19,8 @@ import qualified Blockchain.Data.Block as BDB
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Model.WrappedBlock (OutputBlock(..), OutputTx(..), IngestBlock(..), IngestTx(..))
-import Blockchain.Sequencer.TxCallObject (TxCallObject)
+import Blockchain.Sequencer.HexData (HexData(..))
+import Blockchain.Sequencer.TxCallObject (TxCallObject(..))
 import qualified Blockchain.Strato.Model.Address as A
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
@@ -103,7 +104,18 @@ data JsonRpcCommand
   deriving (Eq, Read, Show, GHCG.Generic, Data)
 
 instance Format JsonRpcCommand where
-  format = show
+  format JRCGetBalance {jrcAddress = addr, jrcId = rid} =
+    "JRCGetBalance id=" ++ rid ++ " addr=" ++ format addr
+  format JRCGetCode {jrcAddress = addr, jrcId = rid} =
+    "JRCGetCode id=" ++ rid ++ " addr=" ++ format addr
+  format JRCGetTransactionCount {jrcAddress = addr, jrcId = rid} =
+    "JRCGetTransactionCount id=" ++ rid ++ " addr=" ++ format addr
+  format JRCGetStorageAt {jrcAddress = addr, jrcId = rid} =
+    "JRCGetStorageAt id=" ++ rid ++ " addr=" ++ format addr
+  format JRCCall {jrcCallObj = obj, jrcId = rid, jrcBlockString = blk} =
+    let dataHex = format $ unHexData (data_ obj)
+        toStr = maybe "none" format (to obj)
+    in "JRCCall id=" ++ rid ++ " to=" ++ toStr ++ " data=" ++ dataHex ++ " block=" ++ blk
   
 data P2pEvent
   = P2pTx OutputTx
