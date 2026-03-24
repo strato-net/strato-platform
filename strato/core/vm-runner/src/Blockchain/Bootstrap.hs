@@ -104,9 +104,9 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
     createTopicAndWait "seq_vm_events"
   kafkaEnv <- runKafkaVMEvents getKafkaEnv
   let pub sd vmes = do
-        for_ sd $ \diff -> liftIO $ UEC.runKafkaMConfigured "vm-runner-bootstrap" $
-          IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]
-        void . runKafkaMUsingEnv kafkaEnv $ produceVMEvents' vmes
+        void . runKafkaMUsingEnv kafkaEnv $ do
+          for_ sd $ \diff -> IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]
+          produceVMEvents' vmes
   let sr = GI.stateRoot genesisInfo
 
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
