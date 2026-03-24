@@ -142,6 +142,7 @@ generateDockerCompose = do
 
   let postgres = def
         { image = "postgres:14.18"
+        , shm_size = Just "1g"
         , user = Just userGid
         , environment = Just $ Map.fromList
             [ ("POSTGRES_DB", "eth")
