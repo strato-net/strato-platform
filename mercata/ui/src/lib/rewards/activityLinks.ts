@@ -22,6 +22,11 @@ export const getActivityLink = (activityName: string): string | null => {
   if (lowerName.includes('cdp')) {
     return '/dashboard/borrow?subtab=vaults';
   }
+
+  // Save USDST activities - goes to the dedicated Save USDST earn page
+  if (lowerName.includes('save usdst') || lowerName.includes('saveusdst')) {
+    return '/dashboard/earn-save';
+  }
   
   // Vault activities - goes to the Vault page
   if (lowerName.includes('vault')) {
