@@ -453,7 +453,7 @@ const Earn = () => {
         title: "STRATO Vault",
         subtitle: "Diversified real assets: gold, silver, ETH, BTC, stables - actively managed",
         apyRaw: vaultState.alpha,
-        rateLabel: "Alpha vs HODL",
+        rateLabel: "APY",
         tvl: vaultState.totalEquity,
         badge: "Vault",
         onCardClick: () => navigate("/dashboard/earn-vault"),
@@ -520,7 +520,7 @@ const Earn = () => {
                   ? "text-green-600 dark:text-green-400"
                   : "text-red-600 dark:text-red-400",
             }}
-            rateLabel="Alpha vs HODL"
+            rateLabel="APY"
             rateValue={vaultState.alpha === "-" ? "-" : `${vaultState.alpha}%`}
           />
         ),
@@ -824,7 +824,7 @@ const Earn = () => {
                                 <p className={`text-sm font-semibold ${vaultAlpha.className}`}>
                                   {vaultAlpha.label === "-" ? "-" : vaultAlpha.label}
                                 </p>
-                                <p className="text-xs text-muted-foreground">Alpha vs HODL</p>
+                                <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">${formatUsd(vaultState.totalEquity)}</p>
