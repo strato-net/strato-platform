@@ -39,6 +39,7 @@ export interface BridgeToken {
   enabled: boolean;              // effective route enabled state
   isDefaultRoute: boolean;       // true when route token matches asset default token
   stratoTokenImage?: string;     // First image URL from TokenFactory images
+  rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
 }
 
 /**
@@ -53,6 +54,8 @@ export interface DepositAction {
   stratoTokenImage?: string;
   payToken: string;              // STRATO pay token this applies to (join key to match VIA MINT routes)
   oraclePrice?: string;          // WAD-scaled price for estimated output calc
+  /** Metal forge fee in basis points; AUTO_FORGE (action 2) only, from MetalForge metalConfigs */
+  feeBps?: string;
 }
 
 // ============================================================================

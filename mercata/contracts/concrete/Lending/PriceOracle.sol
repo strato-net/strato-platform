@@ -23,12 +23,14 @@ contract record PriceOracle is Ownable {
     mapping(address => uint256) public record prices;
     mapping(address => uint256) public record lastUpdated;
     mapping(address => OracleState) public record oracleState;
+    mapping(address => uint256) public record rebaseFactors;
 
     uint256 public queueSize = 2;  // Global queue size, synced to per-asset on push
 
     // Events
     event PriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
     event BatchPricesUpdated(address[] assets, uint256[] priceValues, uint256 timestamp);
+    event RebaseFactorsUpdated(address[] assets, uint256[] factors, uint256 timestamp);
 
     constructor(address _owner) Ownable(_owner) {}
 
@@ -205,6 +207,22 @@ contract record PriceOracle is Ownable {
         }
 
         emit BatchPricesUpdated(assets, priceValues, block.timestamp);
+    }
+
+    /**
+     * @dev Set rebase factors for multiple assets in batch.
+     *      STRATO tokens do not rebase, but these factors refer to the external asset's multiplier/index.
+     */
+    function setRebaseFactors(address[] calldata assets, uint256[] calldata factors) external onlyOwner {
+        require(assets.length == factors.length, "Arrays length mismatch");
+        require(assets.length > 0, "Empty arrays");
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            require(assets[i] != address(0), "Invalid asset address");
+            rebaseFactors[assets[i]] = factors[i];
+        }
+
+        emit RebaseFactorsUpdated(assets, factors, block.timestamp);
     }
 
     /**

@@ -6,6 +6,20 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import { Token as TokenType, EarningAsset } from "@mercata/shared-types";
 import { formatBalance } from "@/utils/numberUtils";
 
+const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
+  const symbol = asset?._symbol?.toLowerCase?.() || "";
+  const name = asset?._name?.toLowerCase?.() || "";
+  return symbol === "saveusdst" || name.includes("save usdst") || name.includes("saveusdst");
+};
+
+const getAssetDetailHref = (asset: { address?: string; _symbol?: string; _name?: string } | null | undefined): string => {
+  if (isSaveUsdstAsset(asset)) {
+    return "/dashboard/earn-save";
+  }
+
+  return `/dashboard/deposits/${asset?.address || ""}`;
+};
+
 interface AssetsProps {
   loading: boolean;
   tokens: EarningAsset[];
@@ -139,7 +153,7 @@ const AssetsList = ({
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link
-                                    to={`/dashboard/deposits/${asset?.address || ''}`}
+                                    to={getAssetDetailHref(asset)}
                                     className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
                                   >
                                     {asset?._symbol || asset?._name || ""}
@@ -185,11 +199,23 @@ const AssetsList = ({
                         </p>
                       </td>
                       <td className="py-3 md:py-4 px-3 md:px-4 whitespace-nowrap text-right">
-                        <p className="font-medium text-sm md:text-base text-foreground">
-                          {guestMode || !asset?.totalBalance || asset.totalBalance === "0"
-                            ? "-"
-                            : formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
-                        </p>
+                        {guestMode || !asset?.totalBalance || asset.totalBalance === "0" ? (
+                          <p className="font-medium text-sm md:text-base text-foreground">-</p>
+                        ) : (
+                          <div>
+                            <p className="font-medium text-sm md:text-base text-foreground">
+                              {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
+                            </p>
+                            {asset.rebaseFactor && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                ≈ {formatBalance(
+                                  (BigInt(asset.totalBalance) * BigInt(asset.rebaseFactor) / (10n ** 18n)).toString(),
+                                  undefined, 18, 1, 4
+                                )} {asset._symbol?.replace(/^w/, '')}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )
@@ -284,7 +310,7 @@ const AssetsList = ({
                             )}
                             <div className="ml-2 md:ml-3 min-w-0 flex-1">
                               <Link
-                                to={`/dashboard/deposits/${asset?.address || ''}`}
+                                to={getAssetDetailHref(asset)}
                                 className="font-medium text-sm md:text-base text-blue-600 hover:text-blue-800 underline transition-colors block truncate"
                               >
                                 {asset?._symbol || asset?._name || ""}

@@ -19,6 +19,8 @@ export interface EarningAsset extends Token {
   totalBalance: string;
   isPoolToken: boolean;
   value: string;
+  apy?: string;
+  rebaseFactor?: string;
 }
 
 export interface BalanceSnapshot {

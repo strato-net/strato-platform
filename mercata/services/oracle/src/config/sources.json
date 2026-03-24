@@ -5,7 +5,7 @@
     "parse": "data[].prices[0].value",
     "timestamp": "data[0].prices[0].lastUpdatedAt",
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "TSLAX"]
   },
   "CoinMarketCap": {
     "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
@@ -42,7 +42,7 @@
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
     "apiKeyEnvVar": "COINGECKO_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "TSLAX", "SPYX"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
@@ -53,7 +53,9 @@
       "SYRUPUSDC": "syrupusdc",
       "RETH": "rocket-pool-eth",
       "USDC": "usd-coin",
-      "USDT": "tether"
+      "USDT": "tether",
+      "TSLAX": "tesla-xstock",
+      "SPYX": "sp500-xstock"
     }
   },
   "CoinAPI": {
@@ -63,13 +65,13 @@
     "parse": "assets",
     "timestamp": "data_quote_start",
     "apiKeyEnvVar": "COINAPI_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "USDC", "USDT"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "USDC", "USDT", "TSLAX", "SPYX"]
   },
   "DefiLlama": {
     "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",
     "parse": "defiLlama",
     "apiKeyEnvVar": "DEFILLAMA_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "TSLAX", "SPYX"],
     "symbolMapping": {
       "ETH": "coingecko:ethereum",
       "WBTC": "coingecko:wrapped-bitcoin",
@@ -80,7 +82,9 @@
       "SYRUPUSDC": "coingecko:syrupusdc",
       "RETH": "coingecko:rocket-pool-eth",
       "USDC": "coingecko:usd-coin",
-      "USDT": "coingecko:tether"
+      "USDT": "coingecko:tether",
+      "TSLAX": "coingecko:tesla-xstock",
+      "SPYX": "coingecko:sp500-xstock"
     }
   },
   "Commodities-API": {
@@ -105,11 +109,13 @@
     "params": "apikey,symbol",
     "parse": "{symbol}.price",
     "apiKeyEnvVar": "TWELVEDATA_API_KEY",
-    "comment": "Also supports crypto: ETH/USD, BTC/USD, WBTC/USD, PAXG/USD, XAUT/USD. XAG requires Grow plan ($29/mo)",
-    "assets": ["XAU", "XAG"],
+    "comment": "Uses stock price feeds as a proxy for xStock assets (SPYX, TSLAX).",
+    "assets": ["XAU", "XAG", "SPYX", "TSLAX"],
     "symbolMapping": {
       "XAU": "XAU/USD",
-      "XAG": "XAG/USD"
+      "XAG": "XAG/USD",
+      "SPYX": "SPY",
+      "TSLAX": "TSLA"
     }
   },
   "OANDA": {

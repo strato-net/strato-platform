@@ -41,9 +41,12 @@ generateDockerCompose = do
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
             ]
         , environment = Just $ Map.fromList
+            -- TODO: NODE_URL should contain an internal port for nginx from ethConf.yml (portNum var) - since we have it dynamic and mirrored now
             [ ("NODE_URL", "http://nginx")
             , ("BASE_URL", "https://" ++ nodeHost)
             , ("STRATO_HOSTNAME", stratoHostname)
+            -- TODO: missing some environment vars
+            , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
@@ -55,6 +58,7 @@ generateDockerCompose = do
         { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ hashMercataUi
         , depends_on = Just $ DependsOnList ["mercata-backend"]
         , volumes = Just ["./logs:/logs"]
+        -- TODO: missing environment vars
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-ui.log 2>&1"]
         , restart = Just "unless-stopped"

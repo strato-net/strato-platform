@@ -67,6 +67,7 @@ generateDockerComposeAllDocker = do
             , ("ONRAMP_HOT_WALLET_ADDRESS", "${ONRAMP_HOT_WALLET_ADDRESS}")
             , ("BA_USERNAME", "${BA_USERNAME}")
             , ("BA_PASSWORD", "${BA_PASSWORD}")
+            , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]

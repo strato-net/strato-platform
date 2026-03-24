@@ -63,6 +63,7 @@ async function main() {
     console.log(`CDP Engine: ${deployedContract.managers.cdpEngine}`);
     console.log(`CDP Vault: ${deployedContract.managers.cdpVault}`);
     console.log(`Safety Module: ${deployedContract.managers.safetyModule}`);
+    console.log(`Save USDST Vault: ${deployedContract.managers.saveUSDSTVault}`);
     console.log(`Rewards: ${deployedContract.managers.rewards}`);
     console.log(`Escrow: ${deployedContract.managers.escrow}`);
     console.log(`Metal Forge: ${deployedContract.managers.metalForge}`);
@@ -92,6 +93,7 @@ async function main() {
       CDP_ENGINE: deployedContract.managers.cdpEngine,
       CDP_VAULT: deployedContract.managers.cdpVault,
       SAFETY_MODULE: deployedContract.managers.safetyModule,
+      SAVE_USDST_VAULT: deployedContract.managers.saveUSDSTVault,
       REWARDS: deployedContract.managers.rewards,
       ESCROW: deployedContract.managers.escrow,
       METAL_FORGE: deployedContract.managers.metalForge,

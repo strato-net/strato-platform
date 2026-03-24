@@ -35,6 +35,11 @@ contract Describe_Mercata is Authorizable {
         require(address(m.liquidityPool().registry().lendingPool()) != address(0), "LiquidityPool's LendingPool address is 0");
     }
 
+    function it_deploys_save_usdst_vault() {
+        require(address(m.saveUSDSTVault()) != address(0), "SaveUSDSTVault address is 0");
+        require(m.saveUSDSTVault().asset() == address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), "SaveUSDSTVault asset mismatch");
+    }
+
     function it_can_create_tokens() {
         address t = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         require(t != address(0), "Failed to create Token");
