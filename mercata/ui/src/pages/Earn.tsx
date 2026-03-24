@@ -156,7 +156,7 @@ const PositionCard = ({
   icon: ReactNode;
   deposited: string;
   earnings: { label: string; className: string };
-  rateLabel: "APY" | "APR";
+  rateLabel: string;
   rateValue: string;
 }) => {
   return (
@@ -361,7 +361,7 @@ const Earn = () => {
     const rows: OpportunityRow[] = [];
 
     if (activeFilter === "all" || activeFilter === "vaults") {
-      rows.push({ kind: "vault", apySortValue: parseApy(vaultState.apy) });
+      rows.push({ kind: "vault", apySortValue: parseApy(vaultState.alpha) });
     }
 
     if (activeFilter === "all" || activeFilter === "pools") {
@@ -372,12 +372,12 @@ const Earn = () => {
     }
 
     return rows.sort((a, b) => b.apySortValue - a.apySortValue);
-  }, [activeFilter, liquidityInfo?.supplyAPY, sortedPools, vaultState.apy]);
+  }, [activeFilter, liquidityInfo?.supplyAPY, sortedPools, vaultState.alpha]);
 
-  const topApy = formatApyDisplay(vaultState.apy);
+  const vaultAlpha = formatApyDisplay(vaultState.alpha);
   const topOpportunity = useMemo<OpportunityRow>(() => {
     const candidates: OpportunityRow[] = [
-      { kind: "vault", apySortValue: parseApy(vaultState.apy) },
+      { kind: "vault", apySortValue: parseApy(vaultState.alpha) },
       { kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) },
       ...sortedPools.map((pool) => ({
         kind: "pool" as const,
@@ -391,7 +391,7 @@ const Earn = () => {
         apySortValue: Number.NEGATIVE_INFINITY,
       }
     );
-  }, [liquidityInfo?.supplyAPY, sortedPools, vaultState.apy]);
+  }, [liquidityInfo?.supplyAPY, sortedPools, vaultState.alpha]);
 
   const rewardActivityByContract = useMemo(() => {
     const map = new Map<string, { emissionRate: bigint }>();
@@ -452,7 +452,8 @@ const Earn = () => {
       return {
         title: "STRATO Vault",
         subtitle: "Diversified real assets: gold, silver, ETH, BTC, stables - actively managed",
-        apyRaw: vaultState.apy,
+        apyRaw: vaultState.alpha,
+        rateLabel: "Alpha vs HODL",
         tvl: vaultState.totalEquity,
         badge: "Vault",
         onCardClick: () => navigate("/dashboard/earn-vault"),
@@ -465,6 +466,7 @@ const Earn = () => {
         title: "USDST Lending Pool",
         subtitle: "Earn yield by supplying USDST liquidity",
         apyRaw: liquidityInfo?.supplyAPY?.toString(),
+        rateLabel: "APY",
         tvl: liquidityInfo?.totalUSDSTSupplied?.toString() || "0",
         badge: "Lending",
         onCardClick: () => navigate("/dashboard/earn-lending"),
@@ -477,6 +479,7 @@ const Earn = () => {
       title: pool.poolName,
       subtitle: `Earn fees on ${pool.poolName.replace(" Pool", "")} swaps`,
       apyRaw: pool.apy,
+      rateLabel: "APY",
       tvl: pool.totalLiquidityUSD,
       badge: "Pool",
       onCardClick: () => navigateToPoolDetails(pool),
@@ -485,7 +488,7 @@ const Earn = () => {
     };
   }, [
     topOpportunity,
-    vaultState.apy,
+    vaultState.alpha,
     vaultState.totalEquity,
     liquidityInfo?.supplyAPY,
     liquidityInfo?.totalUSDSTSupplied,
@@ -504,7 +507,7 @@ const Earn = () => {
     if (userHasVaultPosition) {
       positions.push({
         key: "position-vault",
-        apySortValue: parseApy(vaultState.apy),
+        apySortValue: parseApy(vaultState.alpha),
         card: (
           <PositionCard
             title="STRATO Vault"
@@ -517,8 +520,8 @@ const Earn = () => {
                   ? "text-green-600 dark:text-green-400"
                   : "text-red-600 dark:text-red-400",
             }}
-            rateLabel="APY"
-            rateValue={vaultState.apy === "-" ? "-" : `${vaultState.apy}%`}
+            rateLabel="Alpha vs HODL"
+            rateValue={vaultState.alpha === "-" ? "-" : `${vaultState.alpha}%`}
           />
         ),
       });
@@ -706,7 +709,7 @@ const Earn = () => {
                   </div>
                   <div className="text-left md:text-right shrink-0">
                     <p className="text-3xl md:text-[40px] leading-none font-semibold text-foreground">
-                      <span>APY </span>
+                      <span>{topOpportunityMeta.rateLabel} </span>
                       <span className={topOpportunityApy.className}>
                         {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
                       </span>
@@ -818,10 +821,10 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${topApy.className}`}>
-                                  {topApy.label === "-" ? "-" : topApy.label}
+                                <p className={`text-sm font-semibold ${vaultAlpha.className}`}>
+                                  {vaultAlpha.label === "-" ? "-" : vaultAlpha.label}
                                 </p>
-                                <p className="text-xs text-muted-foreground">APY</p>
+                                <p className="text-xs text-muted-foreground">Alpha vs HODL</p>
                               </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">${formatUsd(vaultState.totalEquity)}</p>

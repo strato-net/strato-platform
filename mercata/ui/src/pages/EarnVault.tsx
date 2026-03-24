@@ -73,7 +73,7 @@ const EarnVault = () => {
   const {
     totalEquity,
     totalShares,
-    apy,
+    alpha,
     assets,
     userShares,
     userValueUsd,
@@ -138,7 +138,7 @@ const EarnVault = () => {
     refreshVault(false);
   };
 
-  const apyDisplay = formatApy(apy);
+  const alphaDisplay = formatApy(alpha);
 
   return (
     <div className="min-h-screen bg-background">
@@ -185,15 +185,15 @@ const EarnVault = () => {
                       </p>
                     </div>
                     <div className="rounded-xl border border-border bg-muted/40 p-4">
-                      <p className="text-xs md:text-sm text-muted-foreground">APY</p>
+                      <p className="text-xs md:text-sm text-muted-foreground">Alpha vs HODL</p>
                       <p
                         className={`mt-1 text-2xl md:text-3xl font-semibold ${
-                          apyDisplay.positive
+                          alphaDisplay.positive
                             ? "text-green-600 dark:text-green-400"
                             : "text-red-600 dark:text-red-400"
                         }`}
                       >
-                        {loading ? "..." : apyDisplay.text}
+                        {loading ? "..." : alphaDisplay.text}
                       </p>
                     </div>
                   </div>
