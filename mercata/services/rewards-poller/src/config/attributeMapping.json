@@ -155,7 +155,7 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "owner"
+      "user": "receiver"
     }
   }
 }
