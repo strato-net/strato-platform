@@ -35,7 +35,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
   };
 
   // Build season display from currentSeason
-  const seasonDisplay = `Season ${state?.currentSeason || 1}`;
+  const seasonDisplay = `Season ${state?.currentSeason || 2}`;
 
   if (loading) {
     return (
