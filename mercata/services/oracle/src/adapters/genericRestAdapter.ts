@@ -1,6 +1,6 @@
 import { apiRequest } from '../utils/apiClient';
-import { SourceConfig, BatchPriceResult, Asset } from '../types';
-import { logError } from '../utils/logger';
+import { SourceConfig, BatchPriceResult, Asset, RebaseConfig } from '../types';
+import { logError, logInfo } from '../utils/logger';
 
 function extractNestedProperty(obj: any, path: string): any {
     if (!path) return undefined;
@@ -297,4 +297,75 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
     }
     
     return result;
+}
+
+/**
+ * Fetch a rebase factor from an external source (e.g., Ethereum eth_call via Alchemy).
+ * Uses bigint internally for precise uint256 handling, returns number for pipeline compat.
+ * Result is the raw factor value (NOT scaled to 18 decimals); caller divides by factorPrecision.
+ */
+export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig): Promise<number> {
+    let url = rebase.factorUrl;
+    const stratoUrl = process.env.STRATO_NODE_URL || '';
+    url = url.replace(/\$\{STRATO_NODE_URL\}/g, stratoUrl);
+
+    const apiKey = rebase.factorApiKeyEnvVar ? process.env[rebase.factorApiKeyEnvVar] || '' : '';
+    if (apiKey) {
+        url = url.replace(/\$\{API_KEY\}/g, apiKey);
+    }
+
+    const method = (rebase.factorMethod || 'GET').toUpperCase();
+    const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {})
+    };
+    if (rebase.factorHeaders && apiKey) {
+        rebase.factorHeaders.split(',').forEach(h => {
+            const name = h.trim();
+            headers[name] = name === 'Authorization' ? `Bearer ${apiKey}` : apiKey;
+        });
+    }
+
+    const requestConfig: any = { method, url, headers };
+    if (method === 'POST' && rebase.factorBody) {
+        requestConfig.data = JSON.parse(rebase.factorBody);
+    }
+
+    const response = await apiRequest(requestConfig, {
+        logPrefix: 'RebaseFactor',
+        apiUrl: url,
+        method
+    });
+
+    const raw = extractNestedProperty(response.data, rebase.factorParse);
+    if (raw === undefined || raw === null) {
+        logError('RebaseFactor', new Error(`${assetKey}: no value at path "${rebase.factorParse}"`));
+        return 0;
+    }
+
+    let rawStr = String(raw).trim();
+
+    // ABI-encoded eth_call responses with multiple return values pack each uint256
+    // as 32 bytes (64 hex chars). Extract only the first word when result is longer.
+    if (rawStr.startsWith('0x') && rawStr.length > 66) {
+        rawStr = rawStr.slice(0, 66);
+    }
+
+    let factor: number;
+    if (rawStr.startsWith('0x')) {
+        factor = Number(BigInt(rawStr));
+    } else if (/^\d+$/.test(rawStr)) {
+        factor = Number(rawStr);
+    } else {
+        logError('RebaseFactor', new Error(`${assetKey}: invalid factor value "${rawStr}"`));
+        return 0;
+    }
+
+    if (!isFinite(factor) || factor <= 0) {
+        logError('RebaseFactor', new Error(`${assetKey}: invalid factor value "${rawStr}"`));
+        return 0;
+    }
+
+    logInfo('RebaseFactor', `${assetKey}: factor=${factor} (parse="${rebase.factorParse}")`);
+    return factor;
 }

@@ -3,6 +3,7 @@ import RestStatus from "http-status-codes";
 import {
   getVaultInfo,
   getUserPosition,
+  getUserActivity,
   getUserBalances,
   getWithdrawPreview,
   deposit,
@@ -53,6 +54,24 @@ class VaultController {
       const { accessToken, address: userAddress } = req;
       const position = await getUserPosition(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(position);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get user's deposit/withdrawal activity
+   */
+  static async getUserActivity(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, query } = req;
+      const limit = parseInt(query.limit as string) || 20;
+      const result = await getUserActivity(accessToken, userAddress as string, limit);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

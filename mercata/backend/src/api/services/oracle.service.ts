@@ -74,6 +74,20 @@ export const getOraclePrices = async (
   );
 };
 
+export const getRebaseFactors = async (
+  accessToken: string
+): Promise<Map<string, string>> => {
+  const { data } = await cirrus.get(accessToken, `/${PriceOracle}-rebaseFactors`, {
+    params: { select: "asset:key,factor:value::text" }
+  }).catch(() => ({ data: [] }));
+
+  return new Map(
+    (data || [])
+      .filter((r: any) => r.asset && r.factor && r.factor !== "0")
+      .map((r: any) => [r.asset, r.factor])
+  );
+};
+
 export const getPrice = async (
   accessToken: string,
   asset?: string

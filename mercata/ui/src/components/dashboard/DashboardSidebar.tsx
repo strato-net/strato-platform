@@ -53,26 +53,26 @@ const NAV_CATEGORIES: NavCategory[] = [
     ],
   },
   {
+    label: 'EARN',
+    items: [
+      { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
+      { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
+    ],
+  },
+  {
     label: 'SPEND',
     items: [
       { icon: CreditCard, label: 'Card', path: '/dashboard/credit-card' },
     ],
   },
   {
-    label: 'EARN',
-    items: [
-      { icon: HandCoins, label: 'Earn', path: '/dashboard/earn' },
-    ],
-  },
-  {
     label: 'PRO',
     items: [
       { icon: Vault, label: 'Vault', path: '/dashboard/vault' },
-      { icon: Gift, label: 'Rewards', path: '/dashboard/rewards' },
-      { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
-      { icon: BarChart3, label: 'STRATO Stats', path: '/dashboard/stats' },
       { icon: Droplets, label: 'Advanced', path: '/dashboard/advanced' },
-      { icon: UserPlus, label: 'My Referrals', path: '/dashboard/referrals' },
+      { icon: UserPlus, label: 'Referrals', path: '/dashboard/referrals' },
+      { icon: Activity, label: 'Activity Feed', path: '/dashboard/activity' },
+      { icon: BarChart3, label: 'Analytics', path: '/dashboard/stats' },
       { icon: Shield, label: 'Admin', path: '/dashboard/admin', adminOnly: true },
     ],
   },

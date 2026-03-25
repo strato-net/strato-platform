@@ -551,8 +551,22 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const provider = event.attributes.provider || event.attributes.Provider || "";
-      const tokenBAmount = event.attributes.tokenBAmount || event.attributes.token_b_amount || event.attributes.tokenB || "0";
-      const tokenAAmount = event.attributes.tokenAAmount || event.attributes.token_a_amount || event.attributes.tokenA || "0";
+      let tokenAAmount = event.attributes.tokenAAmount || event.attributes.token_a_amount || event.attributes.tokenA || "0";
+      let tokenBAmount = event.attributes.tokenBAmount || event.attributes.token_b_amount || event.attributes.tokenB || "0";
+
+      // StablePool events use tokenAmounts[] instead of individual fields
+      if ((!tokenAAmount || tokenAAmount === "0") && (!tokenBAmount || tokenBAmount === "0")) {
+        const raw = event.attributes.tokenAmounts || event.attributes.token_amounts;
+        if (raw) {
+          try {
+            const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+            if (Array.isArray(arr) && arr.length >= 2) {
+              tokenAAmount = String(arr[0]);
+              tokenBAmount = String(arr[1]);
+            }
+          } catch { /* keep defaults */ }
+        }
+      }
 
       // Get token addresses from event metadata if available (set by ActivityFeedCards)
       const tokenA = (event as any).tokenA || "";

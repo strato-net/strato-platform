@@ -73,11 +73,10 @@ const EarnVault = () => {
   const {
     totalEquity,
     totalShares,
-    apy,
+    alpha,
     assets,
     userShares,
     userValueUsd,
-    allTimeEarnings,
     loading,
     loadingUser,
   } = vaultState;
@@ -95,23 +94,6 @@ const EarnVault = () => {
       })
       .sort((a, b) => Number(BigInt(b.valueUsd || "0") - BigInt(a.valueUsd || "0")));
   }, [assets, totalEquity]);
-
-  const earningsFormatted = useMemo(() => {
-    try {
-      const value = parseFloat(formatUnits(allTimeEarnings || "0", 18));
-      const abs = Math.abs(value).toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-      if (Math.abs(value) < 0.005) return { text: "$0.00", positive: true };
-      return {
-        text: `${value >= 0 ? "+" : "-"}$${abs}`,
-        positive: value >= 0,
-      };
-    } catch {
-      return { text: "$0.00", positive: true };
-    }
-  }, [allTimeEarnings]);
 
   useEffect(() => {
     document.title = "STRATO Earn Vault | STRATO";
@@ -138,7 +120,7 @@ const EarnVault = () => {
     refreshVault(false);
   };
 
-  const apyDisplay = formatApy(apy);
+  const alphaDisplay = formatApy(alpha);
 
   return (
     <div className="min-h-screen bg-background">
@@ -185,15 +167,15 @@ const EarnVault = () => {
                       </p>
                     </div>
                     <div className="rounded-xl border border-border bg-muted/40 p-4">
-                      <p className="text-xs md:text-sm text-muted-foreground">APY</p>
+                      <p className="text-xs md:text-sm text-muted-foreground">Alpha vs HODL</p>
                       <p
                         className={`mt-1 text-2xl md:text-3xl font-semibold ${
-                          apyDisplay.positive
+                          alphaDisplay.positive
                             ? "text-green-600 dark:text-green-400"
                             : "text-red-600 dark:text-red-400"
                         }`}
                       >
-                        {loading ? "..." : apyDisplay.text}
+                        {loading ? "..." : alphaDisplay.text}
                       </p>
                     </div>
                   </div>
@@ -283,31 +265,14 @@ const EarnVault = () => {
 
                 <section className="space-y-3">
                   <h2 className="text-xl font-semibold">Your Position</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-                    <div className="rounded-xl border border-border bg-muted/30 p-4">
-                      <p className="text-sm text-muted-foreground">Your Shares</p>
-                      <p className="text-2xl font-semibold mt-1">
-                        {guestMode || loadingUser ? "-" : formatShares(userShares)}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-border bg-muted/30 p-4">
-                      <p className="text-sm text-muted-foreground">USD Value</p>
-                      <p className="text-2xl font-semibold mt-1">
-                        {guestMode || loadingUser ? "-" : `$${formatUsd(userValueUsd)}`}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-border bg-muted/30 p-4">
-                      <p className="text-sm text-muted-foreground">All-Time Earnings</p>
-                      <p
-                        className={`text-2xl font-semibold mt-1 ${
-                          earningsFormatted.positive
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-red-600 dark:text-red-400"
-                        }`}
-                      >
-                        {guestMode || loadingUser ? "-" : earningsFormatted.text}
-                      </p>
-                    </div>
+                  <div className="rounded-xl border border-border bg-muted/30 p-4">
+                    <p className="text-sm text-muted-foreground">Your Shares</p>
+                    <p className="text-2xl font-semibold mt-1">
+                      {guestMode || loadingUser
+                        ? "-"
+                        : <>{formatShares(userShares)} <span className="text-base text-muted-foreground">(${formatUsd(userValueUsd)})</span></>
+                      }
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">

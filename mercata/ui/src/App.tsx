@@ -33,6 +33,7 @@ import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
 import Earn from "./pages/Earn";
+import EarnSave from "./pages/EarnSave";
 import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
@@ -63,6 +64,7 @@ import { CDPProvider } from "@/context/CDPContext";
 import { SwapProvider } from "@/context/SwapContext";
 import { NetworkProvider } from "@/context/NetworkContext";
 import { VaultProvider } from "@/context/VaultContext";
+import { SaveUsdstProvider } from "@/context/SaveUsdstContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
@@ -190,12 +192,13 @@ const App = () => {
                               <CDPProvider>
                                 <BridgeProvider>
                                   <EarnProvider>
-                                  <VaultProvider>
-                                    <TooltipProvider>
-                                      <Toaster />
-                                      <BrowserRouter>
-                                        <UsdstBalanceBox />
-                                        <Routes>
+                                    <VaultProvider>
+                                      <SaveUsdstProvider>
+                                        <TooltipProvider>
+                                          <Toaster />
+                                          <BrowserRouter>
+                                            <UsdstBalanceBox />
+                                            <Routes>
                                           <Route path="/" element={<Index />} />
                                           <Route path="/claim" element={<Claim />} />
                                           <Route
@@ -267,6 +270,14 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Earn />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/earn-save"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <EarnSave />
                                               </GuestAccessibleRoute>
                                             }
                                           />
@@ -404,10 +415,11 @@ const App = () => {
 
                                           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                                           <Route path="*" element={<NotFound />} />
-                                        </Routes>
-                                      </BrowserRouter>
-                                    </TooltipProvider>
-                                  </VaultProvider>
+                                            </Routes>
+                                          </BrowserRouter>
+                                        </TooltipProvider>
+                                      </SaveUsdstProvider>
+                                    </VaultProvider>
                                   </EarnProvider>
                                 </BridgeProvider>
                               </CDPProvider>
