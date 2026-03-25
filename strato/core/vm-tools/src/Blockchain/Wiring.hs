@@ -37,7 +37,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
-import Blockchain.Stream.VMEvent (VMEvent(..), produceVMEvents)
+import Blockchain.Stream.VMEvent (VMEvent(..), produceVMEvents')
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
@@ -52,6 +52,7 @@ import Control.Monad (join, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
+import Control.Monad.Composable.Kafka (HasKafka)
 import Control.Monad.IO.Class
 import Control.Monad.Reader (ReaderT)
 import qualified Data.ByteString as B
@@ -145,8 +146,8 @@ instance HasContext m => Mod.Modifiable BaggerState m where
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TRC.Cache (ReaderT Context m) where
   access _ = contextGets _txRunResultsCache
 
-instance {-# OVERLAPPING #-} MonadIO m => m `Mod.Yields` TransactionResult where
-  yield tr = void $ produceVMEvents [NewTransactionResult tr]
+instance {-# OVERLAPPING #-} HasKafka m => m `Mod.Yields` TransactionResult where
+  yield tr = void $ produceVMEvents' [NewTransactionResult tr]
 
 vmBlockHashRootKey :: B.ByteString
 vmBlockHashRootKey = "block_hash_root"

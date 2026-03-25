@@ -196,7 +196,7 @@ routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
 routeOutEvent oev = Nothing <$ sendOutEvent oev
 
 sendOutEvent :: (MonadLogger m, HasKafka m, HasContext m) => VmOutEvent -> m ()
-sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
+sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents' vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry diff]
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
@@ -205,7 +205,7 @@ sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "produceAddressStateUpdates" (Just vmBlockInsertionMined) $
       void $ produceIndexEvents [AddressStateUpdates asm]
-sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
+sendOutEvent (OutJSONRPC s b) = produceResponse s b
 sendOutEvent (OutBlock o) = void $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 sendOutEvent (OutBlockVerificationFailure _) = pure ()
 sendOutEvent (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpNodes]
