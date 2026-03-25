@@ -8,7 +8,7 @@ RUN apk add bash apache2-utils vim nano bind-tools jq yq && \
     luarocks install lua-resty-openidc 1.7.6 --only-server https://raw.githubusercontent.com/rocks-moonscript-org/moonrocks-mirror/daab2726276e3282dc347b89a42a5107c3500567
     # The --only-server url added to avoid the error in luarocks: "main function has more than 65536 constants"
 
-COPY nginx.tpl.conf openid.tpl.lua csrf.lua /tmp/
+COPY nginx.tpl.conf openid.tpl.lua vault-openid.tpl.lua csrf.lua /tmp/
 
 COPY swagger/ /usr/local/openresty/nginx/html/swagger/
 
