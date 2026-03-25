@@ -220,7 +220,9 @@ export const UserRewardsSection = ({
   const unclaimedRewardsStr = userRewards.unclaimedRewards || "0";
   const unclaimedFormatted = formatBalance(unclaimedRewardsStr, "points", 18, 2, 6);
   const activitiesWithStake = userRewards.activities.filter(
-    (a) => safeBigInt(a.userInfo?.stake || "0") > 0n
+    (a) =>
+      safeBigInt(a.userInfo?.stake || "0") > 0n &&
+      safeBigInt(a.activity?.emissionRate || "0") > 0n
   );
 
   // Calculate what user would receive if they claim:
