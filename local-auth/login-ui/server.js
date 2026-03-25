@@ -9,7 +9,7 @@ app.use(cookieParser());
 
 const PORT = process.env.PORT || 3000;
 const KRATOS_PUBLIC_URL = process.env.KRATOS_PUBLIC_URL || 'http://kratos:4433';
-const KRATOS_BROWSER_URL = process.env.KRATOS_BROWSER_URL || 'http://localhost:8081/kratos';
+const KRATOS_BROWSER_URL = process.env.KRATOS_BROWSER_URL || 'http://localhost:8081/auth/kratos';
 const KRATOS_ADMIN_URL = process.env.KRATOS_ADMIN_URL || 'http://localhost:4434';
 const HYDRA_ADMIN_URL = process.env.HYDRA_ADMIN_URL || 'http://localhost:4445';
 
@@ -71,13 +71,13 @@ app.get('/login', async (req, res) => {
       // Show login form for OAuth
       return res.send(html('Sign In', `
         <p class="info">Sign in to authorize the application</p>
-        <form method="POST" action="/local-auth/login/oauth">
+        <form method="POST" action="/auth/ui/login/oauth">
           <input type="hidden" name="login_challenge" value="${login_challenge}">
           <input type="email" name="email" placeholder="Email" required>
           <input type="password" name="password" placeholder="Password" required>
           <button type="submit">Sign In</button>
         </form>
-        <p class="info"><a href="/local-auth/registration">Create an account</a></p>
+        <p class="info"><a href="/auth/ui/registration">Create an account</a></p>
       `));
     } catch (error) {
       console.error('Hydra login error:', error.response?.data || error.message);
@@ -105,7 +105,7 @@ app.get('/login', async (req, res) => {
           <input type="password" name="password" placeholder="Password" required>
           <button type="submit">Sign In</button>
         </form>
-        <p class="info"><a href="/local-auth/registration">Create an account</a></p>
+        <p class="info"><a href="/auth/ui/registration">Create an account</a></p>
       `));
     } catch (error) {
       console.error('Kratos flow error:', error.response?.data || error.message);
@@ -113,8 +113,8 @@ app.get('/login', async (req, res) => {
     }
   }
 
-  // No flow - redirect to create one
-  res.redirect(`${KRATOS_BROWSER_URL}/self-service/login/browser`);
+  // No flow - always create a fresh Kratos login flow
+  res.redirect(`${KRATOS_BROWSER_URL}/self-service/login/browser?refresh=true`);
 });
 
 // Handle OAuth login form submission
@@ -155,7 +155,7 @@ app.post('/login/oauth', async (req, res) => {
     console.error('OAuth login error:', error.response?.data || error.message);
     res.send(html('Sign In', `
       <p class="error">Invalid email or password</p>
-      <form method="POST" action="/local-auth/login/oauth">
+      <form method="POST" action="/auth/ui/login/oauth">
         <input type="hidden" name="login_challenge" value="${login_challenge}">
         <input type="email" name="email" placeholder="Email" value="${email}" required>
         <input type="password" name="password" placeholder="Password" required>
@@ -208,7 +208,7 @@ app.get('/consent', async (req, res) => {
       <ul>
         ${consentRequest.requested_scope.map(s => `<li>${s}</li>`).join('')}
       </ul>
-      <form method="POST" action="/consent">
+      <form method="POST" action="/auth/ui/consent">
         <input type="hidden" name="consent_challenge" value="${consent_challenge}">
         <button type="submit" name="action" value="accept">Allow</button>
         <button type="submit" name="action" value="reject" style="background: #666;">Deny</button>
@@ -270,9 +270,13 @@ app.get('/registration', async (req, res) => {
 
       const csrfToken = flowData.ui.nodes.find(n => n.attributes.name === 'csrf_token')?.attributes.value || '';
       const messages = flowData.ui.messages?.map(m => m.text).join('<br>') || '';
+      const fieldMessages = flowData.ui.nodes
+        .flatMap(n => (n.messages || []).map(m => m.text))
+        .join('<br>');
 
       return res.send(html('Create Account', `
         ${messages ? `<p class="error">${messages}</p>` : ''}
+        ${fieldMessages ? `<p class="error">${fieldMessages}</p>` : ''}
         <form method="POST" action="${flowData.ui.action}">
           <input type="hidden" name="csrf_token" value="${csrfToken}">
           <input type="hidden" name="method" value="password">
@@ -281,7 +285,7 @@ app.get('/registration', async (req, res) => {
           <input type="password" name="password" placeholder="Password (min 8 characters)" required>
           <button type="submit">Create Account</button>
         </form>
-        <p class="info"><a href="/local-auth/login">Already have an account? Sign in</a></p>
+        <p class="info"><a href="/auth/ui/login">Already have an account? Sign in</a></p>
       `));
     } catch (error) {
       console.error('Registration flow error:', error.response?.data || error.message);
@@ -309,7 +313,7 @@ app.get('/logout', async (req, res) => {
     }
   }
 
-  res.redirect('/login');
+  res.redirect('/auth/ui/login');
 });
 
 // Home page
@@ -317,12 +321,12 @@ app.get('/', (req, res) => {
   res.send(html('STRATO Local Auth', `
     <p>Local authentication service for STRATO.</p>
     <ul>
-      <li><a href="/login">Sign In</a></li>
-      <li><a href="/registration">Create Account</a></li>
+      <li><a href="/auth/ui/login">Sign In</a></li>
+      <li><a href="/auth/ui/registration">Create Account</a></li>
     </ul>
     <h3>Endpoints</h3>
     <ul>
-      <li>OAuth Discovery: <a href="http://localhost:4444/.well-known/openid-configuration">/.well-known/openid-configuration</a></li>
+      <li>OAuth Discovery: <a href="http://localhost:8081/auth/.well-known/openid-configuration">/auth/.well-known/openid-configuration</a></li>
     </ul>
   `));
 });

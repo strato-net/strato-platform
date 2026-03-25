@@ -14,10 +14,10 @@ serve:
 
 urls:
   self:
-    issuer: http://localhost:4444
-  consent: http://localhost:3000/consent
-  login: http://localhost:3000/login
-  logout: http://localhost:3000/logout
+    issuer: http://localhost:8081/auth
+  consent: http://localhost:8081/auth/ui/consent
+  login: http://localhost:8081/auth/ui/login
+  logout: http://localhost:8081/auth/ui/logout
 
 secrets:
   system:

@@ -89,10 +89,10 @@ psql -h postgres -U postgres -d hydra -c "SELECT tablename FROM pg_tables WHERE 
 
 # Run migrations - must set DSN explicitly for each tool since -e reads from DSN env var
 echo "Running Kratos migrations..."
-DSN="postgres://postgres@postgres:5432/kratos?sslmode=disable" kratos migrate sql -e --yes --config /etc/config/kratos.yml
+DSN="$DSN" kratos migrate sql -e --yes --config /etc/config/kratos.yml
 
 echo "Running Hydra migrations..."
-DSN="postgres://postgres@postgres:5432/hydra?sslmode=disable" hydra migrate sql -e --yes --config /etc/config/hydra.yml
+DSN="$HYDRA_DSN" hydra migrate sql -e --yes --config /etc/config/hydra.yml
 
 # Start supervisor in background temporarily to start services
 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf &
@@ -103,24 +103,32 @@ wait_for_service "http://localhost:4433/health/ready" "Kratos"
 wait_for_service "http://localhost:4444/health/ready" "Hydra"
 wait_for_service "http://localhost:3000/health" "Login UI"
 
-# Create default OAuth client in Hydra if it doesn't exist
+# Read OAuth client credentials from shared secrets file
+OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID:-strato-local}"
+OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-strato-local-secret}"
+if [ -f /run/secrets/oauth_credentials.yaml ]; then
+    OAUTH_CLIENT_ID=$(grep "clientId:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
+    OAUTH_CLIENT_SECRET=$(grep "clientSecret:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
+fi
+
+# Create OAuth client in Hydra if it doesn't exist
 echo "Creating default OAuth client..."
-CLIENT_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:4445/admin/clients/strato-local")
+CLIENT_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:4445/admin/clients/${OAUTH_CLIENT_ID}")
 if [ "$CLIENT_EXISTS" != "200" ]; then
     curl -s -X POST "http://localhost:4445/admin/clients" \
         -H "Content-Type: application/json" \
-        -d '{
-            "client_id": "strato-local",
-            "client_secret": "strato-local-secret",
-            "grant_types": ["authorization_code", "refresh_token", "client_credentials"],
-            "response_types": ["code", "token", "id_token"],
-            "scope": "openid offline email profile",
-            "redirect_uris": ["http://localhost:8081/auth/openidc/return", "http://127.0.0.1:8081/auth/openidc/return"],
-            "token_endpoint_auth_method": "client_secret_basic"
-        }' > /dev/null
-    echo "OAuth client 'strato-local' created."
+        -d "{
+            \"client_id\": \"${OAUTH_CLIENT_ID}\",
+            \"client_secret\": \"${OAUTH_CLIENT_SECRET}\",
+            \"grant_types\": [\"authorization_code\", \"refresh_token\", \"client_credentials\"],
+            \"response_types\": [\"code\", \"token\", \"id_token\"],
+            \"scope\": \"openid offline email profile\",
+            \"redirect_uris\": [\"http://localhost:8081/auth/openidc/return\", \"http://127.0.0.1:8081/auth/openidc/return\"],
+            \"token_endpoint_auth_method\": \"client_secret_basic\"
+        }" > /dev/null
+    echo "OAuth client '${OAUTH_CLIENT_ID}' created."
 else
-    echo "OAuth client 'strato-local' already exists."
+    echo "OAuth client '${OAUTH_CLIENT_ID}' already exists."
 fi
 
 # Create default admin user in Kratos if needed
