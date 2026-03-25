@@ -15,13 +15,11 @@ import BlockApps.Logging
 import Blockchain.DB.CodeDB
 --import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), void)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka
-import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text as T
@@ -29,23 +27,19 @@ import Prelude hiding (id)
 
 -- TODO: Add private chain functionality to JSON RPC commands
 
-produceResponse :: String -> B.ByteString -> IO ()
-produceResponse id theData = do
-  _ <- runKafkaMConfigured "ethereum-vm" $
-       produceItems "jsonrpcresponse" [(id, theData)]
-
-  return ()
+produceResponse :: HasKafka m => String -> B.ByteString -> m ()
+produceResponse id theData = void $ produceItems "jsonrpcresponse" [(id, theData)]
 
 runJsonRpcCommand ::
-  ( MonadIO m,
-    MonadLogger m,
+  ( MonadLogger m,
+    HasKafka m,
     HasCodeDB m,
     (Address `A.Alters` AddressState) m
   ) =>
   JsonRpcCommand ->
   m ()
 runJsonRpcCommand =
-  liftIO . uncurry produceResponse
+  uncurry produceResponse
     <=< runJsonRpcCommand'
 
 runJsonRpcCommand' ::
