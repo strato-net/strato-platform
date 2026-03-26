@@ -40,10 +40,7 @@ generateDockerComposeAllDocker = do
         , depends_on = Just $ DependsOnList ["strato", "postgrest"]
         , init = Just True
         , environment = Just $ Map.fromList
-            [ ("OAUTH_DISCOVERY_URL", "${OAUTH_DISCOVERY_URL}")
-            , ("OAUTH_CLIENT_ID", "${OAUTH_CLIENT_ID}")
-            , ("OAUTH_CLIENT_SECRET", "${OAUTH_CLIENT_SECRET}")
-            , ("NODE_URL", "http://nginx")
+            [ ("NODE_URL", "http://nginx")
             , ("BASE_URL", "https://${NODE_HOST}")
             , ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
             , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
@@ -67,10 +64,14 @@ generateDockerComposeAllDocker = do
             , ("ONRAMP_HOT_WALLET_ADDRESS", "${ONRAMP_HOT_WALLET_ADDRESS}")
             , ("BA_USERNAME", "${BA_USERNAME}")
             , ("BA_PASSWORD", "${BA_PASSWORD}")
+            , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
-        , volumes = Just ["./logs:/logs"]
+        , volumes = Just
+            [ "./logs:/logs"
+            , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
+            ]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -239,6 +240,7 @@ generateDockerComposeAllDocker = do
 
   let postgres = def
         { image = "postgres:14.18"
+        , shm_size = Just "1g"
         , environment = Just $ Map.fromList
             [ ("POSTGRES_DB", "eth")
             , ("POSTGRES_PASSWORD_FILE", "/run/secrets/postgres_password")

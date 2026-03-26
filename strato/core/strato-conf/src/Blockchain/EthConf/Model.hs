@@ -79,14 +79,12 @@ instance ToJSON EthConf where
   toEncoding = Aeson.genericToEncoding Aeson.defaultOptions { Aeson.omitNothingFields = True }
 
 data ApiConfig = ApiConfig
-  { ipAddress :: String
-  , httpPort :: Int
+  { httpPort :: Int
   } deriving (Show, Eq, Generic, ToJSON)
 
 instance FromJSON ApiConfig where
   parseJSON = withObject "ApiConfig" $ \v -> ApiConfig
-    <$> v .: "ipAddress"
-    <*> v .:? "httpPort" .!= 8081
+    <$> v .:? "httpPort" .!= 8081
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
@@ -232,8 +230,7 @@ instance Default P2PConf where
 
 instance Default ApiConfig where
   def = ApiConfig
-    { ipAddress = "127.0.0.1"
-    , httpPort = 8081
+    { httpPort = 8081
     }
 
 instance Default DebugConfig where

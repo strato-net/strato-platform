@@ -5,6 +5,7 @@ import MobileSidebar from "@/components/dashboard/MobileSidebar";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import VaultOverview from "@/components/vault/VaultOverview";
 import VaultTransactions from "@/components/vault/VaultTransactions";
+import VaultUserActivity from "@/components/vault/VaultUserActivity";
 import VaultUserPosition from "@/components/vault/VaultUserPosition";
 import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import VaultWithdrawModal from "@/components/vault/VaultWithdrawModal";
@@ -65,8 +66,11 @@ const Vault = () => {
             guestMode={guestMode}
           />
 
-          {/* Recent Transactions */}
-          <VaultTransactions />
+          {/* Activity Tables */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <VaultTransactions />
+            {!guestMode && <VaultUserActivity />}
+          </div>
         </main>
       </div>
 

@@ -99,11 +99,60 @@ router.get("/info", authHandler.authorizeRequest(true), VaultController.getInfo)
  *                 userValueUsd:
  *                   type: string
  *                   description: User's position value in USD (18 decimals)
+ *                 allTimeDeposits:
+ *                   type: string
+ *                   description: User's all-time total deposits in USD (18 decimals)
  *                 allTimeEarnings:
  *                   type: string
  *                   description: User's all-time earnings/losses in USD (18 decimals, can be negative)
  */
 router.get("/user", authHandler.authorizeRequest(), VaultController.getUserPosition);
+
+/**
+ * @openapi
+ * /vault/user/activity:
+ *   get:
+ *     summary: Get user's vault deposit/withdrawal activity
+ *     description: Retrieve the authenticated user's deposit and withdrawal history
+ *     tags:
+ *       - Vault
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Maximum number of activity items to return
+ *     responses:
+ *       200:
+ *         description: User activity retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 activity:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       type:
+ *                         type: string
+ *                         enum: [deposit, withdrawal]
+ *                       timestamp:
+ *                         type: string
+ *                       assetSymbol:
+ *                         type: string
+ *                       amountIn:
+ *                         type: string
+ *                       sharesMinted:
+ *                         type: string
+ *                       sharesBurned:
+ *                         type: string
+ *                       valueUsd:
+ *                         type: string
+ */
+router.get("/user/activity", authHandler.authorizeRequest(), VaultController.getUserActivity);
 
 /**
  * @openapi

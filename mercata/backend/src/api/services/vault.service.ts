@@ -90,6 +90,7 @@ export interface VaultInfo {
   totalShares: string;
   navPerShare: string;
   apy: string;
+  alpha: string;
   paused: boolean;
   assets: VaultAsset[];
   deficitAssets: string[];
@@ -101,6 +102,7 @@ export interface VaultInfo {
 export interface UserPosition {
   userShares: string;
   userValueUsd: string;
+  allTimeDeposits: string;
   allTimeEarnings: string;
 }
 
@@ -131,6 +133,12 @@ export interface VaultTransaction {
     collateralSeized: string;
     debtBurnedUSD: string;
   };
+}
+
+export interface UserActivityItem {
+  type: "deposit" | "withdrawal";
+  timestamp: string;
+  valueUsd: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -498,108 +506,104 @@ const getFirstDepositDate = async (
 };
 
 /**
- * Get APY for the vault based on performance over time.
- * Uses 30-day period if available, otherwise uses time since first deposit.
- * Formula: profit = (currentEquity - startEquity) + totalWithdrawals - totalDeposits
- * APY = ((1 + periodReturn)^(365/30)) - 1
+ * Get vault performance metrics using time-weighted return (TWR) via NAV/share.
+ * Returns both the vault APY and the alpha (outperformance vs HODL benchmark).
+ * Alpha = vaultAPY - hodlAPY, where HODL reprices historical balances at current prices.
  */
-const getAPY = async (
+const getPerformanceMetrics = async (
   accessToken: string,
   vaultAddress: string,
   currentEquity: bigint,
+  currentTotalShares: bigint,
+  shareTokenAddress: string,
   botExecutor: string,
   priceOracleAddress: string,
-  supportedAssets: string[]
-): Promise<string> => {
+  supportedAssets: string[],
+  currentPrices: Map<string, string>
+): Promise<{ apy: string; alpha: string }> => {
+  const noData = { apy: "-", alpha: "-" };
   try {
-    // ── Step 1: Determine the measurement period ──────────────────────────
-    const firstDeposit = await getFirstDepositDate(accessToken, vaultAddress);
+    if (currentTotalShares <= 0n || currentEquity <= 0n) return noData;
 
-    if (!firstDeposit) {
-      return "-"; // No deposits yet
-    }
+    const currentNAV = (currentEquity * WAD) / currentTotalShares;
+
+    const firstDeposit = await getFirstDepositDate(accessToken, vaultAddress);
+    if (!firstDeposit) return noData;
 
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const msSinceFirstDeposit = now.getTime() - firstDeposit.timestamp.getTime();
-    const periodDays = msSinceFirstDeposit / (24 * 60 * 60 * 1000);
-
-
-    // The measurement period must start on or after the day AFTER the first deposit.
-    // The first deposit itself is "baked into" startEquity, not counted as a flow.
     const dayAfterFirstDeposit = new Date(firstDeposit.timestamp.getTime() + 24 * 60 * 60 * 1000);
     const earliestStartDate = dayAfterFirstDeposit.toISOString().split("T")[0];
     const todayStr = now.toISOString().split("T")[0];
 
-    let startEquity: bigint;
-    let profit: bigint;
+    if (earliestStartDate >= todayStr) return noData;
 
-    if (earliestStartDate > todayStr) {
-      // ── Path A: Vault < 1 calendar day old ──────────────────────────────
-      // dayAfterFirstDeposit is in the future, so historical equity is useless.
-      // Use total net deposits as starting capital; profit is simply the gain over deposits.
-      const { totalDepositsUsd: allDeposits, totalWithdrawalsUsd: allWithdrawals } =
-        await getDepositsWithdrawalsInPeriod(accessToken, vaultAddress, firstDeposit.date);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startDate = thirtyDaysAgo >= dayAfterFirstDeposit
+      ? thirtyDaysAgo.toISOString().split("T")[0]
+      : earliestStartDate;
 
-      startEquity = allDeposits - allWithdrawals;
+    const startDateObj = new Date(startDate + "T00:00:00Z");
+    const actualDays = Math.max((now.getTime() - startDateObj.getTime()) / (24 * 60 * 60 * 1000), 1);
 
-      if (startEquity <= 0n) {
-        return "-";
+    // Historical total supply
+    const { data: histStorage } = await cirrus.get(accessToken, "/history@storage", {
+      params: {
+        address: `eq.${shareTokenAddress}`,
+        valid_from: `lte.${startDate}`,
+        valid_to: `gte.${startDate}`,
+        select: "data",
+      },
+    });
+    const histTotalSupply = safeBigInt(histStorage?.[0]?.data?._totalSupply);
+    if (histTotalSupply <= 0n) return noData;
+
+    // Historical balances and prices per asset (needed for both equity and HODL)
+    let histEquity = 0n;
+    let hodlEquity = 0n;
+
+    for (const assetAddress of supportedAssets) {
+      const histBalance = await getHistoricalTokenBalance(accessToken, assetAddress, botExecutor, startDate);
+      const histBalanceBN = safeBigInt(histBalance);
+
+      const histPrice = await getHistoricalAssetPrice(accessToken, priceOracleAddress, assetAddress, startDate);
+      const histPriceBN = safeBigInt(histPrice);
+
+      if (histPriceBN > 0n) {
+        histEquity += (histBalanceBN * histPriceBN) / WAD;
       }
 
-      profit = currentEquity - startEquity;
-    } else {
-      // ── Path B: Vault >= 1 calendar day old ─────────────────────────────
-      // Use historical equity from startDate plus deposit/withdrawal flows in the period.
-      let startDate: string;
-
-      if (thirtyDaysAgo >= dayAfterFirstDeposit) {
-        startDate = thirtyDaysAgo.toISOString().split("T")[0];
-      } else {
-        startDate = earliestStartDate;
+      // HODL: same historical balances, but at today's prices
+      const currentPriceBN = safeBigInt(currentPrices.get(assetAddress));
+      if (currentPriceBN > 0n) {
+        hodlEquity += (histBalanceBN * currentPriceBN) / WAD;
       }
-
-      // Get starting equity from historical data
-      startEquity = await getHistoricalEquity(
-        accessToken,
-        vaultAddress,
-        botExecutor,
-        priceOracleAddress,
-        supportedAssets,
-        startDate
-      );
-
-      if (startEquity <= 0n) {
-        return "-";
-      }
-
-      // Get deposit / withdrawal flows in the period
-      const { totalDepositsUsd, totalWithdrawalsUsd } = await getDepositsWithdrawalsInPeriod(
-        accessToken,
-        vaultAddress,
-        startDate
-      );
-
-      profit = (currentEquity - startEquity) + totalWithdrawalsUsd - totalDepositsUsd;
     }
 
-    // ── Calculate period return and APY ───────────────────────────────────
-    const periodReturnScaled = (profit * WAD) / startEquity;
-    const periodReturn = Number(periodReturnScaled) / 1e18;
+    if (histEquity <= 0n) return noData;
 
-    if (periodReturn <= -1) {
-      return "-";
-    }
+    // Vault APY (NAV-based TWR)
+    const histNAV = (histEquity * WAD) / histTotalSupply;
+    if (histNAV <= 0n) return noData;
 
-    // Always annualize over 30 days — profit is measured over a 30-day window
-    const apy = Math.pow(1 + periodReturn, 365 / 30) - 1;
-    const apyPercent = apy * 100;
+    const vaultReturn = Number(((currentNAV - histNAV) * WAD) / histNAV) / 1e18;
+    if (vaultReturn <= -1) return noData;
 
-    return apyPercent.toFixed(2);
+    const vaultApy = Math.pow(1 + vaultReturn, 365 / actualDays) - 1;
+
+    // HODL APY (passive benchmark)
+    const hodlReturn = Number(((hodlEquity - histEquity) * WAD) / histEquity) / 1e18;
+    const hodlApy = hodlReturn <= -1 ? -1 : Math.pow(1 + hodlReturn, 365 / actualDays) - 1;
+
+    // Alpha = vault outperformance vs HODL
+    const alpha = vaultApy - hodlApy;
+
+    return {
+      apy: (vaultApy * 100).toFixed(2),
+      alpha: (alpha * 100).toFixed(2),
+    };
   } catch (error) {
-    console.error("Error calculating APY:", error);
-    return "-";
+    console.error("Error calculating performance metrics:", error);
+    return noData;
   }
 };
 
@@ -814,6 +818,7 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
       totalShares: "0",
       navPerShare: "0",
       apy: "0",
+      alpha: "0",
       paused: false,
       assets: [],
       deficitAssets: [],
@@ -854,39 +859,33 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
   let withdrawableEquity = 0n;
   const assets: VaultAsset[] = [];
   const deficitAssets: string[] = [];
+  const currentPrices = new Map<string, string>();
 
   for (const assetAddress of supportedAssetAddresses) {
-    // Get token info
     const tokenInfo = await getTokenInfo(accessToken, assetAddress);
-    
-    // Get balance held by bot executor
     const balance = await getTokenBalance(accessToken, assetAddress, botExecutor);
     const balanceBN = safeBigInt(balance);
-    
-    // Get min reserve
+
     const minReserve = minReserveMap.get(assetAddress.toLowerCase()) || "0";
     const minReserveBN = safeBigInt(minReserve);
-    
-    // Calculate withdrawable
+
     const withdrawable = balanceBN > minReserveBN ? (balanceBN - minReserveBN).toString() : "0";
     const withdrawableBN = safeBigInt(withdrawable);
-    
-    // Get price
+
     const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
     const priceBN = safeBigInt(priceUsd);
-    
-    // Calculate value in USD
+    currentPrices.set(assetAddress, priceUsd);
+
     const valueUsd = priceBN > 0n ? ((balanceBN * priceBN) / WAD).toString() : "0";
     const withdrawableValueUsd = priceBN > 0n ? ((withdrawableBN * priceBN) / WAD) : 0n;
-    
+
     totalEquity += safeBigInt(valueUsd);
     withdrawableEquity += withdrawableValueUsd;
-    
-    // Check for deficit
+
     if (balanceBN < minReserveBN) {
       deficitAssets.push(assetAddress);
     }
-    
+
     assets.push({
       address: assetAddress,
       symbol: tokenInfo.symbol,
@@ -901,20 +900,23 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
   }
 
   // Calculate NAV per share
-  let navPerShare = WAD.toString(); // Default to $1 per share
+  let navPerShare = WAD.toString();
   const totalSharesBN = safeBigInt(totalShares);
   if (totalSharesBN > 0n && totalEquity > 0n) {
     navPerShare = ((totalEquity * WAD) / totalSharesBN).toString();
   }
 
-  // Calculate APY based on 30-day performance
-  const apy = await getAPY(
+  // Calculate APY and alpha vs HODL
+  const { apy, alpha } = await getPerformanceMetrics(
     accessToken,
     vaultAddress,
     totalEquity,
+    totalSharesBN,
+    shareToken,
     botExecutor,
     priceOracleAddress,
-    supportedAssetAddresses
+    supportedAssetAddresses,
+    currentPrices
   );
 
   return {
@@ -923,6 +925,7 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     totalShares,
     navPerShare,
     apy,
+    alpha,
     paused,
     assets,
     deficitAssets,
@@ -945,6 +948,7 @@ export const getUserPosition = async (
     return {
       userShares: "0",
       userValueUsd: "0",
+      allTimeDeposits: "0",
       allTimeEarnings: "0",
     };
   }
@@ -955,6 +959,7 @@ export const getUserPosition = async (
     return {
       userShares: "0",
       userValueUsd: "0",
+      allTimeDeposits: "0",
       allTimeEarnings: "0",
     };
   }
@@ -989,6 +994,7 @@ export const getUserPosition = async (
   return {
     userShares,
     userValueUsd,
+    allTimeDeposits: totalDepositedUsd.toString(),
     allTimeEarnings,
   };
 };
@@ -1467,5 +1473,73 @@ export const getTransactions = async (
   } catch (error) {
     console.error("Error fetching bot transactions:", error);
     return { transactions: [] };
+  }
+};
+
+/**
+ * Get user's deposit and withdrawal activity
+ */
+export const getUserActivity = async (
+  accessToken: string,
+  userAddress: string,
+  limit: number = 20
+): Promise<{ activity: UserActivityItem[] }> => {
+  const vaultAddress = await getVaultAddress(accessToken);
+
+  if (!vaultAddress) {
+    return { activity: [] };
+  }
+
+  try {
+    const [{ data: depositEvents }, { data: withdrawEvents }] = await Promise.all([
+      cirrus.get(accessToken, `/${Vault}-Deposited`, {
+        params: {
+          select: "depositValueUSD::text,block_timestamp",
+          address: `eq.${vaultAddress}`,
+          user: `eq.${userAddress}`,
+          order: "block_timestamp.desc",
+          limit: limit.toString(),
+        },
+      }),
+      cirrus.get(accessToken, `/${Vault}-Withdrawn`, {
+        params: {
+          select: "withdrawValueUSD::text,block_timestamp",
+          address: `eq.${vaultAddress}`,
+          user: `eq.${userAddress}`,
+          order: "block_timestamp.desc",
+          limit: limit.toString(),
+        },
+      }),
+    ]);
+
+    const activity: UserActivityItem[] = [];
+
+    for (const evt of depositEvents || []) {
+      activity.push({
+        type: "deposit",
+        timestamp: evt.block_timestamp || "",
+        valueUsd: evt.depositValueUSD || "0",
+      });
+    }
+
+    for (const evt of withdrawEvents || []) {
+      activity.push({
+        type: "withdrawal",
+        timestamp: evt.block_timestamp || "",
+        valueUsd: evt.withdrawValueUSD || "0",
+      });
+    }
+
+    activity.sort((a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    if (activity.length > limit) {
+      activity.length = limit;
+    }
+
+    return { activity };
+  } catch (error) {
+    console.error("Error fetching user activity:", error);
+    return { activity: [] };
   }
 };

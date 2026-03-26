@@ -1,4 +1,4 @@
-import { Wallet, Coins, Loader2, TrendingUp } from "lucide-react";
+import { Wallet, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useVaultContext } from "@/context/VaultContext";
@@ -28,22 +28,6 @@ const formatShares = (value: string): string => {
   }
 };
 
-const formatEarnings = (value: string): { formatted: string; isPositive: boolean; isZero: boolean } => {
-  try {
-    const num = parseFloat(formatUnits(value, 18));
-    const isZero = Math.abs(num) < 0.005;
-    const isPositive = num >= 0;
-    const absFormatted = Math.abs(num).toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    const formatted = isPositive ? `+$${absFormatted}` : `-$${absFormatted}`;
-    return { formatted: isZero ? "$0.00" : formatted, isPositive, isZero };
-  } catch {
-    return { formatted: "$0.00", isPositive: true, isZero: true };
-  }
-};
-
 interface VaultUserPositionProps {
   onDeposit: () => void;
   onWithdraw: () => void;
@@ -55,7 +39,6 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
   const {
     userShares,
     userValueUsd,
-    allTimeEarnings,
     paused,
     loadingUser,
     shareTokenSymbol,
@@ -125,42 +108,15 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
         ) : (
           <>
             {/* Position Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-muted/50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <Coins className="h-4 w-4" />
-                  Your Shares
-                </div>
-                <div className="text-2xl font-bold">
-                  {formatShares(userShares)}
-                </div>
-                <div className="text-xs text-muted-foreground">{shareTokenSymbol}</div>
+            <div className="bg-muted/50 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                <Wallet className="h-4 w-4" />
+                Your Shares
               </div>
-
-              <div className="bg-muted/50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <Wallet className="h-4 w-4" />
-                  USD Value
-                </div>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  ${formatUsd(userValueUsd)}
-                </div>
+              <div className="text-2xl font-bold">
+                {formatShares(userShares)} <span className="text-base text-muted-foreground">(${formatUsd(userValueUsd)})</span>
               </div>
-
-              <div className="bg-muted/50 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <TrendingUp className="h-4 w-4" />
-                  All-Time Earnings
-                </div>
-                {(() => {
-                  const { formatted, isPositive, isZero } = formatEarnings(allTimeEarnings);
-                  return (
-                    <div className={`text-2xl font-bold ${isZero ? "" : isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                      {formatted}
-                    </div>
-                  );
-                })()}
-              </div>
+              <div className="text-xs text-muted-foreground">{shareTokenSymbol}</div>
             </div>
 
             {/* Action Buttons */}

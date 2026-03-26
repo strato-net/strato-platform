@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { ArrowLeft, CircleDollarSign, PiggyBank, Sparkles, Wallet } from "lucide-react";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/context/UserContext";
+import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits } from "@/utils/numberUtils";
@@ -25,10 +26,12 @@ import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import {
-  calculateRealTimePendingRewards,
+  calculateEstimatedRewardsPerDay,
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
+
+const CATA_PRICE_USD = 0.25;
 
 const formatTokenAmount = (value: string, maxFractionDigits: number = 4): string => {
   try {
@@ -60,43 +63,41 @@ const formatPercent = (value: string): string => {
   return `${num.toFixed(2)}%`;
 };
 
-type SaveUsdstInfo = {
-  configured: boolean;
-  deployed: boolean;
-  vaultAddress: string;
-  assetAddress: string;
-  assetSymbol: string;
-  shareSymbol: string;
-  totalManagedAssets: string;
-  totalAssets: string;
-  pricingAssets: string;
-  totalShares: string;
-  exchangeRate: string;
-  apy: string;
-  paused: boolean;
-};
-
-type SaveUsdstUserInfo = SaveUsdstInfo & {
-  walletAssets: string;
-  userShares: string;
-  redeemableAssets: string;
-  maxDeposit: string;
-  maxRedeem: string;
-  maxWithdraw: string;
-  userTotalDepositedAssets: string;
-  userTotalWithdrawnAssets: string;
-  userNetDepositedAssets: string;
-  userAllTimeEarningsAssets: string;
+const formatUsdAmount = (value: string): string => {
+  try {
+    const num = Number(formatUnits(value || "0", 18));
+    if (!Number.isFinite(num)) return "$0.00";
+    return num.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  } catch {
+    return "$0.00";
+  }
 };
 
 type ActionMode = "deposit" | "redeem" | null;
 
 const getEstimatedIncentiveApyPercent = (
+  nativeApyPercent?: string | number | null,
   emissionRate?: string,
   totalStakeUsd?: string | null
 ): string => {
   try {
     if (!emissionRate || !totalStakeUsd) return "-";
+
+    const nativeApy =
+      nativeApyPercent === null ||
+      nativeApyPercent === undefined ||
+      nativeApyPercent === "" ||
+      nativeApyPercent === "-"
+        ? 0
+        : Number(nativeApyPercent);
+    if (!Number.isFinite(nativeApy)) {
+      return "-";
+    }
 
     const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
     if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) return "-";
@@ -104,9 +105,33 @@ const getEstimatedIncentiveApyPercent = (
     const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
     if (!Number.isFinite(annualCata) || annualCata < 0) return "-";
 
-    return ((annualCata * 0.25) / tvlUsd * 100).toFixed(2);
+    const rewardsApy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
+    const totalApy = nativeApy + rewardsApy;
+    if (!Number.isFinite(totalApy) || totalApy <= 0) {
+      return "-";
+    }
+
+    return totalApy.toFixed(2);
   } catch {
     return "-";
+  }
+};
+
+const getPointsPerDollarPerDay = (
+  emissionRate?: string,
+  totalStakeUsd?: string | null
+): string | null => {
+  try {
+    if (!emissionRate || !totalStakeUsd) return null;
+    const totalStakeUsdBig = BigInt(totalStakeUsd);
+    if (totalStakeUsdBig <= 0n) return null;
+
+    const ptsPerDollarPerDayWei = (BigInt(emissionRate) * 86400n * (10n ** 18n)) / totalStakeUsdBig;
+    return formatRoundedWithCommas(
+      roundByMagnitude(formatTokenAmount(ptsPerDollarPerDayWei.toString(), 18))
+    );
+  } catch {
+    return null;
   }
 };
 
@@ -116,9 +141,12 @@ const EarnSave = () => {
   const { toast } = useToast();
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
   const { userRewards, loading: rewardsUserLoading } = useRewardsUserInfo();
-  const [saveInfo, setSaveInfo] = useState<SaveUsdstInfo | null>(null);
-  const [userInfo, setUserInfo] = useState<SaveUsdstUserInfo | null>(null);
-  const [loadingInfo, setLoadingInfo] = useState(true);
+  const {
+    saveUsdstInfo: saveInfo,
+    saveUsdstUserInfo: userInfo,
+    loadingSaveUsdst: loadingInfo,
+    refreshSaveUsdst,
+  } = useSaveUsdstContext();
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -128,43 +156,6 @@ const EarnSave = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  const refreshData = useCallback(
-    async (signal?: AbortSignal) => {
-      try {
-        setLoadingInfo(true);
-        const [infoResponse, userResponse] = await Promise.all([
-          api.get<SaveUsdstInfo>("/earn/save-usdst/info", { signal }),
-          isLoggedIn
-            ? api.get<SaveUsdstUserInfo>("/earn/save-usdst/user", { signal })
-            : Promise.resolve({ data: null } as { data: null }),
-        ]);
-
-        if (signal?.aborted) return;
-
-        setSaveInfo(infoResponse.data);
-        setUserInfo(userResponse.data);
-      } catch (error: any) {
-        if (signal?.aborted || error?.name === "AbortError" || error?.code === "ERR_CANCELED") {
-          return;
-        }
-
-        setSaveInfo(null);
-        setUserInfo(null);
-      } finally {
-        if (!signal?.aborted) {
-          setLoadingInfo(false);
-        }
-      }
-    },
-    [isLoggedIn]
-  );
-
-  useEffect(() => {
-    const abortController = new AbortController();
-    refreshData(abortController.signal);
-    return () => abortController.abort();
-  }, [refreshData]);
-
   useEffect(() => {
     if (!actionMode) {
       setActionAmount("");
@@ -173,6 +164,9 @@ const EarnSave = () => {
 
   const effectiveInfo = userInfo || saveInfo;
   const exchangeRate = formatExchangeRate(effectiveInfo?.exchangeRate || "0");
+  const tvlDisplay = loadingInfo
+    ? "..."
+    : formatUsdAmount(effectiveInfo?.tvlUsd || "0");
   const walletAssets = userInfo?.walletAssets || "0";
   const userShares = userInfo?.userShares || "0";
   const redeemableAssets = userInfo?.redeemableAssets || "0";
@@ -206,27 +200,49 @@ const EarnSave = () => {
   }, [normalizedVaultAddress, userRewards]);
   const incentiveYield = formatPercent(
     getEstimatedIncentiveApyPercent(
+      effectiveInfo?.apy,
       saveRewardsActivity?.emissionRate,
-      saveRewardsActivity?.totalStakeUsd ?? null
+      saveRewardsActivity?.totalStakeUsd ??
+        effectiveInfo?.tvlUsd ??
+        effectiveInfo?.pricingAssets ??
+        effectiveInfo?.totalAssets ??
+        null
     )
   );
-  const saveRewardPointsEarned = useMemo(() => {
+  const saveRewardPointsPerDollarPerDay = useMemo(
+    () =>
+      getPointsPerDollarPerDay(
+        saveRewardsActivity?.emissionRate,
+        saveRewardsActivity?.totalStakeUsd ??
+          effectiveInfo?.tvlUsd ??
+          effectiveInfo?.pricingAssets ??
+          effectiveInfo?.totalAssets ??
+          null
+      ),
+    [
+      saveRewardsActivity?.emissionRate,
+      saveRewardsActivity?.totalStakeUsd,
+      effectiveInfo?.tvlUsd,
+      effectiveInfo?.pricingAssets,
+      effectiveInfo?.totalAssets,
+    ]
+  );
+  const saveRewardPointsPerDay = useMemo(() => {
     if (saveRewardEntries.length === 0) return "0";
 
-    const currentTime = Math.floor(Date.now() / 1000);
-    const pendingRewards = saveRewardEntries.reduce((total, { activity, userInfo }) => (
-      total + BigInt(calculateRealTimePendingRewards(
-        userInfo?.stake || "0",
-        activity.accRewardPerStake || "0",
-        userInfo?.userIndex || "0",
-        activity.emissionRate || "0",
-        activity.totalStake || "0",
-        activity.lastUpdateTime || "0",
-        currentTime
-      ))
-    ), 0n);
+    const rewardsPerDay = saveRewardEntries.reduce((total, { activity, userInfo, personalEmissionRate }) => {
+      if (personalEmissionRate && BigInt(personalEmissionRate) > 0n) {
+        return total + (BigInt(personalEmissionRate) * 86400n);
+      }
 
-    return formatRoundedWithCommas(roundByMagnitude(formatUnits(pendingRewards, 18)));
+      return total + BigInt(calculateEstimatedRewardsPerDay(
+        userInfo?.stake || "0",
+        activity.totalStake || "0",
+        activity.emissionRate || "0"
+      ));
+    }, 0n);
+
+    return formatRoundedWithCommas(roundByMagnitude(formatUnits(rewardsPerDay, 18)));
   }, [saveRewardEntries]);
   const isInsolvent = BigInt(effectiveInfo?.totalShares || "0") > 0n && BigInt(effectiveInfo?.pricingAssets || "0") === 0n;
   const depositDisabled = !isLoggedIn || !isConfigured || !isDeployed || isPaused || isInsolvent;
@@ -280,9 +296,11 @@ const EarnSave = () => {
       icon: <CircleDollarSign className="h-4 w-4 text-violet-600 dark:text-violet-400" />,
     },
     {
-      label: "Reward Points Earned",
-      value: loadingInfo || rewardsUserLoading ? "..." : isLoggedIn ? `${saveRewardPointsEarned} Points` : "--",
-      hint: "Points you've earned so far",
+      label: "Estimated Rewards/Day",
+      value: loadingInfo || rewardsUserLoading ? "..." : isLoggedIn ? `${saveRewardPointsPerDay} points` : "--",
+      hint: saveRewardPointsPerDollarPerDay
+        ? `Points you can earn per day at the current rate (${saveRewardPointsPerDollarPerDay} pts/$1/day)`
+        : "Points you can earn per day at the current rate",
       icon: <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
     },
   ];
@@ -323,7 +341,7 @@ const EarnSave = () => {
       }
 
       setActionMode(null);
-      await refreshData();
+      await refreshSaveUsdst();
     } finally {
       setIsSubmitting(false);
     }
@@ -341,7 +359,7 @@ const EarnSave = () => {
         variant: "success",
       });
       setActionMode(null);
-      await refreshData();
+      await refreshSaveUsdst();
     } finally {
       setIsSubmitting(false);
     }
@@ -436,7 +454,7 @@ const EarnSave = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
                           <p className="text-muted-foreground">Exchange Rate</p>
                           <p className="mt-1 text-lg font-semibold">{exchangeRate}</p>
@@ -445,12 +463,19 @@ const EarnSave = () => {
                           </p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
+                          <p className="text-muted-foreground">TVL</p>
+                          <p className="mt-1 text-lg font-semibold">{tvlDisplay}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Total value currently saved in the vault
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-border/60 bg-background/70 p-3">
                           <p className="text-muted-foreground">Yield</p>
                           <p className="mt-1 text-lg font-semibold">
                             {loadingInfo || rewardsActivitiesLoading ? "..." : incentiveYield}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Estimated annualized rewards incentive yield
+                            Estimated annualized total yield, including rewards and native fees
                           </p>
                         </div>
                       </div>

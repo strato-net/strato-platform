@@ -33,6 +33,11 @@ contract Describe_SaveUSDSTVault is Authorizable {
         vault.initialize(USDST, "Save USDST", "saveUSDST");
     }
 
+    function recordRewardTransfer(uint amount) internal {
+        Token(USDST).transfer(address(vault), amount);
+        vault.recordRewardTransfer(amount);
+    }
+
     function it_initializes_as_an_exchange_rate_vault() public {
         require(vault.asset() == USDST, "asset not set");
         require(vault.totalSupply() == 0, "unexpected initial supply");
@@ -84,8 +89,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         require(vault.convertToAssets(100e18) == 100e18, "initial assets mismatch");
 
         Token(USDST).mint(address(this), 20e18);
-        Token(USDST).approve(address(vault), 20e18);
-        vault.notifyReward(20e18);
+        recordRewardTransfer(20e18);
 
         require(vault.totalAssets() == 120e18, "reward should raise assets");
         require(vault.convertToAssets(100e18) == 120e18, "share value should increase");
@@ -94,15 +98,15 @@ contract Describe_SaveUSDSTVault is Authorizable {
 
     function it_reverts_reward_notification_when_no_shares_exist() public {
         Token(USDST).mint(address(this), 20e18);
-        Token(USDST).approve(address(vault), 20e18);
+        Token(USDST).transfer(address(vault), 20e18);
 
         bool reverted = false;
-        try vault.notifyReward(20e18) {
+        try vault.recordRewardTransfer(20e18) {
         } catch {
             reverted = true;
         }
 
-        require(reverted, "notifyReward should revert when no shares exist");
+        require(reverted, "recordRewardTransfer should revert when no shares exist");
         require(vault.totalAssets() == 0, "managed assets should remain zero");
     }
 
@@ -114,8 +118,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         saver.do(address(vault), "deposit(uint256,address)", 50e18, address(saver));
 
         Token(USDST).mint(address(this), 10e18);
-        Token(USDST).approve(address(vault), 10e18);
-        vault.notifyReward(10e18);
+        recordRewardTransfer(10e18);
 
         uint saverBalanceBefore = IERC20(USDST).balanceOf(address(saver));
         saver.do(address(vault), "redeem(uint256,address,address)", 50e18, address(saver), address(saver));
@@ -135,15 +138,15 @@ contract Describe_SaveUSDSTVault is Authorizable {
         saver.do(address(vault), "redeem(uint256,address,address)", 50e18, address(saver), address(saver));
 
         Token(USDST).mint(address(this), 10e18);
-        Token(USDST).approve(address(vault), 10e18);
+        Token(USDST).transfer(address(vault), 10e18);
 
         bool reverted = false;
-        try vault.notifyReward(10e18) {
+        try vault.recordRewardTransfer(10e18) {
         } catch {
             reverted = true;
         }
 
-        require(reverted, "notifyReward should revert after full redeem");
+        require(reverted, "recordRewardTransfer should revert after full redeem");
         require(vault.totalSupply() == 0, "supply should remain zero");
         require(vault.totalAssets() == 0, "managed assets should remain zero");
     }
@@ -161,8 +164,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         bob.do(address(vault), "deposit(uint256,address)", 100e18, address(bob));
 
         Token(USDST).mint(address(this), 20e18);
-        Token(USDST).approve(address(vault), 20e18);
-        vault.notifyReward(20e18);
+        recordRewardTransfer(20e18);
 
         // 220 managed, 200 shares. Each user has 100 shares = 110 USDST.
         uint aliceBefore = IERC20(USDST).balanceOf(address(alice));
@@ -190,8 +192,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
 
         // Reward of 100 doubles the rate to 2:1
         Token(USDST).mint(address(this), 100e18);
-        Token(USDST).approve(address(vault), 100e18);
-        vault.notifyReward(100e18);
+        recordRewardTransfer(100e18);
 
         // Bob deposits 100 at 2:1, gets 50 shares
         Token(USDST).mint(address(bob), 100e18);
@@ -203,8 +204,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
 
         // Another reward of 30. Total managed = 330, total shares = 150.
         Token(USDST).mint(address(this), 30e18);
-        Token(USDST).approve(address(vault), 30e18);
-        vault.notifyReward(30e18);
+        recordRewardTransfer(30e18);
 
         // Alice: 100/150 * 330 = 220. Bob: 50/150 * 330 = 110.
         uint aliceBefore = IERC20(USDST).balanceOf(address(alice));
@@ -238,8 +238,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         charlie.do(address(vault), "deposit(uint256,address)", 20e18, address(charlie));
 
         Token(USDST).mint(address(this), 10e18);
-        Token(USDST).approve(address(vault), 10e18);
-        vault.notifyReward(10e18);
+        recordRewardTransfer(10e18);
 
         // Alice and bob withdraw. Charlie is last.
         alice.do(address(vault), "redeem(uint256,address,address)", 50e18, address(alice), address(alice));
@@ -263,8 +262,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         alice.do(address(vault), "deposit(uint256,address)", 100e18, address(alice));
 
         Token(USDST).mint(address(this), 100e18);
-        Token(USDST).approve(address(vault), 100e18);
-        vault.notifyReward(100e18);
+        recordRewardTransfer(100e18);
 
         // Rate is now 2:1. Depositing 1 wei should yield 0 shares and revert.
         User dust = new User();
@@ -484,8 +482,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         bob.do(address(vault), "deposit(uint256,address)", amountB, address(bob));
 
         Token(USDST).mint(address(this), reward);
-        Token(USDST).approve(address(vault), reward);
-        vault.notifyReward(reward);
+        recordRewardTransfer(reward);
 
         uint aliceShares = IERC20(address(vault)).balanceOf(address(alice));
         uint aliceBefore = IERC20(USDST).balanceOf(address(alice));
@@ -520,8 +517,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         uint rate1 = vault.exchangeRate();
 
         Token(USDST).mint(address(this), rew);
-        Token(USDST).approve(address(vault), rew);
-        vault.notifyReward(rew);
+        recordRewardTransfer(rew);
         uint rate2 = vault.exchangeRate();
         require(rate2 >= rate1, "rate must not decrease after reward");
 
@@ -543,8 +539,7 @@ contract Describe_SaveUSDSTVault is Authorizable {
         u.do(address(vault), "deposit(uint256,address)", dep, address(u));
 
         Token(USDST).mint(address(this), rew);
-        Token(USDST).approve(address(vault), rew);
-        vault.notifyReward(rew);
+        recordRewardTransfer(rew);
 
         uint liveBalanceBeforeBurn = IERC20(USDST).balanceOf(address(vault));
         uint burnAmt = seedBurn % (liveBalanceBeforeBurn + 1);
@@ -558,5 +553,10 @@ contract Describe_SaveUSDSTVault is Authorizable {
 
         require(maxW <= liveBalance, "maxWithdraw exceeds live balance");
         require(maxW <= claim, "maxWithdraw exceeds economic claim");
+
+        // Needed because state persists across test runs
+        if (burnAmt > 0) {
+            Token(USDST).mint(address(vault), burnAmt);
+        }
     }
 }

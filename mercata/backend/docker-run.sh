@@ -6,6 +6,9 @@ if [ -f /run/secrets/oauth_credentials.yaml ]; then
   export OAUTH_DISCOVERY_URL=$(grep "discoveryUrl:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
   export OAUTH_CLIENT_ID=$(grep "clientId:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
   export OAUTH_CLIENT_SECRET=$(grep "clientSecret:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
+else
+  echo "ERROR: /run/secrets/oauth_credentials.yaml not found. Cannot start without OAuth credentials."
+  exit 1
 fi
 
 STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}

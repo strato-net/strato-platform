@@ -8,7 +8,7 @@ import { getVaultShareTokenPrice } from "../services/vault.service";
 import * as config from "../../config/config";
 import { OraclePriceMap } from "@mercata/shared-types";
 
-const { Token, DECIMALS, Pool, LendingPool, lendingRegistry } = constants;
+const { Token, DECIMALS, Pool, LendingPool, SaveUSDSTVault, lendingRegistry } = constants;
 
 const addMTokenPrice = async (
   accessToken: string,
@@ -102,6 +102,43 @@ const addVaultTokenPrice = async (
   }
 };
 
+const addSaveUsdstTokenPrice = async (
+  accessToken: string,
+  priceMap: OraclePriceMap
+): Promise<void> => {
+  if (!config.saveUsdstVault) {
+    return;
+  }
+
+  const { data: vaultRows } = await cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
+    params: {
+      address: `eq.${config.saveUsdstVault}`,
+      select: "address,assetToken,_managedAssets::text,_totalSupply::text",
+    }
+  });
+
+  const vault = vaultRows?.[0];
+  if (!vault?.address || !vault?.assetToken) {
+    return;
+  }
+
+  const { data: balanceRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
+    params: {
+      address: `eq.${vault.assetToken}`,
+      key: `eq.${vault.address}`,
+      select: "value::text",
+    }
+  });
+
+  const managedAssets = BigInt(vault._managedAssets || "0");
+  const totalShares = BigInt(vault._totalSupply || "0");
+  const liveBalance = BigInt(balanceRows?.[0]?.value || "0");
+  const pricingAssets = liveBalance < managedAssets ? liveBalance : managedAssets;
+  const pricePerShare = totalShares === 0n ? DECIMALS : (pricingAssets * DECIMALS) / totalShares;
+
+  priceMap.set(vault.address, pricePerShare.toString());
+};
+
 export const getCompletePriceMap = async (
   accessToken: string
 ): Promise<Map<string, string>> => {
@@ -110,7 +147,8 @@ export const getCompletePriceMap = async (
     addMTokenPrice(accessToken, priceMap),
     addSTokenPrice(accessToken, priceMap),
     addLPTokenPrices(accessToken, priceMap),
-    addVaultTokenPrice(accessToken, priceMap)
+    addVaultTokenPrice(accessToken, priceMap),
+    addSaveUsdstTokenPrice(accessToken, priceMap)
   ]);
   return priceMap;
 };
