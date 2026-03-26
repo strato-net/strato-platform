@@ -54,7 +54,7 @@ runtimeConfig = def
 
 getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
-  env <- newAuthEnv flags_vaultUrl
+  env <- newAuthEnv $ flags_vaultUrl ++ "/strato/v2.3"
   ak <- waitOnVault env $ runWithAuth env (getKey Nothing Nothing)
   return (VC.unPubKey ak, VC.unAddress ak)
 

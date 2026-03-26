@@ -245,7 +245,7 @@ instance Default ContractsConf where
 
 instance Default UrlConfig where
   def = UrlConfig
-    { vaultUrl = "https://vault.blockapps.net:8093/strato/v2.3"
+    { vaultUrl = "https://vault.blockapps.net:8093"
     , fileServerUrl = ""
     , notificationServerUrl = ""
     , repoUrl = ""
