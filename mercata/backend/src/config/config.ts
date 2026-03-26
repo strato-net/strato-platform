@@ -61,6 +61,14 @@ export const hiddenSwapPools: Set<string> = new Set([
   "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user
 ]);
 
+// Yield-bearing tokens benchmarked against a base asset for ratio-growth APY.
+// Verified on both https://app.strato.nexus and https://node1.testnet.strato.nexus (2026-03-26).
+export const yieldBenchmarks = [
+  { tokenSymbol: "wstETH", baseSymbol: "ETH", tokenAddress: "f2aa370405030a434ae07e7826178325c675e925", baseAddress: "93fb7295859b2d70199e0a4883b7c320cf874e6c" },
+  { tokenSymbol: "rETH", baseSymbol: "ETH", tokenAddress: "2e4789eb7db143576da25990a3c0298917a8a87d", baseAddress: "93fb7295859b2d70199e0a4883b7c320cf874e6c" },
+  { tokenSymbol: "sUSDS", baseSymbol: "USDST", tokenAddress: "6e2d93d323edf1b3cc4672a909681b6a430cae64", baseAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010" },
+  { tokenSymbol: "syrupUSDC", baseSymbol: "USDC", tokenAddress: "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca", baseAddress: "6aeacaa19c68e53035bf495d15e0a328fc600ba8" },
+];
 
 /*
    Network-specific defaults;
