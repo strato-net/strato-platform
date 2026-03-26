@@ -33,7 +33,6 @@ import System.FilePath ((</>))
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
-import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
 import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
