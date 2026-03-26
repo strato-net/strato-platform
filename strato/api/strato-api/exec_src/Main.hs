@@ -233,7 +233,7 @@ main = do
             Bloc.Monad.globalNonceCounter = nonceCache,
             Bloc.Monad.nodePubKey = pubKey
           }
-  let bindHost = "*"
+  let bindHost = "!4"
       bindPort = 3000 :: Int
   putStrLn $ "Starting strato-api on " ++ bindHost ++ ":" ++ show bindPort
   let settings = setPort bindPort $ setHost (fromString bindHost) defaultSettings
