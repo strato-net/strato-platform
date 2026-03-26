@@ -17,6 +17,7 @@ module Handlers.Transaction
   ( TxsFilterParams (..),
     txsFilterParams,
     API,
+    postTxClient,
     getTransaction,
     getTransaction',
     postTransaction,
@@ -62,13 +63,14 @@ import qualified Database.Esqueleto.Legacy as E
 import Numeric.Natural
 import SQLM
 import Servant
+import Servant.Client (ClientM, client)
 import Settings
 import SortDirection
 import System.Clock
 import Text.Format
 import UnliftIO
 
-type API =
+type GetTransactions =
   "transaction" :> QueryParam "address" Address
     :> QueryParam "from" Address
     :> QueryParam "to" Address
@@ -92,9 +94,15 @@ type API =
     :> QueryParam "search" T.Text
     :> QueryParam "sortby" Sortby
     :> Get '[JSON] [RawTransaction']
-    :<|> "transaction"
+
+type PostTransaction = "transaction"
     :> ReqBody '[JSON] RawTransaction'
     :> Post '[JSON, PlainText] Keccak256
+
+type API = GetTransactions :<|> PostTransaction
+
+postTxClient :: RawTransaction' -> ClientM Keccak256
+postTxClient = client (Proxy @PostTransaction)
 
 data TxsFilterParams = TxsFilterParams
   { qtAddress :: Maybe Address,
