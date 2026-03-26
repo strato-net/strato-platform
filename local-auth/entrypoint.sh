@@ -22,6 +22,32 @@ else
     echo "No postgres password file found, using passwordless connection"
 fi
 
+read_secret_file() {
+    local path="$1"
+    local name="$2"
+    if [ ! -f "$path" ]; then
+        echo "ERROR: Missing required secret file: $path ($name)"
+        exit 1
+    fi
+    tr -d '\r\n' < "$path"
+}
+
+escape_sed_replacement() {
+    printf '%s' "$1" | sed -e 's/[\/&|]/\\&/g'
+}
+
+HYDRA_SYSTEM_SECRET=$(read_secret_file "/run/secrets/local_auth_hydra_system_secret" "HYDRA_SYSTEM_SECRET")
+HYDRA_PAIRWISE_SALT=$(read_secret_file "/run/secrets/local_auth_hydra_pairwise_salt" "HYDRA_PAIRWISE_SALT")
+KRATOS_COOKIE_SECRET=$(read_secret_file "/run/secrets/local_auth_kratos_cookie_secret" "KRATOS_COOKIE_SECRET")
+
+HYDRA_SYSTEM_SECRET_ESCAPED=$(escape_sed_replacement "$HYDRA_SYSTEM_SECRET")
+HYDRA_PAIRWISE_SALT_ESCAPED=$(escape_sed_replacement "$HYDRA_PAIRWISE_SALT")
+KRATOS_COOKIE_SECRET_ESCAPED=$(escape_sed_replacement "$KRATOS_COOKIE_SECRET")
+
+sed -i "s|__HYDRA_SYSTEM_SECRET__|${HYDRA_SYSTEM_SECRET_ESCAPED}|g" /etc/config/hydra.yml
+sed -i "s|__HYDRA_PAIRWISE_SALT__|${HYDRA_PAIRWISE_SALT_ESCAPED}|g" /etc/config/hydra.yml
+sed -i "s|__KRATOS_COOKIE_SECRET__|${KRATOS_COOKIE_SECRET_ESCAPED}|g" /etc/config/kratos.yml
+
 # Function to wait for postgres
 wait_for_postgres() {
     local max_attempts=30

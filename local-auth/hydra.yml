@@ -21,7 +21,7 @@ urls:
 
 secrets:
   system:
-    - PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
+    - __HYDRA_SYSTEM_SECRET__
 
 oidc:
   subject_identifiers:
@@ -29,7 +29,7 @@ oidc:
       - public
       - pairwise
     pairwise:
-      salt: PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
+      salt: __HYDRA_PAIRWISE_SALT__
 
 strategies:
   access_token: jwt

@@ -1,10 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Blockchain.Init.EthConf (genEthConf) where
+module Blockchain.Init.EthConf (genEthConf, getInternalVaultUrl) where
 
 import Blockchain.EthConf
-import Blockchain.Init.Options
+import Blockchain.Init.Options hiding (flags_localAuth)
+import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
 import Control.Concurrent
@@ -23,6 +24,10 @@ getApiIPAddress
   | flags_apiIPAddress /= "127.0.0.1" = flags_apiIPAddress  -- User provided explicit value
   | os == "linux" = "172.17.0.1"                            -- Linux Docker bridge
   | otherwise = "host.docker.internal"                      -- macOS/Windows Docker
+
+-- | Get the internal vault URL for nginx to proxy to (vault-wrapper on host)
+getInternalVaultUrl :: String
+getInternalVaultUrl = "http://" ++ getApiIPAddress ++ ":8093"
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -61,9 +66,16 @@ runtimeConfig = def
   , debugConfig = def { svmTrace = flags_svmTrace }
   }
 
+-- | Get effective vault URL based on localAuth flag
+getEffectiveVaultUrl :: String
+getEffectiveVaultUrl
+  | Opts.flags_localAuth = "http://localhost:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
+  | otherwise = flags_vaultUrl
+
 getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
-  env <- newAuthEnv flags_vaultUrl
+  let vaultUrl' = getEffectiveVaultUrl
+  env <- newAuthEnv vaultUrl'
   ak <- waitOnVault env $ runWithAuth env (getKey Nothing Nothing)
   return (VC.unPubKey ak, VC.unAddress ak)
 
@@ -101,8 +113,12 @@ genEthConf :: IO EthConf
 genEthConf = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
-  (pub, _addr) <- getNodeKey
-  putStrLn $ "  ✓ Node key: " ++ shortDescription pub
+  -- For local auth mode, skip vault during setup (vault-wrapper starts later)
+  if Opts.flags_localAuth
+    then putStrLn "  ✓ Local auth mode: node key will be created when vault-wrapper starts"
+    else do
+      (pub, _addr) <- getNodeKey
+      putStrLn $ "  ✓ Node key: " ++ shortDescription pub
 
   return runtimeConfig
     { sqlConfig = (sqlConfig runtimeConfig)
@@ -126,7 +142,7 @@ genEthConf = do
         , mempoolLivenessCutoff = flags_mempoolLivenessCutoff
         }
     , urlConfig = def
-        { vaultUrl = flags_vaultUrl
+        { vaultUrl = getEffectiveVaultUrl
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl

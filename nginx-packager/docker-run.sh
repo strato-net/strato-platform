@@ -55,7 +55,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     echo "OAUTH_DISCOVERY_URL is required but not set"
     exit 5
   fi
-  if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
+  if ! curl --silent --output /dev/null --fail --location "${OAUTH_DISCOVERY_URL}"
   then
     echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
     exit 6

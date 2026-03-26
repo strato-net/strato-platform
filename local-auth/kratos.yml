@@ -75,7 +75,7 @@ log:
 
 secrets:
   cookie:
-    - PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
+    - __KRATOS_COOKIE_SECRET__
 
 hashers:
   argon2:

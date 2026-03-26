@@ -10,6 +10,7 @@ module Blockchain.Init.BuildMetadata
   , hashPostgrest
   , hashNginx
   , hashPrometheus
+  , hashLocalAuth
   ) where
 
 import Blockchain.Init.BuildMetadata.TH (getValue)
@@ -40,3 +41,6 @@ hashNginx = $(getValue "HASH_NGINX")
 
 hashPrometheus :: String
 hashPrometheus = $(getValue "HASH_PROMETHEUS")
+
+hashLocalAuth :: String
+hashLocalAuth = $(getValue "HASH_LOCAL_AUTH")
