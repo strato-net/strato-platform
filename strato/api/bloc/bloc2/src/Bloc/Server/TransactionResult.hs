@@ -1,6 +1,7 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -15,6 +16,7 @@
 module Bloc.Server.TransactionResult
   ( getBlocTransactionResult,
     postBlocTransactionResults,
+    postBlocTransactionResults',
     getBatchBlocTransactionResult',
     getBlocTransactionResult',
     forStateT,
@@ -27,7 +29,7 @@ where
 import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
-import Bloc.Database.Queries (getContractByAddress)
+import Bloc.Database.Queries (getContractByAddress, withCodeCollectionCache)
 import Bloc.Monad
 import Bloc.Server.Utils
 import BlockApps.Logging
@@ -60,7 +62,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Set (isSubsetOf)
-import Data.Source.Map
+import Data.Source.Map (SourceMap)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Text.Encoding (encodeUtf8)
@@ -69,6 +71,7 @@ import Handlers.AccountInfo
 import Handlers.Storage
 import Handlers.Transaction
 import SQLM
+import SolidVM.Model.CodeCollection (CodeCollection)
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function (funcVals)
 import SolidVM.Model.CodeCollection.Statement
@@ -103,9 +106,7 @@ emptyBatchState = BatchState Map.empty
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' ::
   ( MonadUnliftIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -119,7 +120,7 @@ getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': 
 getBlocTransactionResult' hashes@(txh : _) resolve =
   if resolve
     then do
-      results <- forM hashes $ \h -> withAsync (getBlocTransactionResult h True) $ \e -> wait e
+      results <- postBlocTransactionResults' resolve hashes
       $logDebugLS "getBlocTransactionResult'/results" results
       case results of
         [] -> throwIO $ AnError "Empty list provided: results is empty"
@@ -131,8 +132,8 @@ getBlocTransactionResult' hashes@(txh : _) resolve =
 getBlocTransactionResult ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -142,15 +143,13 @@ getBlocTransactionResult ::
   Keccak256 ->
   Bool ->
   m BlocTransactionResult
-getBlocTransactionResult txHash resolve = unsafeHead =<< postBlocTransactionResults resolve [txHash]
+getBlocTransactionResult txHash resolve = withCodeCollectionCache $ unsafeHead =<< postBlocTransactionResults' resolve [txHash]
   where unsafeHead [] = throwIO $ AnError "getBlocTransactionResult: No results returned"
         unsafeHead (x:_) = pure x
 
 getBatchBlocTransactionResult' ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -162,14 +161,15 @@ getBatchBlocTransactionResult' ::
   m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
   if resolve
-    then postBlocTransactionResults True hashes
+    then postBlocTransactionResults' True hashes
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
+-- | Outer wrapper that introduces the ReaderT IORef cache layer
 postBlocTransactionResults ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -179,7 +179,23 @@ postBlocTransactionResults ::
   Bool ->
   [Keccak256] ->
   m [BlocTransactionResult]
-postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
+postBlocTransactionResults resolve hashes = do
+  withCodeCollectionCache $ postBlocTransactionResults' resolve hashes
+
+-- | Inner function usable when already within a StateT cache layer
+postBlocTransactionResults' ::
+  ( MonadIO m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
+    MonadLogger m
+  ) =>
+  Bool ->
+  [Keccak256] ->
+  m [BlocTransactionResult]
+postBlocTransactionResults' resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
 recurseTRDs ::
   ( MonadIO m
@@ -247,9 +263,7 @@ rawTx2PostTx RawTransaction {..} =
 
 evalAndReturn ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     MonadLogger m
@@ -315,9 +329,7 @@ contractResult txHash txResult@TransactionResult {..} name = do
 
 functionResult ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     MonadLogger m
@@ -363,9 +375,7 @@ functionResult txHash txResult@TransactionResult {..} funcName addr = do
 
 getReturnTypes ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     MonadLogger m
@@ -376,7 +386,7 @@ getReturnTypes ::
 getReturnTypes addr funcName = do
   -- Fetch contract from database
   $logDebugS "getReturnTypes" . Text.pack $ "Fetching contract for address: " ++ show addr
-  mContract <- getContractByAddress addr
+  mContract <- getContractByAddress addr (Just funcName)
   case mContract of
     Just contract -> do
       -- Extract return types

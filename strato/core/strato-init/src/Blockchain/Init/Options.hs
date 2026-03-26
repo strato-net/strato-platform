@@ -30,13 +30,13 @@ defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
 defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for more peers"
 
-defineFlag "apiIPAddress" "127.0.0.1" "The IP address that strato-api will bind to"
+defineFlag "apiIPAddress" "0.0.0.0" "The IP address that strato-api will bind to"
 
 defineFlag "httpPort" (8081 :: Int) "The external HTTP port for nginx"
 
 defineFlag "svmTrace" (False :: Bool) "Enable verbose logging in SolidVM"
 
-defineFlag "vaultUrl" "https://vault.blockapps.net:8093/strato/v2.3" "URL of the shared vault service"
+defineFlag "vaultUrl" "https://vault.blockapps.net:8093" "URL of the shared vault service"
 
 defineFlag "fileServerUrl" "" "URL of the file server for marketplace (derived from network if not provided)"
 

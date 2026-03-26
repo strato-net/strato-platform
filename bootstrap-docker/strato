@@ -303,7 +303,7 @@ EOF
     -v "${HOME}/.secrets:/root/.secrets:ro" \
     ${postgres_password:+-e postgres_password="${postgres_password}"} \
     "${STRATO_IMAGE}" \
-    /node/nodedata --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}/strato/v2.3" --repoUrl="${REPO_URL:-}" \
+    /node/nodedata --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}" --repoUrl="${REPO_URL:-}" \
     --pghost=postgres --kafkahost=kafka --redisHost=redis --apiIPAddress=0.0.0.0 --httpPort="${HTTP_PORT}"
 
   # Fix ownership for non-root containers
