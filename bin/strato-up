@@ -2,17 +2,62 @@
 
 set -e
 
+NODE_DIR="$1"
+SETUP_ARGS=("$@")
+IS_DARWIN=false
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    IS_DARWIN=true
+fi
+
 # Ensure credentials exist
 strato-login --check || strato-login
 
+# New macOS nodes must bind the host-side API to 0.0.0.0.
+# Only inject this on first creation so existing nodes still work with plain `strato-up <node>`.
+if [[ "$IS_DARWIN" == "true" && -n "$NODE_DIR" && ! -d "$NODE_DIR" ]]; then
+    HAS_API_IP_FLAG=false
+    for arg in "${SETUP_ARGS[@]:1}"; do
+        if [[ "$arg" == "--apiIPAddress" || "$arg" == --apiIPAddress=* ]]; then
+            HAS_API_IP_FLAG=true
+            break
+        fi
+    done
+
+    if [[ "$HAS_API_IP_FLAG" == "false" ]]; then
+        SETUP_ARGS+=(--apiIPAddress=0.0.0.0)
+    fi
+fi
+
 # Setup node (creates if needed, skips if exists with no flags, errors if exists with flags)
-strato-setup "$@"
+strato-setup "${SETUP_ARGS[@]}"
 
-cd "$1"
+cd "$NODE_DIR"
 
-echo "Starting convoke..."
-# stdout goes to log, stderr goes to both log and terminal
-nohup convoke > logs/convoke.log 2> >(tee -a logs/convoke.log >&2) &
-echo "CONVOKE_PID=$!" > .strato.pid
+if [[ "$IS_DARWIN" == "true" ]]; then
+    echo "Starting Docker containers..."
+    docker compose -p strato up -d --wait
+
+    echo "Starting convoke..."
+    # stdout goes to log, stderr goes to both log and terminal
+    nohup convoke --no-docker > logs/convoke.log 2> >(tee -a logs/convoke.log >&2) &
+    CONVOKE_PID=$!
+    echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
+
+    nohup bash -c '
+        convoke_pid="$1"
+        while kill -0 "$convoke_pid" 2>/dev/null; do
+            sleep 1
+        done
+        echo "Stopping Docker containers..."
+        docker compose -p strato down
+        echo "Shutdown complete."
+    ' _ "$CONVOKE_PID" >> logs/convoke.log 2>&1 &
+else
+    echo "Starting convoke..."
+    # stdout goes to log, stderr goes to both log and terminal
+    nohup convoke > logs/convoke.log 2> >(tee -a logs/convoke.log >&2) &
+    echo "CONVOKE_PID=$!" > .strato.pid
+fi
 
 echo "STRATO started in: $(pwd)"
