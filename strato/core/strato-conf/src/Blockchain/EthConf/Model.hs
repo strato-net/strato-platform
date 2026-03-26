@@ -232,7 +232,7 @@ instance Default P2PConf where
 
 instance Default ApiConfig where
   def = ApiConfig
-    { ipAddress = "127.0.0.1"
+    { ipAddress = "0.0.0.0"
     , httpPort = 8081
     }
 
