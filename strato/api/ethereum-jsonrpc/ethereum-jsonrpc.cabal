@@ -36,10 +36,12 @@ executable ethereum-jsonrpc
     , http-types
     , json-rpc-server
     , kafka-monad
+    , milena
     , mtl
     , seqevents
     , strato-conf
     , strato-model
+    , strato-p2p
     , text
     , vector
     , wai

@@ -1,0 +1,49 @@
+version: v2.2.0
+
+dsn: postgres://postgres@postgres:5432/hydra?sslmode=disable
+
+serve:
+  public:
+    cors:
+      enabled: true
+      allowed_origins:
+        - "*"
+  admin:
+    host: 0.0.0.0
+    port: 4445
+
+urls:
+  self:
+    issuer: http://localhost:8081/auth
+  consent: http://localhost:8081/auth/ui/consent
+  login: http://localhost:8081/auth/ui/login
+  logout: http://localhost:8081/auth/ui/logout
+
+secrets:
+  system:
+    - __HYDRA_SYSTEM_SECRET__
+
+oidc:
+  subject_identifiers:
+    supported_types:
+      - public
+      - pairwise
+    pairwise:
+      salt: __HYDRA_PAIRWISE_SALT__
+
+strategies:
+  access_token: jwt
+
+oauth2:
+  expose_internal_errors: true
+
+log:
+  level: info
+  format: text
+
+ttl:
+  access_token: 1h
+  refresh_token: 720h
+  id_token: 1h
+  auth_code: 10m
+  login_consent_request: 30m

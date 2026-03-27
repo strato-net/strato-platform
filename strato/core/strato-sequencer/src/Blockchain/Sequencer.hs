@@ -51,14 +51,14 @@ import Prometheus as P
 import Text.Format
 import Text.Printf
 
-type SeqOutEvent = Either [P2pEvent] [VmEvent]
+type SeqOutEvent = Either [P2pEvent] [VmTask]
 
 -- | Yield events to the P2P layer (via @seq_p2p_events@ topic).
 yieldToP2p :: Monad m => [P2pEvent] -> ConduitT i SeqOutEvent m ()
 yieldToP2p = yield . Left
 
--- | Yield events to the VM (via @seq_vm_events@ topic).
-yieldToVm :: Monad m => [VmEvent] -> ConduitT i SeqOutEvent m ()
+-- | Yield events to the VM (via @vm_tasks@ topic).
+yieldToVm :: Monad m => [VmTask] -> ConduitT i SeqOutEvent m ()
 yieldToVm = yield . Right
 
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
@@ -84,7 +84,7 @@ type MonadSequencer m =
 -- 1. Fetches events from two sources (Kafka 'unseqevents' topic and Blockstanbul timers),
 --    unified via the coproduct 'SeqLoopEvent' (either 'TimerFire' or 'UnseqEvents')
 -- 2. Transforms 'SeqLoopEvent' to 'SeqOutEvent' via 'eventHandler'
--- 3. Writes 'SeqOutEvent' back to Kafka ('seq_vm_events' and 'seq_p2p_events' topics)
+-- 3. Writes 'SeqOutEvent' back to Kafka ('vm_tasks' and 'seq_p2p_events' topics)
 --
 -- @
 -- [fuseChannels]        →        [eventHandler]        →        [writeToKafka]
@@ -118,7 +118,7 @@ writeToKafka :: (
   HasKafka m
   ) =>
   ConduitT SeqOutEvent Void m ()
-writeToKafka = awaitForever $ either writeSeqP2pEvents writeSeqVmEvents
+writeToKafka = awaitForever $ either writeSeqP2pEvents writeSeqVmTasks
 
 eventHandler :: (
   MonadFail m,
@@ -274,7 +274,7 @@ blockstanbulSend' msg = do
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
   yieldToVm vmevs
   where
-    vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmEvent], [P2pEvent])
+    vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmTask], [P2pEvent])
     vmEvenP2pCheckptFilterHelper (x : xs) = do
       let (vms, p2ps) = vmEvenP2pCheckptFilterHelper xs
       case x of

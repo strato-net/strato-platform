@@ -23,7 +23,7 @@ type VaultM = ReaderT VaultData
 
 runVaultM :: MonadIO m => String -> VaultM m a -> m a
 runVaultM url f = do
-  env <- liftIO . newAuthEnv $ url ++ "/strato/v2.3"
+  env <- liftIO $ newAuthEnv url
   runReaderT f env
 
 instance {-# OVERLAPPING #-} MonadIO m => HasVault (VaultM m) where

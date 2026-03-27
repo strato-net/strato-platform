@@ -17,6 +17,10 @@ build-type:     Simple
 
 library
   exposed-modules:
+      BlockApps.Solidity.ABI
+      BlockApps.Solidity.ABI.Bridge
+      BlockApps.Solidity.ABI.Codec
+      BlockApps.Solidity.ABI.Selector
       BlockApps.Solidity.ArgValue
       BlockApps.Solidity.Contract
       BlockApps.Solidity.Parse.Declarations

@@ -5,7 +5,7 @@ module Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker) w
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (apiConfig, httpPort)
+import Blockchain.EthConf.Model (networkConfig, httpPort)
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.Options (flags_composeOnly, flags_repoUrl)
@@ -20,7 +20,7 @@ import System.IO (hPutStrLn, stderr)
 generateDockerComposeAllDocker :: IO ()
 generateDockerComposeAllDocker = do
   let conf = ethConf
-      portNum = show $ httpPort (apiConfig conf)
+      portNum = show $ httpPort (networkConfig conf)
       repoUrl = flags_repoUrl
       stratoVersion = stratoVersionTag
       noLogging = Just Logging { driver = "none", options = Nothing }

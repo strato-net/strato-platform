@@ -8,11 +8,23 @@ where
 import qualified APIProxy as API
 import Binary
 import Blockchain.Constants (stratoVersionString)
+import Blockchain.CommunicationConduit (ethVersion)
+import Blockchain.EthConf (runKafkaMConfigured, ethConf)
+import Blockchain.EthConf.Model (networkConfig, networkID, network)
+import Blockchain.Sequencer.Event (JsonRpcCommand(..), VmTask(..))
+import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Control.Monad.IO.Class
+import Control.Monad.Composable.Kafka (fetchItems, execKafka)
 import Control.Monad.Except
+import Blockchain.Sequencer.HexData (HexData(..))
+import qualified Blockchain.Sequencer.TxCallObject as TxCall
+import Blockchain.Sequencer.TxCallObject (TxCallObject)
+import Network.Kafka (getLastOffset, KafkaTime(..))
+import Network.Kafka.Protocol (Offset(..))
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.KeyMap as KM
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
@@ -26,10 +38,16 @@ import Prelude hiding (id)
 
 type Server = IO
 
--- Chain ID for Ethereum JSON-RPC (matches strato-p2p ethVersion)
--- TODO: Make this configurable via environment variable
-ethVersion :: Integer
-ethVersion = 63
+-- EIP-155 chain ID: keccak256(networkName), first 6 bytes (48 bits).
+-- Fits in JS Number.MAX_SAFE_INTEGER with room for v = chainId * 2 + 35.
+chainId :: Integer
+chainId =
+  let name = network $ networkConfig ethConf
+      digest = keccak256ToByteString $ hash $ BC.pack name
+  in foldl (\acc b -> acc * 256 + fromIntegral b) 0 (B.unpack $ B.take 6 digest)
+
+protocolVersion :: Integer
+protocolVersion = fromIntegral ethVersion
 
 methods :: [Method Server]
 methods =
@@ -107,11 +125,11 @@ web3_clientVersion = flip (toMethod "web3_clientVersion") () $ do
 
 net_version :: Method Server
 net_version = flip (toMethod "net_version") () $ do
-  liftIO $ return $ show ethVersion
+  liftIO $ return $ show $ networkID $ networkConfig ethConf
 
 eth_chainId :: Method Server
 eth_chainId = flip (toMethod "eth_chainId") () $ do
-  liftIO $ return $ "0x" ++ showHex ethVersion ""
+  liftIO $ return $ "0x" ++ showHex chainId ""
 
 web3_sha3 :: Method Server
 web3_sha3 = toMethod "web3_sha3" f (Required "value" :+: ())
@@ -139,7 +157,7 @@ eth_protocolVersion :: Method Server
 eth_protocolVersion = toMethod "eth_protocolVersion" f ()
   where
     f :: RpcResult Server String
-    f = return $ show ethVersion
+    f = return $ show protocolVersion
 
 eth_syncing :: Method Server
 eth_syncing = toMethod "eth_syncing" f ()
@@ -218,41 +236,32 @@ getAccountField addressString field = do
         _ -> return Nothing
     _ -> return Nothing
 
--- TODO: These Kafka-based functions use non-existent helpers (fetchBytesIO, runKafkaConfigured)
--- Commenting out until the required infrastructure is implemented
---
--- emitKafkaJsonRlpCommand :: JsonRpcCommand -> IO ()
--- emitKafkaJsonRlpCommand c = do
---   _ <- runKafkaMConfigured "strato-api" $ writeSeqVmEvents [VmJsonRpcCommand c]
---   return ()
---
--- waitForResponse :: String -> Offset -> IO B.ByteString
--- waitForResponse id offset = do
---   putStrLn $ "before wait: " ++ show offset
---   maybeResponses <- fetchBytesIO "jsonrpcresponse" offset
---   putStrLn "something has come"
---   let responses = map (decode . BLC.fromStrict) $
---         case maybeResponses of
---           Nothing -> error "can't connect to Kafka"
---           Just v -> v
---   putStrLn $ "fetched " ++ show responses
---   case filter ((id ==) . fst) responses of
---     [] -> waitForResponse id (offset + fromIntegral (length responses))
---     [(_, val)] -> return val
---     _ -> error "you should not have more than one response with the same id"
---
--- callVM :: JsonRpcCommand -> IO B.ByteString
--- callVM c = do
---   lastOffsetOrError <-
---     liftIO $
---       runKafkaConfigured "ethereum-jsonrpc" $
---         getLastOffset LatestTime 0 "jsonrpcresponse"
---   let lastOffset =
---         case lastOffsetOrError of
---           Left e -> error $ show e
---           Right val -> val
---   emitKafkaJsonRlpCommand c
---   waitForResponse (jrcId c) lastOffset
+emitJsonRpcCommand :: JsonRpcCommand -> IO ()
+emitJsonRpcCommand c = do
+  putStrLn $ "emitJsonRpcCommand: " ++ show c
+  _ <- runKafkaMConfigured "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
+  return ()
+
+waitForResponse :: String -> Int -> Offset -> IO B.ByteString
+waitForResponse rpcId retries offset = do
+  if retries <= 0
+    then return $ BC.pack "error: timeout waiting for vm-runner response"
+    else do
+      responses <- runKafkaMConfigured "ethereum-jsonrpc" $
+        fetchItems "jsonrpcresponse" offset
+      let matched = filter ((rpcId ==) . fst) (responses :: [(String, B.ByteString)])
+      case matched of
+        ((_, val) : _) -> return val
+        [] -> do
+          let newOffset = offset + fromIntegral (length responses)
+          waitForResponse rpcId (retries - 1) newOffset
+
+callVM :: JsonRpcCommand -> IO B.ByteString
+callVM c = do
+  lastOffset <- runKafkaMConfigured "ethereum-jsonrpc" $
+    execKafka $ getLastOffset LatestTime 0 "jsonrpcresponse"
+  emitJsonRpcCommand c
+  waitForResponse (jrcId c) 50 lastOffset
 
 eth_getBalance :: Method Server
 eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "blockString" :+: ())
@@ -296,11 +305,17 @@ eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Require
       throwError $ rpcError (-32601) "eth_getStorageAt not yet implemented"
 
 eth_call :: Method Server
-eth_call = toMethod "eth_call" f (Required "object" :+: Required "blockString" :+: ())
+eth_call = toMethod "eth_call" f (Required "txObject" :+: Required "blockTag" :+: ())
   where
-    f :: String -> String -> RpcResult Server String
-    f _object _blockString = do
-      throwError $ rpcError (-32601) "eth_call not yet implemented"
+    f :: TxCallObject -> String -> RpcResult Server String
+    f txObj blockTag = do
+      let callData = unHexData $ TxCall.data_ txObj
+          rpcId = "eth_call_" ++ take 16 (BC.unpack $ B16.encode callData)
+      liftIO $ putStrLn $ "eth_call: block=" ++ blockTag ++ " data=" ++ show callData
+      liftIO $ putStrLn $ "eth_call: submitting JRCCall to vm-runner, id=" ++ rpcId
+      result <- liftIO $ callVM $ JRCCall txObj rpcId blockTag
+      liftIO $ putStrLn $ "eth_call: vm-runner returned: " ++ show result
+      return $ "0x" ++ BC.unpack (B16.encode result)
 
 -------------------
 
@@ -471,16 +486,18 @@ eth_sendTransaction = toMethod "eth_sendTransaction" f ()
     f = throwError $ rpcError (-32601) "eth_sendTransaction not supported, use eth_sendRawTransaction"
 
 eth_sendRawTransaction :: Method Server
-eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f ()
+eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_sendRawTransaction not yet implemented"
+    f :: HexData -> RpcResult Server String
+    f (HexData rawTx) = do
+      liftIO $ putStrLn $ "eth_sendRawTransaction received " ++ show (B.length rawTx) ++ " bytes"
+      throwError $ rpcError (-32601) "eth_sendRawTransaction not yet implemented"
 
 eth_estimateGas :: Method Server
-eth_estimateGas = toMethod "eth_estimateGas" f ()
+eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
   where
-    f :: RpcResult Server String
-    f = return "0x5208"
+    f :: TxCallObject -> RpcResult Server String
+    f _ = return "0x5208"
 
 eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())

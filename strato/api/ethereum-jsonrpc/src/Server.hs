@@ -14,11 +14,13 @@ import qualified Data.CaseInsensitive as CI
 import Network.HTTP.Types (status200, status204)
 import Network.Wai
 import Network.Wai.Handler.Warp
+import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
 
 import RPC
 
 startServer :: IO ()
 startServer = do
+  hSetBuffering stdout LineBuffering
   let port = 8545
   runKafkaMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
   putStrLn $ "Listening on port " ++ show port

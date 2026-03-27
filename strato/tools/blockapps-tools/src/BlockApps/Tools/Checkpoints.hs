@@ -78,7 +78,7 @@ kafkaBitsForService = \case
   NullService -> error "kafkaBitsForService NullService called"
   Sequencer ->
     (fromString SeqConst.defaultKafkaClientId', fromString SeqConst.defaultKafkaClientId', SeqKafka.unseqEventsTopicName)
-  EVM -> ("ethereum-vm", "ethereum-vm", SeqKafka.seqVmEventsTopicName)
+  EVM -> ("ethereum-vm", "ethereum-vm", SeqKafka.seqVmTasksTopicName)
   ApiIndexer -> ("strato-api-indexer", "strato-api-indexer", IdxKafka.indexEventsTopicName)
   P2PIndexer -> ("strato-p2p-indexer", "strato-p2p-indexer", IdxKafka.indexEventsTopicName)
   Slipstream -> ("slipstream", "slipstream", "vmevents")

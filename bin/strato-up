@@ -2,9 +2,6 @@
 
 set -e
 
-# Ensure credentials exist
-strato-login --check || strato-login
-
 # Setup node (creates if needed, skips if exists with no flags, errors if exists with flags)
 strato-setup "$@"
 

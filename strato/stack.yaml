@@ -81,7 +81,7 @@ packages:
 - vault/server
 
 #- VM/EVM/ethereum-vm
-- VM/EVM/evm-solidity
+- VM/evm-solidity
 - VM/SolidVM/debugger
 - VM/SolidVM/solid-vm
 - VM/SolidVM/solid-vm-compiler

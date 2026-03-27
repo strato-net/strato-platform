@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Executable.EthereumVM2
-  ( handleVmEvents,
+  ( handleVmTasks,
     writeBlockSummary,
   )
 where
@@ -62,10 +62,10 @@ microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime (Conf.mempoolLivenessCutoff (quarryConfig ethConf))
 {-# NOINLINE microtimeCutoff #-}
 
-handleVmEvents ::
+handleVmTasks ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
   ConduitT VmInEventBatch VmOutEvent m ()
-handleVmEvents = awaitForever $ \InBatch {..} -> do
+handleVmTasks = awaitForever $ \InBatch {..} -> do
   mpResps <- lift $ for mpNodesReqs $ \(o, srs) -> do
     nds <- catMaybes <$> traverse (A.lookup (A.Proxy @MP.NodeData)) srs
     pure $! OutMPNodesResponse o nds

@@ -4,7 +4,8 @@
 module Blockchain.Init.EthConf (genEthConf) where
 
 import Blockchain.EthConf
-import Blockchain.Init.Options
+import Blockchain.Init.Options hiding (flags_localAuth)
+import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
 import Control.Concurrent
@@ -14,7 +15,21 @@ import Servant.Client
 import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
 import qualified Strato.Strato23.API.Types as VC
 import Strato.Strato23.Client
+import System.Info (os)
 import Text.ShortDescription
+
+-- | Address strato-api binds its socket to
+getApiListenAddress :: String
+getApiListenAddress
+  | os == "linux" = "172.17.0.1"
+  | otherwise = "127.0.0.1"
+
+-- | Address Docker containers use to reach strato-api on the host
+getApiHost :: String
+getApiHost
+  | flags_apiIPAddress /= "" = flags_apiIPAddress
+  | os == "linux" = "172.17.0.1"
+  | otherwise = "host.docker.internal"
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -45,7 +60,8 @@ runtimeConfig = def
       , maxHeadersTxsLens = flags_maxHeadersTxsLens
       }
   , apiConfig = def
-      { httpPort = flags_httpPort
+      { apiListenAddress = getApiListenAddress
+      , apiHost = getApiHost
       }
   , contractsConfig = getRailgunProxyForNetwork flags_network >>= \addr ->
       Just ContractsConf { railgunProxy = Just addr }
@@ -54,7 +70,7 @@ runtimeConfig = def
 
 getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
-  env <- newAuthEnv $ flags_vaultUrl ++ "/strato/v2.3"
+  env <- newAuthEnv flags_vaultUrl
   ak <- waitOnVault env $ runWithAuth env (getKey Nothing Nothing)
   return (VC.unPubKey ak, VC.unAddress ak)
 
@@ -92,8 +108,12 @@ genEthConf :: IO EthConf
 genEthConf = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
-  (pub, _addr) <- getNodeKey
-  putStrLn $ "  ✓ Node key: " ++ shortDescription pub
+  -- For local auth mode, skip vault during setup (vault-wrapper starts later)
+  if Opts.flags_localAuth
+    then putStrLn "  ✓ Local auth mode: node key will be created when vault-wrapper starts"
+    else do
+      (pub, _addr) <- getNodeKey
+      putStrLn $ "  ✓ Node key: " ++ shortDescription pub
 
   return runtimeConfig
     { sqlConfig = (sqlConfig runtimeConfig)
@@ -117,7 +137,9 @@ genEthConf = do
         , mempoolLivenessCutoff = flags_mempoolLivenessCutoff
         }
     , urlConfig = def
-        { vaultUrl = flags_vaultUrl
+        { vaultUrl = if Opts.flags_localAuth
+            then "http://localhost:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
+            else flags_vaultUrl
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl
@@ -125,6 +147,7 @@ genEthConf = do
     , networkConfig = def
         { network = flags_network
         , networkID = computeNetworkID
+        , httpPort = flags_httpPort
         , txSizeLimit = flags_txSizeLimit
         , gasLimit = flags_gasLimit
         , blockPeriodMs = flags_blockstanbul_block_period_ms

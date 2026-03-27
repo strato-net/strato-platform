@@ -75,7 +75,7 @@ ethereumVM = runResourceT $ do
 
     initializeBestBlock
 
-    failures <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
+    failures <- runConsume "evm/loop" consumerGroup seqVmTasksTopicName $ \_ seqEvents -> do
 
         let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
         $logInfoS "ethereumVM/maybeSelfAddress" $ T.pack $ format maybeSelfAddress
@@ -94,7 +94,7 @@ ethereumVM = runResourceT $ do
         let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
         failures <- fmap concat . runConduit $
           yield vmInEventBatch
-            .| handleVmEvents
+            .| handleVmTasks
             .| mapMaybeM routeOutEvent
             .| sinkList
 
@@ -167,7 +167,7 @@ outputBlockToContextBestBlockInfo block =
       txL = length txs
   in ContextBestBlockInfo (blockHeaderHash header) header txL
 
-logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
+logEventSummaries :: MonadLogger m => [VmTask] -> m ()
 logEventSummaries evs = do
   let names = map getNames evs
       numberedNames = map (\case [] -> []; x@(x0:_) -> numberIt (length x) x0) $ group $ sort names
@@ -175,7 +175,7 @@ logEventSummaries evs = do
   $logInfoS "logEventSummaries" . T.pack $
     "#### Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"
   where
-    getNames :: VmEvent -> String
+    getNames :: VmTask -> String
     getNames (VmTx _ _) = "TX"
     getNames (VmBlock _) = "Block"
     getNames (VmJsonRpcCommand _) = "JsonRpcCommand"

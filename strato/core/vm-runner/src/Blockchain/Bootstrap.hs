@@ -101,7 +101,7 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
     createTopicAndWait IdxKafka.indexEventsTopicName
     createTopicAndWait "vmevents"
     createTopicAndWait "jsonrpcresponse"
-    createTopicAndWait "seq_vm_events"
+    createTopicAndWait "vm_tasks"
     getKafkaEnv
   let pub sd vmes = do
         void . runKafkaMUsingEnv kafkaEnv $ do

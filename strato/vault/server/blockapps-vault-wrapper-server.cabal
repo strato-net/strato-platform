@@ -82,10 +82,15 @@ executable blockapps-vault-wrapper-server
     , common-log
     , hflags
     , http-client
+    , monad-logger
+    , mtl
+    , persistent
+    , persistent-postgresql
     , postgresql-simple
     , resource-pool
     , servant-options
     , servant-server
+    , text
     , wai-cors
     , wai-extra
     , wai-middleware-prometheus

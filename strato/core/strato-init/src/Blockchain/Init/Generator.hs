@@ -16,7 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
-import Blockchain.Init.Options (flags_jsonrpc)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Strato.Model.Validator
@@ -32,7 +32,7 @@ import System.Environment (lookupEnv)
 import System.FilePath ((</>))
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
-import Text.RawString.QQ
+import Data.Char (toLower)
 import Turtle (chmod, roo)
 import UnliftIO.Directory
 import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
@@ -75,31 +75,31 @@ createGenesisInfo network =
     _ -> HELIUM.genesisBlock
 
 createCommandsFile :: IO ()
-createCommandsFile =
-  writeFile "commands.txt" $ baseCommands ++ jsonrpcCommand
-  where
-    baseCommands = [r|ethereum-discover +RTS -T -RTS
+createCommandsFile = do
+  localAuthCommands <- if flags_localAuth
+    then do
+      pgPassword <- filter (/= '\n') <$> readFile "secrets/postgres_password"
+      return ["blockapps-vault-wrapper-server --pghost localhost --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+    else return []
 
-strato-p2p +RTS -T -RTS
+  let baseCommands =
+        [ "ethereum-discover +RTS -T -RTS"
+        , "strato-p2p +RTS -T -RTS"
+        , "strato-sequencer +RTS -T -N1 -RTS"
+        , "vm-runner --diffPublish=true +RTS -T -I2 -N1 -RTS"
+        , "strato-p2p-indexer"
+        , "strato-api-indexer"
+        , "slipstream +RTS -T -RTS"
+        , "strato-api +RTS -T -N1 -RTS"
+        , "strato-network-monitor"
+        ]
 
-strato-sequencer +RTS -T -N1 -RTS
+      jsonrpcCommands =
+        if flags_jsonrpc
+          then ["ethereum-jsonrpc +RTS -T -RTS"]
+          else []
 
-vm-runner --diffPublish=true +RTS -T -I2 -N1 -RTS
-
-strato-p2p-indexer
-
-strato-api-indexer
-
-slipstream +RTS -T -RTS
-
-strato-api +RTS -T -N1 -RTS
-
-strato-network-monitor
-|]
-    jsonrpcCommand =
-      if flags_jsonrpc
-        then "\nethereum-jsonrpc +RTS -T -RTS\n"
-        else ""
+  writeFile "commands.txt" $ unlines (localAuthCommands ++ baseCommands ++ jsonrpcCommands)
 
 
 
@@ -145,20 +145,101 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
 
-    -- OAuth credentials: check if already placed (e.g. by doit.sh --init in container),
-    -- otherwise copy from ~/.secrets/ (local dev)
+    -- Set vault password for local auth mode: use env var if provided, otherwise generate random
+    when flags_localAuth $ do
+      let vaultPasswordFile = "secrets" </> "vault_password"
+      vaultPasswordExists <- doesFileExist vaultPasswordFile
+      unless vaultPasswordExists $ liftIO $ do
+        envPassword <- lookupEnv "vault_password"
+        password <- case envPassword of
+          Just pw | not (null pw) -> return pw
+          _ -> generatePassword 32
+        putStrLn $ "  Creating vault password file: " ++ vaultPasswordFile
+        writeFile vaultPasswordFile password
+        void $ chmod roo vaultPasswordFile
+
+      let hydraSystemSecretFile = "secrets" </> "local_auth_hydra_system_secret"
+      hydraSystemSecretExists <- doesFileExist hydraSystemSecretFile
+      unless hydraSystemSecretExists $ liftIO $ do
+        envSecret <- lookupEnv "LOCAL_AUTH_HYDRA_SYSTEM_SECRET"
+        secret <- case envSecret of
+          Just s | not (null s) -> return s
+          _ -> generatePassword 64
+        putStrLn $ "  Creating local-auth Hydra system secret file: " ++ hydraSystemSecretFile
+        writeFile hydraSystemSecretFile secret
+        void $ chmod roo hydraSystemSecretFile
+
+      let hydraPairwiseSaltFile = "secrets" </> "local_auth_hydra_pairwise_salt"
+      hydraPairwiseSaltExists <- doesFileExist hydraPairwiseSaltFile
+      unless hydraPairwiseSaltExists $ liftIO $ do
+        envSalt <- lookupEnv "LOCAL_AUTH_HYDRA_PAIRWISE_SALT"
+        salt <- case envSalt of
+          Just s | not (null s) -> return s
+          _ -> generatePassword 64
+        putStrLn $ "  Creating local-auth Hydra pairwise salt file: " ++ hydraPairwiseSaltFile
+        writeFile hydraPairwiseSaltFile salt
+        void $ chmod roo hydraPairwiseSaltFile
+
+      let kratosCookieSecretFile = "secrets" </> "local_auth_kratos_cookie_secret"
+      kratosCookieSecretExists <- doesFileExist kratosCookieSecretFile
+      unless kratosCookieSecretExists $ liftIO $ do
+        envSecret <- lookupEnv "LOCAL_AUTH_KRATOS_COOKIE_SECRET"
+        secret <- case envSecret of
+          Just s | not (null s) -> return s
+          _ -> generatePassword 64
+        putStrLn $ "  Creating local-auth Kratos cookie secret file: " ++ kratosCookieSecretFile
+        writeFile kratosCookieSecretFile secret
+        void $ chmod roo kratosCookieSecretFile
+
+    -- OAuth credentials: generate secure local creds for --localAuth,
+    -- otherwise copy from ~/.secrets/ (external OAuth mode)
     let destOauth = "secrets" </> "oauth_credentials.yaml"
     destOauthExists <- doesFileExist destOauth
     unless destOauthExists $ liftIO $ do
-      home <- getHomeDirectory
-      let sourceOauth = home </> ".secrets" </> "strato_credentials.yaml"
-      sourceExists <- doesFileExist sourceOauth
-      if sourceExists
+      if flags_localAuth
         then do
-          copyFile sourceOauth destOauth
+          envClientId <- lookupEnv "OAUTH_CLIENT_ID"
+          envClientSecret <- lookupEnv "OAUTH_CLIENT_SECRET"
+          clientId <- case envClientId of
+            Just cid | not (null cid) -> return cid
+            _ -> generateClientId 16
+          clientSecret <- case envClientSecret of
+            Just cs | not (null cs) -> return cs
+            _ -> generatePassword 48
+          let localOauthConfig = unlines
+                [ "discoveryUrl: \"http://localhost:8081/auth/.well-known/openid-configuration\""
+                , "clientId: \"" ++ clientId ++ "\""
+                , "clientSecret: \"" ++ clientSecret ++ "\""
+                ]
+          writeFile destOauth localOauthConfig
           void $ chmod roo destOauth
-        else
-          error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml or secrets/oauth_credentials.yaml. Run 'strato-login' first."
+          putStrLn $ "  ✓ Generated secure local OAuth credentials: " ++ destOauth
+        else do
+          home <- getHomeDirectory
+          let sourceOauth = home </> ".secrets" </> "strato_credentials.yaml"
+          sourceExists <- doesFileExist sourceOauth
+          if sourceExists
+            then do
+              copyFile sourceOauth destOauth
+              void $ chmod roo destOauth
+            else
+              error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
+    -- Setup OAuth credentials
+    liftIO $ do
+      let destOauth' = "secrets" </> "oauth_credentials.yaml"
+      if flags_localAuth
+        then putStrLn "  ✓ Local auth mode: OAuth configured for local Hydra"
+        else do
+          -- Copy OAuth credentials from ~/.secrets/
+          home <- getHomeDirectory
+          let sourceOauth = home </> ".secrets" </> "strato_credentials.yaml"
+          sourceExists <- doesFileExist sourceOauth
+          if sourceExists
+            then do
+              copyFile sourceOauth destOauth'
+              void $ chmod roo destOauth'
+            else
+              error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
 
     ethconf <- liftIO genEthConf
 
@@ -221,3 +302,8 @@ generatePassword len = do
   where
     chars = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
     toChar b = chars !! (fromIntegral b `mod` length chars)
+
+generateClientId :: Int -> IO String
+generateClientId len = do
+  suffix <- fmap (map toLower) (generatePassword len)
+  return $ "strato-local-" ++ suffix

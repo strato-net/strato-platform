@@ -211,7 +211,7 @@ checkComposeFile
 export NODE_HOST=${NODE_HOST:-localhost}
 export OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-'https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration'}
 export network=${network:-helium}
-export VAULT_URL=${VAULT_URL:-'https://vault.blockapps.net:8093'}
+export VAULT_URL=${VAULT_URL:-'https://vault.blockapps.net:8093/strato/v2.3'}
 export HTTP_PORT=${HTTP_PORT:-80}
 export HTTPS_PORT=${HTTPS_PORT:-443}
 
