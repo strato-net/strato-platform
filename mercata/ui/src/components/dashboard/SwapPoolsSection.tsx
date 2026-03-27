@@ -19,7 +19,6 @@ const SwapPoolsSection = () => {
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const poolPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const operationInProgressRef = useRef(false);
 
@@ -139,7 +138,7 @@ const SwapPoolsSection = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {loading ? (
+        {poolsLoading && pools.length === 0 ? (
           <div className="flex justify-center items-center h-12">
             <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
           </div>
