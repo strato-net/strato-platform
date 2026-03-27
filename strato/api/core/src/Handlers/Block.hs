@@ -241,7 +241,7 @@ getBlockInfo a b c d e f g h i j k l m n o p q r s =
   getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s)
 
 getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
-getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select (Proxy @[Block]) b
+getBlockInfo' b = map Block' . fromMaybe [] <$> select (Proxy @[Block]) b
 
 blockQueryParams :: [Text]
 blockQueryParams =

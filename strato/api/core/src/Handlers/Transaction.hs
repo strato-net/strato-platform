@@ -222,7 +222,7 @@ instance {-# OVERLAPPING #-} (LoggingT IO) `Mod.Outputs` [IngestEvent] where
     $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 
 postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
-postTransactionC limit (RawTransaction' raw "") = do
+postTransactionC limit (RawTransaction' raw) = do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
   ts <- liftIO getCurrentMicrotime
@@ -233,8 +233,6 @@ postTransactionC limit (RawTransaction' raw "") = do
   yield ieTx
   $logInfoS "postTransaction" . T.pack $ "Successfully inserted tx: " ++ format h
   return h
-postTransactionC _ _ =
-  throwIO $ DeprecatedError "The 'next' parameter is no longer supported"
 
 postTransaction ::
   (MonadIO m, MonadLogger m, m `Mod.Outputs` [IngestEvent]) =>
@@ -250,7 +248,7 @@ postTransactionListC limit raws = do
   parserStart <- liftIO $ getTime Realtime
 
   txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
-  let txs = fmap (\(RawTransaction' raw _) -> rawTX2TX $ raw) raws
+  let txs = fmap (\(RawTransaction' raw) -> rawTX2TX $ raw) raws
       hs = fmap (toJSON . transactionHash) txs
       txr = filter success $ zip hs txs
   let num = length txs
@@ -329,7 +327,7 @@ getTransaction' ::
   Selectable TxsFilterParams [RawTransaction] m =>
   TxsFilterParams ->
   m [RawTransaction']
-getTransaction' a = map rtToRtPrime . zip (repeat "") . fromMaybe [] <$> select (Proxy @[RawTransaction]) a
+getTransaction' a = map rtToRtPrime . fromMaybe [] <$> select (Proxy @[RawTransaction]) a
 
 transactionQueryParams :: [String]
 transactionQueryParams =

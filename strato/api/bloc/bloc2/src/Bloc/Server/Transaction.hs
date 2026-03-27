@@ -1033,7 +1033,7 @@ preparePostTx ::
   Transaction ->
   RawTransaction'
 preparePostTx time _ tx =
-  flip RawTransaction' "" $
+  RawTransaction' $
     txAndTime2RawTX API tx 0 time
 
 preparePostUnsignedRawTx ::
@@ -1221,7 +1221,7 @@ getAccountNonce addr = do
   case mAccts of
     [] -> return $ Nonce $ fromInteger 0
     [act] -> do
-      let mkNonce (AddressStateRef' AddressStateRef{..} _) = Nonce $ fromInteger addressStateRefNonce
+      let mkNonce (AddressStateRef' AddressStateRef{..}) = Nonce $ fromInteger addressStateRefNonce
       return $ mkNonce act
     _ -> error "returned more than one account with a single address in getAccountNonce"
 {-

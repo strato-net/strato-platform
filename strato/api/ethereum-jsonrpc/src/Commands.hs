@@ -10,7 +10,7 @@ import Binary
 import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runKafkaMConfigured, ethConf)
-import Blockchain.EthConf.Model (apiConfig, ipAddress, networkConfig, networkID, network)
+import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, network)
 import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
 import Blockchain.Data.BlockHeader (BlockHeader (..))
 import Blockchain.Data.DataDefs (AddressStateRef (..), RawTransaction(..), TransactionResult (..))
@@ -64,8 +64,8 @@ apiBaseUrl :: BaseUrl
 apiBaseUrl =
   BaseUrl
     Http
-    (ipAddress $ apiConfig ethConf)
-    3000
+    (apiListenAddress $ apiConfig ethConf)
+    (apiPort $ apiConfig ethConf)
     "/eth/v1.2"
 
 runLocal :: ClientM a -> IO (Either ClientError a)
@@ -284,7 +284,7 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
         response <- liftIO $ runLocal $
           Accounts.getAccountsFilter Accounts.accountsFilterParams {Accounts._qaAddress = Just addr}
         case response of
-          Right (AddressStateRef' account _ : _) ->
+          Right (AddressStateRef' account : _) ->
             return $ "0x" ++ showHex (addressStateRefBalance account) ""
           _ -> return "0x0"
 
@@ -298,7 +298,7 @@ eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" 
         response <- liftIO $ runLocal $
           Accounts.getAccountsFilter Accounts.accountsFilterParams {Accounts._qaAddress = Just addr}
         case response of
-          Right (AddressStateRef' account _ : _) ->
+          Right (AddressStateRef' account : _) ->
             case addressStateRefContractName account of
               Just cn | not (null cn) -> return "0x01"
               _ -> return "0x"
@@ -314,7 +314,7 @@ eth_getTransactionCount = toMethod "eth_getTransactionCount" f (Required "addres
         response <- liftIO $ runLocal $
           Accounts.getAccountsFilter Accounts.accountsFilterParams {Accounts._qaAddress = Just addr}
         case response of
-          Right (AddressStateRef' account _ : _) ->
+          Right (AddressStateRef' account : _) ->
             return $ "0x" ++ showHex (addressStateRefNonce account) ""
           _ -> return "0x0"
 
@@ -444,7 +444,6 @@ eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+
               (-1)    -- blockNumber
               (unsafeCreateKeccak256FromWord256 1)
               API)
-            ""
       result <- liftIO $ runLocal $ Tx.postTxClient tx
       let txHash = case result of
             Right h -> normalizeHash (show h)

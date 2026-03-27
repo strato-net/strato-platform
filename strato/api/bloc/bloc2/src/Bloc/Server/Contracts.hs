@@ -64,7 +64,7 @@ getContracts mName mOffset mLimit = do
   let addressToVal ts addr = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr
       addressesToMap =
         foldrM
-          ( \(AddressStateRef' AddressStateRef {..} _) m -> case addressStateRefContractName of
+          ( \(AddressStateRef' AddressStateRef {..}) m -> case addressStateRefContractName of
               Nothing -> pure m
               Just n -> do
                 ts <- liftIO getCurrentTime
@@ -112,7 +112,7 @@ getContractsData (ContractName cName) = do
       accountsFilterParams
         { _qaContractName = Just cName
         }
-  return $ (\(AddressStateRef' r _) -> addressStateRefAddress r) <$> svmRefs
+  return $ (\(AddressStateRef' r) -> addressStateRefAddress r) <$> svmRefs
 
 getContractsContract ::
   ( MonadIO m,

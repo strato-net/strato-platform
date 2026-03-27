@@ -98,7 +98,7 @@ instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT a
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState (SQLM m) where
   select _ a = runMaybeT $ do
-    (AddressStateRef' r _) <-
+    (AddressStateRef' r) <-
       MaybeT
         . fmap listToMaybe
         . getAccount'
