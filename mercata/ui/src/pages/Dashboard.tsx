@@ -20,6 +20,7 @@ import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
+import { useRewards } from "@/hooks/useRewards";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
@@ -86,6 +87,7 @@ const Dashboard = () => {
   });
 
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
+  const { state: rewardsState } = useRewards();
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
   const highestIncentiveApy = useMemo(() => {
     if (!rewardsActivities.length) return 0;
@@ -295,7 +297,7 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Rewards (Season)"
+              title="Rewards"
               value={(() => {
                 if (!isLoggedIn) return "-";
                 if (rankLoading) return "Loading...";

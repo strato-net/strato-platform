@@ -27,11 +27,13 @@
       "000000000000000000000000000000000000101c",
       "000000000000000000000000000000000000101e",
       "ac621a150f49198036f84ffe90b4f2286b623583",
-      "69010124cdaa64286f6e413267a7001ea9379df4"
+      "69010124cdaa64286f6e413267a7001ea9379df4",
+      "96c26f8306a0097d985d1654b4596c48bb6277c4",
+      "a049efb1a3417801b3dd3877dd566aa24b95b3a0",
+      "f84425db11cf977dfcaace0431a080e0ff2604ca"
     ],
     "notes": [
       "lpMintBurnSources are raw token units in rewards-poller: Token-Transfer value for Minted/Burned"
     ]
   }
 }
-

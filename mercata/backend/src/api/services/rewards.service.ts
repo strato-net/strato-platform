@@ -296,7 +296,7 @@ export const fetchRewardsOverview = async (
     ]);
 
     // Hardcoded season info for now
-    const currentSeason = 1;
+    const currentSeason = 2;
 
 
     // Sum up total stake across all activities

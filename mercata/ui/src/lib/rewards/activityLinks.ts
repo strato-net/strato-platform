@@ -13,9 +13,9 @@ export const getActivityLink = (activityName: string): string | null => {
 
   const lowerName = activityName.toLowerCase();
 
-  // Direct mint activities - goes to the Deposits page, Easy Savings tab
-  if (lowerName.includes('direct mint')) {
-    return '/dashboard/deposits?tab=easy-savings';
+  // Bridge-related activities - goes to the Fund page
+  if (lowerName.includes('direct mint') || lowerName.includes('bridge')) {
+    return '/dashboard/deposits';
   }
 
   // CDP-related activities - goes to the Borrow page, Vaults sub-tab

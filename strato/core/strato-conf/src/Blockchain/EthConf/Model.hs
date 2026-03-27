@@ -79,14 +79,16 @@ instance ToJSON EthConf where
   toEncoding = Aeson.genericToEncoding Aeson.defaultOptions { Aeson.omitNothingFields = True }
 
 data ApiConfig = ApiConfig
-  { ipAddress :: String
-  , httpPort :: Int
+  { apiPort :: Int
+  , apiListenAddress :: String
+  , apiHost :: String
   } deriving (Show, Eq, Generic, ToJSON)
 
 instance FromJSON ApiConfig where
   parseJSON = withObject "ApiConfig" $ \v -> ApiConfig
-    <$> v .: "ipAddress"
-    <*> v .:? "httpPort" .!= 8081
+    <$> v .:? "apiPort" .!= 3000
+    <*> v .:? "apiListenAddress" .!= "127.0.0.1"
+    <*> v .:? "apiHost" .!= "localhost"
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
@@ -160,12 +162,23 @@ data UrlConfig = UrlConfig
 data NetworkConf = NetworkConf
   { network :: String
   , networkID :: Integer
+  , httpPort :: Int
   , txSizeLimit :: Int
   , gasLimit :: Integer
   , blockPeriodMs :: Int
   , roundPeriodS :: Int
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, ToJSON)
+
+instance FromJSON NetworkConf where
+  parseJSON = withObject "NetworkConf" $ \v -> NetworkConf
+    <$> v .:? "network" .!= "upquark"
+    <*> v .:? "networkID" .!= (-1)
+    <*> v .:? "httpPort" .!= 8081
+    <*> v .:? "txSizeLimit" .!= 2097152
+    <*> v .:? "gasLimit" .!= 1000000
+    <*> v .:? "blockPeriodMs" .!= 1000
+    <*> v .:? "roundPeriodS" .!= 120
 
 data DebugConfig = DebugConfig
   { svmTrace :: Bool
@@ -232,8 +245,9 @@ instance Default P2PConf where
 
 instance Default ApiConfig where
   def = ApiConfig
-    { ipAddress = "127.0.0.1"
-    , httpPort = 8081
+    { apiPort = 3000
+    , apiListenAddress = "127.0.0.1"
+    , apiHost = "localhost"
     }
 
 instance Default DebugConfig where
@@ -248,7 +262,7 @@ instance Default ContractsConf where
 
 instance Default UrlConfig where
   def = UrlConfig
-    { vaultUrl = "https://vault.blockapps.net:8093/strato/v2.3"
+    { vaultUrl = "https://vault.blockapps.net:8093"
     , fileServerUrl = ""
     , notificationServerUrl = ""
     , repoUrl = ""
@@ -258,6 +272,7 @@ instance Default NetworkConf where
   def = NetworkConf
     { network = "upquark"
     , networkID = -1  -- will be computed from network name
+    , httpPort = 8081
     , txSizeLimit = 2097152  -- 2 MiB
     , gasLimit = 1000000
     , blockPeriodMs = 1000   -- minimum delay between blocks
