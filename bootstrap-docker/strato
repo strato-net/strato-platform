@@ -304,7 +304,7 @@ EOF
     ${postgres_password:+-e postgres_password="${postgres_password}"} \
     "${STRATO_IMAGE}" \
     /node/nodedata --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}" --repoUrl="${REPO_URL:-}" \
-    --pghost=postgres --kafkahost=kafka --redisHost=redis --apiIPAddress=0.0.0.0 --httpPort="${HTTP_PORT}"
+    --pghost=postgres --kafkahost=kafka --redisHost=redis --httpPort="${HTTP_PORT}"
 
   # Fix ownership for non-root containers
   sudo chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} nodedata/ logs/ 2>/dev/null || true
