@@ -394,24 +394,26 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await api.post('/tokens/transfer', payload);
+      fetchNetBalance();
     } catch (err) {
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchNetBalance]);
 
   const bulkTransferToken = useCallback(async (payload: { address: string; transfers: BulkTransferItem[] }): Promise<BulkTransferResponse> => {
     setLoading(true);
     try {
       const response = await api.post<BulkTransferResponse>('/tokens/bulk-transfer', payload);
+      fetchNetBalance();
       return response.data;
     } catch (err) {
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchNetBalance]);
 
   const approveToken = useCallback(async (payload: { address: string; spender: string; value: string }) => {
     setLoading(true);
@@ -428,12 +430,13 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await api.post('/tokens/transferFrom', payload);
+      fetchNetBalance();
     } catch (err) {
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchNetBalance]);
 
   const setTokenStatus = useCallback(async (payload: { address: string; status: number }) => {
     setLoading(true);
@@ -472,13 +475,18 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [getEarningAssets, isLoggedIn]);
 
-  // Net balance - fetch once on mount for logged-in users
+  // Net balance - fetch on mount + poll every 60s for logged-in users
   useEffect(() => {
-    if (isLoggedIn) {
+    if (!isLoggedIn) return;
+
+    fetchNetBalance();
+
+    const interval = setInterval(() => {
       fetchNetBalance();
-    }
+    }, 60000);
 
     return () => {
+      clearInterval(interval);
       if (netBalanceAbortControllerRef.current) {
         netBalanceAbortControllerRef.current.abort();
       }
