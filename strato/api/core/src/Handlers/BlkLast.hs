@@ -83,4 +83,4 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastBlocks (SQLM m) where
 getBlkLast :: (Monad m, GetLastBlocks m) => Integer -> m [Block']
 getBlkLast n = do
   blks <- getLastBlocks n
-  pure $ flip Block' "" <$> blks
+  pure $ Block' <$> blks

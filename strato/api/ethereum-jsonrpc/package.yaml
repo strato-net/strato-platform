@@ -16,6 +16,9 @@ executables:
       - binary
       - blaze-builder
       - blockapps-data
+      - blockapps-datadefs
+      - blockDB
+      - core-api2
       - bytestring
       - case-insensitive
       - containers
@@ -26,10 +29,13 @@ executables:
       - milena
       - mtl
       - seqevents
+      - servant
+      - servant-client
       - strato-conf
       - strato-model
       - strato-p2p
       - text
+      - time
       - vector
       - wai
       - warp

@@ -50,7 +50,7 @@ import           Numeric
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON
 -}
-data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show, Generic)
+newtype RawTransaction' = RawTransaction' RawTransaction deriving (Eq, Show, Generic)
 
 newtype UnsignedRawTransaction' = UnsignedRawTransaction' RawTransaction deriving (Eq, Show, Generic)
 
@@ -64,10 +64,9 @@ instance ToSchema RawTransaction' where
       NamedSchema (Just "RawTransaction") mempty
 
 instance ToJSON RawTransaction' where
-  toJSON (RawTransaction' rt@(RawTransaction{..}) next) =
+  toJSON (RawTransaction' rt@(RawTransaction{..})) =
     object $
-      [ "next" .= next,
-        "from" .= rawTransactionFromAddress,
+      [ "from" .= rawTransactionFromAddress,
         "nonce" .= rawTransactionNonce,
         "gasLimit" .= rawTransactionGasLimit,
         "to" .= rawTransactionToAddress,
@@ -116,7 +115,6 @@ instance FromJSON RawTransaction' where
     let defaultTime = UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
     time <- t .:? "timestamp" .!= defaultTime
     o <- t .:? "origin" .!= API
-    next <- t .:? "next" .!= ""
 
     return
       ( RawTransaction'
@@ -138,7 +136,6 @@ instance FromJSON RawTransaction' where
               h
               o
           )
-          next
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
 
@@ -206,14 +203,14 @@ instance FromJSON UnsignedRawTransaction' where
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
 
-rtToRtPrime :: (String, RawTransaction) -> RawTransaction'
-rtToRtPrime (s, x) = RawTransaction' x s
+rtToRtPrime :: RawTransaction -> RawTransaction'
+rtToRtPrime = RawTransaction'
 
 rtToRtPrime' :: RawTransaction -> RawTransaction'
-rtToRtPrime' x = RawTransaction' x ""
+rtToRtPrime' = RawTransaction'
 
 rtPrimeToRt :: RawTransaction' -> RawTransaction
-rtPrimeToRt (RawTransaction' x _) = x
+rtPrimeToRt (RawTransaction' x) = x
 
 newtype Transaction' = Transaction' Transaction deriving (Eq, Show)
 
@@ -306,7 +303,7 @@ tToTPrime = Transaction'
 tPrimeToT :: Transaction' -> Transaction
 tPrimeToT (Transaction' tx) = tx
 
-data Block' = Block' Block String deriving (Eq, Show)
+newtype Block' = Block' Block deriving (Eq, Show)
 
 instance ToSchema Block' where
   declareNamedSchema _ =
@@ -314,10 +311,9 @@ instance ToSchema Block' where
       NamedSchema (Just "Block") mempty
 
 instance ToJSON Block' where
-  toJSON (Block' (Block bd rt bu) next) =
+  toJSON (Block' (Block bd rt bu)) =
     object
-      [ "next" .= next,
-        "kind" .= ("Block" :: String),
+      [ "kind" .= ("Block" :: String),
         "blockData" .= bdToBdPrime bd,
         "receiptTransactions" .= map tToTPrime rt,
         "blockUncles" .= map bdToBdPrime bu,
@@ -378,7 +374,7 @@ blockDataRefToBlock bdr vs vd ps sigs txs = case vs of
       }
 
 bPrimeToB :: Block' -> Block
-bPrimeToB (Block' x _) = x
+bPrimeToB (Block' x) = x
 
 newtype BlockData' = BlockData' BlockHeader deriving (Eq, Show)
 
@@ -445,8 +441,7 @@ instance FromJSON Block' where
     bData <- bdPrimeToBd <$> v .: "blockData"
     bTxs <- map tPrimeToT <$> (v .: "receiptTransactions")
     bUncles <- map bdPrimeToBd <$> (v .: "blockUncles")
-    next <- v .: "next"
-    pure $ Block' (Block bData bTxs bUncles) next
+    pure $ Block' (Block bData bTxs bUncles)
 
 bdToBdPrime :: BlockHeader -> BlockData'
 bdToBdPrime = BlockData'
@@ -499,7 +494,7 @@ csr2s (CommitmentSignatureRef _ _ r s v) =
   either (const Nothing) Just . importSignature $
     word256ToBytes r <> word256ToBytes s <> B.singleton v
 
-data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
+newtype AddressStateRef' = AddressStateRef' AddressStateRef deriving (Eq, Show)
 
 instance ToSchema AddressStateRef' where
   declareNamedSchema _ = do
@@ -511,8 +506,7 @@ instance ToSchema AddressStateRef' where
     return $ NamedSchema (Just "AddressStateRef") $ mempty
       & type_ ?~ OpenApiObject
       & properties .~
-        [ ("next", strSchema)
-        , ("kind", strSchema)
+        [ ("kind", strSchema)
         , ("address", addrSchema)
         , ("nonce", intSchema)
         , ("balance", strSchema)
@@ -521,13 +515,12 @@ instance ToSchema AddressStateRef' where
         , ("contractName", maybeStrSchema)
         , ("latestBlockNum", intSchema)
         ]
-      & required .~ ["next", "kind", "address", "nonce", "balance", "contractRoot", "latestBlockNum"]
+      & required .~ ["kind", "address", "nonce", "balance", "contractRoot", "latestBlockNum"]
 
 instance ToJSON AddressStateRef' where
-  toJSON (AddressStateRef' (AddressStateRef addr n b cr ch cn bNum) next) =
+  toJSON (AddressStateRef' (AddressStateRef addr n b cr ch cn bNum)) =
     object
-      [ "next" .= next,
-        "kind" .= ("AddressStateRef" :: String),
+      [ "kind" .= ("AddressStateRef" :: String),
         "address" .= addr,
         "nonce" .= n,
         "balance" .= show b,
@@ -558,13 +551,13 @@ instance FromJSON AddressStateRef' where
               )
   parseJSON _ = fail "JSON not an object"
 
-asrToAsrPrime :: (String, AddressStateRef) -> AddressStateRef'
-asrToAsrPrime (s, x) = AddressStateRef' x s
+asrToAsrPrime :: AddressStateRef -> AddressStateRef'
+asrToAsrPrime = AddressStateRef'
 
 asrToAsrPrime' :: AddressStateRef -> AddressStateRef'
-asrToAsrPrime' x = AddressStateRef' x ""
+asrToAsrPrime' = AddressStateRef'
 
-data Address' = Address' Address String deriving (Eq, Show)
+newtype Address' = Address' Address deriving (Eq, Show)
 {-
 adToAdPrime :: Address -> Address'
 adToAdPrime x = Address' x ""

@@ -1,40 +1,51 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Commands
   ( methods,
   )
 where
 
-import qualified APIProxy as API
 import Binary
 import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runKafkaMConfigured, ethConf)
-import Blockchain.EthConf.Model (networkConfig, networkID, network)
+import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, network)
+import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
+import Blockchain.Data.BlockHeader (BlockHeader (..))
+import Blockchain.Data.DataDefs (AddressStateRef (..), RawTransaction(..), TransactionResult (..))
+import Blockchain.Data.TXOrigin (TXOrigin(API))
+import Blockchain.Model.JsonBlock (AddressStateRef' (..), Block', RawTransaction'(..), Transaction'(..), bPrimeToB)
 import Blockchain.Sequencer.Event (JsonRpcCommand(..), VmTask(..))
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
-import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
+import Blockchain.Strato.Model.Address (Address(..))
+import Blockchain.Strato.Model.Keccak256 (hash, keccak256FromHex, keccak256ToByteString, unsafeCreateKeccak256FromWord256)
 import Control.Monad.IO.Class
 import Control.Monad.Composable.Kafka (fetchItems, execKafka)
 import Control.Monad.Except
 import Blockchain.Sequencer.HexData (HexData(..))
 import qualified Blockchain.Sequencer.TxCallObject as TxCall
 import Blockchain.Sequencer.TxCallObject (TxCallObject)
+import qualified Handlers.AccountInfo as Accounts
+import qualified Handlers.BlkLast as BlkLast
+import qualified Handlers.Block as Blocks
+import qualified Handlers.Transaction as Tx
+import qualified Handlers.TransactionResult as TxResults
 import Network.Kafka (getLastOffset, KafkaTime(..))
 import Network.Kafka.Protocol (Offset(..))
-import qualified Data.Aeson as JSON
-import qualified Data.Aeson.KeyMap as KM
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Map as M
-import Data.String (fromString)
+import Data.Time.Calendar (fromGregorian)
+import Data.Time.Clock (UTCTime(..))
 import qualified Data.Text as T
-import qualified Data.Vector as V
 import Network.JsonRpc.Server
 import Numeric (showHex)
 import Prelude hiding (id)
+import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Network.HTTP.Types.Status (statusCode, statusMessage)
+import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
 
 type Server = IO
 
@@ -48,6 +59,27 @@ chainId =
 
 protocolVersion :: Integer
 protocolVersion = fromIntegral ethVersion
+
+apiBaseUrl :: BaseUrl
+apiBaseUrl =
+  BaseUrl
+    Http
+    (apiListenAddress $ apiConfig ethConf)
+    (apiPort $ apiConfig ethConf)
+    "/eth/v1.2"
+
+runLocal :: ClientM a -> IO (Either ClientError a)
+runLocal action = do
+  mgr <- newManager defaultManagerSettings
+  runClientM action (mkClientEnv mgr apiBaseUrl)
+
+formatClientError :: ClientError -> T.Text
+formatClientError (FailureResponse _ resp) =
+  let s = responseStatusCode resp
+  in T.pack $ "HTTP " ++ show (statusCode s) ++ " " ++ BC.unpack (statusMessage s)
+formatClientError (ConnectionError _) = "connection error"
+formatClientError (DecodeFailure msg _) = "decode error: " <> msg
+formatClientError _ = "request failed"
 
 methods :: [Method Server]
 methods =
@@ -197,44 +229,23 @@ eth_accounts = toMethod "eth_accounts" f ()
 
 ----------------
 
-getBlockNumber :: JSON.Value -> Maybe Integer
-getBlockNumber (JSON.Array val) =
-  case V.toList val of
-    [JSON.Object o] ->
-      case KM.lookup "blockData" o of
-        Just (JSON.Object v) ->
-          case KM.lookup "number" v of
-            Just (JSON.Number n) -> Just $ round n
-            _ -> Nothing
-        _ -> Nothing
-    _ -> Nothing
-getBlockNumber _ = Nothing
+getBlockNumber :: Block' -> Integer
+getBlockNumber blk = case blockBlockData $ bPrimeToB blk of
+  BlockHeader {number = n} -> n
+  BlockHeaderV2 {number = n} -> n
 
 eth_blockNumber :: Method Server
 eth_blockNumber = toMethod "eth_blockNumber" f ()
   where
     f :: RpcResult Server String
     f = do
-      response <- liftIO $ API.call "block/last/1"
-      case JSON.decode $ BLC.pack response :: Maybe JSON.Value of
-        Just v ->
-          case getBlockNumber v of
-            Just n ->
-              return $ "0x" ++ showHex n ""
-            Nothing -> throwError $ rpcError (-1) (T.pack "bad response from server")
-        v -> throwError $ rpcError (-1) (T.pack $ "bad response from server: " ++ show v)
+      response <- liftIO $ runLocal $ BlkLast.getBlkLastClient 1
+      case response of
+        Right (blk : _) -> return $ "0x" ++ showHex (getBlockNumber blk) ""
+        Right [] -> throwError $ rpcError (-32603) "empty block list from server"
+        Left err -> throwError $ rpcError (-32603) $ formatClientError err
 
 ----------------
-
-getAccountField :: String -> String -> IO (Maybe JSON.Value)
-getAccountField addressString field = do
-  response <- API.call $ "account?address=" ++ addressString
-  case JSON.decode $ BLC.pack response :: Maybe JSON.Value of
-    Just (JSON.Array arr) ->
-      case V.toList arr of
-        (JSON.Object o : _) -> return $ KM.lookup (fromString field) o
-        _ -> return Nothing
-    _ -> return Nothing
 
 emitJsonRpcCommand :: JsonRpcCommand -> IO ()
 emitJsonRpcCommand c = do
@@ -267,35 +278,45 @@ eth_getBalance :: Method Server
 eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "blockString" :+: ())
   where
     f :: String -> String -> RpcResult Server String
-    f addressString _blockString = do
-      result <- liftIO $ getAccountField addressString "balance"
-      case result of
-        Just (JSON.String bal) ->
-          case reads (T.unpack bal) :: [(Integer, String)] of
-            [(n, _)] -> return $ "0x" ++ showHex n ""
-            _ -> return "0x0"
-        Just (JSON.Number n) -> return $ "0x" ++ showHex (round n :: Integer) ""
-        _ -> return "0x0"
+    f addressString _blockString = case strToAddress addressString of
+      Left _ -> return "0x0"
+      Right addr -> do
+        response <- liftIO $ runLocal $
+          Accounts.getAccountsFilter Accounts.accountsFilterParams {Accounts._qaAddress = Just addr}
+        case response of
+          Right (AddressStateRef' account : _) ->
+            return $ "0x" ++ showHex (addressStateRefBalance account) ""
+          _ -> return "0x0"
 
 eth_getCode :: Method Server
 eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" :+: ())
   where
     f :: String -> String -> RpcResult Server String
-    f addressString _blockString = do
-      result <- liftIO $ getAccountField addressString "contractName"
-      case result of
-        Just (JSON.String cn) | not (T.null cn) -> return "0x01"
-        _ -> return "0x"
+    f addressString _blockString = case strToAddress addressString of
+      Left _ -> return "0x"
+      Right addr -> do
+        response <- liftIO $ runLocal $
+          Accounts.getAccountsFilter Accounts.accountsFilterParams {Accounts._qaAddress = Just addr}
+        case response of
+          Right (AddressStateRef' account : _) ->
+            case addressStateRefContractName account of
+              Just cn | not (null cn) -> return "0x01"
+              _ -> return "0x"
+          _ -> return "0x"
 
 eth_getTransactionCount :: Method Server
 eth_getTransactionCount = toMethod "eth_getTransactionCount" f (Required "address" :+: Required "block" :+: ())
   where
     f :: String -> String -> RpcResult Server String
-    f addressString _blockString = do
-      result <- liftIO $ getAccountField addressString "nonce"
-      case result of
-        Just (JSON.Number n) -> return $ "0x" ++ showHex (round n :: Integer) ""
-        _ -> return "0x0"
+    f addressString _blockString = case strToAddress addressString of
+      Left _ -> return "0x0"
+      Right addr -> do
+        response <- liftIO $ runLocal $
+          Accounts.getAccountsFilter Accounts.accountsFilterParams {Accounts._qaAddress = Just addr}
+        case response of
+          Right (AddressStateRef' account : _) ->
+            return $ "0x" ++ showHex (addressStateRefNonce account) ""
+          _ -> return "0x0"
 
 eth_getStorageAt :: Method Server
 eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Required "key" :+: Required "block" :+: ())
@@ -332,110 +353,25 @@ parseBlockNum s = case reads s :: [(Integer, String)] of
   _ -> Nothing
 
 -- Fetch a block from the REST API and return the raw JSON
-fetchBlockByNumber :: String -> IO (Maybe JSON.Value)
+fetchBlockByNumber :: String -> IO (Maybe Block')
 fetchBlockByNumber blockParam = do
-  let endpoint = case parseBlockNum blockParam of
-        Nothing -> "block/last/1"
-        Just n  -> "block?number=" ++ show n
-  response <- API.call endpoint
-  case JSON.decode $ BLC.pack response :: Maybe JSON.Value of
-    Just (JSON.Array arr) | not (V.null arr) -> return $ Just (V.head arr)
-    _ -> return Nothing
+  response <- case parseBlockNum blockParam of
+    Nothing -> runLocal $ BlkLast.getBlkLastClient 1
+    Just n ->
+      runLocal $
+        Blocks.getBlocksFilter Blocks.blocksFilterParams {Blocks.qbNumber = Just (fromIntegral n)}
+  return $ case response of
+    Right (blk : _) -> Just blk
+    _ -> Nothing
 
-fetchBlockByHash :: String -> IO (Maybe JSON.Value)
+fetchBlockByHash :: String -> IO (Maybe Block')
 fetchBlockByHash hashStr = do
   let h = if take 2 hashStr == "0x" then drop 2 hashStr else hashStr
-  response <- API.call $ "block?hash=" ++ h
-  case JSON.decode $ BLC.pack response :: Maybe JSON.Value of
-    Just (JSON.Array arr) | not (V.null arr) -> return $ Just (V.head arr)
-    _ -> return Nothing
-
--- Convert STRATO block JSON to Ethereum block JSON
-stratoBlockToEthBlock :: Bool -> JSON.Value -> String
-stratoBlockToEthBlock _fullTxs (JSON.Object blk) =
-  let bd = case KM.lookup "blockData" blk of
-        Just (JSON.Object o) -> o
-        _ -> KM.empty
-      lkp k = KM.lookup (fromString k) bd
-      lkpBlk k = KM.lookup (fromString k) blk
-      hexNum k = case lkp k of
-        Just (JSON.Number n) -> "0x" ++ showHex (round n :: Integer) ""
-        _ -> "0x0"
-      hexStr k = case lkp k of
-        Just (JSON.String s) -> "\"" ++ T.unpack s ++ "\""
-        _ -> "null"
-      blockHash = case lkpBlk "blockHash" of
-        Just (JSON.String s) -> "\"0x" ++ T.unpack s ++ "\""
-        _ -> "null"
-      txHashes = case lkpBlk "receiptTransactions" of
-        Just (JSON.Array txs) -> "[" ++ concatComma (map getTxHash (V.toList txs)) ++ "]"
-        _ -> "[]"
-      getTxHash (JSON.Object tx) = case KM.lookup "hash" tx of
-        Just (JSON.String h) -> "\"0x" ++ T.unpack h ++ "\""
-        _ -> "null"
-      getTxHash _ = "null"
-      concatComma [] = ""
-      concatComma [x] = x
-      concatComma (x:xs) = x ++ "," ++ concatComma xs
-  in "{\"number\":\"" ++ hexNum "number" ++ "\""
-     ++ ",\"hash\":" ++ blockHash
-     ++ ",\"parentHash\":" ++ hexStr "parentHash"
-     ++ ",\"nonce\":\"0x0000000000000000\""
-     ++ ",\"sha3Uncles\":\"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\""
-     ++ ",\"logsBloom\":\"0x" ++ replicate 512 '0' ++ "\""
-     ++ ",\"transactionsRoot\":" ++ hexStr "transactionsRoot"
-     ++ ",\"stateRoot\":" ++ hexStr "stateRoot"
-     ++ ",\"receiptsRoot\":" ++ hexStr "receiptsRoot"
-     ++ ",\"miner\":\"0x0000000000000000000000000000000000000000\""
-     ++ ",\"difficulty\":\"0x0\""
-     ++ ",\"totalDifficulty\":\"0x0\""
-     ++ ",\"extraData\":" ++ hexStr "extraData"
-     ++ ",\"size\":\"0x0\""
-     ++ ",\"gasLimit\":\"0x1c9c380\""
-     ++ ",\"gasUsed\":\"0x0\""
-     ++ ",\"timestamp\":" ++ (case lkp "timestamp" of
-          Just (JSON.String ts) -> "\"0x" ++ showHex (tsToUnix (T.unpack ts)) "" ++ "\""
-          _ -> "\"0x0\"")
-     ++ ",\"transactions\":" ++ txHashes
-     ++ ",\"uncles\":[]"
-     ++ "}"
-  where
-    tsToUnix :: String -> Integer
-    tsToUnix _ = 0
-stratoBlockToEthBlock _ _ = "null"
-
--- Convert STRATO tx JSON to Ethereum tx JSON
-stratoTxToEthTx :: JSON.Value -> String
-stratoTxToEthTx (JSON.Object tx) =
-  let lkp k = KM.lookup (fromString k) tx
-      hashVal = case lkp "hash" of
-        Just (JSON.String h) -> "0x" ++ T.unpack h
-        _ -> "0x"
-      fromVal = case lkp "from" of
-        Just (JSON.String f) -> "0x" ++ T.unpack f
-        _ -> "0x0000000000000000000000000000000000000000"
-      toVal = case lkp "to" of
-        Just (JSON.String t) -> "\"0x" ++ T.unpack t ++ "\""
-        _ -> "null"
-      nonceVal = case lkp "nonce" of
-        Just (JSON.Number n) -> "0x" ++ showHex (round n :: Integer) ""
-        _ -> "0x0"
-      blkNum = case lkp "blockNumber" of
-        Just (JSON.Number n) -> "0x" ++ showHex (round n :: Integer) ""
-        _ -> "0x0"
-  in "{\"hash\":\"" ++ hashVal ++ "\""
-     ++ ",\"nonce\":\"" ++ nonceVal ++ "\""
-     ++ ",\"blockHash\":\"" ++ hashVal ++ "\""
-     ++ ",\"blockNumber\":\"" ++ blkNum ++ "\""
-     ++ ",\"transactionIndex\":\"0x0\""
-     ++ ",\"from\":\"" ++ fromVal ++ "\""
-     ++ ",\"to\":" ++ toVal
-     ++ ",\"value\":\"0x0\""
-     ++ ",\"gas\":\"0x5208\""
-     ++ ",\"gasPrice\":\"0x0\""
-     ++ ",\"input\":\"0x\""
-     ++ "}"
-stratoTxToEthTx _ = "null"
+  response <- runLocal $
+    Blocks.getBlocksFilter Blocks.blocksFilterParams {Blocks.qbHash = Just (keccak256FromHex h)}
+  return $ case response of
+    Right (blk : _) -> Just blk
+    _ -> Nothing
 
 eth_getBlockTransactionCountByHash :: Method Server
 eth_getBlockTransactionCountByHash = toMethod "eth_getBlockTransactionCountByHash" f (Required "blockHash" :+: ())
@@ -444,9 +380,7 @@ eth_getBlockTransactionCountByHash = toMethod "eth_getBlockTransactionCountByHas
     f blockHash = do
       mBlk <- liftIO $ fetchBlockByHash blockHash
       case mBlk of
-        Just (JSON.Object blk) -> case KM.lookup "receiptTransactions" blk of
-          Just (JSON.Array txs) -> return $ "0x" ++ showHex (V.length txs) ""
-          _ -> return "0x0"
+        Just blk -> return $ "0x" ++ showHex (length $ blockReceiptTransactions $ bPrimeToB blk) ""
         _ -> return "0x0"
 
 eth_getBlockTransactionCountByNumber :: Method Server
@@ -456,9 +390,7 @@ eth_getBlockTransactionCountByNumber = toMethod "eth_getBlockTransactionCountByN
     f blockNumber = do
       mBlk <- liftIO $ fetchBlockByNumber blockNumber
       case mBlk of
-        Just (JSON.Object blk) -> case KM.lookup "receiptTransactions" blk of
-          Just (JSON.Array txs) -> return $ "0x" ++ showHex (V.length txs) ""
-          _ -> return "0x0"
+        Just blk -> return $ "0x" ++ showHex (length $ blockReceiptTransactions $ bPrimeToB blk) ""
         _ -> return "0x0"
 
 eth_getUncleCountByBlockHash :: Method Server
@@ -491,7 +423,38 @@ eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+
     f :: HexData -> RpcResult Server String
     f (HexData rawTx) = do
       liftIO $ putStrLn $ "eth_sendRawTransaction received " ++ show (B.length rawTx) ++ " bytes"
-      throwError $ rpcError (-32601) "eth_sendRawTransaction not yet implemented"
+      let toAddr = case strToAddress "0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010" of
+            Right a -> a
+            Left e -> error $ "bad hardcoded address: " ++ e
+          tx = RawTransaction'
+            (RawTransaction
+              (UTCTime (fromGregorian 2000 1 1) 0)
+              (Address 0)
+              0       -- nonce
+              21000   -- gasLimit
+              (Just toAddr)
+              (Just "transfer")
+              Nothing -- contractName
+              ["f1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14", "1"]
+              (T.pack $ network $ networkConfig ethConf)
+              Nothing -- code
+              1       -- r
+              1       -- s
+              0x1b    -- v
+              (-1)    -- blockNumber
+              (unsafeCreateKeccak256FromWord256 1)
+              API)
+      result <- liftIO $ runLocal $ Tx.postTxClient tx
+      let txHash = case result of
+            Right h -> normalizeHash (show h)
+            Left _ -> "0x0"
+      liftIO $ putStrLn $ "eth_sendRawTransaction submitted dummy tx hash: " ++ txHash
+      return txHash
+
+    normalizeHash :: String -> String
+    normalizeHash s =
+      let trimmed = filter (`notElem` ['"', '\n', '\r', ' ']) s
+       in if take 2 trimmed == "0x" then trimmed else "0x" ++ trimmed
 
 eth_estimateGas :: Method Server
 eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
@@ -502,22 +465,14 @@ eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
 eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())
   where
-    f :: String -> Bool -> RpcResult Server String
-    f blockHash fullTxs = do
-      mBlk <- liftIO $ fetchBlockByHash blockHash
-      case mBlk of
-        Just blk -> return $ stratoBlockToEthBlock fullTxs blk
-        Nothing -> return "null"
+    f :: String -> Bool -> RpcResult Server (Maybe Block')
+    f blockHash _fullTxs = liftIO $ fetchBlockByHash blockHash
 
 eth_getBlockByNumber :: Method Server
 eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber" :+: Required "fullTransactions" :+: ())
   where
-    f :: String -> Bool -> RpcResult Server String
-    f blockNumber fullTxs = do
-      mBlk <- liftIO $ fetchBlockByNumber blockNumber
-      case mBlk of
-        Just blk -> return $ stratoBlockToEthBlock fullTxs blk
-        Nothing -> return "null"
+    f :: String -> Bool -> RpcResult Server (Maybe Block')
+    f blockNumber _fullTxs = liftIO $ fetchBlockByNumber blockNumber
 
 -- TODO: blockHash field in tx response needs the actual block hash, not the tx hash.
 -- STRATO tx JSON doesn't include the block hash, so we'd need an extra lookup.
@@ -530,94 +485,59 @@ eth_getTransactionByHash = toMethod "eth_getTransactionByHash" f (Required "txHa
 eth_getTransactionByBlockHashAndIndex :: Method Server
 eth_getTransactionByBlockHashAndIndex = toMethod "eth_getTransactionByBlockHashAndIndex" f (Required "blockHash" :+: Required "index" :+: ())
   where
-    f :: String -> String -> RpcResult Server String
+    f :: String -> String -> RpcResult Server (Maybe Transaction')
     f blockHash indexStr = do
       let idx = case parseBlockNum indexStr of
             Just n -> fromIntegral n
             Nothing -> 0 :: Int
       mBlk <- liftIO $ fetchBlockByHash blockHash
-      case mBlk of
-        Just (JSON.Object blk) -> case KM.lookup "receiptTransactions" blk of
-          Just (JSON.Array txs) | idx < V.length txs ->
-            return $ stratoTxToEthTx (txs V.! idx)
-          _ -> return "null"
-        _ -> return "null"
+      return $ case mBlk of
+        Just blk ->
+          let txs = blockReceiptTransactions $ bPrimeToB blk
+           in if idx < length txs
+                then Just $ Transaction' (txs !! idx)
+                else Nothing
+        _ -> Nothing
 
 eth_getTransactionByBlockNumberAndIndex :: Method Server
 eth_getTransactionByBlockNumberAndIndex = toMethod "eth_getTransactionByBlockNumberAndIndex" f (Required "blockNumber" :+: Required "index" :+: ())
   where
-    f :: String -> String -> RpcResult Server String
+    f :: String -> String -> RpcResult Server (Maybe Transaction')
     f blockNumber indexStr = do
       let idx = case parseBlockNum indexStr of
             Just n -> fromIntegral n
             Nothing -> 0 :: Int
       mBlk <- liftIO $ fetchBlockByNumber blockNumber
-      case mBlk of
-        Just (JSON.Object blk) -> case KM.lookup "receiptTransactions" blk of
-          Just (JSON.Array txs) | idx < V.length txs ->
-            return $ stratoTxToEthTx (txs V.! idx)
-          _ -> return "null"
-        _ -> return "null"
+      return $ case mBlk of
+        Just blk ->
+          let txs = blockReceiptTransactions $ bPrimeToB blk
+           in if idx < length txs
+                then Just $ Transaction' (txs !! idx)
+                else Nothing
+        _ -> Nothing
 
 eth_getTransactionReceipt :: Method Server
 eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "txHash" :+: ())
   where
-    f :: String -> RpcResult Server String
+    f :: String -> RpcResult Server (Maybe TransactionResult)
     f txHash = do
       let h = if take 2 txHash == "0x" then drop 2 txHash else txHash
-      response <- liftIO $ API.call $ "transactionResult/" ++ h
-      case JSON.decode $ BLC.pack response :: Maybe JSON.Value of
-        Just (JSON.Array arr) | not (V.null arr) ->
-          case V.head arr of
-            JSON.Object tr -> do
-              let lkp k = KM.lookup (fromString k) tr
-                  txHashHex = "0x" ++ h
-                  blkHash = case lkp "blockHash" of
-                    Just (JSON.String s) -> "0x" ++ T.unpack s
-                    _ -> txHashHex
-                  gasUsed = case lkp "gasUsed" of
-                    Just (JSON.Number n) -> "0x" ++ showHex (round n :: Integer) ""
-                    Just (JSON.String s) -> case reads (T.unpack s) :: [(Integer, String)] of
-                      [(n, _)] -> "0x" ++ showHex n ""
-                      _ -> "0x0"
-                    _ -> "0x0"
-                  statusCode = case lkp "status" of
-                    Just (JSON.String "success") -> "0x1"
-                    _ -> "0x0"
-                  contractAddr = case lkp "contractsCreated" of
-                    Just (JSON.Array cs) | not (V.null cs) -> case V.head cs of
-                      JSON.String a -> "\"0x" ++ T.unpack a ++ "\""
-                      _ -> "null"
-                    _ -> "null"
-              return $ "{\"transactionHash\":\"" ++ txHashHex ++ "\""
-                ++ ",\"transactionIndex\":\"0x0\""
-                ++ ",\"blockHash\":\"" ++ blkHash ++ "\""
-                ++ ",\"blockNumber\":\"0x0\""
-                ++ ",\"from\":\"0x0000000000000000000000000000000000000000\""
-                ++ ",\"to\":null"
-                ++ ",\"cumulativeGasUsed\":" ++ "\"" ++ gasUsed ++ "\""
-                ++ ",\"gasUsed\":\"" ++ gasUsed ++ "\""
-                ++ ",\"contractAddress\":" ++ contractAddr
-                ++ ",\"logs\":[]"
-                ++ ",\"logsBloom\":\"0x" ++ replicate 512 '0' ++ "\""
-                ++ ",\"status\":\"" ++ statusCode ++ "\""
-                ++ ",\"effectiveGasPrice\":\"0x0\""
-                ++ ",\"type\":\"0x0\""
-                ++ "}"
-            _ -> return "null"
-        _ -> return "null"
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (keccak256FromHex h)
+      case response of
+        Right (tr : _) -> return (Just tr)
+        _ -> return Nothing
 
 eth_getUncleByBlockHashAndIndex :: Method Server
 eth_getUncleByBlockHashAndIndex = toMethod "eth_getUncleByBlockHashAndIndex" f ()
   where
-    f :: RpcResult Server String
-    f = return "null"
+    f :: RpcResult Server (Maybe Block')
+    f = return Nothing
 
 eth_getUncleByBlockNumberAndIndex :: Method Server
 eth_getUncleByBlockNumberAndIndex = toMethod "eth_getUncleByBlockNumberAndIndex" f ()
   where
-    f :: RpcResult Server String
-    f = return "null"
+    f :: RpcResult Server (Maybe Block')
+    f = return Nothing
 
 eth_getCompilers :: Method Server
 eth_getCompilers = toMethod "eth_getCompilers" f ()

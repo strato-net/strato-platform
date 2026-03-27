@@ -127,7 +127,7 @@ getLogicCodePtr a = runMaybeT $ do
   logicAddr <- MaybeT . pure $ case v of
     BAddress address' -> Just address'
     _ -> Nothing
-  (AddressStateRef' l _) <- MaybeT
+  (AddressStateRef' l) <- MaybeT
     . fmap listToMaybe
     . getAccount'
     $ accountsFilterParams & qaAddress ?~ logicAddr
@@ -163,7 +163,7 @@ getContractWithCodeCollectionByAddress ::
   Text ->
   m (Maybe (Contract, CodeCollection))
 getContractWithCodeCollectionByAddress a fn = runMaybeT $ do
-  (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount'
+  (AddressStateRef' r) <- MaybeT . fmap listToMaybe $ getAccount' 
     $ accountsFilterParams & qaAddress ?~ a
   codePtr <- MaybeT . pure $ addressStateRefCodePtr r
   case addressStateRefContractName r of
@@ -184,7 +184,7 @@ getContractByAccountsFilterParams ::
   Maybe Text ->
   m (Maybe Contract)
 getContractByAccountsFilterParams aParams mFuncName = runMaybeT $ do
-  (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount' aParams
+  (AddressStateRef' r) <- MaybeT . fmap listToMaybe $ getAccount' aParams
   a <- MaybeT . pure $ aParams ^. qaAddress
   codePtr <- MaybeT . pure $ addressStateRefCodePtr r
   case (addressStateRefContractName r, mFuncName) of

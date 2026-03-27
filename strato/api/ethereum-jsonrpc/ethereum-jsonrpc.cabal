@@ -14,7 +14,6 @@ build-type:     Simple
 executable ethereum-jsonrpc
   main-is: Main.hs
   other-modules:
-      APIProxy
       Binary
       Commands
       RPC
@@ -28,10 +27,13 @@ executable ethereum-jsonrpc
     , base16-bytestring
     , binary
     , blaze-builder
+    , blockDB
     , blockapps-data
+    , blockapps-datadefs
     , bytestring
     , case-insensitive
     , containers
+    , core-api2
     , http-client
     , http-types
     , json-rpc-server
@@ -39,10 +41,13 @@ executable ethereum-jsonrpc
     , milena
     , mtl
     , seqevents
+    , servant
+    , servant-client
     , strato-conf
     , strato-model
     , strato-p2p
     , text
+    , time
     , vector
     , wai
     , warp
