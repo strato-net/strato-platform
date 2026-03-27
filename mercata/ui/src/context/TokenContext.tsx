@@ -65,6 +65,11 @@ type TokenContextType = {
   voucherBalance: string;
   loadingUsdstBalance: boolean;
   fetchUsdstBalance: (signal?: AbortSignal) => Promise<void>;
+  // Net balance (current snapshot)
+  netBalance: number;
+  totalBorrowed: number;
+  loadingNetBalance: boolean;
+  refreshNetBalance: () => Promise<void>;
   // Balance history caches
   netBalanceHistoryCache: Record<string, BalanceSnapshot[]>;
   rewardsHistoryCache: Record<string, BalanceSnapshot[]>;
@@ -91,22 +96,28 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [loadingEarningAssets, setLoadingEarningAssets] = useState(false);
   const [loadingInactiveTokens, setLoadingInactiveTokens] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // USDST balance state
   const [usdstBalance, setUsdstBalance] = useState("0");
   const [voucherBalance, setVoucherBalance] = useState("0");
   const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
-  
+
   // Balance history caches
   const [netBalanceHistoryCache, setNetBalanceHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
   const [rewardsHistoryCache, setRewardsHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
   const [borrowedHistoryCache, setBorrowedHistoryCacheState] = useState<Record<string, BalanceSnapshot[]>>({});
   const [loadingBalanceHistory, setLoadingBalanceHistory] = useState(false);
 
+  // Net balance (current snapshot)
+  const [netBalance, setNetBalance] = useState(0);
+  const [totalBorrowed, setTotalBorrowed] = useState(0);
+  const [loadingNetBalance, setLoadingNetBalance] = useState(true);
+
   // ========== REFS ==========
   const earningAssetsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const earningAssetsAbortControllerRef = useRef<AbortController | null>(null);
   const inactiveTokensAbortControllerRef = useRef<AbortController | null>(null);
+  const netBalanceAbortControllerRef = useRef<AbortController | null>(null);
 
   const getAllTokens = useCallback(async (query: Record<string, string> = {}) => {
     setLoading(true);
@@ -144,14 +155,14 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await api.get<{ tokens: TokenType[]; totalCount: number }>(
         `/tokens/v2`,
-        { 
+        {
           params: { status: 'neq.2' },
           signal: inactiveTokensAbortControllerRef.current.signal
         }
       );
-      
+
       if (!inactiveTokensAbortControllerRef.current.signal.aborted) {
-      setInactiveTokens(res.data?.tokens || []);
+        setInactiveTokens(res.data?.tokens || []);
       }
     } catch (err: any) {
       if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
@@ -248,10 +259,10 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         endpoint,
         { signal: earningAssetsAbortControllerRef.current.signal }
       );
-      
+
       if (!earningAssetsAbortControllerRef.current.signal.aborted) {
         setEarningAssets(res.data || []);
-        
+
         // Find USDST token from earning assets and update balance (only for logged-in users)
         if (isLoggedIn) {
           const usdstToken = res.data?.find((asset) => asset.address === usdstAddress);
@@ -327,6 +338,36 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const setBorrowedHistoryCache = useCallback((range: string, data: BalanceSnapshot[]) => {
     setBorrowedHistoryCacheState(prev => ({ ...prev, [range]: data }));
   }, []);
+
+  const fetchNetBalance = useCallback(async () => {
+    if (!isLoggedIn) return;
+
+    setLoadingNetBalance(true);
+
+    if (netBalanceAbortControllerRef.current) {
+      netBalanceAbortControllerRef.current.abort();
+    }
+    netBalanceAbortControllerRef.current = new AbortController();
+
+    try {
+      const res = await api.get<{ netBalance: number; totalBorrowed: number }>(
+        '/tokens/v2/net-balance',
+        { signal: netBalanceAbortControllerRef.current.signal }
+      );
+
+      if (!netBalanceAbortControllerRef.current.signal.aborted) {
+        setNetBalance(res.data.netBalance);
+        setTotalBorrowed(res.data.totalBorrowed);
+        setLoadingNetBalance(false);
+      }
+    } catch (err: unknown) {
+      const e = err as { name?: string; code?: string };
+      if (e.name === 'AbortError' || e.code === 'ERR_CANCELED') return;
+      if (!netBalanceAbortControllerRef.current?.signal.aborted) {
+        setLoadingNetBalance(false);
+      }
+    }
+  }, [isLoggedIn]);
 
   const createToken = useCallback(async (token: CreateTokenPayload) => {
     setLoading(true);
@@ -431,6 +472,19 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [getEarningAssets, isLoggedIn]);
 
+  // Net balance - fetch once on mount for logged-in users
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchNetBalance();
+    }
+
+    return () => {
+      if (netBalanceAbortControllerRef.current) {
+        netBalanceAbortControllerRef.current.abort();
+      }
+    };
+  }, [fetchNetBalance, isLoggedIn]);
+
 
   return (
     <TokenContext.Provider
@@ -466,6 +520,10 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         voucherBalance,
         loadingUsdstBalance,
         fetchUsdstBalance,
+        netBalance,
+        totalBorrowed,
+        loadingNetBalance,
+        refreshNetBalance: fetchNetBalance,
         netBalanceHistoryCache,
         rewardsHistoryCache,
         borrowedHistoryCache,
