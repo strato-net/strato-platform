@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications  #-}
 
 module Commands
@@ -7,19 +8,21 @@ module Commands
 where
 
 import Binary
+import EthTypes (TransactionReceipt(..))
 import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runKafkaMConfigured, ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, network)
 import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
 import Blockchain.Data.BlockHeader (BlockHeader (..))
-import Blockchain.Data.DataDefs (AddressStateRef (..), RawTransaction(..), TransactionResult (..))
+import Blockchain.Data.DataDefs (AddressStateRef (..), RawTransaction(..))
 import Blockchain.Data.TXOrigin (TXOrigin(API))
 import Blockchain.Model.JsonBlock (AddressStateRef' (..), Block', RawTransaction'(..), Transaction'(..), bPrimeToB)
 import Blockchain.Sequencer.Event (JsonRpcCommand(..), VmTask(..))
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
 import Blockchain.Strato.Model.Address (Address(..))
-import Blockchain.Strato.Model.Keccak256 (hash, keccak256FromHex, keccak256ToByteString, unsafeCreateKeccak256FromWord256)
+import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, unsafeCreateKeccak256FromWord256)
+import Text.Format (format)
 import Control.Monad.IO.Class
 import Control.Monad.Composable.Kafka (fetchItems, execKafka)
 import Control.Monad.Except
@@ -420,7 +423,7 @@ eth_sendTransaction = toMethod "eth_sendTransaction" f ()
 eth_sendRawTransaction :: Method Server
 eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+: ())
   where
-    f :: HexData -> RpcResult Server String
+    f :: HexData -> RpcResult Server Keccak256
     f (HexData rawTx) = do
       liftIO $ putStrLn $ "eth_sendRawTransaction received " ++ show (B.length rawTx) ++ " bytes"
       let toAddr = case strToAddress "0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010" of
@@ -445,16 +448,11 @@ eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+
               (unsafeCreateKeccak256FromWord256 1)
               API)
       result <- liftIO $ runLocal $ Tx.postTxClient tx
-      let txHash = case result of
-            Right h -> normalizeHash (show h)
-            Left _ -> "0x0"
-      liftIO $ putStrLn $ "eth_sendRawTransaction submitted dummy tx hash: " ++ txHash
-      return txHash
-
-    normalizeHash :: String -> String
-    normalizeHash s =
-      let trimmed = filter (`notElem` ['"', '\n', '\r', ' ']) s
-       in if take 2 trimmed == "0x" then trimmed else "0x" ++ trimmed
+      case result of
+        Right h -> do
+          liftIO $ putStrLn $ "eth_sendRawTransaction submitted tx hash: " ++ format h
+          return h
+        Left err -> throwError $ rpcError (-32603) (formatClientError err)
 
 eth_estimateGas :: Method Server
 eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
@@ -519,13 +517,14 @@ eth_getTransactionByBlockNumberAndIndex = toMethod "eth_getTransactionByBlockNum
 eth_getTransactionReceipt :: Method Server
 eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "txHash" :+: ())
   where
-    f :: String -> RpcResult Server (Maybe TransactionResult)
+    f :: String -> RpcResult Server (Maybe TransactionReceipt)
     f txHash = do
       let h = if take 2 txHash == "0x" then drop 2 txHash else txHash
       response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (keccak256FromHex h)
       case response of
-        Right (tr : _) -> return (Just tr)
-        _ -> return Nothing
+        Right (tr : _) -> return (Just (TransactionReceipt tr))
+        Right [] -> return Nothing
+        Left err -> throwError $ rpcError (-32603) (formatClientError err)
 
 eth_getUncleByBlockHashAndIndex :: Method Server
 eth_getUncleByBlockHashAndIndex = toMethod "eth_getUncleByBlockHashAndIndex" f ()

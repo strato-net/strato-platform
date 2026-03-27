@@ -22,6 +22,7 @@ executables:
       - bytestring
       - case-insensitive
       - containers
+      - format
       - http-client
       - http-types
       - json-rpc-server
