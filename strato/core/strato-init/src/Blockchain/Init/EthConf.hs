@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Blockchain.Init.EthConf (genEthConf, getInternalVaultUrl) where
+module Blockchain.Init.EthConf (genEthConf) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
@@ -18,16 +18,18 @@ import Strato.Strato23.Client
 import System.Info (os)
 import Text.ShortDescription
 
--- | Get the API IP address, using OS-appropriate default for Docker
-getApiIPAddress :: String
-getApiIPAddress
-  | flags_apiIPAddress /= "127.0.0.1" = flags_apiIPAddress  -- User provided explicit value
-  | os == "linux" = "172.17.0.1"                            -- Linux Docker bridge
-  | otherwise = "host.docker.internal"                      -- macOS/Windows Docker
+-- | Address strato-api binds its socket to
+getApiListenAddress :: String
+getApiListenAddress
+  | os == "linux" = "172.17.0.1"
+  | otherwise = "127.0.0.1"
 
--- | Get the internal vault URL for nginx to proxy to (vault-wrapper on host)
-getInternalVaultUrl :: String
-getInternalVaultUrl = "http://" ++ getApiIPAddress ++ ":8093"
+-- | Address Docker containers use to reach strato-api on the host
+getApiHost :: String
+getApiHost
+  | flags_apiIPAddress /= "" = flags_apiIPAddress
+  | os == "linux" = "172.17.0.1"
+  | otherwise = "host.docker.internal"
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -58,24 +60,17 @@ runtimeConfig = def
       , maxHeadersTxsLens = flags_maxHeadersTxsLens
       }
   , apiConfig = def
-      { ipAddress = getApiIPAddress
-      , httpPort = flags_httpPort
+      { apiListenAddress = getApiListenAddress
+      , apiHost = getApiHost
       }
   , contractsConfig = getRailgunProxyForNetwork flags_network >>= \addr ->
       Just ContractsConf { railgunProxy = Just addr }
   , debugConfig = def { svmTrace = flags_svmTrace }
   }
 
--- | Get effective vault URL based on localAuth flag
-getEffectiveVaultUrl :: String
-getEffectiveVaultUrl
-  | Opts.flags_localAuth = "http://localhost:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
-  | otherwise = flags_vaultUrl
-
 getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
-  let vaultUrl' = getEffectiveVaultUrl
-  env <- newAuthEnv vaultUrl'
+  env <- newAuthEnv flags_vaultUrl
   ak <- waitOnVault env $ runWithAuth env (getKey Nothing Nothing)
   return (VC.unPubKey ak, VC.unAddress ak)
 
@@ -142,7 +137,9 @@ genEthConf = do
         , mempoolLivenessCutoff = flags_mempoolLivenessCutoff
         }
     , urlConfig = def
-        { vaultUrl = getEffectiveVaultUrl
+        { vaultUrl = if Opts.flags_localAuth
+            then "http://localhost:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
+            else flags_vaultUrl
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl
@@ -150,6 +147,7 @@ genEthConf = do
     , networkConfig = def
         { network = flags_network
         , networkID = computeNetworkID
+        , httpPort = flags_httpPort
         , txSizeLimit = flags_txSizeLimit
         , gasLimit = flags_gasLimit
         , blockPeriodMs = flags_blockstanbul_block_period_ms

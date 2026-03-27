@@ -52,6 +52,7 @@ import Control.Monad (join, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
+import Control.Monad.Composable.Kafka (HasKafka)
 import Control.Monad.IO.Class
 import Control.Monad.Reader (ReaderT)
 import qualified Data.ByteString as B
@@ -145,7 +146,7 @@ instance HasContext m => Mod.Modifiable BaggerState m where
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TRC.Cache (ReaderT Context m) where
   access _ = contextGets _txRunResultsCache
 
-instance {-# OVERLAPPING #-} MonadIO m => m `Mod.Yields` TransactionResult where
+instance {-# OVERLAPPING #-} HasKafka m => m `Mod.Yields` TransactionResult where
   yield tr = void $ produceVMEvents [NewTransactionResult tr]
 
 vmBlockHashRootKey :: B.ByteString

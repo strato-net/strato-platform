@@ -34,14 +34,11 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
     }
   };
 
-  // Build season display from currentSeason
-  const seasonDisplay = `Season ${state?.currentSeason || 1}`;
-
   if (loading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{seasonDisplay} Reward Overview</CardTitle>
+          <CardTitle>Rewards Overview</CardTitle>
           <CardDescription>Global rewards system statistics</CardDescription>
         </CardHeader>
         <CardContent>
@@ -60,7 +57,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Reward Overview</CardTitle>
+          <CardTitle>Rewards Overview</CardTitle>
           <CardDescription>Global rewards system statistics</CardDescription>
         </CardHeader>
         <CardContent>
@@ -97,7 +94,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
       <CardHeader className="px-4 md:px-6 pb-3 md:pb-4">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-lg md:text-xl">{seasonDisplay} Reward Overview</CardTitle>
+            <CardTitle className="text-lg md:text-xl">Rewards Overview</CardTitle>
             <CardDescription className="text-xs md:text-sm">Global rewards system statistics</CardDescription>
           </div>
           {onRefresh && (

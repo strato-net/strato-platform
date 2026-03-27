@@ -5,7 +5,7 @@ module Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker) w
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (apiConfig, httpPort)
+import Blockchain.EthConf.Model (networkConfig, httpPort)
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.Options (flags_composeOnly, flags_repoUrl)
@@ -20,7 +20,7 @@ import System.IO (hPutStrLn, stderr)
 generateDockerComposeAllDocker :: IO ()
 generateDockerComposeAllDocker = do
   let conf = ethConf
-      portNum = show $ httpPort (apiConfig conf)
+      portNum = show $ httpPort (networkConfig conf)
       repoUrl = flags_repoUrl
       stratoVersion = stratoVersionTag
       noLogging = Just Logging { driver = "none", options = Nothing }
@@ -40,10 +40,7 @@ generateDockerComposeAllDocker = do
         , depends_on = Just $ DependsOnList ["strato", "postgrest"]
         , init = Just True
         , environment = Just $ Map.fromList
-            [ ("OAUTH_DISCOVERY_URL", "${OAUTH_DISCOVERY_URL}")
-            , ("OAUTH_CLIENT_ID", "${OAUTH_CLIENT_ID}")
-            , ("OAUTH_CLIENT_SECRET", "${OAUTH_CLIENT_SECRET}")
-            , ("NODE_URL", "http://nginx")
+            [ ("NODE_URL", "http://nginx")
             , ("BASE_URL", "https://${NODE_HOST}")
             , ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
             , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
@@ -71,7 +68,10 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
-        , volumes = Just ["./logs:/logs"]
+        , volumes = Just
+            [ "./logs:/logs"
+            , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
+            ]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }

@@ -76,7 +76,7 @@ contract record MercataBridge is Ownable {
     event WithdrawalAborted(uint256 withdrawalId);
 
     /// @notice Emitted when a withdrawal is completed and tokens are burned
-    event WithdrawalCompleted(uint256 withdrawalId);
+    event WithdrawalCompleted(uint256 withdrawalId, address user, address stratoToken, uint256 stratoTokenAmount);
 
     /// @notice Emitted when a withdrawal is pending custody transaction
     event WithdrawalPending(string custodyTxHash, uint256 withdrawalId);
@@ -1044,7 +1044,7 @@ contract record MercataBridge is Ownable {
         w.bridgeStatus = BridgeStatus.COMPLETED;
         w.timestamp = block.timestamp;
 
-        emit WithdrawalCompleted(id);
+        emit WithdrawalCompleted(id, w.stratoSender, w.stratoToken, w.stratoTokenAmount);
     }
 
     /**

@@ -18,7 +18,6 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.SolidStorageDB (getSolidStorageKeyVal')
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.ExecResults (ExecResults (..))
-import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.HexData (HexData (..))
 import qualified Blockchain.Sequencer.TxCallObject as TxCall
@@ -29,11 +28,10 @@ import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Keccak256 (hash)
 import Blockchain.VMContext (ContextBestBlockInfo (..), CurrentBlockHash (..), VMBase, getContextBestBlockInfo)
 import Control.Lens ((^.))
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
-import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -46,15 +44,12 @@ import SolidVM.Model.SolidString (SolidString, labelToText, stringToLabel)
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 import Text.Format (format)
 
-produceResponse :: String -> B.ByteString -> IO ()
-produceResponse id theData = do
-  _ <- runKafkaMConfigured "ethereum-vm" $
-    produceItems "jsonrpcresponse" [(id, theData)]
-  return ()
+produceResponse :: HasKafka m => String -> B.ByteString -> m ()
+produceResponse id theData = void $ produceItems "jsonrpcresponse" [(id, theData)]
 
-runJsonRpcCommand :: VMBase m => JsonRpcCommand -> m ()
+runJsonRpcCommand :: (VMBase m, HasKafka m) => JsonRpcCommand -> m ()
 runJsonRpcCommand =
-  liftIO . uncurry produceResponse
+  uncurry produceResponse
     <=< runJsonRpcCommand'
 
 runJsonRpcCommand' :: VMBase m => JsonRpcCommand -> m (String, B.ByteString)

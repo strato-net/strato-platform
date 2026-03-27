@@ -6,6 +6,14 @@ pipeline {
     stage('Prepare') {
       steps {
         sh 'git fetch --tags'
+        sh 'git fetch origin develop --quiet'
+        script {
+          if (env.BRANCH_NAME != 'develop' && sh(script: 'git diff --quiet origin/develop...HEAD', returnStatus: true) == 0) {
+            currentBuild.result = 'NOT_BUILT'
+            currentBuild.description = "Skipped - no changes vs develop"
+            error('No changes compared to develop, skipping build.')
+          }
+        }
         wrap([$class: 'BuildUser']) {
           script {
             BUILD_USER=''
@@ -16,7 +24,7 @@ pipeline {
             }
             MAIN_AGENT_NAME="${env.NODE_NAME}"
             currentBuild.description = "${MAIN_AGENT_NAME} //${BUILD_USER}"
-            
+
             lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
           }
         }

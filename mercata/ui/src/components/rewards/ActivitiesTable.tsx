@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Activity } from "@/services/rewardsService";
 import { formatBalance } from "@/utils/numberUtils";
-import { formatEmissionRatePerDay, formatEmissionRatePerWeek, roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
+import { formatEmissionRatePerDay, formatEmissionRatePerWeek, roundByMagnitude, formatRoundedWithCommas, safeBigInt } from "@/services/rewardsService";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "react-router-dom";
@@ -88,7 +88,10 @@ const InfoTooltip = ({ content }: { content: string }) => {
 
 export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) => {
   const loginButtonClass = "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
-  const sortedActivities = [...activities].sort((a, b) => getEstimatedApyPercent(b) - getEstimatedApyPercent(a));
+  const visibleActivities = activities.filter(
+    (activity) => safeBigInt(activity?.emissionRate || "0") > 0n
+  );
+  const sortedActivities = [...visibleActivities].sort((a, b) => getEstimatedApyPercent(b) - getEstimatedApyPercent(a));
 
   if (loading) {
     return (
@@ -108,7 +111,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
     );
   }
 
-  if (activities.length === 0) {
+  if (visibleActivities.length === 0) {
     return (
       <Card>
         <CardHeader className="px-3 md:px-6">

@@ -30,7 +30,7 @@ defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
 defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for more peers"
 
-defineFlag "apiIPAddress" "127.0.0.1" "The IP address that strato-api will bind to"
+defineFlag "apiIPAddress" "" "The address containers use to reach strato-api on the host (auto-detected if empty)"
 
 defineFlag "httpPort" (8081 :: Int) "The external HTTP port for nginx"
 
