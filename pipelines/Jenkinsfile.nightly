@@ -71,7 +71,7 @@ pipeline {
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
                 OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \\
                 OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
-                VAULT_URL=https://\$(</host):8093 \\
+                VAULT_URL=https://\$(</host):8093/strato/v2.3 \\
                 VAULT_PROXY_DEBUG=false \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
                 useCustomGenesis=false \\
