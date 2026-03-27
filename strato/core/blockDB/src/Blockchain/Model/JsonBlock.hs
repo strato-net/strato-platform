@@ -9,9 +9,7 @@ module Blockchain.Model.JsonBlock (
   RawTransaction'(..),
   Transaction'(..),
   Block'(..),
-  BlockData',
   AddressStateRef'(..),
-  tPrimeToT,
   bPrimeToB,
   rtPrimeToRt,
   rtToRtPrime,
@@ -376,10 +374,10 @@ blockDataRefToBlock bdr vs vd ps sigs txs = case vs of
 bPrimeToB :: Block' -> Block
 bPrimeToB (Block' x) = x
 
-newtype BlockData' = BlockData' BlockHeader deriving (Eq, Show)
+newtype BlockHeader' = BlockHeader' BlockHeader deriving (Eq, Show)
 
-instance ToJSON BlockData' where
-  toJSON (BlockData' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed mh non)) =
+instance ToJSON BlockHeader' where
+  toJSON (BlockHeader' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed mh non)) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= ph,
@@ -398,7 +396,7 @@ instance ToJSON BlockData' where
         "mixHash" .= mh
       ]
 
-  toJSON (BlockData' (BlockHeaderV2{..})) =
+  toJSON (BlockHeader' (BlockHeaderV2{..})) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= parentHash,
@@ -415,10 +413,11 @@ instance ToJSON BlockData' where
         "signatures" .= signatures
       ]
 
-instance FromJSON BlockData' where
+instance FromJSON BlockHeader' where
   parseJSON = withObject "BlockData'" $ \v ->
-    BlockData'
-      <$> ( BlockHeader
+    BlockHeader'
+    {-
+      <$> ( BlockHeaderV2
               <$> v .: "parentHash"
               <*> v .: "unclesHash"
               <*> v .: "coinbase"
@@ -434,6 +433,21 @@ instance FromJSON BlockData' where
               <*> v .: "extraData"
               <*> v .: "mixHash"
               <*> v .: "nonce"
+      -}        
+      <$> ( BlockHeaderV2
+              <$> v .: "parentHash"
+              <*> v .: "stateRoot"
+              <*> v .: "transactionsRoot"
+              <*> v .: "receiptsRoot"
+              <*> v .:? "logBloom" .!= B.replicate 64 0x30 -- this is what log blooms currently get set to
+              <*> v .: "number"
+              <*> v .: "timestamp"
+              <*> v .: "extraData"
+              <*> v .: "currentValidators"
+              <*> v .: "newValidators"
+              <*> v .: "removedValidators"
+              <*> v .: "proposalSignature"
+              <*> v .: "signatures"
           )
 
 instance FromJSON Block' where
@@ -443,11 +457,11 @@ instance FromJSON Block' where
     bUncles <- map bdPrimeToBd <$> (v .: "blockUncles")
     pure $ Block' (Block bData bTxs bUncles)
 
-bdToBdPrime :: BlockHeader -> BlockData'
-bdToBdPrime = BlockData'
+bdToBdPrime :: BlockHeader -> BlockHeader'
+bdToBdPrime = BlockHeader'
 
-bdPrimeToBd :: BlockData' -> BlockHeader
-bdPrimeToBd (BlockData' bd) = bd
+bdPrimeToBd :: BlockHeader' -> BlockHeader
+bdPrimeToBd (BlockHeader' bd) = bd
 
 newtype BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
