@@ -49,7 +49,6 @@ data Options
   | SyncStats {}
   | FRawMP {stateRoot :: String, filename :: String}
   | Hash {hash :: String}
-  | InsertTX {}
   | Migrate {tables :: String}
   | PushBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qAddr :: Address}
   | Raw {filename :: String}
@@ -158,9 +157,6 @@ dumpKafkaVMEventsOptions =
     [ startingBlock := 0 += typ "INT"
     ]
 
-insertTXOptions :: Annotate Ann
-insertTXOptions =
-  record InsertTX {} []
 {-
 checkpointOptions :: Annotate Ann
 checkpointOptions =
@@ -306,7 +302,6 @@ options =
       syncStatsOptions,
       fRawMPOptions,
       hashOptions,
-      insertTXOptions,
       rawMPOptions,
       rawOptions,
       redisOptions,
@@ -363,7 +358,6 @@ run DumpKafkaSequencerP2P {..} = dumpKafkaSequencerP2P (fromIntegral startingBlo
 run DumpKafkaUnSequencer {..} = dumpKafkaUnSequencer (fromIntegral startingBlock)
 run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
 run SyncStats = syncStats
-run InsertTX {} = error "strato-barometer: the insertTx tool has been deprecated."
 run Hash {..} = Hash.doit hash
 run Raw {..} = Raw.doit filename
 run Redis {..} = redis $ BC.pack key
