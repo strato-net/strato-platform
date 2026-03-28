@@ -90,7 +90,6 @@ packages:
 - VM/SolidVM/solid-vm-parser
 - VM/SolidVM/solid-vm-static-analysis
 - VM/SolidVM/source-tools
-#- VM/vrun
 
 
 extra-deps:
