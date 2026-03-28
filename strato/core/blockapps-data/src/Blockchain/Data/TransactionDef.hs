@@ -26,7 +26,7 @@ import Data.List
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Persist.TH
-import GHC.Generics
+import GHC.Generics hiding (to)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.ShortDescription
@@ -36,28 +36,28 @@ derivePersistField "Transaction"
 
 data Transaction
   = MessageTX
-      { transactionNonce :: Integer,
-        transactionGasLimit :: Integer,
-        transactionTo :: Address,
-        transactionFuncName :: Text,
-        transactionArgs :: [Text],
-        transactionNetwork :: Text,
-        transactionChainId :: Maybe Integer,
-        transactionR :: Integer,
-        transactionS :: Integer,
-        transactionV :: Word8
+      { nonce :: Integer,
+        gasLimit :: Integer,
+        to :: Address,
+        funcName :: Text,
+        args :: [Text],
+        network :: Text,
+        chainId :: Maybe Integer,
+        r :: Integer,
+        s :: Integer,
+        v :: Word8
       }
   | ContractCreationTX
-      { transactionNonce :: Integer,
-        transactionGasLimit :: Integer,
-        transactionContractName :: Text,
-        transactionArgs :: [Text],
-        transactionNetwork :: Text,
-        transactionCode :: Code,
-        transactionChainId :: Maybe Integer,
-        transactionR :: Integer,
-        transactionS :: Integer,
-        transactionV :: Word8
+      { nonce :: Integer,
+        gasLimit :: Integer,
+        contractName :: Text,
+        args :: [Text],
+        network :: Text,
+        code :: Code,
+        chainId :: Maybe Integer,
+        r :: Integer,
+        s :: Integer,
+        v :: Word8
       }
   deriving (Show, Read, Eq, Ord, Generic, Data, NFData)
 
@@ -77,22 +77,22 @@ instance Format Transaction where
         ++ tab'
           ( "\n"
               ++ "tNonce: "
-              ++ show transactionNonce
+              ++ show nonce
               ++ "\n"
               ++ "tGasLimit: "
-              ++ show transactionGasLimit
+              ++ show gasLimit
               ++ "\n"
               ++ "to: "
-              ++ format transactionTo
+              ++ format to
               ++ "\n"
               ++ "tFuncName: "
-              ++ ("\n" ++ format transactionFuncName)
+              ++ ("\n" ++ format funcName)
               ++ "\n"
               ++ "params: "
-              ++ format transactionArgs
+              ++ format args
               ++ "\n"
               ++ "network: "
-              ++ format transactionNetwork
+              ++ format network
               ++ "\n"
               ++ "hash: "
               ++ format (hash . rlpSerialize . rlpEncode $ t)
@@ -104,19 +104,19 @@ instance Format Transaction where
         ++ tab'
           ( "\n"
               ++ "tNonce: "
-              ++ show transactionNonce
+              ++ show nonce
               ++ "\n"
               ++ "tGasLimit: "
-              ++ show transactionGasLimit
+              ++ show gasLimit
               ++ "\n"
               ++ "ContractName: "
-              ++ show transactionContractName
+              ++ show contractName
               ++ "\n"
               ++ "tArgs: "
-              ++ show transactionArgs
+              ++ show args
               ++ "\n"
               ++ "tNetwork: "
-              ++ show transactionNetwork
+              ++ show network
               ++ "\n"
               ++ "hash: "
               ++ format (hash . rlpSerialize . rlpEncode $ t)
@@ -128,15 +128,15 @@ instance RLPSerializable Transaction where
     case partial of
           p@MessageTX {} ->
             p
-              { transactionV = fromInteger $ rlpDecode vVal,
-                transactionR = rlpDecode rVal,
-                transactionS = rlpDecode sVal
+              { v = fromInteger $ rlpDecode vVal,
+                r = rlpDecode rVal,
+                s = rlpDecode sVal
               }
           p@ContractCreationTX {} ->
             p
-              { transactionV = fromInteger $ rlpDecode vVal,
-                transactionR = rlpDecode rVal,
-                transactionS = rlpDecode sVal
+              { v = fromInteger $ rlpDecode vVal,
+                r = rlpDecode rVal,
+                s = rlpDecode sVal
               }
     where
       partial = partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7]
@@ -147,17 +147,17 @@ instance RLPSerializable Transaction where
       RLPArray items ->
         RLPArray $ items ++
         [
-          rlpEncode $ toInteger (transactionV t),
-          rlpEncode (transactionR t),
-          rlpEncode (transactionS t)
+          rlpEncode $ toInteger (v t),
+          rlpEncode (r t),
+          rlpEncode (s t)
         ]
       v -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show v
 
 instance ShortDescription Transaction where
   shortDescription MessageTX {..} = shorten 90 $
-    "calling " ++ format transactionTo ++ "/" ++ T.unpack transactionFuncName ++  "(" ++ intercalate "," (map format transactionArgs) ++ ")"
+    "calling " ++ format to ++ "/" ++ T.unpack funcName ++  "(" ++ intercalate "," (map format args) ++ ")"
   shortDescription ContractCreationTX {..} = shorten 40 $
-    "Create Contract " ++ T.unpack transactionContractName ++ "(" ++ intercalate "," (map format transactionArgs) ++ ")"
+    "Create Contract " ++ T.unpack contractName ++ "(" ++ intercalate "," (map format args) ++ ")"
 
 isMessageTX :: Transaction -> Bool
 isMessageTX MessageTX {} = True
@@ -165,32 +165,32 @@ isMessageTX _ = False
 
 --partialRLP(De|En)code are used for the signing algorithm
 partialRLPDecode :: RLPObject -> Transaction
-partialRLPDecode (RLPArray [RLPScalar 1, n, gl, contractName, args, network, code]) =
+partialRLPDecode (RLPArray [RLPScalar 1, n, gl, cName, ags, net, cd]) =
   --Note- Address 0 /= Address 000000....  Only Address 0 yields a ContractCreationTX
   ContractCreationTX
-    { transactionNonce = rlpDecode n,
-      transactionGasLimit = rlpDecode gl,
-      transactionContractName = rlpDecode contractName,
-      transactionArgs = rlpDecode args,
-      transactionNetwork = rlpDecode network,
-      transactionCode = rlpDecode code,
-      transactionChainId = Nothing,
-      transactionR = error "transactionR not initialized in partialRLPDecode",
-      transactionS = error "transactionS not initialized in partialRLPDecode",
-      transactionV = error "transactionV not initialized in partialRLPDecode"
+    { nonce = rlpDecode n,
+      gasLimit = rlpDecode gl,
+      contractName = rlpDecode cName,
+      args = rlpDecode ags,
+      network = rlpDecode net,
+      code = rlpDecode cd,
+      chainId = Nothing,
+      r = error "r not initialized in partialRLPDecode",
+      s = error "s not initialized in partialRLPDecode",
+      v = error "v not initialized in partialRLPDecode"
     }
-partialRLPDecode (RLPArray [RLPScalar 2, n, gl, toAddr, funcName, args, network]) =
+partialRLPDecode (RLPArray [RLPScalar 2, n, gl, toAddr, fn, ags, net]) =
   MessageTX
-    { transactionNonce = rlpDecode n,
-      transactionGasLimit = rlpDecode gl,
-      transactionTo = rlpDecode toAddr,
-      transactionFuncName = rlpDecode funcName,
-      transactionArgs = rlpDecode args,
-      transactionNetwork = rlpDecode network,
-      transactionChainId = Nothing,
-      transactionR = error "transactionR not initialized in partialRLPDecode",
-      transactionS = error "transactionS not initialized in partialRLPDecode",
-      transactionV = error "transactionV not initialized in partialRLPDecode"
+    { nonce = rlpDecode n,
+      gasLimit = rlpDecode gl,
+      to = rlpDecode toAddr,
+      funcName = rlpDecode fn,
+      args = rlpDecode ags,
+      network = rlpDecode net,
+      chainId = Nothing,
+      r = error "r not initialized in partialRLPDecode",
+      s = error "s not initialized in partialRLPDecode",
+      v = error "v not initialized in partialRLPDecode"
     }
 partialRLPDecode x = error ("rlp object has wrong format in call to partialRLPDecode: " ++ show x)
 
@@ -198,20 +198,20 @@ partialRLPEncode :: Transaction -> RLPObject
 partialRLPEncode MessageTX {..} =
   RLPArray $
     [ rlpEncode (2::Integer),
-      rlpEncode transactionNonce,
-      rlpEncode transactionGasLimit,
-      rlpEncode transactionTo,
-      rlpEncode transactionFuncName,
-      rlpEncode transactionArgs,
-      rlpEncode transactionNetwork
+      rlpEncode nonce,
+      rlpEncode gasLimit,
+      rlpEncode to,
+      rlpEncode funcName,
+      rlpEncode args,
+      rlpEncode network
     ]
 partialRLPEncode ContractCreationTX {..} =
   RLPArray $
     [ rlpEncode (1::Integer),
-      rlpEncode transactionNonce,
-      rlpEncode transactionGasLimit,
-      rlpEncode transactionContractName,
-      rlpEncode transactionArgs,
-      rlpEncode transactionNetwork,
-      rlpEncode transactionCode
+      rlpEncode nonce,
+      rlpEncode gasLimit,
+      rlpEncode contractName,
+      rlpEncode args,
+      rlpEncode network,
+      rlpEncode code
     ]

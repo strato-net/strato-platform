@@ -28,7 +28,7 @@ import Blockchain.DB.BlockSummaryDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.Transaction
+import Blockchain.Data.Transaction (getSigVals, whoReallySignedThisTransactionEcrecover)
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Event hiding (selfAddress)
 import Blockchain.JsonRpcCommand

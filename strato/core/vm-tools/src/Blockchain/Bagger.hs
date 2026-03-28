@@ -25,7 +25,6 @@ import qualified Blockchain.Data.AddressStateDB as DD
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TXOrigin as TO
-import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResult
 import Blockchain.Database.MerklePatricia (StateRoot (..))
@@ -173,7 +172,7 @@ getCachedRunResults bd = do
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, Keccak256) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
   NonceTooLow s q expected OutputTx {otHash = hsh, otBaseTx = bt} ->
-    (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hsh)
+    (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (TD.nonce bt) ++ ")", hsh)
   BalanceTooLow s q needed actual OutputTx {otHash = hsh} ->
     (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hsh)
   GasLimitTooLow s q _ OutputTx {otHash = hsh} ->
@@ -394,7 +393,7 @@ logReady prefix address OutputTx {otHash = h, otBaseTx = t} = do
   $logDebugS "Bagger.logReady+status " . T.pack $ prefix
   $logDebugS "Bagger.logReady+address" . T.pack $ format address
   $logDebugS "Bagger.logReady+hash   " . T.pack $ format h
-  $logDebugS "Bagger.logReady+nonce  " . T.pack $ show (TD.transactionNonce t)
+  $logDebugS "Bagger.logReady+nonce  " . T.pack $ show (TD.nonce t)
   $logDebugS "Bagger.logReady++++++++" "+++++++++++++++++++"
 
 logDiscard :: (MonadLogger m) => String -> Address -> Integer -> OutputTx -> m ()
@@ -404,7 +403,7 @@ logDiscard prefix address expectation OutputTx {otHash = h, otBaseTx = t} = do
   $logDebugS "Bagger.logDiscard=expect " . T.pack $ show expectation
   $logDebugS "Bagger.logDiscard=address" . T.pack $ format address
   $logDebugS "Bagger.logDiscard=hash   " . T.pack $ format h
-  $logDebugS "Bagger.logDiscard=nonce  " . T.pack $ show (TD.transactionNonce t)
+  $logDebugS "Bagger.logDiscard=nonce  " . T.pack $ show (TD.nonce t)
   $logDebugS "Bagger.logDiscard========" "==================="
 
 logDiscard' :: (MonadLogger m) => String -> Address -> OutputTx -> m ()
@@ -413,7 +412,7 @@ logDiscard' prefix address OutputTx {otHash = h, otBaseTx = t} = do
   $logDebugS "Bagger.logDiscard'-status " . T.pack $ prefix
   $logDebugS "Bagger.logDiscard'-address" . T.pack $ format address
   $logDebugS "Bagger.logDiscard'-hash   " . T.pack $ format h
-  $logDebugS "Bagger.logDiscard'-nonce  " . T.pack $ show (TD.transactionNonce t)
+  $logDebugS "Bagger.logDiscard'-nonce  " . T.pack $ show (TD.nonce t)
   $logDebugS "Bagger.logDiscard'--------" "-------------------"
 
 addToQueued :: MonadBagger m => BaggerStage -> OutputTx -> m ()
@@ -543,7 +542,7 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
   state <- lift getBaggerState
   let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
-      txn = TD.transactionNonce bt
+      txn = TD.nonce bt
       txFee = B.calculateIntrinsicTxFee state t
       txSize = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt
   when (intrinsicGas >= Conf.gasLimit (networkConfig ethConf))

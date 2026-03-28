@@ -280,26 +280,28 @@ instance FromJSON Transaction' where
 
 {-
   = MessageTX
-      { transactionNonce :: Integer,
-        transactionGasLimit :: Integer,
-        transactionTo :: Address,
-        transactionFuncName :: Text,
-        transactionArgs :: [Text],
-        transactionNetwork :: Text,
-        transactionR :: Integer,
-        transactionS :: Integer,
-        transactionV :: Word8
+      { nonce :: Integer,
+        gasLimit :: Integer,
+        to :: Address,
+        funcName :: Text,
+        args :: [Text],
+        network :: Text,
+        chainId :: Maybe Integer,
+        r :: Integer,
+        s :: Integer,
+        v :: Word8
       }
   | ContractCreationTX
-      { transactionNonce :: Integer,
-        transactionGasLimit :: Integer,
-        transactionContractName :: Text,
-        transactionArgs :: [Text],
-        transactionNetwork :: Text,
-        transactionCode :: Code,
-        transactionR :: Integer,
-        transactionS :: Integer,
-        transactionV :: Word8
+      { nonce :: Integer,
+        gasLimit :: Integer,
+        contractName :: Text,
+        args :: [Text],
+        network :: Text,
+        code :: Code,
+        chainId :: Maybe Integer,
+        r :: Integer,
+        s :: Integer,
+        v :: Word8
       }
 -}
 

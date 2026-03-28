@@ -49,7 +49,8 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
-import Blockchain.Data.Transaction (Transaction(..), rawTX2TX, transactionHash, transactionTo, partialTransactionHash, txAndTime2RawTX)
+import Blockchain.Data.Transaction (Transaction, rawTX2TX, transactionHash, partialTransactionHash, txAndTime2RawTX)
+import qualified Blockchain.Data.TransactionDef as TX
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.SyncState (BestBlock (..), WorldBestBlock(..))
 import Blockchain.Sequencer.Event (IngestEvent)
@@ -679,7 +680,7 @@ callSignature unsigned = do
   let msgHash = keccak256ToByteString $ partialTransactionHash unsigned
   sig <- sign msgHash
   let (r, s, v) = getSigVals sig
-  return $ unsigned{transactionV = fromIntegral v, transactionR = fromIntegral r, transactionS = fromIntegral s}
+  return $ unsigned{TX.v = fromIntegral v, TX.r = fromIntegral r, TX.s = fromIntegral s}
 
 ------------------------------------------------------------------
 
@@ -1005,30 +1006,30 @@ prepareUnsignedTx :: Integer -> TransactionHeader -> Transaction
 prepareUnsignedTx gasLimit TransactionHeader {..} =
   case transactionheaderToAddr of
     Nothing ->
-      ContractCreationTX
-      { transactionNonce = fromIntegral $ fromMaybe 0 (txparamsNonce transactionheaderTxParams),
-        transactionGasLimit = fromIntegral $ fromMaybe (Gas gasLimit) (txparamsGasLimit transactionheaderTxParams),
-        transactionContractName = fromMaybe (error "prepareUnsignedTx: contractName missing in ContractCreationTX") transactionheaderContractName,
-        transactionArgs = transactionheaderArgs,
-        transactionNetwork = transactionheaderNetwork,
-        transactionCode = fromMaybe (error "prepareUnsignedTx: code missing in ContractCreationTX") transactionheaderCode,
-        transactionChainId = Just cid,
-        transactionR = 0,
-        transactionS = 0,
-        transactionV = 0
+      TX.ContractCreationTX
+      { TX.nonce = fromIntegral $ fromMaybe 0 (txparamsNonce transactionheaderTxParams),
+        TX.gasLimit = fromIntegral $ fromMaybe (Gas gasLimit) (txparamsGasLimit transactionheaderTxParams),
+        TX.contractName = fromMaybe (error "prepareUnsignedTx: contractName missing in ContractCreationTX") transactionheaderContractName,
+        TX.args = transactionheaderArgs,
+        TX.network = transactionheaderNetwork,
+        TX.code = fromMaybe (error "prepareUnsignedTx: code missing in ContractCreationTX") transactionheaderCode,
+        TX.chainId = Just cid,
+        TX.r = 0,
+        TX.s = 0,
+        TX.v = 0
       }
     Just _ ->
-      MessageTX
-      { transactionNonce = fromIntegral $ fromMaybe 0 (txparamsNonce transactionheaderTxParams),
-        transactionGasLimit = fromIntegral $ fromMaybe (Gas gasLimit) (txparamsGasLimit transactionheaderTxParams),
-        transactionTo = fromMaybe (error "prepareUnsignedTx: transactionTo missing in MessageTX") transactionheaderToAddr,
-        transactionFuncName = fromMaybe (error "prepareUnsignedTx: funcName missing in MessageTX") transactionheaderFuncName,
-        transactionArgs = transactionheaderArgs,
-        transactionNetwork = transactionheaderNetwork,
-        transactionChainId = Just cid,
-        transactionR = 0,
-        transactionS = 0,
-        transactionV = 0
+      TX.MessageTX
+      { TX.nonce = fromIntegral $ fromMaybe 0 (txparamsNonce transactionheaderTxParams),
+        TX.gasLimit = fromIntegral $ fromMaybe (Gas gasLimit) (txparamsGasLimit transactionheaderTxParams),
+        TX.to = fromMaybe (error "prepareUnsignedTx: to missing in MessageTX") transactionheaderToAddr,
+        TX.funcName = fromMaybe (error "prepareUnsignedTx: funcName missing in MessageTX") transactionheaderFuncName,
+        TX.args = transactionheaderArgs,
+        TX.network = transactionheaderNetwork,
+        TX.chainId = Just cid,
+        TX.r = 0,
+        TX.s = 0,
+        TX.v = 0
       }
   where
     cid = EthConf.chainId $ EthConf.networkConfig ethConf
@@ -1053,14 +1054,14 @@ preparePostUnsignedRawTx time tx contractName' args =
     RawTransaction
       time
       (Address 0)
-      (fromIntegral nonce')
-      (fromIntegral gasLimit)
-      (Just toAddr)
-      (Just $ transactionFuncName tx)
+      (fromIntegral $ TX.nonce tx)
+      (fromIntegral $ TX.gasLimit tx)
+      (Just $ TX.to tx)
+      (Just $ TX.funcName tx)
       (Just contractName')
       args
-      network
-      (Just $ transactionCode tx)
+      (TX.network tx)
+      (Just $ TX.code tx)
       (Just $ EthConf.chainId $ EthConf.networkConfig ethConf)
       0
       0
@@ -1068,11 +1069,6 @@ preparePostUnsignedRawTx time tx contractName' args =
       0
       zeroHash
       API
-  where
-    gasLimit = transactionGasLimit tx
-    network = transactionNetwork tx
-    nonce' = transactionNonce tx
-    toAddr = transactionTo tx
 
 signAndPrepare ::
   (MonadIO m, HasVault m, HasBlocEnv m) =>
@@ -1080,9 +1076,9 @@ signAndPrepare ::
   TransactionHeader ->
   m RawTransaction'
 signAndPrepare from th = do
-  gasLimit <- fmap gasLimit getBlocEnv
+  BlocEnv {gasLimit = envGasLimit} <- getBlocEnv
   time <- liftIO getCurrentTime
-  fmap (preparePostTx time from) . callSignature $ prepareUnsignedTx gasLimit th
+  fmap (preparePostTx time from) . callSignature $ prepareUnsignedTx envGasLimit th
 
 prepareUnsignedRawTx ::
   (MonadIO m, HasBlocEnv m) =>
@@ -1091,9 +1087,9 @@ prepareUnsignedRawTx ::
   TransactionHeader ->
   m BlocTransactionUnsignedResult
 prepareUnsignedRawTx contractName' args th = do
-  gasLimit <- fmap gasLimit getBlocEnv
+  BlocEnv {gasLimit = envGasLimit} <- getBlocEnv
   time <- liftIO getCurrentTime
-  let unsigned = prepareUnsignedTx gasLimit th
+  let unsigned = prepareUnsignedTx envGasLimit th
       msgHash = unsafeCreateKeccak256FromByteString $ keccak256ToByteString $ partialTransactionHash unsigned
       unsignedRawTx = preparePostUnsignedRawTx time unsigned contractName' args
   pure $ BlocTransactionUnsignedResult msgHash (Just unsignedRawTx)

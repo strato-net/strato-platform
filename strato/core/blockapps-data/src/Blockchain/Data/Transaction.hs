@@ -60,28 +60,28 @@ instance TransactionLike Transaction where
   txPartialHash = hash . rlpSerialize . partialRLPEncode
   txChainHash = error "Transaction.txChainHash: Not a private transaction"
   txSigner = whoSignedThisTransaction
-  txNonce = transactionNonce
-  txNetwork = transactionNetwork
+  txNonce = nonce
+  txNetwork = network
   txFuncName t = case t of
-    MessageTX{..} -> Just transactionFuncName
+    MessageTX{..} -> Just funcName
     _ -> Nothing
   txContractName t = case t of
-    ContractCreationTX{..} -> Just transactionContractName
+    ContractCreationTX{..} -> Just contractName
     _ -> Nothing
-  txArgs = transactionArgs
-  txSignature t = (transactionR t, transactionS t, transactionV t)
-  txGasLimit = transactionGasLimit
+  txArgs = args
+  txSignature t = (r t, s t, v t)
+  txGasLimit = gasLimit
 
   txType MessageTX {} = Message
   txType ContractCreationTX {} = ContractCreation
 
-  txDestination MessageTX {..} = Just transactionTo
+  txDestination MessageTX {..} = Just to
   txDestination ContractCreationTX {} = Nothing
 
   txCode MessageTX {} = Nothing
-  txCode ContractCreationTX {..} = Just transactionCode
+  txCode ContractCreationTX {..} = Just code
 
-  txChainId = transactionChainId
+  txChainId = chainId
 
   morphTx t = case type' of
     Message -> MessageTX n gl dest (fromJust $ txFuncName t) args network cid r s v
@@ -117,9 +117,9 @@ txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransacti
 txAndTime2RawTX origin tx blkNum time =
   case tx of
     MessageTX{..} ->
-      RawTransaction time signer transactionNonce transactionGasLimit (Just transactionTo) (Just transactionFuncName) Nothing transactionArgs transactionNetwork Nothing transactionChainId transactionR transactionS transactionV (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin
     ContractCreationTX{..} ->
-      RawTransaction time signer transactionNonce transactionGasLimit Nothing Nothing (Just transactionContractName) transactionArgs transactionNetwork (Just transactionCode) transactionChainId transactionR transactionS transactionV (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -174,7 +174,7 @@ whoSignedThisTransaction :: Transaction -> Maybe Address
 whoSignedThisTransaction tx = fromPublicKey <$> EC.recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
-      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR tx) (intToBSS $ transactionS tx) ((transactionV tx) - 0x1b))
+      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r tx) (intToBSS $ s tx) ((v tx) - 0x1b))
       mesg = keccak256ToByteString $ partialTransactionHash tx
 
 whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer -> Integer -> Maybe Address

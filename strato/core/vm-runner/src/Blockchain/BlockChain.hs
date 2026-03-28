@@ -43,6 +43,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
+import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
@@ -346,7 +347,7 @@ addTransactions blockData txs proposer =
       let remainingBlockGas =
             case result of
               Left _ -> blockGas
-              Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
+              Right execResult -> blockGas - (TD.gasLimit bt - calculateReturned bt execResult)
 
       go remainingBlockGas rest (trrs `DL.snoc` trr)
 
@@ -382,7 +383,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
                   putMemRawStorageTxMap M.empty
                   return $ Bagger.TxMiningResult (Just $ TFInsufficientFunds limit actual tx) (DL.toList ran) unran remGas
                 _ -> do
-                  let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
+                  let nextRemGas = remGas - (TD.gasLimit bt - calculateReturned bt execResult)
                   flushMemAddressStateTxToBlockDB
                   flushMemStorageTxDBToBlockDB
                   mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs mSelfAddress
@@ -403,15 +404,15 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   let maxGas = fromIntegral (maxBound :: Int)
   acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
 
-  when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
-  unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
+  when (TD.gasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (TD.gasLimit bt) remainingBlockGas t
+  unless nonceValid $ throwE $ TFNonceMismatch (TD.nonce bt) acctNonce t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
   when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
     . throwE
     $ TFTXSizeLimitExceeded txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
 
   let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
-      adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
+      adjustedTxGasLimit = bool (TD.gasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
   feeResult <- payFees b availableGas tAddr t proposer
@@ -488,24 +489,24 @@ runCodeForTransaction b availableGas tAddr t proposer =
               proposer
               availableGas
               newAddress
-              (transactionCode ut)
+              (TD.code ut)
               (txHash ut)
               (fromJust $ txContractName ut)
               (txArgs ut)
         else do
-          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
+          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (TD.to ut)
 
           lift $
             SolidVM.call
                   b -- blockData
-                  (transactionTo ut) -- codeAddress
+                  (TD.to ut) -- codeAddress
                   tAddr -- sender
                   proposer -- proposer
                   (fromIntegral availableGas) -- availableGas
                   tAddr -- origin
                   (txHash ut) -- txHash
-                  (transactionFuncName ut)
-                  (transactionArgs ut)
+                  (TD.funcName ut)
+                  (TD.args ut)
                   Nothing
 
 payFees ::
@@ -553,7 +554,7 @@ zeroBytesLength t =
         then length $ filter (== 0) $ B.unpack $ transactionData bt
         else length $ filter (== 0) $ B.unpack $ codeBytes' bt --is ContractCreationTX
   where
-    codeBytes' bt = case transactionCode bt of
+    codeBytes' bt = case TD.code bt of
       Code cb -> cb
       PtrToCode _ -> "" -- TODO: lookup code?
 
@@ -609,7 +610,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
             Just ex ->
               let fmt = either show show ex
                in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
-      gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
+      gasUsed = fromInteger $ TD.gasLimit t - gasRemaining
       etherUsed = gasUsed
 
       beforeAddresses = S.fromList [x | (x, ASModification _) <- M.toList beforeMap]
@@ -663,7 +664,7 @@ printTransactionMessage ::
   NominalDiffTime ->
   m ()
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
-  let tNonce = transactionNonce $ otBaseTx ot
+  let tNonce = TD.nonce $ otBaseTx ot
   multilineLog "printTx/err" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
@@ -674,7 +675,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left e
       ]
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right results) deltaT = do
   let t = otBaseTx ot
-      tNonce = transactionNonce t
+      tNonce = TD.nonce t
       extra =
         if isMessageTX t
           then ""
