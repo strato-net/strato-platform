@@ -42,6 +42,7 @@ data Transaction
         transactionFuncName :: Text,
         transactionArgs :: [Text],
         transactionNetwork :: Text,
+        transactionChainId :: Maybe Integer,
         transactionR :: Integer,
         transactionS :: Integer,
         transactionV :: Word8
@@ -53,6 +54,7 @@ data Transaction
         transactionArgs :: [Text],
         transactionNetwork :: Text,
         transactionCode :: Code,
+        transactionChainId :: Maybe Integer,
         transactionR :: Integer,
         transactionS :: Integer,
         transactionV :: Word8
@@ -172,6 +174,7 @@ partialRLPDecode (RLPArray [RLPScalar 1, n, gl, contractName, args, network, cod
       transactionArgs = rlpDecode args,
       transactionNetwork = rlpDecode network,
       transactionCode = rlpDecode code,
+      transactionChainId = Nothing,
       transactionR = error "transactionR not initialized in partialRLPDecode",
       transactionS = error "transactionS not initialized in partialRLPDecode",
       transactionV = error "transactionV not initialized in partialRLPDecode"
@@ -184,6 +187,7 @@ partialRLPDecode (RLPArray [RLPScalar 2, n, gl, toAddr, funcName, args, network]
       transactionFuncName = rlpDecode funcName,
       transactionArgs = rlpDecode args,
       transactionNetwork = rlpDecode network,
+      transactionChainId = Nothing,
       transactionR = error "transactionR not initialized in partialRLPDecode",
       transactionS = error "transactionS not initialized in partialRLPDecode",
       transactionV = error "transactionV not initialized in partialRLPDecode"

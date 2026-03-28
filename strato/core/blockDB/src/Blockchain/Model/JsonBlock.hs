@@ -73,6 +73,7 @@ instance ToJSON RawTransaction' where
         "args".= rawTransactionArgs,
         "network".= rawTransactionNetwork,
         "code".= rawTransactionCode,
+        "chainId" .= rawTransactionChainId,
         "r" .= showHex rawTransactionR "",
         "s" .= showHex rawTransactionS "",
         "v" .= showHex rawTransactionV "",
@@ -114,6 +115,8 @@ instance FromJSON RawTransaction' where
     time <- t .:? "timestamp" .!= defaultTime
     o <- t .:? "origin" .!= API
 
+    cid <- t .:? "chainId"
+
     return
       ( RawTransaction'
           ( RawTransaction
@@ -127,6 +130,7 @@ instance FromJSON RawTransaction' where
               args
               network
               code
+              cid
               (tr :: Integer)
               (ts :: Integer)
               (tv :: Word8)
@@ -177,6 +181,7 @@ instance FromJSON UnsignedRawTransaction' where
     let defaultTime = UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
     time <- t .:? "timestamp" .!= defaultTime
     o <- t .:? "origin" .!= API
+    cid <- t .:? "chainId"
 
     return
       ( UnsignedRawTransaction'
@@ -191,6 +196,7 @@ instance FromJSON UnsignedRawTransaction' where
               args
               network
               code
+              cid
               tr
               ts
               tv
@@ -213,7 +219,7 @@ rtPrimeToRt (RawTransaction' x) = x
 newtype Transaction' = Transaction' Transaction deriving (Eq, Show)
 
 instance ToJSON Transaction' where
-  toJSON (Transaction' tx@(MessageTX nonce gasLimit (Address toAddr) funcName args network tr ts tv)) =
+  toJSON (Transaction' tx@(MessageTX nonce gasLimit (Address toAddr) funcName args network cid tr ts tv)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -223,13 +229,14 @@ instance ToJSON Transaction' where
         "network" .= network,
         "args" .= args,
         "funcName" .= funcName,
+        "chainId" .= cid,
         "r" .= showHex tr "",
         "s" .= showHex ts "",
         "v" .= showHex tv "",
         "hash" .= transactionHash tx,
         "transactionType" .= show (transactionSemantics tx)
       ]
-  toJSON (Transaction' tx@(ContractCreationTX nonce gasLimit contractName args network code tr ts tv)) =
+  toJSON (Transaction' tx@(ContractCreationTX nonce gasLimit contractName args network code cid tr ts tv)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -239,6 +246,7 @@ instance ToJSON Transaction' where
         "network" .= network,
         "args" .= args,
         "contractName" .= contractName,
+        "chainId" .= cid,
         "r" .= showHex tr "",
         "s" .= showHex ts "",
         "v" .= showHex tv "",
@@ -255,6 +263,7 @@ instance FromJSON Transaction' where
         network <- t .:? "network" .!= ""
         funcName <- t .:? "funcName" .!= ""
         contractName <- t .:? "contractName" .!= ""
+        cid <- t .:? "chainId"
         tr <- parseHexStr (t .: "r")
         ts <- parseHexStr (t .: "s")
         tv <- parseHexStr (t .:? "v" .!= "0")
@@ -263,9 +272,9 @@ instance FromJSON Transaction' where
           Nothing -> do
             code <- t .: "code"
             return . Transaction' $ ContractCreationTX
-              nonce gasLimit contractName args network code tr ts tv
+              nonce gasLimit contractName args network code cid tr ts tv
           (Just toAddr) -> do
-            return . Transaction' $ MessageTX nonce gasLimit toAddr funcName args network tr ts tv
+            return . Transaction' $ MessageTX nonce gasLimit toAddr funcName args network cid tr ts tv
   parseJSON _ = error "bad param when calling parseJSON for Transaction'"
 
 

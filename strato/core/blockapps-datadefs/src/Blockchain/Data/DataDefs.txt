@@ -81,6 +81,7 @@ RawTransaction
     args [Text]
     network Text
     code Code Maybe
+    chainId Integer Maybe sqltype=numeric(1000,0)
     r Integer
     s Integer
     v Word8

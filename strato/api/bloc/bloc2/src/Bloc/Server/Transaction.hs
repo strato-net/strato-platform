@@ -47,6 +47,8 @@ import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
+import Blockchain.EthConf (ethConf)
+import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.Data.Transaction (Transaction(..), rawTX2TX, transactionHash, transactionTo, partialTransactionHash, txAndTime2RawTX)
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.SyncState (BestBlock (..), WorldBestBlock(..))
@@ -1010,6 +1012,7 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
         transactionArgs = transactionheaderArgs,
         transactionNetwork = transactionheaderNetwork,
         transactionCode = fromMaybe (error "prepareUnsignedTx: code missing in ContractCreationTX") transactionheaderCode,
+        transactionChainId = Just cid,
         transactionR = 0,
         transactionS = 0,
         transactionV = 0
@@ -1022,10 +1025,13 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
         transactionFuncName = fromMaybe (error "prepareUnsignedTx: funcName missing in MessageTX") transactionheaderFuncName,
         transactionArgs = transactionheaderArgs,
         transactionNetwork = transactionheaderNetwork,
+        transactionChainId = Just cid,
         transactionR = 0,
         transactionS = 0,
         transactionV = 0
       }
+  where
+    cid = EthConf.chainId $ EthConf.networkConfig ethConf
 
 preparePostTx ::
   UTCTime ->
@@ -1055,6 +1061,7 @@ preparePostUnsignedRawTx time tx contractName' args =
       args
       network
       (Just $ transactionCode tx)
+      (Just $ EthConf.chainId $ EthConf.networkConfig ethConf)
       0
       0
       0

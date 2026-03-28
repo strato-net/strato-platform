@@ -12,6 +12,7 @@ import EthTypes (TransactionReceipt(..))
 import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runKafkaMConfigured, ethConf)
+import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, network)
 import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
 import Blockchain.Data.BlockHeader (BlockHeader (..))
@@ -51,14 +52,6 @@ import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
 
 type Server = IO
-
--- EIP-155 chain ID: keccak256(networkName), first 6 bytes (48 bits).
--- Fits in JS Number.MAX_SAFE_INTEGER with room for v = chainId * 2 + 35.
-chainId :: Integer
-chainId =
-  let name = network $ networkConfig ethConf
-      digest = keccak256ToByteString $ hash $ BC.pack name
-  in foldl (\acc b -> acc * 256 + fromIntegral b) 0 (B.unpack $ B.take 6 digest)
 
 protocolVersion :: Integer
 protocolVersion = fromIntegral ethVersion
@@ -164,7 +157,7 @@ net_version = flip (toMethod "net_version") () $ do
 
 eth_chainId :: Method Server
 eth_chainId = flip (toMethod "eth_chainId") () $ do
-  liftIO $ return $ "0x" ++ showHex chainId ""
+  liftIO $ return $ "0x" ++ showHex (EthConf.chainId $ networkConfig ethConf) ""
 
 web3_sha3 :: Method Server
 web3_sha3 = toMethod "web3_sha3" f (Required "value" :+: ())
@@ -441,6 +434,7 @@ eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+
               ["f1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14", "1"]
               (T.pack $ network $ networkConfig ethConf)
               Nothing -- code
+              (Just $ EthConf.chainId $ networkConfig ethConf)
               1       -- r
               1       -- s
               0x1b    -- v

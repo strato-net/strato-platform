@@ -37,6 +37,7 @@ oneTX size =
       transactionContractName = "",
       transactionArgs = [],
       transactionNetwork = "",
+      transactionChainId = Nothing,
       transactionR = 1 `shiftL` 200,
       transactionS = 1 `shiftL` 133,
       transactionV = 27
