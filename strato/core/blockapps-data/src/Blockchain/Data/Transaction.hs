@@ -24,6 +24,7 @@ module Blockchain.Data.Transaction
     partialTransactionHash,
     whoSignedThisTransactionEcrecover,
     whoReallySignedThisTransactionEcrecover,
+    toEthV,
     getSigVals,
     codePtrName,
     codePtrHash
@@ -48,6 +49,7 @@ import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Reader
 import qualified Crypto.Secp256k1 as SEC
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as BSS
 import Data.Maybe
 import Data.Time.Clock
@@ -61,25 +63,34 @@ instance TransactionLike Transaction where
   txChainHash = error "Transaction.txChainHash: Not a private transaction"
   txSigner = whoSignedThisTransaction
   txNonce = nonce
-  txNetwork = network
+  txNetwork t = case t of
+    EthereumTX{} -> ""
+    _            -> network t
   txFuncName t = case t of
     MessageTX{..} -> Just funcName
     _ -> Nothing
   txContractName t = case t of
     ContractCreationTX{..} -> Just contractName
     _ -> Nothing
-  txArgs = args
+  txArgs t = case t of
+    EthereumTX{} -> []
+    _            -> args t
+  txSignature EthereumTX{..} = (r, s, v)
   txSignature t = (r t, s t, v t)
   txGasLimit = gasLimit
 
   txType MessageTX {} = Message
   txType ContractCreationTX {} = ContractCreation
+  txType EthereumTX {ethTo = Nothing} = ContractCreation
+  txType EthereumTX {} = Message
 
   txDestination MessageTX {..} = Just to
   txDestination ContractCreationTX {} = Nothing
+  txDestination EthereumTX {..} = ethTo
 
   txCode MessageTX {} = Nothing
   txCode ContractCreationTX {..} = Just code
+  txCode EthereumTX {} = Nothing
 
   txChainId = chainId
 
@@ -107,19 +118,23 @@ codePtrName (SolidVMCode n _) = Just n
 codePtrName _ = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just funcName) Nothing args network Nothing cid r s v _ _ _) =
-  MessageTX nonce' gl to' funcName args network cid r s v
-rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just contractName) args network (Just code) cid r s v _ _ _) =
-  ContractCreationTX nonce' gl contractName args network code cid r s v
+rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just fn) Nothing ags net Nothing cid r' s' v' _ _ _ _ _ _) =
+  MessageTX nonce' gl to' fn ags net cid r' s' v'
+rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just cn) ags net (Just cd) cid r' s' v' _ _ _ _ _ _) =
+  ContractCreationTX nonce' gl cn ags net cd cid r' s' v'
+rawTX2TX (RawTransaction _ _ nonce' gl mTo Nothing Nothing [] _ Nothing cid r' s' v' _ _ _ mgp mval mdata) =
+  EthereumTX nonce' (fromMaybe 0 mgp) gl mTo (fromMaybe 0 mval) (fromMaybe B.empty mdata) cid r' s' v'
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
     MessageTX{..} ->
-      RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing
     ContractCreationTX{..} ->
-      RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing
+    EthereumTX{..} ->
+      RawTransaction time signer nonce gasLimit ethTo Nothing Nothing [] "" Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin (Just gasPrice) (Just value) (Just txData)
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -171,6 +186,15 @@ getSigVals (EC.Signature (SEC.CompactRecSig r s v)) =
    in (convert r, convert s, v + 0x1b)
 
 whoSignedThisTransaction :: Transaction -> Maybe Address
+whoSignedThisTransaction tx@EthereumTX{..} = fromPublicKey <$> EC.recoverPub sig mesg
+    where
+      intToBSS = BSS.toShort . word256ToBytes . fromInteger
+      sig = EC.Signature (SEC.CompactRecSig (intToBSS r) (intToBSS s) v)
+      mesg = keccak256ToByteString $ hash $ rlpSerialize $ case chainId of
+        Nothing  -> partialRLPEncode tx
+        Just cid -> case partialRLPEncode tx of
+          RLPArray items -> RLPArray $ items ++ [rlpEncode cid, rlpEncode (0::Integer), rlpEncode (0::Integer)]
+          x -> x
 whoSignedThisTransaction tx = fromPublicKey <$> EC.recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
@@ -193,6 +217,7 @@ whoReallySignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recover
 
 isContractCreationTX :: Transaction -> Bool
 isContractCreationTX ContractCreationTX {} = True
+isContractCreationTX EthereumTX {ethTo = Nothing} = True
 isContractCreationTX _ = False
 
 transactionHash :: Transaction -> Keccak256

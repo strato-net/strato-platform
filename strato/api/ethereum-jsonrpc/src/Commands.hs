@@ -13,16 +13,18 @@ import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runKafkaMConfigured, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
-import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, network)
+import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID)
 import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
 import Blockchain.Data.BlockHeader (BlockHeader (..))
-import Blockchain.Data.DataDefs (AddressStateRef (..), RawTransaction(..))
+import Blockchain.Data.DataDefs (AddressStateRef (..))
+import Blockchain.Data.RLP (rlpDecode, rlpDeserialize)
+import Blockchain.Data.Transaction (Transaction(..), transactionHash, txAndTime2RawTX)
 import Blockchain.Data.TXOrigin (TXOrigin(API))
 import Blockchain.Model.JsonBlock (AddressStateRef' (..), Block', RawTransaction'(..), Transaction'(..), bPrimeToB)
 import Blockchain.Sequencer.Event (JsonRpcCommand(..), VmTask(..))
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
-import Blockchain.Strato.Model.Address (Address(..))
-import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, unsafeCreateKeccak256FromWord256)
+import Blockchain.Strato.Model.Address ()
+import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString)
 import Text.Format (format)
 import Control.Monad.IO.Class
 import Control.Monad.Composable.Kafka (fetchItems, execKafka)
@@ -31,18 +33,18 @@ import Blockchain.Sequencer.HexData (HexData(..))
 import qualified Blockchain.Sequencer.TxCallObject as TxCall
 import Blockchain.Sequencer.TxCallObject (TxCallObject)
 import qualified Handlers.AccountInfo as Accounts
+import qualified Handlers.Transaction as Tx
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Blocks
-import qualified Handlers.Transaction as Tx
 import qualified Handlers.TransactionResult as TxResults
 import Network.Kafka (getLastOffset, KafkaTime(..))
 import Network.Kafka.Protocol (Offset(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.Map as M
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (UTCTime(..))
+import qualified Data.Map as M
 import qualified Data.Text as T
 import Network.JsonRpc.Server
 import Numeric (showHex)
@@ -417,34 +419,17 @@ eth_sendRawTransaction :: Method Server
 eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+: ())
   where
     f :: HexData -> RpcResult Server Keccak256
-    f (HexData rawTx) = do
-      liftIO $ putStrLn $ "eth_sendRawTransaction received " ++ show (B.length rawTx) ++ " bytes"
-      let toAddr = case strToAddress "0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010" of
-            Right a -> a
-            Left e -> error $ "bad hardcoded address: " ++ e
-          tx = RawTransaction'
-            (RawTransaction
-              (UTCTime (fromGregorian 2000 1 1) 0)
-              (Address 0)
-              0       -- nonce
-              21000   -- gasLimit
-              (Just toAddr)
-              (Just "transfer")
-              Nothing -- contractName
-              ["f1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14", "1"]
-              (T.pack $ network $ networkConfig ethConf)
-              Nothing -- code
-              (Just $ EthConf.chainId $ networkConfig ethConf)
-              1       -- r
-              1       -- s
-              0x1b    -- v
-              (-1)    -- blockNumber
-              (unsafeCreateKeccak256FromWord256 1)
-              API)
+    f (HexData rawTxBytes) = do
+      liftIO $ putStrLn $ "eth_sendRawTransaction received " ++ show (B.length rawTxBytes) ++ " bytes"
+      let ethTx = rlpDecode (rlpDeserialize rawTxBytes) :: Transaction
+          rawTx = txAndTime2RawTX API ethTx (-1) (UTCTime (fromGregorian 2000 1 1) 0)
+          tx = RawTransaction' rawTx
+          h = transactionHash ethTx
+      liftIO $ putStrLn $ "eth_sendRawTransaction decoded tx hash: " ++ format h
       result <- liftIO $ runLocal $ Tx.postTxClient tx
       case result of
-        Right h -> do
-          liftIO $ putStrLn $ "eth_sendRawTransaction submitted tx hash: " ++ format h
+        Right h' -> do
+          liftIO $ putStrLn $ "eth_sendRawTransaction strato hash: " ++ format h' ++ " returning eth hash: " ++ format h
           return h
         Left err -> throwError $ rpcError (-32603) (formatClientError err)
 

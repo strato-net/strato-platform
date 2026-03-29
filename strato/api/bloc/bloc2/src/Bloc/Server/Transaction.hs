@@ -1069,6 +1069,9 @@ preparePostUnsignedRawTx time tx contractName' args =
       0
       zeroHash
       API
+      Nothing
+      Nothing
+      Nothing
 
 signAndPrepare ::
   (MonadIO m, HasVault m, HasBlocEnv m) =>

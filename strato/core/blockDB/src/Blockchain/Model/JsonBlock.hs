@@ -81,7 +81,10 @@ instance ToJSON RawTransaction' where
         "hash" .= rawTransactionTxHash,
         "transactionType" .= show (rawTransactionSemantics rt),
         "timestamp" .= rawTransactionTimestamp,
-        "origin" .= rawTransactionOrigin
+        "origin" .= rawTransactionOrigin,
+        "gasPrice" .= rawTransactionGasPrice,
+        "value" .= rawTransactionValue,
+        "txData" .= fmap B.unpack rawTransactionTxData
       ]
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
@@ -117,6 +120,10 @@ instance FromJSON RawTransaction' where
 
     cid <- t .:? "chainId"
 
+    gp <- t .:? "gasPrice"
+    val <- t .:? "value"
+    td <- fmap (fmap B.pack) (t .:? "txData")
+
     return
       ( RawTransaction'
           ( RawTransaction
@@ -137,6 +144,9 @@ instance FromJSON RawTransaction' where
               bn
               h
               o
+              gp
+              val
+              td
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
@@ -203,6 +213,9 @@ instance FromJSON UnsignedRawTransaction' where
               bn
               h
               o
+              Nothing
+              Nothing
+              Nothing
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
@@ -252,6 +265,21 @@ instance ToJSON Transaction' where
         "v" .= showHex tv "",
         "hash" .= transactionHash tx,
         "transactionType" .= show (transactionSemantics tx)
+      ]
+  toJSON (Transaction' tx@(EthereumTX n gp gl eto val _ cid tr ts tv)) =
+    object $
+      [ "kind" .= ("Transaction" :: String),
+        "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
+        "nonce" .= n,
+        "gasPrice" .= gp,
+        "gasLimit" .= gl,
+        "to" .= eto,
+        "value" .= val,
+        "r" .= showHex tr "",
+        "s" .= showHex ts "",
+        "v" .= showHex (toEthV tv cid) "",
+        "hash" .= transactionHash tx,
+        "transactionType" .= ("EthereumTX" :: String)
       ]
 
 instance FromJSON Transaction' where

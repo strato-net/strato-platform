@@ -35,6 +35,7 @@ executable ethereum-jsonrpc
     , case-insensitive
     , containers
     , core-api2
+    , ethereum-rlp
     , format
     , http-client
     , http-types
