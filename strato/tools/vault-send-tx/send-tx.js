@@ -23,7 +23,8 @@ const https = require("https");
 const http = require("http");
 
 const VAULT_URL = process.env.VAULT_URL || "https://vault.blockapps.net:8093";
-const NETWORK_RPC = process.env.NETWORK_RPC || "https://ethereum-sepolia-rpc.publicnode.com";
+const DEFAULT_NETWORK_RPC = "https://ethereum-sepolia-rpc.publicnode.com";
+const NETWORK_RPC = process.env.NETWORK_RPC || DEFAULT_NETWORK_RPC;
 
 // ---------------------------------------------------------------------------
 // Vault API helpers
@@ -93,10 +94,25 @@ async function vaultSign(hash) {
 // Transaction construction + signing
 // ---------------------------------------------------------------------------
 
-async function buildAndSign(provider, fromAddress, opts) {
-  const to = opts.to || fromAddress; // default: send to self
-  const value = ethers.parseEther(opts.value || "0");
+function toBigIntOrUndefined(value) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(value);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    return BigInt(trimmed);
+  }
+  throw new Error(`Unsupported bigint value: ${String(value)}`);
+}
 
+async function signTransaction(provider, fromAddress, txRequest) {
+  const to = txRequest.to || fromAddress;
+  const value =
+    txRequest.value !== undefined
+      ? toBigIntOrUndefined(txRequest.value)
+      : ethers.parseEther(txRequest.valueEth || "0");
+  const data = txRequest.data || "0x";
   const [nonce, feeData] = await Promise.all([
     provider.getTransactionCount(fromAddress, "latest"),
     provider.getFeeData(),
@@ -107,13 +123,14 @@ async function buildAndSign(provider, fromAddress, opts) {
   const tx = {
     type: 2,
     chainId,
-    nonce,
+    nonce: txRequest.nonce ?? nonce,
     to,
     value,
-    data: "0x",
-    maxFeePerGas: feeData.maxFeePerGas,
-    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
-    gasLimit: 21000n, // simple ETH transfer
+    data,
+    maxFeePerGas: toBigIntOrUndefined(txRequest.maxFeePerGas) ?? feeData.maxFeePerGas,
+    maxPriorityFeePerGas:
+      toBigIntOrUndefined(txRequest.maxPriorityFeePerGas) ?? feeData.maxPriorityFeePerGas,
+    gasLimit: toBigIntOrUndefined(txRequest.gasLimit) ?? 21000n,
   };
 
   console.log("\n--- Unsigned Transaction ---");
@@ -123,7 +140,9 @@ async function buildAndSign(provider, fromAddress, opts) {
   console.log("  nonce:               ", tx.nonce);
   console.log("  maxFeePerGas:        ", ethers.formatUnits(tx.maxFeePerGas, "gwei"), "gwei");
   console.log("  maxPriorityFeePerGas:", ethers.formatUnits(tx.maxPriorityFeePerGas, "gwei"), "gwei");
+  console.log("  gasLimit:            ", tx.gasLimit.toString());
   console.log("  chainId:             ", tx.chainId);
+  console.log("  data bytes:          ", (tx.data.length - 2) / 2);
 
   // Serialize the unsigned tx to get the signing hash
   const unsignedSerialized = ethers.Transaction.from(tx).unsignedSerialized;
@@ -158,6 +177,19 @@ async function buildAndSign(provider, fromAddress, opts) {
   console.log("  recovered from:  ", recovered, "✓");
 
   return signedTx;
+}
+
+async function buildAndSign(provider, fromAddress, opts) {
+  return signTransaction(provider, fromAddress, {
+    to: opts.to,
+    valueEth: opts.value || "0",
+    gasLimit: 21000n,
+  });
+}
+
+async function submitSignedTransaction(provider, signedTx) {
+  const resp = await provider.broadcastTransaction(signedTx.serialized);
+  return { response: resp, receipt: await resp.wait() };
 }
 
 // ---------------------------------------------------------------------------
@@ -203,10 +235,9 @@ async function main() {
   // 4. Submit (or dry-run)
   if (submit) {
     console.log("\n--- Submitting ---");
-    const resp = await provider.broadcastTransaction(signedTx.serialized);
+    const { response: resp, receipt } = await submitSignedTransaction(provider, signedTx);
     console.log("  tx hash:", resp.hash);
     console.log("\n  Waiting for confirmation...");
-    const receipt = await resp.wait();
     console.log("  confirmed in block:", receipt.blockNumber);
     console.log("  gas used:", receipt.gasUsed.toString());
     console.log("  status:", receipt.status === 1 ? "SUCCESS ✓" : "FAILED ✗");
@@ -217,7 +248,20 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("\nError:", err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("\nError:", err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  DEFAULT_NETWORK_RPC,
+  loadToken,
+  vaultRequest,
+  vaultGetAddress,
+  vaultSign,
+  signTransaction,
+  buildAndSign,
+  submitSignedTransaction,
+};

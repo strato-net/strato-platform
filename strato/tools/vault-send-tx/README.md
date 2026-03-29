@@ -84,6 +84,80 @@ VAULT_URL=http://localhost:8093 \
   node send-tx.js --submit
 ```
 
+## Across test runner
+
+This package also includes a minimal Across bridge PoC for moving supported
+assets across supported EVM chains with the vault signer.
+
+Default behavior:
+- discovers the Across-supported chain RPCs and token addresses
+- fetches an Across quote for `1 USDC`
+- prints balances and quote details
+- in dry-run mode, signs but does not broadcast
+- with `--submit`, sends approval txs if needed, sends the bridge tx, then polls
+  Across until the deposit is `filled`
+- retries the temporary `DepositNotFound` indexer lag that can happen on testnet
+- refreshes the quote after approvals so the bridge tx uses current allowance state
+
+Examples:
+
+```bash
+# Dry-run the default Sepolia -> Base Sepolia USDC test
+node across-bridge.js
+
+# Broadcast the live test
+ACROSS_API_KEY=... node across-bridge.js --submit
+
+# Reverse direction
+ACROSS_API_KEY=... node across-bridge.js \
+  --origin-chain-id 84532 \
+  --destination-chain-id 11155111 \
+  --submit
+
+# Change amount or recipient
+ACROSS_API_KEY=... node across-bridge.js \
+  --amount 0.5 \
+  --recipient 0x... \
+  --submit
+
+# Bridge native ETH instead of USDC
+ACROSS_API_KEY=... node across-bridge.js \
+  --symbol ETH \
+  --amount 0.001 \
+  --submit
+
+# Override token lookup with exact Across-supported token addresses
+ACROSS_API_KEY=... node across-bridge.js \
+  --origin-chain-id 84532 \
+  --destination-chain-id 11155111 \
+  --input-token 0x036CbD53842c5426634e7929541eC2318f3dCF7e \
+  --output-token 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238 \
+  --amount 0.5 \
+  --submit
+```
+
+Arguments:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--origin-chain-id` | `11155111` | Origin chain ID |
+| `--destination-chain-id` | `84532` | Destination chain ID |
+| `--symbol` | `USDC` | Token symbol looked up through Across |
+| `--input-token` | unset | Exact origin token address to use instead of symbol lookup |
+| `--output-token` | unset | Exact destination token address to use instead of symbol lookup |
+| `--amount` | `1` | Human-readable token amount |
+| `--recipient` | vault address | Destination recipient |
+| `--submit` | off | Broadcast approval and bridge txs |
+
+Additional environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ACROSS_API_BASE` | `https://testnet.across.to/api` | Across API base URL |
+| `ACROSS_API_KEY` | unset | Bearer token for Across API |
+| `ORIGIN_RPC` | Across chain RPC | Override origin RPC |
+| `DESTINATION_RPC` | Across chain RPC | Override destination RPC |
+
 ## Environment variables
 
 | Variable      | Default                                        | Description                          |
