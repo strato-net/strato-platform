@@ -42,7 +42,7 @@ instance NFData ExecResults
 
 calculateReturned :: Transaction -> ExecResults -> Integer
 calculateReturned t er =
-  let realRefund = min (erRefund er) ((transactionGasLimit t - erRemainingTxGas er) `div` 2)
+  let realRefund = min (erRefund er) ((gasLimit t - erRemainingTxGas er) `div` 2)
    in realRefund + erRemainingTxGas er
 
 evmErrorResults :: Integer -> VMException -> ExecResults

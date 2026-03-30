@@ -10,7 +10,7 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
+import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
@@ -48,5 +48,5 @@ checkValidity parentBSum b = do
 
 isNonceValid :: (Address `A.Alters` AddressState) f => OutputTx -> f Bool
 isNonceValid ot@OutputTx {otSigner = txAddr} =
-  let tNonce = transactionNonce $ otBaseTx ot
+  let tNonce = TD.nonce $ otBaseTx ot
    in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy txAddr
