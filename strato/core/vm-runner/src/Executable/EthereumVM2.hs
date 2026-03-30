@@ -74,7 +74,12 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
   lift . for_ mpNodesResps $ A.insertMany (A.Proxy @MP.NodeData) . M.fromList . map (toSR &&& id)
 
   rpcResps <- lift $ do
-    resps <- traverse runJsonRpcCommand' rpcCommands
+    bbHash <- do
+      bbi <- getContextBestBlockInfo
+      case bbi of
+        ContextBestBlockInfo h _ _ -> pure h
+        Unspecified -> pure Keccak256.zeroHash
+    resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
   yieldMany $! uncurry OutJSONRPC <$> rpcResps
