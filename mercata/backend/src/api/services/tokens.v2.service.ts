@@ -155,16 +155,19 @@ export const getEarningAssets = async (
     };
   });
 
-  const saveUsdstAsset =
-    saveUsdstInfo && saveUsdstUserInfo && BigInt(saveUsdstUserInfo.userShares || "0") > 0n
-      ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo)
-      : null;
+  const saveUsdstAsset = saveUsdstInfo?.deployed
+    ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo ?? undefined)
+    : null;
 
-  if (
-    saveUsdstAsset &&
-    !earningAssets.some((asset: EarningAsset) => asset.address.toLowerCase() === saveUsdstAsset.address.toLowerCase())
-  ) {
-    earningAssets.push(saveUsdstAsset);
+  if (saveUsdstAsset) {
+    const existingIdx = earningAssets.findIndex(
+      (asset: EarningAsset) => asset.address.toLowerCase() === saveUsdstAsset.address.toLowerCase()
+    );
+    if (existingIdx >= 0) {
+      earningAssets[existingIdx] = saveUsdstAsset;
+    } else {
+      earningAssets.push(saveUsdstAsset);
+    }
   }
 
   return earningAssets;
