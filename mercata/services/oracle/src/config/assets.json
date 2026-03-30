@@ -94,7 +94,7 @@
         "underlyingAsset": "ETH",
         "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
         "factorParse": "result",
         "factorPrecision": "1000000000000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
@@ -106,7 +106,7 @@
         "underlyingAsset": "WEETH",
         "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
         "factorParse": "result",
         "factorPrecision": "1000000000000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
@@ -118,7 +118,7 @@
         "underlyingAsset": "WSTETH",
         "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00537f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
         "factorParse": "result",
         "factorPrecision": "1000000000000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
@@ -130,7 +130,7 @@
         "underlyingAsset": "WBTC",
         "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00532260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
         "factorParse": "result",
         "factorPrecision": "1000000000000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
@@ -142,7 +142,7 @@
         "underlyingAsset": "USDC",
         "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
         "factorParse": "result",
         "factorPrecision": "1000000000000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
@@ -154,7 +154,7 @@
         "underlyingAsset": "USDT",
         "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
         "factorParse": "result",
         "factorPrecision": "1000000000000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
