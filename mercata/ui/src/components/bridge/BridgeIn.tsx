@@ -51,7 +51,7 @@ import {
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
@@ -1170,6 +1170,22 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             <Link to="/dashboard/withdrawals" className="text-xs text-blue-500 hover:text-blue-400">
               Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
             </Link>
+          </div>
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            fundingMode === "metals" ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
+          }`}>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/30 p-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Gem className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <p className="text-xs text-amber-800 dark:text-amber-200">
+                  We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
+                </p>
+              </div>
+              <a
+                href="mailto:metals@strato.nexus?subject=Metals%20Deposit%20Inquiry&body=Name%3A%0AEmail%3A%0AMessage%3A%0A"
+                className="inline-flex items-center gap-1 shrink-0 font-semibold text-xs text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 underline underline-offset-2"
+              ><Mail className="w-3 h-3" />Contact us {"\u2192"}</a>
+            </div>
           </div>
         </div>
 
