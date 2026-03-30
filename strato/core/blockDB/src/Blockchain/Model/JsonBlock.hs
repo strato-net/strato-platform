@@ -29,6 +29,7 @@ import           Blockchain.Strato.Model.ExtendedWord (word256ToBytes)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Validator
+import           Control.Applicative                   ((<|>))
 import           Control.DeepSeq
 import           Control.Monad                        (join)
 import           Data.Aeson
@@ -284,26 +285,47 @@ instance ToJSON Transaction' where
 
 instance FromJSON Transaction' where
   parseJSON (Object t) = do
-        mToAddr <- t .:? "to"
+    mInit <- t .:? "init"
+    case mInit of
+      Just code -> do
         nonce <- t .:? "nonce" .!= 0
         gasLimit <- t .:? "gasLimit" .!= 0
         args <- t .:? "args" .!= []
         network <- t .:? "network" .!= ""
-        funcName <- t .:? "funcName" .!= ""
         contractName <- t .:? "contractName" .!= ""
         cid <- t .:? "chainId"
         tr <- parseHexStr (t .: "r")
         ts <- parseHexStr (t .: "s")
         tv <- parseHexStr (t .:? "v" .!= "0")
-
-        case mToAddr of
-          Nothing -> do
-            code <- t .: "code"
-            return . Transaction' $ ContractCreationTX
-              nonce gasLimit contractName args network code cid tr ts tv
-          (Just toAddr) -> do
+        return . Transaction' $ ContractCreationTX
+          nonce gasLimit contractName args network code cid tr ts tv
+      Nothing -> do
+        mFuncName <- t .:? "funcName"
+        case mFuncName of
+          Just funcName -> do
+            toAddr <- t .: "to"
+              <|> fail "detected SolidVM function call (has 'funcName') but missing required field 'to'"
+            nonce <- t .:? "nonce" .!= 0
+            gasLimit <- t .:? "gasLimit" .!= 0
+            args <- t .:? "args" .!= []
+            network <- t .:? "network" .!= ""
+            cid <- t .:? "chainId"
+            tr <- parseHexStr (t .: "r")
+            ts <- parseHexStr (t .: "s")
+            tv <- parseHexStr (t .:? "v" .!= "0")
             return . Transaction' $ MessageTX nonce gasLimit toAddr funcName args network cid tr ts tv
-  parseJSON _ = error "bad param when calling parseJSON for Transaction'"
+          Nothing -> do
+            n <- t .:? "nonce" .!= 0
+            gp <- t .:? "gasPrice" .!= 0
+            gl <- t .:? "gasLimit" .!= 0
+            eto <- t .:? "to"
+            val <- t .:? "value" .!= 0
+            rawV <- parseHexStr (t .:? "v" .!= "0")
+            tr <- parseHexStr (t .: "r")
+            ts <- parseHexStr (t .: "s")
+            return . Transaction' $ EthereumTX n gp gl eto val B.empty
+              (ethVToChainId rawV) tr ts (ethVToRecoveryId rawV)
+  parseJSON _ = fail "expected a Transaction object with 'init' (contract deploy), 'funcName' (SolidVM call), or neither (Ethereum transaction)"
 
 
 {-
