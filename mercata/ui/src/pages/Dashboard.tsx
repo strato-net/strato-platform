@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft } from "lucide-react";
+import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
@@ -427,6 +427,32 @@ const Dashboard = () => {
               <ArrowRightLeft size={18} />
               <span className="text-xs md:text-sm">Swap</span>
             </Button>
+          </div>
+
+          {/* Physical Metals Deposit Banner */}
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl p-4 md:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg shrink-0">
+                    <Gem className="text-amber-600 dark:text-amber-400" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm md:text-base font-semibold text-amber-900 dark:text-amber-100">Deposit Physical Gold & Silver</h3>
+                    <p className="text-xs md:text-sm text-amber-700 dark:text-amber-300 mt-0.5">
+                    We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href="mailto:metals@strato.nexus?subject=Metals%20Deposit%20Inquiry&body=Name%3A%0AEmail%3A%0AMessage%3A%0A"
+                  className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors"
+                >
+                  <Mail size={16} />
+                  Contact Us
+                </a>
+              </div>
+            </div>
           </div>
 
           <div className="mb-8">
