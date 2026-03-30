@@ -24,6 +24,8 @@ module Blockchain.Data.Transaction
     partialTransactionHash,
     whoSignedThisTransactionEcrecover,
     whoReallySignedThisTransactionEcrecover,
+    ethVToRecoveryId,
+    ethVToChainId,
     toEthV,
     getSigVals,
     codePtrName,
@@ -94,19 +96,23 @@ instance TransactionLike Transaction where
 
   txChainId = chainId
 
-  morphTx t = case type' of
-    Message -> MessageTX n gl dest (fromJust $ txFuncName t) args network cid r s v
-    ContractCreation -> ContractCreationTX n gl (fromJust contractName) args network code cid r s v
+  morphTx t = case txType t of
+    Message
+      | Just fn <- txFuncName t ->
+          MessageTX n gl (fromJust $ txDestination t) fn args network cid r s v
+      | otherwise ->
+          EthereumTX n 0 gl (txDestination t) 0 B.empty cid r s v
+    ContractCreation
+      | Just cn <- txContractName t ->
+          ContractCreationTX n gl cn args network (fromJust $ txCode t) cid r s v
+      | otherwise ->
+          EthereumTX n 0 gl Nothing 0 B.empty cid r s v
     where
-      type' = txType t
       n = txNonce t
       gl = txGasLimit t
       args = txArgs t
-      contractName = txContractName t
-      dest = fromJust (txDestination t)
       network = txNetwork t
       cid = txChainId t
-      code = fromJust (txCode t)
       (r, s, v) = txSignature t
 
 codePtrHash :: CodePtr -> Maybe Keccak256

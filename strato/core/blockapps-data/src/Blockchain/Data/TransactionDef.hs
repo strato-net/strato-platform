@@ -11,6 +11,8 @@ module Blockchain.Data.TransactionDef
     partialRLPEncode,
     partialRLPDecode,
     formatChainId,
+    ethVToRecoveryId,
+    ethVToChainId,
     toEthV,
   )
 where
