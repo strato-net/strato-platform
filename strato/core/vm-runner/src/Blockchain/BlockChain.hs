@@ -24,6 +24,7 @@ module Blockchain.BlockChain
 where
 
 import BlockApps.Logging
+import BlockApps.Solidity.ABI (decodeABIArgs, valueToArgText, funcArgTypes)
 import qualified Blockchain.Bagger as Bagger
 import Blockchain.Bagger.Transactions
 import qualified Blockchain.DB.AddressStateDB as NoCache
@@ -48,6 +49,7 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
+import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
@@ -98,6 +100,7 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
+import SolidVM.Model.SolidString (labelToText)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -473,8 +476,38 @@ runCodeForTransaction ::
   ExceptT TransactionFailureCause m ExecResults
 runCodeForTransaction b availableGas tAddr t proposer =
   let ut = otBaseTx t
-   in if isContractCreationTX ut
-        then do
+   in case ut of
+        TD.EthereumTX {TD.ethTo = Just toAddr, TD.txData = callData} -> do
+          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $
+            "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
+          let selector = B.take 4 callData
+              argsBytes = B.drop 4 callData
+          lift (resolveFunction toAddr selector) >>= \case
+            Nothing -> throwE $ TFCodeCollectionNotFound toAddr
+              ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
+            Just (fName, func) -> do
+              let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
+                  fnStr = T.unpack (labelToText fName)
+              $logInfoS "runCodeForTransaction" $ T.pack $
+                "EthereumTX resolved: " ++ fnStr ++ "(" ++ intercalate ", " (map T.unpack argTexts) ++ ") on " ++ format toAddr
+              lift $
+                SolidVM.call
+                  b
+                  toAddr
+                  tAddr
+                  proposer
+                  (fromIntegral availableGas)
+                  tAddr
+                  (txHash ut)
+                  (labelToText fName)
+                  argTexts
+                  Nothing
+
+        TD.EthereumTX {TD.ethTo = Nothing} ->
+          throwE $ TFCodeCollectionNotFound (Address 0)
+            "EthereumTX contract creation (raw EVM bytecode) not supported" t
+
+        _ | isContractCreationTX ut -> do
           when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
@@ -493,7 +526,8 @@ runCodeForTransaction b availableGas tAddr t proposer =
               (txHash ut)
               (fromJust $ txContractName ut)
               (txArgs ut)
-        else do
+
+        _ -> do
           when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (TD.to ut)
 
           lift $
