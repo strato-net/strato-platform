@@ -25,8 +25,6 @@ generateDockerCompose = do
       stratoApiPort = show $ apiPort (apiConfig conf)
       nodeHost = "localhost:" ++ portNum
       sHost = apiHost (apiConfig conf)
-      extraHosts = Just $ "localhost:host-gateway"
-        : if sHost == "host.docker.internal" then ["host.docker.internal:host-gateway"] else []
       userGid = uid ++ ":" ++ gid
 
   -- Disable Docker logging since we redirect stdout/stderr to files
@@ -69,7 +67,6 @@ generateDockerCompose = do
             , ("BA_PASSWORD", "${BA_PASSWORD}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
             ]
-        , extra_hosts = extraHosts
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
         , restart = Just "unless-stopped"
@@ -115,7 +112,6 @@ generateDockerCompose = do
             , ("STRATO_PORT_API", stratoApiPort)
             , ("STRATO_PORT_VAULT_PROXY", "8013")
             ]
-        , extra_hosts = extraHosts
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
@@ -218,7 +214,6 @@ generateDockerCompose = do
                then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
                     ]
                else []
-        , extra_hosts = extraHosts
         , ports = Just [portNum ++ ":" ++ portNum, "443:443"]
         , volumes = Just
             [ "./logs:/logs"
@@ -292,7 +287,6 @@ generateDockerCompose = do
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", nodeHost)
             ]
-        , extra_hosts = extraHosts
         , volumes = Just
             [ "./logs:/logs"
             , "./prometheus:/prometheus"
