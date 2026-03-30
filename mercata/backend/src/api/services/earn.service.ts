@@ -113,28 +113,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     }
   }
 
-  const volumeMap = buildVolumeMap(swapEvents, prices);
-  const activePools = (pools || []).filter((p: any) =>
-    p.tokenA?.address && p.tokenB?.address &&
-    !p.isPaused && !p.isDisabled &&
-    !(p.tokenABalance === "0" && p.tokenBBalance === "0") &&
-    !hiddenSwapPools.has(p.address)
-  );
-  for (const p of activePools) {
-    const apy = computePoolAPY(p, prices, volumeMap);
-    if (apy === ZERO_APY) continue;
-    const meta = `${p.tokenA._symbol}-${p.tokenB._symbol}`;
-    const poolAddress = String(p.address ?? "").toLowerCase().replace(/^0x/, "");
-    const row = {
-      source: "swap" as const,
-      apy,
-      meta,
-      ...(poolAddress ? { poolAddress } : {}),
-    };
-    add(p.tokenA.address, row);
-    add(p.tokenB.address, row);
-  }
-
+  const baseYieldByAddr = new Map<string, number>();
   for (const pair of yieldBenchmarks) {
     const apy = computeYieldAPY(
       prices.get(pair.tokenAddress),
@@ -143,7 +122,33 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       historicalYieldPrices.get(pair.baseAddress),
     );
     if (!apy) continue;
-    add(pair.tokenAddress, { source: "yield", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
+    add(pair.tokenAddress, { source: "base", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
+    baseYieldByAddr.set(pair.tokenAddress, parseFloat(apy));
+  }
+
+  const volumeMap = buildVolumeMap(swapEvents, prices);
+  const activePools = (pools || []).filter((p: any) =>
+    p.tokenA?.address && p.tokenB?.address &&
+    !p.isPaused && !p.isDisabled &&
+    !(p.tokenABalance === "0" && p.tokenBBalance === "0") &&
+    !hiddenSwapPools.has(p.address)
+  );
+  for (const p of activePools) {
+    const meta = `${p.tokenA._symbol}-${p.tokenB._symbol}`;
+    const poolAddress = String(p.address ?? "").toLowerCase().replace(/^0x/, "");
+    const swapApy = computePoolAPY(p, prices, volumeMap);
+    if (swapApy !== ZERO_APY) {
+      const row = { source: "swap" as const, apy: swapApy, meta, ...(poolAddress ? { poolAddress } : {}) };
+      add(p.tokenA.address, row);
+      add(p.tokenB.address, row);
+    }
+    if (baseYieldByAddr.size > 0) {
+      const wApy = weightedBaseYield([p.tokenA.address, p.tokenB.address], [p.tokenABalance || "0", p.tokenBBalance || "0"], prices, baseYieldByAddr);
+      if (wApy) {
+        add(p.tokenA.address, { source: "weighted_swap", apy: wApy, meta, ...(poolAddress ? { poolAddress } : {}) });
+        add(p.tokenB.address, { source: "weighted_swap", apy: wApy, meta, ...(poolAddress ? { poolAddress } : {}) });
+      }
+    }
   }
 
   if (vaultAPY && vaultAPY !== "-" && parseFloat(vaultAPY) > 0) {
@@ -269,6 +274,16 @@ function computePoolAPY(pool: any, prices: Map<string, string>, volumeMap: Map<s
   const tvl = Number((BigInt(pool.tokenABalance || "0") * priceA + BigInt(pool.tokenBBalance || "0") * priceB) / DECIMALS) / 1e18;
   const apy = tvl > 0 ? (lpFees / tvl) * 365 * 100 : 0;
   return apy.toFixed(2);
+}
+
+function weightedBaseYield(addrs: string[], bals: string[], prices: Map<string, string>, baseYields: Map<string, number>): string | null {
+  let ws = 0, total = 0;
+  for (let i = 0; i < addrs.length; i++) {
+    const usd = Number(BigInt(bals[i] || "0") * BigInt(prices.get(addrs[i]) || "0") / DECIMALS) / 1e18;
+    total += usd;
+    ws += usd * (baseYields.get(addrs[i]) || 0);
+  }
+  return total > 0 && ws > 0 ? (ws / total).toFixed(2) : null;
 }
 
 function computeYieldAPY(

@@ -68,6 +68,7 @@ const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: strin
     case "vault":
       return "/dashboard/earn-vault";
     case "swap":
+    case "weighted_swap":
       return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
     case "safety":
       return "/dashboard/advanced?tab=safety";
@@ -331,6 +332,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     for (const entry of tokenApys) {
       let best: ApySource | null = null;
       for (const a of entry.apys) {
+        if (a.source === "base") continue;
         if (!best || parseFloat(a.apy) > parseFloat(best.apy)) best = a;
       }
       if (best && parseFloat(best.apy) > 0) {

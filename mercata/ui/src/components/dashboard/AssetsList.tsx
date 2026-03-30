@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { Token as TokenType, EarningAsset } from "@mercata/shared-types";
+import { Token as TokenType, EarningAsset, ApySource } from "@mercata/shared-types";
 import { formatBalance } from "@/utils/numberUtils";
+import { useEarnContext } from "@/context/EarnContext";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -28,6 +29,19 @@ interface AssetsProps {
   guestMode?: boolean;
 }
 
+const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+
+const earnPath = (s: ApySource): string => {
+  switch (s.source) {
+    case "lending": return "/dashboard/earn-lending";
+    case "vault": return "/dashboard/earn-vault";
+    case "swap": case "weighted_swap":
+      return s.poolAddress ? `/dashboard/earn-pools?pool=${s.poolAddress}` : "/dashboard/earn-pools";
+    case "safety": return "/dashboard/advanced?tab=safety";
+    default: return "/dashboard/earn";
+  }
+};
+
 const AssetsList = ({
   loading,
   tokens,
@@ -37,6 +51,21 @@ const AssetsList = ({
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
+  const navigate = useNavigate();
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
+
+  const bestApyByAddr = useMemo(() => {
+    const m = new Map<string, ApySource>();
+    for (const entry of tokenApys) {
+      let best: ApySource | null = null;
+      for (const a of entry.apys) {
+        if (a.source === "base") continue;
+        if (!best || parseFloat(a.apy) > parseFloat(best.apy)) best = a;
+      }
+      if (best && parseFloat(best.apy) > 0) m.set(normAddr(entry.token), best);
+    }
+    return m;
+  }, [tokenApys]);
 
   const hasEarningAssets = tokens.length > 0;
   const hasInactiveTokens = inActiveTokens.length > 0;
@@ -149,21 +178,38 @@ const AssetsList = ({
                             </div>
                           )}
                           <div className="ml-2 md:ml-3 min-w-0 flex-1">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Link
-                                    to={getAssetDetailHref(asset)}
-                                    className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                            <div className="flex items-center gap-2">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Link
+                                      to={getAssetDetailHref(asset)}
+                                      className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
+                                    >
+                                      {asset?._symbol || asset?._name || ""}
+                                    </Link>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{asset?._name || ""}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              {tokenApysLoaded && (() => {
+                                const best = bestApyByAddr.get(normAddr(asset?.address || ""));
+                                if (!best) return null;
+                                return (
+                                  <span
+                                    role="link"
+                                    tabIndex={0}
+                                    className="inline-flex items-center gap-0.5 shrink-0 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-500 cursor-pointer hover:bg-green-500/20 transition-colors"
+                                    onClick={() => navigate(earnPath(best))}
+                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(earnPath(best)); } }}
                                   >
-                                    {asset?._symbol || asset?._name || ""}
-                                  </Link>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{asset?._name || ""}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                                    Earn up to {best.apy}% {"\u2192"}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                             <p className="hidden md:block text-muted-foreground text-xs truncate">
                               {asset?._name || ""}
                             </p>
