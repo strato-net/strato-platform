@@ -297,7 +297,7 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title={`Rewards (Season ${rewardsState?.currentSeason || 2})`}
+              title="Rewards"
               value={(() => {
                 if (!isLoggedIn) return "-";
                 if (rankLoading) return "Loading...";

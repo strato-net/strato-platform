@@ -192,17 +192,12 @@ export async function initNetworkConfig() {
   vault = process.env.VAULT || defaultVaultFor[networkId] || '';
 }
 
-// Addresses of internal protocol contracts whose Token:Transfer events should
-// be excluded from the activity feed (gas fees, pool operations, minting, etc.).
-// Populated at startup by initInternalAddresses().
-export let internalAddresses: Array<string> = [];
-
 /**
  * Fetch and cache internal protocol contract addresses by querying the on-chain registries and factories.
  * Must be called after initNetworkConfig() so network-specific addresses are available.
  * Used to exclude internal transfers from the My Activity / All Activity feed.
  */
-export async function initInternalAddresses() {
+export async function getInternalAddresses() {
   const { cirrus } = await import("../utils/mercataApiHelper");
   const accessToken = await getServiceToken();
 
@@ -255,5 +250,5 @@ export async function initInternalAddresses() {
     }
   }
 
-  internalAddresses = Array.from(new Set(addresses.filter(Boolean)));
+  return Array.from(new Set(addresses.filter(Boolean)));
 }

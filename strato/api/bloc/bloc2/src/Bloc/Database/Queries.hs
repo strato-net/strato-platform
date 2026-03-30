@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -23,10 +24,11 @@ module Bloc.Database.Queries
     getCodeCollectionByCodePtr,
     getContractWithCodeCollectionByCodePtr,
     evmContractSolidVMError,
+    withCodeCollectionCache,
   )
 where
 
-import Blockchain.DB.CodeDB
+import Blockchain.DB.CodeDB (HasCodeDB, DBCode)
 import Blockchain.Data.AddressStateDB (AddressState)
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs (AddressStateRef(..))
@@ -41,11 +43,13 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import Data.Foldable (foldl')
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, listToMaybe)
+import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
 import Data.Source.Annotation
 import Data.Source.Map
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -59,123 +63,154 @@ import UnliftIO
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
-getContractByAddress ::
+-- | Lift HasCodeDB (Alters) through ReaderT IORef cache
+instance {-# OVERLAPPING #-}
+  ( Monad m,
+    (Keccak256 `A.Alters` DBCode) m
+  ) => (Keccak256 `A.Alters` DBCode) (ReaderT (IORef (Map.Map Keccak256 CodeCollection)) m) where
+  lookup p k = lift $ A.lookup p k
+  insert p k v = lift $ A.insert p k v
+  delete p k = lift $ A.delete p k
+
+-- | Cache-through instance: checks the IORef map first, loads and caches on miss
+instance {-# OVERLAPPING #-}
   ( MonadIO m,
     HasCodeDB m,
     A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` SourceMap) m
+  ) => (Keccak256 `A.Selectable` CodeCollection) (ReaderT (IORef (Map.Map Keccak256 CodeCollection)) m) where
+  select _ ch = do
+    ref <- ask
+    cache <- liftIO $ readIORef ref
+    case Map.lookup ch cache of
+      Just cc -> pure $ Just cc
+      Nothing -> do
+        mSrcMap <- lift $ A.select (A.Proxy @SourceMap) ch
+        case mSrcMap of
+          Nothing -> pure Nothing
+          Just srcMap -> do
+            eCC <- lift $ sourceToContractDetails False srcMap
+            case eCC of
+              Left _ -> pure Nothing
+              Right (_, cc) -> do
+                liftIO $ modifyIORef' ref (Map.insert ch cc)
+                pure $ Just cc
+
+{-# NOINLINE proxyContractNames #-}
+proxyContractNames :: [String]
+proxyContractNames = ["Proxy", "UserRegistry", "User"]
+
+{-# NOINLINE funcSet #-}
+funcSet :: S.Set (String, Text)
+funcSet = S.fromList . concat $ zipWith (map . (,)) proxyContractNames allFunctionNames
+  where
+    proxyFunctionNames = ["setLogicContract", "transferOwnership", "renounceOwnership"]
+    userRegistryFunctionNames = ["createUser", "createUserFor", "deriveUserAddress", "canCreateUser", "initializeUser"]
+    userFunctionNames = ["addUserAddress", "revokeUserAddress", "revokeAllUserAddresses", "createContract", "createSaltedContract", "callContract"]
+    allFunctionNames = [proxyFunctionNames, proxyFunctionNames ++ userRegistryFunctionNames, proxyFunctionNames ++ userFunctionNames]
+
+getLogicCodePtr ::
+  ( MonadIO m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
   Address ->
+  m (Maybe CodePtr)
+getLogicCodePtr a = runMaybeT $ do
+  (StorageAddress _ v _) <- MaybeT
+    . fmap listToMaybe
+    . getStorage'
+    $ storageFilterParams
+        { qsAddress = Just a
+        , qsKey = Just "logicContract"
+        }
+  logicAddr <- MaybeT . pure $ case v of
+    BAddress address' -> Just address'
+    _ -> Nothing
+  (AddressStateRef' l _) <- MaybeT
+    . fmap listToMaybe
+    . getAccount'
+    $ accountsFilterParams & qaAddress ?~ logicAddr
+  MaybeT . pure $ addressStateRefCodePtr l
+
+withCodeCollectionCache :: MonadIO m => ReaderT (IORef (Map.Map Keccak256 CodeCollection)) m a -> m a
+withCodeCollectionCache action = do
+  ref <- liftIO $ newIORef Map.empty
+  runReaderT action ref
+
+getContractByAddress ::
+  ( MonadIO m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
+  ) =>
+  Address ->
+  Maybe Text ->
   m (Maybe Contract)
-getContractByAddress a = getContractByAccountsFilterParams
-  $ accountsFilterParams
-  & qaAddress ?~ a
+getContractByAddress a mFuncName = getContractByAccountsFilterParams
+  (accountsFilterParams & qaAddress ?~ a)
+  mFuncName
 
 -- | Get contract and code collection by address (for file-level struct access)
 -- Also resolves proxy contracts by looking up their logicContract
 getContractWithCodeCollectionByAddress ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
   Address ->
+  Text ->
   m (Maybe (Contract, CodeCollection))
-getContractWithCodeCollectionByAddress a = runMaybeT $ do
-  (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount' 
+getContractWithCodeCollectionByAddress a fn = runMaybeT $ do
+  (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount'
     $ accountsFilterParams & qaAddress ?~ a
   codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-  (contract, cc) <- MaybeT $ either (const Nothing) Just <$> getContractWithCodeCollectionByCodePtr codePtr
-  -- Check if this is a proxy contract and resolve the logic contract's functions
   case addressStateRefContractName r of
-    Just name | name `elem` ["Proxy", "UserRegistry", "User"] -> do
-      -- Look up the logicContract storage variable
-      mLogicAddr <- lift . runMaybeT $ do
-        (StorageAddress _ v _) <- MaybeT
-          . fmap listToMaybe
-          . getStorage'
-          $ storageFilterParams
-              { qsAddress = Just a
-              , qsKey = Just "logicContract"
-              }
-        MaybeT . pure $ case v of
-          BAddress address' -> Just address'
-          _ -> Nothing
-      case mLogicAddr of
-        Just logicAddr -> do
-          -- Get the logic contract's code
-          (AddressStateRef' l _) <- MaybeT
-            . fmap listToMaybe
-            . getAccount'
-            $ accountsFilterParams & qaAddress ?~ logicAddr
-          logicCodePtr <- MaybeT . pure $ addressStateRefCodePtr l
-          (logicContract, logicCC) <- MaybeT $ either (const Nothing) Just <$> getContractWithCodeCollectionByCodePtr logicCodePtr
-          -- Merge the proxy and logic contract functions
-          pure (contract <> logicContract, cc <> logicCC)
-        Nothing -> pure (contract, cc)
-    _ -> pure (contract, cc)
+    -- Proxy contract, calling a logic contract function: load only logic CC
+    Just name | name `elem` proxyContractNames && not (S.member (name, fn) funcSet) -> do
+      mLogicCodePtr <- lift $ getLogicCodePtr a
+      MaybeT $ either (const Nothing) Just <$> getContractWithCodeCollectionByCodePtr (fromMaybe codePtr mLogicCodePtr)
+    -- Not a proxy, or calling a proxy-native function: load only proxy CC
+    _ -> MaybeT $ either (const Nothing) Just <$> getContractWithCodeCollectionByCodePtr codePtr
 
 getContractByAccountsFilterParams ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m,
+    (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
   AccountsFilterParams ->
+  Maybe Text ->
   m (Maybe Contract)
-getContractByAccountsFilterParams aParams = runMaybeT $ do
+getContractByAccountsFilterParams aParams mFuncName = runMaybeT $ do
   (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount' aParams
-  proxyCodePtr <- case addressStateRefContractName r of
-    -- TODO: This block of code is a hack. Figure out a better solution
-    --
-    -- This is a quick hack to get around the issues with calling Proxy
-    -- contracts through the API. If the contract is named "Proxy", and
-    -- the function name being called is not "setLogicContract", then
-    -- the API will load the "logicContract" storage element from the
-    -- contract's storage, then load the code for that address.
-    --
-    -- Ideally, we wouldn't have to hardcode any of these names in
-    -- the API, but this should get us back up and running for the
-    --  time being.
-    Just name | name `elem` ["Proxy", "UserRegistry", "User"] -> MaybeT . fmap (maybe (Just []) Just) . runMaybeT $ do
-      a <- MaybeT . pure $ aParams ^. qaAddress
-      (StorageAddress _ v _) <- MaybeT
-        . fmap listToMaybe
-        . getStorage'
-        $ storageFilterParams
-            { qsAddress = Just a
-            , qsKey = Just "logicContract"
-            }
-      logicContract <- MaybeT $ pure $
-            case v of
-              BAddress address' -> Just address'
-              _ -> Nothing
-      (AddressStateRef' l _) <- MaybeT
-        . fmap listToMaybe
-        . getAccount'
-        $ accountsFilterParams
-          & qaAddress ?~ logicContract
-      MaybeT . pure $ (:[]) <$> addressStateRefCodePtr l
-
-    _ -> MaybeT . pure $ Just []
+  a <- MaybeT . pure $ aParams ^. qaAddress
   codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-  MaybeT $ do
-    eContracts <- traverse getContractDetailsByCodeHash $ codePtr : proxyCodePtr
-    case catMaybes $ either (const Nothing) (Just . snd) <$> eContracts of
-      [] -> pure Nothing
-      (c:cs) -> pure . Just $ foldl' (<>) c cs
+  case (addressStateRefContractName r, mFuncName) of
+    -- Proxy contract, calling a logic contract function: load only logic contract
+    (Just name, Just fn) | name `elem` proxyContractNames && not (S.member (name, fn) funcSet) -> do
+      mLogicCodePtr <- lift $ getLogicCodePtr a
+      MaybeT $ do
+        eContract <- getContractDetailsByCodeHash $ fromMaybe codePtr mLogicCodePtr
+        pure $ either (const Nothing) (Just . snd) eContract
+    -- Proxy contract, no function specified: load both and merge
+    (Just name, Nothing) | name `elem` proxyContractNames -> do
+      mLogicCodePtr <- lift $ getLogicCodePtr a
+      MaybeT $ do
+        let codePtrs = codePtr : maybe [] (:[]) mLogicCodePtr
+        eContracts <- traverse getContractDetailsByCodeHash codePtrs
+        case catMaybes $ either (const Nothing) (Just . snd) <$> eContracts of
+          [] -> pure Nothing
+          (c:cs) -> pure . Just $ foldl' (<>) c cs
+    -- Not a proxy, or calling a proxy-native function: load only proxy contract
+    _ -> MaybeT $ do
+      eContract <- getContractDetailsByCodeHash codePtr
+      pure $ either (const Nothing) (Just . snd) eContract
 
 getContractDetailsByCodeHash ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m
+    (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   CodePtr ->
   m (Either Text (CodePtr, Contract))
@@ -183,28 +218,23 @@ getContractDetailsByCodeHash codePtr = runExceptT $ do
   nameStr <- case codePtr of
     SolidVMCode n _ -> pure n
     _ -> throwE "EVM contracts no longer supported"
-  (cHash, cc) <- getCodeHashAndCollection codePtr
+  (cHash, cc) <- getCodeHashAndCollection False codePtr
   details <- case Map.lookup nameStr $ _contracts cc of
     Nothing -> throwE $ "Could not find contract " <> (Text.pack nameStr) <> " in code collection " <> Text.pack (format codePtr)
     Just d -> pure (SolidVMCode nameStr cHash, d)
   pure $ force details
 
 getCodeCollectionByCodePtr ::
-  ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m
+  ( (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   CodePtr ->
   m (Either Text CodeCollection)
-getCodeCollectionByCodePtr = runExceptT . fmap snd . getCodeHashAndCollection
+getCodeCollectionByCodePtr = runExceptT . fmap snd . getCodeHashAndCollection False
 
 -- | Get both the contract and code collection (for file-level struct access)
 getContractWithCodeCollectionByCodePtr ::
   ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m
+    (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
   CodePtr ->
   m (Either Text (Contract, CodeCollection))
@@ -212,29 +242,26 @@ getContractWithCodeCollectionByCodePtr codePtr = runExceptT $ do
   nameStr <- case codePtr of
     SolidVMCode n _ -> pure n
     _ -> throwE "EVM contracts no longer supported"
-  (_, cc) <- getCodeHashAndCollection codePtr
+  (_, cc) <- getCodeHashAndCollection False codePtr
   contract <- case Map.lookup nameStr $ _contracts cc of
     Nothing -> throwE $ "Could not find contract " <> (Text.pack nameStr) <> " in code collection " <> Text.pack (format codePtr)
     Just d -> pure d
   pure $ force (contract, cc)
 
 getCodeHashAndCollection ::
-  ( MonadIO m,
-    HasCodeDB m,
-    A.Selectable Address AddressState m,
-    (Keccak256 `A.Selectable` SourceMap) m
+  ( (Keccak256 `A.Selectable` CodeCollection) m
   ) =>
+  Bool ->
   CodePtr ->
   ExceptT Text m (Keccak256, CodeCollection)
-getCodeHashAndCollection codePtr = do
+getCodeHashAndCollection _typeCheck codePtr = do
       ch <- case codePtr of
         ExternallyOwned _ -> throwE $ "EVM contracts no longer supported"
         SolidVMCode _ ch -> pure ch
-      srcMap <-
-        lift (A.select (A.Proxy @SourceMap) ch) >>= \case
-          Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
-          Just s -> pure s
-      either (throwE . Text.pack . show) pure =<< lift (sourceToContractDetails srcMap)
+      cc <- lift (A.select (A.Proxy @CodeCollection) ch) >>= \case
+        Nothing -> throwE $ "Could not find code collection for code hash " <> Text.pack (format ch)
+        Just cc -> pure cc
+      pure (ch, cc)
 
 evmContractSolidVMError :: Text
 evmContractSolidVMError =
@@ -255,7 +282,7 @@ getContractDetailsForContract ::
 getContractDetailsForContract src mContract = do
   eCodeCollection <-
     if hasAnyNonEmptySources src
-      then sourceToContractDetails src
+      then sourceToContractDetails True src
       else throwIO . UserError $ "No source code given for contract"
   case eCodeCollection of
     Left annotations -> throwIO . UserError . Text.pack $ "Detected errors during compilation: " ++ show annotations
@@ -271,6 +298,7 @@ sourceToContractDetails ::
     HasCodeDB m,
     A.Selectable Address AddressState m
   ) =>
+  Bool ->
   SourceMap ->
   m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
 sourceToContractDetails = createMetadataNoCompile
@@ -281,10 +309,11 @@ createMetadataNoCompile ::
     HasCodeDB m,
     A.Selectable Address AddressState m
   ) =>
+  Bool ->
   SourceMap ->
   m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
-createMetadataNoCompile sourceList = do
+createMetadataNoCompile typeCheck sourceList = do
   let isRunningTests = False
-  compiledSource <- compileSourceWithAnnotations isRunningTests True (Map.fromList $ unSourceMap sourceList)
+  compiledSource <- compileSourceWithAnnotations isRunningTests typeCheck (Map.fromList $ unSourceMap sourceList)
   let srcHash = hash . Text.encodeUtf8 $ serializeSourceMap sourceList
   pure $ (srcHash,) <$> compiledSource

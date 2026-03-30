@@ -205,7 +205,7 @@ sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "produceAddressStateUpdates" (Just vmBlockInsertionMined) $
       void $ produceIndexEvents [AddressStateUpdates asm]
-sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
+sendOutEvent (OutJSONRPC s b) = produceResponse s b
 sendOutEvent (OutBlock o) = void $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 sendOutEvent (OutBlockVerificationFailure _) = pure ()
 sendOutEvent (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpNodes]
