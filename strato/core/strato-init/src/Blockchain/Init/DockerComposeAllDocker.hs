@@ -122,6 +122,7 @@ generateDockerComposeAllDocker = do
             , ("STRATO_PORT_VAULT_PROXY", "${STRATO_PORT_VAULT_PROXY:-8013}")
             , ("MONITOR_URL", "${MONITOR_URL}")
             ]
+        , extra_hosts = Just ["localhost:host-gateway"]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh /usr/src/app/docker-run.sh >> /logs/apex.log 2>&1"]
         , volumes = Just ["./logs:/logs", "./nodedata/secrets:/run/secrets:ro"]

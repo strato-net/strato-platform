@@ -25,8 +25,8 @@ generateDockerCompose = do
       stratoApiPort = show $ apiPort (apiConfig conf)
       nodeHost = "localhost:" ++ portNum
       sHost = apiHost (apiConfig conf)
-      needsExtraHosts = sHost == "host.docker.internal"
-      extraHosts = if needsExtraHosts then Just ["host.docker.internal:host-gateway"] else Nothing
+      extraHosts = Just $ "localhost:host-gateway"
+        : if sHost == "host.docker.internal" then ["host.docker.internal:host-gateway"] else []
       userGid = uid ++ ":" ++ gid
 
   -- Disable Docker logging since we redirect stdout/stderr to files
