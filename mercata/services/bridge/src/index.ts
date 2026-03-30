@@ -11,6 +11,7 @@ import { initializeMercataPolling } from "./polling/mercataPolling";
 import { initOpenIdConfig} from "./auth";
 import { healthMonitor } from "./utils/healthMonitor";
 import DepositActionController from "./controllers/depositAction.controller";
+import AcrossController from "./controllers/across.controller";
 import AuthHandler from "./auth/tokenMiddleware";
 
 const app = express();
@@ -41,6 +42,15 @@ app.get("/health", async (_, res) => {
   res.status(errorFileExists ? 500 : 200).json({status: !errorFileExists, message: 'pong'})
 });
 app.post("/request-deposit-action", AuthHandler.authorizeRequest(), DepositActionController.requestDepositAction);
+
+// Across intent routes
+app.get("/across/quote", AcrossController.getQuote);
+app.get("/across/limits", AcrossController.getLimits);
+app.get("/across/routes", AcrossController.getRoutes);
+app.get("/across/status", AcrossController.getStatus);
+app.get("/across/tokens", AcrossController.getTokens);
+app.post("/across/initiate", AcrossController.initiate);
+app.post("/across/initiate-by-symbol", AcrossController.initiateBySymbol);
 
 app.listen(port, async () => {
   try {
