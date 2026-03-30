@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
@@ -31,17 +31,6 @@ interface AssetsProps {
 
 const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
 
-const earnPath = (s: ApySource): string => {
-  switch (s.source) {
-    case "lending": return "/dashboard/earn-lending";
-    case "vault": return "/dashboard/earn-vault";
-    case "swap": case "weighted_swap":
-      return s.poolAddress ? `/dashboard/earn-pools?pool=${s.poolAddress}` : "/dashboard/earn-pools";
-    case "safety": return "/dashboard/advanced?tab=safety";
-    default: return "/dashboard/earn";
-  }
-};
-
 const AssetsList = ({
   loading,
   tokens,
@@ -51,18 +40,22 @@ const AssetsList = ({
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
-  const navigate = useNavigate();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
 
-  const bestApyByAddr = useMemo(() => {
-    const m = new Map<string, ApySource>();
+  const earnByAddr = useMemo(() => {
+    const m = new Map<string, { native?: ApySource; base?: ApySource; total: number }>();
     for (const entry of tokenApys) {
       let best: ApySource | null = null;
+      let base: ApySource | undefined;
       for (const a of entry.apys) {
-        if (a.source === "base") continue;
+        if (a.source === "base") { base = a; continue; }
         if (!best || parseFloat(a.apy) > parseFloat(best.apy)) best = a;
       }
-      if (best && parseFloat(best.apy) > 0) m.set(normAddr(entry.token), best);
+      if (best && parseFloat(best.apy) <= 0) best = null;
+      if (!best && !base) continue;
+      const total = (best ? parseFloat(best.apy) : 0) + (base ? parseFloat(base.apy) : 0);
+      if (total <= 0) continue;
+      m.set(normAddr(entry.token), { native: best ?? undefined, base, total });
     }
     return m;
   }, [tokenApys]);
@@ -126,6 +119,9 @@ const AssetsList = ({
                   Asset
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                  Earn Up To
+                </th>
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Price
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
@@ -146,7 +142,7 @@ const AssetsList = ({
               {shouldShowLoading ? (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
@@ -178,43 +174,57 @@ const AssetsList = ({
                             </div>
                           )}
                           <div className="ml-2 md:ml-3 min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Link
-                                      to={getAssetDetailHref(asset)}
-                                      className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
-                                    >
-                                      {asset?._symbol || asset?._name || ""}
-                                    </Link>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{asset?._name || ""}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                              {tokenApysLoaded && (() => {
-                                const best = bestApyByAddr.get(normAddr(asset?.address || ""));
-                                if (!best) return null;
-                                return (
-                                  <span
-                                    role="link"
-                                    tabIndex={0}
-                                    className="inline-flex items-center gap-0.5 shrink-0 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-500 cursor-pointer hover:bg-green-500/20 transition-colors"
-                                    onClick={() => navigate(earnPath(best))}
-                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(earnPath(best)); } }}
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link
+                                    to={getAssetDetailHref(asset)}
+                                    className="font-medium text-sm md:text-base text-blue-600 truncate hover:text-blue-800 underline transition-colors"
                                   >
-                                    Earn up to {best.apy}% {"\u2192"}
-                                  </span>
-                                );
-                              })()}
-                            </div>
+                                    {asset?._symbol || asset?._name || ""}
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{asset?._name || ""}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <p className="hidden md:block text-muted-foreground text-xs truncate">
                               {asset?._name || ""}
                             </p>
                           </div>
                         </div>
+                      </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        {(() => {
+                          const info = tokenApysLoaded ? earnByAddr.get(normAddr(asset?.address || "")) : undefined;
+                          if (!info) return <p className="text-sm text-muted-foreground">-</p>;
+                          return (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="text-sm font-medium text-green-500 cursor-default">{info.total.toFixed(2)}%</span>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="text-xs">
+                                  <div className="flex flex-col gap-1">
+                                    {info.native && (
+                                      <div className="flex justify-between gap-4">
+                                        <span className="text-muted-foreground">Native APY:</span>
+                                        <span className="font-medium">{info.native.apy}%</span>
+                                      </div>
+                                    )}
+                                    {info.base && (
+                                      <div className="flex justify-between gap-4">
+                                        <span className="text-muted-foreground">Base APY:</span>
+                                        <span className="font-medium">{info.base.apy}%</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        })()}
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
@@ -269,7 +279,7 @@ const AssetsList = ({
               ) : (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
