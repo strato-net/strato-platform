@@ -53,7 +53,6 @@ export const cdpRegistry = process.env.CDP_REGISTRY || "000000000000000000000000
 
 export const safetyModule = process.env.SAFETY_MODULE || "0000000000000000000000000000000000001015";
 export const sToken = process.env.SUSDST_ADDRESS || "0000000000000000000000000000000000001016";
-export const saveUsdstVault = process.env.SAVE_USDST_VAULT || "ceeb982f671b4ee2b4471e5b49f3126739537f15";
 export const featuredEarnOpportunity = process.env.FEATURED_EARN_OPPORTUNITY || "save-usdst";
 
 // Hidden swap pools - these pools are filtered out from API responses
@@ -103,6 +102,11 @@ export const defaultVaultFor: Record<string, string> = {
   "33056204878082667": "34bc729f66106a146b0864e673a3571b28fa23e1", // Upquark mainnet
 };
 
+export const defaultSaveUsdstVaultFor: Record<string, string> = {
+  "114784819836269": "ceeb982f671b4ee2b4471e5b49f3126739537f15", // Helium testnet
+  "33056204878082667": "22550671fcad04a213697ac7ae4f4366e96446ed", // Upquark mainnet
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
@@ -112,6 +116,7 @@ export let vaultFactory: string = '';
 export let metalForge: string = '';
 export let creditCardTopUp: string = '';
 export let vault: string = '';
+export let saveUsdstVault: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -166,6 +171,22 @@ export function setCreditCardTopUpConfig(networkId: string) {
   }
 }
 
+export function setSaveUsdstVaultConfig(networkId: string) {
+  if (process.env.SAVE_USDST_VAULT) {
+    saveUsdstVault = process.env.SAVE_USDST_VAULT;
+  } else {
+    saveUsdstVault = defaultSaveUsdstVaultFor[networkId];
+  }
+}
+
+export function setVaultConfig(networkId: string) {
+  if (process.env.VAULT) {
+    vault = process.env.VAULT;
+  } else {
+    vault = defaultVaultFor[networkId];
+  }
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -181,7 +202,8 @@ export async function initNetworkConfig() {
   setVaultFactoryConfig(networkId);
   setMetalForgeConfig(networkId);
   setCreditCardTopUpConfig(networkId);
-  vault = process.env.VAULT || defaultVaultFor[networkId] || '';
+  setSaveUsdstVaultConfig(networkId);
+  setVaultConfig(networkId);
 }
 
 /**
