@@ -237,7 +237,8 @@ function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: Confi
 
 interface RebaseFactorEntry {
     targetAddress: string;
-    factor: number;
+    // WAD-normalized (1e18) factor pushed on-chain; app side divides by 1e18
+    factor: bigint;
 }
 
 async function applyRebaseFactors(
@@ -260,12 +261,16 @@ async function applyRebaseFactors(
         }
 
         try {
-            const factor = await withTimeout(fetchRebaseFactor(assetKey, rebase), TIMEOUTS.FETCH);
-            if (factor <= 0) continue;
+            const rawFactor = await withTimeout(fetchRebaseFactor(assetKey, rebase), TIMEOUTS.FETCH);
+            if (rawFactor <= 0n) continue;
 
-            const precision = Number(rebase.factorPrecision);
-            const rebasedPrice = Math.floor(underlying.medianPrice * factor / precision);
-            const sourceName = `${rebase.underlyingAsset}×rebaseFactor (${factor / precision})`;
+            const precision = BigInt(rebase.factorPrecision);
+            // WAD-normalize: app side always divides by 1e18 regardless of factorPrecision
+            const wadFactor = rawFactor * 1000000000000000000n / precision;
+            if (wadFactor <= 0n) continue;
+
+            const rebasedPrice = Number(BigInt(underlying.medianPrice) * rawFactor / precision);
+            const sourceName = `${rebase.underlyingAsset}×rebaseFactor (${Number(rawFactor * 10000n / precision) / 10000})`;
 
             const previousPrice = previousPrices.get(asset.targetAssetAddress.toLowerCase()) || 0;
             checkPriceChange(assetKey, rebasedPrice, previousPrice);
@@ -278,9 +283,9 @@ async function applyRebaseFactors(
                 expectedSourceCount: 1,
             });
 
-            collectedFactors.push({ targetAddress: asset.targetAssetAddress, factor });
+            collectedFactors.push({ targetAddress: asset.targetAssetAddress, factor: wadFactor });
 
-            logInfo('CronScheduler', `${assetKey}: rebased price $${(rebasedPrice / 1e18).toFixed(4)} (underlying=$${(underlying.medianPrice / 1e18).toFixed(4)}, factor=${factor})`);
+            logInfo('CronScheduler', `${assetKey}: rebased price $${(rebasedPrice / 1e18).toFixed(4)} (underlying=$${(underlying.medianPrice / 1e18).toFixed(4)}, wadFactor=${wadFactor})`);
         } catch (err) {
             logError('CronScheduler', new Error(`${assetKey}: rebase factor fetch failed: ${(err as Error).message}`));
         }
