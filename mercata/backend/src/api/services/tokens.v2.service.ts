@@ -9,7 +9,41 @@ import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 
-const { Token, CollateralVault, CDPEngine, DECIMALS } = constants;
+const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS } = constants;
+
+// Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
+// Returns a map of stratoToken -> externalSymbol.
+// Used to display the equivalent quantity of an external rebasing token in the UI.
+// Omits tokens who map to multiple different externalSymbol values for different chains.
+const getRebasingExternalSymbols = async (
+  accessToken: string,
+  stratoTokenAddresses: string[]
+): Promise<Map<string, string>> => {
+  if (!stratoTokenAddresses.length || !mercataBridge) return new Map();
+  const { data } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, {
+    params: {
+      address: `eq.${mercataBridge}`,
+      "value->>stratoToken": `in.(${stratoTokenAddresses.join(",")})`,
+      select: "value->>stratoToken,value->>externalSymbol",
+    },
+  }).catch(() => ({ data: [] }));
+
+  const symbolsByToken = new Map<string, Set<string>>();
+  for (const row of data || []) {
+    const stratoToken = (row.stratoToken || "").toLowerCase().replace(/^0x/, "");
+    const sym: string = row.externalSymbol;
+    if (!stratoToken || !sym) continue;
+    if (!symbolsByToken.has(stratoToken)) symbolsByToken.set(stratoToken, new Set());
+    symbolsByToken.get(stratoToken)!.add(sym);
+  }
+
+  const result = new Map<string, string>();
+  for (const [stratoToken, symbols] of symbolsByToken) {
+    if (symbols.size === 1) result.set(stratoToken, [...symbols][0]);
+    // size > 1 → conflicting symbols across routes → omit
+  }
+  return result;
+};
 
 const buildSaveUsdstEarningAsset = (
   info: Awaited<ReturnType<typeof getSaveUsdstInfo>>,
@@ -124,6 +158,13 @@ export const getEarningAssets = async (
     )
   );
 
+  const rebasingAddresses = (tokens.data || [])
+    .map((t: any) => t.address as string)
+    .filter((addr: string) => rebaseFactorMap.has(addr));
+
+  const rebasingExternalSymbolMap = await getRebasingExternalSymbols(accessToken, rebasingAddresses)
+    .catch(() => new Map<string, string>());
+
   const earningAssets = (tokens.data || []).map((t: any) => {
     const balance = t.balances?.[0]?.balance || "0";
     const price = rawPrices.get(t.address) || "0";
@@ -137,6 +178,7 @@ export const getEarningAssets = async (
         : "0.00";
 
     const rebaseFactor = rebaseFactorMap.get(t.address);
+    const rebasingExternalSymbol = rebaseFactor ? rebasingExternalSymbolMap.get(t.address) : undefined;
 
     return {
       ...t,
@@ -152,6 +194,7 @@ export const getEarningAssets = async (
         t.description === "Liquidity Provider Token",
       value,
       ...(rebaseFactor ? { rebaseFactor } : {}),
+      ...(rebasingExternalSymbol ? { rebasingExternalSymbol } : {}),
     };
   });
 
