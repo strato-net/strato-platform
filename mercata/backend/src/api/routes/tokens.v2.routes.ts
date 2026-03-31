@@ -58,6 +58,29 @@ router.get("/earning-assets/public", authHandler.authorizeRequest(true), TokensV
 
 /**
  * @openapi
+ * /tokens/v2/net-balance:
+ *   get:
+ *     summary: Get current net balance (assets minus debt) for the signed-in user
+ *     tags: [Tokens]
+ *     responses:
+ *       200:
+ *         description: Net balance snapshot
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 netBalance:
+ *                   type: number
+ *                 totalBorrowed:
+ *                   type: number
+ *                 totalAssetValue:
+ *                   type: number
+ */
+router.get("/net-balance", authHandler.authorizeRequest(), TokensV2Controller.getNetBalanceSnapshot);
+
+/**
+ * @openapi
  * /tokens/v2/balance-history:
  *   get:
  *     summary: Get token balance history for the signed-in user (v2)
