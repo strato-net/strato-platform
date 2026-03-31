@@ -41,7 +41,6 @@ generateDockerComposeAllDocker = do
         , init = Just True
         , environment = Just $ Map.fromList
             [ ("NODE_URL", "http://nginx")
-            , ("BASE_URL", "https://${NODE_HOST}")
             , ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
             , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
             , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA}")
