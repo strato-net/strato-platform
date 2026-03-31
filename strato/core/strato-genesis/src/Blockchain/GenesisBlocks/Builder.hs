@@ -7,11 +7,9 @@ import Blockchain.GenesisBlocks.Contracts.UserRegistry
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Validator
 
-buildGenesisInfo :: [Address] -> [Validator] -> [Address] -> GenesisInfo -> GenesisInfo
-buildGenesisInfo extraFaucets validatorList admins gi =
-  let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
-      faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-   in insertUserRegistryContract
-        . insertMercataGovernanceContract (admins !! 0) validatorList admins
-        $ gi {addressInfo = faucetAccounts ++ (addressInfo gi)}
+buildGenesisInfo :: [Validator] -> [Address] -> GenesisInfo -> GenesisInfo
+buildGenesisInfo validatorList admins gi =
+  insertUserRegistryContract
+    . insertMercataGovernanceContract (admins !! 0) validatorList admins
+    $ gi
 
