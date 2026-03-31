@@ -20,6 +20,7 @@ const {
   Pool,
   poolFactory,
   StablePool,
+  MetalForge,
 } = constants;
 
 /**
@@ -56,6 +57,7 @@ export interface AggregatedProtocolRevenue {
     lending: ProtocolRevenue;
     swap: ProtocolRevenue;
     stablePool: ProtocolRevenue;
+    metalForge: ProtocolRevenue;
     gas: ProtocolRevenue;
   };
   aggregated: RevenueByPeriod;
@@ -894,6 +896,101 @@ export const getGasCostRevenue = async (
 };
 
 /**
+ * Get protocol revenue from MetalForge mint fees
+ * Revenue = Σ(feeAmount) from MetalMinted events, converted to USD
+ */
+export const getMetalForgeProtocolRevenue = async (
+  accessToken: string,
+): Promise<ProtocolRevenue> => {
+  try {
+    const metalForgeAddress = constants.metalForge;
+
+    const emptyRevenue: ProtocolRevenue = {
+      totalRevenue: "0",
+      revenueByPeriod: {
+        daily: { total: "0", byAsset: [] },
+        weekly: { total: "0", byAsset: [] },
+        monthly: { total: "0", byAsset: [] },
+        ytd: { total: "0", byAsset: [] },
+        allTime: { total: "0", byAsset: [] }
+      }
+    };
+
+    if (!metalForgeAddress) return emptyRevenue;
+
+    const { data: mintEvents } = await cirrus.get(accessToken, `/${MetalForge}-MetalMinted`, {
+      params: {
+        address: `eq.${metalForgeAddress}`,
+        select: "payToken,feeAmount::text,block_timestamp",
+        order: "block_timestamp.desc"
+      }
+    });
+
+    if (!mintEvents || mintEvents.length === 0) return emptyRevenue;
+
+    const timeCutoffs = getTimeCutoffs();
+    const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
+    const DECIMALS = 10n ** 18n;
+
+    // Get unique pay tokens and fetch prices
+    const payTokens = [...new Set<string>(mintEvents.map((e: any) => (e.payToken as string).toLowerCase()))];
+    const priceMap = new Map<string, bigint>();
+    await Promise.all(
+      payTokens.map(async (tokenAddress) => {
+        try {
+          const priceData = await getPrice(accessToken, tokenAddress) as { asset: string; price: string };
+          priceMap.set(tokenAddress, BigInt(priceData.price || "0"));
+        } catch {
+          priceMap.set(tokenAddress, 0n);
+        }
+      })
+    );
+
+    // Transform events: convert feeAmount to USD using payToken price
+    const transformedEvents = mintEvents.map((event: any) => {
+      const payToken = (event.payToken as string).toLowerCase();
+      const feeAmount = BigInt(event.feeAmount || "0");
+      const price = priceMap.get(payToken) || 0n;
+      return {
+        value: (feeAmount * price) / DECIMALS,
+        timestamp: parseTimestamp(event.block_timestamp),
+        asset: payToken
+      };
+    });
+
+    const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
+
+    const tokenSymbolCache = new Map<string, string>();
+    const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
+      buildRevenueArray(accessToken, periodRevenue.allTime, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.daily, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.weekly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
+    ]);
+
+    const calculateTotal = (revenueMap: Record<string, bigint>): string =>
+      Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
+
+    return {
+      totalRevenue: calculateTotal(periodRevenue.allTime),
+      revenueByPeriod: {
+        daily: { total: calculateTotal(periodRevenue.daily), byAsset: dailyArray },
+        weekly: { total: calculateTotal(periodRevenue.weekly), byAsset: weeklyArray },
+        monthly: { total: calculateTotal(periodRevenue.monthly), byAsset: monthlyArray },
+        ytd: { total: calculateTotal(periodRevenue.ytd), byAsset: ytdArray },
+        allTime: { total: calculateTotal(periodRevenue.allTime), byAsset: allTimeArray }
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching metal forge protocol revenue:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch metal forge protocol revenue");
+  }
+};
+
+/**
  * Get aggregated protocol revenue across all protocols
  */
 export const getAggregatedProtocolRevenue = async (
@@ -902,15 +999,16 @@ export const getAggregatedProtocolRevenue = async (
 ): Promise<AggregatedProtocolRevenue> => {
   try {
     // Fetch revenue data from all protocols in parallel
-    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, gasRevenue] = await Promise.all([
+    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, metalForgeRevenue, gasRevenue] = await Promise.all([
       getCDPProtocolRevenue(accessToken, userAddress),
       getLendingProtocolRevenue(accessToken),
       getSwapProtocolRevenue(accessToken),
       getStablePoolProtocolRevenue(accessToken),
+      getMetalForgeProtocolRevenue(accessToken),
       getGasCostRevenue(accessToken)
     ]);
 
-    const allProtocols = [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, gasRevenue];
+    const allProtocols = [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, metalForgeRevenue, gasRevenue];
     
     // Helper to aggregate revenues across protocols
     const aggregateRevenues = (...revenues: RevenueByAsset[][]): RevenueByAsset[] => {
@@ -964,6 +1062,7 @@ export const getAggregatedProtocolRevenue = async (
         lending: lendingRevenue,
         swap: swapRevenue,
         stablePool: stablePoolRevenue,
+        metalForge: metalForgeRevenue,
         gas: gasRevenue
       },
       aggregated
@@ -983,7 +1082,7 @@ export const getProtocolRevenueByPeriod = async (
   accessToken: string,
   userAddress: string,
   period: 'daily' | 'weekly' | 'monthly' | 'ytd' | 'allTime',
-  protocol?: 'cdp' | 'lending' | 'swap' | 'stablePool' | 'gas'
+  protocol?: 'cdp' | 'lending' | 'swap' | 'stablePool' | 'metalForge' | 'gas'
 ): Promise<RevenuePeriod> => {
   try {
     if (protocol) {
@@ -1000,6 +1099,9 @@ export const getProtocolRevenueByPeriod = async (
           break;
         case 'stablePool':
           revenue = await getStablePoolProtocolRevenue(accessToken);
+          break;
+        case 'metalForge':
+          revenue = await getMetalForgeProtocolRevenue(accessToken);
           break;
         case 'gas':
           revenue = await getGasCostRevenue(accessToken);

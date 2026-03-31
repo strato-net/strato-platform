@@ -73,6 +73,7 @@ interface AggregatedRevenueResponse {
     lending: ProtocolRevenueResponse;
     swap: ProtocolRevenueResponse;
     stablePool: ProtocolRevenueResponse;
+    metalForge: ProtocolRevenueResponse;
     gas: ProtocolRevenueResponse;
   };
   aggregated: RevenuePeriod;
@@ -111,6 +112,9 @@ const StratoStats = () => {
 
   const [stablePoolTotalRevenue, setStablePoolTotalRevenue] = useState<string>('0');
   const [stablePoolRevenueByPeriod, setStablePoolRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+
+  const [metalForgeTotalRevenue, setMetalForgeTotalRevenue] = useState<string>('0');
+  const [metalForgeRevenueByPeriod, setMetalForgeRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
 
   const [lendingTotalRevenue, setLendingTotalRevenue] = useState<string>('0');
   const [lendingRevenueByPeriod, setLendingRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
@@ -182,6 +186,9 @@ const StratoStats = () => {
 
       setStablePoolTotalRevenue(response.data.byProtocol.stablePool.totalRevenue);
       setStablePoolRevenueByPeriod(response.data.byProtocol.stablePool.revenueByPeriod);
+
+      setMetalForgeTotalRevenue(response.data.byProtocol.metalForge.totalRevenue);
+      setMetalForgeRevenueByPeriod(response.data.byProtocol.metalForge.revenueByPeriod);
 
       setLendingTotalRevenue(response.data.byProtocol.lending.totalRevenue);
       setLendingRevenueByPeriod(response.data.byProtocol.lending.revenueByPeriod);
@@ -531,6 +538,24 @@ const StratoStats = () => {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} stable pool fees
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Metal Forge Revenue</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(metalForgeRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} metal mint fees
                       </p>
                     </CardContent>
                   </Card>
