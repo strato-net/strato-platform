@@ -5,7 +5,7 @@ if (apiKey) {
   sgMail.setApiKey(apiKey);
 }
 
-const METALS_INQUIRY_TO = "maxim_voyevoda@blockapps.net";
+const METALS_INQUIRY_TO = "metals@strato.nexus";
 const METALS_INQUIRY_FROM = "no-reply@strato.nexus";
 
 /** Fields for a physical-metals inquiry email (other contact types can use their own types here later). */
