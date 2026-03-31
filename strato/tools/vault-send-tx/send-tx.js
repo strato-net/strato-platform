@@ -107,7 +107,9 @@ function toBigIntOrUndefined(value) {
 }
 
 async function signTransaction(provider, fromAddress, txRequest) {
-  const to = txRequest.to || fromAddress;
+  const to = Object.prototype.hasOwnProperty.call(txRequest, "to")
+    ? txRequest.to
+    : fromAddress;
   const value =
     txRequest.value !== undefined
       ? toBigIntOrUndefined(txRequest.value)
@@ -124,7 +126,6 @@ async function signTransaction(provider, fromAddress, txRequest) {
     type: 2,
     chainId,
     nonce: txRequest.nonce ?? nonce,
-    to,
     value,
     data,
     maxFeePerGas: toBigIntOrUndefined(txRequest.maxFeePerGas) ?? feeData.maxFeePerGas,
@@ -132,10 +133,13 @@ async function signTransaction(provider, fromAddress, txRequest) {
       toBigIntOrUndefined(txRequest.maxPriorityFeePerGas) ?? feeData.maxPriorityFeePerGas,
     gasLimit: toBigIntOrUndefined(txRequest.gasLimit) ?? 21000n,
   };
+  if (to !== null && to !== undefined) {
+    tx.to = to;
+  }
 
   console.log("\n--- Unsigned Transaction ---");
   console.log("  from:                ", fromAddress);
-  console.log("  to:                  ", tx.to);
+  console.log("  to:                  ", tx.to ?? "[contract creation]");
   console.log("  value:               ", ethers.formatEther(tx.value), "ETH");
   console.log("  nonce:               ", tx.nonce);
   console.log("  maxFeePerGas:        ", ethers.formatUnits(tx.maxFeePerGas, "gwei"), "gwei");

@@ -158,6 +158,96 @@ Additional environment variables:
 | `ORIGIN_RPC` | Across chain RPC | Override origin RPC |
 | `DESTINATION_RPC` | Across chain RPC | Override destination RPC |
 
+## Test token workflow
+
+To try a custom-asset route, this package also includes a plain owner-mintable
+ERC-20 and scripts to deploy/mint it with the vault signer.
+
+Files:
+- `TestMintableERC20.sol`
+- `deploy-test-token.js`
+- `mint-test-token.js`
+
+Deploy on the current `NETWORK_RPC` chain:
+
+```bash
+# Dry-run deployment
+node deploy-test-token.js --name "Test USDST" --symbol tUSDST --decimals 18
+
+# Broadcast deployment
+node deploy-test-token.js --name "Test USDST" --symbol tUSDST --decimals 18 --submit
+```
+
+Mint after deployment:
+
+```bash
+# Dry-run mint
+node mint-test-token.js \
+  --token 0x... \
+  --to 0x... \
+  --amount 1000 \
+  --decimals 18
+
+# Broadcast mint
+node mint-test-token.js \
+  --token 0x... \
+  --to 0x... \
+  --amount 1000 \
+  --decimals 18 \
+  --submit
+```
+
+Minimal experiment flow:
+- deploy the same test token to `Sepolia` and `Base Sepolia`
+- mint inventory on both chains
+- quote/custom-fill the exact token addresses with `across-bridge.js --input-token ... --output-token ...`
+- run your own relayer/filler against that route
+
+## Self-relayed custom fills
+
+For custom token routes that the public Across quote path will not price, you can
+use the included self-relay script to:
+- approve the origin and destination SpokePools
+- submit a direct `depositV3Now()` on the origin chain
+- parse the emitted `FundsDeposited` event
+- call `fillV3Relay()` on the destination chain using your own inventory
+
+Example:
+
+```bash
+node self-relay-fill.js \
+  --input-token 0x... \
+  --output-token 0x... \
+  --recipient 0x... \
+  --amount 1 \
+  --decimals 18 \
+  --submit
+```
+
+Optional flags:
+- `--input-token 0x...`
+- `--output-token 0x...`
+- `--recipient 0x...` defaults to the vault address
+- `--amount 1`
+- `--decimals 18`
+- `--fill-deadline-offset 3600`
+
+## Refund check
+
+To watch whether the origin spoke pool has created a claimable relayer refund for
+the custom token, use:
+
+```bash
+node check-relayer-refund.js \
+  --token 0x... \
+  --relayer 0x...
+```
+
+Optional flags:
+- `--rpc https://...`
+- `--spoke-pool 0x...`
+- `--lookback-blocks 50000`
+
 ## Environment variables
 
 | Variable      | Default                                        | Description                          |
