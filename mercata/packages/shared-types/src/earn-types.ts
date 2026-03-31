@@ -1,5 +1,5 @@
 export interface ApySource {
-  source: "lending" | "swap" | "vault" | "safety";
+  source: "lending" | "swap" | "vault" | "safety" | "yield";
   apy: string;
   meta?: string;
   /** Lowercase pool address without 0x; swap sources only */
