@@ -72,6 +72,7 @@ interface AggregatedRevenueResponse {
     cdp: ProtocolRevenueResponse;
     lending: ProtocolRevenueResponse;
     swap: ProtocolRevenueResponse;
+    stablePool: ProtocolRevenueResponse;
     gas: ProtocolRevenueResponse;
   };
   aggregated: RevenuePeriod;
@@ -107,6 +108,9 @@ const StratoStats = () => {
 
   const [swapTotalRevenue, setSwapTotalRevenue] = useState<string>('0');
   const [swapRevenueByPeriod, setSwapRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+
+  const [stablePoolTotalRevenue, setStablePoolTotalRevenue] = useState<string>('0');
+  const [stablePoolRevenueByPeriod, setStablePoolRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
 
   const [lendingTotalRevenue, setLendingTotalRevenue] = useState<string>('0');
   const [lendingRevenueByPeriod, setLendingRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
@@ -175,6 +179,9 @@ const StratoStats = () => {
 
       setSwapTotalRevenue(response.data.byProtocol.swap.totalRevenue);
       setSwapRevenueByPeriod(response.data.byProtocol.swap.revenueByPeriod);
+
+      setStablePoolTotalRevenue(response.data.byProtocol.stablePool.totalRevenue);
+      setStablePoolRevenueByPeriod(response.data.byProtocol.stablePool.revenueByPeriod);
 
       setLendingTotalRevenue(response.data.byProtocol.lending.totalRevenue);
       setLendingRevenueByPeriod(response.data.byProtocol.lending.revenueByPeriod);
@@ -455,7 +462,7 @@ const StratoStats = () => {
                 </div>
 
                 {/* Revenue Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">CDP Revenue</CardTitle>
@@ -506,6 +513,24 @@ const StratoStats = () => {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} swap fees
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Stable Pool Revenue</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(stablePoolRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} stable pool fees
                       </p>
                     </CardContent>
                   </Card>

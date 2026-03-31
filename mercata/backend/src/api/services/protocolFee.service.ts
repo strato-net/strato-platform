@@ -19,6 +19,7 @@ const {
   PoolFactory,
   Pool,
   poolFactory,
+  StablePool,
 } = constants;
 
 /**
@@ -54,6 +55,7 @@ export interface AggregatedProtocolRevenue {
     cdp: ProtocolRevenue;
     lending: ProtocolRevenue;
     swap: ProtocolRevenue;
+    stablePool: ProtocolRevenue;
     gas: ProtocolRevenue;
   };
   aggregated: RevenueByPeriod;
@@ -629,6 +631,199 @@ export const getSwapProtocolRevenue = async (
 };
 
 /**
+ * Get protocol revenue from stable pool operations
+ *
+ * Revenue[T1,T2] = (adminBalances at T2 − adminBalances at T1) + Σ Transfer events in [T1,T2]
+ *
+ * Uses history@mapping for point-in-time snapshots of adminBalances.
+ * For allTime, T1 balances are 0 (empty map).
+ */
+export const getStablePoolProtocolRevenue = async (
+  accessToken: string,
+): Promise<ProtocolRevenue> => {
+  try {
+    const feeCollector = await getSwapFeeCollector(accessToken);
+
+    const { data: stablePoolsData } = await cirrus.get(accessToken, `/${StablePool}`, {
+      params: {
+        poolFactory: `eq.${poolFactory}`,
+        select: "address"
+      }
+    });
+
+    const emptyRevenue: ProtocolRevenue = {
+      totalRevenue: "0",
+      revenueByPeriod: {
+        daily: { total: "0", byAsset: [] },
+        weekly: { total: "0", byAsset: [] },
+        monthly: { total: "0", byAsset: [] },
+        ytd: { total: "0", byAsset: [] },
+        allTime: { total: "0", byAsset: [] }
+      }
+    };
+
+    if (!stablePoolsData || stablePoolsData.length === 0) {
+      return emptyRevenue;
+    }
+
+    const stablePoolAddresses: string[] = stablePoolsData.map((e: any) => e.address);
+    const poolFilter = `in.(${stablePoolAddresses.join(",")})`;
+    const timeCutoffs = getTimeCutoffs();
+    const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
+    const toIso = (ts: number) => new Date(ts * 1000).toISOString();
+
+    // Point-in-time snapshot of adminBalances across all stable pools, summed by token
+    const getAdminBalancesAt = async (isoTimestamp: string): Promise<Map<string, bigint>> => {
+      const { data } = await cirrus.get(accessToken, "/history@mapping", {
+        params: {
+          address: poolFilter,
+          collection_name: "eq.adminBalances",
+          valid_from: `lte.${isoTimestamp}`,
+          valid_to: `gte.${isoTimestamp}`,
+          select: "key->>key,value::text"
+        }
+      });
+      const map = new Map<string, bigint>();
+      for (const row of (data || [])) {
+        const token = String(row["key->>key"] ?? row.key ?? "").toLowerCase();
+        if (!token) continue;
+        const rawVal = String(row.value ?? row["value::text"] ?? "0").trim();
+        let val: bigint;
+        try { val = BigInt(rawVal || "0"); } catch { val = 0n; }
+        if (val > 0n) map.set(token, (map.get(token) || 0n) + val);
+      }
+      return map;
+    };
+
+    // Fetch all snapshots and Transfer events in parallel
+    const [nowBalances, dailyStartBal, weeklyStartBal, monthlyStartBal, ytdStartBal, transferRes] =
+      await Promise.all([
+        getAdminBalancesAt(toIso(timeCutoffs.now)),
+        getAdminBalancesAt(toIso(oneDayAgo)),
+        getAdminBalancesAt(toIso(oneWeekAgo)),
+        getAdminBalancesAt(toIso(oneMonthAgo)),
+        getAdminBalancesAt(toIso(ytdCutoff)),
+        cirrus.get(accessToken, `/event`, {
+          params: {
+            event_name: "eq.Transfer",
+            select: "address,attributes,block_timestamp",
+            "attributes->>from": poolFilter,
+            "attributes->>to": `eq.${feeCollector}`,
+            order: "block_timestamp.desc"
+          }
+        })
+      ]);
+
+    const transferEvents: any[] = transferRes.data || [];
+
+    // Bucket Transfer events by period and token (raw token amounts)
+    const emptyBucket = () => new Map<string, bigint>();
+    const transferBuckets = {
+      daily: emptyBucket(), weekly: emptyBucket(), monthly: emptyBucket(),
+      ytd: emptyBucket(), allTime: emptyBucket()
+    };
+
+    for (const event of transferEvents) {
+      const token = event.address?.toLowerCase();
+      if (!token) continue;
+      const rawAmount = event.attributes?.value;
+      const amount = BigInt(rawAmount || "0");
+      if (amount === 0n) continue;
+      const ts = parseTimestamp(event.block_timestamp);
+
+      transferBuckets.allTime.set(token, (transferBuckets.allTime.get(token) || 0n) + amount);
+      if (ts >= oneDayAgo) transferBuckets.daily.set(token, (transferBuckets.daily.get(token) || 0n) + amount);
+      if (ts >= oneWeekAgo) transferBuckets.weekly.set(token, (transferBuckets.weekly.get(token) || 0n) + amount);
+      if (ts >= oneMonthAgo) transferBuckets.monthly.set(token, (transferBuckets.monthly.get(token) || 0n) + amount);
+      if (ts >= ytdCutoff) transferBuckets.ytd.set(token, (transferBuckets.ytd.get(token) || 0n) + amount);
+    }
+
+    // Revenue[T1,T2] = (adminBal@T2 − adminBal@T1) + transfers in [T1,T2]
+    const computePeriodRevenue = (
+      startBal: Map<string, bigint>,
+      endBal: Map<string, bigint>,
+      transfers: Map<string, bigint>,
+      priceMap: Map<string, bigint>
+    ): Record<string, bigint> => {
+      const DECIMALS = 10n ** 18n;
+      const allTokens = new Set([...startBal.keys(), ...endBal.keys(), ...transfers.keys()]);
+      const result: Record<string, bigint> = {};
+      for (const token of allTokens) {
+        const delta = (endBal.get(token) || 0n) - (startBal.get(token) || 0n);
+        const swept = transfers.get(token) || 0n;
+        const rawRevenue = delta + swept;
+        if (rawRevenue <= 0n) continue;
+        const price = priceMap.get(token) || 0n;
+        const usdRevenue = (rawRevenue * price) / DECIMALS;
+        if (usdRevenue > 0n) result[token] = usdRevenue;
+      }
+      return result;
+    };
+
+    // Collect all token addresses for price lookup
+    const tokenSet = new Set<string>();
+    for (const m of [nowBalances, dailyStartBal, weeklyStartBal, monthlyStartBal, ytdStartBal,
+      transferBuckets.daily, transferBuckets.weekly, transferBuckets.monthly,
+      transferBuckets.ytd, transferBuckets.allTime]) {
+      for (const k of m.keys()) tokenSet.add(k);
+    }
+
+    if (tokenSet.size === 0) return emptyRevenue;
+
+    const priceMap = new Map<string, bigint>();
+    await Promise.all(
+      [...tokenSet].map(async (tokenAddress) => {
+        try {
+          const priceData = await getPrice(accessToken, tokenAddress) as { asset: string; price: string };
+          priceMap.set(tokenAddress, BigInt(priceData.price || "0"));
+        } catch {
+          priceMap.set(tokenAddress, 0n);
+        }
+      })
+    );
+
+    const emptyMap = new Map<string, bigint>();
+    const periodRevenue = {
+      daily: computePeriodRevenue(dailyStartBal, nowBalances, transferBuckets.daily, priceMap),
+      weekly: computePeriodRevenue(weeklyStartBal, nowBalances, transferBuckets.weekly, priceMap),
+      monthly: computePeriodRevenue(monthlyStartBal, nowBalances, transferBuckets.monthly, priceMap),
+      ytd: computePeriodRevenue(ytdStartBal, nowBalances, transferBuckets.ytd, priceMap),
+      allTime: computePeriodRevenue(emptyMap, nowBalances, transferBuckets.allTime, priceMap),
+    };
+
+    const tokenSymbolCache = new Map<string, string>();
+    const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
+      buildRevenueArray(accessToken, periodRevenue.allTime, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.daily, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.weekly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
+    ]);
+
+    const calculateTotal = (revenueMap: Record<string, bigint>): string => {
+      return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
+    };
+
+    return {
+      totalRevenue: calculateTotal(periodRevenue.allTime),
+      revenueByPeriod: {
+        daily: { total: calculateTotal(periodRevenue.daily), byAsset: dailyArray },
+        weekly: { total: calculateTotal(periodRevenue.weekly), byAsset: weeklyArray },
+        monthly: { total: calculateTotal(periodRevenue.monthly), byAsset: monthlyArray },
+        ytd: { total: calculateTotal(periodRevenue.ytd), byAsset: ytdArray },
+        allTime: { total: calculateTotal(periodRevenue.allTime), byAsset: allTimeArray }
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching stable pool protocol revenue:", {
+      error: error.response?.data || error.message,
+      stack: error.stack
+    });
+    throw new Error("Failed to fetch stable pool protocol revenue");
+  }
+};
+
+/**
  * Get gas cost revenue from transaction fees
  */
 export const getGasCostRevenue = async (
@@ -792,12 +987,15 @@ export const getAggregatedProtocolRevenue = async (
 ): Promise<AggregatedProtocolRevenue> => {
   try {
     // Fetch revenue data from all protocols in parallel
-    const [cdpRevenue, lendingRevenue, swapRevenue, gasRevenue] = await Promise.all([
+    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, gasRevenue] = await Promise.all([
       getCDPProtocolRevenue(accessToken, userAddress),
       getLendingProtocolRevenue(accessToken),
       getSwapProtocolRevenue(accessToken),
+      getStablePoolProtocolRevenue(accessToken),
       getGasCostRevenue(accessToken)
     ]);
+
+    const allProtocols = [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, gasRevenue];
     
     // Helper to aggregate revenues across protocols
     const aggregateRevenues = (...revenues: RevenueByAsset[][]): RevenueByAsset[] => {
@@ -827,87 +1025,22 @@ export const getAggregatedProtocolRevenue = async (
         });
     };
     
-    // Aggregate totals
-    const totalRevenue = (
-      BigInt(cdpRevenue.totalRevenue) +
-      BigInt(lendingRevenue.totalRevenue) +
-      BigInt(swapRevenue.totalRevenue) +
-      BigInt(gasRevenue.totalRevenue)
-    ).toString();
+    const totalRevenue = allProtocols
+      .reduce((sum, p) => sum + BigInt(p.totalRevenue), 0n)
+      .toString();
     
-    // Aggregate each time period
-    const aggregated: RevenueByPeriod = {
-      daily: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.daily.total) +
-          BigInt(lendingRevenue.revenueByPeriod.daily.total) +
-          BigInt(swapRevenue.revenueByPeriod.daily.total) +
-          BigInt(gasRevenue.revenueByPeriod.daily.total)
-        ).toString(),
+    const periods: (keyof RevenueByPeriod)[] = ['daily', 'weekly', 'monthly', 'ytd', 'allTime'];
+    const aggregated = {} as RevenueByPeriod;
+    for (const period of periods) {
+      aggregated[period] = {
+        total: allProtocols
+          .reduce((sum, p) => sum + BigInt(p.revenueByPeriod[period].total), 0n)
+          .toString(),
         byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.daily.byAsset,
-          lendingRevenue.revenueByPeriod.daily.byAsset,
-          swapRevenue.revenueByPeriod.daily.byAsset,
-          gasRevenue.revenueByPeriod.daily.byAsset
+          ...allProtocols.map(p => p.revenueByPeriod[period].byAsset)
         )
-      },
-      weekly: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.weekly.total) +
-          BigInt(lendingRevenue.revenueByPeriod.weekly.total) +
-          BigInt(swapRevenue.revenueByPeriod.weekly.total) +
-          BigInt(gasRevenue.revenueByPeriod.weekly.total)
-        ).toString(),
-        byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.weekly.byAsset,
-          lendingRevenue.revenueByPeriod.weekly.byAsset,
-          swapRevenue.revenueByPeriod.weekly.byAsset,
-          gasRevenue.revenueByPeriod.weekly.byAsset
-        )
-      },
-      monthly: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.monthly.total) +
-          BigInt(lendingRevenue.revenueByPeriod.monthly.total) +
-          BigInt(swapRevenue.revenueByPeriod.monthly.total) +
-          BigInt(gasRevenue.revenueByPeriod.monthly.total)
-        ).toString(),
-        byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.monthly.byAsset,
-          lendingRevenue.revenueByPeriod.monthly.byAsset,
-          swapRevenue.revenueByPeriod.monthly.byAsset,
-          gasRevenue.revenueByPeriod.monthly.byAsset
-        )
-      },
-      ytd: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.ytd.total) +
-          BigInt(lendingRevenue.revenueByPeriod.ytd.total) +
-          BigInt(swapRevenue.revenueByPeriod.ytd.total) +
-          BigInt(gasRevenue.revenueByPeriod.ytd.total)
-        ).toString(),
-        byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.ytd.byAsset,
-          lendingRevenue.revenueByPeriod.ytd.byAsset,
-          swapRevenue.revenueByPeriod.ytd.byAsset,
-          gasRevenue.revenueByPeriod.ytd.byAsset
-        )
-      },
-      allTime: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.allTime.total) +
-          BigInt(lendingRevenue.revenueByPeriod.allTime.total) +
-          BigInt(swapRevenue.revenueByPeriod.allTime.total) +
-          BigInt(gasRevenue.revenueByPeriod.allTime.total)
-        ).toString(),
-        byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.allTime.byAsset,
-          lendingRevenue.revenueByPeriod.allTime.byAsset,
-          swapRevenue.revenueByPeriod.allTime.byAsset,
-          gasRevenue.revenueByPeriod.allTime.byAsset
-        )
-      }
-    };
+      };
+    }
     
     return {
       totalRevenue,
@@ -915,6 +1048,7 @@ export const getAggregatedProtocolRevenue = async (
         cdp: cdpRevenue,
         lending: lendingRevenue,
         swap: swapRevenue,
+        stablePool: stablePoolRevenue,
         gas: gasRevenue
       },
       aggregated
@@ -934,11 +1068,10 @@ export const getProtocolRevenueByPeriod = async (
   accessToken: string,
   userAddress: string,
   period: 'daily' | 'weekly' | 'monthly' | 'ytd' | 'allTime',
-  protocol?: 'cdp' | 'lending' | 'swap' | 'gas'
+  protocol?: 'cdp' | 'lending' | 'swap' | 'stablePool' | 'gas'
 ): Promise<RevenuePeriod> => {
   try {
     if (protocol) {
-      // Get specific protocol revenue
       let revenue: ProtocolRevenue;
       switch (protocol) {
         case 'cdp':
@@ -949,6 +1082,9 @@ export const getProtocolRevenueByPeriod = async (
           break;
         case 'swap':
           revenue = await getSwapProtocolRevenue(accessToken);
+          break;
+        case 'stablePool':
+          revenue = await getStablePoolProtocolRevenue(accessToken);
           break;
         case 'gas':
           revenue = await getGasCostRevenue(accessToken);
