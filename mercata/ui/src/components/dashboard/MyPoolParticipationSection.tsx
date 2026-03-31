@@ -5,6 +5,9 @@ import { formatBalance } from "@/utils/numberUtils";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { useVaultContext } from "@/context/VaultContext";
+import { useEarnContext } from "@/context/EarnContext";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { findBestNonVaultEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
 
@@ -19,12 +22,14 @@ export default function MyPoolParticipationSection({
   loading = false,
   guestMode = false,
 }: PoolParticipationProps) {
+  const normAddr = (value?: string | null) => (value || "").toLowerCase().replace(/^0x/, "");
   const hasData = poolTokens.length > 0;
   const shouldShowLoading = loading && !hasData;
 
   const { liquidityInfo, loadingLiquidity } = useLendingContext();
   const { pools, poolsLoading } = useSwapContext();
   const { vaultState } = useVaultContext();
+  const { tokenApys } = useEarnContext();
 
   const [expandedTokens, setExpandedTokens] = useState<Record<string, boolean>>(
     {}
@@ -34,35 +39,51 @@ export default function MyPoolParticipationSection({
     const map = new Map<string, any>();
     pools?.forEach((pool: any) => {
       const addr = pool.lpToken?.address;
-      if (addr) map.set(addr, pool);
+      if (addr) map.set(normAddr(addr), pool);
     });
     return map;
   }, [pools]);
 
   const resolveTokenAPY = useCallback(
-    (token: any): string | null => {
+    (token: any, pool?: any): { value: string | null; info: ReturnType<typeof findBestNonVaultEarnApyInfo> } => {
       if (liquidityInfo?.withdrawable?.address === token.address) {
-        return liquidityInfo.supplyAPY?.toFixed(2) || null;
+        const info = findBestNonVaultEarnApyInfo(tokenApys, token.address);
+        return { value: liquidityInfo.supplyAPY?.toFixed(2) || null, info };
       }
 
-      if (token._symbol === "SUSDST" || token._symbol === "safetyUSDST") return null;
+      if (token._symbol === "SUSDST" || token._symbol === "safetyUSDST") return { value: null, info: null };
 
       if (
         token._symbol?.endsWith("-LP") ||
         token.description === "Liquidity Provider Token"
       ) {
-        return lpTokenPoolMap.get(token.address)?.apy || null;
+        const resolvedPool =
+          pool ||
+          lpTokenPoolMap.get(normAddr(token.address)) ||
+          pools?.find((candidate: any) => candidate.lpToken?._symbol === token._symbol);
+        const info = resolvedPool ? findPoolEarnApyInfo(tokenApys, resolvedPool.address, resolvedPool.apy) : null;
+        return {
+          value: info ? info.total.toFixed(2) : resolvedPool?.apy || null,
+          info,
+        };
       }
 
       if (vaultState.shareTokenAddress && token.address === vaultState.shareTokenAddress) {
-        return vaultState.alpha && vaultState.alpha !== "0" && vaultState.alpha !== "-"
-          ? vaultState.alpha
-          : null;
+        return {
+          value: vaultState.alpha && vaultState.alpha !== "0" && vaultState.alpha !== "-"
+            ? vaultState.alpha
+            : null,
+          info: findVaultEarnApyInfo(tokenApys),
+        };
       }
 
-      return null;
+      const info = findBestNonVaultEarnApyInfo(tokenApys, token.address);
+      return {
+        value: info ? info.total.toFixed(2) : null,
+        info,
+      };
     },
-    [liquidityInfo, lpTokenPoolMap, vaultState.alpha]
+    [liquidityInfo, lpTokenPoolMap, pools, tokenApys, vaultState.alpha, vaultState.shareTokenAddress]
   );
 
   const rows = useMemo(
@@ -76,9 +97,13 @@ export default function MyPoolParticipationSection({
           token._symbol?.endsWith("-LP") ||
           token.description === "Liquidity Provider Token";
 
-        const pool = isLPToken ? lpTokenPoolMap.get(token.address) : null;
+        const pool = isLPToken
+          ? lpTokenPoolMap.get(normAddr(token.address)) || pools?.find((candidate: any) => candidate.lpToken?._symbol === token._symbol) || null
+          : null;
 
         const rawValue = token.value ? parseFloat(token.value) : 0;
+
+        const apyInfo = resolveTokenAPY(token, pool);
 
         return {
           token,
@@ -92,13 +117,14 @@ export default function MyPoolParticipationSection({
                   2
                 )
               : "-",
-          apy: resolveTokenAPY(token),
+          apy: apyInfo.value,
+          apyInfo: apyInfo.info,
           value: rawValue > 0 ? `$${rawValue.toFixed(2)}` : "-",
           isLPToken,
           pool,
         };
       }),
-    [poolTokens, lpTokenPoolMap, resolveTokenAPY]
+    [lpTokenPoolMap, poolTokens, pools, resolveTokenAPY]
   );
 
   const anyLoading = poolsLoading || loadingLiquidity || vaultState.loading;
@@ -139,7 +165,7 @@ export default function MyPoolParticipationSection({
         ) : (
           <div className="space-y-2">
             {rows.map(
-              ({ token, formattedBalance, apy, value, isLPToken, pool }) => {
+              ({ token, formattedBalance, apy, apyInfo, value, isLPToken, pool }) => {
                 const isExpanded = !!expandedTokens[token.address];
                 const canExpand = isLPToken && pool && formattedBalance !== "-";
 
@@ -180,7 +206,9 @@ export default function MyPoolParticipationSection({
                         ) : anyLoading ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
                         ) : apy ? (
-                          `${apy}%`
+                          <EarnApyTooltip info={apyInfo}>
+                            <span className="cursor-default">{apy}%</span>
+                          </EarnApyTooltip>
                         ) : (
                           "N/A"
                         )}
