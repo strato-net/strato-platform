@@ -17,6 +17,8 @@ const {
   LendingRegistry,
   CDPRegistry,
   PoolFactory,
+  Pool,
+  poolFactory,
 } = constants;
 
 /**
@@ -498,7 +500,7 @@ export const getLendingProtocolRevenue = async (
 };
 
 /**
- * Get protocol revenue from swap operations
+ * Get protocol revenue from swap operations for non-stable pools
  */
 export const getSwapProtocolRevenue = async (
   accessToken: string,
@@ -507,15 +509,16 @@ export const getSwapProtocolRevenue = async (
     // Get fee collector address
     const feeCollector = await getSwapFeeCollector(accessToken);
     
-    // Get all pools from the factory's allPools array
-    const { data: allPoolsData } = await cirrus.get(accessToken, `/${PoolFactory}-allPools`, {
+    // Get only non-stable (volatile) pools belonging to our PoolFactory
+    const { data: volatilePoolsData } = await cirrus.get(accessToken, `/${Pool}`, {
       params: {
-        address: `eq.${config.poolFactory}`,
-        select: "value"
+        isStable: "eq.false",
+        poolFactory: `eq.${poolFactory}`,
+        select: "address"
       }
     });
     
-    if (!allPoolsData || allPoolsData.length === 0) {
+    if (!volatilePoolsData || volatilePoolsData.length === 0) {
       return {
         totalRevenue: "0",
         revenueByPeriod: {
@@ -528,8 +531,7 @@ export const getSwapProtocolRevenue = async (
       };
     }
     
-    // Extract pool addresses from the allPools array
-    const poolAddresses = allPoolsData.map((entry: any) => entry.value);
+    const poolAddresses = volatilePoolsData.map((entry: any) => entry.address);
     
     // Query all Transfer events where 'from' is any pool and 'to' is feeCollector
     const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
