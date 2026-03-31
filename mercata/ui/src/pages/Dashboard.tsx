@@ -25,6 +25,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
+import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
+import { useNetwork } from "@/context/NetworkContext";
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
@@ -78,6 +80,8 @@ const Dashboard = () => {
   });
   const { loans, refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
+  const { contactEnabled } = useNetwork();
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
     const stored = localStorage.getItem('dashboard-timeRange');
     if (stored && TIME_RANGES.includes(stored as TimeRange)) {
@@ -281,6 +285,34 @@ const Dashboard = () => {
         <DashboardHeader title="Portfolio" />
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
+          {/* Physical Metals Deposit Banner (only when contact API is configured) */}
+          {contactEnabled && (
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl p-4 md:p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg shrink-0">
+                      <Gem className="text-amber-600 dark:text-amber-400" size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-semibold text-amber-900 dark:text-amber-100">Deposit Physical Gold & Silver</h3>
+                      <p className="text-xs md:text-sm text-amber-700 dark:text-amber-300 mt-0.5">
+                        We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => setContactModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium"
+                  >
+                    <Mail size={16} />
+                    Contact Us
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to view your portfolio, track rewards, and manage your assets" />
           )}
@@ -429,32 +461,6 @@ const Dashboard = () => {
             </Button>
           </div>
 
-          {/* Physical Metals Deposit Banner */}
-          <div className="mb-8">
-            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl p-4 md:p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg shrink-0">
-                    <Gem className="text-amber-600 dark:text-amber-400" size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm md:text-base font-semibold text-amber-900 dark:text-amber-100">Deposit Physical Gold & Silver</h3>
-                    <p className="text-xs md:text-sm text-amber-700 dark:text-amber-300 mt-0.5">
-                    We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
-                    </p>
-                  </div>
-                </div>
-                <a
-                  href="mailto:metals@strato.nexus?subject=Metals%20Deposit%20Inquiry&body=Name%3A%0AEmail%3A%0AMessage%3A%0A"
-                  className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors"
-                >
-                  <Mail size={16} />
-                  Contact Us
-                </a>
-              </div>
-            </div>
-          </div>
-
           <div className="mb-8">
             <AssetsList 
               loading={loadingEarningAssets || loadingInactiveTokens} 
@@ -486,6 +492,9 @@ const Dashboard = () => {
       </div>
 
       <MobileBottomNav />
+      {contactEnabled && (
+        <ContactInquiryModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
+      )}
     </div>
   );
 };

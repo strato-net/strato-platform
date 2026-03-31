@@ -37,9 +37,11 @@ import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transfe
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useUser } from "@/context/UserContext";
+import { useNetwork } from "@/context/NetworkContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
+import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import {
   Select,
@@ -264,6 +266,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     triggerDepositRefresh,
   } = useBridgeContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
+  const { contactEnabled } = useNetwork();
   const navigate = useNavigate();
 
   // State -- fundingMode can be controlled externally or managed internally
@@ -289,6 +292,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const [selectedPayToken, setSelectedPayToken] = useState<PayTokenConfig | null>(null);
   const [selectedMetal, setSelectedMetal] = useState<MetalConfig | null>(null);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<DepositStep>("confirm_tx");
   const [progressTxHash, setProgressTxHash] = useState<string>();
   const [progressError, setProgressError] = useState<string>();
@@ -1171,9 +1175,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
             </Link>
           </div>
-          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            fundingMode === "metals" ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
-          }`}>
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              fundingMode === "metals" && contactEnabled ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
+            }`}
+          >
             <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/30 p-3">
               <div className="flex items-center gap-3 min-w-0">
                 <Gem className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -1181,10 +1187,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
                 </p>
               </div>
-              <a
-                href="mailto:metals@strato.nexus?subject=Metals%20Deposit%20Inquiry&body=Name%3A%0AEmail%3A%0AMessage%3A%0A"
+              <button
+                type="button"
+                onClick={() => setContactModalOpen(true)}
                 className="inline-flex items-center gap-1 shrink-0 font-semibold text-xs text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 underline underline-offset-2"
-              ><Mail className="w-3 h-3" />Contact us {"\u2192"}</a>
+              >
+                <Mail className="w-3 h-3" />
+                Contact us {"\u2192"}
+              </button>
             </div>
           </div>
         </div>
@@ -1208,6 +1218,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             setProgressError(undefined);
           }}
         />
+        {contactEnabled && (
+          <ContactInquiryModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
+        )}
       </div>
     );
 };
