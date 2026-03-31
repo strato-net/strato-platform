@@ -94,7 +94,10 @@ export async function runTopUpCycle(): Promise<void> {
       }
       const balance = await getErc20Balance(rpcUrl, c.externalToken, c.cardWalletAddress);
       const threshold = BigInt(c.thresholdAmount);
-      if (balance >= threshold) continue;
+      if (BigInt(balance) * BigInt(1000000000000) >= threshold) { // TODO: use proper externalDecimals amount for conversion
+        logInfo("CardTopUp", `Card ${c.id}'s balance is above threshold, skipping`);
+        continue;
+      }
       const lastTopUp = c.lastTopUpAt ? new Date(c.lastTopUpAt).getTime() : 0;
       const cooldownMs = c.cooldownMinutes * 60 * 1000;
       if (Date.now() - lastTopUp < cooldownMs) {
