@@ -24,6 +24,7 @@ module Blockchain.BlockChain
 where
 
 import BlockApps.Logging
+import BlockApps.Solidity.ABI (decodeABIArgs, valueToArgText, funcArgTypes)
 import qualified Blockchain.Bagger as Bagger
 import Blockchain.Bagger.Transactions
 import qualified Blockchain.DB.AddressStateDB as NoCache
@@ -43,10 +44,12 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
+import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
+import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
@@ -68,7 +71,7 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
-import Blockchain.EthConf (ethConf, networkConfig)
+import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Conduit
@@ -97,6 +100,7 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
+import SolidVM.Model.SolidString (labelToText)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -346,7 +350,7 @@ addTransactions blockData txs proposer =
       let remainingBlockGas =
             case result of
               Left _ -> blockGas
-              Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
+              Right execResult -> blockGas - (TD.gasLimit bt - calculateReturned bt execResult)
 
       go remainingBlockGas rest (trrs `DL.snoc` trr)
 
@@ -382,7 +386,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
                   putMemRawStorageTxMap M.empty
                   return $ Bagger.TxMiningResult (Just $ TFInsufficientFunds limit actual tx) (DL.toList ran) unran remGas
                 _ -> do
-                  let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
+                  let nextRemGas = remGas - (TD.gasLimit bt - calculateReturned bt execResult)
                   flushMemAddressStateTxToBlockDB
                   flushMemStorageTxDBToBlockDB
                   mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs mSelfAddress
@@ -403,15 +407,15 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   let maxGas = fromIntegral (maxBound :: Int)
   acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
 
-  when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
-  unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
+  when (TD.gasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (TD.gasLimit bt) remainingBlockGas t
+  unless nonceValid $ throwE $ TFNonceMismatch (TD.nonce bt) acctNonce t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
   when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
     . throwE
     $ TFTXSizeLimitExceeded txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
 
   let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
-      adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
+      adjustedTxGasLimit = bool (TD.gasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
   feeResult <- payFees b availableGas tAddr t proposer
@@ -472,8 +476,57 @@ runCodeForTransaction ::
   ExceptT TransactionFailureCause m ExecResults
 runCodeForTransaction b availableGas tAddr t proposer =
   let ut = otBaseTx t
-   in if isContractCreationTX ut
-        then do
+   in case ut of
+        TD.EthereumTX {TD.ethTo = Just toAddr, TD.value = val, TD.txData = callData}
+          | B.null callData && val > 0 -> do
+            let nativeAddr = nativeTokenAddress (contractsConfig ethConf)
+                recipientArg = T.pack $ "0x" ++ formatAddressWithoutColor toAddr
+                amountArg = T.pack $ show val
+            $logInfoS "runCodeForTransaction" $ T.pack $
+              "EthereumTX native transfer: " ++ show val ++ " to " ++ format toAddr ++ " -> nativeToken.transfer"
+            lift $
+              SolidVM.call
+                b
+                nativeAddr
+                tAddr
+                proposer
+                (fromIntegral availableGas)
+                tAddr
+                (txHash ut)
+                "transfer"
+                [recipientArg, amountArg]
+                Nothing
+          | otherwise -> do
+            when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $
+              "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
+            let selector = B.take 4 callData
+                argsBytes = B.drop 4 callData
+            lift (resolveFunction toAddr selector) >>= \case
+              Nothing -> throwE $ TFCodeCollectionNotFound toAddr
+                ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
+              Just (fName, func) -> do
+                let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
+                    fnStr = T.unpack (labelToText fName)
+                $logInfoS "runCodeForTransaction" $ T.pack $
+                  "EthereumTX resolved: " ++ fnStr ++ "(" ++ intercalate ", " (map T.unpack argTexts) ++ ") on " ++ format toAddr
+                lift $
+                  SolidVM.call
+                    b
+                    toAddr
+                    tAddr
+                    proposer
+                    (fromIntegral availableGas)
+                    tAddr
+                    (txHash ut)
+                    (labelToText fName)
+                    argTexts
+                    Nothing
+
+        TD.EthereumTX {TD.ethTo = Nothing} ->
+          throwE $ TFCodeCollectionNotFound (Address 0)
+            "EthereumTX contract creation (raw EVM bytecode) not supported" t
+
+        _ | isContractCreationTX ut -> do
           when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
@@ -488,24 +541,25 @@ runCodeForTransaction b availableGas tAddr t proposer =
               proposer
               availableGas
               newAddress
-              (transactionCode ut)
+              (TD.code ut)
               (txHash ut)
               (fromJust $ txContractName ut)
               (txArgs ut)
-        else do
-          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
+
+        _ -> do
+          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (TD.to ut)
 
           lift $
             SolidVM.call
                   b -- blockData
-                  (transactionTo ut) -- codeAddress
+                  (TD.to ut) -- codeAddress
                   tAddr -- sender
                   proposer -- proposer
                   (fromIntegral availableGas) -- availableGas
                   tAddr -- origin
                   (txHash ut) -- txHash
-                  (transactionFuncName ut)
-                  (transactionArgs ut)
+                  (TD.funcName ut)
+                  (TD.args ut)
                   Nothing
 
 payFees ::
@@ -553,7 +607,7 @@ zeroBytesLength t =
         then length $ filter (== 0) $ B.unpack $ transactionData bt
         else length $ filter (== 0) $ B.unpack $ codeBytes' bt --is ContractCreationTX
   where
-    codeBytes' bt = case transactionCode bt of
+    codeBytes' bt = case TD.code bt of
       Code cb -> cb
       PtrToCode _ -> "" -- TODO: lookup code?
 
@@ -609,7 +663,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
             Just ex ->
               let fmt = either show show ex
                in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
-      gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
+      gasUsed = fromInteger $ TD.gasLimit t - gasRemaining
       etherUsed = gasUsed
 
       beforeAddresses = S.fromList [x | (x, ASModification _) <- M.toList beforeMap]
@@ -663,7 +717,7 @@ printTransactionMessage ::
   NominalDiffTime ->
   m ()
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
-  let tNonce = transactionNonce $ otBaseTx ot
+  let tNonce = TD.nonce $ otBaseTx ot
   multilineLog "printTx/err" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
@@ -674,7 +728,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left e
       ]
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right results) deltaT = do
   let t = otBaseTx ot
-      tNonce = transactionNonce t
+      tNonce = TD.nonce t
       extra =
         if isMessageTX t
           then ""

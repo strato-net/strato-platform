@@ -126,12 +126,6 @@ instance Arbitrary MsgAuth where
 instance Arbitrary View where
   arbitrary = genericArbitrary
 
-instance Arbitrary TrustedMessage where
-  arbitrary = genericArbitrary
-
-instance Arbitrary WireMessage where
-  arbitrary = genericArbitrary
-
 instance Arbitrary ForcedConfigChange where
   arbitrary = genericArbitrary
 

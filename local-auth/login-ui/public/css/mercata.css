@@ -1,0 +1,460 @@
+/*
+###########################   STRATO MERCATA THEME   ###########################
+Dark mode support + STRATO branding
+*/
+
+/* ============================================
+   DARK MODE - Variable Overrides
+   ============================================ */
+html.dark-mode,
+html[data-theme="dark"] {
+    --kc-bg: #0a0f1a;
+    --kc-card-bg: #0d1421;
+    --kc-text: #e4e4e7;
+    --kc-text-muted: #9ca3af;
+    --kc-text-light: #6b7280;
+    --kc-border: #1e293b;
+    --kc-border-light: #374151;
+    --kc-surface: #1e293b;
+    --kc-surface-hover: #374151;
+    --kc-link-hover: #60a5fa;
+    --kc-header-text: #e4e4e7;
+    --kc-input-bg: #0d1421;
+    --kc-input-text: #e4e4e7;
+}
+
+/* System preference fallback */
+@media (prefers-color-scheme: dark) {
+  html:not(.light-mode):not([data-theme="light"]) {
+        --kc-bg: #0a0f1a;
+        --kc-card-bg: #0d1421;
+        --kc-text: #e4e4e7;
+        --kc-text-muted: #9ca3af;
+        --kc-text-light: #6b7280;
+        --kc-border: #1e293b;
+        --kc-border-light: #374151;
+        --kc-surface: #1e293b;
+        --kc-surface-hover: #374151;
+        --kc-link-hover: #60a5fa;
+        --kc-header-text: #e4e4e7;
+        --kc-input-bg: #0d1421;
+        --kc-input-text: #e4e4e7;
+  }
+}
+
+/* ============================================
+   STRATO BRANDING
+   ============================================ */
+
+/* Logo */
+.toplogo:after {
+  content: "";
+  display: block;
+  background-image: url("../img/strato-logo.png?v=1");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  width: 100%;
+  max-width: 364px;
+  height: 80px;
+  margin: 20px auto;
+}
+
+/* Dark mode logo - use actual dark theme logo */
+html.dark-mode .toplogo:after,
+html[data-theme="dark"] .toplogo:after {
+    background-image: url("../img/strato-dark.png?v=1");
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light-mode):not([data-theme="light"]) .toplogo:after {
+        background-image: url("../img/strato-dark.png?v=1");
+    }
+}
+
+/* Page title styling */
+.login-pf-page .login-pf-header h1#kc-page-title {
+    color: #001B70;
+  font-weight: 400;
+  font-family: Raleway, Open Sans, sans-serif;
+  font-size: 28px;
+    margin: 0 0 30px 0;
+  padding: 0;
+}
+
+html.dark-mode .login-pf-page .login-pf-header h1#kc-page-title,
+html[data-theme="dark"] .login-pf-page .login-pf-header h1#kc-page-title {
+    color: #3452FE;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not(.light-mode):not([data-theme="light"]) .login-pf-page .login-pf-header h1#kc-page-title {
+        color: #3452FE;
+    }
+}
+
+/* Card styling */
+.login-pf-page .card-pf {
+    width: fit-content;
+    margin: 0 auto 20px;
+    padding: 40px 60px;
+    box-sizing: border-box;
+    border-radius: 20px;
+    border-top: none;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Primary button */
+input.pf-c-button {
+  background: #001b71 !important;
+  color: #fff;
+  width: 100%;
+    margin: 10px 0 !important;
+  font-size: 16px;
+  height: 36px;
+  line-height: 36px;
+    border-radius: 0;
+  border: 0;
+  outline: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+input.pf-c-button:hover {
+  background: #4986f2 !important;
+}
+
+/* Registration button */
+#kc-registration a {
+  display: block;
+  background: #e93323;
+  color: #fff;
+  width: 100%;
+    margin: 10px 0 !important;
+  font-size: 16px;
+  height: 36px;
+  line-height: 36px;
+  border-radius: 0;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+    text-align: center;
+}
+
+#kc-registration a:hover {
+  background: #4986f2;
+  text-decoration: none;
+}
+
+/* OR divider */
+#mercata-register-or-text {
+  display: flex;
+  flex-direction: row;
+    color: var(--kc-text-muted);
+}
+
+#mercata-register-or-text:before,
+#mercata-register-or-text:after {
+  content: "";
+  flex: 1 1;
+    border-bottom: 1px solid var(--kc-border);
+  margin: auto;
+}
+
+#mercata-register-or-text:before { margin-right: 10px; }
+#mercata-register-or-text:after { margin-left: 10px; }
+
+/* Registration terms */
+p#registration-terms {
+    text-align: center;
+    font-size: 14px;
+    color: var(--kc-text-muted);
+}
+
+p#registration-terms a {
+    color: #3452FE;
+}
+
+/* Alerts */
+
+/* Friendly info-style alert for verification messages (not aggressive) */
+.alert-warning {
+  background: rgba(52, 82, 254, 0.05);
+  border: none;
+  border-left: 4px solid #3452FE;
+  border-radius: 8px;
+  color: var(--kc-text, #1a1a2e);
+  text-align: left;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.alert-warning .pf-c-alert__icon {
+  color: #3452FE;
+}
+
+.alert-warning .pf-c-alert__icon .fa {
+  color: #3452FE;
+}
+
+.alert-success {
+  background: rgba(21, 52, 226, 0.05);
+  border: none;
+  border-left: 4px solid #1534e2;
+  border-radius: 8px;
+  color: var(--kc-text, #1a1a2e);
+  text-align: left;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.alert-success .pf-c-alert__icon {
+  color: #1534e2;
+}
+
+.alert-error {
+  background: rgba(233, 51, 35, 0.05);
+  border: none;
+  border-left: 4px solid #e93323;
+  border-radius: 8px;
+  color: var(--kc-text, #1a1a2e);
+  text-align: left;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.alert-error .pf-c-alert__icon {
+  color: #e93323;
+}
+
+/* Dark mode alerts */
+html.dark-mode .alert-warning,
+html[data-theme="dark"] .alert-warning {
+  background: rgba(52, 82, 254, 0.15);
+  color: var(--kc-text);
+}
+
+html.dark-mode .alert-success,
+html[data-theme="dark"] .alert-success {
+  background: rgba(21, 52, 226, 0.15);
+  color: var(--kc-text);
+}
+
+html.dark-mode .alert-error,
+html[data-theme="dark"] .alert-error {
+  background: rgba(233, 51, 35, 0.15);
+  color: var(--kc-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not(.light-mode):not([data-theme="light"]) .alert-warning {
+    background: rgba(52, 82, 254, 0.15);
+    color: var(--kc-text);
+  }
+  html:not(.light-mode):not([data-theme="light"]) .alert-success {
+    background: rgba(21, 52, 226, 0.15);
+    color: var(--kc-text);
+  }
+  html:not(.light-mode):not([data-theme="light"]) .alert-error {
+    background: rgba(233, 51, 35, 0.15);
+    color: var(--kc-text);
+  }
+}
+
+/* Hide some default elements */
+.login-pf-page .login-pf-header {
+    padding: 0;
+    margin: 0;
+}
+
+#kc-header {
+    margin-bottom: 0;
+}
+
+#kc-header-wrapper {
+    padding-top: 0;
+}
+
+#kc-info-wrapper {
+    background: none;
+    padding-top: 0;
+}
+
+[data-page-id="login-register"] .subtitle {
+  display: none;
+}
+
+/* Links */
+a {
+    color: #3452FE;
+}
+
+html.dark-mode a:hover,
+html[data-theme="dark"] a:hover {
+  color: #6b8cff;
+}
+
+/* Password visibility toggle button - dark mode fix */
+html.dark-mode .pf-c-button.pf-m-control,
+html.dark-mode button.pf-c-button.pf-m-control,
+html[data-theme="dark"] .pf-c-button.pf-m-control,
+html[data-theme="dark"] button.pf-c-button.pf-m-control {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background-color: var(--kc-card-bg) !important;
+  color: var(--kc-text) !important;
+}
+
+html.dark-mode .pf-c-button.pf-m-control:hover,
+html.dark-mode button.pf-c-button.pf-m-control:hover,
+html[data-theme="dark"] .pf-c-button.pf-m-control:hover,
+html[data-theme="dark"] button.pf-c-button.pf-m-control:hover {
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.dark-mode .pf-c-button.pf-m-control i,
+html[data-theme="dark"] .pf-c-button.pf-m-control i {
+  color: var(--kc-text) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not(.light-mode):not([data-theme="light"]) .pf-c-button.pf-m-control,
+  html:not(.light-mode):not([data-theme="light"]) button.pf-c-button.pf-m-control {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    background-color: var(--kc-card-bg) !important;
+    color: var(--kc-text) !important;
+  }
+  html:not(.light-mode):not([data-theme="light"]) .pf-c-button.pf-m-control:hover,
+  html:not(.light-mode):not([data-theme="light"]) button.pf-c-button.pf-m-control:hover {
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  html:not(.light-mode):not([data-theme="light"]) .pf-c-button.pf-m-control i {
+    color: var(--kc-text) !important;
+  }
+}
+
+/* ============================================
+   THEME TOGGLE BUTTON
+   Matches the React app's mode-toggle component
+   ============================================ */
+
+.theme-toggle-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+}
+
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background-color: var(--kc-card-bg, #ffffff);
+  border: 1px solid var(--kc-border, #e0e0e0);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.theme-toggle-btn:hover {
+  background-color: var(--kc-surface-hover, #f7f8f8);
+  border-color: var(--kc-border-light, #d0d0d0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.theme-toggle-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(52, 82, 254, 0.3);
+}
+
+.theme-toggle-btn svg {
+  width: 20px;
+  height: 20px;
+  color: var(--kc-text, #1a1a2e);
+  transition: transform 0.3s ease, opacity 0.2s ease;
+}
+
+/* Sun icon - visible in light mode */
+.theme-toggle-btn .sun-icon {
+  display: block;
+  transform: rotate(0deg) scale(1);
+}
+
+.theme-toggle-btn .moon-icon {
+  display: none;
+  transform: rotate(90deg) scale(0);
+}
+
+/* Dark mode - show moon, hide sun */
+html.dark-mode .theme-toggle-btn .sun-icon,
+html[data-theme="dark"] .theme-toggle-btn .sun-icon {
+  display: none;
+  transform: rotate(-90deg) scale(0);
+}
+
+html.dark-mode .theme-toggle-btn .moon-icon,
+html[data-theme="dark"] .theme-toggle-btn .moon-icon {
+  display: block;
+  transform: rotate(0deg) scale(1);
+}
+
+/* Dark mode button styling */
+html.dark-mode .theme-toggle-btn,
+html[data-theme="dark"] .theme-toggle-btn {
+  background-color: var(--kc-card-bg);
+  border-color: var(--kc-border);
+}
+
+html.dark-mode .theme-toggle-btn:hover,
+html[data-theme="dark"] .theme-toggle-btn:hover {
+  background-color: var(--kc-surface-hover);
+  border-color: var(--kc-border-light);
+}
+
+html.dark-mode .theme-toggle-btn svg,
+html[data-theme="dark"] .theme-toggle-btn svg {
+  color: var(--kc-text);
+}
+
+/* System preference fallback for toggle button */
+@media (prefers-color-scheme: dark) {
+  html:not(.light-mode):not([data-theme="light"]) .theme-toggle-btn .sun-icon {
+    display: none;
+  }
+  html:not(.light-mode):not([data-theme="light"]) .theme-toggle-btn .moon-icon {
+    display: block;
+  }
+  html:not(.light-mode):not([data-theme="light"]) .theme-toggle-btn {
+    background-color: var(--kc-card-bg);
+    border-color: var(--kc-border);
+  }
+  html:not(.light-mode):not([data-theme="light"]) .theme-toggle-btn:hover {
+    background-color: var(--kc-surface-hover);
+  }
+  html:not(.light-mode):not([data-theme="light"]) .theme-toggle-btn svg {
+    color: var(--kc-text);
+  }
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+  .theme-toggle-container {
+    top: 12px;
+    right: 12px;
+  }
+  
+  .theme-toggle-btn {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .theme-toggle-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+}

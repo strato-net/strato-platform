@@ -31,15 +31,16 @@ genesisBlock = case eitherGenesis of
 oneTX :: Int -> Transaction
 oneTX size =
   ContractCreationTX
-    { transactionNonce = 0,
-      transactionGasLimit = 1,
-      transactionCode = Code {codeBytes = Text.replicate size "q"},
-      transactionContractName = "",
-      transactionArgs = [],
-      transactionNetwork = "",
-      transactionR = 1 `shiftL` 200,
-      transactionS = 1 `shiftL` 133,
-      transactionV = 27
+    { nonce = 0,
+      gasLimit = 1,
+      code = Code {codeBytes = Text.replicate size "q"},
+      contractName = "",
+      args = [],
+      network = "",
+      chainId = Nothing,
+      r = 1 `shiftL` 200,
+      s = 1 `shiftL` 133,
+      v = 27
     }
 
 --benchPrivateKey :: PrivateKey

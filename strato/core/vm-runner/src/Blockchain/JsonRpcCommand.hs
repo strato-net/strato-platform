@@ -9,6 +9,7 @@ module Blockchain.JsonRpcCommand
   ( produceResponse,
     runJsonRpcCommand,
     runJsonRpcCommand',
+    resolveFunction,
   )
 where
 

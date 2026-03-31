@@ -9,6 +9,7 @@ module Blockchain.EthConf.Model where
 -- These are the aspects EthConf that don't require unsafePerformIO
 
 import Blockchain.Strato.Model.Address (Address)
+import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
@@ -51,7 +52,7 @@ data EthConf = EthConf
     discoveryConfig :: DiscoveryConf,
     p2pConfig :: P2PConf,
     apiConfig :: ApiConfig,
-    contractsConfig :: Maybe ContractsConf,
+    contractsConfig :: ContractsConf,
     urlConfig :: UrlConfig,
     networkConfig :: NetworkConf,
     debugConfig :: DebugConfig
@@ -69,7 +70,7 @@ instance FromJSON EthConf where
     <*> v .: "discoveryConfig"
     <*> v .:? "p2pConfig" .!= def
     <*> v .: "apiConfig"
-    <*> v .:? "contractsConfig"
+    <*> v .:? "contractsConfig" .!= def
     <*> v .:? "urlConfig" .!= def
     <*> v .:? "networkConfig" .!= def
     <*> v .:? "debugConfig" .!= def
@@ -148,11 +149,13 @@ data QuarryConf = QuarryConf
 
 data ContractsConf = ContractsConf
   { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
+  , nativeTokenAddress :: Address  -- ^ ERC20 treated as native token (e.g. USDST)
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data UrlConfig = UrlConfig
   { vaultUrl :: String
+  , vaultUrlDocker :: String
   , fileServerUrl :: String
   , notificationServerUrl :: String
   , repoUrl :: String  -- Docker registry URL prefix for images
@@ -179,6 +182,13 @@ instance FromJSON NetworkConf where
     <*> v .:? "gasLimit" .!= 1000000
     <*> v .:? "blockPeriodMs" .!= 1000
     <*> v .:? "roundPeriodS" .!= 120
+
+-- EIP-155 chain ID: keccak256(networkName), first 6 bytes (48 bits).
+-- Fits in JS Number.MAX_SAFE_INTEGER with room for v = chainId * 2 + 35.
+chainId :: NetworkConf -> Integer
+chainId nc =
+  let digest = keccak256ToByteString $ hash $ C8.pack $ network nc
+  in foldl (\acc b -> acc * 256 + fromIntegral b) 0 (B.unpack $ B.take 6 digest)
 
 data DebugConfig = DebugConfig
   { svmTrace :: Bool
@@ -258,11 +268,13 @@ instance Default DebugConfig where
 instance Default ContractsConf where
   def = ContractsConf
     { railgunProxy = Nothing
+    , nativeTokenAddress = 0
     }
 
 instance Default UrlConfig where
   def = UrlConfig
     { vaultUrl = "https://vault.blockapps.net:8093"
+    , vaultUrlDocker = "https://vault.blockapps.net:8093"
     , fileServerUrl = ""
     , notificationServerUrl = ""
     , repoUrl = ""
@@ -290,7 +302,7 @@ instance Default EthConf where
     , discoveryConfig = def
     , p2pConfig = def
     , apiConfig = def
-    , contractsConfig = Nothing
+    , contractsConfig = def
     , urlConfig = def
     , networkConfig = def
     , debugConfig = def
