@@ -11,10 +11,11 @@ This document covers deployment for both **testnet** and **mainnet** environment
 | **STRATO node** | `https://node1.testnet.strato.nexus` | `https://app.strato.nexus` |
 | **EVM Chain A** | Sepolia (11155111) | Ethereum (1) |
 | **EVM Chain B** | Base Sepolia (84532) | Base (8453) |
-| **Hardhat network flags** | `--network sepolia` / `--network baseSepolia` | `--network mainnet` / `--network base` |
-| **Block explorer** | sepolia.etherscan.io / sepolia.basescan.org | etherscan.io / basescan.org |
+| **EVM Chain C** | Linea Sepolia (59141) | Linea (59144) |
+| **Hardhat network flags** | `--network sepolia` / `--network baseSepolia` / `--network lineaSepolia` | `--network mainnet` / `--network base` / `--network linea` |
+| **Block explorer** | sepolia.etherscan.io / sepolia.basescan.org / sepolia.lineascan.build | etherscan.io / basescan.org / lineascan.build |
 | **Env profile flag** | `--env testnet` | `--env prod` |
-| **Contracts per env** | 10 (2 vaults, 6 rep tokens, 2 rep bridges) | 10 (same set) |
+| **Contracts per env** | 15 (3 vaults, 9 rep tokens, 3 rep bridges) | 15 (same set) |
 
 ### STRATO-Native Token Addresses
 
@@ -48,10 +49,12 @@ PRIVATE_KEY=<deployer_private_key>
 # --- Testnet ---
 SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<key>
 BASE_SEPOLIA_RPC_URL=https://base-sepolia.g.alchemy.com/v2/<key>
+LINEA_SEPOLIA_RPC_URL=https://linea-sepolia.g.alchemy.com/v2/<key>
 
 # --- Mainnet ---
 MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/<key>
 BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/<key>
+LINEA_RPC_URL=https://linea-mainnet.g.alchemy.com/v2/<key>
 
 SAFE_ADDRESS=<safe_multisig_address>
 ```
@@ -63,14 +66,18 @@ ACROSS_SIGNER_PRIVATE_KEY=<relayer_eoa_private_key>
 # --- Testnet ---
 CHAIN_11155111_VAULT_ADDRESS=<vault_sepolia>
 CHAIN_84532_VAULT_ADDRESS=<vault_base_sepolia>
+CHAIN_59141_VAULT_ADDRESS=<vault_linea_sepolia>
 CHAIN_11155111_REP_BRIDGE_ADDRESS=<rep_bridge_sepolia>
 CHAIN_84532_REP_BRIDGE_ADDRESS=<rep_bridge_base_sepolia>
+CHAIN_59141_REP_BRIDGE_ADDRESS=<rep_bridge_linea_sepolia>
 
 # --- Mainnet ---
 CHAIN_1_VAULT_ADDRESS=<vault_mainnet>
 CHAIN_8453_VAULT_ADDRESS=<vault_base>
+CHAIN_59144_VAULT_ADDRESS=<vault_linea>
 CHAIN_1_REP_BRIDGE_ADDRESS=<rep_bridge_mainnet>
 CHAIN_8453_REP_BRIDGE_ADDRESS=<rep_bridge_base>
+CHAIN_59144_REP_BRIDGE_ADDRESS=<rep_bridge_linea>
 
 STRATO_CUSTODY_VAULT_ADDRESS=<custody_vault_strato>
 ```
@@ -108,12 +115,13 @@ cat deployments/ExternalBridgeVault_sepolia_latest.json
 
 Record `SEPOLIA_VAULT_ADDRESS`.
 
-Repeat for Base Sepolia:
+Repeat for Base Sepolia and Linea Sepolia:
 ```bash
 SAFE_ADDRESS=<testnet_safe> npx hardhat run scripts/deployBridgeVault.js --network baseSepolia
+SAFE_ADDRESS=<testnet_safe> npx hardhat run scripts/deployBridgeVault.js --network lineaSepolia
 ```
 
-Record `BASE_SEPOLIA_VAULT_ADDRESS`.
+Record `BASE_SEPOLIA_VAULT_ADDRESS` and `LINEA_SEPOLIA_VAULT_ADDRESS`.
 
 ### Step 1.2M: Deploy ExternalBridgeVault `[MAINNET]`
 
@@ -121,58 +129,47 @@ Record `BASE_SEPOLIA_VAULT_ADDRESS`.
 
 ```bash
 SAFE_ADDRESS=<mainnet_safe> npx hardhat run scripts/deployBridgeVault.js --network mainnet
-```
-
-Record `MAINNET_VAULT_ADDRESS`.
-
-```bash
 SAFE_ADDRESS=<mainnet_safe> npx hardhat run scripts/deployBridgeVault.js --network base
+SAFE_ADDRESS=<mainnet_safe> npx hardhat run scripts/deployBridgeVault.js --network linea
 ```
 
-Record `BASE_VAULT_ADDRESS`.
+Record `MAINNET_VAULT_ADDRESS`, `BASE_VAULT_ADDRESS`, and `LINEA_VAULT_ADDRESS`.
 
 **Verify:**
 ```bash
 cat deployments/ExternalBridgeVault_mainnet_latest.json
 cat deployments/ExternalBridgeVault_base_latest.json
-# Verify on etherscan.io and basescan.org
+cat deployments/ExternalBridgeVault_linea_latest.json
+# Verify on etherscan.io, basescan.org, and lineascan.build
 ```
 
 ---
 
 ### Step 1.3: Deploy StratoRepresentationTokens `[TESTNET]`
 
-Deploy 3 tokens per chain (6 total):
+Deploy 3 tokens per chain (9 total for testnet):
 
 ```bash
-# Sepolia
-for TOKEN in USDST GOLDST SILVST; do
-  SAFE_ADDRESS=<testnet_safe> TOKEN_NAME=$TOKEN TOKEN_SYMBOL=$TOKEN \
-    npx hardhat run scripts/deployRepresentationToken.js --network sepolia
-done
-
-# Base Sepolia
-for TOKEN in USDST GOLDST SILVST; do
-  SAFE_ADDRESS=<testnet_safe> TOKEN_NAME=$TOKEN TOKEN_SYMBOL=$TOKEN \
-    npx hardhat run scripts/deployRepresentationToken.js --network baseSepolia
+# Sepolia, Base Sepolia, Linea Sepolia
+for NETWORK in sepolia baseSepolia lineaSepolia; do
+  for TOKEN in USDST GOLDST SILVST; do
+    SAFE_ADDRESS=<testnet_safe> TOKEN_NAME=$TOKEN TOKEN_SYMBOL=$TOKEN \
+      npx hardhat run scripts/deployRepresentationToken.js --network $NETWORK
+  done
 done
 ```
 
-**Verify:** Check `deployments/StratoRepresentationToken_*_*_latest.json` for all 6 deployments.
+**Verify:** Check `deployments/StratoRepresentationToken_*_*_latest.json` for all 9 deployments.
 
 ### Step 1.3M: Deploy StratoRepresentationTokens `[MAINNET]`
 
 ```bash
-# Ethereum Mainnet
-for TOKEN in USDST GOLDST SILVST; do
-  SAFE_ADDRESS=<mainnet_safe> TOKEN_NAME=$TOKEN TOKEN_SYMBOL=$TOKEN \
-    npx hardhat run scripts/deployRepresentationToken.js --network mainnet
-done
-
-# Base Mainnet
-for TOKEN in USDST GOLDST SILVST; do
-  SAFE_ADDRESS=<mainnet_safe> TOKEN_NAME=$TOKEN TOKEN_SYMBOL=$TOKEN \
-    npx hardhat run scripts/deployRepresentationToken.js --network base
+# Ethereum Mainnet, Base, Linea
+for NETWORK in mainnet base linea; do
+  for TOKEN in USDST GOLDST SILVST; do
+    SAFE_ADDRESS=<mainnet_safe> TOKEN_NAME=$TOKEN TOKEN_SYMBOL=$TOKEN \
+      npx hardhat run scripts/deployRepresentationToken.js --network $NETWORK
+  done
 done
 ```
 
@@ -185,18 +182,20 @@ One per chain:
 ```bash
 SAFE_ADDRESS=<testnet_safe> npx hardhat run scripts/deployRepresentationBridge.js --network sepolia
 SAFE_ADDRESS=<testnet_safe> npx hardhat run scripts/deployRepresentationBridge.js --network baseSepolia
+SAFE_ADDRESS=<testnet_safe> npx hardhat run scripts/deployRepresentationBridge.js --network lineaSepolia
 ```
 
-Record `SEPOLIA_REP_BRIDGE_ADDRESS` and `BASE_SEPOLIA_REP_BRIDGE_ADDRESS`.
+Record `SEPOLIA_REP_BRIDGE_ADDRESS`, `BASE_SEPOLIA_REP_BRIDGE_ADDRESS`, and `LINEA_SEPOLIA_REP_BRIDGE_ADDRESS`.
 
 ### Step 1.4M: Deploy StratoRepresentationBridge `[MAINNET]`
 
 ```bash
 SAFE_ADDRESS=<mainnet_safe> npx hardhat run scripts/deployRepresentationBridge.js --network mainnet
 SAFE_ADDRESS=<mainnet_safe> npx hardhat run scripts/deployRepresentationBridge.js --network base
+SAFE_ADDRESS=<mainnet_safe> npx hardhat run scripts/deployRepresentationBridge.js --network linea
 ```
 
-Record `MAINNET_REP_BRIDGE_ADDRESS` and `BASE_REP_BRIDGE_ADDRESS`.
+Record `MAINNET_REP_BRIDGE_ADDRESS`, `BASE_REP_BRIDGE_ADDRESS`, and `LINEA_REP_BRIDGE_ADDRESS`.
 
 ---
 
@@ -208,6 +207,7 @@ Record `MAINNET_REP_BRIDGE_ADDRESS` and `BASE_REP_BRIDGE_ADDRESS`.
 cd mercata/ethereum
 node scripts/configureBridgeRoles.js --network sepolia
 node scripts/configureBridgeRoles.js --network baseSepolia
+node scripts/configureBridgeRoles.js --network lineaSepolia
 ```
 
 **Verify planned transactions include:**
@@ -223,6 +223,7 @@ node scripts/configureBridgeRoles.js --network baseSepolia
 ```bash
 node scripts/configureBridgeRoles.js --network sepolia --apply
 node scripts/configureBridgeRoles.js --network baseSepolia --apply
+node scripts/configureBridgeRoles.js --network lineaSepolia --apply
 ```
 
 **Verify (after Safe approval + execution):**
@@ -240,11 +241,15 @@ node scripts/configureBridgeRoles.js --network baseSepolia --apply
 > **Gate:** Testnet configuration verified and all on-chain checks passing.
 
 ```bash
+# Dry-run all three chains first
 node scripts/configureBridgeRoles.js --network mainnet
-node scripts/configureBridgeRoles.js --network mainnet --apply
-
 node scripts/configureBridgeRoles.js --network base
+node scripts/configureBridgeRoles.js --network linea
+
+# Apply after reviewing dry-run output
+node scripts/configureBridgeRoles.js --network mainnet --apply
 node scripts/configureBridgeRoles.js --network base --apply
+node scripts/configureBridgeRoles.js --network linea --apply
 ```
 
 **Mainnet rate limit values:**
@@ -328,8 +333,10 @@ If not already done by `configureBridgeRoles.js`, submit via Safe:
 |-------|------|--------|
 | Sepolia (testnet) | `DepositRouter.setGnosisSafe(SEPOLIA_VAULT_ADDRESS)` | Testnet vault |
 | Base Sepolia (testnet) | `DepositRouter.setGnosisSafe(BASE_SEPOLIA_VAULT_ADDRESS)` | Testnet vault |
+| Linea Sepolia (testnet) | `DepositRouter.setGnosisSafe(LINEA_SEPOLIA_VAULT_ADDRESS)` | Testnet vault |
 | Ethereum (mainnet) | `DepositRouter.setGnosisSafe(MAINNET_VAULT_ADDRESS)` | Mainnet vault |
 | Base (mainnet) | `DepositRouter.setGnosisSafe(BASE_VAULT_ADDRESS)` | Mainnet vault |
+| Linea (mainnet) | `DepositRouter.setGnosisSafe(LINEA_VAULT_ADDRESS)` | Mainnet vault |
 
 **Verify:** `DepositRouter.gnosisSafe()` returns the vault address on each chain.
 
@@ -363,14 +370,18 @@ Add to `mercata/services/bridge/.env`:
 # Testnet
 CHAIN_11155111_VAULT_ADDRESS=<sepolia_vault>
 CHAIN_84532_VAULT_ADDRESS=<base_sepolia_vault>
+CHAIN_59141_VAULT_ADDRESS=<linea_sepolia_vault>
 CHAIN_11155111_REP_BRIDGE_ADDRESS=<sepolia_rep_bridge>
 CHAIN_84532_REP_BRIDGE_ADDRESS=<base_sepolia_rep_bridge>
+CHAIN_59141_REP_BRIDGE_ADDRESS=<linea_sepolia_rep_bridge>
 
 # Mainnet (in prod .env)
 CHAIN_1_VAULT_ADDRESS=<mainnet_vault>
 CHAIN_8453_VAULT_ADDRESS=<base_vault>
+CHAIN_59144_VAULT_ADDRESS=<linea_vault>
 CHAIN_1_REP_BRIDGE_ADDRESS=<mainnet_rep_bridge>
 CHAIN_8453_REP_BRIDGE_ADDRESS=<base_rep_bridge>
+CHAIN_59144_REP_BRIDGE_ADDRESS=<linea_rep_bridge>
 
 STRATO_CUSTODY_VAULT_ADDRESS=<strato_custody_vault>
 
@@ -402,14 +413,16 @@ Standard deployment process. The new `isNative` and `assetFamily` fields are add
 
 ## Phase 6: Smoke Tests
 
-### `[TESTNET]` — Run all 5 tests before proceeding to mainnet
+### `[TESTNET]` — Run all tests on each chain before proceeding to mainnet
+
+Run tests 1–5 on Sepolia and Base Sepolia. Run tests 1–4 on Linea Sepolia (Across rebalancing is not available on Linea Sepolia).
 
 | # | Test | Steps | Expected |
 |---|------|-------|----------|
-| 1 | External-canonical deposit | Send USDC to vault via DepositRouter on Sepolia | Bridge service detects deposit, STRATO mints USDC representation |
-| 2 | External-canonical withdrawal | Request USDC withdrawal on STRATO targeting Sepolia | Allocator checks liquidity, vault releases USDC, MercataBridge burns |
-| 3 | STRATO-canonical outbound | Request USDST withdrawal targeting Sepolia | MercataBridge escrows, rep bridge mints rUSDST, custody vault locks |
-| 4 | STRATO-canonical inbound | Burn rUSDST on Sepolia via UI | Bridge service detects burn, MercataBridge unlocks from custody vault |
+| 1 | External-canonical deposit | Send USDC to vault via DepositRouter | Bridge service detects deposit, STRATO mints USDC representation |
+| 2 | External-canonical withdrawal | Request USDC withdrawal on STRATO | Allocator checks liquidity, vault releases USDC, MercataBridge burns |
+| 3 | STRATO-canonical outbound | Request USDST withdrawal targeting chain | MercataBridge escrows, rep bridge mints rUSDST, custody vault locks |
+| 4 | STRATO-canonical inbound | Burn rUSDST on external chain via UI | Bridge service detects burn, MercataBridge unlocks from custody vault |
 | 5 | Rate limit enforcement | Attempt release exceeding rate limit | Transaction reverts with `RateLimitExceeded` |
 
 ### `[MAINNET]` — Run tests 1–4 with small amounts
@@ -428,6 +441,8 @@ Standard deployment process. The new `isNative` and `assetFamily` fields are add
 ## Phase 7: Enable Advanced Features
 
 ### `[TESTNET]` — Enable immediately after smoke tests
+
+> **Note:** Across testnet does not support Linea Sepolia (59141). Rebalancing to/from Linea Sepolia will not work until either Across adds support or an alternative cross-chain transfer mechanism is configured. Rebalancing between Sepolia and Base Sepolia works normally. On mainnet, Across fully supports Linea (59144).
 
 ```bash
 REBALANCING_ENABLED=true
@@ -504,19 +519,19 @@ Remove vault env vars from `.env` and restart. The verification service falls ba
 ## Deployment Order Summary
 
 ```
-TESTNET                                    MAINNET
-────────                                   ───────
-1. Compile contracts                       (same binary)
-2. Deploy vaults (Sepolia, Base Sepolia)   8.  Deploy vaults (Mainnet, Base)
-3. Deploy rep tokens (6 contracts)         9.  Deploy rep tokens (6 contracts)
-4. Deploy rep bridges (2 contracts)        10. Deploy rep bridges (2 contracts)
-5. Configure roles (dry-run → apply)       11. Configure roles (dry-run → apply)
-6. STRATO: upgrade + migrate              12. STRATO: upgrade + migrate (same node or prod node)
-7. Smoke tests ← GATE                     13. Custody transfer (one chain at a time)
-                                           14. Deploy service + backend + UI
-                                           15. Small-amount smoke tests
-                                           16. Monitoring period (24-48h)
-                                           17. Enable rebalancing + circuit breakers
+TESTNET                                              MAINNET
+────────                                             ───────
+1. Compile contracts                                 (same binary)
+2. Deploy vaults (Sepolia, Base Sepolia, Linea Sep)  8.  Deploy vaults (Mainnet, Base, Linea)
+3. Deploy rep tokens (9 contracts: 3 tokens x 3 ch)  9.  Deploy rep tokens (9 contracts)
+4. Deploy rep bridges (3 contracts)                  10. Deploy rep bridges (3 contracts)
+5. Configure roles (dry-run → apply, all 3 chains)  11. Configure roles (dry-run → apply, all 3 chains)
+6. STRATO: upgrade + migrate                        12. STRATO: upgrade + migrate (prod node)
+7. Smoke tests ← GATE                               13. Custody transfer (one chain at a time)
+                                                     14. Deploy service + backend + UI
+                                                     15. Small-amount smoke tests
+                                                     16. Monitoring period (24-48h)
+                                                     17. Enable rebalancing + circuit breakers
 ```
 
 ---
@@ -525,18 +540,18 @@ TESTNET                                    MAINNET
 
 ### `[TESTNET]`
 
-- [ ] ExternalBridgeVault deployed on Sepolia and Base Sepolia
-- [ ] 6 StratoRepresentationTokens deployed (USDST, GOLDST, SILVST x 2 chains)
-- [ ] 2 StratoRepresentationBridges deployed
-- [ ] All roles granted and verified on-chain
-- [ ] Token mappings registered and verified
-- [ ] Rate limits configured
+- [ ] ExternalBridgeVault deployed on Sepolia, Base Sepolia, and Linea Sepolia
+- [ ] 9 StratoRepresentationTokens deployed (USDST, GOLDST, SILVST x 3 chains)
+- [ ] 3 StratoRepresentationBridges deployed (one per chain)
+- [ ] All roles granted and verified on-chain (all 3 chains)
+- [ ] Token mappings registered and verified (all 3 chains)
+- [ ] Rate limits configured (all 3 chains)
 - [ ] StratoCustodyVault deployed on STRATO
 - [ ] MercataBridge upgraded with isNative
 - [ ] Assets registered with correct isNative flags
-- [ ] DepositRouters repointed to vaults
+- [ ] DepositRouters repointed to vaults (all 3 chains)
 - [ ] Custody balances transferred
-- [ ] Bridge service running with vault env vars
+- [ ] Bridge service running with vault env vars (all 3 chains)
 - [ ] All 5 smoke tests passing
 - [ ] Rebalancing enabled
 - [ ] Circuit breakers enabled
@@ -546,19 +561,19 @@ TESTNET                                    MAINNET
 - [ ] All testnet checklist items verified first
 - [ ] Rate limits reviewed and calibrated to mainnet volume
 - [ ] Security review of deployed contract addresses
-- [ ] ExternalBridgeVault deployed on Mainnet and Base
-- [ ] 6 StratoRepresentationTokens deployed
-- [ ] 2 StratoRepresentationBridges deployed
-- [ ] All roles granted (verified on etherscan/basescan)
-- [ ] Token mappings registered
-- [ ] Rate limits configured (mainnet-calibrated values)
+- [ ] ExternalBridgeVault deployed on Mainnet, Base, and Linea
+- [ ] 9 StratoRepresentationTokens deployed (3 tokens x 3 chains)
+- [ ] 3 StratoRepresentationBridges deployed
+- [ ] All roles granted (verified on etherscan/basescan/lineascan)
+- [ ] Token mappings registered (all 3 chains)
+- [ ] Rate limits configured (mainnet-calibrated values, all 3 chains)
 - [ ] STRATO-side upgrade and migration applied
 - [ ] DepositRouters repointed (one chain at a time)
 - [ ] Custody balances transferred (one chain at a time, verified after each)
-- [ ] Bridge service deployed with mainnet vault env vars
+- [ ] Bridge service deployed with mainnet vault env vars (all 3 chains)
 - [ ] Small-amount smoke tests passing
 - [ ] 24–48 hour monitoring period completed
 - [ ] Reconciliation running with no discrepancy alerts
 - [ ] Rebalancing enabled with mainnet thresholds
 - [ ] Circuit breakers enabled with mainnet thresholds
-- [ ] Old Safe balances confirmed zero (excluding gas dust)
+- [ ] Old Safe balances confirmed zero on all 3 chains (excluding gas dust)

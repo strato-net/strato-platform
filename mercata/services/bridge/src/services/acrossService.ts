@@ -31,7 +31,7 @@ const ERC20_APPROVE_ABI = [
   "function allowance(address owner, address spender) external view returns (uint256)",
 ];
 
-// Testnet token addresses per chain
+// Token addresses per chain (testnet and mainnet)
 const CHAIN_TOKENS: Record<number, AcrossChainTokens> = {
   // Sepolia
   11155111: {
@@ -65,6 +65,38 @@ const CHAIN_TOKENS: Record<number, AcrossChainTokens> = {
     },
     USDT: {
       address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // Base Sepolia maps USDT->USDC
+      symbol: "USDT",
+      decimals: 6,
+    },
+  },
+  // Linea Sepolia (note: Across testnet does NOT support Linea Sepolia routes;
+  // these addresses are canonical tokens for non-Across bridge flows)
+  59141: {
+    ETH: {
+      address: "0x06565ed324Ee9fb4DB0FF80B7eDbE4Cb007555a3", // WETH on Linea Sepolia
+      symbol: "ETH",
+      decimals: 18,
+    },
+    USDC: {
+      address: "0xFEce4462D57bD51A6A552365A011b95f0E16d9B7",
+      symbol: "USDC",
+      decimals: 6,
+    },
+  },
+  // Linea Mainnet
+  59144: {
+    ETH: {
+      address: "0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f", // WETH on Linea
+      symbol: "ETH",
+      decimals: 18,
+    },
+    USDC: {
+      address: "0x176211869cA2b568f2A7D4EE941E073a821EE1ff",
+      symbol: "USDC",
+      decimals: 6,
+    },
+    USDT: {
+      address: "0xA219439258ca9da29E9Cc4cE5596924745e12B93",
       symbol: "USDT",
       decimals: 6,
     },

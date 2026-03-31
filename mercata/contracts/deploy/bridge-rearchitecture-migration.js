@@ -100,6 +100,35 @@ const STRATO_CANONICAL_ASSETS = [
     externalSymbol: "SILVST",
     stratoToken: "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
   },
+  // --- Linea Sepolia (59141) ---
+  // Uncomment and fill in addresses after deploying tokens on Linea Sepolia
+  // // USDST - Linea Sepolia
+  // {
+  //   externalToken: "<usdst_linea_sepolia_address>",
+  //   externalChainId: 59141,
+  //   externalDecimals: 18,
+  //   externalName: "USDST",
+  //   externalSymbol: "USDST",
+  //   stratoToken: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+  // },
+  // // GOLDST - Linea Sepolia
+  // {
+  //   externalToken: "<goldst_linea_sepolia_address>",
+  //   externalChainId: 59141,
+  //   externalDecimals: 18,
+  //   externalName: "GOLDST",
+  //   externalSymbol: "GOLDST",
+  //   stratoToken: "cdc93d30182125e05eec985b631c7c61b3f63ff0",
+  // },
+  // // SILVST - Linea Sepolia
+  // {
+  //   externalToken: "<silvst_linea_sepolia_address>",
+  //   externalChainId: 59141,
+  //   externalDecimals: 18,
+  //   externalName: "SILVST",
+  //   externalSymbol: "SILVST",
+  //   stratoToken: "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
+  // },
 ];
 
 const ZERO_UINT256 = "0000000000000000000000000000000000000000";
