@@ -237,7 +237,6 @@ function addEquivalentAssetPrices(prices: AggregatedPrice[], configLoader: Confi
 
 interface RebaseFactorEntry {
     targetAddress: string;
-    // WAD-normalized (1e18) factor pushed on-chain; app side divides by 1e18
     factor: bigint;
 }
 
@@ -265,7 +264,7 @@ async function applyRebaseFactors(
             if (rawFactor <= 0n) continue;
 
             const precision = BigInt(rebase.factorPrecision);
-            // WAD-normalize: app side always divides by 1e18 regardless of factorPrecision
+            // Always push 1e18-based factor onchain regardless of factorPrecision
             const wadFactor = rawFactor * 1000000000000000000n / precision;
             if (wadFactor <= 0n) continue;
 
