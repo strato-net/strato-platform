@@ -16,9 +16,9 @@ executable ethereum-jsonrpc
   other-modules:
       Binary
       Commands
-      EthTypes
       RPC
       Server
+      TransactionReceipt
       Paths_ethereum_jsonrpc
   hs-source-dirs:
       src
