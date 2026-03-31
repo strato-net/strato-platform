@@ -289,8 +289,7 @@ pipeline {
   post {
     always {
       sh 'rm -rf .docker-work'
-      sh "mkdir -p mynode/logs" // make sure the dir exists
-      archiveArtifacts artifacts: 'mynode/logs', fingerprint: true, allowEmptyArchive: true
+      archiveArtifacts artifacts: 'mynode/logs/**', fingerprint: true, allowEmptyArchive: true
     }
 
     success {
