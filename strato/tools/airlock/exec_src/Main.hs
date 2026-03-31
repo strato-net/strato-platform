@@ -96,7 +96,7 @@ readContractAddress = do
               hPutStrLn stderr $ "Error: Invalid node config: " ++ show err
               exitFailure
             Right ethConf -> 
-              return $ formatAddressWithoutColor <$> (contractsConfig ethConf >>= railgunProxy)
+              return $ formatAddressWithoutColor <$> railgunProxy (contractsConfig ethConf)
 
 -- | Require the Railgun contract address, failing with helpful message if not set
 requireContractAddress :: String -> IO String
