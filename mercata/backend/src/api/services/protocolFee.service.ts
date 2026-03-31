@@ -824,46 +824,27 @@ export const getStablePoolProtocolRevenue = async (
 };
 
 /**
- * Get gas cost revenue from transaction fees
+ * Get gas cost revenue from STRATO transaction fees (0.01 USDST per tx)
  */
 export const getGasCostRevenue = async (
   accessToken: string,
 ): Promise<ProtocolRevenue> => {
   try {
-    // Get fee collector address (same as swap)
+    const GAS_FEE_WEI = "10000000000000000"; // 1e16 = 0.01 USDST
+    const usdstAddress = constants.USDST.toLowerCase();
     const feeCollector = await getSwapFeeCollector(accessToken);
-    
-    // Query all Transfer events where 'to' is feeCollector and 'from' is not a zero/system address
-    const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
+
+    // Query USDST Transfer events to feeCollector with exactly 0.01 USDST value (gas fee payments)
+    const { data: gasTransferEvents } = await cirrus.get(accessToken, `/event`, {
       params: {
-        event_name: `eq.Transfer`,
-        select: "address,attributes,block_timestamp",
+        event_name: "eq.Transfer",
+        address: `eq.${usdstAddress}`,
         "attributes->>to": `eq.${feeCollector}`,
-        // Exclude transfers from zero/system addresses (000000000000000000000000000000000000%)
-        "attributes->>from": `not.like.000000000000000000000000000000000000%`,
+        "attributes->>value": `eq.${GAS_FEE_WEI}`,
+        select: "block_timestamp",
         order: "block_timestamp.desc"
       }
     });
-    // Also need to exclude transfers from pools (since those are already counted in swap revenue)
-    // Get all pool addresses to exclude
-    const { data: allPoolsData } = await cirrus.get(accessToken, `/${PoolFactory}-allPools`, {
-      params: {
-        address: `eq.${config.poolFactory}`,
-        select: "value"
-      }
-    });
-    const poolAddresses = allPoolsData ? allPoolsData.map((entry: any) => entry.value) : [];
-    
-    // Get lending pool liquidityPool address to exclude (already counted in lending revenue)
-    const { lendingPool: lendingPoolAddress, liquidityPool: liquidityPoolAddress } = await getPool(accessToken, { 
-      select: "lendingPool,liquidityPool" 
-    });
-    
-    // Filter out transfers from pools and liquidity pool
-    const excludedAddresses = new Set([...poolAddresses, liquidityPoolAddress].filter(Boolean));
-    const gasTransferEvents = tokenTransferEvents?.filter((event: any) => 
-      !excludedAddresses.has(event.attributes.from)
-    ) || [];
     
     if (!gasTransferEvents || gasTransferEvents.length === 0) {
       return {
@@ -877,98 +858,32 @@ export const getGasCostRevenue = async (
         }
       };
     }
-    // Aggregate by token and time period
+    const fee = BigInt(GAS_FEE_WEI);
     const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = getTimeCutoffs();
-    
-    const revenueByAsset: Record<string, {
-      symbol: string;
-      daily: bigint;
-      weekly: bigint;
-      monthly: bigint;
-      ytd: bigint;
-      allTime: bigint;
-    }> = {};
-    
-    // Process each transfer event
+
+    // Count events per period — each event is exactly 0.01 USDST
+    let daily = 0n, weekly = 0n, monthly = 0n, ytd = 0n, allTime = 0n;
     for (const event of gasTransferEvents) {
-      const tokenAddress = event.address;
-      const amount = BigInt(event.attributes.value || "0");
-      const timestamp = parseTimestamp(event.block_timestamp);
-      
-      // Initialize token entry if not exists
-      if (!revenueByAsset[tokenAddress]) {
-        const tokenInfo = await getTokenInfo(accessToken, tokenAddress);
-        revenueByAsset[tokenAddress] = {
-          symbol: tokenInfo.symbol,
-          daily: 0n,
-          weekly: 0n,
-          monthly: 0n,
-          ytd: 0n,
-          allTime: 0n
-        };
-      }
-      
-      // Add to appropriate time buckets
-      revenueByAsset[tokenAddress].allTime += amount;
-      if (timestamp >= ytdCutoff) revenueByAsset[tokenAddress].ytd += amount;
-      if (timestamp >= oneMonthAgo) revenueByAsset[tokenAddress].monthly += amount;
-      if (timestamp >= oneWeekAgo) revenueByAsset[tokenAddress].weekly += amount;
-      if (timestamp >= oneDayAgo) revenueByAsset[tokenAddress].daily += amount;
+      const ts = parseTimestamp(event.block_timestamp);
+      allTime += fee;
+      if (ts >= oneDayAgo) daily += fee;
+      if (ts >= oneWeekAgo) weekly += fee;
+      if (ts >= oneMonthAgo) monthly += fee;
+      if (ts >= ytdCutoff) ytd += fee;
     }
-    // Convert to result format
-    const formatRevenueByAsset = (selector: keyof typeof revenueByAsset[string]): RevenueByAsset[] => {
-      return Object.entries(revenueByAsset)
-        .map(([asset, data]) => ({
-          asset,
-          symbol: data.symbol,
-          revenue: data[selector].toString()
-        }))
-        .filter(item => item.revenue !== "0")
-        .sort((a, b) => {
-          const revenueA = BigInt(a.revenue);
-          const revenueB = BigInt(b.revenue);
-          if (revenueA > revenueB) return -1;
-          if (revenueA < revenueB) return 1;
-          return 0;
-        });
-    };
-    // Calculate totals
-    const calculateTotal = (items: RevenueByAsset[]): string => {
-      return items.reduce((sum, item) => sum + BigInt(item.revenue), 0n).toString();
-    };
-    
-    const revenueByPeriod: RevenueByPeriod = {
-      daily: {
-        byAsset: formatRevenueByAsset('daily'),
-        total: "0"
-      },
-      weekly: {
-        byAsset: formatRevenueByAsset('weekly'),
-        total: "0"
-      },
-      monthly: {
-        byAsset: formatRevenueByAsset('monthly'),
-        total: "0"
-      },
-      ytd: {
-        byAsset: formatRevenueByAsset('ytd'),
-        total: "0"
-      },
-      allTime: {
-        byAsset: formatRevenueByAsset('allTime'),
-        total: "0"
-      }
-    };
-    
-    // Set totals
-    revenueByPeriod.daily.total = calculateTotal(revenueByPeriod.daily.byAsset);
-    revenueByPeriod.weekly.total = calculateTotal(revenueByPeriod.weekly.byAsset);
-    revenueByPeriod.monthly.total = calculateTotal(revenueByPeriod.monthly.byAsset);
-    revenueByPeriod.ytd.total = calculateTotal(revenueByPeriod.ytd.byAsset);
-    revenueByPeriod.allTime.total = calculateTotal(revenueByPeriod.allTime.byAsset);
+
+    const buildByAsset = (total: bigint): RevenueByAsset[] =>
+      total > 0n ? [{ asset: usdstAddress, symbol: "USDST", revenue: total.toString() }] : [];
+
     return {
-      totalRevenue: revenueByPeriod.allTime.total,
-      revenueByPeriod
+      totalRevenue: allTime.toString(),
+      revenueByPeriod: {
+        daily: { total: daily.toString(), byAsset: buildByAsset(daily) },
+        weekly: { total: weekly.toString(), byAsset: buildByAsset(weekly) },
+        monthly: { total: monthly.toString(), byAsset: buildByAsset(monthly) },
+        ytd: { total: ytd.toString(), byAsset: buildByAsset(ytd) },
+        allTime: { total: allTime.toString(), byAsset: buildByAsset(allTime) }
+      }
     };
   } catch (error: any) {
     console.error("Error fetching gas cost revenue:", {
