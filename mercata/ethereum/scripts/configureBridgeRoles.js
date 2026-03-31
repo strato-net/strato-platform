@@ -56,8 +56,15 @@ const DEFAULT_RATE_LIMITS = {
 const CHAIN_NAME_TO_ID = {
   sepolia: 11155111,
   baseSepolia: 84532,
+  "base-sepolia": 84532,
+  base_sepolia: 84532,
   mainnet: 1,
+  ethereum: 1,
   base: 8453,
+  base_mainnet: 8453,
+  linea: 59144,
+  lineaSepolia: 59141,
+  "linea-sepolia": 59141,
 };
 
 function parseArgs() {
