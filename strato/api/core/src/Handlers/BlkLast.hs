@@ -17,7 +17,7 @@ where
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Transaction
+import Blockchain.Data.Transaction (rawTX2TX)
 import Blockchain.Model.JsonBlock
 import Control.Arrow ((&&&), (***))
 import Control.Monad.Composable.SQL

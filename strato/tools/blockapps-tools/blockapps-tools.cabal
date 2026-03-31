@@ -26,7 +26,6 @@ library
       BlockApps.Tools.Hash
       BlockApps.Tools.InsertP2P
       BlockApps.Tools.InsertSeq
-      BlockApps.Tools.InsertTX
       BlockApps.Tools.Psql
       BlockApps.Tools.Raw
       BlockApps.Tools.RawMP

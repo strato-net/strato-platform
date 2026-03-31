@@ -140,6 +140,9 @@ genEthConf = do
         { vaultUrl = if Opts.flags_localAuth
             then "http://localhost:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
             else flags_vaultUrl
+        , vaultUrlDocker = if Opts.flags_localAuth
+            then "http://nginx:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
+            else flags_vaultUrl
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl

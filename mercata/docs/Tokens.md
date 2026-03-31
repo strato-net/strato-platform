@@ -1,6 +1,6 @@
 ## Tokens
 
-Purpose: ERC20-like tokens with metadata, factory, faucet, and access hooks.
+Purpose: ERC20-like tokens with metadata, factory, and access hooks.
 
 Functional summary:
 - Standard ERC20 transfers with revert-on-failure semantics; owner‑controlled mint/burn and metadata.

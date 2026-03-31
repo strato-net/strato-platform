@@ -10,6 +10,7 @@ import qualified Data.ByteString as BS
 import Blockchain.EthConf (runKafkaMConfigured)
 import Control.Monad.Composable.Kafka (createTopicAndWait)
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.CaseInsensitive as CI
 import Network.HTTP.Types (status200, status204)
 import Network.Wai
@@ -40,10 +41,10 @@ app req respond
       respond $ responseLBS status204 corsHeaders ""
   | otherwise = do
       body <- strictRequestBody req
-      putStrLn $ show (remoteHost req) ++ " >>> " ++ show body
+      putStrLn $ show (remoteHost req) ++ " >>> " ++ BLC.unpack body
 
       response <- doRPC body
 
-      putStrLn $ show (remoteHost req) ++ " <<< " ++ show response
+      putStrLn $ show (remoteHost req) ++ " <<< " ++ BLC.unpack response
       respond $
         responseBuilder status200 corsHeaders $ copyByteString $ BL.toStrict response

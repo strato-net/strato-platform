@@ -60,12 +60,6 @@ clientSecret: "${OAUTH_CLIENT_SECRET}"
 EOF
 fi
 
-# Create faucet key if needed
-mkdir -p config
-if [ ! -f config/priv ]; then
-  echo -ne "\x1d\xd8\x85\xa4\x23\xf4\xe2\x12\x74\x0f\x11\x6a\xfa\x66\xd4\x0a\xaf\xdb\xb3\xa3\x81\x07\x91\x50\x37\x18\x01\x87\x1d\x9e\xa2\x81" > config/priv
-fi
-
 echo -e "${Green}Starting STRATO processes via convoke...${NC}"
 
 # Run convoke to supervise all processes (--no-docker since we're inside Docker)
