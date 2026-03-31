@@ -26,6 +26,7 @@ import vaultRoutes from "./routes/vault.routes";
 import onrampRoutes from "./routes/onramp.routes";
 import metalForgeRoutes from "./routes/metalForge.routes";
 import earnRoutes from "./routes/earn.routes";
+import contactRoutes from "./routes/contact.routes";
 
 const router = Router();
 
@@ -106,6 +107,9 @@ router.use("/metal-forge", metalForgeRoutes);
 
 // ----- Earn Routes -----
 router.use("/earn", earnRoutes);
+
+// ----- Contact Routes -----
+router.use("/contact", contactRoutes);
 
 // ----- Documentation Routes -----
 // Serve static files for Swagger customizations
