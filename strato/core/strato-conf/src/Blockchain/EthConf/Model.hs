@@ -154,6 +154,7 @@ data ContractsConf = ContractsConf
 
 data UrlConfig = UrlConfig
   { vaultUrl :: String
+  , vaultUrlDocker :: String
   , fileServerUrl :: String
   , notificationServerUrl :: String
   , repoUrl :: String  -- Docker registry URL prefix for images
@@ -271,6 +272,7 @@ instance Default ContractsConf where
 instance Default UrlConfig where
   def = UrlConfig
     { vaultUrl = "https://vault.blockapps.net:8093"
+    , vaultUrlDocker = "https://vault.blockapps.net:8093"
     , fileServerUrl = ""
     , notificationServerUrl = ""
     , repoUrl = ""
