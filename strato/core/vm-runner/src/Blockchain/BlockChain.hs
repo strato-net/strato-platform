@@ -71,7 +71,7 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
-import Blockchain.EthConf (ethConf, networkConfig)
+import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Conduit
@@ -479,15 +479,15 @@ runCodeForTransaction b availableGas tAddr t proposer =
    in case ut of
         TD.EthereumTX {TD.ethTo = Just toAddr, TD.value = val, TD.txData = callData}
           | B.null callData && val > 0 -> do
-            let usdstAddr = Address 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+            let nativeAddr = nativeTokenAddress (contractsConfig ethConf)
                 recipientArg = T.pack $ "0x" ++ formatAddressWithoutColor toAddr
                 amountArg = T.pack $ show val
             $logInfoS "runCodeForTransaction" $ T.pack $
-              "EthereumTX native transfer: " ++ show val ++ " to " ++ format toAddr ++ " -> USDST.transfer"
+              "EthereumTX native transfer: " ++ show val ++ " to " ++ format toAddr ++ " -> nativeToken.transfer"
             lift $
               SolidVM.call
                 b
-                usdstAddr
+                nativeAddr
                 tAddr
                 proposer
                 (fromIntegral availableGas)

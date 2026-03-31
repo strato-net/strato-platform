@@ -8,15 +8,15 @@ module Commands
 where
 
 import Binary
-import EthTypes (TransactionReceipt(..))
+import TransactionReceipt (TransactionReceipt, mkTransactionReceipt)
 import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runKafkaMConfigured, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
-import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID)
+import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
 import Blockchain.Data.BlockHeader (BlockHeader (..))
-import Blockchain.Data.DataDefs (AddressStateRef (..))
+import Blockchain.Data.DataDefs (AddressStateRef (..), TransactionResult(..))
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize)
 import Blockchain.Data.Transaction (Transaction(..), transactionHash, txAndTime2RawTX)
 import Blockchain.Data.TXOrigin (TXOrigin(API))
@@ -24,7 +24,7 @@ import Blockchain.Model.JsonBlock (AddressStateRef' (..), Block', RawTransaction
 import Blockchain.Sequencer.Event (JsonRpcCommand(..), VmTask(..))
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
 import Blockchain.Strato.Model.Address (Address(..), addressToHex)
-import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString)
+import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, keccak256ToHex)
 import Text.Format (format)
 import Control.Monad.IO.Class
 import Control.Monad.Composable.Kafka (fetchItems, execKafka)
@@ -44,6 +44,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (UTCTime(..))
+import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Network.JsonRpc.Server
@@ -275,35 +276,32 @@ callVM c = do
 eth_getBalance :: Method Server
 eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "blockString" :+: ())
   where
-    -- USDST is the platform's native token (ERC20 treated as native for MetaMask)
-    usdstAddr = Address 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
-    -- balanceOf(address) selector: keccak256("balanceOf(address)")[:4]
     balanceOfSelector = "70a08231"
 
-    f :: String -> String -> RpcResult Server String
-    f addressString _blockString = case strToAddress addressString of
-      Left _ -> return "0x0"
-      Right addr -> do
-        let padding = BC.replicate 24 '0'
-            calldataHex = balanceOfSelector <> padding <> addressToHex addr
-            calldata = case B16.decode calldataHex of
-              Right bs -> bs
-              Left _ -> B.empty
-            txObj = TxCallObject
-              { TxCall.from = Address 0
-              , TxCall.to = Just usdstAddr
-              , TxCall.gas = "0x0"
-              , TxCall.gasPrice = "0x0"
-              , TxCall.value = "0x0"
-              , TxCall.data_ = HexData calldata
-              }
-            rpcId = "eth_getBalance_" ++ showHex addr ""
-        result <- liftIO $ callVM $ JRCCall txObj rpcId "latest"
-        if B.length result == 32
-          then do
-            let balance = foldl (\acc b -> acc * 256 + fromIntegral b) (0 :: Integer) (B.unpack result)
-            return $ "0x" ++ showHex balance ""
-          else return "0x0"
+    nativeAddr = nativeTokenAddress (contractsConfig ethConf)
+
+    f :: Address -> String -> RpcResult Server String
+    f addr _blockString = do
+          let padding = BC.replicate 24 '0'
+              calldataHex = balanceOfSelector <> padding <> addressToHex addr
+              calldata = case B16.decode calldataHex of
+                Right bs -> bs
+                Left _ -> B.empty
+              txObj = TxCallObject
+                { TxCall.from = Address 0
+                , TxCall.to = Just nativeAddr
+                , TxCall.gas = "0x0"
+                , TxCall.gasPrice = "0x0"
+                , TxCall.value = "0x0"
+                , TxCall.data_ = HexData calldata
+                }
+              rpcId = "eth_getBalance_" ++ showHex addr ""
+          result <- liftIO $ callVM $ JRCCall txObj rpcId "latest"
+          if B.length result == 32
+            then do
+              let balance = foldl (\acc b -> acc * 256 + fromIntegral b) (0 :: Integer) (B.unpack result)
+              return $ "0x" ++ showHex balance ""
+            else return "0x0"
 
 eth_getCode :: Method Server
 eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" :+: ())
@@ -515,14 +513,22 @@ eth_getTransactionByBlockNumberAndIndex = toMethod "eth_getTransactionByBlockNum
 eth_getTransactionReceipt :: Method Server
 eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "txHash" :+: ())
   where
-    f :: String -> RpcResult Server (Maybe TransactionReceipt)
+    f :: Keccak256 -> RpcResult Server (Maybe TransactionReceipt)
     f txHash = do
-      let h = if take 2 txHash == "0x" then drop 2 txHash else txHash
-      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (keccak256FromHex h)
+      response <- liftIO $ runLocal $ TxResults.getTransactionResultClient txHash
       case response of
-        Right (tr : _) -> return (Just (TransactionReceipt tr))
+        Right (tr : _) -> Just <$> buildReceipt tr
         Right [] -> return Nothing
         Left err -> throwError $ rpcError (-32603) (formatClientError err)
+
+    buildReceipt :: TransactionResult -> RpcResult Server TransactionReceipt
+    buildReceipt tr = do
+      mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex (transactionResultBlockHash tr))
+      let blkNum = maybe 0 getBlockNumber mBlk
+          txs = maybe [] (blockReceiptTransactions . bPrimeToB) mBlk
+      case find (\t -> transactionHash t == transactionResultTransactionHash tr) txs of
+        Just tx -> return $ mkTransactionReceipt tr tx blkNum
+        Nothing -> throwError $ rpcError (-32603) "Transaction not found in block"
 
 eth_getUncleByBlockHashAndIndex :: Method Server
 eth_getUncleByBlockHashAndIndex = toMethod "eth_getUncleByBlockHashAndIndex" f ()
