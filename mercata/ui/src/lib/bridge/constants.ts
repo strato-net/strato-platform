@@ -179,6 +179,73 @@ export const DEPOSIT_ROUTER_ABI = [
   }
 ] as const;
 
+// StratoRepresentationBridge ABI (for STRATO-canonical return flow)
+export const STRATO_REP_BRIDGE_ABI = [
+  {
+    inputs: [
+      { name: 'stratoToken', type: 'address' },
+      { name: 'from', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    name: 'burnRepresentation',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'stratoToken', type: 'address' }],
+    name: 'getRepresentationToken',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const;
+
+// StratoRepresentationToken ABI (for approve before burn)
+export const STRATO_REP_TOKEN_ABI = [
+  {
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    name: 'approve',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' }
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'owner', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const;
+
+// Withdrawal status labels for user-facing display
+export const WITHDRAWAL_STATUS_LABELS: Record<string, string> = {
+  Requested: "Pending",
+  PendingLiquidity: "Pending",
+  Ready: "Pending",
+  Executing: "Processing",
+  Completed: "Completed",
+  Cancelled: "Cancelled",
+  Expired: "Cancelled",
+  Rejected: "Failed",
+  FailedRecoverable: "Failed",
+  FailedPostExecution: "Failed",
+};
+
 // Chain Management
 export const SUPPORTED_CHAINS = {
   MAINNET: 1,

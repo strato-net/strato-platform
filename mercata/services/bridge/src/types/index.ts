@@ -150,6 +150,7 @@ export interface ChainInfo {
 
 export interface AssetInfo {
   enabled: boolean;
+  isNative: boolean;
   stratoToken: string;
   externalName: string;
   externalToken: string;
@@ -168,4 +169,54 @@ export interface BridgeInfo {
   tokenFactory: string;
   withdrawalCounter: number;
   withdrawalsPaused: boolean;
+}
+
+// ---------------- Asset Family Types ----------------
+
+export type AssetFamily = "external-canonical" | "strato-canonical";
+
+export interface AssetFamilyInfo extends AssetInfo {
+  assetFamily: AssetFamily;
+}
+
+// ---------------- Vault / Liquidity Types ----------------
+
+export interface VaultBalance {
+  chainId: number;
+  token: string;
+  balance: bigint;
+  reserved: bigint;
+  lastUpdated: number;
+}
+
+export interface LiquidityReservation {
+  withdrawalId: string;
+  chainId: number;
+  token: string;
+  amount: bigint;
+  reservedAt: number;
+}
+
+export type AllocationStatus = "ready" | "pending_liquidity" | "rejected";
+
+export interface AllocationResult {
+  status: AllocationStatus;
+  reason?: string;
+}
+
+export interface ExecutionResult {
+  success: boolean;
+  txHash?: string;
+  error?: string;
+}
+
+export interface RebalanceTransfer {
+  id: string;
+  token: string;
+  sourceChainId: number;
+  destinationChainId: number;
+  amount: bigint;
+  txHash?: string;
+  status: "pending" | "confirmed" | "failed";
+  initiatedAt: number;
 }

@@ -59,6 +59,7 @@ export const getAssetInfo = async (
 
   const normalize = (v: any): AssetInfo => ({
     enabled: !!v.enabled,
+    isNative: !!v.isNative,
     stratoToken: v.stratoToken,
     externalName: v.externalName,
     externalToken: v.externalToken,

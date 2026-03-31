@@ -15,6 +15,10 @@ export const DEPOSIT_EVENT_SIGNATURE =
 export const TRANSFER_EVENT_SIGNATURE =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
+// RepresentationBurned(address indexed stratoToken, address indexed representationToken, address indexed from, uint256 amount)
+export const REPRESENTATION_BURNED_EVENT_SIGNATURE =
+  "0x" + "0"; // Computed after deployment; placeholder updated by deploy script
+
 // Error file configuration
 export const ERROR_FILE_NAME = "bridge-error.flag";
 
@@ -72,6 +76,27 @@ const config = {
       type: "FUNCTION" as const,
     },
   },
+  rebalancing: {
+    enabled: process.env.REBALANCING_ENABLED === "true",
+    checkInterval: Number(process.env.REBALANCING_CHECK_INTERVAL) || 5 * 60 * 1000,
+    minThreshold: BigInt(process.env.REBALANCING_MIN_THRESHOLD || "500000000000000000000"), // $500 in 18-decimal
+    reservePct: Number(process.env.REBALANCING_RESERVE_PCT) || 10,
+    maxPerTransfer: BigInt(process.env.REBALANCING_MAX_PER_TRANSFER || "0"), // 0 = unlimited
+  },
+  circuitBreaker: {
+    enabled: process.env.CIRCUIT_BREAKER_ENABLED === "true",
+    anomalyThreshold: BigInt(process.env.CB_ANOMALY_THRESHOLD || "0"), // 0 = disabled
+    windowDurationMs: Number(process.env.CB_WINDOW_DURATION_MS) || 3_600_000,
+    cooldownMs: Number(process.env.CB_COOLDOWN_MS) || 30 * 60 * 1000,
+  },
+  reconciliation: {
+    interval: Number(process.env.RECONCILIATION_INTERVAL) || 5 * 60 * 1000,
+    discrepancyThresholdPct: Number(process.env.RECONCILIATION_DISCREPANCY_PCT) || 1,
+    discrepancyAbsoluteFloor: BigInt(process.env.RECONCILIATION_ABS_FLOOR || "1000000000000000000"), // 1 token
+  },
+  stratoCustodyVault: {
+    address: process.env.STRATO_CUSTODY_VAULT_ADDRESS || "",
+  },
   api: {
     nodeUrl: process.env.NODE_URL,
     errorCodes: {
@@ -99,6 +124,24 @@ export const getChainRpcUrl = (chainId: number | bigint): string => {
   }
 
   return rpcUrl;
+};
+
+export const getChainVaultAddress = (chainId: number | bigint): string => {
+  const chainIdStr = chainId.toString();
+  const addr = process.env[`CHAIN_${chainIdStr}_VAULT_ADDRESS`];
+  if (!addr) {
+    throw new Error(
+      `CHAIN_${chainIdStr}_VAULT_ADDRESS environment variable is not configured`,
+    );
+  }
+  return addr;
+};
+
+export const getChainRepBridgeAddress = (
+  chainId: number | bigint,
+): string | undefined => {
+  const chainIdStr = chainId.toString();
+  return process.env[`CHAIN_${chainIdStr}_REP_BRIDGE_ADDRESS`];
 };
 
 // Validate required environment variables

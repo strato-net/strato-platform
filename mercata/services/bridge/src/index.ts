@@ -9,6 +9,11 @@ import { validateBridgeConfig } from "./utils/configValidator";
 import { startMultiChainDepositPolling } from "./polling/alchemyPolling";
 import { initializeMercataPolling } from "./polling/mercataPolling";
 import { initOpenIdConfig} from "./auth";
+import { AssetFamilyRegistry } from "./services/assetFamilyRegistry";
+import { LiquidityManager } from "./services/liquidityManager";
+import { RebalancingService } from "./services/rebalancingService";
+import { CircuitBreakerService } from "./services/circuitBreakerService";
+import { WithdrawalAllocator } from "./services/withdrawalAllocator";
 import { healthMonitor } from "./utils/healthMonitor";
 import DepositActionController from "./controllers/depositAction.controller";
 import AcrossController from "./controllers/across.controller";
@@ -68,6 +73,28 @@ app.listen(port, async () => {
 
     // Initialize OAuth
     await initOpenIdConfig();
+
+    // Initialize rearchitecture services
+    const assetFamilyRegistry = new AssetFamilyRegistry();
+    await assetFamilyRegistry.initialize();
+    const circuitBreakerService = new CircuitBreakerService();
+    const liquidityManager = new LiquidityManager(assetFamilyRegistry);
+    await liquidityManager.refreshBalances();
+    const rebalancingService = new RebalancingService(assetFamilyRegistry, liquidityManager);
+    const withdrawalAllocator = new WithdrawalAllocator(assetFamilyRegistry, liquidityManager, circuitBreakerService);
+
+    // Start periodic services
+    liquidityManager.startPeriodicReconciliation();
+    rebalancingService.startPeriodicCheck();
+
+    // Export services for use by polling and controllers
+    (app as any).services = {
+      assetFamilyRegistry,
+      liquidityManager,
+      rebalancingService,
+      circuitBreakerService,
+      withdrawalAllocator,
+    };
 
     // Start polling services
     startMultiChainDepositPolling();

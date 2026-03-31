@@ -92,6 +92,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           chainName: cfg.chainInfo.chainName,
           enabled: cfg.chainInfo.enabled,
           depositRouter: cfg.chainInfo.depositRouter,
+          vaultAddress: cfg.chainInfo.vaultAddress,
+          repBridgeAddress: cfg.chainInfo.repBridgeAddress,
         }));
 
       networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
