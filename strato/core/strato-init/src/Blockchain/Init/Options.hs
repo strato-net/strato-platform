@@ -33,6 +33,7 @@ defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for m
 defineFlag "apiIPAddress" "" "The address containers use to reach strato-api on the host (auto-detected if empty)"
 
 defineFlag "httpPort" (8081 :: Int) "The external HTTP port for nginx"
+defineFlag "nodeHost" ("localhost" :: String) "The external hostname for the node"
 
 defineFlag "svmTrace" (False :: Bool) "Enable verbose logging in SolidVM"
 
@@ -45,6 +46,9 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "jsonrpc" (False :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for MetaMask integration"
 defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
+defineFlag "ssl" (False :: Bool) "Enable SSL (HTTPS on port 443)"
+defineFlag "sslCert" ("" :: String) "Path to SSL certificate file (required when --ssl=true)"
+defineFlag "sslKey" ("" :: String) "Path to SSL private key file (required when --ssl=true)"
 
 defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
 

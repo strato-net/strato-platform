@@ -16,7 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_ssl, flags_sslCert, flags_sslKey)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Strato.Model.Validator
@@ -126,12 +126,29 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ putStrLn $ "Setting up STRATO node: " ++ nodeDir
     liftIO $ putStrLn $ "  Network: " ++ network
 
+    -- Validate SSL cert/key paths before doing any setup
+    when flags_ssl $ do
+      when (null flags_sslCert || null flags_sslKey) $
+        liftIO $ error "--ssl=true requires --sslCert and --sslKey."
+      certExists <- doesFileExist flags_sslCert
+      unless certExists $
+        liftIO $ error $ "SSL certificate file not found: " ++ flags_sslCert
+      keyExists <- doesFileExist flags_sslKey
+      unless keyExists $
+        liftIO $ error $ "SSL key file not found: " ++ flags_sslKey
+
     -- Create node directories first (needed before genEthConf reads postgres_password)
     liftIO $ mapM_ (createDirectoryIfMissing True)
-      ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
+      ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", "ssl", ".ethereumH"]
     
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
+
+    -- Copy SSL cert and key into the node's ssl/ directory
+    when flags_ssl $ liftIO $ do
+      copyFile flags_sslCert ("ssl" </> "server.pem")
+      copyFile flags_sslKey ("ssl" </> "server.key")
+      putStrLn "  ✓ SSL certificate and key installed"
 
     -- Set postgres password: use env var if provided, otherwise generate random
     let pgPasswordFile = "secrets" </> "postgres_password"

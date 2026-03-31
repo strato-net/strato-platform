@@ -8,7 +8,7 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, apiHost, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_localAuth)
+import Blockchain.Init.Options (flags_localAuth, flags_ssl, flags_nodeHost)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
@@ -23,7 +23,7 @@ generateDockerCompose = do
   let conf = ethConf
       portNum = show $ httpPort (networkConfig conf)
       stratoApiPort = show $ apiPort (apiConfig conf)
-      nodeHost = "localhost:" ++ portNum
+      nodeHost = if flags_ssl then flags_nodeHost else flags_nodeHost ++ ":" ++ portNum
       sHost = apiHost (apiConfig conf)
       userGid = uid ++ ":" ++ gid
 
@@ -44,7 +44,6 @@ generateDockerCompose = do
             ]
         , environment = Just $ Map.fromList
             [ ("NODE_URL", "http://nginx:" ++ portNum)
-            , ("BASE_URL", "https://" ++ nodeHost)
             , ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
             , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
             , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA}")
@@ -92,7 +91,7 @@ generateDockerCompose = do
         , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", nodeHost)
-            , ("ssl", "false")
+            , ("ssl", if flags_ssl then "true" else "false")
             ]
         , volumes = Just ["./logs:/logs"]
         , entrypoint = Just ["/bin/sh", "-c"]
@@ -209,6 +208,7 @@ generateDockerCompose = do
         , environment = Just $ Map.fromList $
             [ ("STRATO_PORT_API", stratoApiPort)
             , ("STRATO_PORT_VAULT_PROXY", "8013")
+            , ("ssl", if flags_ssl then "true" else "false")
             ]
             ++ if flags_localAuth
                then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
