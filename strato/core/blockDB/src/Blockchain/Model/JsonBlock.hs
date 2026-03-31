@@ -9,9 +9,7 @@ module Blockchain.Model.JsonBlock (
   RawTransaction'(..),
   Transaction'(..),
   Block'(..),
-  BlockData',
   AddressStateRef'(..),
-  tPrimeToT,
   bPrimeToB,
   rtPrimeToRt,
   rtToRtPrime,
@@ -31,6 +29,7 @@ import           Blockchain.Strato.Model.ExtendedWord (word256ToBytes)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Validator
+import           Control.Applicative                   ((<|>))
 import           Control.DeepSeq
 import           Control.Monad                        (join)
 import           Data.Aeson
@@ -50,7 +49,7 @@ import           Numeric
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON
 -}
-data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show, Generic)
+newtype RawTransaction' = RawTransaction' RawTransaction deriving (Eq, Show, Generic)
 
 newtype UnsignedRawTransaction' = UnsignedRawTransaction' RawTransaction deriving (Eq, Show, Generic)
 
@@ -64,10 +63,9 @@ instance ToSchema RawTransaction' where
       NamedSchema (Just "RawTransaction") mempty
 
 instance ToJSON RawTransaction' where
-  toJSON (RawTransaction' rt@(RawTransaction{..}) next) =
+  toJSON (RawTransaction' rt@(RawTransaction{..})) =
     object $
-      [ "next" .= next,
-        "from" .= rawTransactionFromAddress,
+      [ "from" .= rawTransactionFromAddress,
         "nonce" .= rawTransactionNonce,
         "gasLimit" .= rawTransactionGasLimit,
         "to" .= rawTransactionToAddress,
@@ -76,6 +74,7 @@ instance ToJSON RawTransaction' where
         "args".= rawTransactionArgs,
         "network".= rawTransactionNetwork,
         "code".= rawTransactionCode,
+        "chainId" .= rawTransactionChainId,
         "r" .= showHex rawTransactionR "",
         "s" .= showHex rawTransactionS "",
         "v" .= showHex rawTransactionV "",
@@ -83,7 +82,10 @@ instance ToJSON RawTransaction' where
         "hash" .= rawTransactionTxHash,
         "transactionType" .= show (rawTransactionSemantics rt),
         "timestamp" .= rawTransactionTimestamp,
-        "origin" .= rawTransactionOrigin
+        "origin" .= rawTransactionOrigin,
+        "gasPrice" .= rawTransactionGasPrice,
+        "value" .= rawTransactionValue,
+        "txData" .= fmap B.unpack rawTransactionTxData
       ]
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
@@ -116,7 +118,12 @@ instance FromJSON RawTransaction' where
     let defaultTime = UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
     time <- t .:? "timestamp" .!= defaultTime
     o <- t .:? "origin" .!= API
-    next <- t .:? "next" .!= ""
+
+    cid <- t .:? "chainId"
+
+    gp <- t .:? "gasPrice"
+    val <- t .:? "value"
+    td <- fmap (fmap B.pack) (t .:? "txData")
 
     return
       ( RawTransaction'
@@ -131,14 +138,17 @@ instance FromJSON RawTransaction' where
               args
               network
               code
+              cid
               (tr :: Integer)
               (ts :: Integer)
               (tv :: Word8)
               bn
               h
               o
+              gp
+              val
+              td
           )
-          next
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
 
@@ -182,6 +192,7 @@ instance FromJSON UnsignedRawTransaction' where
     let defaultTime = UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
     time <- t .:? "timestamp" .!= defaultTime
     o <- t .:? "origin" .!= API
+    cid <- t .:? "chainId"
 
     return
       ( UnsignedRawTransaction'
@@ -196,29 +207,33 @@ instance FromJSON UnsignedRawTransaction' where
               args
               network
               code
+              cid
               tr
               ts
               tv
               bn
               h
               o
+              Nothing
+              Nothing
+              Nothing
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
 
-rtToRtPrime :: (String, RawTransaction) -> RawTransaction'
-rtToRtPrime (s, x) = RawTransaction' x s
+rtToRtPrime :: RawTransaction -> RawTransaction'
+rtToRtPrime = RawTransaction'
 
 rtToRtPrime' :: RawTransaction -> RawTransaction'
-rtToRtPrime' x = RawTransaction' x ""
+rtToRtPrime' = RawTransaction'
 
 rtPrimeToRt :: RawTransaction' -> RawTransaction
-rtPrimeToRt (RawTransaction' x _) = x
+rtPrimeToRt (RawTransaction' x) = x
 
 newtype Transaction' = Transaction' Transaction deriving (Eq, Show)
 
 instance ToJSON Transaction' where
-  toJSON (Transaction' tx@(MessageTX nonce gasLimit (Address toAddr) funcName args network tr ts tv)) =
+  toJSON (Transaction' tx@(MessageTX nonce gasLimit (Address toAddr) funcName args network cid tr ts tv)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -228,13 +243,14 @@ instance ToJSON Transaction' where
         "network" .= network,
         "args" .= args,
         "funcName" .= funcName,
+        "chainId" .= cid,
         "r" .= showHex tr "",
         "s" .= showHex ts "",
         "v" .= showHex tv "",
         "hash" .= transactionHash tx,
         "transactionType" .= show (transactionSemantics tx)
       ]
-  toJSON (Transaction' tx@(ContractCreationTX nonce gasLimit contractName args network code tr ts tv)) =
+  toJSON (Transaction' tx@(ContractCreationTX nonce gasLimit contractName args network code cid tr ts tv)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -244,58 +260,98 @@ instance ToJSON Transaction' where
         "network" .= network,
         "args" .= args,
         "contractName" .= contractName,
+        "chainId" .= cid,
         "r" .= showHex tr "",
         "s" .= showHex ts "",
         "v" .= showHex tv "",
         "hash" .= transactionHash tx,
         "transactionType" .= show (transactionSemantics tx)
       ]
+  toJSON (Transaction' tx@(EthereumTX n gp gl eto val _ cid tr ts tv)) =
+    object $
+      [ "kind" .= ("Transaction" :: String),
+        "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
+        "nonce" .= n,
+        "gasPrice" .= gp,
+        "gasLimit" .= gl,
+        "to" .= eto,
+        "value" .= val,
+        "r" .= showHex tr "",
+        "s" .= showHex ts "",
+        "v" .= showHex (toEthV tv cid) "",
+        "hash" .= transactionHash tx,
+        "transactionType" .= ("EthereumTX" :: String)
+      ]
 
 instance FromJSON Transaction' where
   parseJSON (Object t) = do
-        mToAddr <- t .:? "to"
+    mInit <- t .:? "init"
+    case mInit of
+      Just code -> do
         nonce <- t .:? "nonce" .!= 0
         gasLimit <- t .:? "gasLimit" .!= 0
         args <- t .:? "args" .!= []
         network <- t .:? "network" .!= ""
-        funcName <- t .:? "funcName" .!= ""
         contractName <- t .:? "contractName" .!= ""
+        cid <- t .:? "chainId"
         tr <- parseHexStr (t .: "r")
         ts <- parseHexStr (t .: "s")
         tv <- parseHexStr (t .:? "v" .!= "0")
-
-        case mToAddr of
+        return . Transaction' $ ContractCreationTX
+          nonce gasLimit contractName args network code cid tr ts tv
+      Nothing -> do
+        mFuncName <- t .:? "funcName"
+        case mFuncName of
+          Just funcName -> do
+            toAddr <- t .: "to"
+              <|> fail "detected SolidVM function call (has 'funcName') but missing required field 'to'"
+            nonce <- t .:? "nonce" .!= 0
+            gasLimit <- t .:? "gasLimit" .!= 0
+            args <- t .:? "args" .!= []
+            network <- t .:? "network" .!= ""
+            cid <- t .:? "chainId"
+            tr <- parseHexStr (t .: "r")
+            ts <- parseHexStr (t .: "s")
+            tv <- parseHexStr (t .:? "v" .!= "0")
+            return . Transaction' $ MessageTX nonce gasLimit toAddr funcName args network cid tr ts tv
           Nothing -> do
-            code <- t .: "code"
-            return . Transaction' $ ContractCreationTX
-              nonce gasLimit contractName args network code tr ts tv
-          (Just toAddr) -> do
-            return . Transaction' $ MessageTX nonce gasLimit toAddr funcName args network tr ts tv
-  parseJSON _ = error "bad param when calling parseJSON for Transaction'"
+            n <- t .:? "nonce" .!= 0
+            gp <- t .:? "gasPrice" .!= 0
+            gl <- t .:? "gasLimit" .!= 0
+            eto <- t .:? "to"
+            val <- t .:? "value" .!= 0
+            rawV <- parseHexStr (t .:? "v" .!= "0")
+            tr <- parseHexStr (t .: "r")
+            ts <- parseHexStr (t .: "s")
+            return . Transaction' $ EthereumTX n gp gl eto val B.empty
+              (ethVToChainId rawV) tr ts (ethVToRecoveryId rawV)
+  parseJSON _ = fail "expected a Transaction object with 'init' (contract deploy), 'funcName' (SolidVM call), or neither (Ethereum transaction)"
 
 
 {-
   = MessageTX
-      { transactionNonce :: Integer,
-        transactionGasLimit :: Integer,
-        transactionTo :: Address,
-        transactionFuncName :: Text,
-        transactionArgs :: [Text],
-        transactionNetwork :: Text,
-        transactionR :: Integer,
-        transactionS :: Integer,
-        transactionV :: Word8
+      { nonce :: Integer,
+        gasLimit :: Integer,
+        to :: Address,
+        funcName :: Text,
+        args :: [Text],
+        network :: Text,
+        chainId :: Maybe Integer,
+        r :: Integer,
+        s :: Integer,
+        v :: Word8
       }
   | ContractCreationTX
-      { transactionNonce :: Integer,
-        transactionGasLimit :: Integer,
-        transactionContractName :: Text,
-        transactionArgs :: [Text],
-        transactionNetwork :: Text,
-        transactionCode :: Code,
-        transactionR :: Integer,
-        transactionS :: Integer,
-        transactionV :: Word8
+      { nonce :: Integer,
+        gasLimit :: Integer,
+        contractName :: Text,
+        args :: [Text],
+        network :: Text,
+        code :: Code,
+        chainId :: Maybe Integer,
+        r :: Integer,
+        s :: Integer,
+        v :: Word8
       }
 -}
 
@@ -306,7 +362,7 @@ tToTPrime = Transaction'
 tPrimeToT :: Transaction' -> Transaction
 tPrimeToT (Transaction' tx) = tx
 
-data Block' = Block' Block String deriving (Eq, Show)
+newtype Block' = Block' Block deriving (Eq, Show)
 
 instance ToSchema Block' where
   declareNamedSchema _ =
@@ -314,10 +370,9 @@ instance ToSchema Block' where
       NamedSchema (Just "Block") mempty
 
 instance ToJSON Block' where
-  toJSON (Block' (Block bd rt bu) next) =
+  toJSON (Block' (Block bd rt bu)) =
     object
-      [ "next" .= next,
-        "kind" .= ("Block" :: String),
+      [ "kind" .= ("Block" :: String),
         "blockData" .= bdToBdPrime bd,
         "receiptTransactions" .= map tToTPrime rt,
         "blockUncles" .= map bdToBdPrime bu,
@@ -378,12 +433,12 @@ blockDataRefToBlock bdr vs vd ps sigs txs = case vs of
       }
 
 bPrimeToB :: Block' -> Block
-bPrimeToB (Block' x _) = x
+bPrimeToB (Block' x) = x
 
-newtype BlockData' = BlockData' BlockHeader deriving (Eq, Show)
+newtype BlockHeader' = BlockHeader' BlockHeader deriving (Eq, Show)
 
-instance ToJSON BlockData' where
-  toJSON (BlockData' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed mh non)) =
+instance ToJSON BlockHeader' where
+  toJSON (BlockHeader' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed mh non)) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= ph,
@@ -402,7 +457,7 @@ instance ToJSON BlockData' where
         "mixHash" .= mh
       ]
 
-  toJSON (BlockData' (BlockHeaderV2{..})) =
+  toJSON (BlockHeader' (BlockHeaderV2{..})) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= parentHash,
@@ -419,10 +474,11 @@ instance ToJSON BlockData' where
         "signatures" .= signatures
       ]
 
-instance FromJSON BlockData' where
+instance FromJSON BlockHeader' where
   parseJSON = withObject "BlockData'" $ \v ->
-    BlockData'
-      <$> ( BlockHeader
+    BlockHeader'
+    {-
+      <$> ( BlockHeaderV2
               <$> v .: "parentHash"
               <*> v .: "unclesHash"
               <*> v .: "coinbase"
@@ -438,6 +494,21 @@ instance FromJSON BlockData' where
               <*> v .: "extraData"
               <*> v .: "mixHash"
               <*> v .: "nonce"
+      -}        
+      <$> ( BlockHeaderV2
+              <$> v .: "parentHash"
+              <*> v .: "stateRoot"
+              <*> v .: "transactionsRoot"
+              <*> v .: "receiptsRoot"
+              <*> v .:? "logBloom" .!= B.replicate 64 0x30 -- this is what log blooms currently get set to
+              <*> v .: "number"
+              <*> v .: "timestamp"
+              <*> v .: "extraData"
+              <*> v .: "currentValidators"
+              <*> v .: "newValidators"
+              <*> v .: "removedValidators"
+              <*> v .: "proposalSignature"
+              <*> v .: "signatures"
           )
 
 instance FromJSON Block' where
@@ -445,14 +516,13 @@ instance FromJSON Block' where
     bData <- bdPrimeToBd <$> v .: "blockData"
     bTxs <- map tPrimeToT <$> (v .: "receiptTransactions")
     bUncles <- map bdPrimeToBd <$> (v .: "blockUncles")
-    next <- v .: "next"
-    pure $ Block' (Block bData bTxs bUncles) next
+    pure $ Block' (Block bData bTxs bUncles)
 
-bdToBdPrime :: BlockHeader -> BlockData'
-bdToBdPrime = BlockData'
+bdToBdPrime :: BlockHeader -> BlockHeader'
+bdToBdPrime = BlockHeader'
 
-bdPrimeToBd :: BlockData' -> BlockHeader
-bdPrimeToBd (BlockData' bd) = bd
+bdPrimeToBd :: BlockHeader' -> BlockHeader
+bdPrimeToBd (BlockHeader' bd) = bd
 
 newtype BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
@@ -499,7 +569,7 @@ csr2s (CommitmentSignatureRef _ _ r s v) =
   either (const Nothing) Just . importSignature $
     word256ToBytes r <> word256ToBytes s <> B.singleton v
 
-data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
+newtype AddressStateRef' = AddressStateRef' AddressStateRef deriving (Eq, Show)
 
 instance ToSchema AddressStateRef' where
   declareNamedSchema _ = do
@@ -511,8 +581,7 @@ instance ToSchema AddressStateRef' where
     return $ NamedSchema (Just "AddressStateRef") $ mempty
       & type_ ?~ OpenApiObject
       & properties .~
-        [ ("next", strSchema)
-        , ("kind", strSchema)
+        [ ("kind", strSchema)
         , ("address", addrSchema)
         , ("nonce", intSchema)
         , ("balance", strSchema)
@@ -521,13 +590,12 @@ instance ToSchema AddressStateRef' where
         , ("contractName", maybeStrSchema)
         , ("latestBlockNum", intSchema)
         ]
-      & required .~ ["next", "kind", "address", "nonce", "balance", "contractRoot", "latestBlockNum"]
+      & required .~ ["kind", "address", "nonce", "balance", "contractRoot", "latestBlockNum"]
 
 instance ToJSON AddressStateRef' where
-  toJSON (AddressStateRef' (AddressStateRef addr n b cr ch cn bNum) next) =
+  toJSON (AddressStateRef' (AddressStateRef addr n b cr ch cn bNum)) =
     object
-      [ "next" .= next,
-        "kind" .= ("AddressStateRef" :: String),
+      [ "kind" .= ("AddressStateRef" :: String),
         "address" .= addr,
         "nonce" .= n,
         "balance" .= show b,
@@ -558,13 +626,13 @@ instance FromJSON AddressStateRef' where
               )
   parseJSON _ = fail "JSON not an object"
 
-asrToAsrPrime :: (String, AddressStateRef) -> AddressStateRef'
-asrToAsrPrime (s, x) = AddressStateRef' x s
+asrToAsrPrime :: AddressStateRef -> AddressStateRef'
+asrToAsrPrime = AddressStateRef'
 
 asrToAsrPrime' :: AddressStateRef -> AddressStateRef'
-asrToAsrPrime' x = AddressStateRef' x ""
+asrToAsrPrime' = AddressStateRef'
 
-data Address' = Address' Address String deriving (Eq, Show)
+newtype Address' = Address' Address deriving (Eq, Show)
 {-
 adToAdPrime :: Address -> Address'
 adToAdPrime x = Address' x ""

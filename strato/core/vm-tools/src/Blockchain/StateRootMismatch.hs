@@ -82,7 +82,7 @@ instance ( MonadUnliftIO m
     Nothing -> do
       StateRootMismatchM . void $ writeUnseqEvents [IEGetMPNodes [k]]
       fmap (Just . fromMaybe MP.EmptyNodeData) . timeout 10000000 $
-        runConsume "StateRootMismatchM/lookup" "ethereum-vm" seqVmEventsTopicName $ \_ evs -> do
+        runConsume "StateRootMismatchM/lookup" "ethereum-vm" seqVmTasksTopicName $ \_ evs -> do
           let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd
               findND _ = Nothing
               mND = foldr (<|>) Nothing (findND <$> evs)

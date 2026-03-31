@@ -5,9 +5,10 @@ module Blockchain.Init.DockerCompose (generateDockerCompose) where
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (apiConfig, httpPort, ipAddress, urlConfig, vaultUrl)
+import Blockchain.EthConf.Model (apiConfig, apiPort, apiHost, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
+import Blockchain.Init.Options (flags_localAuth)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
@@ -20,10 +21,10 @@ generateDockerCompose = do
   gid <- show <$> getEffectiveGroupID
   
   let conf = ethConf
-      portNum = show $ httpPort (apiConfig conf)
+      portNum = show $ httpPort (networkConfig conf)
+      stratoApiPort = show $ apiPort (apiConfig conf)
       nodeHost = "localhost:" ++ portNum
-      stratoHostname = ipAddress (apiConfig conf)
-      vault = vaultUrl (urlConfig conf)
+      sHost = apiHost (apiConfig conf)
       userGid = uid ++ ":" ++ gid
 
   -- Disable Docker logging since we redirect stdout/stderr to files
@@ -39,11 +40,32 @@ generateDockerCompose = do
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
+            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , environment = Just $ Map.fromList
-            [ ("NODE_URL", "http://nginx")
+            [ ("NODE_URL", "http://nginx:" ++ portNum)
             , ("BASE_URL", "https://" ++ nodeHost)
-            , ("STRATO_HOSTNAME", stratoHostname)
+            , ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
+            , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
+            , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA}")
+            , ("RPC_URL_SEPOLIA_FALLBACK", "${RPC_URL_SEPOLIA_FALLBACK}")
+            , ("RPC_URL_BASE", "${RPC_URL_BASE}")
+            , ("RPC_URL_BASE_FALLBACK", "${RPC_URL_BASE_FALLBACK}")
+            , ("RPC_URL_BASE_SEPOLIA", "${RPC_URL_BASE_SEPOLIA}")
+            , ("RPC_URL_BASE_SEPOLIA_FALLBACK", "${RPC_URL_BASE_SEPOLIA_FALLBACK}")
+            , ("POOL_FACTORY", "${POOL_FACTORY}")
+            , ("LENDING_REGISTRY", "${LENDING_REGISTRY}")
+            , ("TOKEN_FACTORY", "${TOKEN_FACTORY}")
+            , ("ADMIN_REGISTRY", "${ADMIN_REGISTRY}")
+            , ("MERCATA_BRIDGE", "${MERCATA_BRIDGE}")
+            , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID}")
+            , ("STRIPE_SECRET_KEY", "${STRIPE_SECRET_KEY}")
+            , ("STRIPE_PUBLISHABLE_KEY", "${STRIPE_PUBLISHABLE_KEY}")
+            , ("STRIPE_WEBHOOK_SECRET", "${STRIPE_WEBHOOK_SECRET}")
+            , ("ONRAMP_HOT_WALLET_ADDRESS", "${ONRAMP_HOT_WALLET_ADDRESS}")
+            , ("BA_USERNAME", "${BA_USERNAME}")
+            , ("BA_PASSWORD", "${BA_PASSWORD}")
+            , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
@@ -55,6 +77,10 @@ generateDockerCompose = do
         { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ hashMercataUi
         , depends_on = Just $ DependsOnList ["mercata-backend"]
         , volumes = Just ["./logs:/logs"]
+        , environment = Just $ Map.fromList
+            [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID}")
+            , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID}")
+            ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-ui.log 2>&1"]
         , restart = Just "unless-stopped"
@@ -82,14 +108,14 @@ generateDockerCompose = do
             [ ("postgres_host", "postgres")
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
-            , ("STRATO_HOSTNAME", stratoHostname)
-            , ("STRATO_PORT_API", "3000")
+            , ("STRATO_HOSTNAME", sHost)
+            , ("STRATO_PORT_API", stratoApiPort)
             , ("STRATO_PORT_VAULT_PROXY", "8013")
-            , ("vaultUrl", vault)
             ]
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
+            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh /usr/src/app/docker-run.sh >> /logs/apex.log 2>&1"]
@@ -119,8 +145,7 @@ generateDockerCompose = do
         { image = "postgrest:" ++ stratoVersionTag ++ "-" ++ hashPostgrest
         , depends_on = Just $ DependsOnList ["postgres"]
         , environment = Just $ Map.fromList
-            [ ("blocHost", "strato:3000")
-            , ("PG_ENV_POSTGRES_DB", "cirrus")
+            [ ("PG_ENV_POSTGRES_DB", "cirrus")
             , ("PG_ENV_POSTGRES_HOST", "postgres")
             , ("PG_ENV_POSTGRES_USER", "postgres")
             , ("PG_PORT_5432_TCP_PORT", "5432")
@@ -138,6 +163,7 @@ generateDockerCompose = do
 
   let postgres = def
         { image = "postgres:14.18"
+        , shm_size = Just "1g"
         , user = Just userGid
         , environment = Just $ Map.fromList
             [ ("POSTGRES_DB", "eth")
@@ -162,16 +188,32 @@ generateDockerCompose = do
         , ports = Just ["5432:5432"]
         }
 
+
   let nginx = def
         { image = "nginx:" ++ stratoVersionTag ++ "-" ++ hashNginx
-        , depends_on = Just $ DependsOnList ["apex", "docs", "postgrest", "prometheus", "smd", "mercata-backend", "mercata-ui"]
-        , environment = Just $ Map.fromList
-            [ ("STRATO_HOSTNAME", stratoHostname)
-            , ("STRATO_PORT_API", "3000")
+        , depends_on = Just $
+            if flags_localAuth
+              then DependsOnMap $ Map.fromList
+                [ ("apex", DependsOnCondition "service_started")
+                , ("docs", DependsOnCondition "service_started")
+                , ("postgrest", DependsOnCondition "service_started")
+                , ("prometheus", DependsOnCondition "service_started")
+                , ("smd", DependsOnCondition "service_started")
+                , ("mercata-backend", DependsOnCondition "service_started")
+                , ("mercata-ui", DependsOnCondition "service_started")
+                , ("local-auth", DependsOnCondition "service_healthy")
+                ]
+              else DependsOnList
+                ["apex", "docs", "postgrest", "prometheus", "smd", "mercata-backend", "mercata-ui"]
+        
+        , environment = Just $ Map.fromList $
+            [ ("STRATO_PORT_API", stratoApiPort)
             , ("STRATO_PORT_VAULT_PROXY", "8013")
-            , ("VAULT_URL", vault)
             ]
-        , extra_hosts = Just ["host.docker.internal:host-gateway"]
+            ++ if flags_localAuth
+               then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
+                    ]
+               else []
         , ports = Just [portNum ++ ":" ++ portNum, "443:443"]
         , volumes = Just
             [ "./logs:/logs"
@@ -244,18 +286,47 @@ generateDockerCompose = do
         , user = Just userGid
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", nodeHost)
-            , ("STRATO_HOSTNAME", stratoHostname)
             ]
-        , volumes = Just ["./logs:/logs", "./prometheus:/prometheus"]
+        , volumes = Just
+            [ "./logs:/logs"
+            , "./prometheus:/prometheus"
+            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
+            ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /entrypoint.sh >> /logs/prometheus.log 2>&1"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
 
-  let composeFile = ComposeFile
-        { namedVolumes = Nothing
-        , services = Map.fromList
+  let localAuth = def
+        { image = "local-auth:" ++ stratoVersionTag ++ "-" ++ hashLocalAuth
+        , depends_on = Just $ DependsOnList ["postgres"]
+        , environment = Just $ Map.fromList
+            [ ("DSN", "postgres://postgres@postgres:5432/kratos?sslmode=disable")
+            , ("HYDRA_DSN", "postgres://postgres@postgres:5432/hydra?sslmode=disable")
+            , ("URLS_SELF_ISSUER", "http://127.0.0.1:" ++ portNum ++ "/auth")
+            , ("URLS_LOGIN", "http://localhost:" ++ portNum ++ "/auth/ui/login")
+            , ("URLS_CONSENT", "http://localhost:" ++ portNum ++ "/auth/ui/consent")
+            ]
+        , healthcheck = Just Healthcheck
+            { test = ["CMD", "curl", "-f", "http://localhost:4444/.well-known/openid-configuration"]
+            , interval = Just "5s"
+            , timeout = Just "5s"
+            , retries = Just 30
+            , start_period = Just "30s"
+            }
+        , volumes = Just
+            [ "./logs:/logs"
+            , "./secrets:/run/secrets:ro"
+            ]
+        , entrypoint = Just ["/bin/sh", "-c"]
+        , command = Just ["exec /entrypoint.sh >> /logs/local-auth.log 2>&1"]
+        , ports = Just ["4444:4444"]  -- Only expose Hydra OAuth port; login UI accessed via nginx proxy
+        , restart = Just "unless-stopped"
+        , logging = noLogging
+        }
+
+  let baseServices =
             [ ("mercata-backend", mercataBackend)
             , ("mercata-ui", mercataUi)
             , ("smd", smd)
@@ -268,6 +339,14 @@ generateDockerCompose = do
             , ("kafka", kafka)
             , ("prometheus", prometheus)
             ]
+
+  let allServices = if flags_localAuth
+        then ("local-auth", localAuth) : baseServices
+        else baseServices
+
+  let composeFile = ComposeFile
+        { namedVolumes = Nothing
+        , services = Map.fromList allServices
         }
 
   Yaml.encodeFile "docker-compose.yml" composeFile

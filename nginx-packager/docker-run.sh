@@ -25,14 +25,20 @@ DOCS_HOST=${DOCS_HOST:-docs:8080}
 POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
 SMD_HOST=${SMD_HOST:-smd:3002}
-STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
-VAULT_URL=${VAULT_URL:-https://vault.blockapps.net:8093}
 
-# Read HTTP port from ethconf.yaml (single source of truth)
-HTTP_PORT=$(yq '.apiConfig.httpPort' /config/ethconf.yaml)
+# Read config from ethconf.yaml (single source of truth)
+STRATO_HOSTNAME=$(yq '.apiConfig.apiHost' /config/ethconf.yaml)
+HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
+VAULT_URL=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml)
+INTERNAL_VAULT_URL=${INTERNAL_VAULT_URL:-http://${STRATO_HOSTNAME}:8093}
+
+if [[ -z "${VAULT_URL}" || "${VAULT_URL}" == "null" ]]; then
+  echo "urlConfig.vaultUrl is required in /config/ethconf.yaml"
+  exit 7
+fi
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -48,7 +54,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     echo "OAUTH_DISCOVERY_URL is required but not set"
     exit 5
   fi
-  if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
+  if ! curl --silent --output /dev/null --fail --location "${OAUTH_DISCOVERY_URL}"
   then
     echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
     exit 6
@@ -81,6 +87,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_STATS_ENABLED/d' /tmp/nginx.conf
   fi
 
+  # Remove local-auth-only routes unless local-auth discovery is configured
+  if [[ "${OAUTH_DISCOVERY_URL:-}" != *"local-auth"* ]]; then
+    sed -i '/#TEMPLATE_MARK_LOCAL_AUTH/d' /tmp/nginx.conf
+  else
+    # In local-auth mode keep the lines, but strip template markers from output
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_LOCAL_AUTH//g' /tmp/nginx.conf
+  fi
+
   if [ "$SERVE_LOGS" != true ]; then
     sed -i '/#TEMPLATE_MARK_LOGS/d' /tmp/nginx.conf
   fi
@@ -104,6 +118,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf
   sed -i "s|__VAULT_URL__|$VAULT_URL|g" /tmp/nginx.conf
+  sed -i "s|__INTERNAL_VAULT_URL__|$INTERNAL_VAULT_URL|g" /tmp/nginx.conf
   sed -i "s|__HTTP_PORT__|$HTTP_PORT|g" /tmp/nginx.conf
   
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
@@ -126,17 +141,21 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate .lua scripts from templates according to configuration provided
   ########
   cp /tmp/openid.tpl.lua /tmp/openid.lua
+  cp /tmp/vault-openid.tpl.lua /tmp/vault-openid.lua
   sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
   sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
   sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
   sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*'"$OAUTH_SCOPE"'*g' /tmp/openid.lua
+  sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/vault-openid.lua
 
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
     sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
+    sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/vault-openid.lua
   else
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
     sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
+    sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/vault-openid.lua
   fi
 
   ########
@@ -145,6 +164,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
   mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
+  mv /tmp/vault-openid.lua /usr/local/openresty/nginx/lua/vault-openid.lua
   
   mv /tmp/csrf.lua /usr/local/openresty/nginx/lua/csrf.lua
 

@@ -63,11 +63,6 @@ cradle:
     - path: "VM/SolidVM/source-tools/test/"
       component: "source-tools:test:source-tools-test"
 
-    - path: "VM/vrun/app/Main.hs"
-      component: "vrun:exe:vrun"
-
-    - path: "VM/vrun/app/Paths_vrun.hs"
-      component: "vrun:exe:vrun"
 
     - path: "api/bloc/bloc2/src/"
       component: "bloc2:lib"

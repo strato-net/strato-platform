@@ -18,7 +18,7 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
-import Blockchain.Data.Transaction
+import Blockchain.Data.Transaction (insertTXIfNew', transactionHash)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord

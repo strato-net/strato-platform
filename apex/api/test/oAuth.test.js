@@ -1,44 +1,17 @@
 /* jshint esnext: true */
 const chai = require('chai');
-const chaiHttp = require('chai-http');
 const assert = chai.assert;
 const process = require('process');
 
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
 
-const waitFaucet = async function(address) {
-  const res = await chai.request(process.env.stratoRoot)
-      .post('/faucet')
-      .field('address', address);
-  assert.equal(res.status, RestStatus.OK);
-  const sleep = function(ms) {
-      return new Promise(resolve => setTimeout(resolve, ms))
-    };
-  let text = "[]";
-  do {
-      await sleep(400);
-      let res = await chai.request(process.env.stratoRoot)
-        .get('/account')
-        .query({
-          'address': address
-        })
-        .catch((err) => {
-          throw err;
-        });
-      text = res.text;
-    } while (text === "[]");
-
-}
-
-chai.use(chaiHttp);
-
 describe('OAuth tests', function () {
   this.timeout(10000);
 
   const username = 'test02@test.com'
 
-  let app, userAccountAddress;
+  let app;
 
     //need to add skip check to each describe block because of mocha bug.
     // technically beforeEach would work, but other beforeEach's still run
@@ -74,9 +47,8 @@ describe('OAuth tests', function () {
     const _username = username + new Date()
     const result = await oAuth.createKey(_username);
 
-    if(result.status == RestStatus.OK){ //user created, faucet em
+    if(result.status == RestStatus.OK){
       userAccountAddress = result.user.address;
-      await waitFaucet(userAccountAddress);
     }
 
     const user = await oAuth.getKey(_username)

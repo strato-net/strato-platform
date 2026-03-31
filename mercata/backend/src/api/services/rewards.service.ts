@@ -49,6 +49,7 @@ const USD_NOTIONAL_SWAP_SOURCES = new Set<string>(STAKE_SEMANTICS.usd_notional.s
 const USD_NOTIONAL_DEPOSIT_COMPLETED_SOURCES = new Set<string>(STAKE_SEMANTICS.usd_notional.depositCompletedSources.map(normalizeAddr));
 const USD_NOTIONAL_AMOUNT_USD_SOURCES = new Set<string>(STAKE_SEMANTICS.usd_notional.amountUsdSources.map(normalizeAddr));
 const TOKEN_UNITS_SOURCES = new Set<string>(STAKE_SEMANTICS.token_units.lpMintBurnSources.map(normalizeAddr));
+const SAVE_USDST_SOURCE = normalizeAddr(config.saveUsdstVault || "");
 
 const inferStakeSemantics = (activity: {
   name?: string;
@@ -78,7 +79,7 @@ const inferStakeSemantics = (activity: {
   // token quantities (e.g. LP token transfer `value`), but sometimes they're shares or
   // protocol-specific units. We only confidently mark token_units when the source itself
   // is the token contract (LP token mint/burn is tracked via Token-Transfer on that token).
-  if (TOKEN_UNITS_SOURCES.has(sourceContract)) {
+  if (TOKEN_UNITS_SOURCES.has(sourceContract) || (SAVE_USDST_SOURCE && sourceContract === SAVE_USDST_SOURCE)) {
     return { stakeDenomination: "token_units", stakeAssetAddress: sourceContract };
   }
 
@@ -295,7 +296,7 @@ export const fetchRewardsOverview = async (
     ]);
 
     // Hardcoded season info for now
-    const currentSeason = 1;
+    const currentSeason = 2;
 
 
     // Sum up total stake across all activities

@@ -22,7 +22,7 @@ local authenticate_opts = {
   client_id = "<CLIENT_ID_PLACEHOLDER>",
   client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
   scope = "<OAUTH_SCOPE_PLACEHOLDER>",
-  token_endpoint_auth_method = "client_secret_post",
+  token_endpoint_auth_method = "client_secret_basic",
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
   -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token), enc_id_token (required for https://openid.net/specs/openid-connect-rpinitiated-1_0.html, strictly followed by Keycloak 26.0.2+)

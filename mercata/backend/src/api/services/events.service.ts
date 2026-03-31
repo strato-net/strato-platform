@@ -1,6 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { internalAddresses } from "../../config/config";
+import { getInternalAddresses } from "../../config/config";
 import type {
   EventData,
   EventResponse,
@@ -215,7 +215,7 @@ export const getActivitiesByTypes = async (
 
   // Exclude internal transfers involving protocol contracts.
   // Activity types opt in via excludeProtocolAddresses in their filterConfig.
-  const internalAddrList = internalAddresses.join(",");
+  const internalAddrList = (await getInternalAddresses()).join(",");
 
   const applyFilters = (
     pairs: ActivityTypePair[],

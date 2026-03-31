@@ -140,19 +140,18 @@ contract record SaveUSDSTVault is ERC20, Ownable, Pausable {
         return (_pricingAssets() * 1e18) / totalSupply();
     }
 
-    /// @notice Pull USDST from the owner and credit it as savings rewards.
-    function notifyReward(uint256 amount) external onlyOwner {
+    /// @notice Credit prefunded USDST rewards that have already arrived in the vault.
+    function recordRewardTransfer(uint256 expectedAmount) external onlyOwner returns (uint256 credited) {
         _requireInitialized();
-        require(amount > 0, "SaveUSDST: zero reward");
+        require(expectedAmount > 0, "SaveUSDST: zero reward");
         require(totalSupply() > 0, "SaveUSDST: no shares");
 
-        uint256 beforeBalance = IERC20(assetToken).balanceOf(address(this));
-        require(IERC20(assetToken).transferFrom(_msgSender(), address(this), amount), "SaveUSDST: reward transfer failed");
-        uint256 delta = IERC20(assetToken).balanceOf(address(this)) - beforeBalance;
-        require(delta > 0, "SaveUSDST: no reward delta");
+        uint256 balance = IERC20(assetToken).balanceOf(address(this));
+        require(balance >= _managedAssets + expectedAmount, "SaveUSDST: insufficient stray");
 
-        _managedAssets += delta;
-        emit RewardNotified(_msgSender(), delta);
+        credited = expectedAmount;
+        _managedAssets += credited;
+        emit RewardNotified(_msgSender(), credited);
     }
 
     function pause() external onlyOwner {

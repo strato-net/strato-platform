@@ -22,7 +22,7 @@ where
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Transaction
+import Blockchain.Data.Transaction (rawTX2TX)
 import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
@@ -241,7 +241,7 @@ getBlockInfo a b c d e f g h i j k l m n o p q r s =
   getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s)
 
 getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
-getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select (Proxy @[Block]) b
+getBlockInfo' b = map Block' . fromMaybe [] <$> select (Proxy @[Block]) b
 
 blockQueryParams :: [Text]
 blockQueryParams =

@@ -8,6 +8,7 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.SolidVM
+    - Blockchain.SolidVM.Builtins
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
   ghc-options: -Wall -O2
@@ -29,6 +30,7 @@ library:
   - deepseq
   - elliptic-curve
   - ethereum-rlp
+  - evm-solidity
   - exceptions
   - extra
   - format

@@ -13,7 +13,6 @@ import Data.Aeson (FromJSON(..), decode, encode, object, withObject, (.:), (.=))
 import Data.Base64.Types as B64
 import Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Lazy as LBS
-import Data.Maybe (fromJust)
 import qualified Data.Text as T
 import Data.Text.Encoding as TE
 import Data.Time.Clock.POSIX (getPOSIXTime)
@@ -24,6 +23,12 @@ import System.Directory (createDirectoryIfMissing)
 import System.FileLock (withFileLock, SharedExclusive(Exclusive))
 import System.FilePath (takeDirectory)
 import Text.URI as URI
+
+-- | Check if URI points to localhost (allows HTTP for local development)
+isLocalhost :: URI -> Bool
+isLocalhost uri = case URI.uriAuthority uri of
+  Right auth -> URI.unRText (URI.authHost auth) `elem` ["localhost", "127.0.0.1", "::1"]
+  _ -> False
 
 tokenFilePath :: FilePath
 tokenFilePath = "secrets/oauth_token"
@@ -80,9 +85,15 @@ writeCachedToken token expiresIn = do
 getTokenEndpoint :: T.Text -> IO T.Text
 getTokenEndpoint discoveryUrl = do
   uri <- URI.mkURI discoveryUrl
-  let (url, _) = fromJust (useHttpsURI uri)
-  response <- runReq defaultHttpConfig $ R.req R.GET url NoReqBody jsonResponse
-    (R.responseTimeout 10000000) -- 10 seconds
+  response <- case useHttpsURI uri of
+    Just (url, opts) -> runReq defaultHttpConfig $ R.req R.GET url NoReqBody jsonResponse
+      (opts <> R.responseTimeout 10000000)
+    Nothing
+      | isLocalhost uri -> case useHttpURI uri of
+          Just (url, opts) -> runReq defaultHttpConfig $ R.req R.GET url NoReqBody jsonResponse
+            (opts <> R.responseTimeout 10000000)
+          Nothing -> error $ "Invalid discovery URL: " <> T.unpack discoveryUrl
+      | otherwise -> error $ "HTTPS required for non-localhost discovery URL: " <> T.unpack discoveryUrl
   pure $ ddTokenEndpoint (responseBody response)
 
 newtype DiscoveryDocument = DiscoveryDocument { ddTokenEndpoint :: T.Text }
@@ -94,13 +105,18 @@ instance FromJSON DiscoveryDocument where
 fetchToken :: T.Text -> T.Text -> T.Text -> IO TokenResponse
 fetchToken tokenEndpoint clientId' clientSecret' = do
   uri <- URI.mkURI tokenEndpoint
-  let (url, _) = fromJust (useHttpsURI uri)
-      authHeader = R.header "Authorization" $ TE.encodeUtf8 $
+  let authHeader = R.header "Authorization" $ TE.encodeUtf8 $
         "Basic " <> B64.extractBase64 (B64.encodeBase64 $ TE.encodeUtf8 $ clientId' <> ":" <> clientSecret')
       contentType = R.header "Content-Type" "application/x-www-form-urlencoded"
       body = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
-  response <- runReq defaultHttpConfig $
-    R.req R.POST url body jsonResponse (authHeader <> contentType <> R.responseTimeout 10000000) -- 10 seconds
+      baseOpts = authHeader <> contentType <> R.responseTimeout 10000000
+  response <- case useHttpsURI uri of
+    Just (url, urlOpts) -> runReq defaultHttpConfig $ R.req R.POST url body jsonResponse (urlOpts <> baseOpts)
+    Nothing
+      | isLocalhost uri -> case useHttpURI uri of
+          Just (url, urlOpts) -> runReq defaultHttpConfig $ R.req R.POST url body jsonResponse (urlOpts <> baseOpts)
+          Nothing -> error $ "Invalid token endpoint URL: " <> T.unpack tokenEndpoint
+      | otherwise -> error $ "HTTPS required for non-localhost token endpoint: " <> T.unpack tokenEndpoint
   pure $ responseBody response
 
 data TokenResponse = TokenResponse

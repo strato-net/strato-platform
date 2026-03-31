@@ -12,7 +12,8 @@ module Blockchain.CommunicationConduit
     handleMsgClientConduit,
     bytesToMessages,
     debounceTxSendsAndUnseq,
-    messageToBytes
+    messageToBytes,
+    ethVersion
   )
 where
 

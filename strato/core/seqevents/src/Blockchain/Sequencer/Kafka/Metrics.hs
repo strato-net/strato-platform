@@ -33,11 +33,11 @@ seqP2PReads = buildCounter "seq_p2p_reads" "Events read from seq_p2p_events by k
 
 {-# NOINLINE seqVMWrites #-}
 seqVMWrites :: Vector Text Counter
-seqVMWrites = buildCounter "seq_vm_writes" "Events written to seq_vm_events by kind"
+seqVMWrites = buildCounter "seq_vm_writes" "Tasks written to vm_tasks by kind"
 
 {-# NOINLINE seqVMReads #-}
 seqVMReads :: Vector Text Counter
-seqVMReads = buildCounter "seq_vm_reads" "Events read from seq_vm_events by kind"
+seqVMReads = buildCounter "seq_vm_reads" "Tasks read from vm_tasks by kind"
 
 recordEvents :: (ShowConstructor a, MonadIO m) => Vector Text Counter -> [a] -> m ()
 recordEvents vec = recordEvents' vec . fmap (show . showConstructor)

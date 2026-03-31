@@ -15,6 +15,10 @@
     "DepositCompleted": {
       "amount": "stratoTokenAmount",
       "user": "stratoRecipient"
+    },
+    "WithdrawalCompleted": {
+      "amount": "stratoTokenAmount",
+      "user": "user"
     }
   },
   "0000000000000000000000000000000000001011": {
@@ -148,6 +152,32 @@
       "amount": "value"
     }
   },
+  "f84425db11cf977dfcaace0431a080e0ff2604ca": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "a049efb1a3417801b3dd3877dd566aa24b95b3a0": {
+    "Minted": {
+      "amount": "value"
+    },
+    "Burned": {
+      "amount": "value"
+    }
+  },
+  "22550671fcad04a213697ac7ae4f4366e96446ed": {
+    "Deposit": {
+      "amount": "shares",
+      "user": "owner"
+    },
+    "Withdraw": {
+      "amount": "shares",
+      "user": "receiver"
+    }
+  },
   "ceeb982f671b4ee2b4471e5b49f3126739537f15": {
     "Deposit": {
       "amount": "shares",
@@ -155,7 +185,7 @@
     },
     "Withdraw": {
       "amount": "shares",
-      "user": "owner"
+      "user": "receiver"
     }
   }
 }

@@ -98,7 +98,7 @@ instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT a
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState (SQLM m) where
   select _ a = runMaybeT $ do
-    (AddressStateRef' r _) <-
+    (AddressStateRef' r) <-
       MaybeT
         . fmap listToMaybe
         . getAccount'
@@ -179,6 +179,34 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
 
+ensureNodePubKey :: IO V.PublicKey
+ensureNodePubKey =
+  runLoggingT $
+    runVaultM (vaultUrl . urlConfig $ ethConf) waitForNodePubKey
+  where
+    waitForNodePubKey :: VaultM (LoggingT IO) V.PublicKey
+    waitForNodePubKey = do
+      getResult <- try $ fmap V.unPubKey . blocVaultWrapper $ getKey Nothing Nothing
+      case getResult of
+        Right pubKey -> return pubKey
+        Left err -> do
+          liftIO $ putStrLn $ "Vault key lookup failed: " ++ show (err :: ApiError)
+          if isMissingUserError err
+            then do
+              liftIO $ putStrLn "Node key does not exist. Creating key in Vault..."
+              _ <- blocVaultWrapper (postKey Nothing)
+              liftIO $ putStrLn "Node key created in Vault."
+              fmap V.unPubKey . blocVaultWrapper $ getKey Nothing Nothing
+            else throwIO err
+
+    isMissingUserError :: ApiError -> Bool
+    isMissingUserError (VaultWrapperError clientErr) =
+      "statusCode = 400" `T.isInfixOf` errTxt &&
+      "doesn't exist" `T.isInfixOf` errTxt
+      where
+        errTxt = T.pack (show clientErr)
+    isMissingUserError _ = False
+
 main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
@@ -219,11 +247,7 @@ main = do
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
 
-  pubKey <- runLoggingT
-          . runVaultM (vaultUrl . urlConfig $ ethConf)
-          . fmap V.unPubKey
-          . blocVaultWrapper
-          $ getKey Nothing Nothing
+  pubKey <- ensureNodePubKey
 
   let env =
         BlocEnv
@@ -233,10 +257,10 @@ main = do
             Bloc.Monad.globalNonceCounter = nonceCache,
             Bloc.Monad.nodePubKey = pubKey
           }
-  let bindHost = ipAddress $ apiConfig ethConf
-      bindPort = 3000 :: Int
-  putStrLn $ "Starting strato-api on " ++ bindHost ++ ":" ++ show bindPort
-  let settings = setPort bindPort $ setHost (fromString bindHost) defaultSettings
+  let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
+      bindPort = Conf.apiPort (Conf.apiConfig ethConf)
+  putStrLn $ "Starting strato-api on " ++ bindHost' ++ ":" ++ show bindPort
+  let settings = setPort bindPort $ setHost (fromString bindHost') defaultSettings
   runSettings settings $ app env theDoc urlMap
 
 app :: BlocEnv -> OpenApi -> UrlMap -> Application

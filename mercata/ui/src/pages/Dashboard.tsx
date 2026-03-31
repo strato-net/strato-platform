@@ -20,6 +20,7 @@ import { useCDP } from "@/context/CDPContext";
 import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
+import { useRewards } from "@/hooks/useRewards";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
@@ -86,6 +87,7 @@ const Dashboard = () => {
   });
 
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
+  const { state: rewardsState } = useRewards();
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
   const highestIncentiveApy = useMemo(() => {
     if (!rewardsActivities.length) return 0;
@@ -96,7 +98,7 @@ const Dashboard = () => {
   }, [rewardsActivities]);
 
   // Extract CATA token from inactive tokens by address
-  const cataToken = useMemo(() => 
+  const cataToken = useMemo(() =>
     inactiveTokens?.find(token => token.address === cataAddress),
     [inactiveTokens]
   );
@@ -122,10 +124,7 @@ const Dashboard = () => {
 
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isLoadingNetBalance } = useNetBalance({
-    tokens: earningAssets,
     cataToken,
-    loans,
-    totalCDPDebt
   });
 
   const chartConfig = useMemo(() => ({
@@ -151,7 +150,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     document.title = "Dashboard | STRATO";
-    
+
     // Check if user just logged in and needs to be redirected back to claim page
     const claimReturnUrl = localStorage.getItem("claimReturnUrl");
     if (claimReturnUrl && isLoggedIn) {
@@ -159,13 +158,13 @@ const Dashboard = () => {
       navigate(claimReturnUrl, { replace: true });
       return;
     }
-    
+
     const hasExistingEarningAssets = earningAssets.length > 0;
     const hasExistingInactiveTokens = inactiveTokens.length > 0;
-    
+
     // Always fetch earning assets (uses public endpoint for guests)
     getEarningAssets(!hasExistingEarningAssets);
-    
+
     // Only fetch inactive tokens for logged-in users (no public endpoint available)
     if (isLoggedIn) {
       getInactiveTokens(!hasExistingInactiveTokens);
@@ -219,8 +218,8 @@ const Dashboard = () => {
       const cache = activeTab === 'netBalance'
         ? netBalanceCacheRef.current
         : activeTab === 'rewards'
-        ? rewardsCacheRef.current
-        : borrowedCacheRef.current;
+          ? rewardsCacheRef.current
+          : borrowedCacheRef.current;
       const cacheKey = `${activeTab}:${selectedTimeRange}`;
       const cached = cache[selectedTimeRange];
       const cachedAt = cacheTimestampsRef.current[cacheKey] || 0;
@@ -295,7 +294,7 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Rewards (Season)"
+              title="Rewards"
               value={(() => {
                 if (!isLoggedIn) return "-";
                 if (rankLoading) return "Loading...";
@@ -382,7 +381,7 @@ const Dashboard = () => {
           {/* Portfolio Value Chart - hidden on mobile and for guests */}
           {isLoggedIn && (
             <div className="mb-8 hidden md:block">
-              <PortfolioValueChart 
+              <PortfolioValueChart
                 data={chartConfig[activeTab].data || []}
                 onTimeRangeChange={onTimeRangeChange}
                 selectedTimeRange={selectedTimeRange}
@@ -428,23 +427,23 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <AssetsList 
-              loading={loadingEarningAssets || loadingInactiveTokens} 
-              tokens={nonPoolTokens} 
-              inActiveTokens={isLoggedIn ? inactiveTokens : []} 
+            <AssetsList
+              loading={loadingEarningAssets || loadingInactiveTokens}
+              tokens={nonPoolTokens}
+              inActiveTokens={isLoggedIn ? inactiveTokens : []}
               guestMode={!isLoggedIn}
             />
           </div>
 
           <div className="mb-8">
-            <BorrowingSection 
+            <BorrowingSection
               loanData={loans}
               guestMode={!isLoggedIn}
             />
           </div>
 
           <div className="mb-8">
-            <MyPoolParticipationSection 
+            <MyPoolParticipationSection
               poolTokens={poolTokens}
               loading={loadingEarningAssets}
               guestMode={!isLoggedIn}

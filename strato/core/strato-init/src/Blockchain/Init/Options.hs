@@ -30,7 +30,7 @@ defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
 defineFlag "minPeers" (0 :: Int) "Threshold for discovery to stop querying for more peers"
 
-defineFlag "apiIPAddress" "127.0.0.1" "The IP address that strato-api will bind to"
+defineFlag "apiIPAddress" "" "The address containers use to reach strato-api on the host (auto-detected if empty)"
 
 defineFlag "httpPort" (8081 :: Int) "The external HTTP port for nginx"
 
@@ -44,6 +44,7 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "jsonrpc" (False :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for MetaMask integration"
+defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
 
 defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
 

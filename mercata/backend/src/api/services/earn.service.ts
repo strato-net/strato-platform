@@ -1,6 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { hiddenSwapPools } from "../../config/config";
+import { hiddenSwapPools, yieldBenchmarks } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { totalDebtFromScaled, calculateAPYs } from "../helpers/lending.helper";
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
@@ -12,19 +12,24 @@ const calcEquity = (addrs: string[], bals: Map<string, string>, pxs: Map<string,
   addrs.reduce((s, a) => s + BigInt(bals.get(a) || "0") * BigInt(pxs.get(a) || "0") / DECIMALS, 0n);
 
 export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]> => {
-  const twentyFourHoursAgo = toUTCTime(new Date(Date.now() - 24 * 60 * 60 * 1000));
-  const thirtyDaysAgo = toUTCTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const now = Date.now();
+  const twentyFourHoursAgo = toUTCTime(new Date(now - 24 * 60 * 60 * 1000));
+  const thirtyDaysAgoTime = new Date(now - 30 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = toUTCTime(thirtyDaysAgoTime);
+  const thirtyDaysAgoDate = thirtyDaysAgoTime.toISOString().split("T")[0];
   const vaultAddr = constants.vault;
+  const yieldHistoryAssets = [...new Set(yieldBenchmarks.flatMap((p) => [p.tokenAddress, p.baseAddress]))];
 
   const mappingOr = `(and(address.eq.${constants.lendingPool},collection_name.eq.assetConfigs,key->>key.eq.${constants.USDST}),and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${constants.liquidityPool}),and(address.eq.${constants.priceOracle},collection_name.eq.prices)${vaultAddr ? `,and(address.eq.${vaultAddr},collection_name.eq.supportedAssets)` : ""})`;
   const eventOr = `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo})${vaultAddr ? `,and(address.eq.${vaultAddr},event_name.in.(Deposited,Withdrawn),block_timestamp.gte.${thirtyDaysAgo})` : ""})`;
 
-  // Phase 1: 4 parallel calls
+  // Phase 1: 5 parallel calls
   const [
     { data: storageRows },
     { data: mappingRows },
     { data: eventRows },
     { data: pools },
+    { data: yieldHistRows },
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
       address: `in.(${constants.lendingPool},${constants.safetyModule},${constants.sToken}${vaultAddr ? `,${vaultAddr}` : ""})`,
@@ -36,6 +41,16 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       poolFactory: `eq.${constants.poolFactory}`,
       select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
     }}),
+    yieldHistoryAssets.length
+      ? cirrus.get(accessToken, "/history@mapping", { params: {
+        address: `eq.${constants.priceOracle}`,
+        collection_name: "eq.prices",
+        "key->>key": `in.(${yieldHistoryAssets.join(",")})`,
+        select: "key->>key,value::text",
+        valid_from: `lte.${thirtyDaysAgoDate}`,
+        valid_to: `gte.${thirtyDaysAgoDate}`,
+      }})
+      : Promise.resolve({ data: [] as any[] }),
   ]);
 
   // Parse storage
@@ -48,6 +63,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 
   // Parse mapping
   const prices = new Map<string, string>();
+  const historicalYieldPrices = new Map<string, string>();
   let lendingCfg: any = null;
   let liqBalance: string | null = null;
   const vaultAssets: string[] = [];
@@ -59,6 +75,9 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       const addr = r.value.replace(/"/g, "");
       if (addr) vaultAssets.push(addr);
     }
+  }
+  for (const r of yieldHistRows || []) {
+    if (r.key) historicalYieldPrices.set(r.key, r.value || "0");
   }
 
   // Parse events (single pass)
@@ -114,6 +133,17 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     };
     add(p.tokenA.address, row);
     add(p.tokenB.address, row);
+  }
+
+  for (const pair of yieldBenchmarks) {
+    const apy = computeYieldAPY(
+      prices.get(pair.tokenAddress),
+      prices.get(pair.baseAddress),
+      historicalYieldPrices.get(pair.tokenAddress),
+      historicalYieldPrices.get(pair.baseAddress),
+    );
+    if (!apy) continue;
+    add(pair.tokenAddress, { source: "yield", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
   }
 
   if (vaultAPY && vaultAPY !== "-" && parseFloat(vaultAPY) > 0) {
@@ -239,4 +269,31 @@ function computePoolAPY(pool: any, prices: Map<string, string>, volumeMap: Map<s
   const tvl = Number((BigInt(pool.tokenABalance || "0") * priceA + BigInt(pool.tokenBBalance || "0") * priceB) / DECIMALS) / 1e18;
   const apy = tvl > 0 ? (lpFees / tvl) * 365 * 100 : 0;
   return apy.toFixed(2);
+}
+
+function computeYieldAPY(
+  tokenNowRaw?: string,
+  baseNowRaw?: string,
+  tokenStartRaw?: string,
+  baseStartRaw?: string,
+): string | null {
+  try {
+    const tokenNow = BigInt(tokenNowRaw || "0");
+    const baseNow = BigInt(baseNowRaw || "0");
+    const tokenStart = BigInt(tokenStartRaw || "0");
+    const baseStart = BigInt(baseStartRaw || "0");
+    if (tokenNow <= 0n || baseNow <= 0n || tokenStart <= 0n || baseStart <= 0n) return null;
+
+    const ratioNow = Number(tokenNow) / Number(baseNow);
+    const ratioStart = Number(tokenStart) / Number(baseStart);
+    if (!isFinite(ratioNow) || !isFinite(ratioStart) || ratioStart <= 0) return null;
+
+    const periodReturn = ratioNow / ratioStart - 1;
+    if (periodReturn <= -1 || !isFinite(periodReturn)) return null;
+
+    const apy = (Math.pow(1 + periodReturn, 365 / 30) - 1) * 100;
+    return apy > 0 ? apy.toFixed(2) : null;
+  } catch {
+    return null;
+  }
 }

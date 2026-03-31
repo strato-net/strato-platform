@@ -191,7 +191,7 @@ popAllPending s@BaggerState {pending = p} = (popped, s {pending = M.empty})
 purgeFromPending :: OutputTx -> BaggerState -> BaggerState
 purgeFromPending OutputTx {otSigner = sender, otBaseTx = tx} s@BaggerState {pending = p} = s {pending = newATL}
   where
-    newATL = purgeFromATL sender (TD.transactionNonce tx) p
+    newATL = purgeFromATL sender (TD.nonce tx) p
 
 addToPromotionCache :: OutputTx -> BaggerState -> BaggerState
 addToPromotionCache tx s@BaggerState {miningCache = mc@MiningCache {promotedTransactions = pt}} =
@@ -201,7 +201,7 @@ upsertPT :: OutputTx -> [OutputTx] -> [OutputTx]
 upsertPT tx@OutputTx {otSigner = addr, otBaseTx = bt} pt = ret
   where
     filtered = filter (not . (\t -> otSigner t == addr && nonce' (otBaseTx t) <= nonce' bt)) pt
-    nonce' = TD.transactionNonce
+    nonce' = TD.nonce
     !ret = tx : filtered
 
 flushPendingOnly :: BaggerState -> ([(OutputTx, BaggerTxQueue)], BaggerState)

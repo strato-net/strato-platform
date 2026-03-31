@@ -4,12 +4,48 @@ import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getRebaseFactors } from "./oracle.service";
 import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.service";
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
+import { getLoan } from "./lending.service";
+import { getVaults } from "./cdp.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 
-const { Token, CollateralVault, CDPEngine, DECIMALS } = constants;
+const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS } = constants;
+
+// Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
+// Returns a map of stratoToken -> externalSymbol.
+// Used to display the equivalent quantity of an external rebasing token in the UI.
+// Omits tokens who map to multiple different externalSymbol values for different chains.
+const getRebasingExternalSymbols = async (
+  accessToken: string,
+  stratoTokenAddresses: string[]
+): Promise<Map<string, string>> => {
+  if (!stratoTokenAddresses.length || !mercataBridge) return new Map();
+  const { data } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, {
+    params: {
+      address: `eq.${mercataBridge}`,
+      "value->>stratoToken": `in.(${stratoTokenAddresses.join(",")})`,
+      select: "value->>stratoToken,value->>externalSymbol",
+    },
+  }).catch(() => ({ data: [] }));
+
+  const symbolsByToken = new Map<string, Set<string>>();
+  for (const row of data || []) {
+    const stratoToken = (row.stratoToken || "").toLowerCase().replace(/^0x/, "");
+    const sym: string = row.externalSymbol;
+    if (!stratoToken || !sym) continue;
+    if (!symbolsByToken.has(stratoToken)) symbolsByToken.set(stratoToken, new Set());
+    symbolsByToken.get(stratoToken)!.add(sym);
+  }
+
+  const result = new Map<string, string>();
+  for (const [stratoToken, symbols] of symbolsByToken) {
+    if (symbols.size === 1) result.set(stratoToken, [...symbols][0]);
+    // size > 1 → conflicting symbols across routes → omit
+  }
+  return result;
+};
 
 const buildSaveUsdstEarningAsset = (
   info: Awaited<ReturnType<typeof getSaveUsdstInfo>>,
@@ -41,6 +77,7 @@ const buildSaveUsdstEarningAsset = (
     totalBalance,
     isPoolToken: false,
     value,
+    apy: info.apy || "0",
   };
 };
 
@@ -123,6 +160,13 @@ export const getEarningAssets = async (
     )
   );
 
+  const rebasingAddresses = (tokens.data || [])
+    .map((t: any) => t.address as string)
+    .filter((addr: string) => rebaseFactorMap.has(addr));
+
+  const rebasingExternalSymbolMap = await getRebasingExternalSymbols(accessToken, rebasingAddresses)
+    .catch(() => new Map<string, string>());
+
   const earningAssets = (tokens.data || []).map((t: any) => {
     const balance = t.balances?.[0]?.balance || "0";
     const price = rawPrices.get(t.address) || "0";
@@ -136,6 +180,7 @@ export const getEarningAssets = async (
         : "0.00";
 
     const rebaseFactor = rebaseFactorMap.get(t.address);
+    const rebasingExternalSymbol = rebaseFactor ? rebasingExternalSymbolMap.get(t.address) : undefined;
 
     return {
       ...t,
@@ -151,19 +196,23 @@ export const getEarningAssets = async (
         t.description === "Liquidity Provider Token",
       value,
       ...(rebaseFactor ? { rebaseFactor } : {}),
+      ...(rebasingExternalSymbol ? { rebasingExternalSymbol } : {}),
     };
   });
 
-  const saveUsdstAsset =
-    saveUsdstInfo && saveUsdstUserInfo && BigInt(saveUsdstUserInfo.userShares || "0") > 0n
-      ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo)
-      : null;
+  const saveUsdstAsset = saveUsdstInfo?.deployed
+    ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo ?? undefined)
+    : null;
 
-  if (
-    saveUsdstAsset &&
-    !earningAssets.some((asset: EarningAsset) => asset.address.toLowerCase() === saveUsdstAsset.address.toLowerCase())
-  ) {
-    earningAssets.push(saveUsdstAsset);
+  if (saveUsdstAsset) {
+    const existingIdx = earningAssets.findIndex(
+      (asset: EarningAsset) => asset.address.toLowerCase() === saveUsdstAsset.address.toLowerCase()
+    );
+    if (existingIdx >= 0) {
+      earningAssets[existingIdx] = saveUsdstAsset;
+    } else {
+      earningAssets.push(saveUsdstAsset);
+    }
   }
 
   return earningAssets;
@@ -661,4 +710,51 @@ export const getPoolPriceHistory = async (
     ((s,_) => s)
   );
   return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.balance}));
+};
+
+export const getNetBalance = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number }> => {
+  const [earningAssetsResult, loanResult, vaultsResult] = await Promise.allSettled([
+    getEarningAssets(accessToken, userAddress),
+    getLoan(accessToken, userAddress),
+    getVaults(accessToken, userAddress),
+  ]);
+
+  let totalAssetValue = 0;
+  if (earningAssetsResult.status === "fulfilled") {
+    for (const asset of earningAssetsResult.value) {
+      totalAssetValue += parseFloat(asset.value || "0");
+    }
+  }
+
+  let lendingDebt = 0;
+  if (loanResult.status === "fulfilled" && loanResult.value?.totalAmountOwed) {
+    try {
+      const raw = BigInt(loanResult.value.totalAmountOwed);
+      if (raw > 1n) {
+        lendingDebt = Number(raw) / 1e18;
+      }
+    } catch { /* dust or invalid */ }
+  }
+
+  let cdpDebt = 0;
+  if (vaultsResult.status === "fulfilled") {
+    for (const vault of vaultsResult.value) {
+      try {
+        const raw = BigInt(vault.debtAmount || "0");
+        if (raw > 1n) {
+          cdpDebt += Number(raw) / 1e18;
+        }
+      } catch { /* dust or invalid */ }
+    }
+  }
+
+  const totalBorrowed = lendingDebt + cdpDebt;
+  return {
+    netBalance: totalAssetValue - totalBorrowed,
+    totalBorrowed,
+    totalAssetValue,
+  };
 };
