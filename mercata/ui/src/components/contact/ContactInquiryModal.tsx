@@ -126,7 +126,7 @@ const ContactInquiryModal = ({ open, onOpenChange }: ContactInquiryModalProps) =
                   Sending...
                 </>
               ) : (
-                "Send message"
+                "Send Inquiry"
               )}
             </Button>
           </form>
