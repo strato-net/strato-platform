@@ -41,6 +41,7 @@ import Data.Traversable (for)
 import Debugger
 import SolidVM.Model.CodeCollection
 import SolidVM.Model.SolidString
+import SolidVM.Model.Value (Value(..))
 import SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.Fuzzer.Types
@@ -247,9 +248,10 @@ fuzzFunction contractAddress ctx fName args = local ((fuzzerContextArgs . fuzzer
       exception txs = failure txs . T.pack . show
       failure' = failure [FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs]
       exception' = exception [FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs]
-  $logInfoS "runFuzzerOnce/callResults" (maybe "No return value" T.pack $ erReturnVal callResults)
+  $logInfoS "runFuzzerOnce/callResults" (T.pack . maybe "No return value" show $ erReturnVal callResults)
   case erException callResults of
     Nothing -> case erReturnVal callResults of
-      Just ret | ret == "()" || ret == "(true)" -> success ctx
+      Nothing -> success ctx
+      Just (SBool True) -> success ctx
       _ -> failure' $ "Test " <> labelToText _fuzzerArgsFuncName <> " failed with arguments (" <> T.intercalate ", " _fuzzerArgsCallArgs <> ")"
     Just e -> exception' e
