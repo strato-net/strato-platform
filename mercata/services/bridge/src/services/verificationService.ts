@@ -86,8 +86,11 @@ const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
 
     if (ctx.rebaseFactor && ctx.rebaseFactor > 0n) {
       const rebasedAmount = (convertedAmount * WAD) / ctx.rebaseFactor;
-      logInfo("Verification", `  rebased=${rebasedAmount} match=${rebasedAmount === ctx.stratoTokenAmount}`);
-      return rebasedAmount === ctx.stratoTokenAmount;
+      // Truncate to external token decimal precision to match oracle's integer truncation
+      const precision = 10n ** BigInt(18 - ctx.externalDecimals);
+      const truncatedRebasedAmount = (rebasedAmount / precision) * precision;
+      logInfo("Verification", `  rebased=${rebasedAmount} truncated=${truncatedRebasedAmount} match=${truncatedRebasedAmount === ctx.stratoTokenAmount}`);
+      return truncatedRebasedAmount === ctx.stratoTokenAmount;
     }
     
     return convertedAmount === ctx.stratoTokenAmount;
