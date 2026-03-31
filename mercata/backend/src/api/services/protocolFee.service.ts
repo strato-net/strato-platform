@@ -48,6 +48,8 @@ export interface RevenueByPeriod {
 export interface ProtocolRevenue {
   totalRevenue: string;
   revenueByPeriod: RevenueByPeriod;
+  pendingRevenue?: string;
+  lastAccrual?: number;
 }
 
 export interface AggregatedProtocolRevenue {
@@ -205,60 +207,112 @@ const buildRevenueArray = async (
 
 /**
  * Get protocol revenue from CDP operations
- * Sums all toCollector values from FeesRouted events
+ * Revenue = Σ(toCollector) from FeesRouted events
+ * Pending = un-accrued stability fees across all collateral assets since their lastAccrual
  */
 export const getCDPProtocolRevenue = async (
   accessToken: string,
   userAddress: string
 ): Promise<ProtocolRevenue> => {
   try {
-    // Get registry to find CDPEngine address
     const registry = await getCDPRegistry(accessToken, userAddress, {}, "getCDPProtocolRevenue");
-    
+
     if (!registry?.cdpEngine) {
       throw new Error("CDP Engine not found");
     }
     const cdpEngineAddress = registry.cdpEngine.address;
-    
-    // Fetch all FeesRouted events from CDPEngine
-    const { data: feesRoutedEvents } = await cirrus.get(
-      accessToken,
-      `/${CDPEngine}-FeesRouted`,
-      {
+
+    // Fetch FeesRouted events and CDPEngine state in parallel
+    const [{ data: feesRoutedEvents }, { data: engineData }] = await Promise.all([
+      cirrus.get(accessToken, `/${CDPEngine}-FeesRouted`, {
         params: {
           select: "asset,toCollector::text,block_timestamp",
           address: `eq.${cdpEngineAddress}`
         }
-      }
-    );
-
-    if (!feesRoutedEvents || feesRoutedEvents.length === 0) {
-      return {
-        totalRevenue: "0",
-        revenueByPeriod: {
-          daily: { total: "0", byAsset: [] },
-          weekly: { total: "0", byAsset: [] },
-          monthly: { total: "0", byAsset: [] },
-          ytd: { total: "0", byAsset: [] },
-          allTime: { total: "0", byAsset: [] }
+      }),
+      cirrus.get(accessToken, `/${CDPEngine}`, {
+        params: {
+          address: `eq.${cdpEngineAddress}`,
+          select: `feeToReserveBps::text,collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),collateralGlobalStates:${CDPEngine}-collateralGlobalStates(asset:key,CollateralGlobalState:value)`
         }
-      };
-    }
+      })
+    ]);
 
     const timeCutoffs = getTimeCutoffs();
-    
-    // Transform events to common format
-    // Note: CDP fees are always paid in USDST, so we use the USDST address
-    // rather than the collateral asset from the event
-    const transformedEvents = feesRoutedEvents.map((event: any) => ({
+    const { now } = timeCutoffs;
+    const RAY = 10n ** 27n;
+    const usdstAddress = constants.USDST.toLowerCase();
+
+    // FeesRouted revenue (already realized)
+    const transformedEvents = (feesRoutedEvents || []).map((event: any) => ({
       value: BigInt(event.toCollector || "0"),
       timestamp: parseTimestamp(event.block_timestamp),
-      asset: constants.USDST.toLowerCase()
+      asset: usdstAddress
     }));
-    
+
     const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
-    
-    // Build revenue data with token symbols
+
+    // Compute pending (un-accrued) stability fees across all assets
+    const engine = engineData?.[0];
+    const feeToReserveBps = BigInt(engine?.feeToReserveBps || "0");
+    const collectorShareBps = 10000n - feeToReserveBps;
+    let pendingRevenue = 0n;
+    let mostRecentAccrual = 0;
+
+    if (engine) {
+      const configs: any[] = engine.collateralConfigs || [];
+      const states: any[] = engine.collateralGlobalStates || [];
+
+      const configByAsset = new Map<string, any>();
+      for (const c of configs) {
+        const asset = (c.asset ?? "").toLowerCase();
+       if (asset) configByAsset.set(asset, c.CollateralConfig);
+      }
+
+      const rpow = (x: bigint, n: bigint, base: bigint): bigint => {
+        let z = n % 2n !== 0n ? x : base;
+        let xC = x;
+        for (let nC = n / 2n; nC !== 0n; nC = nC / 2n) {
+          xC = (xC * xC) / base;
+          if (nC % 2n !== 0n) z = (z * xC) / base;
+        }
+        return z;
+      };
+
+      for (const s of states) {
+        const asset = (s.asset ?? "").toLowerCase();
+        const globalState = s.CollateralGlobalState;
+        if (!asset || !globalState) continue;
+
+        const rateAccumulator = BigInt(globalState.rateAccumulator || "0");
+        const lastAccrual = BigInt(globalState.lastAccrual || "0");
+        const totalScaledDebt = BigInt(globalState.totalScaledDebt || "0");
+
+        if (totalScaledDebt === 0n || rateAccumulator === 0n) continue;
+
+        const config = configByAsset.get(asset);
+        const stabilityFeeRate = BigInt(config?.stabilityFeeRate || "0");
+        if (stabilityFeeRate <= RAY) continue;
+
+        const dt = BigInt(now) - lastAccrual;
+        if (dt <= 0n) continue;
+
+        if (Number(lastAccrual) > mostRecentAccrual) {
+          mostRecentAccrual = Number(lastAccrual);
+        }
+
+        const factor = rpow(stabilityFeeRate, dt, RAY);
+        const newRate = (rateAccumulator * factor) / RAY;
+        const feeUSD = (totalScaledDebt * (newRate - rateAccumulator)) / RAY;
+        const toCollector = (feeUSD * collectorShareBps) / 10000n;
+        pendingRevenue += toCollector;
+      }
+    }
+
+    const calculateTotal = (revenueMap: Record<string, bigint>): string => {
+      return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
+    };
+
     const tokenSymbolCache = new Map<string, string>();
     const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
       buildRevenueArray(accessToken, periodRevenue.allTime, tokenSymbolCache),
@@ -267,12 +321,7 @@ export const getCDPProtocolRevenue = async (
       buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
       buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
     ]);
-    
-    // Calculate totals
-    const calculateTotal = (revenueMap: Record<string, bigint>): string => {
-      return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
-    };
-    
+
     return {
       totalRevenue: calculateTotal(periodRevenue.allTime),
       revenueByPeriod: {
@@ -281,7 +330,9 @@ export const getCDPProtocolRevenue = async (
         monthly: { total: calculateTotal(periodRevenue.monthly), byAsset: monthlyArray },
         ytd: { total: calculateTotal(periodRevenue.ytd), byAsset: ytdArray },
         allTime: { total: calculateTotal(periodRevenue.allTime), byAsset: allTimeArray }
-      }
+      },
+      pendingRevenue: pendingRevenue.toString(),
+      lastAccrual: mostRecentAccrual
     };
   } catch (error: any) {
     console.error("Error fetching CDP protocol revenue:", {
@@ -334,78 +385,52 @@ const getSwapFeeCollector = async (
 
 /**
  * Get protocol revenue from lending pool operations
- * 
- * Revenue is calculated using point-in-time snapshots:
- * - revenue_t = reservesAccrued_t * (10000 - safetyShareBps_t) / 10000
- * - period_revenue = (revenue_t2 - revenue_t1) + sum(ReservesSweptTreasury events)
- * 
- * This approach correctly handles safetyShareBps changes at each snapshot time.
+ *
+ * Revenue[T1,T2] = treasuryShare of (reservesAccrued@T2 − reservesAccrued@T1) + Σ(ReservesSweptTreasury)
+ *
+ * Pending revenue = un-accrued interest since lastAccrual, computed via rpow off-chain.
  */
 export const getLendingProtocolRevenue = async (
   accessToken: string,
 ): Promise<ProtocolRevenue> => {
   try {
-    // Get lending pool address from registry
-    const { lendingPool: lendingPoolAddress } = await getPool(accessToken, { 
-      select: "lendingPool" 
+    const { lendingPool: lendingPoolAddress } = await getPool(accessToken, {
+      select: "lendingPool"
     });
-    
+
     if (!lendingPoolAddress) {
       throw new Error("Lending pool address not found");
     }
 
+    const RAY = 10n ** 27n;
     const timeCutoffs = getTimeCutoffs();
     const { now, oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
-    
-    // Define time periods with their start and end timestamps (in seconds)
-    const periods = {
-      daily: { start: oneDayAgo, end: now },
-      weekly: { start: oneWeekAgo, end: now },
-      monthly: { start: oneMonthAgo, end: now },
-      ytd: { start: ytdCutoff, end: now },
-      allTime: { start: 0, end: now }
-    };
-    
-    // Helper to format timestamp for history query (convert seconds to ISO string)
-    const formatTimestamp = (ts: number): string => {
-      return new Date(ts * 1000).toISOString();
-    };
-    
-    // Get unique timestamps we need to query
-    const uniqueTimestamps = [...new Set([now, oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff, 0])];
-    
-    // Fetch storage history for all needed timestamps in parallel
-    const storagePromises = uniqueTimestamps.map(async (ts) => {
-      const timeStr = formatTimestamp(ts);
+    const toIso = (ts: number) => new Date(ts * 1000).toISOString();
+
+    const getReservesAccruedAt = async (isoTimestamp: string): Promise<bigint> => {
       try {
         const { data } = await cirrus.get(accessToken, "/history@storage", {
           params: {
             address: `eq.${lendingPoolAddress}`,
-            valid_from: `lte.${timeStr}`,
-            valid_to: `gte.${timeStr}`,
+            valid_from: `lte.${isoTimestamp}`,
+            valid_to: `gte.${isoTimestamp}`,
             select: "data"
           }
         });
-        
-        if (!data || data.length === 0) {
-          return { timestamp: ts, reservesAccrued: 0n, safetyShareBps: 0 };
-        }
-        
-        const storageData = data[0].data;
-        return {
-          timestamp: ts,
-          reservesAccrued: BigInt(storageData?.reservesAccrued || "0"),
-          safetyShareBps: Number(storageData?.safetyShareBps || 0)
-        };
-      } catch (e) {
-        // If history query fails (e.g., no data at that time), default to 0
-        return { timestamp: ts, reservesAccrued: 0n, safetyShareBps: 0 };
+        return BigInt(data?.[0]?.data?.reservesAccrued || "0");
+      } catch {
+        return 0n;
       }
-    });
-    
-    // Query swept treasury events and pool info in parallel with storage queries
-    const [storageResults, sweptTreasuryRes, poolData] = await Promise.all([
-      Promise.all(storagePromises),
+    };
+
+    // Fetch all snapshots, sweep events, and pool state in parallel
+    const [nowReserves, dailyStart, weeklyStart, monthlyStart, ytdStart,
+      sweptTreasuryRes, poolData] = await Promise.all([
+      getReservesAccruedAt(toIso(now)),
+      getReservesAccruedAt(toIso(oneDayAgo)),
+      getReservesAccruedAt(toIso(oneWeekAgo)),
+      getReservesAccruedAt(toIso(oneMonthAgo)),
+      getReservesAccruedAt(toIso(ytdCutoff)),
       cirrus.get(accessToken, `/${LendingPool}-ReservesSweptTreasury`, {
         params: {
           address: `eq.${lendingPoolAddress}`,
@@ -413,78 +438,92 @@ export const getLendingProtocolRevenue = async (
         }
       }),
       cirrus.get(accessToken, `/${LendingPool}`, {
-        params: { 
-          address: `eq.${lendingPoolAddress}`, 
-          select: "borrowableAsset" 
+        params: {
+          address: `eq.${lendingPoolAddress}`,
+          select: "borrowableAsset,borrowIndex::text,lastAccrual::text,totalScaledDebt::text,safetyShareBps::text,assetConfigs:BlockApps-LendingPool-assetConfigs(asset:key,AssetConfig:value)"
         }
       })
     ]);
-    // Build a map from timestamp to storage data
-    const storageByTimestamp = new Map<number, { reservesAccrued: bigint; safetyShareBps: number }>();
-    storageResults.forEach(({ timestamp, reservesAccrued, safetyShareBps }) => {
-      storageByTimestamp.set(timestamp, { reservesAccrued, safetyShareBps });
-    });
-    
-    // Process swept treasury events
-    interface SweptEvent { amount: bigint; timestamp: number; }
-    
-    const sweptTreasuryEvents: SweptEvent[] = (sweptTreasuryRes.data || []).map((e: any) => ({
+
+    const safetyShareBps = BigInt(poolData.data?.[0]?.safetyShareBps || "0");
+    const treasuryShareBps = 10000n - safetyShareBps;
+
+    // Only treasury swept events count as revenue
+    interface SweptEvent { amount: bigint; timestamp: number }
+    const sweptEvents: SweptEvent[] = (sweptTreasuryRes.data || []).map((e: any) => ({
       amount: BigInt(e.amount || "0"),
       timestamp: parseTimestamp(e.block_timestamp)
     }));
-    
-    // Helper to calculate revenue at a point in time
-    // revenue = reservesAccrued * (10000 - safetyShareBps) / 10000
-    const calculateRevenueAtTime = (storage: { reservesAccrued: bigint; safetyShareBps: number }): bigint => {
-      return (storage.reservesAccrued * BigInt(10000 - storage.safetyShareBps)) / 10000n;
+
+    const sweptByPeriod = { daily: 0n, weekly: 0n, monthly: 0n, ytd: 0n, allTime: 0n };
+    for (const e of sweptEvents) {
+      sweptByPeriod.allTime += e.amount;
+      if (e.timestamp >= oneDayAgo) sweptByPeriod.daily += e.amount;
+      if (e.timestamp >= oneWeekAgo) sweptByPeriod.weekly += e.amount;
+      if (e.timestamp >= oneMonthAgo) sweptByPeriod.monthly += e.amount;
+      if (e.timestamp >= ytdCutoff) sweptByPeriod.ytd += e.amount;
+    }
+
+    // Treasury revenue = treasury share of delta(reservesAccrued) + swept treasury
+    const calc = (startRes: bigint, swept: bigint): bigint => {
+      const delta = nowReserves - startRes;
+      const treasuryDelta = (delta * treasuryShareBps) / 10000n;
+      const rev = treasuryDelta + swept;
+      return rev > 0n ? rev : 0n;
     };
-    
-    // Calculate revenue for each period
-    // period_revenue = (revenue_t2 - revenue_t1) + sum(ReservesSweptTreasury)
-    const calculatePeriodRevenue = (periodKey: keyof typeof periods): bigint => {
-      const { start, end } = periods[periodKey];
-      
-      const startStorage = storageByTimestamp.get(start) || { reservesAccrued: 0n, safetyShareBps: 0 };
-      const endStorage = storageByTimestamp.get(end) || { reservesAccrued: 0n, safetyShareBps: 0 };
-      
-      // Calculate revenue at start and end of period using their respective safetyShareBps
-      const revenueAtStart = calculateRevenueAtTime(startStorage);
-      const revenueAtEnd = calculateRevenueAtTime(endStorage);
-      
-      // Sum of ReservesSweptTreasury events during the period
-      const sweptTreasuryInPeriod = sweptTreasuryEvents
-        .filter(e => e.timestamp >= start && e.timestamp <= end)
-        .reduce((sum: bigint, e: SweptEvent) => sum + e.amount, 0n);
-      
-      // Total revenue = (revenue_t2 - revenue_t1) + swept treasury
-      const protocolRevenue = (revenueAtEnd - revenueAtStart) + sweptTreasuryInPeriod;
-      
-      return protocolRevenue > 0n ? protocolRevenue : 0n;
-    };
-    
-    // Get the borrowable asset for token info
-    const borrowableAsset = poolData.data?.[0]?.borrowableAsset || constants.USDST;
-    
-    // Calculate revenue for each period
-    const dailyRevenue = calculatePeriodRevenue('daily');
-    const weeklyRevenue = calculatePeriodRevenue('weekly');
-    const monthlyRevenue = calculatePeriodRevenue('monthly');
-    const ytdRevenue = calculatePeriodRevenue('ytd');
-    const allTimeRevenue = calculatePeriodRevenue('allTime');
-    
-    // Get token symbol
+
+    const dailyRevenue = calc(dailyStart, sweptByPeriod.daily);
+    const weeklyRevenue = calc(weeklyStart, sweptByPeriod.weekly);
+    const monthlyRevenue = calc(monthlyStart, sweptByPeriod.monthly);
+    const ytdRevenue = calc(ytdStart, sweptByPeriod.ytd);
+    const allTimeRevenue = calc(0n, sweptByPeriod.allTime);
+
+    // Compute pending (un-accrued) revenue since lastAccrual
+    const pool = poolData.data?.[0];
+    const borrowableAsset = pool?.borrowableAsset || constants.USDST;
+    let pendingRevenue = 0n;
+    let lastAccrualTs = 0;
+
+    if (pool) {
+      const borrowIndex = BigInt(pool.borrowIndex || "0");
+      const lastAccrual = BigInt(pool.lastAccrual || "0");
+      const totalScaledDebt = BigInt(pool.totalScaledDebt || "0");
+
+      lastAccrualTs = Number(lastAccrual);
+      const borrowableConfig = pool.assetConfigs?.find(
+        (c: any) => (c.asset ?? c.key)?.toLowerCase() === borrowableAsset.toLowerCase()
+      );
+      const assetConfig = borrowableConfig?.AssetConfig ?? borrowableConfig?.value;
+      const perSecondFactorRAY = BigInt(assetConfig?.perSecondFactorRAY || "0");
+      const reserveFactor = BigInt(assetConfig?.reserveFactor || "0");
+
+      if (perSecondFactorRAY > 0n && totalScaledDebt > 0n && borrowIndex > 0n) {
+        const dt = BigInt(now) - lastAccrual;
+        if (dt > 0n) {
+          const rpow = (x: bigint, n: bigint, base: bigint): bigint => {
+            let z = n % 2n !== 0n ? x : base;
+            let xC = x;
+            for (let nC = n / 2n; nC !== 0n; nC = nC / 2n) {
+              xC = (xC * xC) / base;
+              if (nC % 2n !== 0n) z = (z * xC) / base;
+            }
+            return z;
+          };
+          const projectedIndex = (borrowIndex * rpow(perSecondFactorRAY, dt, RAY)) / RAY;
+          const interestDelta = (totalScaledDebt * (projectedIndex - borrowIndex)) / RAY;
+          const totalPending = (interestDelta * reserveFactor) / 10000n;
+          pendingRevenue = (totalPending * treasuryShareBps) / 10000n;
+        }
+      }
+    }
+
     const tokenInfo = await getTokenInfo(accessToken, borrowableAsset);
-    
-    // Build result in same format
+
     const buildByAsset = (revenue: bigint): RevenueByAsset[] => {
       if (revenue <= 0n) return [];
-      return [{
-        asset: borrowableAsset,
-        symbol: tokenInfo.symbol,
-        revenue: revenue.toString()
-      }];
+      return [{ asset: borrowableAsset, symbol: tokenInfo.symbol, revenue: revenue.toString() }];
     };
-    
+
     return {
       totalRevenue: allTimeRevenue.toString(),
       revenueByPeriod: {
@@ -493,7 +532,9 @@ export const getLendingProtocolRevenue = async (
         monthly: { total: monthlyRevenue.toString(), byAsset: buildByAsset(monthlyRevenue) },
         ytd: { total: ytdRevenue.toString(), byAsset: buildByAsset(ytdRevenue) },
         allTime: { total: allTimeRevenue.toString(), byAsset: buildByAsset(allTimeRevenue) }
-      }
+      },
+      pendingRevenue: pendingRevenue.toString(),
+      lastAccrual: lastAccrualTs
     };
   } catch (error: any) {
     console.error("Error fetching lending protocol revenue:", {

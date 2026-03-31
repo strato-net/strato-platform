@@ -64,6 +64,8 @@ interface RevenuePeriod {
 interface ProtocolRevenueResponse {
   totalRevenue: string;
   revenueByPeriod: RevenuePeriod;
+  pendingRevenue?: string;
+  lastAccrual?: number;
 }
 
 interface AggregatedRevenueResponse {
@@ -106,6 +108,8 @@ const StratoStats = () => {
   // Protocol Revenue state
   const [cdpTotalRevenue, setCdpTotalRevenue] = useState<string>('0');
   const [cdpRevenueByPeriod, setCdpRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+  const [cdpPendingRevenue, setCdpPendingRevenue] = useState<string>('0');
+  const [cdpLastAccrual, setCdpLastAccrual] = useState<number>(0);
 
   const [swapTotalRevenue, setSwapTotalRevenue] = useState<string>('0');
   const [swapRevenueByPeriod, setSwapRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
@@ -118,6 +122,8 @@ const StratoStats = () => {
 
   const [lendingTotalRevenue, setLendingTotalRevenue] = useState<string>('0');
   const [lendingRevenueByPeriod, setLendingRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+  const [lendingPendingRevenue, setLendingPendingRevenue] = useState<string>('0');
+  const [lendingLastAccrual, setLendingLastAccrual] = useState<number>(0);
 
   const [gasTotalRevenue, setGasTotalRevenue] = useState<string>('0');
   const [gasRevenueByPeriod, setGasRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
@@ -180,6 +186,8 @@ const StratoStats = () => {
 
       setCdpTotalRevenue(response.data.byProtocol.cdp.totalRevenue);
       setCdpRevenueByPeriod(response.data.byProtocol.cdp.revenueByPeriod);
+      setCdpPendingRevenue(response.data.byProtocol.cdp.pendingRevenue || '0');
+      setCdpLastAccrual(response.data.byProtocol.cdp.lastAccrual || 0);
 
       setSwapTotalRevenue(response.data.byProtocol.swap.totalRevenue);
       setSwapRevenueByPeriod(response.data.byProtocol.swap.revenueByPeriod);
@@ -192,6 +200,8 @@ const StratoStats = () => {
 
       setLendingTotalRevenue(response.data.byProtocol.lending.totalRevenue);
       setLendingRevenueByPeriod(response.data.byProtocol.lending.revenueByPeriod);
+      setLendingPendingRevenue(response.data.byProtocol.lending.pendingRevenue || '0');
+      setLendingLastAccrual(response.data.byProtocol.lending.lastAccrual || 0);
 
       setGasTotalRevenue(response.data.byProtocol.gas.totalRevenue);
       setGasRevenueByPeriod(response.data.byProtocol.gas.revenueByPeriod);
@@ -485,6 +495,16 @@ const StratoStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} CDP fees
                       </p>
+                      {!revenueLoading && BigInt(cdpPendingRevenue || '0') > 0n && (
+                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                          +${formatLargeNumber(parseFloat(formatUnits(BigInt(cdpPendingRevenue), 18)))} pending
+                          {cdpLastAccrual > 0 && (
+                            <span className="text-muted-foreground">
+                              {' '}(since {Math.round((Date.now() / 1000 - cdpLastAccrual) / 3600)}h ago)
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -503,6 +523,16 @@ const StratoStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} lending fees
                       </p>
+                      {!revenueLoading && BigInt(lendingPendingRevenue || '0') > 0n && (
+                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                          +${formatLargeNumber(parseFloat(formatUnits(BigInt(lendingPendingRevenue), 18)))} pending
+                          {lendingLastAccrual > 0 && (
+                            <span className="text-muted-foreground">
+                              {' '}(since {Math.round((Date.now() / 1000 - lendingLastAccrual) / 3600)}h ago)
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
