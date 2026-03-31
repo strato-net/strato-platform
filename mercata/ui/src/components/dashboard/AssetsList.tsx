@@ -3,9 +3,17 @@ import { Link } from "react-router-dom";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { Token as TokenType, EarningAsset, ApySource } from "@mercata/shared-types";
+import { Token as TokenType, EarningAsset } from "@mercata/shared-types";
 import { formatBalance } from "@/utils/numberUtils";
 import { useEarnContext } from "@/context/EarnContext";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
+import StackedApyTooltip from "@/components/ui/StackedApyTooltip";
+import {
+  buildRewardApyMap,
+  buildStackedApyBreakdown,
+  buildTokenApyMaps,
+  getDirectBaseApyBreakdown,
+} from "@/lib/stackedApy";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -41,24 +49,9 @@ const AssetsList = ({
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
-
-  const earnByAddr = useMemo(() => {
-    const m = new Map<string, { native?: ApySource; base?: ApySource; total: number }>();
-    for (const entry of tokenApys) {
-      let best: ApySource | null = null;
-      let base: ApySource | undefined;
-      for (const a of entry.apys) {
-        if (a.source === "base") { base = a; continue; }
-        if (!best || parseFloat(a.apy) > parseFloat(best.apy)) best = a;
-      }
-      if (best && parseFloat(best.apy) <= 0) best = null;
-      if (!best && !base) continue;
-      const total = (best ? parseFloat(best.apy) : 0) + (base ? parseFloat(base.apy) : 0);
-      if (total <= 0) continue;
-      m.set(normAddr(entry.token), { native: best ?? undefined, base, total });
-    }
-    return m;
-  }, [tokenApys]);
+  const { activities: rewardsActivities } = useRewardsActivities();
+  const rewardApyByContract = useMemo(() => buildRewardApyMap(rewardsActivities), [rewardsActivities]);
+  const { entriesByToken } = useMemo(() => buildTokenApyMaps(tokenApys), [tokenApys]);
 
   const hasEarningAssets = tokens.length > 0;
   const hasInactiveTokens = inActiveTokens.length > 0;
@@ -197,32 +190,27 @@ const AssetsList = ({
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         {(() => {
-                          const info = tokenApysLoaded ? earnByAddr.get(normAddr(asset?.address || "")) : undefined;
-                          if (!info) return <p className="text-sm text-muted-foreground">-</p>;
+                          const breakdown = !tokenApysLoaded
+                            ? null
+                            : isSaveUsdstAsset(asset)
+                              ? buildStackedApyBreakdown({
+                                  native: asset.apy,
+                                  reward: rewardApyByContract.get(normAddr(asset?.address || "")) || 0,
+                                })
+                              : getDirectBaseApyBreakdown({
+                                  entriesByToken,
+                                  address: asset?.address || "",
+                                });
+                          if (!breakdown || breakdown.total <= 0) {
+                            return <p className="text-sm text-muted-foreground">-</p>;
+                          }
                           return (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="text-sm font-medium text-green-500 cursor-default">{info.total.toFixed(2)}%</span>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="text-xs">
-                                  <div className="flex flex-col gap-1">
-                                    {info.native && (
-                                      <div className="flex justify-between gap-4">
-                                        <span className="text-muted-foreground">Native APY:</span>
-                                        <span className="font-medium">{info.native.apy}%</span>
-                                      </div>
-                                    )}
-                                    {info.base && (
-                                      <div className="flex justify-between gap-4">
-                                        <span className="text-muted-foreground">Base APY:</span>
-                                        <span className="font-medium">{info.base.apy}%</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                            <StackedApyTooltip
+                              breakdown={breakdown}
+                              valueText={`${breakdown.total.toFixed(2)}%`}
+                              className="text-sm font-medium text-green-500"
+                              side="left"
+                            />
                           );
                         })()}
                       </td>

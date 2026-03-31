@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import StackedApyTooltip from "@/components/ui/StackedApyTooltip";
+import { buildRewardApyMap, buildStackedApyBreakdown, normalizeApyAddress } from "@/lib/stackedApy";
 
 const LendingPoolSection = () => {
   const { isLoggedIn } = useUser();
@@ -32,6 +35,16 @@ const LendingPoolSection = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { activities: rewardsActivities } = useRewardsActivities();
+  const rewardApyByContract = useMemo(() => buildRewardApyMap(rewardsActivities), [rewardsActivities]);
+  const lendingYieldBreakdown = useMemo(
+    () =>
+      buildStackedApyBreakdown({
+        native: liquidityInfo?.supplyAPY,
+        reward: rewardApyByContract.get(normalizeApyAddress(liquidityInfo?.withdrawable?.address)) || 0,
+      }),
+    [liquidityInfo?.supplyAPY, liquidityInfo?.withdrawable?.address, rewardApyByContract],
+  );
 
   const refreshLendingData = (signal?: AbortSignal) => {
     // Pool stats are public - always fetch
@@ -547,7 +560,12 @@ const LendingPoolSection = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-muted-foreground text-sm sm:text-base">Supply APY</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}</span>
+                  <StackedApyTooltip
+                    breakdown={lendingYieldBreakdown}
+                    valueText={lendingYieldBreakdown.total > 0 ? `${lendingYieldBreakdown.total.toFixed(2)}%` : "N/A"}
+                    className="font-medium text-sm sm:text-base"
+                    side="left"
+                  />
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-muted-foreground text-sm sm:text-base">Max Supply APY</span>

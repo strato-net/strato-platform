@@ -5,8 +5,19 @@ import { formatBalance } from "@/utils/numberUtils";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { useVaultContext } from "@/context/VaultContext";
+import { useEarnContext } from "@/context/EarnContext";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
+import StackedApyTooltip from "@/components/ui/StackedApyTooltip";
+import {
+  buildRewardApyMap,
+  buildStackedApyBreakdown,
+  buildTokenApyMaps,
+  calculatePoolWeightedBase,
+  calculateWeightedBaseFromAssets,
+  normalizeApyAddress,
+} from "@/lib/stackedApy";
 
 interface PoolParticipationProps {
   poolTokens: any[];
@@ -25,6 +36,8 @@ export default function MyPoolParticipationSection({
   const { liquidityInfo, loadingLiquidity } = useLendingContext();
   const { pools, poolsLoading } = useSwapContext();
   const { vaultState } = useVaultContext();
+  const { tokenApys } = useEarnContext();
+  const { activities: rewardsActivities } = useRewardsActivities();
 
   const [expandedTokens, setExpandedTokens] = useState<Record<string, boolean>>(
     {}
@@ -39,30 +52,52 @@ export default function MyPoolParticipationSection({
     return map;
   }, [pools]);
 
-  const resolveTokenAPY = useCallback(
-    (token: any): string | null => {
+  const { baseByToken } = useMemo(() => buildTokenApyMaps(tokenApys), [tokenApys]);
+  const rewardApyByContract = useMemo(() => buildRewardApyMap(rewardsActivities), [rewardsActivities]);
+
+  const resolveTokenBreakdown = useCallback(
+    (token: any) => {
       if (liquidityInfo?.withdrawable?.address === token.address) {
-        return liquidityInfo.supplyAPY?.toFixed(2) || null;
+        return buildStackedApyBreakdown({
+          native: liquidityInfo.supplyAPY?.toFixed(2) || 0,
+          reward: rewardApyByContract.get(normalizeApyAddress(liquidityInfo?.withdrawable?.address)) || 0,
+        });
       }
 
-      if (token._symbol === "SUSDST" || token._symbol === "safetyUSDST") return null;
+      if (token._symbol === "SUSDST" || token._symbol === "safetyUSDST") {
+        return buildStackedApyBreakdown({});
+      }
 
       if (
         token._symbol?.endsWith("-LP") ||
         token.description === "Liquidity Provider Token"
       ) {
-        return lpTokenPoolMap.get(token.address)?.apy || null;
+        const pool = lpTokenPoolMap.get(token.address);
+        return buildStackedApyBreakdown({
+          native: pool?.apy || 0,
+          base: calculatePoolWeightedBase(pool, baseByToken),
+          reward: rewardApyByContract.get(normalizeApyAddress(token.address)) || 0,
+        });
       }
 
       if (vaultState.shareTokenAddress && token.address === vaultState.shareTokenAddress) {
-        return vaultState.alpha && vaultState.alpha !== "0" && vaultState.alpha !== "-"
-          ? vaultState.alpha
-          : null;
+        return buildStackedApyBreakdown({
+          native: vaultState.alpha,
+          base: calculateWeightedBaseFromAssets(
+            (vaultState.assets || []).map((asset) => ({
+              address: asset.address,
+              balance: asset.balance,
+              price: asset.priceUsd,
+            })),
+            baseByToken,
+          ),
+          reward: rewardApyByContract.get(normalizeApyAddress(vaultState.shareTokenAddress)) || 0,
+        });
       }
 
-      return null;
+      return buildStackedApyBreakdown({});
     },
-    [liquidityInfo, lpTokenPoolMap, vaultState.alpha]
+    [baseByToken, liquidityInfo, lpTokenPoolMap, rewardApyByContract, vaultState.alpha, vaultState.assets, vaultState.shareTokenAddress]
   );
 
   const rows = useMemo(
@@ -92,13 +127,13 @@ export default function MyPoolParticipationSection({
                   2
                 )
               : "-",
-          apy: resolveTokenAPY(token),
+          breakdown: resolveTokenBreakdown(token),
           value: rawValue > 0 ? `$${rawValue.toFixed(2)}` : "-",
           isLPToken,
           pool,
         };
       }),
-    [poolTokens, lpTokenPoolMap, resolveTokenAPY]
+    [poolTokens, lpTokenPoolMap, resolveTokenBreakdown]
   );
 
   const anyLoading = poolsLoading || loadingLiquidity || vaultState.loading;
@@ -139,7 +174,7 @@ export default function MyPoolParticipationSection({
         ) : (
           <div className="space-y-2">
             {rows.map(
-              ({ token, formattedBalance, apy, value, isLPToken, pool }) => {
+              ({ token, formattedBalance, breakdown, value, isLPToken, pool }) => {
                 const isExpanded = !!expandedTokens[token.address];
                 const canExpand = isLPToken && pool && formattedBalance !== "-";
 
@@ -179,8 +214,13 @@ export default function MyPoolParticipationSection({
                           "N/A"
                         ) : anyLoading ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
-                        ) : apy ? (
-                          `${apy}%`
+                        ) : breakdown.total > 0 ? (
+                          <StackedApyTooltip
+                            breakdown={breakdown}
+                            valueText={`${breakdown.total.toFixed(2)}%`}
+                            className="text-sm font-semibold text-foreground"
+                            side="left"
+                          />
                         ) : (
                           "N/A"
                         )}

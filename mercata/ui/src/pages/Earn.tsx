@@ -23,12 +23,14 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useToast } from "@/hooks/use-toast";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidityDepositModal from "@/components/dashboard/LiquidityDepositModal";
 import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModal";
 import VaultDepositModal from "@/components/vault/VaultDepositModal";
+import StackedApyTooltip from "@/components/ui/StackedApyTooltip";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
@@ -40,10 +42,16 @@ import {
   LENDING_DEPOSIT_FEE,
   rewardsEnabled,
 } from "@/lib/constants";
+import {
+  buildRewardApyMap,
+  buildStackedApyBreakdown,
+  buildTokenApyMaps,
+  calculatePoolWeightedBase,
+  calculateWeightedBaseFromAssets,
+} from "@/lib/stackedApy";
 
 const WAD = BigInt(10) ** BigInt(18);
 const TOP_OPPORTUNITY_MIN_POOL_TVL = 100000n * WAD;
-const CATA_PRICE_USD = 0.25;
 
 const safeBigInt = (value: string | undefined | null): bigint => {
   if (!value) return BigInt(0);
@@ -117,50 +125,6 @@ const formatApyDisplay = (value: string | number | undefined): { label: string; 
   return { label: "0.00%", className: "text-foreground" };
 };
 
-const getEstimatedIncentiveApy = (
-  nativeApyPercent?: string | number | null,
-  emissionRate?: string,
-  totalStakeUsd?: string | null
-): number => {
-  try {
-    const nativeApy =
-      nativeApyPercent === null ||
-      nativeApyPercent === undefined ||
-      nativeApyPercent === "" ||
-      nativeApyPercent === "-"
-        ? 0
-        : Number(nativeApyPercent);
-    const hasNativeApy = Number.isFinite(nativeApy) && nativeApy > 0;
-    if (!Number.isFinite(nativeApy)) {
-      return Number.NEGATIVE_INFINITY;
-    }
-
-    if (!emissionRate || !totalStakeUsd) {
-      return hasNativeApy ? Number(nativeApy.toFixed(2)) : Number.NEGATIVE_INFINITY;
-    }
-
-    const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
-    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) {
-      return hasNativeApy ? Number(nativeApy.toFixed(2)) : Number.NEGATIVE_INFINITY;
-    }
-
-    const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
-    if (!Number.isFinite(annualCata) || annualCata < 0) {
-      return hasNativeApy ? Number(nativeApy.toFixed(2)) : Number.NEGATIVE_INFINITY;
-    }
-
-    const rewardsApy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
-    const totalApy = nativeApy + rewardsApy;
-    if (!Number.isFinite(totalApy) || totalApy <= 0) {
-      return hasNativeApy ? Number(nativeApy.toFixed(2)) : Number.NEGATIVE_INFINITY;
-    }
-
-    return Number(totalApy.toFixed(2));
-  } catch {
-    return Number.NEGATIVE_INFINITY;
-  }
-};
-
 const formatPointsMultiplier = (scaledTenths: bigint): string => {
   const whole = scaledTenths / 10n;
   const frac = scaledTenths % 10n;
@@ -230,6 +194,7 @@ const Earn = () => {
   const { liquidityInfo, loadingLiquidity, refreshLiquidity, depositLiquidity } = useLendingContext();
   const { saveUsdstInfo } = useSaveUsdstContext();
   const { earningAssets, usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { tokenApys } = useEarnContext();
   const { activities: rewardsActivities } = useRewardsActivities();
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
@@ -384,24 +349,6 @@ const Earn = () => {
 
   const saveUsdstNativeApy = saveUsdstInfo?.apy ?? saveUsdstAsset?.apy;
 
-  const saveUsdstEstimatedApy = useMemo(() => {
-    return getEstimatedIncentiveApy(
-      saveUsdstNativeApy,
-      saveUsdstRewardsActivity?.emissionRate,
-      saveUsdstRewardsActivity?.totalStakeUsd ??
-        saveUsdstInfo?.tvlUsd ??
-        saveUsdstInfo?.pricingAssets ??
-        saveUsdstInfo?.totalAssets ??
-        null
-    );
-  }, [
-    saveUsdstNativeApy,
-    saveUsdstInfo?.tvlUsd,
-    saveUsdstInfo?.pricingAssets,
-    saveUsdstInfo?.totalAssets,
-    saveUsdstRewardsActivity,
-  ]);
-
   const saveUsdstTvl = useMemo(() => {
     if (saveUsdstInfo?.deployed && saveUsdstInfo.tvlUsd) {
       return saveUsdstInfo.tvlUsd;
@@ -417,6 +364,62 @@ const Earn = () => {
 
     return saveUsdstRewardsActivity?.totalStakeUsd || "0";
   }, [saveUsdstInfo, saveUsdstRewardsActivity]);
+
+  const { baseByToken } = useMemo(() => buildTokenApyMaps(tokenApys), [tokenApys]);
+  const rewardApyByContract = useMemo(() => buildRewardApyMap(rewardsActivities), [rewardsActivities]);
+
+  const saveUsdstYieldBreakdown = useMemo(
+    () =>
+      buildStackedApyBreakdown({
+        native: saveUsdstNativeApy,
+        reward:
+          rewardApyByContract.get(
+            normalizeAddress(saveUsdstRewardsActivity?.sourceContract || saveUsdstAsset?.address),
+          ) || 0,
+      }),
+    [rewardApyByContract, saveUsdstAsset?.address, saveUsdstNativeApy, saveUsdstRewardsActivity?.sourceContract],
+  );
+
+  const vaultYieldBreakdown = useMemo(
+    () =>
+      buildStackedApyBreakdown({
+        native: vaultState.alpha,
+        base: calculateWeightedBaseFromAssets(
+          (vaultState.assets || []).map((asset) => ({
+            address: asset.address,
+            balance: asset.balance,
+            price: asset.priceUsd,
+          })),
+          baseByToken,
+        ),
+        reward: rewardApyByContract.get(normalizeAddress(vaultState.shareTokenAddress)) || 0,
+      }),
+    [baseByToken, rewardApyByContract, vaultState.alpha, vaultState.assets, vaultState.shareTokenAddress],
+  );
+
+  const lendingYieldBreakdown = useMemo(
+    () =>
+      buildStackedApyBreakdown({
+        native: liquidityInfo?.supplyAPY,
+        reward: rewardApyByContract.get(normalizeAddress(mUsdstAddress)) || 0,
+      }),
+    [liquidityInfo?.supplyAPY, rewardApyByContract],
+  );
+
+  const poolYieldBreakdowns = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof buildStackedApyBreakdown>>();
+    for (const pool of sortedPools) {
+      map.set(
+        normalizeAddress(pool.address),
+        buildStackedApyBreakdown({
+          native: pool.apy,
+          base: calculatePoolWeightedBase(pool, baseByToken),
+          reward: rewardApyByContract.get(normalizeAddress(pool.lpToken?.address)) || 0,
+        }),
+      );
+    }
+    return map;
+  }, [baseByToken, rewardApyByContract, sortedPools]);
 
   const getOpportunityTvl = (opportunity: OpportunityRow): bigint => {
     if (opportunity.kind === "saveUsdst") return safeBigInt(saveUsdstTvl);
@@ -489,29 +492,27 @@ const Earn = () => {
     const rows: OpportunityRow[] = [];
 
     if (activeFilter === "all" || activeFilter === "vaults") {
-      rows.push({ kind: "saveUsdst", apySortValue: saveUsdstEstimatedApy });
-      rows.push({ kind: "vault", apySortValue: parseApy(vaultState.alpha) });
+      rows.push({ kind: "saveUsdst", apySortValue: saveUsdstYieldBreakdown.total });
+      rows.push({ kind: "vault", apySortValue: vaultYieldBreakdown.total });
     }
 
     if (activeFilter === "all" || activeFilter === "pools") {
-      rows.push({ kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) });
+      rows.push({ kind: "lending", apySortValue: lendingYieldBreakdown.total });
       for (const pool of sortedPools) {
-        rows.push({ kind: "pool", apySortValue: parseApy(pool.apy), pool });
+        rows.push({ kind: "pool", apySortValue: poolYieldBreakdowns.get(normalizeAddress(pool.address))?.total || 0, pool });
       }
     }
 
     return rows.sort(compareOpportunities);
-  }, [activeFilter, liquidityInfo?.supplyAPY, saveUsdstEstimatedApy, saveUsdstTvl, sortedPools, vaultState.alpha, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied]);
-
-  const vaultAlpha = formatApyDisplay(vaultState.alpha);
+  }, [activeFilter, lendingYieldBreakdown.total, liquidityInfo?.totalUSDSTSupplied, poolYieldBreakdowns, saveUsdstTvl, saveUsdstYieldBreakdown.total, sortedPools, vaultState.totalEquity, vaultYieldBreakdown.total]);
   const rankedTopCandidates = useMemo<OpportunityRow[]>(() => {
     const candidates: OpportunityRow[] = [
-      { kind: "saveUsdst", apySortValue: saveUsdstEstimatedApy },
-      { kind: "vault", apySortValue: parseApy(vaultState.alpha) },
-      { kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) },
+      { kind: "saveUsdst", apySortValue: saveUsdstYieldBreakdown.total },
+      { kind: "vault", apySortValue: vaultYieldBreakdown.total },
+      { kind: "lending", apySortValue: lendingYieldBreakdown.total },
       ...sortedPools.map((pool) => ({
         kind: "pool" as const,
-        apySortValue: parseApy(pool.apy),
+        apySortValue: poolYieldBreakdowns.get(normalizeAddress(pool.address))?.total || 0,
         pool,
       })),
     ];
@@ -519,7 +520,7 @@ const Earn = () => {
     return rankedCandidates.filter(isEligibleForTopOpportunity).length > 0
       ? rankedCandidates.filter(isEligibleForTopOpportunity)
       : rankedCandidates;
-  }, [liquidityInfo?.supplyAPY, liquidityInfo?.totalUSDSTSupplied, saveUsdstEstimatedApy, saveUsdstTvl, sortedPools, vaultState.alpha, vaultState.totalEquity]);
+  }, [lendingYieldBreakdown.total, liquidityInfo?.totalUSDSTSupplied, poolYieldBreakdowns, saveUsdstTvl, saveUsdstYieldBreakdown.total, sortedPools, vaultState.totalEquity, vaultYieldBreakdown.total]);
 
   const rewardActivityByContract = useMemo(() => {
     const map = new Map<string, { emissionRate: bigint }>();
@@ -581,7 +582,8 @@ const Earn = () => {
       return {
         title: "Savings Vault",
         subtitle: "Stable USD savings with yield plus rewards",
-        apyRaw: saveUsdstEstimatedApy,
+        apyRaw: saveUsdstYieldBreakdown.total,
+        yieldBreakdown: saveUsdstYieldBreakdown,
         tvl: saveUsdstTvl,
         badge: "Savings Vault",
         rateLabel: "APY",
@@ -595,7 +597,8 @@ const Earn = () => {
       return {
         title: "Diversified Vault",
         subtitle: "Diversified real assets: gold, silver, ETH, BTC, stables - actively managed",
-        apyRaw: vaultState.alpha,
+        apyRaw: vaultYieldBreakdown.total,
+        yieldBreakdown: vaultYieldBreakdown,
         tvl: vaultState.totalEquity,
         badge: "Diversified Vault",
         rateLabel: "APY",
@@ -609,7 +612,8 @@ const Earn = () => {
       return {
         title: "USDST Lending Pool",
         subtitle: "Earn yield by supplying USDST liquidity",
-        apyRaw: liquidityInfo?.supplyAPY?.toString(),
+        apyRaw: lendingYieldBreakdown.total,
+        yieldBreakdown: lendingYieldBreakdown,
         tvl: liquidityInfo?.totalUSDSTSupplied?.toString() || "0",
         badge: "Lending",
         rateLabel: "APY",
@@ -620,10 +624,12 @@ const Earn = () => {
     }
 
     const pool = opportunity.pool;
+    const yieldBreakdown = poolYieldBreakdowns.get(normalizeAddress(pool.address)) || buildStackedApyBreakdown({});
     return {
       title: pool.poolName,
       subtitle: `Earn fees on ${pool.poolName.replace(" Pool", "")} swaps`,
-      apyRaw: pool.apy,
+      apyRaw: yieldBreakdown.total,
+      yieldBreakdown,
       tvl: pool.totalLiquidityUSD,
       badge: "Pool",
       rateLabel: "APY",
@@ -639,32 +645,33 @@ const Earn = () => {
     if (!key) return null;
 
     if (key === "save-usdst" || key === "saveusdst") {
-      return { kind: "saveUsdst", apySortValue: saveUsdstEstimatedApy };
+      return { kind: "saveUsdst", apySortValue: saveUsdstYieldBreakdown.total };
     }
 
     if (key === "vault") {
-      return { kind: "vault", apySortValue: parseApy(vaultState.alpha) };
+      return { kind: "vault", apySortValue: vaultYieldBreakdown.total };
     }
 
     if (key === "lending") {
-      return { kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) };
+      return { kind: "lending", apySortValue: lendingYieldBreakdown.total };
     }
 
     if (key.startsWith("pool:")) {
       const targetAddress = normalizeAddress(key.slice(5));
       const pool = sortedPools.find((candidate) => normalizeAddress(candidate.address) === targetAddress);
       if (pool) {
-        return { kind: "pool", apySortValue: parseApy(pool.apy), pool };
+        return { kind: "pool", apySortValue: poolYieldBreakdowns.get(normalizeAddress(pool.address))?.total || 0, pool };
       }
     }
 
     return null;
   }, [
     featuredOpportunityKey,
-    liquidityInfo?.supplyAPY,
-    saveUsdstEstimatedApy,
+    lendingYieldBreakdown.total,
+    poolYieldBreakdowns,
+    saveUsdstYieldBreakdown.total,
     sortedPools,
-    vaultState.alpha,
+    vaultYieldBreakdown.total,
   ]);
 
   const topOpportunity = useMemo<OpportunityRow>(() => {
@@ -683,20 +690,14 @@ const Earn = () => {
     );
   }, [configuredFeaturedOpportunity, rankedTopCandidates]);
 
-  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, saveUsdstEstimatedApy, saveUsdstTvl, vaultState.alpha, vaultState.totalEquity, liquidityInfo?.supplyAPY, liquidityInfo?.totalUSDSTSupplied, navigate]);
+  const topOpportunityMeta = useMemo(
+    () => getOpportunityMeta(topOpportunity),
+    [getOpportunityMeta, topOpportunity],
+  );
   const topOpportunityApy = formatApyDisplay(topOpportunityMeta.apyRaw);
   const featuredOpportunityMeta = useMemo(
     () => (configuredFeaturedOpportunity ? getOpportunityMeta(configuredFeaturedOpportunity) : null),
-    [
-      configuredFeaturedOpportunity,
-      saveUsdstEstimatedApy,
-      saveUsdstTvl,
-      vaultState.alpha,
-      vaultState.totalEquity,
-      liquidityInfo?.supplyAPY,
-      liquidityInfo?.totalUSDSTSupplied,
-      navigate,
-    ]
+    [configuredFeaturedOpportunity, getOpportunityMeta]
   );
   const featuredOpportunityApy = formatApyDisplay(featuredOpportunityMeta?.apyRaw);
 
@@ -811,7 +812,11 @@ const Earn = () => {
                             {featuredOpportunityMeta.rateLabel}
                           </p>
                           <p className={`text-2xl md:text-[32px] leading-none font-semibold ${featuredOpportunityApy.className}`}>
-                            {featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
+                            <StackedApyTooltip
+                              breakdown={featuredOpportunityMeta.yieldBreakdown}
+                              valueText={featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
+                              className={`text-2xl md:text-[32px] leading-none font-semibold ${featuredOpportunityApy.className}`}
+                            />
                           </p>
                           <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
                             TVL ${formatUsd(featuredOpportunityMeta.tvl)}
@@ -892,7 +897,11 @@ const Earn = () => {
                           {topOpportunityMeta.rateLabel}
                         </p>
                       <p className={`text-2xl md:text-[32px] leading-none font-semibold ${topOpportunityApy.className}`}>
-                          {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
+                          <StackedApyTooltip
+                            breakdown={topOpportunityMeta.yieldBreakdown}
+                            valueText={topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
+                            className={`text-2xl md:text-[32px] leading-none font-semibold ${topOpportunityApy.className}`}
+                          />
                         </p>
                       <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
                           TVL ${formatUsd(topOpportunityMeta.tvl)}
@@ -987,7 +996,7 @@ const Earn = () => {
                     <tbody>
                       {allOpportunities.map((opportunity) => {
                         if (opportunity.kind === "saveUsdst") {
-                          const saveUsdstApyDisplay = formatApyDisplay(saveUsdstEstimatedApy);
+                          const saveUsdstApyDisplay = formatApyDisplay(saveUsdstYieldBreakdown.total);
                           return (
                             <tr
                               key="save-usdst"
@@ -1012,9 +1021,12 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${saveUsdstApyDisplay.className}`}>
-                                  {saveUsdstApyDisplay.label}
-                                </p>
+                                <StackedApyTooltip
+                                  breakdown={saveUsdstYieldBreakdown}
+                                  valueText={saveUsdstApyDisplay.label}
+                                  className={`text-sm font-semibold ${saveUsdstApyDisplay.className}`}
+                                  side="left"
+                                />
                                 <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">
@@ -1090,9 +1102,12 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${vaultAlpha.className}`}>
-                                  {vaultAlpha.label}
-                                </p>
+                                <StackedApyTooltip
+                                  breakdown={vaultYieldBreakdown}
+                                  valueText={formatApyDisplay(vaultYieldBreakdown.total).label}
+                                  className="text-sm font-semibold"
+                                  side="left"
+                                />
                                 <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">
@@ -1167,9 +1182,12 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {formatApyDisplay(liquidityInfo?.supplyAPY).label}
-                                </p>
+                                <StackedApyTooltip
+                                  breakdown={lendingYieldBreakdown}
+                                  valueText={formatApyDisplay(lendingYieldBreakdown.total).label}
+                                  className="text-sm font-semibold"
+                                  side="left"
+                                />
                                 <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">
@@ -1225,6 +1243,7 @@ const Earn = () => {
 
                         const { pool } = opportunity;
                         const poolRewardMeta = getRewardMeta(pool.lpToken?.address);
+                        const poolYieldBreakdown = poolYieldBreakdowns.get(normalizeAddress(pool.address)) || buildStackedApyBreakdown({});
                         return (
                           <Fragment key={pool.address}>
                             <tr
@@ -1247,9 +1266,12 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {formatApyDisplay(pool.apy).label}
-                                </p>
+                                <StackedApyTooltip
+                                  breakdown={poolYieldBreakdown}
+                                  valueText={formatApyDisplay(poolYieldBreakdown.total).label}
+                                  className="text-sm font-semibold"
+                                  side="left"
+                                />
                                 <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">

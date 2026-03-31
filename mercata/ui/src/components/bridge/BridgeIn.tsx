@@ -37,10 +37,14 @@ import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transfe
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useUser } from "@/context/UserContext";
+import { useSwapContext } from "@/context/SwapContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useVaultContext } from "@/context/VaultContext";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 import PercentageButtons from "@/components/ui/PercentageButtons";
+import StackedApyTooltip from "@/components/ui/StackedApyTooltip";
 import {
   Select,
   SelectContent,
@@ -53,6 +57,7 @@ import { redirectToLogin } from "@/lib/auth";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
+import { buildRewardApyMap, buildTokenApyMaps, getTokenOpportunityApyInfo } from "@/lib/stackedApy";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
 
@@ -66,6 +71,7 @@ const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: strin
     case "lending":
       return "/dashboard/earn-lending";
     case "vault":
+    case "vault_weighted":
       return "/dashboard/earn-vault";
     case "swap":
     case "weighted_swap":
@@ -265,6 +271,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     triggerDepositRefresh,
   } = useBridgeContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
+  const { pools } = useSwapContext();
+  const { vaultState } = useVaultContext();
+  const { activities: rewardsActivities } = useRewardsActivities();
   const navigate = useNavigate();
 
   // State -- fundingMode can be controlled externally or managed internally
@@ -328,19 +337,27 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [bridgeableTokens, selectedToken, depositActions]);
 
   const getApyInfo = useMemo(() => {
-    const m = new Map<string, { apy: string; source: ApySource["source"]; poolAddress?: string }>();
-    for (const entry of tokenApys) {
-      let best: ApySource | null = null;
-      for (const a of entry.apys) {
-        if (a.source === "base") continue;
-        if (!best || parseFloat(a.apy) > parseFloat(best.apy)) best = a;
-      }
-      if (best && parseFloat(best.apy) > 0) {
-        m.set(normAddr(entry.token), { apy: best.apy, source: best.source, poolAddress: best.poolAddress });
-      }
+    const m = new Map<string, { breakdown: NonNullable<ReturnType<typeof getTokenOpportunityApyInfo>>["breakdown"]; source: ApySource["source"]; poolAddress?: string }>();
+    const { entriesByToken } = buildTokenApyMaps(tokenApys);
+    const rewardApyByContract = buildRewardApyMap(rewardsActivities);
+    const poolsByAddress = new Map((pools || []).map((pool) => [normAddr(pool.address), pool]));
+
+    for (const [token, entry] of entriesByToken.entries()) {
+      const info = getTokenOpportunityApyInfo({
+        entry,
+        rewardApyByContract,
+        poolsByAddress,
+        vaultShareTokenAddress: vaultState.shareTokenAddress,
+      });
+      if (!info) continue;
+      m.set(token, {
+        breakdown: info.breakdown,
+        source: info.source,
+        poolAddress: info.poolAddress,
+      });
     }
     return (addr: string) => m.get(normAddr(addr));
-  }, [tokenApys]);
+  }, [pools, rewardsActivities, tokenApys, vaultState.shareTokenAddress]);
 
   const ApyLine = ({ addr }: { addr: string }) => {
     const info = tokenApysLoaded ? getApyInfo(addr) : null;
@@ -369,7 +386,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               go();
             }}
           >
-            {`Earn up to ${info.apy}%`} {"\u2192"}
+            <StackedApyTooltip
+              breakdown={info.breakdown}
+              valueText={`Earn up to ${info.breakdown.total.toFixed(2)}%`}
+              className="text-[10px] font-medium text-green-500"
+            />
+            {"\u2192"}
           </span>
         ) : null}
       </div>

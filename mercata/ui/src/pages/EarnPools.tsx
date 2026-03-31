@@ -10,11 +10,15 @@ import { Button } from "@/components/ui/button";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidityDepositModal from "@/components/dashboard/LiquidityDepositModal";
 import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModal";
+import StackedApyTooltip from "@/components/ui/StackedApyTooltip";
+import { useEarnContext } from "@/context/EarnContext";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useSwapContext } from "@/context/SwapContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
+import { buildRewardApyMap, buildStackedApyBreakdown, buildTokenApyMaps, calculatePoolWeightedBase, normalizeApyAddress } from "@/lib/stackedApy";
 
 const WAD = BigInt("1000000000000000000");
 
@@ -91,6 +95,8 @@ const EarnPools = () => {
   const { getPoolByAddress } = useSwapContext();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { isLoggedIn } = useUser();
+  const { tokenApys } = useEarnContext();
+  const { activities: rewardsActivities } = useRewardsActivities();
 
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [selectedPoolData, setSelectedPoolData] = useState<Pool | null>(null);
@@ -139,6 +145,17 @@ const EarnPools = () => {
 
   const highlightedPoolData = selectedPoolData;
   const pageLoading = poolDetailsLoading;
+  const { baseByToken } = useMemo(() => buildTokenApyMaps(tokenApys), [tokenApys]);
+  const rewardApyByContract = useMemo(() => buildRewardApyMap(rewardsActivities), [rewardsActivities]);
+  const highlightedPoolYieldBreakdown = useMemo(
+    () =>
+      buildStackedApyBreakdown({
+        native: highlightedPoolData?.apy,
+        base: calculatePoolWeightedBase(highlightedPoolData, baseByToken),
+        reward: rewardApyByContract.get(normalizeApyAddress(highlightedPoolData?.lpToken?.address)) || 0,
+      }),
+    [baseByToken, highlightedPoolData, rewardApyByContract],
+  );
 
   const handlePoolDeposit = (pool: Pool) => {
     if (!isLoggedIn) return;
@@ -197,9 +214,13 @@ const EarnPools = () => {
                 <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                     <p className="text-[11px] text-muted-foreground">Pool APY</p>
-                    <p className="text-sm font-semibold">
-                      {pageLoading ? "Loading..." : highlightedPoolData ? formatPct(highlightedPoolData.apy) : "N/A"}
-                    </p>
+                    {pageLoading ? "Loading..." : (
+                      <StackedApyTooltip
+                        breakdown={highlightedPoolYieldBreakdown}
+                        valueText={highlightedPoolData ? formatPct(highlightedPoolYieldBreakdown.total) : "N/A"}
+                        className="text-sm font-semibold"
+                      />
+                    )}
                   </div>
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                     <p className="text-[11px] text-muted-foreground">TVL</p>
@@ -326,9 +347,14 @@ const EarnPools = () => {
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">Pool APY</p>
-                        <p className="text-sm font-semibold">
-                          {pageLoading ? "Loading..." : formatPct(highlightedPoolData?.apy)}
-                        </p>
+                        {pageLoading ? "Loading..." : (
+                          <StackedApyTooltip
+                            breakdown={highlightedPoolYieldBreakdown}
+                            valueText={formatPct(highlightedPoolYieldBreakdown.total)}
+                            className="text-sm font-semibold"
+                            side="left"
+                          />
+                        )}
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">A to B Ratio</p>

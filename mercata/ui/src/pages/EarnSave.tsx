@@ -25,11 +25,13 @@ import { safeParseUnits } from "@/utils/numberUtils";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import StackedApyTooltip from "@/components/ui/StackedApyTooltip";
 import {
   calculateEstimatedRewardsPerDay,
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
+import { buildStackedApyBreakdown, calculateRewardApy } from "@/lib/stackedApy";
 
 const CATA_PRICE_USD = 0.25;
 
@@ -208,6 +210,28 @@ const EarnSave = () => {
         effectiveInfo?.totalAssets ??
         null
     )
+  );
+  const saveYieldBreakdown = useMemo(
+    () =>
+      buildStackedApyBreakdown({
+        native: effectiveInfo?.apy,
+        reward: calculateRewardApy(
+          saveRewardsActivity?.emissionRate,
+          saveRewardsActivity?.totalStakeUsd ??
+            effectiveInfo?.tvlUsd ??
+            effectiveInfo?.pricingAssets ??
+            effectiveInfo?.totalAssets ??
+            null,
+        ),
+      }),
+    [
+      effectiveInfo?.apy,
+      effectiveInfo?.pricingAssets,
+      effectiveInfo?.totalAssets,
+      effectiveInfo?.tvlUsd,
+      saveRewardsActivity?.emissionRate,
+      saveRewardsActivity?.totalStakeUsd,
+    ],
   );
   const saveRewardPointsPerDollarPerDay = useMemo(
     () =>
@@ -471,9 +495,17 @@ const EarnSave = () => {
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
                           <p className="text-muted-foreground">Yield</p>
-                          <p className="mt-1 text-lg font-semibold">
-                            {loadingInfo || rewardsActivitiesLoading ? "..." : incentiveYield}
-                          </p>
+                          <div className="mt-1">
+                            {loadingInfo || rewardsActivitiesLoading ? (
+                              <p className="text-lg font-semibold">...</p>
+                            ) : (
+                              <StackedApyTooltip
+                                breakdown={saveYieldBreakdown}
+                                valueText={incentiveYield}
+                                className="text-lg font-semibold"
+                              />
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground mt-1">
                             Estimated annualized total yield, including rewards and native fees
                           </p>

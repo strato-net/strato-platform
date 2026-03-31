@@ -16,10 +16,13 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE, rewardsEnabled } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import StackedApyTooltip from "@/components/ui/StackedApyTooltip";
+import { buildRewardApyMap, buildStackedApyBreakdown, normalizeApyAddress } from "@/lib/stackedApy";
 
 const EarnLending = () => {
   const navigate = useNavigate();
@@ -37,11 +40,21 @@ const EarnLending = () => {
   } = useLendingContext();
   const { toast } = useToast();
   const { userRewards } = useRewardsUserInfo();
+  const { activities: rewardsActivities } = useRewardsActivities();
 
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [stakeMToken, setStakeMToken] = useState<boolean>(rewardsEnabled);
+  const rewardApyByContract = useMemo(() => buildRewardApyMap(rewardsActivities), [rewardsActivities]);
+  const lendingYieldBreakdown = useMemo(
+    () =>
+      buildStackedApyBreakdown({
+        native: liquidityInfo?.supplyAPY,
+        reward: rewardApyByContract.get(normalizeApyAddress(liquidityInfo?.withdrawable?.address)) || 0,
+      }),
+    [liquidityInfo?.supplyAPY, liquidityInfo?.withdrawable?.address, rewardApyByContract],
+  );
 
   const refreshLendingData = (signal?: AbortSignal) => {
     refreshLiquidity(signal);
@@ -180,7 +193,11 @@ const EarnLending = () => {
                   <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
                     <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                       <p className="text-[11px] text-muted-foreground">Supply APY</p>
-                      <p className="text-sm font-semibold">{liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}</p>
+                      <StackedApyTooltip
+                        breakdown={lendingYieldBreakdown}
+                        valueText={lendingYieldBreakdown.total > 0 ? `${lendingYieldBreakdown.total.toFixed(2)}%` : "N/A"}
+                        className="text-sm font-semibold"
+                      />
                     </div>
                     <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                       <p className="text-[11px] text-muted-foreground">TVL</p>
@@ -371,7 +388,7 @@ const EarnLending = () => {
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Total Collateral Value</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.totalCollateralValue || 0n, undefined, 18, 2, 2, true)}</p></div>
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Borrow Index</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : liquidityInfo?.borrowIndex ? (() => { const s = formatUnits(liquidityInfo.borrowIndex || 0, 27); const [w, f = ""] = s.split("."); return f ? `${w}.${f.slice(0, 5)}` : w; })() : "0"}</p></div>
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Reserves Accrued</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.reservesAccrued || 0n, undefined, 18, 2, 2, true)}</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Supply APY</p><p className="text-sm font-semibold">{liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}</p></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Supply APY</p><StackedApyTooltip breakdown={lendingYieldBreakdown} valueText={lendingYieldBreakdown.total > 0 ? `${lendingYieldBreakdown.total.toFixed(2)}%` : "N/A"} className="text-sm font-semibold" side="left" /></div>
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Max Supply APY</p><p className="text-sm font-semibold">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</p></div>
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Borrow APY</p><p className="text-sm font-semibold">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</p></div>
                       {isLoggedIn && (
