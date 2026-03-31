@@ -68,6 +68,7 @@ generateDockerCompose = do
             , ("BA_USERNAME", "${BA_USERNAME}")
             , ("BA_PASSWORD", "${BA_PASSWORD}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
+            , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY}")
             ]
         , extra_hosts = extraHosts
         , entrypoint = Just ["/bin/sh", "-c"]
