@@ -477,31 +477,50 @@ runCodeForTransaction ::
 runCodeForTransaction b availableGas tAddr t proposer =
   let ut = otBaseTx t
    in case ut of
-        TD.EthereumTX {TD.ethTo = Just toAddr, TD.txData = callData} -> do
-          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $
-            "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
-          let selector = B.take 4 callData
-              argsBytes = B.drop 4 callData
-          lift (resolveFunction toAddr selector) >>= \case
-            Nothing -> throwE $ TFCodeCollectionNotFound toAddr
-              ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
-            Just (fName, func) -> do
-              let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
-                  fnStr = T.unpack (labelToText fName)
-              $logInfoS "runCodeForTransaction" $ T.pack $
-                "EthereumTX resolved: " ++ fnStr ++ "(" ++ intercalate ", " (map T.unpack argTexts) ++ ") on " ++ format toAddr
-              lift $
-                SolidVM.call
-                  b
-                  toAddr
-                  tAddr
-                  proposer
-                  (fromIntegral availableGas)
-                  tAddr
-                  (txHash ut)
-                  (labelToText fName)
-                  argTexts
-                  Nothing
+        TD.EthereumTX {TD.ethTo = Just toAddr, TD.value = val, TD.txData = callData}
+          | B.null callData && val > 0 -> do
+            let usdstAddr = Address 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+                recipientArg = T.pack $ "0x" ++ formatAddressWithoutColor toAddr
+                amountArg = T.pack $ show val
+            $logInfoS "runCodeForTransaction" $ T.pack $
+              "EthereumTX native transfer: " ++ show val ++ " to " ++ format toAddr ++ " -> USDST.transfer"
+            lift $
+              SolidVM.call
+                b
+                usdstAddr
+                tAddr
+                proposer
+                (fromIntegral availableGas)
+                tAddr
+                (txHash ut)
+                "transfer"
+                [recipientArg, amountArg]
+                Nothing
+          | otherwise -> do
+            when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $
+              "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
+            let selector = B.take 4 callData
+                argsBytes = B.drop 4 callData
+            lift (resolveFunction toAddr selector) >>= \case
+              Nothing -> throwE $ TFCodeCollectionNotFound toAddr
+                ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
+              Just (fName, func) -> do
+                let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
+                    fnStr = T.unpack (labelToText fName)
+                $logInfoS "runCodeForTransaction" $ T.pack $
+                  "EthereumTX resolved: " ++ fnStr ++ "(" ++ intercalate ", " (map T.unpack argTexts) ++ ") on " ++ format toAddr
+                lift $
+                  SolidVM.call
+                    b
+                    toAddr
+                    tAddr
+                    proposer
+                    (fromIntegral availableGas)
+                    tAddr
+                    (txHash ut)
+                    (labelToText fName)
+                    argTexts
+                    Nothing
 
         TD.EthereumTX {TD.ethTo = Nothing} ->
           throwE $ TFCodeCollectionNotFound (Address 0)
