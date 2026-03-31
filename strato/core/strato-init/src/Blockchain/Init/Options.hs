@@ -46,9 +46,7 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "jsonrpc" (False :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for MetaMask integration"
 defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
-defineFlag "ssl" (False :: Bool) "Enable SSL (HTTPS on port 443)"
-defineFlag "sslCert" ("" :: String) "Path to SSL certificate file (required when --ssl=true)"
-defineFlag "sslKey" ("" :: String) "Path to SSL private key file (required when --ssl=true)"
+defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
 
 defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
 

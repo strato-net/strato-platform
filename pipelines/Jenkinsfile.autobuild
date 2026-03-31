@@ -98,7 +98,7 @@ pipeline {
         }
         */
         
-        // TODO: switch to using SSL (add --ssl=true --sslCert='/home/ubuntu/letsencrypt-ssl/server.pem' --sslKey='/home/ubuntu/letsencrypt-ssl/server.key', (also update check_availability function)
+        // TODO: switch to using SSL (add --sslDir='/home/ubuntu/letsencrypt-ssl', (also update check_availability function to use port 443)
         writeFile file: "run.sh", text: """#!/bin/bash
           export PATH
           strato-up mynode \\
