@@ -2,6 +2,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const SECONDS_PER_YEAR = 31_536_000;
 const YIELD_ANCHOR_UTC_HOUR = 12;
 const DEFAULT_YIELD_WINDOW_DAYS = 30;
+const YIELD_ANCHOR_STEP_DAYS = 3;
 
 export interface YieldHistoryInterval {
   fromMs: number;
@@ -76,15 +77,21 @@ export function indexYieldHistoryRows(rows: any[]): Map<string, YieldHistoryInte
   return byKey;
 }
 
-export function buildYieldAnchors(nowMs: number, days: number = DEFAULT_YIELD_WINDOW_DAYS): number[] {
+export function buildYieldAnchors(
+  nowMs: number,
+  days: number = DEFAULT_YIELD_WINDOW_DAYS,
+  stepDays: number = YIELD_ANCHOR_STEP_DAYS,
+): number[] {
   const now = new Date(nowMs);
   const todayUtcStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const anchors: number[] = [];
+  const step = Math.max(1, stepDays);
 
-  for (let i = days - 1; i >= 0; i--) {
+  for (let i = days - 1; i > 0; i -= step) {
     const dayStartMs = todayUtcStartMs - i * DAY_MS;
     anchors.push(dayStartMs + YIELD_ANCHOR_UTC_HOUR * 60 * 60 * 1000);
   }
+  anchors.push(todayUtcStartMs + YIELD_ANCHOR_UTC_HOUR * 60 * 60 * 1000);
 
   return anchors;
 }
