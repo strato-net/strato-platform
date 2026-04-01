@@ -2,7 +2,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const SECONDS_PER_YEAR = 31_536_000;
 const YIELD_ANCHOR_UTC_HOUR = 12;
 const DEFAULT_YIELD_WINDOW_DAYS = 30;
-const YIELD_ANCHOR_STEP_DAYS = 3;
+const YIELD_ANCHOR_STEP_DAYS = 5;
 
 export interface YieldHistoryInterval {
   fromMs: number;
