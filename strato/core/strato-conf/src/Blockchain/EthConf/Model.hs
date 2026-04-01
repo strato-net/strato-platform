@@ -52,7 +52,7 @@ data EthConf = EthConf
     discoveryConfig :: DiscoveryConf,
     p2pConfig :: P2PConf,
     apiConfig :: ApiConfig,
-    contractsConfig :: Maybe ContractsConf,
+    contractsConfig :: ContractsConf,
     urlConfig :: UrlConfig,
     networkConfig :: NetworkConf,
     debugConfig :: DebugConfig
@@ -70,7 +70,7 @@ instance FromJSON EthConf where
     <*> v .: "discoveryConfig"
     <*> v .:? "p2pConfig" .!= def
     <*> v .: "apiConfig"
-    <*> v .:? "contractsConfig"
+    <*> v .:? "contractsConfig" .!= def
     <*> v .:? "urlConfig" .!= def
     <*> v .:? "networkConfig" .!= def
     <*> v .:? "debugConfig" .!= def
@@ -149,11 +149,13 @@ data QuarryConf = QuarryConf
 
 data ContractsConf = ContractsConf
   { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
+  , nativeTokenAddress :: Address  -- ^ ERC20 treated as native token (e.g. USDST)
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data UrlConfig = UrlConfig
   { vaultUrl :: String
+  , vaultUrlDocker :: String
   , fileServerUrl :: String
   , notificationServerUrl :: String
   , repoUrl :: String  -- Docker registry URL prefix for images
@@ -266,11 +268,13 @@ instance Default DebugConfig where
 instance Default ContractsConf where
   def = ContractsConf
     { railgunProxy = Nothing
+    , nativeTokenAddress = 0
     }
 
 instance Default UrlConfig where
   def = UrlConfig
     { vaultUrl = "https://vault.blockapps.net:8093"
+    , vaultUrlDocker = "https://vault.blockapps.net:8093"
     , fileServerUrl = ""
     , notificationServerUrl = ""
     , repoUrl = ""
@@ -298,7 +302,7 @@ instance Default EthConf where
     , discoveryConfig = def
     , p2pConfig = def
     , apiConfig = def
-    , contractsConfig = Nothing
+    , contractsConfig = def
     , urlConfig = def
     , networkConfig = def
     , debugConfig = def

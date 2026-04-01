@@ -798,11 +798,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         throw new Error(`Transaction reverted on ${selectedNetwork} network. No funds were deposited on STRATO. Please try again.`);
       }
 
-      const externalDecimals = parseInt(selectedToken.externalDecimals || "18");
-      const decimalDiff = 18 - externalDecimals;
-      const amount18Decimals = decimalDiff >= 0 
-        ? (depositAmount * BigInt(10 ** decimalDiff)).toString()
-        : depositAmount.toString();
+      const externalDecimals = BigInt(selectedToken.externalDecimals || "18");
+      const factor = BigInt(selectedToken.rebaseFactor || WAD);
+      const decimalDiff = 18n - externalDecimals;
+      const amount18Decimals = depositAmount * 10n ** decimalDiff;
+      const adjustedAmount = (amount18Decimals * WAD / factor).toString();
 
       const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
       const action = selectedAction?.action || 0;
@@ -815,7 +815,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           externalSender: address,
           stratoRecipient: userAddress,
           stratoToken: selectedToken.stratoToken,
-          stratoTokenAmount: amount18Decimals,
+          stratoTokenAmount: adjustedAmount,
           bridgeStatus: "1",
         },
         block_timestamp: new Date().toISOString(),

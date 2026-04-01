@@ -123,9 +123,9 @@ ethCall id fromAddr toAddr callData = do
           Nothing -> do
             $logInfoS "ethCall" . T.pack $ prettyCall ++ " => (no return value)"
             return (id, B.empty)
-          Just retStr -> do
-            let encoded = encodeReturnABI retTypes retStr
-            $logInfoS "ethCall" . T.pack $ prettyCall ++ " => " ++ retStr
+          Just retVal -> do
+            let encoded = encodeValueABI retTypes retVal
+            $logInfoS "ethCall" . T.pack $ prettyCall ++ " => " ++ show retVal
             return (id, encoded)
 
 initBestBlockContext :: VMBase m => m ()

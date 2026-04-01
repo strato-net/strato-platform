@@ -26,7 +26,7 @@ interface LiquidityWithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedPool: Pool | null;
-  onWithdrawSuccess: () => void;
+  onWithdrawSuccess: () => Promise<void>;
   operationInProgressRef: React.MutableRefObject<boolean>;
   usdstBalance: string;
   voucherBalance: string;
@@ -123,6 +123,7 @@ const LiquidityWithdrawModal = ({
         });
 
         await new Promise(resolve => setTimeout(resolve, 2000));
+        await onWithdrawSuccess();
 
         const formattedLpAmount = formatWeiAmount(calculatedAmount.toString());
         handleClose();
@@ -151,6 +152,7 @@ const LiquidityWithdrawModal = ({
         });
 
         await new Promise(resolve => setTimeout(resolve, 2000));
+        await onWithdrawSuccess();
 
         const tokenAAmount = selectedPool.lpToken._totalSupply === "0"
           ? 0
@@ -183,10 +185,6 @@ const LiquidityWithdrawModal = ({
     } finally {
       setWithdrawLoading(false);
       operationInProgressRef.current = false;
-    }
-
-    if (!withdrawLoading) {
-      onWithdrawSuccess();
     }
   };
 
