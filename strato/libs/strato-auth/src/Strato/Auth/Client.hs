@@ -41,20 +41,17 @@ newAuthEnv url = do
 -- | Run a Servant client action with OAuth authentication.
 --
 -- Retries on 401 (with token refresh) and on connection errors
--- (up to 4 attempts with exponential backoff: 1s, 2s, 4s).
+-- (indefinitely with exponential backoff capped at 30s).
 runWithAuth :: AuthEnv -> ClientM a -> IO (Either ClientError a)
 runWithAuth ae action = withConnectionRetry (1 :: Int)
   where
-    maxAttempts = 4 :: Int
-
     withConnectionRetry attempt = do
       result <- try $ doRequestWith401Retry
       case joinResult result of
-        Left (ConnectionError e)
-          | attempt < maxAttempts -> do
+        Left (ConnectionError e) -> do
               let delaySec = min 30 (2 ^ (attempt - 1) :: Int)
               hPutStrLn stderr $
-                "Vault request: attempt " ++ show attempt ++ "/" ++ show maxAttempts ++
+                "Vault request: connection attempt " ++ show attempt ++
                 " failed (" ++ show e ++ "), retrying in " ++ show delaySec ++ "s"
               threadDelay (delaySec * 1000000)
               withConnectionRetry (attempt + 1)
