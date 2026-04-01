@@ -267,6 +267,13 @@ class SwappingController {
             && BigInt(pool.tokenB?.poolBalance || "0") > 0n;
       });
 
+      // Sort by total liquidity descending so the frontend picks the deepest pool
+      filteredPools.sort((a, b) => {
+        const liqA = parseFloat(a.totalLiquidityUSD || "0");
+        const liqB = parseFloat(b.totalLiquidityUSD || "0");
+        return liqB - liqA;
+      });
+
       res.status(RestStatus.OK).json(filteredPools);
     } catch (error) {
       next(error);
