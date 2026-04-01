@@ -96,7 +96,7 @@ readContractAddress = do
           case result of
             Left _ -> return Nothing
             Right ethConf -> 
-              return $ T.pack . formatAddressWithoutColor <$> (contractsConfig ethConf >>= railgunProxy)
+              return $ T.pack . formatAddressWithoutColor <$> railgunProxy (contractsConfig ethConf)
 
 -- | Create a servant-client environment with custom headers for nginx CSRF bypass
 makeBlocClientEnv :: IO ClientEnv

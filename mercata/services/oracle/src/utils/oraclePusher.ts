@@ -111,13 +111,13 @@ export async function pushAssetPrices(validPrices: AggregatedPrice[]): Promise<T
     return result;
 }
 
-export async function pushRebaseFactors(factors: Array<{ targetAddress: string; factor: number }>): Promise<TransactionResult> {
+export async function pushRebaseFactors(factors: Array<{ targetAddress: string; factor: bigint }>): Promise<TransactionResult> {
     const callListArgs: CallListArg[] = [{
         contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
         method: "setRebaseFactors",
         args: {
             assets: factors.map(f => f.targetAddress),
-            factors: factors.map(f => f.factor)
+            factors: factors.map(f => f.factor.toString())
         },
     }];
 

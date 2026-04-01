@@ -80,6 +80,7 @@ import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
+import SolidVM.Model.Value (Value(..))
 import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
@@ -318,7 +319,7 @@ runTestWithTimeout timeout f = do
           gi = "{ \"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"accountInfo\":[ [\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\",1809251394333065553493296640760748560207343510400633813116524750123642650624] ], \"transactionRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"extraData\":0, \"gasUsed\":0, \"gasLimit\":22517998136852480000000000000000, \"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\", \"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"number\":0, \"difficulty\":8192, \"timestamp\":\"1970-01-01T00:00:00.000Z\", \"coinbase\":\"00000000000000000000\", \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"nonce\":42 }"
           eInput = Ae.eitherDecodeStrict (BC.pack gi)
           !input = either error id eInput
-          gi' = buildGenesisInfo [] vals admins input
+          gi' = buildGenesisInfo vals admins input
 
       (blockCreated, outputBlock) <- generateGBlock gi'
       MP.initializeBlank
@@ -563,7 +564,7 @@ runArgs = runArgsWithSender sender
 runArgsBeef :: [T.Text] -> String -> ContextM ExecResults
 runArgsBeef = runArgsWithSenderBeef sender
 
-runCall :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
+runCall :: T.Text -> [T.Text] -> String -> ContextM (Maybe Value)
 runCall funcName callArgs bs = do
   let code = Code $ T.pack bs
       isRCC = False
@@ -621,9 +622,7 @@ runCall funcName callArgs bs = do
   rethrowEx er2
   return $ erReturnVal er2
 
--- SolidVM returns String instead of ByteString, test it by using the new function runCall' instead of the function runCall
--- compare the returned value (but got) with expected value (expected) in the test case
-runCall' :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
+runCall' :: T.Text -> [T.Text] -> String -> ContextM (Maybe Value)
 runCall' funcName callArgs bs = do
   let code = Code $ T.pack bs
       isRCC = False
@@ -686,7 +685,7 @@ runCall' funcName callArgs bs = do
 lastN' :: Int -> [a] -> [a]
 lastN' n xs = L.foldl' (const . drop 1) xs (drop n xs)
 
-call2 :: T.Text -> [T.Text] -> Address -> ContextM (Maybe String)
+call2 :: T.Text -> [T.Text] -> Address -> ContextM (Maybe Value)
 call2 funcName callArgs contractAddress = do
   let isRCC = False
       blockData =

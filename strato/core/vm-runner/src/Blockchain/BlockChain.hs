@@ -71,7 +71,7 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
-import Blockchain.EthConf (ethConf, networkConfig)
+import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Conduit
@@ -101,6 +101,10 @@ import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
 import SolidVM.Model.SolidString (labelToText)
+import SolidVM.Model.Value (Value(..))
+import qualified Data.Aeson as Aeson
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -430,7 +434,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         , erEvents = erEvents feeResult ++ erEvents er
         }
 
-  if (erException feeResult == Nothing) || (erReturnVal feeResult == Just "(true)")
+  if (erException feeResult == Nothing) || (erReturnVal feeResult == Just (SBool True))
     then do
       $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
 
@@ -477,31 +481,50 @@ runCodeForTransaction ::
 runCodeForTransaction b availableGas tAddr t proposer =
   let ut = otBaseTx t
    in case ut of
-        TD.EthereumTX {TD.ethTo = Just toAddr, TD.txData = callData} -> do
-          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $
-            "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
-          let selector = B.take 4 callData
-              argsBytes = B.drop 4 callData
-          lift (resolveFunction toAddr selector) >>= \case
-            Nothing -> throwE $ TFCodeCollectionNotFound toAddr
-              ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
-            Just (fName, func) -> do
-              let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
-                  fnStr = T.unpack (labelToText fName)
-              $logInfoS "runCodeForTransaction" $ T.pack $
-                "EthereumTX resolved: " ++ fnStr ++ "(" ++ intercalate ", " (map T.unpack argTexts) ++ ") on " ++ format toAddr
-              lift $
-                SolidVM.call
-                  b
-                  toAddr
-                  tAddr
-                  proposer
-                  (fromIntegral availableGas)
-                  tAddr
-                  (txHash ut)
-                  (labelToText fName)
-                  argTexts
-                  Nothing
+        TD.EthereumTX {TD.ethTo = Just toAddr, TD.value = val, TD.txData = callData}
+          | B.null callData && val > 0 -> do
+            let nativeAddr = nativeTokenAddress (contractsConfig ethConf)
+                recipientArg = T.pack $ "0x" ++ formatAddressWithoutColor toAddr
+                amountArg = T.pack $ show val
+            $logInfoS "runCodeForTransaction" $ T.pack $
+              "EthereumTX native transfer: " ++ show val ++ " to " ++ format toAddr ++ " -> nativeToken.transfer"
+            lift $
+              SolidVM.call
+                b
+                nativeAddr
+                tAddr
+                proposer
+                (fromIntegral availableGas)
+                tAddr
+                (txHash ut)
+                "transfer"
+                [recipientArg, amountArg]
+                Nothing
+          | otherwise -> do
+            when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $
+              "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
+            let selector = B.take 4 callData
+                argsBytes = B.drop 4 callData
+            lift (resolveFunction toAddr selector) >>= \case
+              Nothing -> throwE $ TFCodeCollectionNotFound toAddr
+                ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
+              Just (fName, func) -> do
+                let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
+                    fnStr = T.unpack (labelToText fName)
+                $logInfoS "runCodeForTransaction" $ T.pack $
+                  "EthereumTX resolved: " ++ fnStr ++ "(" ++ intercalate ", " (map T.unpack argTexts) ++ ") on " ++ format toAddr
+                lift $
+                  SolidVM.call
+                    b
+                    toAddr
+                    tAddr
+                    proposer
+                    (fromIntegral availableGas)
+                    tAddr
+                    (txHash ut)
+                    (labelToText fName)
+                    argTexts
+                    Nothing
 
         TD.EthereumTX {TD.ethTo = Nothing} ->
           throwE $ TFCodeCollectionNotFound (Address 0)
@@ -656,7 +679,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         case result of
           Left _ -> ("", [], [], []) --TODO keep the trace when the run fails
           Right r ->
-            (fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
+            (maybe "" (TL.unpack . TLE.decodeUtf8 . Aeson.encode) $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash <$> theLogs
   yield . OutEvent $ mkEventEntry <$> theEvents

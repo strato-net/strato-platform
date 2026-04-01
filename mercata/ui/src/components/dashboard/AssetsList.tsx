@@ -262,12 +262,12 @@ const AssetsList = ({
                             <p className="font-medium text-sm md:text-base text-foreground">
                               {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
                             </p>
-                            {asset.rebaseFactor && (
+                            {asset.rebaseFactor && asset.rebasingExternalSymbol && (
                               <p className="text-xs text-muted-foreground mt-0.5">
                                 ≈ {formatBalance(
                                   (BigInt(asset.totalBalance) * BigInt(asset.rebaseFactor) / (10n ** 18n)).toString(),
                                   undefined, 18, 1, 4
-                                )} {asset._symbol?.replace(/^w/, '')}
+                                )} {asset.rebasingExternalSymbol}
                               </p>
                             )}
                           </div>
