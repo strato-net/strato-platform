@@ -532,6 +532,8 @@ type PoolInfo = {
   address: string;
   isStable: boolean;
   isMultiToken: boolean;
+  isPaused: boolean;
+  isDisabled: boolean;
   tokenA?: string;
   tokenB?: string;
   coins?: string[];
@@ -550,7 +552,7 @@ const discoverPoolsForAsset = async (
     cirrus.get(accessToken, `/${Pool}`, {
       params: {
         or: `(tokenA.eq.${assetAddress},tokenB.eq.${assetAddress})`,
-        select: "address,tokenA,tokenB,isStable",
+        select: "address,tokenA,tokenB,isStable,isPaused,isDisabled",
       }
     }).catch(() => ({ data: [] })),
     cirrus.get(accessToken, `/${StablePoolCoins}`, {
@@ -587,13 +589,18 @@ const discoverPoolsForAsset = async (
     const coins = coinsByPool.get(addr);
     const poolRow = poolRowMap.get(addr);
 
+    const isPaused = !!poolRow?.isPaused;
+    const isDisabled = !!poolRow?.isDisabled;
+
     if (coins && coins.length > 2) {
-      results.push({ address: addr, isStable: true, isMultiToken: true, coins });
+      results.push({ address: addr, isStable: true, isMultiToken: true, isPaused, isDisabled, coins });
     } else if (poolRow && poolRow.tokenA && poolRow.tokenB) {
       results.push({
         address: addr,
         isStable: !!poolRow.isStable,
         isMultiToken: false,
+        isPaused,
+        isDisabled,
         tokenA: poolRow.tokenA,
         tokenB: poolRow.tokenB,
       });
@@ -663,12 +670,12 @@ export const getStratoPriceHistory = async (
     const startTime = new Date(historyParams.endTimestamp - (historyParams.interval * historyParams.numTicks));
 
     const allPools = await discoverPoolsForAsset(accessToken, assetAddress);
-    const twoTokenPools = allPools.filter(p => !p.isMultiToken && p.tokenA && p.tokenB);
-    const multiTokenPools = allPools.filter(p => p.isMultiToken && p.coins);
-
-    if (twoTokenPools.length === 0 && multiTokenPools.length === 0) {
+    if (!allPools.some(p => !p.isPaused && !p.isDisabled)) {
       return { data: [], totalCount: 0 };
     }
+
+    const twoTokenPools = allPools.filter(p => !p.isMultiToken && p.tokenA && p.tokenB);
+    const multiTokenPools = allPools.filter(p => p.isMultiToken && p.coins);
 
     // Collect all counterpart token addresses
     const otherTokenAddrs = new Set<string>();
