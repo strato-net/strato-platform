@@ -41,15 +41,6 @@ pipeline {
       }
     }
 
-    stage('Code Quality Checks') {
-      steps {
-        sh '''#!/bin/bash -le
-          echo "Checking for trailing whitespaces..."
-          # ./scripts/delete-trailing-whitespaces.sh --check --excludeDir legacy/pre-erc20-Jun2025 --excludeDir strato/core/strato-genesis .
-        '''
-      }
-    }
-
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
@@ -106,32 +97,15 @@ pipeline {
             --nodeHost=\$(</host) \\
             --vaultUrl=https://\$(</host):8093/strato/v2.3 \\
             --fileServerUrl=https://\$(</host):44300/highway \\
-            --httpPort=80
+            --sslDir='/home/ubuntu/letsencrypt-ssl'
         """
         sh 'chmod +x run.sh'
         sh './run.sh'
 
         sh 'docker ps'
-        writeFile file: "check_availability.sh", text: '''#!/bin/bash -le
-          check_availability() {
-            counter=0
-            until curl --silent --fail --location $(</host)/health | jq .health | grep true
-            do
-              if [[ "$counter" -gt 300 ]]; then
-                echo "STRATO node took longer than 5 minutes to initialize! aborting."
-                exit 73
-              fi
-              echo "waiting for STRATO health endpoint to be available through nginx"
-              counter=$((counter+1))
-              sleep 1
-            done
-            echo "STRATO health endpoint is available through nginx - node is running"
-          }
-
-          check_availability
-        '''
-        sh 'chmod +x check_availability.sh'
-        sh './check_availability.sh'
+        script {
+          lib.checkNodeAvailability(443)
+        }
       }
     }
 
@@ -178,76 +152,6 @@ pipeline {
                 }
               }
             }
-            
-            /*
-            stage('Deploy to Testnet') {
-              // only deploy if building develop branch
-              when {
-                beforeAgent true
-                allOf {
-                  branch "develop"
-                }
-              }
-              agent { label "testnet-build1" }
-              steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-                ]) {
-                  sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
-                }
-                unstash 'bootstrapDocker'
-                dir("bootstrap-docker"){
-                  withCredentials([usernamePassword(credentialsId: 'testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID'),
-                                   string(credentialsId: 'buildtest-rpc-url-sepolia', variable: 'BUILDTEST_RPC_URL_SEPOLIA'),
-                                   string(credentialsId: 'buildtest-rpc-url-sepolia-fallback', variable: 'BUILDTEST_RPC_URL_SEPOLIA_FALLBACK'),
-                                   string(credentialsId: 'buildtest-stripe-secret-key', variable: 'BUILDTEST_STRIPE_SECRET_KEY'),
-                                   string(credentialsId: 'buildtest-stripe-publishable-key', variable: 'BUILDTEST_STRIPE_PUBLISHABLE_KEY'),
-                                   string(credentialsId: 'buildtest-stripe-webhook-secret', variable: 'BUILDTEST_STRIPE_WEBHOOK_SECRET'),
-                                   string(credentialsId: 'buildtest-onramp-hot-wallet-address', variable: 'BUILDTEST_ONRAMP_HOT_WALLET_ADDRESS'),
-                                   usernamePassword(credentialsId: 'buildtest-bridge-admin', passwordVariable: 'BUILDTEST_BA_PASSWORD', usernameVariable: 'BUILDTEST_BA_USERNAME'),
-                                   ]) {
-                    writeFile file: "strato-run.sh", text: """#!/bin/bash
-                        NODE_HOST='buildtest.testnet.strato.nexus' \\
-                          network='helium' \\
-                          OAUTH_CLIENT_ID='$BUILDTEST_CLIENT_ID' \\
-                          OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
-                          RPC_URL_SEPOLIA='$BUILDTEST_RPC_URL_SEPOLIA' \\
-                          RPC_URL_SEPOLIA_FALLBACK='$BUILDTEST_RPC_URL_SEPOLIA_FALLBACK' \\
-                          STRIPE_SECRET_KEY='$BUILDTEST_STRIPE_SECRET_KEY' \\
-                          STRIPE_PUBLISHABLE_KEY='$BUILDTEST_STRIPE_PUBLISHABLE_KEY' \\
-                          STRIPE_WEBHOOK_SECRET='$BUILDTEST_STRIPE_WEBHOOK_SECRET' \\
-                          ONRAMP_HOT_WALLET_ADDRESS='$BUILDTEST_ONRAMP_HOT_WALLET_ADDRESS' \\
-                          BA_USERNAME='$BUILDTEST_BA_USERNAME' \\
-                          BA_PASSWORD='$BUILDTEST_BA_PASSWORD' \\
-                          ssl='true' \\
-                          ./strato
-                    """
-                    
-                    // Copy .pem and .key for SSL
-                    sh 'cp /home/ec2-user/cloudflare-ssl/server.pem ssl/certs/'
-                    sh 'cp /home/ec2-user/cloudflare-ssl/server.key ssl/private/'
-                    
-                    sh "sudo ./strato --pull"
-                    sh "sudo ./strato --wipe"
-                    sh "sudo ./strato-run.sh"
-                    script {
-                      lib.waitLocalNodeIsSynced()
-                    }
-                  }
-                }
-              }
-              post {
-                success {
-                  slackSend(
-                      channel: '#engineering',
-                      color: 'good',
-                      message: "buildtest.testnet.strato.nexus was redeployed from develop"
-                  )
-                }
-              }
-            }
-            */
-
           }
         }
         
@@ -255,6 +159,7 @@ pipeline {
           steps{
             script{
               lib.checkNodeStatusHealth()
+              lib.checkNodeIsGettingBlocks()
             }
           }
         }
