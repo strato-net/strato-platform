@@ -658,11 +658,20 @@ const lookupOraclePrice = (
  * Results are bucketed into intervals matching the spot price endpoint,
  * aggregated as a liquidity-weighted average, and forward-filled.
  */
+const stratoPriceCache = new Map<string, { data: PriceHistoryResponse; expiresAt: number }>();
+const STRATO_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export const getStratoPriceHistory = async (
   accessToken: string,
   assetAddress: string,
   rawParams: Record<string, string | undefined> = {}
 ): Promise<PriceHistoryResponse> => {
+  const cacheKey = `${assetAddress}:${rawParams.duration || '1m'}`;
+  const cached = stratoPriceCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
   try {
     const duration = rawParams.duration || '1m';
     const historyParams = getHistoryParams(duration, rawParams.end);
@@ -844,7 +853,9 @@ export const getStratoPriceHistory = async (
     });
 
     const filled = forwardFillPriceHistory(intervalPrices, assetAddress, intervalMs);
-    return { data: filled, totalCount: filled.length };
+    const result = { data: filled, totalCount: filled.length };
+    stratoPriceCache.set(cacheKey, { data: result, expiresAt: Date.now() + STRATO_CACHE_TTL_MS });
+    return result;
   } catch (error) {
     console.error("[getStratoPriceHistory] Error:", error);
     throw new Error("Failed to fetch STRATO price history");
