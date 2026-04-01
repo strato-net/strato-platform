@@ -6,6 +6,19 @@ pipeline {
     PATH = "~/.local/bin:${env.PATH}"
   }
   stages {
+    
+    stage('Prepare') {
+      steps {
+        sh '''#!/bin/bash -le
+          docker rm -f $(docker ps -aq) || true
+          docker system prune -f || true
+          docker volume prune -fa || true
+          # Clean up node data from previous builds
+          sudo rm -rf mynode || true
+        '''
+      }
+    }
+    
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
