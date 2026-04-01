@@ -1180,17 +1180,19 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               fundingMode === "metals" && contactEnabled ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
             }`}
           >
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/30 p-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-500/10 p-3">
               <div className="flex items-center gap-3 min-w-0">
-                <Gem className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-                <p className="text-xs text-amber-800 dark:text-amber-200">
+                <div className="bg-blue-500 rounded-full p-1 shrink-0">
+                  <Gem className="w-3 h-3 text-white" />
+                </div>
+                <p className="text-xs text-muted-foreground">
                   We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setContactModalOpen(true)}
-                className="inline-flex items-center gap-1 shrink-0 font-semibold text-xs text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 underline underline-offset-2"
+                className="inline-flex items-center gap-1 shrink-0 font-semibold text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 underline underline-offset-2"
               >
                 <Mail className="w-3 h-3" />
                 Contact us {"\u2192"}

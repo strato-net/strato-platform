@@ -288,15 +288,15 @@ const Dashboard = () => {
           {/* Physical Metals Deposit Banner (only when contact API is configured) */}
           {contactEnabled && (
             <div className="mb-8">
-              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl p-4 md:p-5">
+              <div className="bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-200 dark:border-blue-800 rounded-xl p-4 md:p-5 hover:bg-blue-500/15 transition-colors">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg shrink-0">
-                      <Gem className="text-amber-600 dark:text-amber-400" size={20} />
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-500 rounded-full p-1.5 shrink-0">
+                      <Gem className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-sm md:text-base font-semibold text-amber-900 dark:text-amber-100">Deposit Physical Gold & Silver</h3>
-                      <p className="text-xs md:text-sm text-amber-700 dark:text-amber-300 mt-0.5">
+                      <h3 className="text-sm md:text-base font-semibold text-foreground">Deposit Physical Gold & Silver</h3>
+                      <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
                         We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
                       </p>
                     </div>
@@ -304,7 +304,7 @@ const Dashboard = () => {
                   <Button
                     type="button"
                     onClick={() => setContactModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium"
+                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
                   >
                     <Mail size={16} />
                     Contact Us
