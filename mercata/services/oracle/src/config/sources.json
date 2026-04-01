@@ -89,15 +89,6 @@
       "WEETH": "coingecko:wrapped-eeth"
     }
   },
-  "Commodities-API": {
-    "enabled": false,
-    "url": "https://commodities-api.com/api/latest",
-    "params": "access_key,base=USD,symbols",
-    "parse": "data.rates.{symbol}",
-    "timestamp": "data.timestamp",
-    "apiKeyEnvVar": "COMMODITIES_API_KEY",
-    "assets": ["XAU", "XAG"]
-  },
   "CommodityPriceAPI": {
     "url": "https://api.commoditypriceapi.com/v2/rates/latest",
     "params": "symbols",

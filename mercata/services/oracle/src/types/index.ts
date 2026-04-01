@@ -26,7 +26,6 @@ export interface BatchPriceResult {
 }
 
 export interface SourceConfig {
-    enabled?: boolean; // Set to false to skip this source (default: true)
     url?: string; // Optional for constant source
     method?: string;
     params?: string; // Comma-separated URL parameters

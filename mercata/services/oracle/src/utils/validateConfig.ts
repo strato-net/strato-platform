@@ -14,7 +14,6 @@ dotenv.config();
 function getSourcesForSymbol(symbol: string): string[] {
     return Object.entries(sourcesConfig)
         .filter(([_, config]: [string, any]) => {
-            if (config.enabled === false) return false;
             return config.assets?.includes(symbol) || config.symbolMapping?.[symbol];
         })
         .map(([name]) => name);
@@ -101,7 +100,6 @@ export async function validateConfig(): Promise<boolean> {
     
     sourceNames.forEach(sourceName => {
         const source = sourcesConfig[sourceName];
-        if (source.enabled === false) return;
         const sourcePrefix = `   Source ${sourceName}:`;
         
         // Each source must have an assets array
@@ -214,8 +212,7 @@ export async function validateConfig(): Promise<boolean> {
     const proxyOnlyAssets = assetKeys.filter(k => assetsConfig.assets[k].submit === false);
     const submitCount = assetKeys.length - proxyOnlyAssets.length;
     
-    const enabledSourceCount = sourceNames.filter(n => sourcesConfig[n].enabled !== false).length;
-    let summary = `Configuration valid. ${submitCount}/${assetKeys.length} assets to submit, ${enabledSourceCount} sources.`;
+    let summary = `Configuration valid. ${submitCount}/${assetKeys.length} assets to submit, ${sourceNames.length} sources.`;
     if (proxyOnlyAssets.length > 0) {
         summary += ` Proxy-only: [${proxyOnlyAssets.join(', ')}]`;
     }
