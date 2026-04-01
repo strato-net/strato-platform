@@ -90,7 +90,6 @@ packages:
 - VM/SolidVM/solid-vm-parser
 - VM/SolidVM/solid-vm-static-analysis
 - VM/SolidVM/source-tools
-#- VM/vrun
 
 
 extra-deps:
@@ -133,7 +132,7 @@ nix:
 
 notify-if-nix-on-path: false
 
-resolver: lts-23.14 #also duplicated in docker section below
+resolver: lts-23.14
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -155,11 +154,3 @@ ghc-options:
 # Break up large modules into smaller ones
 # Refactor your code to reduce the number of data constructors, type class constraints, or case expressions
 # Use the -ddump-simpl-stats flag to see detailed counts of the simplifier's work, which can help you identify the specific parts of your code that are causing the problem.
-
-
-docker:
-  enable: false
-  image: "strato-buildbase:lts-23.14"
-  set-user: true
-  run-args: ["--ulimit=nofile=60000"]
-  # stack-exe: image  # uncomment when building on arm-based Linux, if getting 'exec /opt/host/bin/stack: exec format error'

@@ -35,7 +35,6 @@ export async function initOpenIdConfig() {
 export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
 export const nodeUrl = process.env.NODE_URL;
-export const baseUrl = process.env.BASE_URL || "http://localhost";
 
 // Smart contract addresses
 export const burnAddress = process.env.BURN_ADDRESS || "0000000000000000000000000000000000000000";
@@ -53,7 +52,6 @@ export const cdpRegistry = process.env.CDP_REGISTRY || "000000000000000000000000
 
 export const safetyModule = process.env.SAFETY_MODULE || "0000000000000000000000000000000000001015";
 export const sToken = process.env.SUSDST_ADDRESS || "0000000000000000000000000000000000001016";
-export const saveUsdstVault = process.env.SAVE_USDST_VAULT || "ceeb982f671b4ee2b4471e5b49f3126739537f15";
 export const featuredEarnOpportunity = process.env.FEATURED_EARN_OPPORTUNITY || "save-usdst";
 
 // Hidden swap pools - these pools are filtered out from API responses
@@ -61,6 +59,14 @@ export const hiddenSwapPools: Set<string> = new Set([
   "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user
 ]);
 
+// Yield-bearing tokens benchmarked against a base asset for ratio-growth APY.
+// Verified on both https://app.strato.nexus and https://node1.testnet.strato.nexus (2026-03-26).
+export const yieldBenchmarks = [
+  { tokenSymbol: "wstETH", baseSymbol: "ETH", tokenAddress: "f2aa370405030a434ae07e7826178325c675e925", baseAddress: "93fb7295859b2d70199e0a4883b7c320cf874e6c" },
+  { tokenSymbol: "rETH", baseSymbol: "ETH", tokenAddress: "2e4789eb7db143576da25990a3c0298917a8a87d", baseAddress: "93fb7295859b2d70199e0a4883b7c320cf874e6c" },
+  { tokenSymbol: "sUSDS", baseSymbol: "USDST", tokenAddress: "6e2d93d323edf1b3cc4672a909681b6a430cae64", baseAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010" },
+  { tokenSymbol: "syrupUSDC", baseSymbol: "USDC", tokenAddress: "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca", baseAddress: "6aeacaa19c68e53035bf495d15e0a328fc600ba8" },
+];
 
 /*
    Network-specific defaults;
@@ -103,6 +109,11 @@ export const defaultVaultFor: Record<string, string> = {
   "33056204878082667": "34bc729f66106a146b0864e673a3571b28fa23e1", // Upquark mainnet
 };
 
+export const defaultSaveUsdstVaultFor: Record<string, string> = {
+  "114784819836269": "ceeb982f671b4ee2b4471e5b49f3126739537f15", // Helium testnet
+  "33056204878082667": "22550671fcad04a213697ac7ae4f4366e96446ed", // Upquark mainnet
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
@@ -112,6 +123,7 @@ export let vaultFactory: string = '';
 export let metalForge: string = '';
 export let creditCardTopUp: string = '';
 export let vault: string = '';
+export let saveUsdstVault: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -166,6 +178,22 @@ export function setCreditCardTopUpConfig(networkId: string) {
   }
 }
 
+export function setSaveUsdstVaultConfig(networkId: string) {
+  if (process.env.SAVE_USDST_VAULT) {
+    saveUsdstVault = process.env.SAVE_USDST_VAULT;
+  } else {
+    saveUsdstVault = defaultSaveUsdstVaultFor[networkId];
+  }
+}
+
+export function setVaultConfig(networkId: string) {
+  if (process.env.VAULT) {
+    vault = process.env.VAULT;
+  } else {
+    vault = defaultVaultFor[networkId];
+  }
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -181,7 +209,8 @@ export async function initNetworkConfig() {
   setVaultFactoryConfig(networkId);
   setMetalForgeConfig(networkId);
   setCreditCardTopUpConfig(networkId);
-  vault = process.env.VAULT || defaultVaultFor[networkId] || '';
+  setSaveUsdstVaultConfig(networkId);
+  setVaultConfig(networkId);
 }
 
 /**

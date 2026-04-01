@@ -234,7 +234,7 @@ instance ToSchema Address where
         (Just "Address")
         ( mempty
             & type_ ?~ OpenApiString
-            & example ?~ "address=deadbeef" --toJSON (Address 0xdeadbeef) -- FIXME if causing troubles outside /faucet
+            & example ?~ "address=deadbeef"
             & description ?~ "Ethereum Address, 20 byte hex encoded string"
         )
 

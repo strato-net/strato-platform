@@ -18,6 +18,7 @@ executable ethereum-jsonrpc
       Commands
       RPC
       Server
+      TransactionReceipt
       Paths_ethereum_jsonrpc
   hs-source-dirs:
       src
@@ -34,6 +35,8 @@ executable ethereum-jsonrpc
     , case-insensitive
     , containers
     , core-api2
+    , ethereum-rlp
+    , format
     , http-client
     , http-types
     , json-rpc-server

@@ -81,12 +81,16 @@ RawTransaction
     args [Text]
     network Text
     code Code Maybe
+    chainId Integer Maybe sqltype=numeric(1000,0)
     r Integer
     s Integer
     v Word8
     blockNumber Int
     txHash Keccak256
     origin TXOrigin
+    gasPrice Integer Maybe sqltype=numeric(1000,0)
+    value Integer Maybe sqltype=numeric(1000,0)
+    txData BS.ByteString Maybe
     UniqueTXHash txHash
     deriving Eq Generic Read Show
 

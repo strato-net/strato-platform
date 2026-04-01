@@ -11,15 +11,26 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Bloc.API.Transaction where
+module Bloc.API.Transaction (
+    PostBlocTransactionParallel,
+    PostBlocTransactionBody,
+    PostBlocTransactionUnsigned,
+    PostBlocTransaction,
+    PostBlocTransactionParallelExternal,
+    PostBlocTransactionRequest(..),
+    BlocTransactionPayload(..),
+    BlocTransactionType(..),
+    FunctionPayload(..),
+    ContractPayload(..),
+    TransferPayload(..),
+    transactionType
+    ) where
 
 import Bloc.API.SwaggerSchema
 import Bloc.API.Users
 import Bloc.API.Utils
 import BlockApps.Solidity.ArgValue
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
@@ -32,7 +43,6 @@ import qualified Data.Map as Map
 import Data.Maybe
 import Data.Source.Map
 import Data.Text (Text)
-import Data.Word
 import GHC.Generics
 import qualified Generic.Random as GR
 import Servant.API as S
@@ -96,68 +106,6 @@ type PostBlocTransactionUnsigned =
     :> "unsigned" -- /transaction/unsigned
     :> ReqBody '[JSON] PostBlocTransactionRequest -- SolidVM transaction
     :> Post '[JSON] [BlocTransactionUnsignedResult]
-
-data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
-  { postbloctransactionrawrequestAddress :: Address,
-    postbloctransactionrawrequestNonce :: Nonce,
-    postbloctransactionrawrequestGasPrice :: Wei,
-    postbloctransactionrawrequestGasLimit :: Gas,
-    postbloctransactionrawrequestTo :: Maybe Address,
-    postbloctransactionrawrequestValue :: Wei,
-    postbloctransactionrawrequestInitOrData :: Code,
-    postbloctransactionrawrequestR :: Word256,
-    postbloctransactionrawrequestS :: Word256,
-    postbloctransactionrawrequestV :: Maybe Word8, -- we can infer from Address if necessary
-    postbloctransactionrawrequestMetadata :: Maybe (Map Text Text)
-  }
-  deriving (Eq, Show, Generic)
-
-instance Arbitrary PostBlocTransactionRawRequest where
-  arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToJSON PostBlocTransactionRawRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON PostBlocTransactionRawRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToSample PostBlocTransactionRawRequest where
-  toSamples _ =
-    singleSample $
-      PostBlocTransactionRawRequest
-        (Address 0x12345678)
-        (Nonce 42)
-        (Wei 1)
-        (Gas 2190000)
-        Nothing
-        (Wei 4)
-        (Code "contract test{}")
-        (21 :: Word256)
-        (42 :: Word256)
-        Nothing
-        Nothing
-
-instance ToSchema PostBlocTransactionRawRequest where
-  declareNamedSchema proxy =
-    genericDeclareNamedSchema blocSchemaOptions proxy
-      & mapped . name ?~ "PostBlocTransactionRawRequest"
-      & mapped . schema . description ?~ "Post Bloc Transaction Raw Request"
-      & mapped . schema . example ?~ toJSON ex
-    where
-      ex :: PostBlocTransactionRawRequest
-      ex =
-        PostBlocTransactionRawRequest
-          (Address 0x12345678)
-          (Nonce 42)
-          (Wei 1)
-          (Gas 2190000)
-          Nothing
-          (Wei 4)
-          (Code "contract test{}")
-          (21 :: Word256)
-          (42 :: Word256)
-          Nothing
-          Nothing
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress :: Maybe Address,
@@ -365,7 +313,3 @@ instance ToSchema FunctionPayload where
             functionpayloadTxParams = Nothing,
             functionpayloadMetadata = Nothing
           }
-
-instance ToParam (QueryFlag "hash") where
-  toParam _ =
-    DocQueryParam "hash" ["true", "false", ""] "flag for generating a tx hash without posting it to the network" Flag

@@ -34,7 +34,6 @@ import System.Environment
 data Options = Options
   { optValidators :: [Validator],
     optAdmins :: [Address],
-    optFaucets :: [Address],
     optInput :: GenesisInfo,
     optOutputName :: String
   }
@@ -45,7 +44,6 @@ defaultOptions =
   Options
     { optValidators = [],
       optAdmins = [],
-      optFaucets = [],
       optInput = error "Uninitialized input genesis info",
       optOutputName = "outputGenesisBlock.json"
     }
@@ -80,20 +78,6 @@ options =
       )
       "The .json filepath containing admin information. Must be a valid array of JSON object with \
       \ commonName, org, and orgUnit fields",
-    Option
-      ['f']
-      ["faucets"]
-      ( ReqArg
-          ( \s opts -> do
-              faucetsStr <- readFile s
-              let eFaucets = Ae.eitherDecodeStrict (C8.pack faucetsStr) :: Either String [Address]
-                  !faucets = either error id eFaucets
-              return opts {optFaucets = faucets}
-          )
-          "Faucets"
-      )
-      "The .json filepath containing faucet account information. Must be a valid array of JSON strings containing \
-      \ 40 ASCII hex characters",
     Option
       ['i']
       ["input"]
@@ -136,7 +120,7 @@ main = do
   --------------------------------- GENERATE GENESIS INFO ------------------------------------
   --------------------------------------------------------------------------------------------
 
-  let gi' = buildGenesisInfo optFaucets optValidators optAdmins def
+  let gi' = buildGenesisInfo optValidators optAdmins def
 
   -- Compute the correct stateRoot by populating the MPT in a temp directory
   -- (avoids locking conflicts with running strato processes)

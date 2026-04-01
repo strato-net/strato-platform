@@ -20,11 +20,12 @@ import Blockchain.VM.VMException
 import Control.DeepSeq
 import qualified Data.Set as S
 import GHC.Generics
+import SolidVM.Model.Value (Value)
 
 data ExecResults = ExecResults
   { erRemainingTxGas :: Integer,
     erRefund :: Integer,
-    erReturnVal :: Maybe String,
+    erReturnVal :: Maybe Value,
     erTrace :: [String],
     erLogs :: [Log],
     erEvents :: [Event],
@@ -42,7 +43,7 @@ instance NFData ExecResults
 
 calculateReturned :: Transaction -> ExecResults -> Integer
 calculateReturned t er =
-  let realRefund = min (erRefund er) ((transactionGasLimit t - erRemainingTxGas er) `div` 2)
+  let realRefund = min (erRefund er) ((gasLimit t - erRemainingTxGas er) `div` 2)
    in realRefund + erRemainingTxGas er
 
 evmErrorResults :: Integer -> VMException -> ExecResults

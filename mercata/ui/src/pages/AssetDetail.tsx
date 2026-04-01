@@ -411,13 +411,12 @@ const AssetDetail = () => {
 
                     {(() => {
                       const ea = earningAssets.find(e => e.address === asset?.address);
-                      if (!ea?.rebaseFactor) return null;
+                      if (!ea?.rebaseFactor || !ea?.rebasingExternalSymbol) return null;
                       const totalBalance = BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0");
                       const equivalent = (totalBalance * BigInt(ea.rebaseFactor)) / (10n ** 18n);
-                      const symbol = (asset?.token?._symbol || asset?._symbol || "").replace(/^w/, "");
                       return (
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Equivalent {symbol}:</span>
+                          <span className="text-muted-foreground">Equivalent {ea.rebasingExternalSymbol}:</span>
                           <span className="font-medium">{formatUnits(equivalent, 18)}</span>
                         </div>
                       );

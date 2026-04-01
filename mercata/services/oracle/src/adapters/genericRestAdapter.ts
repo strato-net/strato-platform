@@ -301,10 +301,10 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
 
 /**
  * Fetch a rebase factor from an external source (e.g., Ethereum eth_call via Alchemy).
- * Uses bigint internally for precise uint256 handling, returns number for pipeline compat.
- * Result is the raw factor value (NOT scaled to 18 decimals); caller divides by factorPrecision.
+ * Returns the raw factor as bigint to preserve full uint256 precision.
+ * Caller is responsible for normalizing to WAD (1e18) before pushing on-chain.
  */
-export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig): Promise<number> {
+export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig): Promise<bigint> {
     let url = rebase.factorUrl;
     const stratoUrl = process.env.STRATO_NODE_URL || '';
     url = url.replace(/\$\{STRATO_NODE_URL\}/g, stratoUrl);
@@ -340,7 +340,7 @@ export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig):
     const raw = extractNestedProperty(response.data, rebase.factorParse);
     if (raw === undefined || raw === null) {
         logError('RebaseFactor', new Error(`${assetKey}: no value at path "${rebase.factorParse}"`));
-        return 0;
+        return 0n;
     }
 
     let rawStr = String(raw).trim();
@@ -351,19 +351,17 @@ export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig):
         rawStr = rawStr.slice(0, 66);
     }
 
-    let factor: number;
-    if (rawStr.startsWith('0x')) {
-        factor = Number(BigInt(rawStr));
-    } else if (/^\d+$/.test(rawStr)) {
-        factor = Number(rawStr);
-    } else {
+    let factor: bigint;
+    try {
+        factor = rawStr.startsWith('0x') ? BigInt(rawStr) : BigInt(rawStr);
+    } catch {
         logError('RebaseFactor', new Error(`${assetKey}: invalid factor value "${rawStr}"`));
-        return 0;
+        return 0n;
     }
 
-    if (!isFinite(factor) || factor <= 0) {
+    if (factor <= 0n) {
         logError('RebaseFactor', new Error(`${assetKey}: invalid factor value "${rawStr}"`));
-        return 0;
+        return 0n;
     }
 
     logInfo('RebaseFactor', `${assetKey}: factor=${factor} (parse="${rebase.factorParse}")`);
