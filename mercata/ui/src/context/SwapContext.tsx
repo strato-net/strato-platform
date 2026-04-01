@@ -146,6 +146,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       // Pick the one with the highest liquidity
       const multiPool = pools
         .filter(p =>
+          !p.isDisabled &&
           p.coins && p.coins.length > 2 &&
           p.coins.some(c => c.address === tokenA && BigInt(c.poolBalance || "0") > 0n) &&
           p.coins.some(c => c.address === tokenB && BigInt(c.poolBalance || "0") > 0n)

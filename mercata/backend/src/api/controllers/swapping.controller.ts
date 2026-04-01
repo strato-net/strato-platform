@@ -247,8 +247,9 @@ class SwappingController {
         tokenB: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
       });
 
-      // Filter to only pools where both requested tokens have pool balance > 0
+      // Filter to only enabled pools where both requested tokens have pool balance > 0
       const filteredPools = pools.filter(pool => {
+        if (pool.isDisabled) return false;
         // Multi-token pool: check coins array
         if (pool.coins && pool.coins.length > 2) {
           const coin1 = pool.coins.find((c: any) => c.address.toLowerCase() === addr1);
