@@ -10,11 +10,14 @@ import { Button } from "@/components/ui/button";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidityDepositModal from "@/components/dashboard/LiquidityDepositModal";
 import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModal";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { useSwapContext } from "@/context/SwapContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
+import { findPoolEarnApyInfo } from "@/utils/earnUtils";
 
 const WAD = BigInt("1000000000000000000");
 
@@ -89,6 +92,7 @@ const EarnPools = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { getPoolByAddress } = useSwapContext();
+  const { tokenApys } = useEarnContext();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { isLoggedIn } = useUser();
 
@@ -139,6 +143,11 @@ const EarnPools = () => {
 
   const highlightedPoolData = selectedPoolData;
   const pageLoading = poolDetailsLoading;
+  const highlightedPoolApyInfo = useMemo(
+    () => (highlightedPoolData ? findPoolEarnApyInfo(tokenApys, highlightedPoolData.address) : null),
+    [highlightedPoolData, tokenApys]
+  );
+  const displayedHighlightedPoolApy = highlightedPoolApyInfo?.total.toFixed(2);
 
   const handlePoolDeposit = (pool: Pool) => {
     if (!isLoggedIn) return;
@@ -197,9 +206,11 @@ const EarnPools = () => {
                 <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                     <p className="text-[11px] text-muted-foreground">Pool APY</p>
-                    <p className="text-sm font-semibold">
-                      {pageLoading ? "Loading..." : highlightedPoolData ? formatPct(highlightedPoolData.apy) : "N/A"}
-                    </p>
+                    <EarnApyTooltip info={highlightedPoolApyInfo}>
+                      <p className="text-sm font-semibold cursor-default">
+                        {pageLoading ? "Loading..." : displayedHighlightedPoolApy ? formatPct(displayedHighlightedPoolApy) : "N/A"}
+                      </p>
+                    </EarnApyTooltip>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
                     <p className="text-[11px] text-muted-foreground">TVL</p>
@@ -326,9 +337,11 @@ const EarnPools = () => {
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">Pool APY</p>
-                        <p className="text-sm font-semibold">
-                          {pageLoading ? "Loading..." : formatPct(highlightedPoolData?.apy)}
-                        </p>
+                        <EarnApyTooltip info={highlightedPoolApyInfo}>
+                          <p className="text-sm font-semibold cursor-default">
+                            {pageLoading ? "Loading..." : formatPct(displayedHighlightedPoolApy)}
+                          </p>
+                        </EarnApyTooltip>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
                         <p className="text-xs text-muted-foreground">A to B Ratio</p>

@@ -23,6 +23,7 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useToast } from "@/hooks/use-toast";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
@@ -35,6 +36,8 @@ import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { CircleArrowDown, PiggyBank, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import stratoVaultLogo from "@/assets/strato-vault-logo.png";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { EarnApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo, roundRewardsApy } from "@/utils/earnUtils";
 import {
   mUsdstAddress,
   LENDING_DEPOSIT_FEE,
@@ -230,6 +233,7 @@ const Earn = () => {
   const { liquidityInfo, loadingLiquidity, refreshLiquidity, depositLiquidity } = useLendingContext();
   const { saveUsdstInfo } = useSaveUsdstContext();
   const { earningAssets, usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
   const { activities: rewardsActivities } = useRewardsActivities();
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
@@ -418,6 +422,36 @@ const Earn = () => {
     return saveUsdstRewardsActivity?.totalStakeUsd || "0";
   }, [saveUsdstInfo, saveUsdstRewardsActivity]);
 
+  const saveUsdstApyInfo = useMemo<EarnApyInfo | null>(() => {
+    const native = parseApy(saveUsdstNativeApy);
+    const total = Number.isFinite(saveUsdstEstimatedApy) && saveUsdstEstimatedApy > 0 ? saveUsdstEstimatedApy : null;
+    if (!total) return null;
+
+    const breakdown = [];
+    if (Number.isFinite(native) && native > 0) {
+      breakdown.push({ label: "Native APY", apy: native.toFixed(2) });
+    }
+    const rewards = Math.max(total - (Number.isFinite(native) && native > 0 ? native : 0), 0);
+    const roundedRewards = roundRewardsApy(rewards);
+    if (roundedRewards) {
+      breakdown.push({ label: "Rewards APY", apy: roundedRewards });
+    }
+    if (breakdown.length === 0) return null;
+    const roundedTotal = breakdown.reduce((sum, item) => sum + Number(item.apy || 0), 0);
+    return { total: roundedTotal, source: "base", breakdown };
+  }, [saveUsdstEstimatedApy, saveUsdstNativeApy]);
+
+  const vaultEarnApyInfo = useMemo(() => findVaultEarnApyInfo(tokenApys), [tokenApys]);
+  const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
+  const getPoolEarnApyInfo = (pool: Pool) => findPoolEarnApyInfo(tokenApys, pool.address);
+  const getPoolDisplayApy = (pool: Pool) => {
+    const info = getPoolEarnApyInfo(pool);
+    return info ? info.total.toFixed(2) : undefined;
+  };
+  const saveUsdstDisplayApyRaw = saveUsdstApyInfo
+    ? saveUsdstApyInfo.total.toFixed(2)
+    : (Number.isFinite(saveUsdstEstimatedApy) && saveUsdstEstimatedApy > 0 ? saveUsdstEstimatedApy.toFixed(2) : undefined);
+
   const getOpportunityTvl = (opportunity: OpportunityRow): bigint => {
     if (opportunity.kind === "saveUsdst") return safeBigInt(saveUsdstTvl);
     if (opportunity.kind === "vault") return safeBigInt(vaultState.totalEquity);
@@ -485,33 +519,37 @@ const Earn = () => {
     return `$${formatUsd(depositedUsd.toString())}`;
   };
 
+  const vaultDisplayApyRaw = tokenApysLoaded
+    ? (vaultEarnApyInfo ? vaultEarnApyInfo.total.toFixed(2) : vaultState.alpha)
+    : vaultState.alpha;
+
   const allOpportunities = useMemo<OpportunityRow[]>(() => {
     const rows: OpportunityRow[] = [];
 
     if (activeFilter === "all" || activeFilter === "vaults") {
-      rows.push({ kind: "saveUsdst", apySortValue: saveUsdstEstimatedApy });
-      rows.push({ kind: "vault", apySortValue: parseApy(vaultState.alpha) });
+      rows.push({ kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) });
+      rows.push({ kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) });
     }
 
     if (activeFilter === "all" || activeFilter === "pools") {
       rows.push({ kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) });
       for (const pool of sortedPools) {
-        rows.push({ kind: "pool", apySortValue: parseApy(pool.apy), pool });
+        rows.push({ kind: "pool", apySortValue: parseApy(getPoolDisplayApy(pool)), pool });
       }
     }
 
     return rows.sort(compareOpportunities);
-  }, [activeFilter, liquidityInfo?.supplyAPY, saveUsdstEstimatedApy, saveUsdstTvl, sortedPools, vaultState.alpha, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied]);
+  }, [activeFilter, liquidityInfo?.supplyAPY, saveUsdstEstimatedApy, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied]);
 
-  const vaultAlpha = formatApyDisplay(vaultState.alpha);
+  const vaultAlpha = formatApyDisplay(vaultDisplayApyRaw);
   const rankedTopCandidates = useMemo<OpportunityRow[]>(() => {
     const candidates: OpportunityRow[] = [
-      { kind: "saveUsdst", apySortValue: saveUsdstEstimatedApy },
-      { kind: "vault", apySortValue: parseApy(vaultState.alpha) },
+      { kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) },
+      { kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) },
       { kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) },
       ...sortedPools.map((pool) => ({
         kind: "pool" as const,
-        apySortValue: parseApy(pool.apy),
+        apySortValue: parseApy(getPoolDisplayApy(pool)),
         pool,
       })),
     ];
@@ -519,7 +557,7 @@ const Earn = () => {
     return rankedCandidates.filter(isEligibleForTopOpportunity).length > 0
       ? rankedCandidates.filter(isEligibleForTopOpportunity)
       : rankedCandidates;
-  }, [liquidityInfo?.supplyAPY, liquidityInfo?.totalUSDSTSupplied, saveUsdstEstimatedApy, saveUsdstTvl, sortedPools, vaultState.alpha, vaultState.totalEquity]);
+  }, [liquidityInfo?.supplyAPY, liquidityInfo?.totalUSDSTSupplied, saveUsdstEstimatedApy, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity]);
 
   const rewardActivityByContract = useMemo(() => {
     const map = new Map<string, { emissionRate: bigint }>();
@@ -581,7 +619,7 @@ const Earn = () => {
       return {
         title: "Savings Vault",
         subtitle: "Stable USD savings with yield plus rewards",
-        apyRaw: saveUsdstEstimatedApy,
+        apyRaw: saveUsdstDisplayApyRaw,
         tvl: saveUsdstTvl,
         badge: "Savings Vault",
         rateLabel: "APY",
@@ -595,7 +633,7 @@ const Earn = () => {
       return {
         title: "Diversified Vault",
         subtitle: "Diversified real assets: gold, silver, ETH, BTC, stables - actively managed",
-        apyRaw: vaultState.alpha,
+        apyRaw: vaultDisplayApyRaw,
         tvl: vaultState.totalEquity,
         badge: "Diversified Vault",
         rateLabel: "APY",
@@ -623,7 +661,7 @@ const Earn = () => {
     return {
       title: pool.poolName,
       subtitle: `Earn fees on ${pool.poolName.replace(" Pool", "")} swaps`,
-      apyRaw: pool.apy,
+      apyRaw: getPoolDisplayApy(pool),
       tvl: pool.totalLiquidityUSD,
       badge: "Pool",
       rateLabel: "APY",
@@ -633,17 +671,23 @@ const Earn = () => {
       pool,
     };
   };
+  const getOpportunityApyInfo = (opportunity: OpportunityRow): EarnApyInfo | null => {
+    if (opportunity.kind === "saveUsdst") return saveUsdstApyInfo;
+    if (opportunity.kind === "vault") return vaultEarnApyInfo;
+    if (opportunity.kind === "lending") return lendingEarnApyInfo;
+    return getPoolEarnApyInfo(opportunity.pool);
+  };
 
   const configuredFeaturedOpportunity = useMemo<OpportunityRow | null>(() => {
     const key = featuredOpportunityKey.trim().toLowerCase();
     if (!key) return null;
 
     if (key === "save-usdst" || key === "saveusdst") {
-      return { kind: "saveUsdst", apySortValue: saveUsdstEstimatedApy };
+      return { kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) };
     }
 
     if (key === "vault") {
-      return { kind: "vault", apySortValue: parseApy(vaultState.alpha) };
+      return { kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) };
     }
 
     if (key === "lending") {
@@ -654,7 +698,7 @@ const Earn = () => {
       const targetAddress = normalizeAddress(key.slice(5));
       const pool = sortedPools.find((candidate) => normalizeAddress(candidate.address) === targetAddress);
       if (pool) {
-        return { kind: "pool", apySortValue: parseApy(pool.apy), pool };
+        return { kind: "pool", apySortValue: parseApy(getPoolDisplayApy(pool)), pool };
       }
     }
 
@@ -663,8 +707,11 @@ const Earn = () => {
     featuredOpportunityKey,
     liquidityInfo?.supplyAPY,
     saveUsdstEstimatedApy,
+    saveUsdstDisplayApyRaw,
     sortedPools,
-    vaultState.alpha,
+    tokenApys,
+    tokenApysLoaded,
+    vaultDisplayApyRaw,
   ]);
 
   const topOpportunity = useMemo<OpportunityRow>(() => {
@@ -683,20 +730,28 @@ const Earn = () => {
     );
   }, [configuredFeaturedOpportunity, rankedTopCandidates]);
 
-  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, saveUsdstEstimatedApy, saveUsdstTvl, vaultState.alpha, vaultState.totalEquity, liquidityInfo?.supplyAPY, liquidityInfo?.totalUSDSTSupplied, navigate]);
+  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, saveUsdstEstimatedApy, saveUsdstDisplayApyRaw, saveUsdstTvl, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.supplyAPY, liquidityInfo?.totalUSDSTSupplied, navigate]);
+  const topOpportunityApyInfo = useMemo(() => getOpportunityApyInfo(topOpportunity), [topOpportunity, saveUsdstApyInfo, vaultEarnApyInfo, lendingEarnApyInfo, tokenApys]);
   const topOpportunityApy = formatApyDisplay(topOpportunityMeta.apyRaw);
   const featuredOpportunityMeta = useMemo(
     () => (configuredFeaturedOpportunity ? getOpportunityMeta(configuredFeaturedOpportunity) : null),
     [
       configuredFeaturedOpportunity,
       saveUsdstEstimatedApy,
+      saveUsdstDisplayApyRaw,
       saveUsdstTvl,
-      vaultState.alpha,
+      tokenApys,
+      tokenApysLoaded,
+      vaultDisplayApyRaw,
       vaultState.totalEquity,
       liquidityInfo?.supplyAPY,
       liquidityInfo?.totalUSDSTSupplied,
       navigate,
     ]
+  );
+  const featuredOpportunityApyInfo = useMemo(
+    () => (configuredFeaturedOpportunity ? getOpportunityApyInfo(configuredFeaturedOpportunity) : null),
+    [configuredFeaturedOpportunity, saveUsdstApyInfo, vaultEarnApyInfo, lendingEarnApyInfo, tokenApys]
   );
   const featuredOpportunityApy = formatApyDisplay(featuredOpportunityMeta?.apyRaw);
 
@@ -810,9 +865,11 @@ const Earn = () => {
                           <p className="text-xs md:text-sm uppercase tracking-wide text-muted-foreground">
                             {featuredOpportunityMeta.rateLabel}
                           </p>
-                          <p className={`text-2xl md:text-[32px] leading-none font-semibold ${featuredOpportunityApy.className}`}>
-                            {featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
-                          </p>
+                          <EarnApyTooltip info={featuredOpportunityApyInfo}>
+                            <p className={`text-2xl md:text-[32px] leading-none font-semibold ${featuredOpportunityApy.className} cursor-default`}>
+                              {featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
+                            </p>
+                          </EarnApyTooltip>
                           <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
                             TVL ${formatUsd(featuredOpportunityMeta.tvl)}
                           </p>
@@ -891,9 +948,11 @@ const Earn = () => {
                         <p className="text-xs md:text-sm uppercase tracking-wide text-muted-foreground">
                           {topOpportunityMeta.rateLabel}
                         </p>
-                      <p className={`text-2xl md:text-[32px] leading-none font-semibold ${topOpportunityApy.className}`}>
-                          {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
-                        </p>
+                      <EarnApyTooltip info={topOpportunityApyInfo}>
+                        <p className={`text-2xl md:text-[32px] leading-none font-semibold ${topOpportunityApy.className} cursor-default`}>
+                            {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
+                          </p>
+                      </EarnApyTooltip>
                       <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
                           TVL ${formatUsd(topOpportunityMeta.tvl)}
                         </p>
@@ -987,7 +1046,7 @@ const Earn = () => {
                     <tbody>
                       {allOpportunities.map((opportunity) => {
                         if (opportunity.kind === "saveUsdst") {
-                          const saveUsdstApyDisplay = formatApyDisplay(saveUsdstEstimatedApy);
+                          const saveUsdstApyDisplay = formatApyDisplay(saveUsdstDisplayApyRaw);
                           return (
                             <tr
                               key="save-usdst"
@@ -1012,9 +1071,11 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${saveUsdstApyDisplay.className}`}>
-                                  {saveUsdstApyDisplay.label}
-                                </p>
+                                <EarnApyTooltip info={saveUsdstApyInfo}>
+                                  <p className={`text-sm font-semibold ${saveUsdstApyDisplay.className} cursor-default`}>
+                                    {saveUsdstApyDisplay.label}
+                                  </p>
+                                </EarnApyTooltip>
                                 <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">
@@ -1090,9 +1151,11 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${vaultAlpha.className}`}>
-                                  {vaultAlpha.label}
-                                </p>
+                                <EarnApyTooltip info={vaultEarnApyInfo}>
+                                  <p className={`text-sm font-semibold ${vaultAlpha.className} cursor-default`}>
+                                    {vaultAlpha.label}
+                                  </p>
+                                </EarnApyTooltip>
                                 <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">
@@ -1167,9 +1230,11 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {formatApyDisplay(liquidityInfo?.supplyAPY).label}
-                                </p>
+                                <EarnApyTooltip info={lendingEarnApyInfo}>
+                                  <p className="text-sm font-semibold cursor-default">
+                                    {formatApyDisplay(liquidityInfo?.supplyAPY).label}
+                                  </p>
+                                </EarnApyTooltip>
                                 <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">
@@ -1225,6 +1290,7 @@ const Earn = () => {
 
                         const { pool } = opportunity;
                         const poolRewardMeta = getRewardMeta(pool.lpToken?.address);
+                        const poolApyInfo = getPoolEarnApyInfo(pool);
                         return (
                           <Fragment key={pool.address}>
                             <tr
@@ -1247,9 +1313,11 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {formatApyDisplay(pool.apy).label}
-                                </p>
+                                <EarnApyTooltip info={poolApyInfo}>
+                                  <p className="text-sm font-semibold cursor-default">
+                                    {formatApyDisplay(getPoolDisplayApy(pool)).label}
+                                  </p>
+                                </EarnApyTooltip>
                                 <p className="text-xs text-muted-foreground">APY</p>
                               </td>
                               <td className="px-4 py-3">

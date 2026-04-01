@@ -9,6 +9,7 @@ import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import {
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
+import { EarnApyInfo, roundRewardsApy } from "@/utils/earnUtils";
 
 const CATA_PRICE_USD = 0.25;
 
@@ -56,13 +58,6 @@ const formatExchangeRate = (exchangeRate: string): string => {
   }
 };
 
-const formatPercent = (value: string): string => {
-  if (!value || value === "-") return "-";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return "-";
-  return `${num.toFixed(2)}%`;
-};
-
 const formatUsdAmount = (value: string): string => {
   try {
     const num = Number(formatUnits(value || "0", 18));
@@ -76,6 +71,33 @@ const formatUsdAmount = (value: string): string => {
   } catch {
     return "$0.00";
   }
+};
+
+const formatApyDisplay = (value: string | number | undefined): { label: string; className: string } => {
+  if (!value || value === "-") {
+    return { label: "--", className: "text-foreground" };
+  }
+
+  const apy = Number(value);
+  if (!Number.isFinite(apy)) {
+    return { label: "--", className: "text-foreground" };
+  }
+
+  if (apy > 0) {
+    return {
+      label: `+${apy.toFixed(2)}%`,
+      className: "text-foreground",
+    };
+  }
+
+  if (apy < 0) {
+    return {
+      label: `${apy.toFixed(2)}%`,
+      className: "text-destructive",
+    };
+  }
+
+  return { label: "0.00%", className: "text-foreground" };
 };
 
 type ActionMode = "deposit" | "redeem" | null;
@@ -106,7 +128,8 @@ const getEstimatedIncentiveApyPercent = (
     if (!Number.isFinite(annualCata) || annualCata < 0) return "-";
 
     const rewardsApy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
-    const totalApy = nativeApy + rewardsApy;
+    const roundedRewardsApy = Number(roundRewardsApy(rewardsApy) || "0");
+    const totalApy = nativeApy + roundedRewardsApy;
     if (!Number.isFinite(totalApy) || totalApy <= 0) {
       return "-";
     }
@@ -198,16 +221,38 @@ const EarnSave = () => {
       return name.includes("save usdst") || name.includes("saveusdst");
     }) || [];
   }, [normalizedVaultAddress, userRewards]);
-  const incentiveYield = formatPercent(
-    getEstimatedIncentiveApyPercent(
-      effectiveInfo?.apy,
-      saveRewardsActivity?.emissionRate,
-      saveRewardsActivity?.totalStakeUsd ??
-        effectiveInfo?.tvlUsd ??
-        effectiveInfo?.pricingAssets ??
-        effectiveInfo?.totalAssets ??
-        null
-    )
+  const incentiveYieldRaw = getEstimatedIncentiveApyPercent(
+    effectiveInfo?.apy,
+    saveRewardsActivity?.emissionRate,
+    saveRewardsActivity?.totalStakeUsd ??
+      effectiveInfo?.tvlUsd ??
+      effectiveInfo?.pricingAssets ??
+      effectiveInfo?.totalAssets ??
+      null
+  );
+  const incentiveYieldInfo = useMemo<EarnApyInfo | null>(() => {
+    const native = Number(effectiveInfo?.apy);
+    const total = Number(incentiveYieldRaw);
+    if (!Number.isFinite(total) || total <= 0) return null;
+
+    const breakdown = [];
+    if (Number.isFinite(native) && native > 0) {
+      breakdown.push({ label: "Native APY", apy: native.toFixed(2) });
+    }
+
+    const rewards = Math.max(total - (Number.isFinite(native) && native > 0 ? native : 0), 0);
+    const roundedRewards = roundRewardsApy(rewards);
+    if (roundedRewards) {
+      breakdown.push({ label: "Rewards APY", apy: roundedRewards });
+    }
+
+    if (breakdown.length === 0) return null;
+
+    const roundedTotal = breakdown.reduce((sum, item) => sum + Number(item.apy || 0), 0);
+    return { total: roundedTotal, source: "base", breakdown };
+  }, [effectiveInfo?.apy, incentiveYieldRaw]);
+  const incentiveYieldDisplay = formatApyDisplay(
+    incentiveYieldInfo ? incentiveYieldInfo.total.toFixed(2) : (incentiveYieldRaw !== "-" ? incentiveYieldRaw : undefined)
   );
   const saveRewardPointsPerDollarPerDay = useMemo(
     () =>
@@ -471,9 +516,15 @@ const EarnSave = () => {
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
                           <p className="text-muted-foreground">Yield</p>
-                          <p className="mt-1 text-lg font-semibold">
-                            {loadingInfo || rewardsActivitiesLoading ? "..." : incentiveYield}
-                          </p>
+                          {loadingInfo || rewardsActivitiesLoading ? (
+                            <p className="mt-1 text-lg font-semibold">...</p>
+                          ) : (
+                            <EarnApyTooltip info={incentiveYieldInfo}>
+                              <p className={`mt-1 text-lg font-semibold cursor-default ${incentiveYieldDisplay.className}`}>
+                                {incentiveYieldDisplay.label}
+                              </p>
+                            </EarnApyTooltip>
+                          )}
                           <p className="text-xs text-muted-foreground mt-1">
                             Estimated annualized total yield, including rewards and native fees
                           </p>

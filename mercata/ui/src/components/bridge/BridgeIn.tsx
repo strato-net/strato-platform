@@ -32,6 +32,8 @@ import {
   validateRouterContract,
 } from "@/lib/bridge/contractService";
 import { normalizeError } from "@/lib/bridge/utils";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { buildEarnApyMap } from "@/utils/earnUtils";
 import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateDecimals } from "@/utils/numberUtils";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
@@ -328,17 +330,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [bridgeableTokens, selectedToken, depositActions]);
 
   const getApyInfo = useMemo(() => {
-    const m = new Map<string, { apy: string; source: ApySource["source"]; poolAddress?: string }>();
-    for (const entry of tokenApys) {
-      let best: ApySource | null = null;
-      for (const a of entry.apys) {
-        if (a.source === "base") continue;
-        if (!best || parseFloat(a.apy) > parseFloat(best.apy)) best = a;
-      }
-      if (best && parseFloat(best.apy) > 0) {
-        m.set(normAddr(entry.token), { apy: best.apy, source: best.source, poolAddress: best.poolAddress });
-      }
-    }
+    const m = buildEarnApyMap(tokenApys);
     return (addr: string) => m.get(normAddr(addr));
   }, [tokenApys]);
 
@@ -354,23 +346,25 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         {!tokenApysLoaded ? (
           <p className="text-[10px] font-medium text-green-500/40 animate-pulse blur-[2px] leading-none">{"\u2026"}</p>
         ) : info ? (
-          <span
-            role="link"
-            tabIndex={0}
-            className="inline-flex items-center gap-0.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-500 cursor-pointer hover:bg-green-500/20 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              go();
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              e.stopPropagation();
-              go();
-            }}
-          >
-            {`Earn up to ${info.apy}%`} {"\u2192"}
-          </span>
+          <EarnApyTooltip info={info} side="top" align="start">
+            <span
+              role="link"
+              tabIndex={0}
+              className="inline-flex items-center gap-0.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-500 cursor-pointer hover:bg-green-500/20 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                go();
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                e.stopPropagation();
+                go();
+              }}
+            >
+              {`Earn up to ${info.total.toFixed(2)}%`} {"\u2192"}
+            </span>
+          </EarnApyTooltip>
         ) : null}
       </div>
     );
