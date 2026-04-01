@@ -66,6 +66,7 @@ generateDockerCompose = do
             , ("BA_USERNAME", "${BA_USERNAME}")
             , ("BA_PASSWORD", "${BA_PASSWORD}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
+            , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]

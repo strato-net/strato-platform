@@ -78,6 +78,7 @@ const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
   const [networkId, setNetworkId] = useState<string | null>(null);
   const [creditCardTopUpAddress, setCreditCardTopUpAddress] = useState<string | null>(null);
+  const [contactEnabled, setContactEnabled] = useState(false);
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
@@ -98,6 +99,7 @@ const App = () => {
           setProjectId(configData.projectId ?? "PROJECT_ID_UNSET");
           if (configData.networkId) setNetworkId(String(configData.networkId));
           if (configData.creditCardTopUpAddress) setCreditCardTopUpAddress(String(configData.creditCardTopUpAddress));
+          if (configData.contactEnabled) setContactEnabled(true);
           setConfigError(false);
         }
       } catch (error) {
@@ -177,7 +179,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NetworkProvider initialNetworkId={networkIdStr} initialCreditCardTopUpAddress={creditCardTopUpAddressStr}>
+      <NetworkProvider initialNetworkId={networkIdStr} initialCreditCardTopUpAddress={creditCardTopUpAddressStr} initialContactEnabled={contactEnabled}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <WagmiProvider config={wagmiConfig}>
             <RainbowKitProvider>

@@ -13,6 +13,7 @@ class ConfigController {
           creditCardTopUpAddress: creditCardTopUp || undefined,
           featuredEarnOpportunity: featuredEarnOpportunity || undefined,
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
+          contactEnabled: !!process.env.SENDGRID_API_KEY,
         }
       });
     } catch (error) {
