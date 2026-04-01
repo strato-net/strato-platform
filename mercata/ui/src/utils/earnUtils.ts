@@ -24,6 +24,15 @@ const parsePositiveApy = (value?: string | null): number => {
   return Number.isFinite(apy) && apy > 0 ? apy : 0;
 };
 
+export const roundRewardsApy = (value?: string | number | null): string | null => {
+  if (value === null || value === undefined || value === "" || value === "-") return null;
+  const apy = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(apy) || apy <= 0) return null;
+  if (apy >= 1000) return Math.round(apy).toString();
+  if (apy >= 10) return apy.toFixed(0);
+  return apy.toFixed(1);
+};
+
 const toBreakdownItem = (label: string, entry?: ApySource): EarnApyBreakdownItem | null => {
   if (!entry || parsePositiveApy(entry.apy) <= 0) return null;
   return { label, apy: entry.apy };
@@ -43,10 +52,11 @@ const buildVaultInfo = (apys: ApySource[]): EarnApyInfo | null => {
   const vault = apys.find((item) => item.source === "vault");
   const vaultWeighted = apys.find((item) => item.source === "vault_weighted");
   const rewards = apys.find((item) => item.source === "rewards");
+  const roundedRewards = rewards ? { ...rewards, apy: roundRewardsApy(rewards.apy) || rewards.apy } : undefined;
   const breakdown = [
     toBreakdownItem("Native APY", vault),
     toBreakdownItem("Base APY", vaultWeighted),
-    toBreakdownItem("Rewards APY", rewards),
+    toBreakdownItem("Rewards APY", roundedRewards),
   ].filter((item): item is EarnApyBreakdownItem => item !== null);
   const total = breakdown.reduce((sum, item) => sum + parsePositiveApy(item.apy), 0);
   return total > 0 ? { total, source: "vault", breakdown } : null;

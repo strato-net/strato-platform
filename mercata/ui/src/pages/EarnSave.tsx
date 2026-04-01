@@ -30,6 +30,7 @@ import {
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
+import { roundRewardsApy } from "@/utils/earnUtils";
 
 const CATA_PRICE_USD = 0.25;
 
@@ -106,7 +107,8 @@ const getEstimatedIncentiveApyPercent = (
     if (!Number.isFinite(annualCata) || annualCata < 0) return "-";
 
     const rewardsApy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
-    const totalApy = nativeApy + rewardsApy;
+    const roundedRewardsApy = Number(roundRewardsApy(rewardsApy) || "0");
+    const totalApy = nativeApy + roundedRewardsApy;
     if (!Number.isFinite(totalApy) || totalApy <= 0) {
       return "-";
     }

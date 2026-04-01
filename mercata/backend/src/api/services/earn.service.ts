@@ -127,7 +127,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       prices
     );
 
-    vaultAPY = vaultMetrics.apy !== "-" ? vaultMetrics.apy : null;
+    vaultAPY = vaultMetrics.alpha !== "-" ? vaultMetrics.alpha : null;
     const vaultRewardsActivity = findRewardActivity(rewardActivities, {
       sourceContract: shareTokenAddress,
       stakeAssetAddress: shareTokenAddress,
