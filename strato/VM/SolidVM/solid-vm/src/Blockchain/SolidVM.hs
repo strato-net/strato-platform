@@ -1286,6 +1286,11 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SNULL, "push") -> case var of
       Constant r -> pure . Constant $ SPush r Nothing
       _ -> pure . Constant $ SPush (SArray V.empty) (Just var)
+    (r@(SReference _), "pop") -> return $ Constant $ SPop r Nothing
+    (a@(SArray _), "pop") -> return $ Constant $ SPop a (Just var)
+    (SNULL, "pop") -> case var of
+      Constant r -> pure . Constant $ SPop r Nothing
+      _ -> pure . Constant $ SPop (SArray V.empty) (Just var)
     (SArray theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
     (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
     (SBytes bs, "length") -> return . Constant . SInteger . fromIntegral $ B.length bs
@@ -1791,6 +1796,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                         Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
                 _ -> typeError "called enum constructor with improper args" $ show argVals
             Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
+            Constant (SPop theArray mvar) -> Builtins.pop theArray mvar argVals
             Constant SStringConcat -> do
                   when
                     ( any

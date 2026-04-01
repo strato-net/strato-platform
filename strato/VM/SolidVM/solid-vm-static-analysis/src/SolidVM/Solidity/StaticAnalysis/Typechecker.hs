@@ -827,6 +827,7 @@ typecheckMember (Mutable t) member = do
     _ -> t'
 typecheckMember (Static (SVMType.Array _ _) x) "length" = pure . Mutable $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Unit x) x [] [] False
+typecheckMember (Static (SVMType.Array _ _) x) "pop" = pure $ Function (Unit x) (Unit x) x [] [] False
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
 typecheckMember (Static (SVMType.String _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x

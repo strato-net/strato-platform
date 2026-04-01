@@ -12,6 +12,7 @@ module Blockchain.SolidVM.Builtins
 
     -- * Non-ABI builtins
     push,
+    pop,
     modExp,
     ecAdd,
     ecMul,
@@ -57,6 +58,30 @@ push (SArray vec) (Just (Variable ref)) [av] = do
   return $ Constant (SInteger $ fromIntegral $ V.length newArr)
 push v mv argVals = do
   invalidArguments "push" (v, mv, argVals)
+
+-- Removes the last element from an array
+pop :: MonadSM m => Value -> Maybe Variable -> ValList -> m Variable
+pop (SReference apt) _ [] = do
+  let lenPath = apt `apSnoc` MS.Field "length"
+  len' <- getInt $ Constant $ SReference lenPath
+  let len :: Int = fromIntegral len'
+  if len <= 0
+    then typeError "pop from empty array" $ show apt
+    else do
+      let newLen = SInteger $ fromIntegral $ len - 1
+          lastIdxPath = apt `apSnoc` MS.Index (BC.pack $ show (len - 1))
+      deleteVar (Constant (SReference lastIdxPath))
+      setVar (Constant (SReference lenPath)) newLen
+      return $ Constant SNULL
+pop (SArray vec) (Just (Variable ref)) [] = do
+  if V.null vec
+    then typeError "pop from empty array" $ show vec
+    else do
+      let newArr = V.init vec
+      setVar (Variable ref) (SArray newArr)
+      return $ Constant SNULL
+pop v mv argVals = do
+  invalidArguments "pop" (v, mv, argVals)
 
 modExp :: Integer -> Integer -> Integer -> Integer
 modExp b e m =

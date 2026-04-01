@@ -101,7 +101,8 @@ data Value
     SContractItem Address SolidString
   | SContract SolidString Address
   | SContractFunction Address SolidString -- address, functionName
-  | SPush Value (Maybe Variable) -- The array function
+  | SPush Value (Maybe Variable) -- The array push function
+  | SPop Value (Maybe Variable) -- The array pop function
   | -- | SSend Value (Maybe Variable)
     -- | STransfer Value (Maybe Variable)
     -- | SDelegateCall Value (Maybe Variable)
