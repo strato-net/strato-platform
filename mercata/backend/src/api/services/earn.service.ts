@@ -148,6 +148,29 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     }
   }
 
+  const lendingRewardsActivity = rewardActivities.find((activity) => {
+    const name = String(activity?.name || "").toLowerCase();
+    const source = normalizeAddress(activity?.sourceContract);
+    const mTokenAddress = normalizeAddress(lpData?.mToken);
+    return name.includes("lending pool liquidity") || (!!mTokenAddress && source === mTokenAddress);
+  }) || null;
+  const lendingRewardsApy = computeRewardsApy(lendingRewardsActivity?.emissionRate, lendingRewardsActivity?.totalStakeUsd);
+  if (lendingRewardsApy && lpData?.borrowableAsset) {
+    add(lpData.borrowableAsset, { source: "rewards", apy: lendingRewardsApy, meta: "lending" });
+    if (lpData.mToken) add(lpData.mToken, { source: "rewards", apy: lendingRewardsApy, meta: "lending" });
+  }
+
+  const directMintRewardsActivity = findRewardActivity(rewardActivities, {
+    sourceContract: constants.mercataBridge,
+  });
+  const directMintRewardsApy = computeRewardsApy(
+    directMintRewardsActivity?.emissionRate,
+    directMintRewardsActivity?.totalStakeUsd
+  );
+  if (directMintRewardsApy) {
+    add(constants.USDST, { source: "rewards", apy: directMintRewardsApy, meta: "direct_mint" });
+  }
+
   const baseYieldByAddr = new Map<string, number>();
   for (const pair of yieldBenchmarks) {
     const apy = computeYieldAPY(
@@ -182,9 +205,19 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     const poolAddress = String(p.address ?? "").toLowerCase().replace(/^0x/, "");
     const lpTokenAddress = p.lpToken.address;
     const swapApy = computePoolAPY(p, prices, volumeMap);
+    const tokenABaseApy = baseYieldByAddr.get(p.tokenA.address);
+    const tokenBBaseApy = baseYieldByAddr.get(p.tokenB.address);
+    const poolRewardActivity = findPoolRewardActivity(rewardActivities, {
+      poolAddress,
+      lpTokenAddress,
+    });
+    const poolRewardApy = computeRewardsApy(poolRewardActivity?.emissionRate, poolRewardActivity?.totalStakeUsd);
+
     if (swapApy !== ZERO_APY) {
       const row = { source: "swap" as const, apy: swapApy, meta, ...(poolAddress ? { poolAddress } : {}) };
       add(lpTokenAddress, row);
+      add(p.tokenA.address, row);
+      add(p.tokenB.address, row);
     }
     if (baseYieldByAddr.size > 0) {
       const wApy = weightedBaseYield([p.tokenA.address, p.tokenB.address], [p.tokenABalance || "0", p.tokenBBalance || "0"], prices, baseYieldByAddr);
@@ -192,16 +225,30 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
         add(lpTokenAddress, { source: "weighted_swap", apy: wApy, meta, ...(poolAddress ? { poolAddress } : {}) });
       }
     }
+    if (tokenABaseApy && tokenABaseApy > 0) {
+      add(p.tokenA.address, { source: "base", apy: tokenABaseApy.toFixed(2), meta, ...(poolAddress ? { poolAddress } : {}) });
+    }
+    if (tokenBBaseApy && tokenBBaseApy > 0) {
+      add(p.tokenB.address, { source: "base", apy: tokenBBaseApy.toFixed(2), meta, ...(poolAddress ? { poolAddress } : {}) });
+    }
+    if (poolRewardApy) {
+      const rewardRow = { source: "rewards" as const, apy: poolRewardApy, meta, ...(poolAddress ? { poolAddress } : {}) };
+      add(lpTokenAddress, rewardRow);
+      add(p.tokenA.address, rewardRow);
+      add(p.tokenB.address, rewardRow);
+    }
   }
 
-  if (vaultAPY && vaultAPY !== "-" && parseFloat(vaultAPY) > 0) {
-    for (const addr of filteredVaultAssets) add(addr, { source: "vault", apy: vaultAPY });
-  }
-  if (vaultWeightedApy && parseFloat(vaultWeightedApy) > 0) {
-    for (const addr of filteredVaultAssets) add(addr, { source: "vault_weighted", apy: vaultWeightedApy });
-  }
-  if (vaultRewardApy && parseFloat(vaultRewardApy) > 0) {
-    for (const addr of filteredVaultAssets) add(addr, { source: "rewards", apy: vaultRewardApy });
+  if (shareTokenAddress) {
+    if (vaultAPY && vaultAPY !== "-" && parseFloat(vaultAPY) > 0) {
+      add(shareTokenAddress, { source: "vault", apy: vaultAPY });
+    }
+    if (vaultWeightedApy && parseFloat(vaultWeightedApy) > 0) {
+      add(shareTokenAddress, { source: "vault_weighted", apy: vaultWeightedApy });
+    }
+    if (vaultRewardApy && parseFloat(vaultRewardApy) > 0) {
+      add(shareTokenAddress, { source: "rewards", apy: vaultRewardApy, meta: "vault" });
+    }
   }
 
   const safetyAPY = computeSafetyAPY(smRow, stRow, smEvents);
@@ -362,6 +409,42 @@ function findRewardActivity(
     (activity) => normalizedStakeAsset && normalizeAddress(activity?.stakeAssetAddress) === normalizedStakeAsset
   );
   if (exactStakeAssetMatch) return exactStakeAssetMatch;
+
+  const withUsdStake = matches.find((activity) => safeBigInt(activity?.totalStakeUsd || "0") > 0n);
+  return withUsdStake || matches[0];
+}
+
+function findPoolRewardActivity(
+  activities: any[],
+  options: {
+    poolAddress?: string | null;
+    lpTokenAddress?: string | null;
+  }
+): any | null {
+  const normalizedPool = normalizeAddress(options.poolAddress);
+  const normalizedLpToken = normalizeAddress(options.lpTokenAddress);
+
+  const matches = activities.filter((activity) => {
+    const source = normalizeAddress(activity?.sourceContract);
+    const stakeAsset = normalizeAddress(activity?.stakeAssetAddress);
+    return (
+      (normalizedPool && source === normalizedPool) ||
+      (normalizedLpToken && source === normalizedLpToken) ||
+      (normalizedLpToken && stakeAsset === normalizedLpToken)
+    );
+  });
+
+  if (matches.length === 0) return null;
+
+  const exactLpStakeMatch = matches.find(
+    (activity) => normalizedLpToken && normalizeAddress(activity?.stakeAssetAddress) === normalizedLpToken
+  );
+  if (exactLpStakeMatch) return exactLpStakeMatch;
+
+  const exactPoolSourceMatch = matches.find(
+    (activity) => normalizedPool && normalizeAddress(activity?.sourceContract) === normalizedPool
+  );
+  if (exactPoolSourceMatch) return exactPoolSourceMatch;
 
   const withUsdStake = matches.find((activity) => safeBigInt(activity?.totalStakeUsd || "0") > 0n);
   return withUsdStake || matches[0];

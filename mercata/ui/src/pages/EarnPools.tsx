@@ -144,12 +144,10 @@ const EarnPools = () => {
   const highlightedPoolData = selectedPoolData;
   const pageLoading = poolDetailsLoading;
   const highlightedPoolApyInfo = useMemo(
-    () => (highlightedPoolData ? findPoolEarnApyInfo(tokenApys, highlightedPoolData.address, highlightedPoolData.apy) : null),
+    () => (highlightedPoolData ? findPoolEarnApyInfo(tokenApys, highlightedPoolData.address) : null),
     [highlightedPoolData, tokenApys]
   );
-  const displayedHighlightedPoolApy = highlightedPoolApyInfo
-    ? highlightedPoolApyInfo.total.toFixed(2)
-    : highlightedPoolData?.apy;
+  const displayedHighlightedPoolApy = highlightedPoolApyInfo?.total.toFixed(2);
 
   const handlePoolDeposit = (pool: Pool) => {
     if (!isLoggedIn) return;

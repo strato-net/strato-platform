@@ -7,7 +7,7 @@ import { useSwapContext } from "@/context/SwapContext";
 import { useVaultContext } from "@/context/VaultContext";
 import { useEarnContext } from "@/context/EarnContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
-import { findBestNonVaultEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
+import { findBestEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
 
@@ -45,10 +45,10 @@ export default function MyPoolParticipationSection({
   }, [pools]);
 
   const resolveTokenAPY = useCallback(
-    (token: any, pool?: any): { value: string | null; info: ReturnType<typeof findBestNonVaultEarnApyInfo> } => {
+    (token: any, pool?: any): { value: string | null; info: ReturnType<typeof findBestEarnApyInfo> } => {
       if (liquidityInfo?.withdrawable?.address === token.address) {
-        const info = findBestNonVaultEarnApyInfo(tokenApys, token.address);
-        return { value: liquidityInfo.supplyAPY?.toFixed(2) || null, info };
+        const info = findBestEarnApyInfo(tokenApys, token.address);
+        return { value: info ? info.total.toFixed(2) : null, info };
       }
 
       if (token._symbol === "SUSDST" || token._symbol === "safetyUSDST") return { value: null, info: null };
@@ -61,23 +61,26 @@ export default function MyPoolParticipationSection({
           pool ||
           lpTokenPoolMap.get(normAddr(token.address)) ||
           pools?.find((candidate: any) => candidate.lpToken?._symbol === token._symbol);
-        const info = resolvedPool ? findPoolEarnApyInfo(tokenApys, resolvedPool.address, resolvedPool.apy) : null;
+        const info = resolvedPool ? findPoolEarnApyInfo(tokenApys, resolvedPool.address) : null;
         return {
-          value: info ? info.total.toFixed(2) : resolvedPool?.apy || null,
+          value: info ? info.total.toFixed(2) : null,
           info,
         };
       }
 
       if (vaultState.shareTokenAddress && token.address === vaultState.shareTokenAddress) {
+        const info = findVaultEarnApyInfo(tokenApys);
         return {
-          value: vaultState.alpha && vaultState.alpha !== "0" && vaultState.alpha !== "-"
-            ? vaultState.alpha
-            : null,
-          info: findVaultEarnApyInfo(tokenApys),
+          value: info
+            ? info.total.toFixed(2)
+            : vaultState.alpha && vaultState.alpha !== "0" && vaultState.alpha !== "-"
+              ? vaultState.alpha
+              : null,
+          info,
         };
       }
 
-      const info = findBestNonVaultEarnApyInfo(tokenApys, token.address);
+      const info = findBestEarnApyInfo(tokenApys, token.address);
       return {
         value: info ? info.total.toFixed(2) : null,
         info,
@@ -149,7 +152,7 @@ export default function MyPoolParticipationSection({
         <div className="grid grid-cols-3 md:grid-cols-4 px-3 md:px-4 text-xs md:text-sm text-muted-foreground font-medium">
           <div>Token</div>
           <div className="text-right md:text-center">Balance</div>
-          <div className="hidden md:block text-center">APY</div>
+          <div className="hidden md:block text-center">Best Available APY</div>
           <div className="text-right">Value</div>
         </div>
 

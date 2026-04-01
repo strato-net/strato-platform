@@ -443,10 +443,10 @@ const Earn = () => {
 
   const vaultEarnApyInfo = useMemo(() => findVaultEarnApyInfo(tokenApys), [tokenApys]);
   const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
-  const getPoolEarnApyInfo = (pool: Pool) => findPoolEarnApyInfo(tokenApys, pool.address, pool.apy);
+  const getPoolEarnApyInfo = (pool: Pool) => findPoolEarnApyInfo(tokenApys, pool.address);
   const getPoolDisplayApy = (pool: Pool) => {
     const info = getPoolEarnApyInfo(pool);
-    return info ? info.total.toFixed(2) : pool.apy;
+    return info ? info.total.toFixed(2) : undefined;
   };
   const saveUsdstDisplayApyRaw = saveUsdstApyInfo
     ? saveUsdstApyInfo.total.toFixed(2)

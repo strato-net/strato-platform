@@ -45,7 +45,7 @@ const AssetsList = ({
   const { tokenApys, tokenApysLoaded } = useEarnContext();
 
   const earnByAddr = useMemo(() => {
-    return buildEarnApyMap(tokenApys, { includeVaultSources: false });
+    return buildEarnApyMap(tokenApys);
   }, [tokenApys]);
 
   const hasEarningAssets = tokens.length > 0;
@@ -107,7 +107,7 @@ const AssetsList = ({
                   Asset
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
-                  Earn Up To
+                  Best Available APY
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Price

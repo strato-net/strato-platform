@@ -48,10 +48,22 @@ const buildSimpleInfo = (entry?: ApySource, source?: ApySource["source"], label?
   };
 };
 
+const buildLendingInfo = (apys: ApySource[]): EarnApyInfo | null => {
+  const lending = apys.find((item) => item.source === "lending" && !item.poolAddress);
+  const rewards = apys.find((item) => item.source === "rewards" && !item.poolAddress && item.meta === "lending");
+  const roundedRewards = rewards ? { ...rewards, apy: roundRewardsApy(rewards.apy) || rewards.apy } : undefined;
+  const breakdown = [
+    toBreakdownItem("Native APY", lending),
+    toBreakdownItem("Rewards APY", roundedRewards),
+  ].filter((item): item is EarnApyBreakdownItem => item !== null);
+  const total = breakdown.reduce((sum, item) => sum + parsePositiveApy(item.apy), 0);
+  return total > 0 ? { total, source: "lending", breakdown } : null;
+};
+
 const buildVaultInfo = (apys: ApySource[]): EarnApyInfo | null => {
-  const vault = apys.find((item) => item.source === "vault");
-  const vaultWeighted = apys.find((item) => item.source === "vault_weighted");
-  const rewards = apys.find((item) => item.source === "rewards");
+  const vault = apys.find((item) => item.source === "vault" && !item.poolAddress);
+  const vaultWeighted = apys.find((item) => item.source === "vault_weighted" && !item.poolAddress);
+  const rewards = apys.find((item) => item.source === "rewards" && !item.poolAddress && item.meta === "vault");
   const roundedRewards = rewards ? { ...rewards, apy: roundRewardsApy(rewards.apy) || rewards.apy } : undefined;
   const breakdown = [
     toBreakdownItem("Native APY", vault),
@@ -65,8 +77,9 @@ const buildVaultInfo = (apys: ApySource[]): EarnApyInfo | null => {
 const buildPoolInfos = (apys: ApySource[]): EarnApyInfo[] => {
   const poolGroups = new Map<string, ApySource[]>();
   apys.forEach((item, index) => {
-    if (item.source !== "swap" && item.source !== "weighted_swap") return;
-    const key = item.poolAddress ? `pool:${item.poolAddress}` : `pool:${item.meta || index}`;
+    if (!item.poolAddress) return;
+    if (item.source !== "swap" && item.source !== "weighted_swap" && item.source !== "base" && item.source !== "rewards") return;
+    const key = `pool:${item.poolAddress || item.meta || index}`;
     if (!poolGroups.has(key)) poolGroups.set(key, []);
     poolGroups.get(key)!.push(item);
   });
@@ -75,9 +88,13 @@ const buildPoolInfos = (apys: ApySource[]): EarnApyInfo[] => {
   poolGroups.forEach((items) => {
     const swap = items.find((item) => item.source === "swap");
     const weightedSwap = items.find((item) => item.source === "weighted_swap");
+    const base = items.find((item) => item.source === "base");
+    const rewards = items.find((item) => item.source === "rewards");
+    const roundedRewards = rewards ? { ...rewards, apy: roundRewardsApy(rewards.apy) || rewards.apy } : undefined;
     const breakdown = [
       toBreakdownItem("Native APY", swap),
-      toBreakdownItem("Base APY", weightedSwap),
+      toBreakdownItem("Base APY", weightedSwap || base),
+      toBreakdownItem("Rewards APY", roundedRewards),
     ].filter((item): item is EarnApyBreakdownItem => item !== null);
     const total = breakdown.reduce((sum, item) => sum + parsePositiveApy(item.apy), 0);
     if (total <= 0) return;
@@ -92,15 +109,86 @@ const buildPoolInfos = (apys: ApySource[]): EarnApyInfo[] => {
   return infos;
 };
 
-const withNativeApyOverride = (info: EarnApyInfo | null, nativeApyRaw?: string | null): EarnApyInfo | null => {
-  const nativeApy = parsePositiveApy(nativeApyRaw);
-  if (!info || nativeApy <= 0 || info.source !== "swap") return info;
+const buildStandaloneRewardInfos = (apys: ApySource[]): EarnApyInfo[] => {
+  const infos: EarnApyInfo[] = [];
+  apys.forEach((item) => {
+    if (item.source !== "rewards" || item.poolAddress) return;
+    if (item.meta === "vault" || item.meta === "lending") return;
+    const roundedRewards = roundRewardsApy(item.apy) || item.apy;
+    const total = parsePositiveApy(roundedRewards);
+    if (total <= 0) return;
+    infos.push({
+      total,
+      source: "rewards",
+      breakdown: [{ label: "Rewards APY", apy: roundedRewards }],
+    });
+  });
+  return infos;
+};
 
-  const breakdown = info.breakdown.map((item, index) =>
-    index === 0 ? { ...item, apy: nativeApy.toFixed(2) } : item
+const pickBestEntry = (
+  entries: ApySource[],
+  transformApy?: (entry: ApySource) => string | null
+): ApySource | null => {
+  let best: ApySource | null = null;
+  let bestValue = 0;
+
+  for (const entry of entries) {
+    const apy = transformApy ? transformApy(entry) : entry.apy;
+    const value = parsePositiveApy(apy);
+    if (value <= 0 || value <= bestValue) continue;
+    best = apy && apy !== entry.apy ? { ...entry, apy } : entry;
+    bestValue = value;
+  }
+
+  return best;
+};
+
+const buildTokenCompositeInfo = (
+  apys: ApySource[],
+  options?: EarnApyLookupOptions
+): EarnApyInfo | null => {
+  const includeVaultSources = options?.includeVaultSources !== false;
+  const usableApys = includeVaultSources
+    ? apys
+    : apys.filter((item) => item.source !== "vault" && item.source !== "vault_weighted" && !(item.source === "rewards" && item.meta === "vault"));
+
+  const native = pickBestEntry(
+    usableApys.filter(
+      (item) =>
+        (item.source === "swap" && !!item.poolAddress) ||
+        (!item.poolAddress && (item.source === "lending" || item.source === "safety" || item.source === "vault"))
+    )
   );
+
+  const bestPoolBase = pickBestEntry(
+    usableApys.filter((item) => !!item.poolAddress && (item.source === "weighted_swap" || item.source === "base"))
+  );
+  const bestFallbackBase = pickBestEntry(
+    usableApys.filter((item) => !item.poolAddress && (item.source === "base" || item.source === "vault_weighted"))
+  );
+  const base = bestPoolBase || bestFallbackBase;
+
+  const rewards = pickBestEntry(
+    usableApys.filter((item) => item.source === "rewards"),
+    (entry) => roundRewardsApy(entry.apy) || entry.apy
+  );
+
+  const breakdown = [
+    toBreakdownItem("Native APY", native || undefined),
+    toBreakdownItem("Base APY", base || undefined),
+    toBreakdownItem("Rewards APY", rewards || undefined),
+  ].filter((item): item is EarnApyBreakdownItem => item !== null);
   const total = breakdown.reduce((sum, item) => sum + parsePositiveApy(item.apy), 0);
-  return total > 0 ? { ...info, total, breakdown } : info;
+  if (total <= 0) return null;
+
+  const poolRoute = native?.poolAddress ? native : base?.poolAddress ? base : rewards?.poolAddress ? rewards : null;
+  return {
+    total,
+    source: poolRoute ? "swap" : native?.source || base?.source || rewards?.source || "base",
+    poolAddress: poolRoute?.poolAddress,
+    breakdown,
+  };
 };
 
 export const buildEarnApyMap = (
@@ -111,24 +199,9 @@ export const buildEarnApyMap = (
   const result = new Map<string, EarnApyInfo>();
 
   for (const entry of tokenApys) {
-    const candidates: EarnApyInfo[] = [];
-    const base = buildSimpleInfo(entry.apys.find((item) => item.source === "base"), "base", "Base APY");
-    const lending = buildSimpleInfo(entry.apys.find((item) => item.source === "lending"), "lending", "Native APY");
-    const safety = buildSimpleInfo(entry.apys.find((item) => item.source === "safety"), "safety", "Native APY");
-    const vault = includeVaultSources ? buildVaultInfo(entry.apys) : null;
-
-    if (base) candidates.push(base);
-    if (lending) candidates.push(lending);
-    if (safety) candidates.push(safety);
-    if (vault) candidates.push(vault);
-    candidates.push(...buildPoolInfos(entry.apys));
-
-    const best = candidates.reduce<EarnApyInfo | null>(
-      (currentBest, candidate) => (!currentBest || candidate.total > currentBest.total ? candidate : currentBest),
-      null
-    );
-    if (best) {
-      result.set(normAddr(entry.token), best);
+    const composite = buildTokenCompositeInfo(entry.apys, { includeVaultSources });
+    if (composite) {
+      result.set(normAddr(entry.token), composite);
     }
   }
 
@@ -155,14 +228,13 @@ export const findVaultEarnApyInfo = (tokenApys: TokenApyEntry[]): EarnApyInfo | 
 
 export const findPoolEarnApyInfo = (
   tokenApys: TokenApyEntry[],
-  poolAddress?: string | null,
-  nativeApyRaw?: string | null
+  poolAddress?: string | null
 ): EarnApyInfo | null => {
   const normalizedPoolAddress = normAddr(poolAddress || "");
   if (!normalizedPoolAddress) return null;
   for (const entry of tokenApys) {
     const info = buildPoolInfos(entry.apys).find((item) => normAddr(item.poolAddress || "") === normalizedPoolAddress);
-    if (info) return withNativeApyOverride(info, nativeApyRaw);
+    if (info) return info;
   }
   return null;
 };
