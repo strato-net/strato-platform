@@ -2,14 +2,52 @@ import { promises as fs } from "fs";
 import path from "path";
 import { logInfo, logError } from "../observability/logger";
 import { BONUS_TRACKING_FILE } from "../config/runtimeConfig";
-import { BonusRunState, BonusCredit } from "../../shared/types";
+import { BonusBalanceSnapshots, BonusCredit, BonusRunState } from "../../shared/types";
 import { writeJsonFileAtomic } from "./atomicJson.store";
+import { normalizeAddressNoPrefix } from "../../shared/core/address";
 
 const BONUS_TRACKING_PATH = path.join(process.cwd(), BONUS_TRACKING_FILE);
 
 const DEFAULT_STATE: BonusRunState = {
   lastSuccessfulTimestamp: null,
   pendingCredits: [],
+  balanceSnapshots: {},
+};
+
+const isValidBalanceString = (value: unknown): value is string => {
+  if (typeof value !== "string" || value.trim().length === 0) return false;
+
+  try {
+    return BigInt(value) >= 0n;
+  } catch {
+    return false;
+  }
+};
+
+const normalizeBalanceSnapshots = (value: unknown): BonusBalanceSnapshots => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const normalizedSnapshots: BonusBalanceSnapshots = {};
+  for (const [token, userSnapshots] of Object.entries(value)) {
+    if (!userSnapshots || typeof userSnapshots !== "object" || Array.isArray(userSnapshots)) continue;
+
+    const tokenKey = normalizeAddressNoPrefix(token);
+    const normalizedUserSnapshots: Record<string, string[]> = {};
+    for (const [user, snapshots] of Object.entries(userSnapshots as Record<string, unknown>)) {
+      if (!Array.isArray(snapshots)) continue;
+
+      const normalizedSnapshotsForUser = snapshots
+        .filter(isValidBalanceString)
+        .map((snapshot) => BigInt(snapshot).toString());
+      if (normalizedSnapshotsForUser.length === 0) continue;
+
+      normalizedUserSnapshots[normalizeAddressNoPrefix(user)] = normalizedSnapshotsForUser;
+    }
+
+    normalizedSnapshots[tokenKey] = normalizedUserSnapshots;
+  }
+
+  return normalizedSnapshots;
 };
 
 function isValidStateShape(x: any): boolean {
@@ -26,6 +64,7 @@ function normalizeState(x: any): BonusRunState {
   return {
     lastSuccessfulTimestamp: x.lastSuccessfulTimestamp,
     pendingCredits: x.pendingCredits,
+    balanceSnapshots: normalizeBalanceSnapshots(x.balanceSnapshots),
   };
 }
 
@@ -83,16 +122,10 @@ class BonusTrackingService {
     );
   }
 
-  async clearPending(): Promise<void> {
+  async replacePending(credits: BonusCredit[]): Promise<void> {
     const state = this.cached ?? await this.getState();
-    await this.writeToFile({ ...state, pendingCredits: [] });
+    await this.writeToFile({ ...state, pendingCredits: [...credits] });
   }
-
-  async appendPending(credits: BonusCredit[]): Promise<void> {
-    const state = this.cached ?? await this.getState();
-    await this.writeToFile({ ...state, pendingCredits: [...state.pendingCredits, ...credits] });
-  }
-
 }
 
 export const bonusTrackingService = new BonusTrackingService();

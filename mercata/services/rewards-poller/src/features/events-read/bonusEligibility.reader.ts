@@ -1,14 +1,14 @@
 import { cirrus } from "../../infra/http/api";
 import { logInfo } from "../../infra/observability/logger";
 import { retryWithBackoff } from "../../infra/http/retry.policy";
-import { BonusTokenConfig, BonusEligibleUser } from "../../shared/types";
+import { BonusTokenBalance, BonusTokenConfig } from "../../shared/types";
 import { buildBonusRuleByToken, normalizeAddressValue } from "./addressNormalization";
 
 const CIRRUS_RETRY_OPTS = { maxAttempts: 3, initialDelay: 5000, maxDelay: 5000 };
 
-export const getBonusEligibleUsers = async (
+export const getCurrentBonusTokenBalances = async (
   tokenConfigs: BonusTokenConfig[]
-): Promise<BonusEligibleUser[]> => {
+): Promise<BonusTokenBalance[]> => {
   if (tokenConfigs.length === 0) return [];
 
   const ruleByToken = buildBonusRuleByToken(tokenConfigs);
@@ -20,28 +20,40 @@ export const getBonusEligibleUsers = async (
         select: "address,user:key,balance:value::text",
       },
     }),
-    "CirrusService-getBonusEligibleUsers",
+    "CirrusService-getCurrentBonusTokenBalances",
     CIRRUS_RETRY_OPTS
   );
 
   if (!Array.isArray(data) || data.length === 0) return [];
 
-  const userBonusMap = new Map<string, BonusEligibleUser>();
+  const balanceByTokenUser = new Map<string, BonusTokenBalance>();
   for (const row of data) {
     const rule = ruleByToken.get(normalizeAddressValue(row.address));
-    if (!rule || BigInt(row.balance || "0") < rule.minBalance) continue;
+    if (!rule) continue;
 
-    const current = userBonusMap.get(row.user);
-    if (!current || rule.bonusBps > current.bonusBps) {
-      userBonusMap.set(row.user, {
+    const user = normalizeAddressValue(row.user);
+    if (user.length === 0) continue;
+
+    const balance = String(row.balance ?? "0").trim();
+    let normalizedBalance: string;
+    try {
+      normalizedBalance = BigInt(balance || "0").toString();
+    } catch {
+      continue;
+    }
+
+    const mapKey = `${normalizeAddressValue(row.address)}:${user}`;
+    const current = balanceByTokenUser.get(mapKey);
+    if (!current || BigInt(normalizedBalance) > BigInt(current.balance)) {
+      balanceByTokenUser.set(mapKey, {
         sourceContract: rule.sourceContract,
-        user: row.user,
-        bonusBps: rule.bonusBps,
+        user,
+        balance: normalizedBalance,
       });
     }
   }
 
-  const users = [...userBonusMap.values()];
-  logInfo("CirrusService", `Loaded ${users.length} bonus-eligible users from ${addresses.length} bonus tokens`);
-  return users;
+  const balances = [...balanceByTokenUser.values()];
+  logInfo("CirrusService", `Loaded ${balances.length} current bonus balances from ${addresses.length} bonus tokens`);
+  return balances;
 };

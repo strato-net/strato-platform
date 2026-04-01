@@ -78,8 +78,14 @@ export interface RewardsAction {
 
 export interface BonusTokenConfig {
   address: string;
-  bonusBps: number;
-  minBalance: string;
+  maxBonusBps: number;
+  balanceForMaxBoost: string;
+}
+
+export interface BonusTokenBalance {
+  sourceContract: string;
+  user: string;
+  balance: string;
 }
 
 export interface BonusCredit {
@@ -91,9 +97,12 @@ export interface BonusCredit {
   eventIndex: number;
 }
 
+export type BonusBalanceSnapshots = Record<string, Record<string, string[]>>;
+
 export interface BonusRunState {
   lastSuccessfulTimestamp: string | null;
   pendingCredits: BonusCredit[];
+  balanceSnapshots: BonusBalanceSnapshots;
 }
 
 export interface BonusEligibleUser {
