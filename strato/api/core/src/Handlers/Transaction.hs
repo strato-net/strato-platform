@@ -217,7 +217,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
 
 instance {-# OVERLAPPING #-} (LoggingT IO) `Mod.Outputs` [IngestEvent] where
   output txs = do
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
     resps <- liftIO $ runKafkaMConfigured "strato-api" $ writeUnseqEvents txs
     $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 

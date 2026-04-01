@@ -2,16 +2,9 @@
 
 #------------------------------------------------------------------------------
 # Bash script for installing pre-requisite packages for building the full
-# STRATO Mercata platform on Linux, macOS and other UNIX-derived platforms.
+# STRATO platform on Linux, macOS and other UNIX-derived platforms.
 #
 # This is an "infrastucture-as-code" alternative to the manual build
-# instructions pages which we previously maintained at the public website:
-#
-# https://old-docs.strato.nexus/
-#
-# ... and for instructions within the strato-platform repository while it was
-# still a private repository, and the public strato-getting-started repository
-# was still necessary.
 #
 # See "How can I reliably get the operating system's name?"
 # http://unix.stackexchange.com/questions/92199/how-can-i-reliably-get-the-operating-systems-name
@@ -21,7 +14,7 @@ set -e
 
 # Function to handle unsupported platforms
 unsupported_platform() {
-    echo "STRATO Mercata is not supported on $1."
+    echo "STRATO is not natively supported on $1."
     exit 1
 }
 
@@ -144,13 +137,13 @@ Darwin)
     # Check macOS version constraints - only allow Sequoia
     MACOS_VERSION=$(sw_vers -productVersion)
     MACOS_MAJOR=$(echo $MACOS_VERSION | cut -d. -f1)
-    if [ "$MACOS_MAJOR" != "15" ]; then
-        echo "ERROR - STRATO Mercata only supports macOS Sequoia (15.x)."
+    if [ "$MACOS_MAJOR" != "15" ] && [ "$MACOS_MAJOR" != "26" ]; then
+        echo "ERROR - This script only natively support macOS Sequoia (15.x) and macOS Tahoe (26.x)."
         echo "Your macOS version: $MACOS_VERSION"
         exit 1
     fi
     
-    echo "Installing STRATO Mercata dependencies on macOS Sequoia $MACOS_VERSION."
+    echo "Installing STRATO dependencies on macOS Sequoia $MACOS_VERSION."
     
     # Install Homebrew if not already installed (non-interactive, safe to run repeatedly)
     if ! command -v brew > /dev/null 2>&1; then
@@ -198,10 +191,10 @@ Linux)
             AMAZON_VERSION=$(. /etc/os-release; echo $VERSION_ID)
             case $AMAZON_VERSION in
                 2023|2023.*)
-                    echo "Installing STRATO Mercata dependencies on Amazon Linux $AMAZON_VERSION."
+                    echo "Installing STRATO dependencies on Amazon Linux $AMAZON_VERSION."
                     ;;
                 *)
-                    echo "ERROR - STRATO Mercata only supports Amazon Linux 2023 (initial release or point releases)."
+                    echo "ERROR - STRATO only supports Amazon Linux 2023 (initial release or point releases)."
                     echo "Your Amazon Linux version: $AMAZON_VERSION"
                     exit 1
                     ;;
@@ -278,10 +271,10 @@ Linux)
                 UBUNTU_CODENAME=$(lsb_release -cs)
                 case $UBUNTU_VERSION in
                     24.04|24.04.*)
-                        echo "Installing STRATO Mercata dependencies on Ubuntu $UBUNTU_VERSION LTS \"$UBUNTU_CODENAME\"."
+                        echo "Installing STRATO dependencies on Ubuntu $UBUNTU_VERSION LTS \"$UBUNTU_CODENAME\"."
                         ;;
                     *)
-                        echo "ERROR - STRATO Mercata only supports Ubuntu 24.04 LTS \"Noble Numbat\" (initial release or point releases)."
+                        echo "ERROR - STRATO only supports Ubuntu 24.04 LTS \"Noble Numbat\" (initial release or point releases)."
                         echo "Your Ubuntu version: $UBUNTU_VERSION \"$UBUNTU_CODENAME\"."
                         exit 1
                         ;;
@@ -291,9 +284,9 @@ Linux)
                 MINT_VERSION=$(lsb_release -rs)
                 MINT_CODENAME=$(lsb_release -cs)
                 if [ "$MINT_VERSION" = "22.1" ] && [ "$MINT_CODENAME" = "xia" ]; then
-                    echo "Installing STRATO Mercata dependencies on Linux Mint $MINT_VERSION \"Xia\"."
+                    echo "Installing STRATO dependencies on Linux Mint $MINT_VERSION \"Xia\"."
                 else
-                    echo "ERROR - STRATO Mercata only supports Linux Mint 22.1 \"Xia\"."
+                    echo "ERROR - STRATO only supports Linux Mint 22.1 \"Xia\"."
                     echo "Your Linux Mint version: $MINT_VERSION \"$MINT_CODENAME\""
                     exit 1
                 fi

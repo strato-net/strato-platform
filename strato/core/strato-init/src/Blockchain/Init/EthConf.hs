@@ -40,6 +40,9 @@ getRailgunProxyForNetwork network = case network of
   "lithium" -> Nothing  -- TODO: Set when deployed
   _         -> Nothing
 
+getNativeTokenForNetwork :: String -> Address
+getNativeTokenForNetwork _ = 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+
 -- | Runtime config that overrides defaults with command-line flags
 runtimeConfig :: EthConf
 runtimeConfig = def
@@ -63,8 +66,10 @@ runtimeConfig = def
       { apiListenAddress = getApiListenAddress
       , apiHost = getApiHost
       }
-  , contractsConfig = getRailgunProxyForNetwork flags_network >>= \addr ->
-      Just ContractsConf { railgunProxy = Just addr }
+  , contractsConfig = ContractsConf
+      { railgunProxy = getRailgunProxyForNetwork flags_network
+      , nativeTokenAddress = getNativeTokenForNetwork flags_network
+      }
   , debugConfig = def { svmTrace = flags_svmTrace }
   }
 
@@ -139,6 +144,9 @@ genEthConf = do
     , urlConfig = def
         { vaultUrl = if Opts.flags_localAuth
             then "http://localhost:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
+            else flags_vaultUrl
+        , vaultUrlDocker = if Opts.flags_localAuth
+            then "http://nginx:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
             else flags_vaultUrl
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
