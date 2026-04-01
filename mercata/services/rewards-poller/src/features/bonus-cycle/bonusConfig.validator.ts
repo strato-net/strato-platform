@@ -16,19 +16,27 @@ export const parseBonusTokenConfigs = (raw: unknown): BonusTokenConfig[] => {
       throw new Error(`Invalid bonusTokenConfigs[${idx}].address: required non-empty string`);
     }
 
-    const bonusBps = Number(token.bonusBps);
-    if (!Number.isInteger(bonusBps) || bonusBps <= 0) {
-      throw new Error(`Invalid bonusTokenConfigs[${idx}].bonusBps: required positive integer (basis points)`);
+    const maxBonusBps = Number(token.maxBonusBps);
+    if (!Number.isInteger(maxBonusBps) || maxBonusBps <= 0) {
+      throw new Error(`Invalid bonusTokenConfigs[${idx}].maxBonusBps: required positive integer (basis points)`);
     }
 
-    if (typeof token.minBalance !== "string" || token.minBalance.trim().length === 0) {
-      throw new Error(`Invalid bonusTokenConfigs[${idx}].minBalance: required non-empty string`);
+    if (typeof token.balanceForMaxBoost !== "string" || token.balanceForMaxBoost.trim().length === 0) {
+      throw new Error(`Invalid bonusTokenConfigs[${idx}].balanceForMaxBoost: required non-empty string`);
+    }
+
+    try {
+      if (BigInt(token.balanceForMaxBoost.trim()) <= 0n) {
+        throw new Error(`Invalid bonusTokenConfigs[${idx}].balanceForMaxBoost: required positive integer string`);
+      }
+    } catch {
+      throw new Error(`Invalid bonusTokenConfigs[${idx}].balanceForMaxBoost: required positive integer string`);
     }
 
     return {
       address: token.address.trim(),
-      bonusBps,
-      minBalance: token.minBalance,
+      maxBonusBps,
+      balanceForMaxBoost: token.balanceForMaxBoost.trim(),
     };
   });
 };

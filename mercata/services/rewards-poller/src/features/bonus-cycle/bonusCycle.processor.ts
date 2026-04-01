@@ -1,11 +1,12 @@
 import { config } from "../../infra/config/runtimeConfig";
 import { logInfo, logError } from "../../infra/observability/logger";
-import { getBonusEligibleUsers } from "../events-read/bonusEligibility.reader";
+import { getCurrentBonusTokenBalances } from "../events-read/bonusEligibility.reader";
 import { batchAddBonus } from "../rewards-cycle/rewardsBatch.writer";
 import { checkBalances } from "../rewards-cycle/rewardsBalance.guard";
 import { NonEmptyArray, BonusCredit } from "../../shared/types";
 import { bonusTrackingService } from "../../infra/state/bonusTracking.repo";
 import {
+  buildBonusUsers,
   calculateBonusCreditsForUsers,
   getCronIntervalSeconds,
   MAX_BONUS_INTERVAL_SECONDS,
@@ -21,7 +22,12 @@ export const processBonusCycle = async (): Promise<void> => {
     await checkBalances();
 
     const state = await bonusTrackingService.getState();
-    const bonusUsers = await getBonusEligibleUsers(tokenConfigs);
+    const currentBalances = await getCurrentBonusTokenBalances(tokenConfigs);
+    const { bonusUsers, balanceSnapshots } = buildBonusUsers(
+      tokenConfigs,
+      currentBalances,
+      state.balanceSnapshots,
+    );
 
     const elapsed = state.lastSuccessfulTimestamp
       ? Math.floor((Date.now() - new Date(state.lastSuccessfulTimestamp).getTime()) / 1000)
@@ -41,6 +47,7 @@ export const processBonusCycle = async (): Promise<void> => {
       await bonusTrackingService.updateState({
         lastSuccessfulTimestamp: new Date().toISOString(),
         pendingCredits: [],
+        balanceSnapshots,
       });
       return;
     }
@@ -52,13 +59,35 @@ export const processBonusCycle = async (): Promise<void> => {
       );
     }
 
-    await bonusTrackingService.clearPending();
-
     const maxBatchSize = config.polling.maxBatchSize;
     let applied = 0;
+    const retryFailedCredits: BonusCredit[] = [];
 
-    for (let i = 0; i < allCredits.length; i += maxBatchSize) {
-      const batch = allCredits.slice(i, i + maxBatchSize) as NonEmptyArray<BonusCredit>;
+    for (let i = 0; i < state.pendingCredits.length; i += maxBatchSize) {
+      const batch = state.pendingCredits.slice(i, i + maxBatchSize) as NonEmptyArray<BonusCredit>;
+      try {
+        await batchAddBonus(batch);
+        applied += batch.length;
+      } catch (error) {
+        logError("RewardsBonusPolling", error as Error, {
+          operation: "processBonus",
+          message: "Pending batch failed - keeping in pending",
+          batchSize: batch.length,
+        });
+        retryFailedCredits.push(...batch);
+      }
+
+      const unprocessedPendingCredits = state.pendingCredits.slice(i + batch.length);
+      await bonusTrackingService.replacePending([
+        ...retryFailedCredits,
+        ...unprocessedPendingCredits,
+      ]);
+    }
+
+    const failedCredits = [...retryFailedCredits];
+
+    for (let i = 0; i < newCredits.length; i += maxBatchSize) {
+      const batch = newCredits.slice(i, i + maxBatchSize) as NonEmptyArray<BonusCredit>;
       try {
         await batchAddBonus(batch);
         applied += batch.length;
@@ -68,13 +97,15 @@ export const processBonusCycle = async (): Promise<void> => {
           message: "Batch failed - added to pending",
           batchSize: batch.length,
         });
-        await bonusTrackingService.appendPending(batch);
+        failedCredits.push(...batch);
+        await bonusTrackingService.replacePending(failedCredits);
       }
     }
 
     await bonusTrackingService.updateState({
       lastSuccessfulTimestamp: new Date().toISOString(),
-      pendingCredits: (await bonusTrackingService.getState()).pendingCredits,
+      pendingCredits: failedCredits,
+      balanceSnapshots,
     });
 
     logInfo("RewardsBonusPolling", `Applied ${applied}/${allCredits.length} bonus credits`);

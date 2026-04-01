@@ -3,8 +3,8 @@ import { normalizeAddressNoPrefix } from "../../shared/core/address";
 
 export interface BonusTokenRule {
   sourceContract: string;
-  bonusBps: number;
-  minBalance: bigint;
+  maxBonusBps: number;
+  balanceForMaxBoost: bigint;
 }
 
 export const buildBonusRuleByToken = (
@@ -15,8 +15,8 @@ export const buildBonusRuleByToken = (
       normalizeAddressNoPrefix(config.address),
       {
         sourceContract: config.address,
-        bonusBps: config.bonusBps,
-        minBalance: BigInt(config.minBalance),
+        maxBonusBps: config.maxBonusBps,
+        balanceForMaxBoost: BigInt(config.balanceForMaxBoost),
       },
     ])
   );
