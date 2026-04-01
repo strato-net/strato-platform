@@ -127,8 +127,8 @@ def spinUpVault() {
   sudo \\
     ssl=true \\
     HTTPS_PORT=8093 \\
-    INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration' \\
-    INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-devel' \\
+    INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
+    INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/mercata' \\
     INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
     PASSWORD=123 \\
     ./vault
