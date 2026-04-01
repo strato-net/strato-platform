@@ -39,7 +39,7 @@ interface LiquidityDepositModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedPool: Pool | null;
-  onDepositSuccess: () => void;
+  onDepositSuccess: () => Promise<void>;
   operationInProgressRef: React.MutableRefObject<boolean>;
   usdstBalance: string;
   voucherBalance: string;
@@ -172,6 +172,7 @@ const LiquidityDepositModal = ({
         });
 
         await new Promise(resolve => setTimeout(resolve, 2000));
+        await onDepositSuccess();
         handleClose();
         toast({ title: "Success", description: `${selectedPool.poolName} deposited successfully.`, variant: "success" });
       } catch (error) {
@@ -180,7 +181,6 @@ const LiquidityDepositModal = ({
         setDepositLoading(false);
         operationInProgressRef.current = false;
       }
-      if (!depositLoading) onDepositSuccess();
       return;
     }
 
@@ -238,6 +238,7 @@ const LiquidityDepositModal = ({
       }
 
       await new Promise(resolve => setTimeout(resolve, 2000));
+      await onDepositSuccess();
 
       handleClose();
       toast({ title: "Success", description: `${selectedPool.poolName} deposited successfully.`, variant: "success" });
@@ -246,10 +247,6 @@ const LiquidityDepositModal = ({
     } finally {
       setDepositLoading(false);
       operationInProgressRef.current = false;
-    }
-
-    if (!depositLoading) {
-      onDepositSuccess();
     }
   };
 
