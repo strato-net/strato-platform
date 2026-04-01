@@ -90,6 +90,7 @@
     }
   },
   "Commodities-API": {
+    "enabled": false,
     "url": "https://commodities-api.com/api/latest",
     "params": "access_key,base=USD,symbols",
     "parse": "data.rates.{symbol}",

@@ -20,6 +20,7 @@ export class ConfigLoader {
         this.sources = {};
         
         Object.entries(rawSources).forEach(([name, config]) => {
+            if (config.enabled === false) return;
             this.sources[name] = {
                 ...config,
                 apiKey: config.apiKeyEnvVar ? process.env[config.apiKeyEnvVar] || '' : '',
