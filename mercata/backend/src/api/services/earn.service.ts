@@ -2,6 +2,7 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { hiddenSwapPools, yieldBenchmarks } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
+import { buildYieldAnchorOverlapFilter, computeYieldAPYFromAnchors, getYieldWindowBounds, indexYieldHistoryRows } from "../helpers/earnYield.helper";
 import { totalDebtFromScaled, calculateAPYs } from "../helpers/lending.helper";
 import {
   computeEquityFromMaps,
@@ -15,16 +16,14 @@ const { Pool, DECIMALS, Vault, Token } = constants;
 const ZERO_APY = "0.00";
 const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
 const CATA_PRICE_USD = 0.25;
-const STABLE_BASE_SYMBOLS = new Set(["USDST", "USDC", "USDT"]);
 
 export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]> => {
   const now = Date.now();
   const twentyFourHoursAgo = toUTCTime(new Date(now - 24 * 60 * 60 * 1000));
-  const thirtyDaysAgoTime = new Date(now - 30 * 24 * 60 * 60 * 1000);
-  const thirtyDaysAgo = toUTCTime(thirtyDaysAgoTime);
-  const thirtyDaysAgoDate = thirtyDaysAgoTime.toISOString().split("T")[0];
+  const thirtyDaysAgo = toUTCTime(new Date(now - 30 * 24 * 60 * 60 * 1000));
+  const { windowStart, windowEndExclusive, anchorsMs } = getYieldWindowBounds(now);
   const vaultAddr = constants.vault;
-  const yieldHistoryAssets = [...new Set(yieldBenchmarks.flatMap((p) => [p.tokenAddress, p.baseAddress]))];
+  const yieldHistoryKeys = [...new Set(yieldBenchmarks.flatMap((p) => [p.tokenAddress, p.baseAddress]))];
 
   const mappingOr = `(and(address.eq.${constants.lendingPool},collection_name.eq.assetConfigs,key->>key.eq.${constants.USDST}),and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${constants.liquidityPool}),and(address.eq.${constants.priceOracle},collection_name.eq.prices)${vaultAddr ? `,and(address.eq.${vaultAddr},collection_name.eq.supportedAssets)` : ""})`;
   const eventOr = `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))`;
@@ -35,7 +34,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     { data: mappingRows },
     { data: eventRows },
     { data: pools },
-    { data: yieldHistRows },
+    { data: yieldHistoryRows },
     { data: vaultRows },
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
@@ -48,14 +47,14 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       poolFactory: `eq.${constants.poolFactory}`,
       select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
     }}),
-    yieldHistoryAssets.length
+    yieldHistoryKeys.length
       ? cirrus.get(accessToken, "/history@mapping", { params: {
         address: `eq.${constants.priceOracle}`,
         collection_name: "eq.prices",
-        "key->>key": `in.(${yieldHistoryAssets.join(",")})`,
-        select: "key->>key,value::text",
-        valid_from: `lte.${thirtyDaysAgoDate}`,
-        valid_to: `gte.${thirtyDaysAgoDate}`,
+        "key->>key": `in.(${yieldHistoryKeys.join(",")})`,
+        select: "key->>key,value::text,valid_from,valid_to",
+        and: `(block_timestamp.gte.${windowStart},block_timestamp.lt.${windowEndExclusive})`,
+        or: buildYieldAnchorOverlapFilter(anchorsMs),
       }})
       : Promise.resolve({ data: [] as any[] }),
     vaultAddr
@@ -77,7 +76,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 
   // Parse mapping
   const prices = new Map<string, string>();
-  const historicalYieldPrices = new Map<string, string>();
+  const yieldHistoryByKey = indexYieldHistoryRows(yieldHistoryRows || []);
   let lendingCfg: any = null;
   let liqBalance: string | null = null;
   const vaultAssets: string[] = [];
@@ -89,9 +88,6 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       const addr = r.value.replace(/"/g, "");
       if (addr) vaultAssets.push(addr);
     }
-  }
-  for (const r of yieldHistRows || []) {
-    if (r.key) historicalYieldPrices.set(r.key, r.value || "0");
   }
 
   // Parse events (single pass)
@@ -173,12 +169,12 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 
   const baseYieldByAddr = new Map<string, number>();
   for (const pair of yieldBenchmarks) {
-    const apy = computeYieldAPY(
-      pair.baseSymbol,
-      prices.get(pair.tokenAddress),
-      prices.get(pair.baseAddress),
-      historicalYieldPrices.get(pair.tokenAddress),
-      historicalYieldPrices.get(pair.baseAddress),
+    const apy = computeYieldAPYFromAnchors(
+      pair.tokenAddress,
+      pair.baseAddress,
+      prices,
+      yieldHistoryByKey,
+      anchorsMs,
     );
     if (!apy) continue;
     add(pair.tokenAddress, { source: "base", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
@@ -448,33 +444,4 @@ function findPoolRewardActivity(
 
   const withUsdStake = matches.find((activity) => safeBigInt(activity?.totalStakeUsd || "0") > 0n);
   return withUsdStake || matches[0];
-}
-
-function computeYieldAPY(
-  baseSymbol: string,
-  tokenNowRaw?: string,
-  baseNowRaw?: string,
-  tokenStartRaw?: string,
-  baseStartRaw?: string,
-): string | null {
-  try {
-    const tokenNow = BigInt(tokenNowRaw || "0");
-    const baseNowFallback = STABLE_BASE_SYMBOLS.has(baseSymbol) ? DECIMALS : 0n;
-    const baseNow = BigInt(baseNowRaw || "0") || baseNowFallback;
-    const tokenStart = BigInt(tokenStartRaw || "0");
-    const baseStart = BigInt(baseStartRaw || "0") || (STABLE_BASE_SYMBOLS.has(baseSymbol) ? baseNow : 0n);
-    if (tokenNow <= 0n || baseNow <= 0n || tokenStart <= 0n || baseStart <= 0n) return null;
-
-    const ratioNow = Number(tokenNow) / Number(baseNow);
-    const ratioStart = Number(tokenStart) / Number(baseStart);
-    if (!isFinite(ratioNow) || !isFinite(ratioStart) || ratioStart <= 0) return null;
-
-    const periodReturn = ratioNow / ratioStart - 1;
-    if (periodReturn <= -1 || !isFinite(periodReturn)) return null;
-
-    const apy = (Math.pow(1 + periodReturn, 365 / 30) - 1) * 100;
-    return apy > 0 ? apy.toFixed(2) : null;
-  } catch {
-    return null;
-  }
 }
