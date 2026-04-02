@@ -129,12 +129,30 @@ nav:
           - Contracts: build-apps/contract-addresses.md
           - API Cheat Sheet: build-apps/quick-reference.md
   
+  # === TECHNICAL DOCUMENTATION ===
+  - Technical Documentation:
+      - Overview: technical/README.md
+      - Design:
+          - Overview: technical/design/README.md
+          - Rewards System: technical/design/rewards.md
+          - Rewards Chef: technical/design/rewards-chef.md
+      - Architecture:
+          - Overview: technical/architecture/README.md
+          - Smart Contracts: technical/architecture/contracts.md
+          - Infrastructure: technical/architecture/infrastructure.md
+          - STRATO Node API: technical/architecture/strato-api.md
+      - API Specifications:
+          - Overview: technical/api-specs/README.md
+          - Lending Specification: technical/api-specs/lending-spec.md
+          - Lending Pool Overview: technical/api-specs/lending_pool_overview.md
+          - Lending API Test Plan: technical/api-specs/lending_api_test_plan.md
+
   # === API REFERENCE ===
   - API Reference:
       - App API (Getting Started): reference/api.md
       - Interactive Reference (Swagger): reference/interactive-api.md
       - Core Platform API (Advanced): reference/strato-node-api.md
-  
+
   # === SAFETY & FAQ ===
   - Safety & Risk: safety.md
   - FAQ: faq.md
