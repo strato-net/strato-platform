@@ -4,13 +4,12 @@ set -e
 echo "=== STRATO Local Auth Starting ==="
 
 # Read httpPort from ethconf.yaml (single source of truth)
-if [ -f /config/ethconf.yaml ]; then
-    HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
-    echo "Read httpPort from ethconf.yaml: ${HTTP_PORT}"
-else
-    HTTP_PORT=8081
-    echo "WARNING: /config/ethconf.yaml not found, defaulting to port ${HTTP_PORT}"
+if [ ! -f /config/ethconf.yaml ]; then
+    echo "ERROR: /config/ethconf.yaml not found. Ensure ethconf.yaml is mounted into the container."
+    exit 1
 fi
+HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
+echo "Read httpPort from ethconf.yaml: ${HTTP_PORT}"
 
 # Read postgres password if available and update DSNs
 if [ -f /run/secrets/postgres_password ]; then
@@ -57,6 +56,7 @@ sed -i "s|__HYDRA_SYSTEM_SECRET__|${HYDRA_SYSTEM_SECRET_ESCAPED}|g" /etc/config/
 sed -i "s|__HYDRA_PAIRWISE_SALT__|${HYDRA_PAIRWISE_SALT_ESCAPED}|g" /etc/config/hydra.yml
 sed -i "s|__HTTP_PORT__|${HTTP_PORT}|g" /etc/config/hydra.yml
 sed -i "s|__KRATOS_COOKIE_SECRET__|${KRATOS_COOKIE_SECRET_ESCAPED}|g" /etc/config/kratos.yml
+sed -i "s|__HTTP_PORT__|${HTTP_PORT}|g" /etc/config/kratos.yml
 
 # Function to wait for postgres
 wait_for_postgres() {
@@ -129,6 +129,9 @@ DSN="$DSN" kratos migrate sql -e --yes --config /etc/config/kratos.yml
 
 echo "Running Hydra migrations..."
 DSN="$HYDRA_DSN" hydra migrate sql -e --yes --config /etc/config/hydra.yml
+
+# Set login UI browser URL from ethconf port
+export KRATOS_BROWSER_URL="http://localhost:${HTTP_PORT}/auth/kratos"
 
 # Start supervisor in background temporarily to start services
 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf &
