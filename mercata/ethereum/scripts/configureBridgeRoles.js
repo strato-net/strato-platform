@@ -211,7 +211,7 @@ async function main() {
       // Map STRATO address (as 0x-prefixed 20-byte) to representation token
       transactions.push(
         buildTx(repBridgeDeployment.addresses.proxy, REP_BRIDGE_ABI, "setTokenMapping", [
-          ethers.getAddress(`0x${"0".repeat(24)}${stratoAddr}`),
+          ethers.getAddress(`0x${stratoAddr}`),
           tokenAddr,
         ]),
       );
@@ -223,7 +223,7 @@ async function main() {
     for (const [symbol, tokenAddr] of Object.entries(repTokens)) {
       const stratoAddr = STRATO_NATIVE_TOKENS[symbol];
       if (!stratoAddr) continue;
-      const fullAddr = ethers.getAddress(`0x${"0".repeat(24)}${stratoAddr}`);
+      const fullAddr = ethers.getAddress(`0x${stratoAddr}`);
       transactions.push(
         buildTx(repBridgeDeployment.addresses.proxy, REP_BRIDGE_ABI, "setMintRateLimit", [
           fullAddr,

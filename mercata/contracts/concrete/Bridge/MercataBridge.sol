@@ -328,7 +328,7 @@ contract record MercataBridge is Ownable {
         require(assetInfo.externalToken == externalToken, "MB: asset not found");
         assetInfo.externalName = externalName;
         assetInfo.externalSymbol = externalSymbol;
-        emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, externalName, externalSymbol, externalToken, assetInfo.maxPerWithdrawal, assetInfo.stratoToken);
+        emit AssetUpdated(assetInfo.enabled, assetInfo.isNative, externalChainId, assetInfo.externalDecimals, externalName, externalSymbol, externalToken, assetInfo.maxPerWithdrawal, assetInfo.stratoToken);
     }
 
     /**
@@ -349,7 +349,7 @@ contract record MercataBridge is Ownable {
         AssetInfo assetInfo = assets[externalToken][externalChainId];
         require(assetInfo.externalToken == externalToken, "MB: asset not found");
         assetInfo.maxPerWithdrawal = maxPerWithdrawal;
-        emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, assetInfo.externalName, assetInfo.externalSymbol, externalToken, maxPerWithdrawal, assetInfo.stratoToken);
+        emit AssetUpdated(assetInfo.enabled, assetInfo.isNative, externalChainId, assetInfo.externalDecimals, assetInfo.externalName, assetInfo.externalSymbol, externalToken, maxPerWithdrawal, assetInfo.stratoToken);
     }
 
     /**

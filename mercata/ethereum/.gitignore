@@ -1,6 +1,9 @@
 # Environment variables
 .env
 
+# OpenZeppelin generated files
+.openzeppelin/
+
 # Dependencies
 node_modules/
 
@@ -24,4 +27,4 @@ deployments/
 
 # IDE files
 .vscode/
-.idea/ 
+.idea/
