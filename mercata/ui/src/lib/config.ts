@@ -6,6 +6,7 @@ export interface ConfigData {
   creditCardTopUpAddress?: string;
   featuredEarnOpportunity?: string;
   stripePublishableKey: string | null;
+  contactEnabled?: boolean;
 }
 
 export const getConfig = async (): Promise<ConfigData> => {

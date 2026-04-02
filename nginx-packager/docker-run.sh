@@ -13,7 +13,6 @@ MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
 BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 blockTime=${blockTime:-13} # keep default the same as strato
 ssl=${ssl:-false}
-sslCertFileType=${sslCertFileType:-pem}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
@@ -75,11 +74,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i 's/<SMD_DEV_MODE_HOST_IP>/'"$SMD_DEV_MODE_HOST_IP"'/g' /tmp/nginx.conf
   fi
   # Remove SSL lines if deployment is not SSL-enabled
-  # Set SSL cert file type if SSL-enabled
   if [ "$ssl" != true ]; then
     sed -i '/#TEMPLATE_MARK_SSL/d' /tmp/nginx.conf
-  else
-    sed -i 's/<SSL_CERT_FILE_TYPE>/'"$sslCertFileType"'/g' /tmp/nginx.conf
   fi
 
   # Remove Stats lines if running in STATS_ENABLED=false
@@ -167,10 +163,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   mv /tmp/vault-openid.lua /usr/local/openresty/nginx/lua/vault-openid.lua
   
   mv /tmp/csrf.lua /usr/local/openresty/nginx/lua/csrf.lua
-
-  if [ "$ssl" = true ] ; then
-    cp -r /tmp/ssl/* /etc/ssl/
-  fi
 fi
 
 echo 'Waiting for apex to be available...'

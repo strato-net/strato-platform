@@ -247,8 +247,9 @@ class SwappingController {
         tokenB: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
       });
 
-      // Filter to only pools where both requested tokens have pool balance > 0
+      // Filter to only enabled pools where both requested tokens have pool balance > 0
       const filteredPools = pools.filter(pool => {
+        if (pool.isDisabled) return false;
         // Multi-token pool: check coins array
         if (pool.coins && pool.coins.length > 2) {
           const coin1 = pool.coins.find((c: any) => c.address.toLowerCase() === addr1);
@@ -265,6 +266,13 @@ class SwappingController {
         if (!hasToken1 || !hasToken2) return false;
         return BigInt(pool.tokenA?.poolBalance || "0") > 0n
             && BigInt(pool.tokenB?.poolBalance || "0") > 0n;
+      });
+
+      // Sort by total liquidity descending so the frontend picks the deepest pool
+      filteredPools.sort((a, b) => {
+        const liqA = parseFloat(a.totalLiquidityUSD || "0");
+        const liqB = parseFloat(b.totalLiquidityUSD || "0");
+        return liqB - liqA;
       });
 
       res.status(RestStatus.OK).json(filteredPools);
