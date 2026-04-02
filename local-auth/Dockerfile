@@ -14,7 +14,8 @@ RUN apk add --no-cache \
     postgresql-client \
     nodejs \
     npm \
-    bash
+    bash \
+    yq
 
 # Copy Kratos and Hydra binaries from official images
 COPY --from=kratos /usr/bin/kratos /usr/bin/kratos

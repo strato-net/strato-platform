@@ -318,6 +318,7 @@ generateDockerCompose = do
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets:/run/secrets:ro"
+            , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /entrypoint.sh >> /logs/local-auth.log 2>&1"]

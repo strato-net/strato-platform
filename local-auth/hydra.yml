@@ -14,10 +14,10 @@ serve:
 
 urls:
   self:
-    issuer: http://localhost:8081/auth
-  consent: http://localhost:8081/auth/ui/consent
-  login: http://localhost:8081/auth/ui/login
-  logout: http://localhost:8081/auth/ui/logout
+    issuer: http://localhost:__HTTP_PORT__/auth
+  consent: http://localhost:__HTTP_PORT__/auth/ui/consent
+  login: http://localhost:__HTTP_PORT__/auth/ui/login
+  logout: http://localhost:__HTTP_PORT__/auth/ui/logout
 
 secrets:
   system:

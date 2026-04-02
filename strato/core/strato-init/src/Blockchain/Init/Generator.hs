@@ -16,7 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Strato.Model.Validator
@@ -207,7 +207,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
             Just cs | not (null cs) -> return cs
             _ -> generatePassword 48
           let localOauthConfig = unlines
-                [ "discoveryUrl: \"http://localhost:8081/auth/.well-known/openid-configuration\""
+                [ "discoveryUrl: \"http://localhost:" ++ show flags_httpPort ++ "/auth/.well-known/openid-configuration\""
                 , "clientId: \"" ++ clientId ++ "\""
                 , "clientSecret: \"" ++ clientSecret ++ "\""
                 ]

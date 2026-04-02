@@ -3,6 +3,15 @@ set -e
 
 echo "=== STRATO Local Auth Starting ==="
 
+# Read httpPort from ethconf.yaml (single source of truth)
+if [ -f /config/ethconf.yaml ]; then
+    HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
+    echo "Read httpPort from ethconf.yaml: ${HTTP_PORT}"
+else
+    HTTP_PORT=8081
+    echo "WARNING: /config/ethconf.yaml not found, defaulting to port ${HTTP_PORT}"
+fi
+
 # Read postgres password if available and update DSNs
 if [ -f /run/secrets/postgres_password ]; then
     PGPASSWORD=$(cat /run/secrets/postgres_password)
@@ -46,6 +55,7 @@ KRATOS_COOKIE_SECRET_ESCAPED=$(escape_sed_replacement "$KRATOS_COOKIE_SECRET")
 
 sed -i "s|__HYDRA_SYSTEM_SECRET__|${HYDRA_SYSTEM_SECRET_ESCAPED}|g" /etc/config/hydra.yml
 sed -i "s|__HYDRA_PAIRWISE_SALT__|${HYDRA_PAIRWISE_SALT_ESCAPED}|g" /etc/config/hydra.yml
+sed -i "s|__HTTP_PORT__|${HTTP_PORT}|g" /etc/config/hydra.yml
 sed -i "s|__KRATOS_COOKIE_SECRET__|${KRATOS_COOKIE_SECRET_ESCAPED}|g" /etc/config/kratos.yml
 
 # Function to wait for postgres
@@ -149,7 +159,7 @@ if [ "$CLIENT_EXISTS" != "200" ]; then
             \"grant_types\": [\"authorization_code\", \"refresh_token\", \"client_credentials\"],
             \"response_types\": [\"code\", \"token\", \"id_token\"],
             \"scope\": \"openid offline email profile\",
-            \"redirect_uris\": [\"http://localhost:8081/auth/openidc/return\", \"http://127.0.0.1:8081/auth/openidc/return\"],
+            \"redirect_uris\": [\"http://localhost:${HTTP_PORT}/auth/openidc/return\", \"http://127.0.0.1:${HTTP_PORT}/auth/openidc/return\"],
             \"token_endpoint_auth_method\": \"client_secret_basic\"
         }" > /dev/null
     echo "OAuth client '${OAUTH_CLIENT_ID}' created."
