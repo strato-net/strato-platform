@@ -57,6 +57,10 @@ import "Proxy/Proxy.sol";
 import "Vault/Vault.sol";
 import "Vault/VaultFactory.sol";
 //TODO
+
+//Direct Mint PSM
+import "./Pools/DirectMintPSM.sol";
+
 contract record Mercata is Authorizable {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
@@ -78,8 +82,10 @@ contract record Mercata is Authorizable {
     SaveUSDSTVault public saveUSDSTVault;
     Rewards public rewards;
     Token public cataToken;
+    Token public usdst;
     Escrow public escrow;
     MetalForge public metalForge;
+    DirectMintPSM public directMintPSM;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
@@ -162,6 +168,9 @@ contract record Mercata is Authorizable {
         // Use existing CATA reward token
         cataToken = Token(address(0x2680dc6693021cd3fefb84351570874fbef8332a));
 
+        // Use existing USDST token
+        usdst = Token(address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010));
+
         // Create Rewards contract and initialize with CATA token
         address rewardsImpl = address(new Rewards(implOwnerIgnored));
         rewards = Rewards(address(new Proxy(rewardsImpl, this)));
@@ -193,7 +202,7 @@ contract record Mercata is Authorizable {
         cdpReserve.initialize(address(cdpRegistry));
         Ownable(cdpReserve).transferOwnership(address(adminRegistry));
 
-        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
+        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(usdst), address(tokenFactory), address(feeCollector), address(cdpReserve));
         Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
 
         address escrowImpl = address(new Escrow(implOwnerIgnored));
@@ -206,12 +215,19 @@ contract record Mercata is Authorizable {
             address(0x0000000000000000000000000000000000001002),
             address(0x141e73dc8d2dbbda4fba3797527d22be4b2c4744),
             address(0x000000000000000000000000000000000000100d),
-            address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010)
+            address(usdst)
         );
         Ownable(metalForge).transferOwnership(address(0x000000000000000000000000000000000000100c));
 
         mercataBridge.initialize(address(tokenFactory), address(lendingRegistry), address(metalForge));
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));
+
+        DirectMintPSM directMintPSMImpl = new DirectMintPSM(address(this));
+        directMintPSM = DirectMintPSM(address(new Proxy(address(directMintPSMImpl), this)));
+        directMintPSM.initialize(address(usdst), [address(0x6aeacaa19c68e53035bf495d15e0a328fc600ba8)], 86400);
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(usdst), "mint", address(directMintPSM));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(usdst), "burn", address(directMintPSM));
+        Ownable(directMintPSM).transferOwnership(address(adminRegistry));
 
         adminRegistry.swapAdmin(this, msg.sender);
     }
