@@ -312,11 +312,14 @@ contract record PoolFactory is Ownable {
         address[] tokens,
         uint[] rateMultipliers,
         uint[] assetTypes,
-        address[] oracles
+        address[] oracles,
+        bool containsYieldVaults
     ) external onlyOwner returns (address pool) {
         for (uint i = 0; i < tokens.length; i++) {
-            require(TokenFactory(tokenFactory).isTokenActive(tokens[i]), "Token not active");
             require(tokens[i] != address(0), "Zero address");
+            if (!containsYieldVaults) {
+                require(TokenFactory(tokenFactory).isTokenActive(tokens[i]), "Token not active");
+            }
             for (uint j = 0; j < tokens.length; j++) {
                 if (i != j) {
                     require(tokens[i] != tokens[j], "Identical addresses");
