@@ -8,6 +8,7 @@ interface NetworkContextType {
   networkId: string | null;
   creditCardTopUpAddress: string | null;
   isTestnet: boolean;
+  contactEnabled: boolean;
   loading: boolean;
 }
 
@@ -18,17 +19,20 @@ interface NetworkProviderProps {
   /** When provided, used instead of fetching config (avoids duplicate fetch when App already has config). */
   initialNetworkId?: string | null;
   initialCreditCardTopUpAddress?: string | null;
+  initialContactEnabled?: boolean;
 }
 
-export const NetworkProvider = ({ children, initialNetworkId, initialCreditCardTopUpAddress }: NetworkProviderProps) => {
+export const NetworkProvider = ({ children, initialNetworkId, initialCreditCardTopUpAddress, initialContactEnabled }: NetworkProviderProps) => {
   const [networkId, setNetworkId] = useState<string | null>(initialNetworkId ?? null);
   const [creditCardTopUpAddress, setCreditCardTopUpAddress] = useState<string | null>(initialCreditCardTopUpAddress ?? null);
+  const [contactEnabled, setContactEnabled] = useState(initialContactEnabled ?? false);
   const [loading, setLoading] = useState(typeof initialNetworkId === "undefined" && typeof initialCreditCardTopUpAddress === "undefined");
 
   useEffect(() => {
     if (typeof initialNetworkId !== "undefined" || typeof initialCreditCardTopUpAddress !== "undefined") {
       setNetworkId(initialNetworkId ?? null);
       setCreditCardTopUpAddress(initialCreditCardTopUpAddress ?? null);
+      setContactEnabled(initialContactEnabled ?? false);
       setLoading(false);
       return;
     }
@@ -38,6 +42,7 @@ export const NetworkProvider = ({ children, initialNetworkId, initialCreditCardT
         const data = response.data?.data;
         if (data?.networkId) setNetworkId(String(data.networkId));
         if (data?.creditCardTopUpAddress) setCreditCardTopUpAddress(String(data.creditCardTopUpAddress));
+        if (data?.contactEnabled) setContactEnabled(true);
       } catch (error) {
         console.error('Failed to fetch network config:', error);
       } finally {
@@ -45,12 +50,12 @@ export const NetworkProvider = ({ children, initialNetworkId, initialCreditCardT
       }
     };
     fetchConfig();
-  }, [initialNetworkId, initialCreditCardTopUpAddress]);
+  }, [initialNetworkId, initialCreditCardTopUpAddress, initialContactEnabled]);
 
   const isTestnet = networkId === TESTNET_NETWORK_ID;
 
   return (
-    <NetworkContext.Provider value={{ networkId, creditCardTopUpAddress, isTestnet, loading }}>
+    <NetworkContext.Provider value={{ networkId, creditCardTopUpAddress, isTestnet, contactEnabled, loading }}>
       {children}
     </NetworkContext.Provider>
   );

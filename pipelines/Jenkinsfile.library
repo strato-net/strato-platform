@@ -122,13 +122,35 @@ def checkNodeStatusHealth() {
   '''
 }
 
+def checkNodeIsGettingBlocks() {
+  sh '''#!/bin/bash -l
+    echo "Waiting for node to start syncing blocks..."
+    counter=0
+    while true; do
+      BLOCK_NUM=$(docker exec strato-nginx-1 curl -s http://apex:3009/status | jq .lastBlock.number 2>/dev/null)
+      # Strip quotes: "123" -> 123
+      BLOCK_NUM_CLEAN=$(echo "$BLOCK_NUM" | tr -d '"')
+      if [[ "$BLOCK_NUM_CLEAN" =~ ^[0-9]+$ ]] && [[ "$BLOCK_NUM_CLEAN" -gt 0 ]]; then
+        echo "Node is syncing blocks (block #${BLOCK_NUM_CLEAN})"
+        exit 0
+      fi
+      if [[ "$counter" -gt 300 ]]; then
+        echo "Node did not sync any blocks within 5 minutes. Last response: ${BLOCK_NUM}"
+        exit 1
+      fi
+      counter=$((counter+1))
+      sleep 1
+    done
+  '''
+}
+
 def spinUpVault() {
   writeFile file: "run-vault.sh", text: """#!/bin/bash
   sudo \\
     ssl=true \\
     HTTPS_PORT=8093 \\
-    INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration' \\
-    INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-devel' \\
+    INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
+    INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/mercata' \\
     INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
     PASSWORD=123 \\
     ./vault
@@ -182,6 +204,30 @@ def spinUpFileServer() {
   sh './check_availability_highway.sh'
 }
 
+def checkNodeAvailability(port) {
+  def protocol = port == 443 ? "https" : "http"
+  writeFile file: "check_availability.sh", text: """#!/bin/bash -le
+    check_availability() {
+      counter=0
+      until curl --silent --fail --location ${protocol}://\$(</host):${port}/health | jq .health | grep true
+      do
+        if [[ "\$counter" -gt 300 ]]; then
+          echo "STRATO node took longer than 5 minutes to initialize! aborting."
+          exit 73
+        fi
+        echo "waiting for STRATO health endpoint to be available through nginx"
+        counter=\$((counter+1))
+        sleep 1
+      done
+      echo "STRATO health endpoint is available through nginx - node is running"
+    }
+
+    check_availability
+  """
+  sh 'chmod +x check_availability.sh'
+  sh './check_availability.sh'
+}
+
 def replaceServerPortsDocker() {
   writeFile file: "replace_server_ports_docker.sh", text: '''#!/bin/bash
     if [ -z "$1" ]; then
@@ -205,7 +251,7 @@ def replaceServerPortsDocker() {
 def waitLocalNodeIsSynced() {
   echo "Waiting for local node to be in-sync and healthy..."
   for (int i = 0; i < 1800; i++) {
-    if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 curl strato:3000/eth/v1.2/metadata | grep \\\"isSynced\\\":true") != 0) {
+    if (sh(returnStatus: true, script: "sudo docker exec strato-nginx-1 curl 172.17.0.1:3000/eth/v1.2/metadata | grep \\\"isSynced\\\":true") != 0) {
       sleep 2
     } else {
       return true
