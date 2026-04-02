@@ -185,7 +185,17 @@ contract record StablePool is Ownable {
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
-    /// @dev Should be called by the PoolFactory contract
+    /// @notice Initialize a new stable pool (amplification, fees, coins, per-coin oracles, LP token).
+    /// @param _a Curve A parameter (amplification coefficient, before A_PRECISION scaling in _initialize).
+    /// @param _fee Swap fee numerator; divide by FEE_DENOMINATOR (1e10). Factory uses swapFeeRate * 1e6.
+    /// @param _offpegFeeMultiplier Off-peg dynamic fee scaling.
+    /// @param _maExpTime Moving-average exponential time parameter; must be non-zero.
+    /// @param _coins Pool token addresses (length ≥ 2); order defines coin indices.
+    /// @param _rateMultipliers Per-coin rate multipliers (PRECISION-scaled).
+    /// @param _assetTypes Per-coin asset type (e.g. 1=normal, 2=rebasing).
+    /// @param _oracles Per-coin price oracles; address(0) if none for that coin.
+    /// @param _lpTokenAddr LP token contract; pool must be whitelisted to mint/burn.
+    /// @dev Typically called by PoolFactory after proxy deployment; owner must set yield extras (e.g. setUsdst, setIsYieldToken) separately if needed.
     function initialize(
         uint _a,
         uint _fee,
