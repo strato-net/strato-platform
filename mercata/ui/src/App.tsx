@@ -38,6 +38,7 @@ import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
 import OnrampPage from "./pages/OnrampPage";
+import OnrampV2Page from "./pages/OnrampV2Page";
 import CreditCardPage from "./pages/CreditCard";
 
 // Import dashboard components
@@ -411,6 +412,15 @@ const App = () => {
                                             element={
                                               <ProtectedRoute>
                                                 <OnrampPage />
+                                              </ProtectedRoute>
+                                            }
+                                          />
+
+                                          <Route
+                                            path="/dashboard/onramp-v2"
+                                            element={
+                                              <ProtectedRoute>
+                                                <OnrampV2Page />
                                               </ProtectedRoute>
                                             }
                                           />
