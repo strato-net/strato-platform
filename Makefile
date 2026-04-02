@@ -48,10 +48,6 @@ $(info )
 
 .DEFAULT_GOAL := all
 
-# Smart docker builds - rebuild if any file in source dir changed
-# Uses fast timestamp checks (find -newer) instead of listing all files as dependencies
-DOCKER_SENTINELS = .docker-built
-
 # Compute content hash for a directory (truncated to 12 chars)
 # Usage: $(call dir_hash,directory_path)
 dir_hash = $(shell git ls-files $(1) 2>/dev/null | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
@@ -68,6 +64,10 @@ HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,mercata/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,mercata/services/bridge/nginx)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
+
+# Check if image exists in Docker — rebuild if missing (hash in tag handles source changes)
+# Usage: $(call image_missing,image_name_with_tag)
+image_missing = ! docker image inspect $(1) >/dev/null 2>&1
 
 # Generate BUILD_METADATA file with version and all hashes for Haskell to read
 # This file is the single source of truth for build metadata
@@ -97,108 +97,83 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
             -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g'
 
-$(DOCKER_SENTINELS):
-	@mkdir -p $@
+.PHONY: postgrest nginx apex mercata-backend mercata-ui prometheus smd bridge bridge-nginx local-auth
 
-# Check if rebuild needed: sentinel missing, hash changed, or source file newer
-# Usage: $(call needs_rebuild,source_dir,expected_hash)
-# Sentinel file contains the hash the image was built with
-needs_rebuild = [ ! -f $@ ] || [ "$$(cat $@ 2>/dev/null)" != "$(2)" ] || [ -n "$$(find $(1) -type f -newer $@ 2>/dev/null | head -1)" ]
-
-# These targets always run the recipe, which then checks if rebuild is actually needed
-.PHONY: $(DOCKER_SENTINELS)/postgrest $(DOCKER_SENTINELS)/nginx $(DOCKER_SENTINELS)/apex
-.PHONY: $(DOCKER_SENTINELS)/mercata-backend $(DOCKER_SENTINELS)/mercata-ui $(DOCKER_SENTINELS)/prometheus
-.PHONY: $(DOCKER_SENTINELS)/smd $(DOCKER_SENTINELS)/bridge $(DOCKER_SENTINELS)/bridge-nginx
-.PHONY: $(DOCKER_SENTINELS)/local-auth
-
-$(DOCKER_SENTINELS)/postgrest: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,postgrest-packager,$(VERSION)-$(HASH_POSTGREST)); then \
+postgrest:
+	@if $(call image_missing,$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST)); then \
 		echo "Building postgrest ($(VERSION)-$(HASH_POSTGREST))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) $(MAKE) --directory=postgrest-packager/ && \
-		echo "$(VERSION)-$(HASH_POSTGREST)" > $@; \
+		BASIL_DOCKER_TAG=$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)postgrest:$(VERSION)-$(HASH_POSTGREST) $(MAKE) --directory=postgrest-packager/; \
 	else \
 		echo "postgrest up to date"; \
 	fi
 
-$(DOCKER_SENTINELS)/nginx: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,nginx-packager,$(VERSION)-$(HASH_NGINX)); then \
+nginx:
+	@if $(call image_missing,$(REPO_URL)nginx:$(VERSION)-$(HASH_NGINX)); then \
 		echo "Building nginx ($(VERSION)-$(HASH_NGINX))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)nginx:$(VERSION)-$(HASH_NGINX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)nginx:$(VERSION)-$(HASH_NGINX) $(MAKE) --directory=nginx-packager/ && \
-		echo "$(VERSION)-$(HASH_NGINX)" > $@; \
+		BASIL_DOCKER_TAG=$(REPO_URL)nginx:$(VERSION)-$(HASH_NGINX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)nginx:$(VERSION)-$(HASH_NGINX) $(MAKE) --directory=nginx-packager/; \
 	else \
 		echo "nginx up to date"; \
 	fi
 
-$(DOCKER_SENTINELS)/apex: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,apex,$(VERSION)-$(HASH_APEX)); then \
+apex:
+	@if $(call image_missing,$(REPO_URL)apex:$(VERSION)-$(HASH_APEX)); then \
 		echo "Building apex ($(VERSION)-$(HASH_APEX))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(VERSION)-$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(VERSION) $(MAKE) --directory=apex/ && \
-		echo "$(VERSION)-$(HASH_APEX)" > $@; \
+		BASIL_DOCKER_TAG=$(REPO_URL)apex:$(VERSION)-$(HASH_APEX) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)apex:$(VERSION)-$(HASH_APEX) STRATO_VERSION=$(VERSION) $(MAKE) --directory=apex/; \
 	else \
 		echo "apex up to date"; \
 	fi
 
-$(DOCKER_SENTINELS)/mercata-backend: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/backend,$(VERSION)-$(HASH_MERCATA_BACKEND)); then \
+mercata-backend:
+	@if $(call image_missing,$(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND)); then \
 		echo "Building mercata-backend ($(VERSION)-$(HASH_MERCATA_BACKEND))..."; \
 		docker build -t $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) -f ./mercata/backend/Dockerfile ./mercata && \
-		docker tag $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_AWS_ECR_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) && \
-		echo "$(VERSION)-$(HASH_MERCATA_BACKEND)" > $@; \
+		docker tag $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_AWS_ECR_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND); \
 	else \
 		echo "mercata-backend up to date"; \
 	fi
 
-$(DOCKER_SENTINELS)/mercata-ui: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/ui,$(VERSION)-$(HASH_MERCATA_UI)); then \
+mercata-ui:
+	@if $(call image_missing,$(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)); then \
 		echo "Building mercata-ui ($(VERSION)-$(HASH_MERCATA_UI))..."; \
 		docker build -t $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) -f ./mercata/ui/Dockerfile ./mercata && \
-		docker tag $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) $(REPO_AWS_ECR_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) && \
-		echo "$(VERSION)-$(HASH_MERCATA_UI)" > $@; \
+		docker tag $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) $(REPO_AWS_ECR_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI); \
 	else \
 		echo "mercata-ui up to date"; \
 	fi
 
-$(DOCKER_SENTINELS)/prometheus: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,prometheus-packager,$(VERSION)-$(HASH_PROMETHEUS)); then \
+prometheus:
+	@if $(call image_missing,$(REPO_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS)); then \
 		echo "Building prometheus ($(VERSION)-$(HASH_PROMETHEUS))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) $(MAKE) --directory=prometheus-packager/ && \
-		echo "$(VERSION)-$(HASH_PROMETHEUS)" > $@; \
+		BASIL_DOCKER_TAG=$(REPO_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)prometheus:$(VERSION)-$(HASH_PROMETHEUS) $(MAKE) --directory=prometheus-packager/; \
 	else \
 		echo "prometheus up to date"; \
 	fi
 
-$(DOCKER_SENTINELS)/smd: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,smd-ui,$(VERSION)-$(HASH_SMD)); then \
+smd:
+	@if $(call image_missing,$(REPO_URL)smd:$(VERSION)-$(HASH_SMD)); then \
 		echo "Building smd ($(VERSION)-$(HASH_SMD))..."; \
-		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(VERSION)-$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(VERSION) $(MAKE) --directory=smd-ui/ && \
-		echo "$(VERSION)-$(HASH_SMD)" > $@; \
+		BASIL_DOCKER_TAG=$(REPO_URL)smd:$(VERSION)-$(HASH_SMD) ECR_DOCKER_TAG=$(REPO_AWS_ECR_URL)smd:$(VERSION)-$(HASH_SMD) STRATO_VERSION=$(VERSION) $(MAKE) --directory=smd-ui/; \
 	else \
 		echo "smd up to date"; \
 	fi
 
-$(DOCKER_SENTINELS)/bridge: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/services/bridge,$(VERSION)-$(HASH_BRIDGE)); then \
+bridge:
+	@if $(call image_missing,$(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE)); then \
 		echo "Building bridge ($(VERSION)-$(HASH_BRIDGE))..."; \
 		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./mercata/services/bridge && \
-		docker tag $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE) && \
-		echo "$(VERSION)-$(HASH_BRIDGE)" > $@; \
+		docker tag $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE); \
 	else \
 		echo "bridge up to date"; \
 	fi
 
-$(DOCKER_SENTINELS)/bridge-nginx: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/services/bridge/nginx,$(VERSION)-$(HASH_BRIDGE_NGINX)); then \
+bridge-nginx:
+	@if $(call image_missing,$(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX)); then \
 		echo "Building bridge-nginx ($(VERSION)-$(HASH_BRIDGE_NGINX))..."; \
 		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) ./mercata/services/bridge/nginx && \
-		docker tag $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) && \
-		echo "$(VERSION)-$(HASH_BRIDGE_NGINX)" > $@; \
+		docker tag $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX); \
 	else \
 		echo "bridge-nginx up to date"; \
 	fi
-
-# Clean sentinel files to force full rebuild
-clean-docker-sentinels:
-	rm -rf $(DOCKER_SENTINELS)
 
 all: local
 
@@ -210,78 +185,56 @@ all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force
 
-apex: $(DOCKER_SENTINELS)/apex
-nginx: $(DOCKER_SENTINELS)/nginx
-postgrest: $(DOCKER_SENTINELS)/postgrest
-prometheus: $(DOCKER_SENTINELS)/prometheus
-smd: $(DOCKER_SENTINELS)/smd
-mercata-backend: $(DOCKER_SENTINELS)/mercata-backend
-mercata-ui: $(DOCKER_SENTINELS)/mercata-ui
-bridge: $(DOCKER_SENTINELS)/bridge
-bridge-nginx: $(DOCKER_SENTINELS)/bridge-nginx
-
-# Force rebuild targets (ignore sentinel files)
+# Force rebuild targets (unconditional)
 apex-force:
 	@echo Now building apex...
 	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION}-${HASH_APEX} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}apex:${VERSION}-${HASH_APEX} STRATO_VERSION=${VERSION}-${HASH_APEX} make --directory=apex/
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/apex
 
 nginx-force:
 	@echo Now building nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION}-${HASH_NGINX} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}nginx:${VERSION}-${HASH_NGINX} make --directory=nginx-packager/
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/nginx
 
 postgrest-force:
 	@echo Now building postgrest...
 	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION}-${HASH_POSTGREST} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}postgrest:${VERSION}-${HASH_POSTGREST} make --directory=postgrest-packager/
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/postgrest
 
 prometheus-force:
 	@echo Now building prometheus...
 	BASIL_DOCKER_TAG=$(REPO_URL)prometheus:${VERSION}-${HASH_PROMETHEUS} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}prometheus:${VERSION}-${HASH_PROMETHEUS} make --directory=prometheus-packager/
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/prometheus
 
 smd-force:
 	@echo building smd...
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION}-${HASH_SMD} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION}-${HASH_SMD} STRATO_VERSION=${VERSION}-${HASH_SMD} make --directory=smd-ui/
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/smd
 
 mercata-backend-force:
 	@echo Now building mercata-backend...
 	docker build -t ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} -f ./mercata/backend/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND}
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-backend
 
 mercata-ui-force:
 	@echo Now building mercata-ui...
 	docker build -t ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} -f ./mercata/ui/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI}
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-ui
 
 bridge-force:
 	@echo Now building bridge...
 	docker build -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./mercata/services/bridge
 	docker tag ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ${REPO_AWS_ECR_URL}bridge:${VERSION}-${HASH_BRIDGE}
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/bridge
 
 bridge-nginx-force:
 	@echo Now building bridge-nginx...
 	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./mercata/services/bridge/nginx
 	docker tag ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX}
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/bridge-nginx
 
-$(DOCKER_SENTINELS)/local-auth: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,local-auth,$(VERSION)-$(HASH_LOCAL_AUTH)); then \
+local-auth:
+	@if $(call image_missing,local-auth:$(VERSION)-$(HASH_LOCAL_AUTH)); then \
 		echo "Building local-auth ($(VERSION)-$(HASH_LOCAL_AUTH))..."; \
-		docker build -t local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) ./local-auth && \
-		echo "$(VERSION)-$(HASH_LOCAL_AUTH)" > $@; \
+		docker build -t local-auth:$(VERSION)-$(HASH_LOCAL_AUTH) ./local-auth; \
 	else \
 		echo "local-auth up to date"; \
 	fi
-
-local-auth: $(DOCKER_SENTINELS)/local-auth
 
 oracle:
 	@echo Now building oracle... 
