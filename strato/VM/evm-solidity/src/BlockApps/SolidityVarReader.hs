@@ -105,7 +105,7 @@ valueToSolidityValue = \case
   ValueVariadic values -> SolidityArray $ map valueToSolidityValue values
 
 svmValueToSolidityValues :: String -> Maybe [SVMType.Type] -> Maybe [SolidityValue]
-svmValueToSolidityValues "" _ = Nothing
+svmValueToSolidityValues "" _ = Just []
 svmValueToSolidityValues resp mReturnTypes =
   case Aeson.eitherDecode (BLC.pack resp) of
     Left _ -> Nothing
