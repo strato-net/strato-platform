@@ -7,7 +7,7 @@ module Blockchain.Sequencer.Event (
   IngestEvent(..),
   FlushMempoolRequest(..),
   FlushMempoolScope(..),
-  VmEvent(..),
+  VmTask(..),
   P2pEvent(..),
   Timestamp,
   SeqLoopEvent(..),
@@ -19,6 +19,8 @@ import qualified Blockchain.Data.Block as BDB
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Model.WrappedBlock (OutputBlock(..), OutputTx(..), IngestBlock(..), IngestTx(..))
+import Blockchain.Sequencer.HexData (HexData(..))
+import Blockchain.Sequencer.TxCallObject (TxCallObject(..))
 import qualified Blockchain.Strato.Model.Address as A
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
@@ -98,9 +100,23 @@ data JsonRpcCommand
   | JRCGetCode {jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String}
   | JRCGetTransactionCount {jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String}
   | JRCGetStorageAt {jrcAddress :: A.Address, jrcKey :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
-  | JRCCall {jrcCode :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
+  | JRCCall {jrcCallObj :: TxCallObject, jrcId :: String, jrcBlockString :: String}
   deriving (Eq, Read, Show, GHCG.Generic, Data)
 
+instance Format JsonRpcCommand where
+  format JRCGetBalance {jrcAddress = addr, jrcId = rid} =
+    "JRCGetBalance id=" ++ rid ++ " addr=" ++ format addr
+  format JRCGetCode {jrcAddress = addr, jrcId = rid} =
+    "JRCGetCode id=" ++ rid ++ " addr=" ++ format addr
+  format JRCGetTransactionCount {jrcAddress = addr, jrcId = rid} =
+    "JRCGetTransactionCount id=" ++ rid ++ " addr=" ++ format addr
+  format JRCGetStorageAt {jrcAddress = addr, jrcId = rid} =
+    "JRCGetStorageAt id=" ++ rid ++ " addr=" ++ format addr
+  format JRCCall {jrcCallObj = obj, jrcId = rid, jrcBlockString = blk} =
+    let dataHex = format $ unHexData (data_ obj)
+        toStr = maybe "none" format (to obj)
+    in "JRCCall id=" ++ rid ++ " to=" ++ toStr ++ " data=" ++ dataHex ++ " block=" ++ blk
+  
 data P2pEvent
   = P2pTx OutputTx
   | P2pBlock OutputBlock
@@ -129,7 +145,7 @@ instance ShowConstructor P2pEvent where
   showConstructor P2pGetMPNodes{} = "P2pGetMPNodes"
   showConstructor P2pMPNodesResponse{} = "P2pMPNodesResponse"
 
-data VmEvent
+data VmTask
   = VmTx Timestamp OutputTx
   | VmBlock OutputBlock
   | VmJsonRpcCommand JsonRpcCommand
@@ -140,7 +156,7 @@ data VmEvent
   | VmFlushMempool FlushMempoolRequest
   deriving (Eq, Show, GHCG.Generic)
 
-instance Format VmEvent where
+instance Format VmTask where
   format (VmTx ts o) = show ts ++ " " ++ format o
   format (VmBlock o) = format o
   format (VmGetMPNodesRequest o srs) = show o ++ " requested: " ++ format srs
@@ -148,7 +164,7 @@ instance Format VmEvent where
   format (VmFlushMempool req) = format req
   format x = show x
 
-instance ShowConstructor VmEvent where
+instance ShowConstructor VmTask where
   showConstructor VmTx{} = "VmTx"
   showConstructor VmBlock{} = "VmBlock"
   showConstructor VmJsonRpcCommand{} = "VmJsonRpcCommand"
@@ -164,4 +180,4 @@ instance Binary JsonRpcCommand
 
 instance Binary P2pEvent
 
-instance Binary VmEvent
+instance Binary VmTask

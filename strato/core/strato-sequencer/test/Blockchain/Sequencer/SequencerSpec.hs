@@ -165,7 +165,7 @@ withTemporaryDepBlockDB genesisBlock m = do
       `finally`
       (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
-feedBackOutputsToInput :: [VmEvent] -> [IngestEvent]
+feedBackOutputsToInput :: [VmTask] -> [IngestEvent]
 feedBackOutputsToInput = map rebox
     where rebox (VmTx ts t) = IETx ts $ unboxTx t
           rebox (VmBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles

@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft } from "lucide-react";
+import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
@@ -25,6 +25,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
+import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
+import { useNetwork } from "@/context/NetworkContext";
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = typeof TIME_RANGES[number];
@@ -78,6 +80,8 @@ const Dashboard = () => {
   });
   const { loans, refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
+  const { contactEnabled } = useNetwork();
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
     const stored = localStorage.getItem('dashboard-timeRange');
     if (stored && TIME_RANGES.includes(stored as TimeRange)) {
@@ -98,7 +102,7 @@ const Dashboard = () => {
   }, [rewardsActivities]);
 
   // Extract CATA token from inactive tokens by address
-  const cataToken = useMemo(() => 
+  const cataToken = useMemo(() =>
     inactiveTokens?.find(token => token.address === cataAddress),
     [inactiveTokens]
   );
@@ -124,10 +128,7 @@ const Dashboard = () => {
 
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isLoadingNetBalance } = useNetBalance({
-    tokens: earningAssets,
     cataToken,
-    loans,
-    totalCDPDebt
   });
 
   const chartConfig = useMemo(() => ({
@@ -153,7 +154,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     document.title = "Dashboard | STRATO";
-    
+
     // Check if user just logged in and needs to be redirected back to claim page
     const claimReturnUrl = localStorage.getItem("claimReturnUrl");
     if (claimReturnUrl && isLoggedIn) {
@@ -161,13 +162,13 @@ const Dashboard = () => {
       navigate(claimReturnUrl, { replace: true });
       return;
     }
-    
+
     const hasExistingEarningAssets = earningAssets.length > 0;
     const hasExistingInactiveTokens = inactiveTokens.length > 0;
-    
+
     // Always fetch earning assets (uses public endpoint for guests)
     getEarningAssets(!hasExistingEarningAssets);
-    
+
     // Only fetch inactive tokens for logged-in users (no public endpoint available)
     if (isLoggedIn) {
       getInactiveTokens(!hasExistingInactiveTokens);
@@ -221,8 +222,8 @@ const Dashboard = () => {
       const cache = activeTab === 'netBalance'
         ? netBalanceCacheRef.current
         : activeTab === 'rewards'
-        ? rewardsCacheRef.current
-        : borrowedCacheRef.current;
+          ? rewardsCacheRef.current
+          : borrowedCacheRef.current;
       const cacheKey = `${activeTab}:${selectedTimeRange}`;
       const cached = cache[selectedTimeRange];
       const cachedAt = cacheTimestampsRef.current[cacheKey] || 0;
@@ -281,6 +282,34 @@ const Dashboard = () => {
         <DashboardHeader title="Portfolio" />
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
+          {/* Physical Metals Deposit Banner (only when contact API is configured) */}
+          {contactEnabled && (
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-200 dark:border-blue-800 rounded-xl p-4 md:p-5 hover:bg-blue-500/15 transition-colors">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-500 rounded-full p-1.5 shrink-0">
+                      <Gem className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-semibold text-foreground">Deposit Physical Gold & Silver</h3>
+                      <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                        We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => setContactModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+                  >
+                    <Mail size={16} />
+                    Contact Us
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to view your portfolio, track rewards, and manage your assets" />
           )}
@@ -384,7 +413,7 @@ const Dashboard = () => {
           {/* Portfolio Value Chart - hidden on mobile and for guests */}
           {isLoggedIn && (
             <div className="mb-8 hidden md:block">
-              <PortfolioValueChart 
+              <PortfolioValueChart
                 data={chartConfig[activeTab].data || []}
                 onTimeRangeChange={onTimeRangeChange}
                 selectedTimeRange={selectedTimeRange}
@@ -430,23 +459,23 @@ const Dashboard = () => {
           </div>
 
           <div className="mb-8">
-            <AssetsList 
-              loading={loadingEarningAssets || loadingInactiveTokens} 
-              tokens={nonPoolTokens} 
-              inActiveTokens={isLoggedIn ? inactiveTokens : []} 
+            <AssetsList
+              loading={loadingEarningAssets || loadingInactiveTokens}
+              tokens={nonPoolTokens}
+              inActiveTokens={isLoggedIn ? inactiveTokens : []}
               guestMode={!isLoggedIn}
             />
           </div>
 
           <div className="mb-8">
-            <BorrowingSection 
+            <BorrowingSection
               loanData={loans}
               guestMode={!isLoggedIn}
             />
           </div>
 
           <div className="mb-8">
-            <MyPoolParticipationSection 
+            <MyPoolParticipationSection
               poolTokens={poolTokens}
               loading={loadingEarningAssets}
               guestMode={!isLoggedIn}
@@ -460,6 +489,9 @@ const Dashboard = () => {
       </div>
 
       <MobileBottomNav />
+      {contactEnabled && (
+        <ContactInquiryModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
+      )}
     </div>
   );
 };

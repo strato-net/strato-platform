@@ -215,7 +215,7 @@ runSequencerMTest c bc m = do
         }
   return $ fst a
 
-pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
+pairToVmTx :: (Timestamp, OutputTx) -> VmTask
 pairToVmTx = uncurry VmTx
 
 createFirstTimer ::

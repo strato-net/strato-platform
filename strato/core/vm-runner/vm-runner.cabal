@@ -31,7 +31,9 @@ library
       src/
   ghc-options: -Wall -O2
   build-depends:
-      base
+      aeson
+    , base
+    , base16-bytestring
     , binary
     , blockDB
     , blockapps-data
@@ -46,6 +48,7 @@ library
     , cross-monitoring
     , dlist
     , ethereum-rlp
+    , evm-solidity
     , exceptions
     , extra
     , format
@@ -72,6 +75,7 @@ library
     , time
     , transformers
     , unliftio
+    , vector
     , vm-tools
   default-language: Haskell2010
 

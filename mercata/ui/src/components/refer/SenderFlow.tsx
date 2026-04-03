@@ -124,11 +124,32 @@ export function SenderFlow(props: Props) {
     }
   }, [activeTokens, entries]);
 
-  // Get max amount for a specific token
+  // Get max amount for a specific token (balance divided by quantity)
   const getMaxAmount = (token: Token | undefined): string => {
     if (!token || !token.balance) return "0";
-    return token.balance;
+    const balance = BigInt(token.balance);
+    const qty = parseInt(quantity, 10);
+    if (isNaN(qty) || qty <= 0) return balance.toString();
+    return (balance / BigInt(qty)).toString();
   };
+
+  // Re-validate entry amounts when quantity changes
+  useEffect(() => {
+    setEntries(prevEntries =>
+      prevEntries.map(entry => {
+        if (!entry.token || !entry.amount) return entry;
+        const maxWei = BigInt(getMaxAmount(entry.token));
+        const amountWei = safeParseUnits(entry.amount, 18);
+        if (amountWei > 0n && maxWei > 0n && amountWei > maxWei) {
+          return { ...entry, amountError: "Maximum amount exceeded" };
+        }
+        if (entry.amountError === "Maximum amount exceeded") {
+          return { ...entry, amountError: "" };
+        }
+        return entry;
+      })
+    );
+  }, [quantity]);
 
   // Add a new entry
   const addEntry = () => {

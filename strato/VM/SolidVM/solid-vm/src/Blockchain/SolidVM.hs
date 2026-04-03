@@ -39,6 +39,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
+import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
@@ -290,7 +291,7 @@ create' creator newAddress ch cc contractName' valList = do
     ExecResults
       { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
         erRefund = 0,
-        erReturnVal = Just "",
+        erReturnVal = Nothing,
         erTrace = [],
         erLogs = [],
         erEvents = toList finalEvs,
@@ -369,11 +370,6 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
     maybeVal <-
       call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) (textToLabel funcName) argVals
 
-    returnVal <-
-      case maybeVal of
-        Nothing -> return "()"
-        Just ret -> encodeForReturn ret
-
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
     let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
@@ -382,7 +378,7 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
       ExecResults
         { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
           erRefund = 0,
-          erReturnVal = Just returnVal,
+          erReturnVal = maybeVal,
           erTrace = [],
           erLogs = [],
           erEvents = toList finalEvs,
@@ -2487,7 +2483,7 @@ callBuiltin "fastForward" [secs] = do
 
 callBuiltin "abiEncode" args = SBytes <$> Builtins.abiEncode args
 callBuiltin "abiEncodePacked" args = SBytes <$> Builtins.abiEncodePacked args
-callBuiltin "abiDecode" (SBytes bs : typeArgs) = return $ Builtins.abiDecode bs typeArgs
+callBuiltin "abiDecode" (SBytes bs : typeArgs) = return $ abiDecode bs typeArgs
 callBuiltin "abiDecode" args = invalidArguments "abi.decode expects (bytes, types...)" args
 
 callBuiltin x args = unknownFunction (formatBuiltinError x args) x
@@ -2799,64 +2795,6 @@ logVals val1 val2 =
       \            %%%% val2 = %s\n"
       (show val1)
       (show val2)
-
---TODO: It would be nice to hold type information in the return value....  Unfortunately to be backwards compatible with the old API, for now we can not include this.
--- change the return type from ByteSTring to String
-encodeForReturn :: MonadSM m => Value -> m String
-encodeForReturn v =
-  case v of
-    STuple {} -> encodeForReturn' v
-    _ -> do
-      v' <- encodeForReturn' v
-      return $ "(" <> v' <> ")"
-
-encodeForReturn' :: MonadSM m => Value -> m String
-encodeForReturn' (SInteger i) = return $ show i
-encodeForReturn' (SEnumVal _ _ v) = return $ show v
-encodeForReturn' (SAddress a _) = return $ "\"" ++ (show a) ++ "\""
-encodeForReturn' (SContract _ a) = return $ "\"" ++ (show a) ++ "\""
-encodeForReturn' (SBool b) = return $ if b then "true" else "false"
-encodeForReturn' (SString s) = return $ show s
-{- The following comments are just for previous encodeForReturn function to return ByteString type.
--- in the case of tuples, we need to follow the EVM/Solidity encoding convention:
---   1) starting at the first value to encode, check if it is fixed length type (32), or
---      dynamic (right now, this group is only strings since we don't return arrays).
---   2) if a fixed type, encode it directly into the next 32 characters in the bytestring
---   3) if dynamic:
---      a) encode an offset value into the next 32 characters.
---      b) at that offset, put the encoded string's length in the first 32 characters,
---         followed by the encoded string
---   4) repeat for the remaining values
---
---   The headers of the bytestring are the initial (tuple_length * 32) characters.
---   They are either encoded simple values, or offsets. If some are offsets (to
---   encoded strings), then they point to characters beyond the (tuple_length * 32)
---   In other words, the final bytestring is headers `B.append` encodedStrings
---
---
---   As an example, return type (string, uint, string) would have the following encoding:
---
---                                            (offsetStr1)            (offsetStr2)
--- Size:  |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
--- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
--}
-encodeForReturn' (SArray items) = do
-  encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
-  return $ "[" ++ (intercalate "," encodedItems) ++ "]" --[,]
-encodeForReturn' (STuple items) = do
-  encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
-
-  return $ "(" ++ (intercalate "," encodedItems) ++ ")"
-encodeForReturn' (SDecimal d) = return $ show d
-encodeForReturn' (SStruct _ vs) = do
-  let encodePair k v = fmap (\v' -> show (labelToString k) ++ ": " ++ v')
-                     . encodeForReturn' =<< getVar v
-  encodedItems <- mapM (uncurry encodePair) $ M.toList vs
-  pure $ "{" ++ intercalate "," encodedItems ++ "}"
-encodeForReturn' SNULL = pure "0"
-encodeForReturn' SReference{} = pure "0"
-encodeForReturn' (SBytes bs) = return $ show $ B16.encode bs
-encodeForReturn' x = todo "Cannot encode this return type: " x
 
 --formatAddressWithoutColor : padded the address with 40 bytes
 solidityExceptionHandlerHelper :: (MonadSM m, Ord k, IsString k) => M.Map k (Maybe (SolidString, SVMType.Type), [CC.Statement]) -> t1 -> t2 -> Integer-> (t1 -> t2 -> m (Maybe Value))-> m (Maybe Value)

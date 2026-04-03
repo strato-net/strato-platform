@@ -57,6 +57,11 @@
       "submit": false,
       "comment": "TSLA stock price feed for TSLAX rebase. submit=false: only used as underlying, not pushed directly."
     },
+    "WEETH": {
+      "targetAssetAddress": "00000000000000000000000000000000deadbeef",
+      "submit": false,
+      "comment": "weETH price feed for AWEETH rebase. submit=false: only used as underlying, not pushed directly."
+    },
     "WSPYX": {
       "targetAssetAddress": "1ac696799624c75050b10b7ee3e6fcf6f1f39aa1",
       "rebase": {
@@ -68,7 +73,7 @@
         "factorPrecision": "1000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
       },
-      "comment": "xStock: price = SPY price × getCurrentMultiplier() on Ethereum / 1e18"
+      "comment": "xStock: price = SPY price * getCurrentMultiplier() on Ethereum / 1e18"
     },
     "WTSLAX": {
       "targetAssetAddress": "f147e193fd1a629aa75aedd4758444ec0c969ca8",
@@ -81,7 +86,7 @@
         "factorPrecision": "1000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
       },
-      "comment": "xStock: price = TSLA price × getCurrentMultiplier() on Ethereum / 1e18"
+      "comment": "xStock: price = TSLA price * getCurrentMultiplier() on Ethereum / 1e18"
     }
   }
 }

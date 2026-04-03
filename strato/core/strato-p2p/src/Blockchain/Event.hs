@@ -28,7 +28,7 @@ import           Blockchain.Data.BlockHeader           (BlockHeader)
 import qualified Blockchain.Data.BlockHeader           as BlockHeader
 import           Blockchain.Data.Control               (P2PCNC (..))
 import           Blockchain.Data.PubKey
-import           Blockchain.Data.Transaction
+import           Blockchain.Data.Transaction           (Transaction)
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.EthConf (ethConf, p2pConfig)

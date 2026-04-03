@@ -5,7 +5,7 @@ module Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker) w
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (apiConfig, httpPort)
+import Blockchain.EthConf.Model (networkConfig, httpPort)
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.Options (flags_composeOnly, flags_repoUrl)
@@ -20,7 +20,7 @@ import System.IO (hPutStrLn, stderr)
 generateDockerComposeAllDocker :: IO ()
 generateDockerComposeAllDocker = do
   let conf = ethConf
-      portNum = show $ httpPort (apiConfig conf)
+      portNum = show $ httpPort (networkConfig conf)
       repoUrl = flags_repoUrl
       stratoVersion = stratoVersionTag
       noLogging = Just Logging { driver = "none", options = Nothing }
@@ -40,11 +40,7 @@ generateDockerComposeAllDocker = do
         , depends_on = Just $ DependsOnList ["strato", "postgrest"]
         , init = Just True
         , environment = Just $ Map.fromList
-            [ ("OAUTH_DISCOVERY_URL", "${OAUTH_DISCOVERY_URL}")
-            , ("OAUTH_CLIENT_ID", "${OAUTH_CLIENT_ID}")
-            , ("OAUTH_CLIENT_SECRET", "${OAUTH_CLIENT_SECRET}")
-            , ("NODE_URL", "http://nginx")
-            , ("BASE_URL", "https://${NODE_HOST}")
+            [ ("NODE_URL", "http://nginx")
             , ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
             , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
             , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA}")
@@ -68,10 +64,14 @@ generateDockerComposeAllDocker = do
             , ("BA_USERNAME", "${BA_USERNAME}")
             , ("BA_PASSWORD", "${BA_PASSWORD}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
+            , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
-        , volumes = Just ["./logs:/logs"]
+        , volumes = Just
+            [ "./logs:/logs"
+            , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
+            ]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -284,7 +284,7 @@ generateDockerComposeAllDocker = do
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /docker-run.sh >> /logs/nginx.log 2>&1"]
         , ports = Just [portNum ++ ":" ++ portNum, "443:443"]
-        , volumes = Just ["./logs:/logs", "./ssl:/tmp/ssl:ro", "./nodedata/secrets:/run/secrets:ro", "./nodedata/.ethereumH:/config:ro"]
+        , volumes = Just ["./logs:/logs", "./secrets/ssl:/etc/ssl/strato:ro", "./nodedata/secrets:/run/secrets:ro", "./nodedata/.ethereumH:/config:ro"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
             { test = ["CMD", "curl", "--silent", "--output", "/dev/null", "--fail", "localhost:" ++ portNum ++ "/_ping"]

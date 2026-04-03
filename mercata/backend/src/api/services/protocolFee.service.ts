@@ -17,6 +17,10 @@ const {
   LendingRegistry,
   CDPRegistry,
   PoolFactory,
+  Pool,
+  poolFactory,
+  StablePool,
+  MetalForge,
 } = constants;
 
 /**
@@ -44,6 +48,8 @@ export interface RevenueByPeriod {
 export interface ProtocolRevenue {
   totalRevenue: string;
   revenueByPeriod: RevenueByPeriod;
+  pendingRevenue?: string;
+  lastAccrual?: number;
 }
 
 export interface AggregatedProtocolRevenue {
@@ -52,6 +58,8 @@ export interface AggregatedProtocolRevenue {
     cdp: ProtocolRevenue;
     lending: ProtocolRevenue;
     swap: ProtocolRevenue;
+    stablePool: ProtocolRevenue;
+    metalForge: ProtocolRevenue;
     gas: ProtocolRevenue;
   };
   aggregated: RevenueByPeriod;
@@ -199,60 +207,112 @@ const buildRevenueArray = async (
 
 /**
  * Get protocol revenue from CDP operations
- * Sums all toCollector values from FeesRouted events
+ * Revenue = Σ(toCollector) from FeesRouted events
+ * Pending = un-accrued stability fees across all collateral assets since their lastAccrual
  */
 export const getCDPProtocolRevenue = async (
   accessToken: string,
   userAddress: string
 ): Promise<ProtocolRevenue> => {
   try {
-    // Get registry to find CDPEngine address
     const registry = await getCDPRegistry(accessToken, userAddress, {}, "getCDPProtocolRevenue");
-    
+
     if (!registry?.cdpEngine) {
       throw new Error("CDP Engine not found");
     }
     const cdpEngineAddress = registry.cdpEngine.address;
-    
-    // Fetch all FeesRouted events from CDPEngine
-    const { data: feesRoutedEvents } = await cirrus.get(
-      accessToken,
-      `/${CDPEngine}-FeesRouted`,
-      {
+
+    // Fetch FeesRouted events and CDPEngine state in parallel
+    const [{ data: feesRoutedEvents }, { data: engineData }] = await Promise.all([
+      cirrus.get(accessToken, `/${CDPEngine}-FeesRouted`, {
         params: {
           select: "asset,toCollector::text,block_timestamp",
           address: `eq.${cdpEngineAddress}`
         }
-      }
-    );
-
-    if (!feesRoutedEvents || feesRoutedEvents.length === 0) {
-      return {
-        totalRevenue: "0",
-        revenueByPeriod: {
-          daily: { total: "0", byAsset: [] },
-          weekly: { total: "0", byAsset: [] },
-          monthly: { total: "0", byAsset: [] },
-          ytd: { total: "0", byAsset: [] },
-          allTime: { total: "0", byAsset: [] }
+      }),
+      cirrus.get(accessToken, `/${CDPEngine}`, {
+        params: {
+          address: `eq.${cdpEngineAddress}`,
+          select: `feeToReserveBps::text,collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),collateralGlobalStates:${CDPEngine}-collateralGlobalStates(asset:key,CollateralGlobalState:value)`
         }
-      };
-    }
+      })
+    ]);
 
     const timeCutoffs = getTimeCutoffs();
-    
-    // Transform events to common format
-    // Note: CDP fees are always paid in USDST, so we use the USDST address
-    // rather than the collateral asset from the event
-    const transformedEvents = feesRoutedEvents.map((event: any) => ({
+    const { now } = timeCutoffs;
+    const RAY = 10n ** 27n;
+    const usdstAddress = constants.USDST.toLowerCase();
+
+    // FeesRouted revenue (already realized)
+    const transformedEvents = (feesRoutedEvents || []).map((event: any) => ({
       value: BigInt(event.toCollector || "0"),
       timestamp: parseTimestamp(event.block_timestamp),
-      asset: constants.USDST.toLowerCase()
+      asset: usdstAddress
     }));
-    
+
     const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
-    
-    // Build revenue data with token symbols
+
+    // Compute pending (un-accrued) stability fees across all assets
+    const engine = engineData?.[0];
+    const feeToReserveBps = BigInt(engine?.feeToReserveBps || "0");
+    const collectorShareBps = 10000n - feeToReserveBps;
+    let pendingRevenue = 0n;
+    let mostRecentAccrual = 0;
+
+    if (engine) {
+      const configs: any[] = engine.collateralConfigs || [];
+      const states: any[] = engine.collateralGlobalStates || [];
+
+      const configByAsset = new Map<string, any>();
+      for (const c of configs) {
+        const asset = (c.asset ?? "").toLowerCase();
+       if (asset) configByAsset.set(asset, c.CollateralConfig);
+      }
+
+      const rpow = (x: bigint, n: bigint, base: bigint): bigint => {
+        let z = n % 2n !== 0n ? x : base;
+        let xC = x;
+        for (let nC = n / 2n; nC !== 0n; nC = nC / 2n) {
+          xC = (xC * xC) / base;
+          if (nC % 2n !== 0n) z = (z * xC) / base;
+        }
+        return z;
+      };
+
+      for (const s of states) {
+        const asset = (s.asset ?? "").toLowerCase();
+        const globalState = s.CollateralGlobalState;
+        if (!asset || !globalState) continue;
+
+        const rateAccumulator = BigInt(globalState.rateAccumulator || "0");
+        const lastAccrual = BigInt(globalState.lastAccrual || "0");
+        const totalScaledDebt = BigInt(globalState.totalScaledDebt || "0");
+
+        if (totalScaledDebt === 0n || rateAccumulator === 0n) continue;
+
+        const config = configByAsset.get(asset);
+        const stabilityFeeRate = BigInt(config?.stabilityFeeRate || "0");
+        if (stabilityFeeRate <= RAY) continue;
+
+        const dt = BigInt(now) - lastAccrual;
+        if (dt <= 0n) continue;
+
+        if (Number(lastAccrual) > mostRecentAccrual) {
+          mostRecentAccrual = Number(lastAccrual);
+        }
+
+        const factor = rpow(stabilityFeeRate, dt, RAY);
+        const newRate = (rateAccumulator * factor) / RAY;
+        const feeUSD = (totalScaledDebt * (newRate - rateAccumulator)) / RAY;
+        const toCollector = (feeUSD * collectorShareBps) / 10000n;
+        pendingRevenue += toCollector;
+      }
+    }
+
+    const calculateTotal = (revenueMap: Record<string, bigint>): string => {
+      return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
+    };
+
     const tokenSymbolCache = new Map<string, string>();
     const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
       buildRevenueArray(accessToken, periodRevenue.allTime, tokenSymbolCache),
@@ -261,12 +321,7 @@ export const getCDPProtocolRevenue = async (
       buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
       buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
     ]);
-    
-    // Calculate totals
-    const calculateTotal = (revenueMap: Record<string, bigint>): string => {
-      return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
-    };
-    
+
     return {
       totalRevenue: calculateTotal(periodRevenue.allTime),
       revenueByPeriod: {
@@ -275,7 +330,9 @@ export const getCDPProtocolRevenue = async (
         monthly: { total: calculateTotal(periodRevenue.monthly), byAsset: monthlyArray },
         ytd: { total: calculateTotal(periodRevenue.ytd), byAsset: ytdArray },
         allTime: { total: calculateTotal(periodRevenue.allTime), byAsset: allTimeArray }
-      }
+      },
+      pendingRevenue: pendingRevenue.toString(),
+      lastAccrual: mostRecentAccrual
     };
   } catch (error: any) {
     console.error("Error fetching CDP protocol revenue:", {
@@ -328,78 +385,52 @@ const getSwapFeeCollector = async (
 
 /**
  * Get protocol revenue from lending pool operations
- * 
- * Revenue is calculated using point-in-time snapshots:
- * - revenue_t = reservesAccrued_t * (10000 - safetyShareBps_t) / 10000
- * - period_revenue = (revenue_t2 - revenue_t1) + sum(ReservesSweptTreasury events)
- * 
- * This approach correctly handles safetyShareBps changes at each snapshot time.
+ *
+ * Revenue[T1,T2] = treasuryShare of (reservesAccrued@T2 − reservesAccrued@T1) + Σ(ReservesSweptTreasury)
+ *
+ * Pending revenue = un-accrued interest since lastAccrual, computed via rpow off-chain.
  */
 export const getLendingProtocolRevenue = async (
   accessToken: string,
 ): Promise<ProtocolRevenue> => {
   try {
-    // Get lending pool address from registry
-    const { lendingPool: lendingPoolAddress } = await getPool(accessToken, { 
-      select: "lendingPool" 
+    const { lendingPool: lendingPoolAddress } = await getPool(accessToken, {
+      select: "lendingPool"
     });
-    
+
     if (!lendingPoolAddress) {
       throw new Error("Lending pool address not found");
     }
 
+    const RAY = 10n ** 27n;
     const timeCutoffs = getTimeCutoffs();
     const { now, oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
-    
-    // Define time periods with their start and end timestamps (in seconds)
-    const periods = {
-      daily: { start: oneDayAgo, end: now },
-      weekly: { start: oneWeekAgo, end: now },
-      monthly: { start: oneMonthAgo, end: now },
-      ytd: { start: ytdCutoff, end: now },
-      allTime: { start: 0, end: now }
-    };
-    
-    // Helper to format timestamp for history query (convert seconds to ISO string)
-    const formatTimestamp = (ts: number): string => {
-      return new Date(ts * 1000).toISOString();
-    };
-    
-    // Get unique timestamps we need to query
-    const uniqueTimestamps = [...new Set([now, oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff, 0])];
-    
-    // Fetch storage history for all needed timestamps in parallel
-    const storagePromises = uniqueTimestamps.map(async (ts) => {
-      const timeStr = formatTimestamp(ts);
+    const toIso = (ts: number) => new Date(ts * 1000).toISOString();
+
+    const getReservesAccruedAt = async (isoTimestamp: string): Promise<bigint> => {
       try {
         const { data } = await cirrus.get(accessToken, "/history@storage", {
           params: {
             address: `eq.${lendingPoolAddress}`,
-            valid_from: `lte.${timeStr}`,
-            valid_to: `gte.${timeStr}`,
+            valid_from: `lte.${isoTimestamp}`,
+            valid_to: `gte.${isoTimestamp}`,
             select: "data"
           }
         });
-        
-        if (!data || data.length === 0) {
-          return { timestamp: ts, reservesAccrued: 0n, safetyShareBps: 0 };
-        }
-        
-        const storageData = data[0].data;
-        return {
-          timestamp: ts,
-          reservesAccrued: BigInt(storageData?.reservesAccrued || "0"),
-          safetyShareBps: Number(storageData?.safetyShareBps || 0)
-        };
-      } catch (e) {
-        // If history query fails (e.g., no data at that time), default to 0
-        return { timestamp: ts, reservesAccrued: 0n, safetyShareBps: 0 };
+        return BigInt(data?.[0]?.data?.reservesAccrued || "0");
+      } catch {
+        return 0n;
       }
-    });
-    
-    // Query swept treasury events and pool info in parallel with storage queries
-    const [storageResults, sweptTreasuryRes, poolData] = await Promise.all([
-      Promise.all(storagePromises),
+    };
+
+    // Fetch all snapshots, sweep events, and pool state in parallel
+    const [nowReserves, dailyStart, weeklyStart, monthlyStart, ytdStart,
+      sweptTreasuryRes, poolData] = await Promise.all([
+      getReservesAccruedAt(toIso(now)),
+      getReservesAccruedAt(toIso(oneDayAgo)),
+      getReservesAccruedAt(toIso(oneWeekAgo)),
+      getReservesAccruedAt(toIso(oneMonthAgo)),
+      getReservesAccruedAt(toIso(ytdCutoff)),
       cirrus.get(accessToken, `/${LendingPool}-ReservesSweptTreasury`, {
         params: {
           address: `eq.${lendingPoolAddress}`,
@@ -407,78 +438,92 @@ export const getLendingProtocolRevenue = async (
         }
       }),
       cirrus.get(accessToken, `/${LendingPool}`, {
-        params: { 
-          address: `eq.${lendingPoolAddress}`, 
-          select: "borrowableAsset" 
+        params: {
+          address: `eq.${lendingPoolAddress}`,
+          select: "borrowableAsset,borrowIndex::text,lastAccrual::text,totalScaledDebt::text,safetyShareBps::text,assetConfigs:BlockApps-LendingPool-assetConfigs(asset:key,AssetConfig:value)"
         }
       })
     ]);
-    // Build a map from timestamp to storage data
-    const storageByTimestamp = new Map<number, { reservesAccrued: bigint; safetyShareBps: number }>();
-    storageResults.forEach(({ timestamp, reservesAccrued, safetyShareBps }) => {
-      storageByTimestamp.set(timestamp, { reservesAccrued, safetyShareBps });
-    });
-    
-    // Process swept treasury events
-    interface SweptEvent { amount: bigint; timestamp: number; }
-    
-    const sweptTreasuryEvents: SweptEvent[] = (sweptTreasuryRes.data || []).map((e: any) => ({
+
+    const safetyShareBps = BigInt(poolData.data?.[0]?.safetyShareBps || "0");
+    const treasuryShareBps = 10000n - safetyShareBps;
+
+    // Only treasury swept events count as revenue
+    interface SweptEvent { amount: bigint; timestamp: number }
+    const sweptEvents: SweptEvent[] = (sweptTreasuryRes.data || []).map((e: any) => ({
       amount: BigInt(e.amount || "0"),
       timestamp: parseTimestamp(e.block_timestamp)
     }));
-    
-    // Helper to calculate revenue at a point in time
-    // revenue = reservesAccrued * (10000 - safetyShareBps) / 10000
-    const calculateRevenueAtTime = (storage: { reservesAccrued: bigint; safetyShareBps: number }): bigint => {
-      return (storage.reservesAccrued * BigInt(10000 - storage.safetyShareBps)) / 10000n;
+
+    const sweptByPeriod = { daily: 0n, weekly: 0n, monthly: 0n, ytd: 0n, allTime: 0n };
+    for (const e of sweptEvents) {
+      sweptByPeriod.allTime += e.amount;
+      if (e.timestamp >= oneDayAgo) sweptByPeriod.daily += e.amount;
+      if (e.timestamp >= oneWeekAgo) sweptByPeriod.weekly += e.amount;
+      if (e.timestamp >= oneMonthAgo) sweptByPeriod.monthly += e.amount;
+      if (e.timestamp >= ytdCutoff) sweptByPeriod.ytd += e.amount;
+    }
+
+    // Treasury revenue = treasury share of delta(reservesAccrued) + swept treasury
+    const calc = (startRes: bigint, swept: bigint): bigint => {
+      const delta = nowReserves - startRes;
+      const treasuryDelta = (delta * treasuryShareBps) / 10000n;
+      const rev = treasuryDelta + swept;
+      return rev > 0n ? rev : 0n;
     };
-    
-    // Calculate revenue for each period
-    // period_revenue = (revenue_t2 - revenue_t1) + sum(ReservesSweptTreasury)
-    const calculatePeriodRevenue = (periodKey: keyof typeof periods): bigint => {
-      const { start, end } = periods[periodKey];
-      
-      const startStorage = storageByTimestamp.get(start) || { reservesAccrued: 0n, safetyShareBps: 0 };
-      const endStorage = storageByTimestamp.get(end) || { reservesAccrued: 0n, safetyShareBps: 0 };
-      
-      // Calculate revenue at start and end of period using their respective safetyShareBps
-      const revenueAtStart = calculateRevenueAtTime(startStorage);
-      const revenueAtEnd = calculateRevenueAtTime(endStorage);
-      
-      // Sum of ReservesSweptTreasury events during the period
-      const sweptTreasuryInPeriod = sweptTreasuryEvents
-        .filter(e => e.timestamp >= start && e.timestamp <= end)
-        .reduce((sum: bigint, e: SweptEvent) => sum + e.amount, 0n);
-      
-      // Total revenue = (revenue_t2 - revenue_t1) + swept treasury
-      const protocolRevenue = (revenueAtEnd - revenueAtStart) + sweptTreasuryInPeriod;
-      
-      return protocolRevenue > 0n ? protocolRevenue : 0n;
-    };
-    
-    // Get the borrowable asset for token info
-    const borrowableAsset = poolData.data?.[0]?.borrowableAsset || constants.USDST;
-    
-    // Calculate revenue for each period
-    const dailyRevenue = calculatePeriodRevenue('daily');
-    const weeklyRevenue = calculatePeriodRevenue('weekly');
-    const monthlyRevenue = calculatePeriodRevenue('monthly');
-    const ytdRevenue = calculatePeriodRevenue('ytd');
-    const allTimeRevenue = calculatePeriodRevenue('allTime');
-    
-    // Get token symbol
+
+    const dailyRevenue = calc(dailyStart, sweptByPeriod.daily);
+    const weeklyRevenue = calc(weeklyStart, sweptByPeriod.weekly);
+    const monthlyRevenue = calc(monthlyStart, sweptByPeriod.monthly);
+    const ytdRevenue = calc(ytdStart, sweptByPeriod.ytd);
+    const allTimeRevenue = calc(0n, sweptByPeriod.allTime);
+
+    // Compute pending (un-accrued) revenue since lastAccrual
+    const pool = poolData.data?.[0];
+    const borrowableAsset = pool?.borrowableAsset || constants.USDST;
+    let pendingRevenue = 0n;
+    let lastAccrualTs = 0;
+
+    if (pool) {
+      const borrowIndex = BigInt(pool.borrowIndex || "0");
+      const lastAccrual = BigInt(pool.lastAccrual || "0");
+      const totalScaledDebt = BigInt(pool.totalScaledDebt || "0");
+
+      lastAccrualTs = Number(lastAccrual);
+      const borrowableConfig = pool.assetConfigs?.find(
+        (c: any) => (c.asset ?? c.key)?.toLowerCase() === borrowableAsset.toLowerCase()
+      );
+      const assetConfig = borrowableConfig?.AssetConfig ?? borrowableConfig?.value;
+      const perSecondFactorRAY = BigInt(assetConfig?.perSecondFactorRAY || "0");
+      const reserveFactor = BigInt(assetConfig?.reserveFactor || "0");
+
+      if (perSecondFactorRAY > 0n && totalScaledDebt > 0n && borrowIndex > 0n) {
+        const dt = BigInt(now) - lastAccrual;
+        if (dt > 0n) {
+          const rpow = (x: bigint, n: bigint, base: bigint): bigint => {
+            let z = n % 2n !== 0n ? x : base;
+            let xC = x;
+            for (let nC = n / 2n; nC !== 0n; nC = nC / 2n) {
+              xC = (xC * xC) / base;
+              if (nC % 2n !== 0n) z = (z * xC) / base;
+            }
+            return z;
+          };
+          const projectedIndex = (borrowIndex * rpow(perSecondFactorRAY, dt, RAY)) / RAY;
+          const interestDelta = (totalScaledDebt * (projectedIndex - borrowIndex)) / RAY;
+          const totalPending = (interestDelta * reserveFactor) / 10000n;
+          pendingRevenue = (totalPending * treasuryShareBps) / 10000n;
+        }
+      }
+    }
+
     const tokenInfo = await getTokenInfo(accessToken, borrowableAsset);
-    
-    // Build result in same format
+
     const buildByAsset = (revenue: bigint): RevenueByAsset[] => {
       if (revenue <= 0n) return [];
-      return [{
-        asset: borrowableAsset,
-        symbol: tokenInfo.symbol,
-        revenue: revenue.toString()
-      }];
+      return [{ asset: borrowableAsset, symbol: tokenInfo.symbol, revenue: revenue.toString() }];
     };
-    
+
     return {
       totalRevenue: allTimeRevenue.toString(),
       revenueByPeriod: {
@@ -487,7 +532,9 @@ export const getLendingProtocolRevenue = async (
         monthly: { total: monthlyRevenue.toString(), byAsset: buildByAsset(monthlyRevenue) },
         ytd: { total: ytdRevenue.toString(), byAsset: buildByAsset(ytdRevenue) },
         allTime: { total: allTimeRevenue.toString(), byAsset: buildByAsset(allTimeRevenue) }
-      }
+      },
+      pendingRevenue: pendingRevenue.toString(),
+      lastAccrual: lastAccrualTs
     };
   } catch (error: any) {
     console.error("Error fetching lending protocol revenue:", {
@@ -498,7 +545,7 @@ export const getLendingProtocolRevenue = async (
 };
 
 /**
- * Get protocol revenue from swap operations
+ * Get protocol revenue from swap operations for non-stable pools
  */
 export const getSwapProtocolRevenue = async (
   accessToken: string,
@@ -507,15 +554,16 @@ export const getSwapProtocolRevenue = async (
     // Get fee collector address
     const feeCollector = await getSwapFeeCollector(accessToken);
     
-    // Get all pools from the factory's allPools array
-    const { data: allPoolsData } = await cirrus.get(accessToken, `/${PoolFactory}-allPools`, {
+    // Get only non-stable (volatile) pools belonging to our PoolFactory
+    const { data: volatilePoolsData } = await cirrus.get(accessToken, `/${Pool}`, {
       params: {
-        address: `eq.${config.poolFactory}`,
-        select: "value"
+        isStable: "eq.false",
+        poolFactory: `eq.${poolFactory}`,
+        select: "address"
       }
     });
     
-    if (!allPoolsData || allPoolsData.length === 0) {
+    if (!volatilePoolsData || volatilePoolsData.length === 0) {
       return {
         totalRevenue: "0",
         revenueByPeriod: {
@@ -528,8 +576,7 @@ export const getSwapProtocolRevenue = async (
       };
     }
     
-    // Extract pool addresses from the allPools array
-    const poolAddresses = allPoolsData.map((entry: any) => entry.value);
+    const poolAddresses = volatilePoolsData.map((entry: any) => entry.address);
     
     // Query all Transfer events where 'from' is any pool and 'to' is feeCollector
     const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
@@ -627,46 +674,220 @@ export const getSwapProtocolRevenue = async (
 };
 
 /**
- * Get gas cost revenue from transaction fees
+ * Get protocol revenue from stable pool operations
+ *
+ * Revenue[T1,T2] = (adminBalances at T2 − adminBalances at T1) + Σ Transfer events in [T1,T2]
+ *
+ * Uses history@mapping for point-in-time snapshots of adminBalances.
+ * For allTime, T1 balances are 0 (empty map).
+ */
+export const getStablePoolProtocolRevenue = async (
+  accessToken: string,
+): Promise<ProtocolRevenue> => {
+  try {
+    const feeCollector = await getSwapFeeCollector(accessToken);
+
+    const { data: stablePoolsData } = await cirrus.get(accessToken, `/${StablePool}`, {
+      params: {
+        poolFactory: `eq.${poolFactory}`,
+        select: "address"
+      }
+    });
+
+    const emptyRevenue: ProtocolRevenue = {
+      totalRevenue: "0",
+      revenueByPeriod: {
+        daily: { total: "0", byAsset: [] },
+        weekly: { total: "0", byAsset: [] },
+        monthly: { total: "0", byAsset: [] },
+        ytd: { total: "0", byAsset: [] },
+        allTime: { total: "0", byAsset: [] }
+      }
+    };
+
+    if (!stablePoolsData || stablePoolsData.length === 0) {
+      return emptyRevenue;
+    }
+
+    const stablePoolAddresses: string[] = stablePoolsData.map((e: any) => e.address);
+    const poolFilter = `in.(${stablePoolAddresses.join(",")})`;
+    const timeCutoffs = getTimeCutoffs();
+    const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
+    const toIso = (ts: number) => new Date(ts * 1000).toISOString();
+
+    // Point-in-time snapshot of adminBalances across all stable pools, summed by token
+    const getAdminBalancesAt = async (isoTimestamp: string): Promise<Map<string, bigint>> => {
+      const { data } = await cirrus.get(accessToken, "/history@mapping", {
+        params: {
+          address: poolFilter,
+          collection_name: "eq.adminBalances",
+          valid_from: `lte.${isoTimestamp}`,
+          valid_to: `gte.${isoTimestamp}`,
+          select: "key->>key,value::text"
+        }
+      });
+      const map = new Map<string, bigint>();
+      for (const row of (data || [])) {
+        const token = String(row["key->>key"] ?? row.key ?? "").toLowerCase();
+        if (!token) continue;
+        const rawVal = String(row.value ?? row["value::text"] ?? "0").trim();
+        let val: bigint;
+        try { val = BigInt(rawVal || "0"); } catch { val = 0n; }
+        if (val > 0n) map.set(token, (map.get(token) || 0n) + val);
+      }
+      return map;
+    };
+
+    // Fetch all snapshots and Transfer events in parallel
+    const [nowBalances, dailyStartBal, weeklyStartBal, monthlyStartBal, ytdStartBal, transferRes] =
+      await Promise.all([
+        getAdminBalancesAt(toIso(timeCutoffs.now)),
+        getAdminBalancesAt(toIso(oneDayAgo)),
+        getAdminBalancesAt(toIso(oneWeekAgo)),
+        getAdminBalancesAt(toIso(oneMonthAgo)),
+        getAdminBalancesAt(toIso(ytdCutoff)),
+        cirrus.get(accessToken, `/event`, {
+          params: {
+            event_name: "eq.Transfer",
+            select: "address,attributes,block_timestamp",
+            "attributes->>from": poolFilter,
+            "attributes->>to": `eq.${feeCollector}`,
+            order: "block_timestamp.desc"
+          }
+        })
+      ]);
+
+    const transferEvents: any[] = transferRes.data || [];
+
+    // Bucket Transfer events by period and token (raw token amounts)
+    const emptyBucket = () => new Map<string, bigint>();
+    const transferBuckets = {
+      daily: emptyBucket(), weekly: emptyBucket(), monthly: emptyBucket(),
+      ytd: emptyBucket(), allTime: emptyBucket()
+    };
+
+    for (const event of transferEvents) {
+      const token = event.address?.toLowerCase();
+      if (!token) continue;
+      const rawAmount = event.attributes?.value;
+      const amount = BigInt(rawAmount || "0");
+      if (amount === 0n) continue;
+      const ts = parseTimestamp(event.block_timestamp);
+
+      transferBuckets.allTime.set(token, (transferBuckets.allTime.get(token) || 0n) + amount);
+      if (ts >= oneDayAgo) transferBuckets.daily.set(token, (transferBuckets.daily.get(token) || 0n) + amount);
+      if (ts >= oneWeekAgo) transferBuckets.weekly.set(token, (transferBuckets.weekly.get(token) || 0n) + amount);
+      if (ts >= oneMonthAgo) transferBuckets.monthly.set(token, (transferBuckets.monthly.get(token) || 0n) + amount);
+      if (ts >= ytdCutoff) transferBuckets.ytd.set(token, (transferBuckets.ytd.get(token) || 0n) + amount);
+    }
+
+    // Revenue[T1,T2] = (adminBal@T2 − adminBal@T1) + transfers in [T1,T2]
+    const computePeriodRevenue = (
+      startBal: Map<string, bigint>,
+      endBal: Map<string, bigint>,
+      transfers: Map<string, bigint>,
+      priceMap: Map<string, bigint>
+    ): Record<string, bigint> => {
+      const DECIMALS = 10n ** 18n;
+      const allTokens = new Set([...startBal.keys(), ...endBal.keys(), ...transfers.keys()]);
+      const result: Record<string, bigint> = {};
+      for (const token of allTokens) {
+        const delta = (endBal.get(token) || 0n) - (startBal.get(token) || 0n);
+        const swept = transfers.get(token) || 0n;
+        const rawRevenue = delta + swept;
+        if (rawRevenue <= 0n) continue;
+        const price = priceMap.get(token) || 0n;
+        const usdRevenue = (rawRevenue * price) / DECIMALS;
+        if (usdRevenue > 0n) result[token] = usdRevenue;
+      }
+      return result;
+    };
+
+    // Collect all token addresses for price lookup
+    const tokenSet = new Set<string>();
+    for (const m of [nowBalances, dailyStartBal, weeklyStartBal, monthlyStartBal, ytdStartBal,
+      transferBuckets.daily, transferBuckets.weekly, transferBuckets.monthly,
+      transferBuckets.ytd, transferBuckets.allTime]) {
+      for (const k of m.keys()) tokenSet.add(k);
+    }
+
+    if (tokenSet.size === 0) return emptyRevenue;
+
+    const priceMap = new Map<string, bigint>();
+    await Promise.all(
+      [...tokenSet].map(async (tokenAddress) => {
+        try {
+          const priceData = await getPrice(accessToken, tokenAddress) as { asset: string; price: string };
+          priceMap.set(tokenAddress, BigInt(priceData.price || "0"));
+        } catch {
+          priceMap.set(tokenAddress, 0n);
+        }
+      })
+    );
+
+    const emptyMap = new Map<string, bigint>();
+    const periodRevenue = {
+      daily: computePeriodRevenue(dailyStartBal, nowBalances, transferBuckets.daily, priceMap),
+      weekly: computePeriodRevenue(weeklyStartBal, nowBalances, transferBuckets.weekly, priceMap),
+      monthly: computePeriodRevenue(monthlyStartBal, nowBalances, transferBuckets.monthly, priceMap),
+      ytd: computePeriodRevenue(ytdStartBal, nowBalances, transferBuckets.ytd, priceMap),
+      allTime: computePeriodRevenue(emptyMap, nowBalances, transferBuckets.allTime, priceMap),
+    };
+
+    const tokenSymbolCache = new Map<string, string>();
+    const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
+      buildRevenueArray(accessToken, periodRevenue.allTime, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.daily, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.weekly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
+    ]);
+
+    const calculateTotal = (revenueMap: Record<string, bigint>): string => {
+      return Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
+    };
+
+    return {
+      totalRevenue: calculateTotal(periodRevenue.allTime),
+      revenueByPeriod: {
+        daily: { total: calculateTotal(periodRevenue.daily), byAsset: dailyArray },
+        weekly: { total: calculateTotal(periodRevenue.weekly), byAsset: weeklyArray },
+        monthly: { total: calculateTotal(periodRevenue.monthly), byAsset: monthlyArray },
+        ytd: { total: calculateTotal(periodRevenue.ytd), byAsset: ytdArray },
+        allTime: { total: calculateTotal(periodRevenue.allTime), byAsset: allTimeArray }
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching stable pool protocol revenue:", {
+      error: error.response?.data || error.message,
+      stack: error.stack
+    });
+    throw new Error("Failed to fetch stable pool protocol revenue");
+  }
+};
+
+/**
+ * Get gas cost revenue from STRATO transaction fees (0.01 USDST per tx)
  */
 export const getGasCostRevenue = async (
   accessToken: string,
 ): Promise<ProtocolRevenue> => {
   try {
-    // Get fee collector address (same as swap)
+    const GAS_FEE_WEI = "10000000000000000"; // 1e16 = 0.01 USDST
+    const usdstAddress = constants.USDST.toLowerCase();
     const feeCollector = await getSwapFeeCollector(accessToken);
-    
-    // Query all Transfer events where 'to' is feeCollector and 'from' is not a zero/system address
-    const { data: tokenTransferEvents } = await cirrus.get(accessToken, `/event`, {
+
+    // Query USDST Transfer events to feeCollector with exactly 0.01 USDST value (gas fee payments)
+    const { data: gasTransferEvents } = await cirrus.get(accessToken, `/event`, {
       params: {
-        event_name: `eq.Transfer`,
-        select: "address,attributes,block_timestamp",
+        event_name: "eq.Transfer",
+        address: `eq.${usdstAddress}`,
         "attributes->>to": `eq.${feeCollector}`,
-        // Exclude transfers from zero/system addresses (000000000000000000000000000000000000%)
-        "attributes->>from": `not.like.000000000000000000000000000000000000%`,
+        "attributes->>value": `eq.${GAS_FEE_WEI}`,
+        select: "block_timestamp",
         order: "block_timestamp.desc"
       }
     });
-    // Also need to exclude transfers from pools (since those are already counted in swap revenue)
-    // Get all pool addresses to exclude
-    const { data: allPoolsData } = await cirrus.get(accessToken, `/${PoolFactory}-allPools`, {
-      params: {
-        address: `eq.${config.poolFactory}`,
-        select: "value"
-      }
-    });
-    const poolAddresses = allPoolsData ? allPoolsData.map((entry: any) => entry.value) : [];
-    
-    // Get lending pool liquidityPool address to exclude (already counted in lending revenue)
-    const { lendingPool: lendingPoolAddress, liquidityPool: liquidityPoolAddress } = await getPool(accessToken, { 
-      select: "lendingPool,liquidityPool" 
-    });
-    
-    // Filter out transfers from pools and liquidity pool
-    const excludedAddresses = new Set([...poolAddresses, liquidityPoolAddress].filter(Boolean));
-    const gasTransferEvents = tokenTransferEvents?.filter((event: any) => 
-      !excludedAddresses.has(event.attributes.from)
-    ) || [];
     
     if (!gasTransferEvents || gasTransferEvents.length === 0) {
       return {
@@ -680,104 +901,133 @@ export const getGasCostRevenue = async (
         }
       };
     }
-    // Aggregate by token and time period
+    const fee = BigInt(GAS_FEE_WEI);
     const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = getTimeCutoffs();
-    
-    const revenueByAsset: Record<string, {
-      symbol: string;
-      daily: bigint;
-      weekly: bigint;
-      monthly: bigint;
-      ytd: bigint;
-      allTime: bigint;
-    }> = {};
-    
-    // Process each transfer event
+
+    // Count events per period — each event is exactly 0.01 USDST
+    let daily = 0n, weekly = 0n, monthly = 0n, ytd = 0n, allTime = 0n;
     for (const event of gasTransferEvents) {
-      const tokenAddress = event.address;
-      const amount = BigInt(event.attributes.value || "0");
-      const timestamp = parseTimestamp(event.block_timestamp);
-      
-      // Initialize token entry if not exists
-      if (!revenueByAsset[tokenAddress]) {
-        const tokenInfo = await getTokenInfo(accessToken, tokenAddress);
-        revenueByAsset[tokenAddress] = {
-          symbol: tokenInfo.symbol,
-          daily: 0n,
-          weekly: 0n,
-          monthly: 0n,
-          ytd: 0n,
-          allTime: 0n
-        };
-      }
-      
-      // Add to appropriate time buckets
-      revenueByAsset[tokenAddress].allTime += amount;
-      if (timestamp >= ytdCutoff) revenueByAsset[tokenAddress].ytd += amount;
-      if (timestamp >= oneMonthAgo) revenueByAsset[tokenAddress].monthly += amount;
-      if (timestamp >= oneWeekAgo) revenueByAsset[tokenAddress].weekly += amount;
-      if (timestamp >= oneDayAgo) revenueByAsset[tokenAddress].daily += amount;
+      const ts = parseTimestamp(event.block_timestamp);
+      allTime += fee;
+      if (ts >= oneDayAgo) daily += fee;
+      if (ts >= oneWeekAgo) weekly += fee;
+      if (ts >= oneMonthAgo) monthly += fee;
+      if (ts >= ytdCutoff) ytd += fee;
     }
-    // Convert to result format
-    const formatRevenueByAsset = (selector: keyof typeof revenueByAsset[string]): RevenueByAsset[] => {
-      return Object.entries(revenueByAsset)
-        .map(([asset, data]) => ({
-          asset,
-          symbol: data.symbol,
-          revenue: data[selector].toString()
-        }))
-        .filter(item => item.revenue !== "0")
-        .sort((a, b) => {
-          const revenueA = BigInt(a.revenue);
-          const revenueB = BigInt(b.revenue);
-          if (revenueA > revenueB) return -1;
-          if (revenueA < revenueB) return 1;
-          return 0;
-        });
-    };
-    // Calculate totals
-    const calculateTotal = (items: RevenueByAsset[]): string => {
-      return items.reduce((sum, item) => sum + BigInt(item.revenue), 0n).toString();
-    };
-    
-    const revenueByPeriod: RevenueByPeriod = {
-      daily: {
-        byAsset: formatRevenueByAsset('daily'),
-        total: "0"
-      },
-      weekly: {
-        byAsset: formatRevenueByAsset('weekly'),
-        total: "0"
-      },
-      monthly: {
-        byAsset: formatRevenueByAsset('monthly'),
-        total: "0"
-      },
-      ytd: {
-        byAsset: formatRevenueByAsset('ytd'),
-        total: "0"
-      },
-      allTime: {
-        byAsset: formatRevenueByAsset('allTime'),
-        total: "0"
-      }
-    };
-    
-    // Set totals
-    revenueByPeriod.daily.total = calculateTotal(revenueByPeriod.daily.byAsset);
-    revenueByPeriod.weekly.total = calculateTotal(revenueByPeriod.weekly.byAsset);
-    revenueByPeriod.monthly.total = calculateTotal(revenueByPeriod.monthly.byAsset);
-    revenueByPeriod.ytd.total = calculateTotal(revenueByPeriod.ytd.byAsset);
-    revenueByPeriod.allTime.total = calculateTotal(revenueByPeriod.allTime.byAsset);
+
+    const buildByAsset = (total: bigint): RevenueByAsset[] =>
+      total > 0n ? [{ asset: usdstAddress, symbol: "USDST", revenue: total.toString() }] : [];
+
     return {
-      totalRevenue: revenueByPeriod.allTime.total,
-      revenueByPeriod
+      totalRevenue: allTime.toString(),
+      revenueByPeriod: {
+        daily: { total: daily.toString(), byAsset: buildByAsset(daily) },
+        weekly: { total: weekly.toString(), byAsset: buildByAsset(weekly) },
+        monthly: { total: monthly.toString(), byAsset: buildByAsset(monthly) },
+        ytd: { total: ytd.toString(), byAsset: buildByAsset(ytd) },
+        allTime: { total: allTime.toString(), byAsset: buildByAsset(allTime) }
+      }
     };
   } catch (error: any) {
     console.error("Error fetching gas cost revenue:", {
       error: error.response?.data || error.message
     });
     throw new Error("Failed to fetch gas cost revenue");
+  }
+};
+
+/**
+ * Get protocol revenue from MetalForge mint fees
+ * Revenue = Σ(feeAmount) from MetalMinted events, converted to USD
+ */
+export const getMetalForgeProtocolRevenue = async (
+  accessToken: string,
+): Promise<ProtocolRevenue> => {
+  try {
+    const metalForgeAddress = constants.metalForge;
+
+    const emptyRevenue: ProtocolRevenue = {
+      totalRevenue: "0",
+      revenueByPeriod: {
+        daily: { total: "0", byAsset: [] },
+        weekly: { total: "0", byAsset: [] },
+        monthly: { total: "0", byAsset: [] },
+        ytd: { total: "0", byAsset: [] },
+        allTime: { total: "0", byAsset: [] }
+      }
+    };
+
+    if (!metalForgeAddress) return emptyRevenue;
+
+    const { data: mintEvents } = await cirrus.get(accessToken, `/${MetalForge}-MetalMinted`, {
+      params: {
+        address: `eq.${metalForgeAddress}`,
+        select: "payToken,feeAmount::text,block_timestamp",
+        order: "block_timestamp.desc"
+      }
+    });
+
+    if (!mintEvents || mintEvents.length === 0) return emptyRevenue;
+
+    const timeCutoffs = getTimeCutoffs();
+    const { oneDayAgo, oneWeekAgo, oneMonthAgo, ytdCutoff } = timeCutoffs;
+    const DECIMALS = 10n ** 18n;
+
+    // Get unique pay tokens and fetch prices
+    const payTokens = [...new Set<string>(mintEvents.map((e: any) => (e.payToken as string).toLowerCase()))];
+    const priceMap = new Map<string, bigint>();
+    await Promise.all(
+      payTokens.map(async (tokenAddress) => {
+        try {
+          const priceData = await getPrice(accessToken, tokenAddress) as { asset: string; price: string };
+          priceMap.set(tokenAddress, BigInt(priceData.price || "0"));
+        } catch {
+          priceMap.set(tokenAddress, 0n);
+        }
+      })
+    );
+
+    // Transform events: convert feeAmount to USD using payToken price
+    const transformedEvents = mintEvents.map((event: any) => {
+      const payToken = (event.payToken as string).toLowerCase();
+      const feeAmount = BigInt(event.feeAmount || "0");
+      const price = priceMap.get(payToken) || 0n;
+      return {
+        value: (feeAmount * price) / DECIMALS,
+        timestamp: parseTimestamp(event.block_timestamp),
+        asset: payToken
+      };
+    });
+
+    const periodRevenue = categorizeRevenueByPeriod(transformedEvents, timeCutoffs);
+
+    const tokenSymbolCache = new Map<string, string>();
+    const [allTimeArray, dailyArray, weeklyArray, monthlyArray, ytdArray] = await Promise.all([
+      buildRevenueArray(accessToken, periodRevenue.allTime, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.daily, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.weekly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.monthly, tokenSymbolCache),
+      buildRevenueArray(accessToken, periodRevenue.ytd, tokenSymbolCache)
+    ]);
+
+    const calculateTotal = (revenueMap: Record<string, bigint>): string =>
+      Object.values(revenueMap).reduce((sum, val) => sum + val, 0n).toString();
+
+    return {
+      totalRevenue: calculateTotal(periodRevenue.allTime),
+      revenueByPeriod: {
+        daily: { total: calculateTotal(periodRevenue.daily), byAsset: dailyArray },
+        weekly: { total: calculateTotal(periodRevenue.weekly), byAsset: weeklyArray },
+        monthly: { total: calculateTotal(periodRevenue.monthly), byAsset: monthlyArray },
+        ytd: { total: calculateTotal(periodRevenue.ytd), byAsset: ytdArray },
+        allTime: { total: calculateTotal(periodRevenue.allTime), byAsset: allTimeArray }
+      }
+    };
+  } catch (error: any) {
+    console.error("Error fetching metal forge protocol revenue:", {
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to fetch metal forge protocol revenue");
   }
 };
 
@@ -790,12 +1040,16 @@ export const getAggregatedProtocolRevenue = async (
 ): Promise<AggregatedProtocolRevenue> => {
   try {
     // Fetch revenue data from all protocols in parallel
-    const [cdpRevenue, lendingRevenue, swapRevenue, gasRevenue] = await Promise.all([
+    const [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, metalForgeRevenue, gasRevenue] = await Promise.all([
       getCDPProtocolRevenue(accessToken, userAddress),
       getLendingProtocolRevenue(accessToken),
       getSwapProtocolRevenue(accessToken),
+      getStablePoolProtocolRevenue(accessToken),
+      getMetalForgeProtocolRevenue(accessToken),
       getGasCostRevenue(accessToken)
     ]);
+
+    const allProtocols = [cdpRevenue, lendingRevenue, swapRevenue, stablePoolRevenue, metalForgeRevenue, gasRevenue];
     
     // Helper to aggregate revenues across protocols
     const aggregateRevenues = (...revenues: RevenueByAsset[][]): RevenueByAsset[] => {
@@ -825,87 +1079,22 @@ export const getAggregatedProtocolRevenue = async (
         });
     };
     
-    // Aggregate totals
-    const totalRevenue = (
-      BigInt(cdpRevenue.totalRevenue) +
-      BigInt(lendingRevenue.totalRevenue) +
-      BigInt(swapRevenue.totalRevenue) +
-      BigInt(gasRevenue.totalRevenue)
-    ).toString();
+    const totalRevenue = allProtocols
+      .reduce((sum, p) => sum + BigInt(p.totalRevenue), 0n)
+      .toString();
     
-    // Aggregate each time period
-    const aggregated: RevenueByPeriod = {
-      daily: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.daily.total) +
-          BigInt(lendingRevenue.revenueByPeriod.daily.total) +
-          BigInt(swapRevenue.revenueByPeriod.daily.total) +
-          BigInt(gasRevenue.revenueByPeriod.daily.total)
-        ).toString(),
+    const periods: (keyof RevenueByPeriod)[] = ['daily', 'weekly', 'monthly', 'ytd', 'allTime'];
+    const aggregated = {} as RevenueByPeriod;
+    for (const period of periods) {
+      aggregated[period] = {
+        total: allProtocols
+          .reduce((sum, p) => sum + BigInt(p.revenueByPeriod[period].total), 0n)
+          .toString(),
         byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.daily.byAsset,
-          lendingRevenue.revenueByPeriod.daily.byAsset,
-          swapRevenue.revenueByPeriod.daily.byAsset,
-          gasRevenue.revenueByPeriod.daily.byAsset
+          ...allProtocols.map(p => p.revenueByPeriod[period].byAsset)
         )
-      },
-      weekly: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.weekly.total) +
-          BigInt(lendingRevenue.revenueByPeriod.weekly.total) +
-          BigInt(swapRevenue.revenueByPeriod.weekly.total) +
-          BigInt(gasRevenue.revenueByPeriod.weekly.total)
-        ).toString(),
-        byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.weekly.byAsset,
-          lendingRevenue.revenueByPeriod.weekly.byAsset,
-          swapRevenue.revenueByPeriod.weekly.byAsset,
-          gasRevenue.revenueByPeriod.weekly.byAsset
-        )
-      },
-      monthly: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.monthly.total) +
-          BigInt(lendingRevenue.revenueByPeriod.monthly.total) +
-          BigInt(swapRevenue.revenueByPeriod.monthly.total) +
-          BigInt(gasRevenue.revenueByPeriod.monthly.total)
-        ).toString(),
-        byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.monthly.byAsset,
-          lendingRevenue.revenueByPeriod.monthly.byAsset,
-          swapRevenue.revenueByPeriod.monthly.byAsset,
-          gasRevenue.revenueByPeriod.monthly.byAsset
-        )
-      },
-      ytd: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.ytd.total) +
-          BigInt(lendingRevenue.revenueByPeriod.ytd.total) +
-          BigInt(swapRevenue.revenueByPeriod.ytd.total) +
-          BigInt(gasRevenue.revenueByPeriod.ytd.total)
-        ).toString(),
-        byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.ytd.byAsset,
-          lendingRevenue.revenueByPeriod.ytd.byAsset,
-          swapRevenue.revenueByPeriod.ytd.byAsset,
-          gasRevenue.revenueByPeriod.ytd.byAsset
-        )
-      },
-      allTime: {
-        total: (
-          BigInt(cdpRevenue.revenueByPeriod.allTime.total) +
-          BigInt(lendingRevenue.revenueByPeriod.allTime.total) +
-          BigInt(swapRevenue.revenueByPeriod.allTime.total) +
-          BigInt(gasRevenue.revenueByPeriod.allTime.total)
-        ).toString(),
-        byAsset: aggregateRevenues(
-          cdpRevenue.revenueByPeriod.allTime.byAsset,
-          lendingRevenue.revenueByPeriod.allTime.byAsset,
-          swapRevenue.revenueByPeriod.allTime.byAsset,
-          gasRevenue.revenueByPeriod.allTime.byAsset
-        )
-      }
-    };
+      };
+    }
     
     return {
       totalRevenue,
@@ -913,6 +1102,8 @@ export const getAggregatedProtocolRevenue = async (
         cdp: cdpRevenue,
         lending: lendingRevenue,
         swap: swapRevenue,
+        stablePool: stablePoolRevenue,
+        metalForge: metalForgeRevenue,
         gas: gasRevenue
       },
       aggregated
@@ -932,11 +1123,10 @@ export const getProtocolRevenueByPeriod = async (
   accessToken: string,
   userAddress: string,
   period: 'daily' | 'weekly' | 'monthly' | 'ytd' | 'allTime',
-  protocol?: 'cdp' | 'lending' | 'swap' | 'gas'
+  protocol?: 'cdp' | 'lending' | 'swap' | 'stablePool' | 'metalForge' | 'gas'
 ): Promise<RevenuePeriod> => {
   try {
     if (protocol) {
-      // Get specific protocol revenue
       let revenue: ProtocolRevenue;
       switch (protocol) {
         case 'cdp':
@@ -947,6 +1137,12 @@ export const getProtocolRevenueByPeriod = async (
           break;
         case 'swap':
           revenue = await getSwapProtocolRevenue(accessToken);
+          break;
+        case 'stablePool':
+          revenue = await getStablePoolProtocolRevenue(accessToken);
+          break;
+        case 'metalForge':
+          revenue = await getMetalForgeProtocolRevenue(accessToken);
           break;
         case 'gas':
           revenue = await getGasCostRevenue(accessToken);

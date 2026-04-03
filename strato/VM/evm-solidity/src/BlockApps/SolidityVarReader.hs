@@ -20,6 +20,7 @@ module BlockApps.SolidityVarReader
     word256ToByteString,
     byteStringToWord256,
     valueToSolidityValue,
+    svmValueToSolidityValues,
     structSort, -- for testing
   )
 where
@@ -56,6 +57,11 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Word
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy.Char8 as BLC
+import qualified Data.Vector as V
+import qualified SolidVM.Model.Value as SVM
+import qualified SolidVM.Model.Type as SVMType
 import Text.Printf
 import Text.Read
 
@@ -97,6 +103,50 @@ valueToSolidityValue = \case
           ++ ")"
   ValueArraySentinel {} -> error "TODO(tim): ValueArraySentinel"
   ValueVariadic values -> SolidityArray $ map valueToSolidityValue values
+
+svmValueToSolidityValues :: String -> Maybe [SVMType.Type] -> Maybe [SolidityValue]
+svmValueToSolidityValues "" _ = Just []
+svmValueToSolidityValues resp mReturnTypes =
+  case Aeson.eitherDecode (BLC.pack resp) of
+    Left _ -> Nothing
+    Right svmVal -> Just $ case svmVal of
+      SVM.STuple items ->
+        let vals = map SVM.getConst (V.toList items)
+        in case mReturnTypes of
+          Just rts | length vals == length rts ->
+            zipWith svmToSolWithType vals rts
+          _ -> map svmToSol vals
+      _ -> case mReturnTypes of
+        Just [rt] -> [svmToSolWithType svmVal rt]
+        _ -> [svmToSol svmVal]
+
+svmToSol :: SVM.Value -> SolidityValue
+svmToSol (SVM.SInteger n) = SolidityValueAsString $ Text.pack $ show n
+svmToSol (SVM.SBool b) = SolidityBool b
+svmToSol (SVM.SString s) = SolidityValueAsString $ Text.pack s
+svmToSol (SVM.SAddress a _) = SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral ((\(Address x) -> x) a) :: Integer)
+svmToSol (SVM.SDecimal d) = SolidityValueAsString $ Text.pack $ show d
+svmToSol (SVM.SEnumVal _ _ vi) = SolidityValueAsString $ Text.pack $ show vi
+svmToSol (SVM.SContract _ a) = SolidityValueAsString $ Text.pack $ show a
+svmToSol (SVM.SBytes bs) = SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bs
+svmToSol (SVM.SArray items) = SolidityArray $ map (svmToSol . SVM.getConst) (V.toList items)
+svmToSol (SVM.STuple items) = SolidityArray $ map (svmToSol . SVM.getConst) (V.toList items)
+svmToSol (SVM.SStruct _ vs) = SolidityObject $ map (\(k,v) -> (Text.pack k, svmToSol (SVM.getConst v))) (Map.toList vs)
+svmToSol SVM.SNULL = SolidityValueAsString "0"
+svmToSol _ = SolidityValueAsString "0"
+
+svmToSolWithType :: SVM.Value -> SVMType.Type -> SolidityValue
+svmToSolWithType SVM.SNULL svmType = svmDefaultForType svmType
+svmToSolWithType v _ = svmToSol v
+
+svmDefaultForType :: SVMType.Type -> SolidityValue
+svmDefaultForType SVMType.Bool = SolidityBool False
+svmDefaultForType (SVMType.Int _ _) = SolidityValueAsString "0"
+svmDefaultForType (SVMType.String _) = SolidityValueAsString ""
+svmDefaultForType (SVMType.Address _) = SolidityValueAsString $ Text.pack $ replicate 40 '0'
+svmDefaultForType SVMType.Decimal = SolidityValueAsString "0"
+svmDefaultForType (SVMType.Bytes _ _) = SolidityValueAsString ""
+svmDefaultForType _ = SolidityValueAsString "0"
 
 word256ToByteString :: Word256 -> ByteString
 word256ToByteString = word256ToBytes

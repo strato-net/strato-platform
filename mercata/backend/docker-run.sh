@@ -6,11 +6,13 @@ if [ -f /run/secrets/oauth_credentials.yaml ]; then
   export OAUTH_DISCOVERY_URL=$(grep "discoveryUrl:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
   export OAUTH_CLIENT_ID=$(grep "clientId:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
   export OAUTH_CLIENT_SECRET=$(grep "clientSecret:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
+else
+  echo "ERROR: /run/secrets/oauth_credentials.yaml not found. Cannot start without OAuth credentials."
+  exit 1
 fi
 
-STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
-STRATO_PORT_API=${STRATO_PORT_API:-3000}
-STRATO_API_URL="http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2"
+STRATO_HOSTNAME=$(grep 'apiHost:' /config/ethconf.yaml | awk '{print $2}' | tr -d '"')
+STRATO_API_URL="http://${STRATO_HOSTNAME}:3000/eth/v1.2"
 
 echo "Waiting for STRATO node to finish syncing (checking ${STRATO_API_URL}/metadata for isSynced=true)..."
 echo "  This may take a long time if the node is catching up with the network."

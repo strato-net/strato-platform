@@ -17,6 +17,7 @@ module SolidVM.Model.Value
     createDefaultValue,
     valEquals,
     valueTypeName,
+    getConst,
   )
 where
 
@@ -24,8 +25,12 @@ import Blockchain.Data.RLP
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Address
 import qualified Data.ByteString.Char8 as BC
-import Text.Format
+import qualified Data.ByteString.Base16 as B16
 import Control.Applicative ((<|>))
+import Control.DeepSeq (NFData, rnf)
+import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), (.:?), (.!=))
+import qualified Data.Aeson as Aeson
+import Text.Format
 import Control.Lens ((^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
@@ -73,6 +78,9 @@ data Variable
 instance Show Variable where
   show (Variable _) = "<variable>"
   show (Constant v) = "Constant: " ++ show v
+
+instance NFData Variable where rnf = (`seq` ())
+instance NFData Value where rnf = (`seq` ())
 
 --TODO- we need to figure out this ambiguity on the Address types....
 --Sometimes address is and integer (solidity can treat an integer as an address),
@@ -414,3 +422,51 @@ instance Format Value where
   format (SString s) = "String(" ++ show (take 20 s) ++ if length s > 20 then "...)" else ")"
   format (SAddress a _) = "Address(" ++ take 10 (show a) ++ "...)"
   format v = valueTypeName v
+
+getConst :: Variable -> Value
+getConst (Constant v) = v
+getConst (Variable _) = SNULL
+
+instance ToJSON Variable where
+  toJSON (Constant v) = toJSON v
+  toJSON (Variable _) = toJSON SNULL
+
+instance FromJSON Variable where
+  parseJSON v = Constant <$> parseJSON v
+
+instance ToJSON Value where
+  toJSON (SInteger n) = object ["t" .= ("int" :: String), "v" .= show n]
+  toJSON (SDecimal d) = object ["t" .= ("dec" :: String), "v" .= show d]
+  toJSON (SString s) = object ["t" .= ("str" :: String), "v" .= s]
+  toJSON (SBool b) = object ["t" .= ("bool" :: String), "v" .= b]
+  toJSON (SAddress a p) = object ["t" .= ("addr" :: String), "v" .= show a, "p" .= p]
+  toJSON (SEnumVal tn vn vi) = object ["t" .= ("enum" :: String), "tn" .= tn, "vn" .= vn, "vi" .= vi]
+  toJSON (SStruct n vs) = object ["t" .= ("struct" :: String), "n" .= n, "v" .= M.map toJSON vs]
+  toJSON (STuple items) = object ["t" .= ("tup" :: String), "v" .= map toJSON (V.toList items)]
+  toJSON (SArray items) = object ["t" .= ("arr" :: String), "v" .= map toJSON (V.toList items)]
+  toJSON (SContract n a) = object ["t" .= ("contract" :: String), "n" .= n, "v" .= show a]
+  toJSON SNULL = toJSON ()
+  toJSON (SBytes bs) = object ["t" .= ("bytes" :: String), "v" .= BC.unpack (B16.encode bs)]
+  toJSON _ = toJSON ()
+
+instance FromJSON Value where
+  parseJSON (Aeson.Object o) = do
+    t <- o .: "t"
+    case (t :: String) of
+      "int" -> SInteger . read <$> o .: "v"
+      "dec" -> SDecimal . read <$> o .: "v"
+      "str" -> SString <$> o .: "v"
+      "bool" -> SBool <$> o .: "v"
+      "addr" -> SAddress <$> (read <$> o .: "v") <*> o .:? "p" .!= False
+      "enum" -> SEnumVal <$> o .: "tn" <*> o .: "vn" <*> o .: "vi"
+      "struct" -> SStruct <$> o .: "n" <*> o .: "v"
+      "tup" -> STuple . V.fromList <$> o .: "v"
+      "arr" -> SArray . V.fromList <$> o .: "v"
+      "contract" -> SContract <$> o .: "n" <*> (read <$> o .: "v")
+      "bytes" -> do
+        hex <- o .: "v"
+        case B16.decode (BC.pack hex) of
+          Right bs -> pure $ SBytes bs
+          Left err -> fail $ "Invalid hex in bytes: " ++ err
+      _ -> fail $ "Unknown Value tag: " ++ t
+  parseJSON _ = pure SNULL

@@ -32,18 +32,16 @@ import Servant
 import Servant.Client
 import UnliftIO
 
-type GetTransactionResult = Capture "txHash" Keccak256 :> Get '[JSON] [TransactionResult]
+type GetTransactionResult = "transactionResult" :> Capture "txHash" Keccak256 :> Get '[JSON] [TransactionResult]
 
-type PostBatchTransactionResult = "batch" :> ReqBody '[JSON, PlainText] [Keccak256]
+type PostBatchTransactionResult = "transactionResult" :> "batch" :> ReqBody '[JSON, PlainText] [Keccak256]
                                           :> Post '[JSON] (M.Map Keccak256 [TransactionResult])
 
-type API = "transactionResult" :> (GetTransactionResult :<|> PostBatchTransactionResult)
+type API = GetTransactionResult :<|> PostBatchTransactionResult
 
 getTransactionResultClient :: Keccak256 -> ClientM [TransactionResult]
-getTransactionResultClient = client (Proxy @GetTransactionResult)
-
 batchTransactionResultClient :: [Keccak256] -> ClientM (M.Map Keccak256 [TransactionResult])
-batchTransactionResultClient = client (Proxy @PostBatchTransactionResult)
+getTransactionResultClient :<|> batchTransactionResultClient = client (Proxy @API)
 
 server :: Selectable Keccak256 [TransactionResult] m => ServerT API m
 server = getTransactionResult :<|> postBatchTransactionResult

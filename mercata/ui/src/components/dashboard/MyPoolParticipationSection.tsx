@@ -55,14 +55,14 @@ export default function MyPoolParticipationSection({
       }
 
       if (vaultState.shareTokenAddress && token.address === vaultState.shareTokenAddress) {
-        return vaultState.apy && vaultState.apy !== "0" && vaultState.apy !== "-"
-          ? vaultState.apy
+        return vaultState.alpha && vaultState.alpha !== "0" && vaultState.alpha !== "-"
+          ? vaultState.alpha
           : null;
       }
 
       return null;
     },
-    [liquidityInfo, lpTokenPoolMap, vaultState.apy]
+    [liquidityInfo, lpTokenPoolMap, vaultState.alpha]
   );
 
   const rows = useMemo(

@@ -5,16 +5,12 @@
 module Blockchain.Stream.VMEvent
   ( VMEvent(..),
     produceVMEvents,
-    produceVMEvents',
-    runKafkaVMEvents,
     fetchVMEvents
   )
 where
 
 import Blockchain.Data.TransactionResult
-import Blockchain.EthConf
 import Blockchain.Stream.Action (Action)
-import Conduit
 import Control.Monad.Composable.Kafka
 import qualified Data.Aeson as JSON
 import Data.Binary
@@ -45,14 +41,8 @@ instance JSON.ToJSON VMEvent
 
 instance JSON.FromJSON VMEvent
 
-produceVMEvents :: MonadIO m => [VMEvent] -> m [ProduceResponse]
-produceVMEvents = runKafkaVMEvents . produceVMEvents'
-
-produceVMEvents' :: HasKafka k => [VMEvent] -> k [ProduceResponse]
-produceVMEvents' = produceItems "vmevents"
-
-runKafkaVMEvents :: MonadIO m => KafkaM m a -> m a
-runKafkaVMEvents = runKafkaMConfigured "blockapps-data"
+produceVMEvents :: HasKafka k => [VMEvent] -> k [ProduceResponse]
+produceVMEvents = produceItems "vmevents"
 
 fetchVMEvents :: HasKafka k => Offset -> k [VMEvent]
 fetchVMEvents = fetchItems "vmevents"
