@@ -101,6 +101,8 @@ const GUEST_SAFE_URLS = [
   // Advanced page - Safety tab
   '/lending/safety/info',
   '/lending/safety/info/public',
+  // PSM page
+  '/psm/info',
   // Rewards page
   '/rewards/overview',
   '/rewards/activities',

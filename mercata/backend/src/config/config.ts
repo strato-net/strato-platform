@@ -109,6 +109,11 @@ export const defaultVaultFor: Record<string, string> = {
   "33056204878082667": "34bc729f66106a146b0864e673a3571b28fa23e1", // Upquark mainnet
 };
 
+export const defaultDirectMintPsmFor: Record<string, string> = {
+  "114784819836269": "df2e081198110fdf287508e069a8c9bc6113707e", // Helium testnet
+  // Upquark mainnet TBD
+};
+
 export const defaultSaveUsdstVaultFor: Record<string, string> = {
   "114784819836269": "ceeb982f671b4ee2b4471e5b49f3126739537f15", // Helium testnet
   "33056204878082667": "22550671fcad04a213697ac7ae4f4366e96446ed", // Upquark mainnet
@@ -124,6 +129,7 @@ export let metalForge: string = '';
 export let creditCardTopUp: string = '';
 export let vault: string = '';
 export let saveUsdstVault: string = '';
+export let directMintPsm: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -186,6 +192,14 @@ export function setSaveUsdstVaultConfig(networkId: string) {
   }
 }
 
+export function setDirectMintPsmConfig(networkId: string) {
+  if (process.env.DIRECT_MINT_PSM) {
+    directMintPsm = process.env.DIRECT_MINT_PSM;
+  } else {
+    directMintPsm = defaultDirectMintPsmFor[networkId] || "";
+  }
+}
+
 export function setVaultConfig(networkId: string) {
   if (process.env.VAULT) {
     vault = process.env.VAULT;
@@ -211,6 +225,7 @@ export async function initNetworkConfig() {
   setCreditCardTopUpConfig(networkId);
   setSaveUsdstVaultConfig(networkId);
   setVaultConfig(networkId);
+  setDirectMintPsmConfig(networkId);
 }
 
 /**
