@@ -10,12 +10,12 @@ const { DirectMintPSM, Token } = constants;
 const normalizeAddress = (value: string | undefined | null): string =>
   (value || "").toLowerCase().replace(/^0x/, "");
 
-const parseEventAttributes = (attributes: unknown): Record<string, any> => {
-  if (!attributes) return {};
-  if (typeof attributes === "string") {
-    try { return JSON.parse(attributes); } catch { return {}; }
+const parseStructValue = (value: unknown): Record<string, any> => {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try { return JSON.parse(value); } catch { return {}; }
   }
-  if (typeof attributes === "object") return attributes as Record<string, any>;
+  if (typeof value === "object") return value as Record<string, any>;
   return {};
 };
 
@@ -145,54 +145,44 @@ export const getPsmInfo = async (
     }
   }
 
-  // 6. Burn requests via events
-  const [requestedRes, resolvedRes] = await Promise.all([
-    cirrus.get(accessToken, "/event", {
+  // 6. Burn requests from the mapping table (zeroed entries = deleted)
+  const burnReqResponse = await cirrus.get(
+    accessToken,
+    `/${DirectMintPSM}-burnRequests`,
+    {
       params: {
         address: `eq.${psmAddress}`,
-        event_name: "eq.BurnRequested",
-        select: "attributes",
-        "attributes->>requester": `eq.${normalizedUser}`,
+        select: "key,value",
       },
-    }),
-    cirrus.get(accessToken, "/event", {
-      params: {
-        address: `eq.${psmAddress}`,
-        event_name: "in.(BurnCompleted,BurnCancelled)",
-        select: "attributes",
-      },
-    }),
-  ]);
-
-  const resolvedIds = new Set(
-    (resolvedRes.data || []).map((e: any) => {
-      const attrs = parseEventAttributes(e.attributes);
-      return String(attrs.id);
-    })
+    }
   );
 
   const currentTime = Math.floor(Date.now() / 1000);
   const burnDelayNum = parseInt(burnDelay) || 0;
 
-  const burnRequests: BurnRequestInfo[] = (requestedRes.data || [])
-    .map((e: any) => {
-      const attrs = parseEventAttributes(e.attributes);
-      const id = String(attrs.id);
-      const requestTime = String(attrs.requestTime || "0");
+  const burnRequests: BurnRequestInfo[] = (burnReqResponse.data || [])
+    .map((entry: any) => {
+      const val = parseStructValue(entry.value);
+      const amount = String(val?.amount || "0");
+      const requester = normalizeAddress(val?.requester);
+      const requestTime = String(val?.requestTime || "0");
       const availableAt = String(parseInt(requestTime) + burnDelayNum);
-      const redeemAddr = normalizeAddress(attrs.redeemToken);
+      const redeemAddr = normalizeAddress(val?.redeemToken);
       return {
-        id,
-        amount: String(attrs.amount || "0"),
+        id: String(entry.key),
+        amount,
         redeemToken: redeemAddr,
         redeemTokenSymbol: tokenMeta[redeemAddr]?.symbol || redeemAddr,
-        requester: normalizeAddress(attrs.requester),
+        requester,
         requestTime,
         availableAt,
         isAvailable: currentTime >= parseInt(availableAt),
       };
     })
-    .filter((r: BurnRequestInfo) => !resolvedIds.has(r.id));
+    .filter(
+      (r: BurnRequestInfo) =>
+        r.requester === normalizedUser && r.amount !== "0" && BigInt(r.amount) > 0n
+    );
 
   burnRequests.sort(
     (a, b) => parseInt(b.requestTime) - parseInt(a.requestTime)

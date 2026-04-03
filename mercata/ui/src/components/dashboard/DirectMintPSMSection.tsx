@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { formatUnits } from "ethers";
-import { ArrowDownUp, Clock, X, Flame } from "lucide-react";
+import { ArrowDownUp, Clock, X, Flame, BarChart3 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +29,6 @@ import {
   PSM_MINT_FEE,
   PSM_BURN_REQUEST_FEE,
   PSM_BURN_COMPLETE_FEE,
-  PSM_BURN_CANCEL_FEE,
 } from "@/lib/constants";
 
 const formatTimeRemaining = (seconds: number): string => {
@@ -37,9 +36,11 @@ const formatTimeRemaining = (seconds: number): string => {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
   if (days > 0) return `${days}d ${hours}h ${minutes}m`;
   if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${secs}s`;
+  return `${secs}s`;
 };
 
 const DirectMintPSMSection = () => {
@@ -71,29 +72,37 @@ const DirectMintPSMSection = () => {
       setLoading(true);
       const info = await psmService.getInfo();
       setPsmInfo(info);
-      if (!mintToken && info.eligibleTokens.length > 0) {
-        setMintToken(info.eligibleTokens[0].address);
-      }
-      if (!redeemToken && info.eligibleTokens.length > 0) {
-        setRedeemToken(info.eligibleTokens[0].address);
-      }
+      setMintToken((prev) => prev || info.eligibleTokens[0]?.address || "");
+      setRedeemToken((prev) => prev || info.eligibleTokens[0]?.address || "");
     } catch {
       // Errors handled by axios interceptor
     } finally {
       setLoading(false);
     }
-  }, [isLoggedIn, mintToken, redeemToken]);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     refreshData();
   }, [refreshData]);
 
-  // Re-check availability every 30s for pending burn requests
+  // Live countdown ticker — ticks every second while any request is pending
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+  const hasPending = psmInfo?.burnRequests.some(
+    (r) => parseInt(r.availableAt) > nowSec
+  );
+
   useEffect(() => {
-    if (!psmInfo?.burnRequests.some((r) => !r.isAvailable)) return;
+    if (!hasPending) return;
+    const id = setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [hasPending]);
+
+  // Re-fetch data every 30s while there are pending requests
+  useEffect(() => {
+    if (!hasPending) return;
     const interval = setInterval(refreshData, 30000);
     return () => clearInterval(interval);
-  }, [psmInfo?.burnRequests, refreshData]);
+  }, [hasPending, refreshData]);
 
   const selectedMintToken = psmInfo?.eligibleTokens.find(
     (t) => t.address === mintToken
@@ -389,11 +398,11 @@ const DirectMintPSMSection = () => {
               </div>
             </div>
 
-            {/* Right: Burn Requests */}
+            {/* Right: PSM Info + Burn Requests */}
             <div className="bg-card rounded-lg p-4 border border-border">
               <h3 className="font-medium mb-3 flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Your Redeem Requests
+                <BarChart3 className="h-4 w-4" />
+                PSM Info
               </h3>
 
               {loading && !psmInfo && (
@@ -402,112 +411,10 @@ const DirectMintPSMSection = () => {
                 </p>
               )}
 
-              {psmInfo &&
-                psmInfo.burnRequests.length === 0 &&
-                !loading && (
-                  <p className="text-sm text-muted-foreground">
-                    No pending redeem requests.
-                  </p>
-                )}
-
-              <div className="space-y-3">
-                {(psmInfo?.burnRequests || []).map((req) => {
-                  const amountFormatted = formatUnits(req.amount, 18);
-                  const nowSec = Math.floor(Date.now() / 1000);
-                  const remaining = parseInt(req.availableAt) - nowSec;
-                  const isCancelExpanded = cancelExpandedId === req.id;
-
-                  return (
-                    <div
-                      key={req.id}
-                      className={`rounded-lg border p-3 ${
-                        req.isAvailable
-                          ? "border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-950/20"
-                          : "border-yellow-200 dark:border-yellow-900 bg-yellow-50/50 dark:bg-yellow-950/20"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-sm">
-                            {amountFormatted}{" "}
-                            {psmInfo?.mintableTokenSymbol || "USDST"} →{" "}
-                            {req.redeemTokenSymbol}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {req.isAvailable ? (
-                              <span className="text-green-600 dark:text-green-400 font-medium">
-                                Available now
-                              </span>
-                            ) : (
-                              <span className="text-yellow-600 dark:text-yellow-400">
-                                Available in {formatTimeRemaining(remaining)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {new Date(
-                              parseInt(req.availableAt) * 1000
-                            ).toLocaleString()}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {/* Complete button */}
-                          {req.isAvailable && (
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs px-2"
-                              disabled={isProcessing}
-                              onClick={() => setCompleteDialogRequest(req)}
-                            >
-                              <Flame className="h-3 w-3 mr-1" />
-                              Complete
-                            </Button>
-                          )}
-
-                          {/* Cancel: X → Cancel button */}
-                          {isCancelExpanded ? (
-                            <div className="flex items-center gap-1">
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="h-7 text-xs px-2"
-                                disabled={isProcessing}
-                                onClick={() => handleCancelBurn(req.id)}
-                              >
-                                Cancel
-                              </Button>
-                              <button
-                                type="button"
-                                className="text-muted-foreground hover:text-foreground p-0.5"
-                                onClick={() => setCancelExpandedId(null)}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              className="text-muted-foreground hover:text-destructive p-0.5 transition-colors"
-                              onClick={() => setCancelExpandedId(req.id)}
-                              disabled={isProcessing}
-                              title="Cancel request"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Stats */}
               {psmInfo && (
-                <div className="mt-4 pt-4 border-t border-border space-y-2 text-sm">
+                <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Burn Delay</span>
+                    <span className="text-muted-foreground">Redeem Delay</span>
                     <span className="font-medium">
                       {burnDelaySec === 0
                         ? "None (instant)"
@@ -524,20 +431,112 @@ const DirectMintPSMSection = () => {
                       </span>
                     </div>
                   ))}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Complete Fee</span>
-                    <span className="font-medium">
-                      {PSM_BURN_COMPLETE_FEE} USDST
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Cancel Fee</span>
-                    <span className="font-medium">
-                      {PSM_BURN_CANCEL_FEE} USDST
-                    </span>
-                  </div>
                 </div>
               )}
+
+              <div className="mt-4 pt-4 border-t border-border">
+                <h3 className="font-medium mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Your Redeem Requests
+                </h3>
+
+                {psmInfo && psmInfo.burnRequests.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No pending redeem requests.
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  {(psmInfo?.burnRequests || []).map((req) => {
+                    const amountFormatted = formatUnits(req.amount, 18);
+                    const remaining = parseInt(req.availableAt) - nowSec;
+                    const available = remaining <= 0;
+                    const isCancelExpanded = cancelExpandedId === req.id;
+
+                    return (
+                      <div
+                        key={req.id}
+                        className={`rounded-lg border p-3 ${
+                          available
+                            ? "border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-950/20"
+                            : "border-yellow-200 dark:border-yellow-900 bg-yellow-50/50 dark:bg-yellow-950/20"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm">
+                              {amountFormatted}{" "}
+                              {psmInfo?.mintableTokenSymbol || "USDST"} →{" "}
+                              {req.redeemTokenSymbol}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {available ? (
+                                <span className="text-green-600 dark:text-green-400 font-medium">
+                                  Available now
+                                </span>
+                              ) : (
+                                <span className="text-yellow-600 dark:text-yellow-400">
+                                  Available in {formatTimeRemaining(remaining)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {new Date(
+                                parseInt(req.availableAt) * 1000
+                              ).toLocaleString()}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {available && (
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs px-2"
+                                disabled={isProcessing}
+                                onClick={() => setCompleteDialogRequest(req)}
+                              >
+                                <Flame className="h-3 w-3 mr-1" />
+                                Complete
+                              </Button>
+                            )}
+
+                            {isCancelExpanded ? (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 text-xs px-2"
+                                  disabled={isProcessing}
+                                  onClick={() => handleCancelBurn(req.id)}
+                                >
+                                  Cancel
+                                </Button>
+                                <button
+                                  type="button"
+                                  className="text-muted-foreground hover:text-foreground p-0.5"
+                                  onClick={() => setCancelExpandedId(null)}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className="text-muted-foreground hover:text-destructive p-0.5 transition-colors"
+                                onClick={() => setCancelExpandedId(req.id)}
+                                disabled={isProcessing}
+                                title="Cancel request"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
