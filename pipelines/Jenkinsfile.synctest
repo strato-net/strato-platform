@@ -27,7 +27,7 @@ pipeline {
       steps {
         sh '''
           if [ ! -d "strato-platform" ]; then
-            git clone https://github.com/strato-net/strato-platform
+            git clone https://github.com/strato-net/strato-platform -b master
           fi
         '''
         dir('strato-platform') {
