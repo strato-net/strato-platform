@@ -1,0 +1,30 @@
+const schemas = pm.require('@blockapps/mercata-schema');
+
+const json = pm.response.json();
+
+pm.test("Valid response format", function () {
+    pm.expect(json).to.be.a('array');
+    pm.expect(json.length).to.be.greaterThan(0);
+    json.forEach( (chain) => {
+        pm.expect(chain).to.have.property('externalChainId');
+        pm.expect(chain).to.have.property('chainInfo');
+        pm.expect(chain.chainInfo).to.have.property('custody');
+        pm.expect(chain.chainInfo).to.have.property('enabled');
+        pm.expect(chain.chainInfo).to.have.property('chainName');
+        pm.expect(chain.chainInfo).to.have.property('depositRouter');
+        pm.expect(chain.chainInfo).to.have.property('lastProcessedBlock');
+    });
+})
+
+pm.test("AI Likes the Schema", function () {
+    const schema = schemas.bridgeNetworkConfigs;
+    pm.expect(json).to.have.jsonSchema(schema);
+});
+
+// Set variables
+if (Array.isArray(json) && json.length > 0) {
+    const chain = json[0];
+
+    pm.variables.set("externalChainId", chain.externalChainId);
+    pm.variables.set("depositRouterExtAddr", chain.chainInfo.depositRouter);
+}

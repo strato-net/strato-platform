@@ -1,0 +1,21 @@
+const schemas = pm.require('@blockapps/mercata-schema');
+
+const json = pm.response.json();
+
+pm.test("Valid response format", function () {
+    pm.expect(json).to.be.an('object');
+    pm.expect(json).to.have.property('data');
+    // pm.expect(json.data.length).to.be.greaterThan(0); // an arbitrary token might not have any history
+    json.data.forEach( (entry) => {
+        pm.expect(entry).to.have.property("id");
+        pm.expect(entry).to.have.property("timestamp");
+        pm.expect(entry).to.have.property("asset");
+        pm.expect(entry).to.have.property("price");
+        pm.expect(entry).to.have.property("blockTimestamp");
+    });
+})
+
+pm.test("AI Likes the Schema", function () {
+    const schema = schemas.oraclePriceHistory;
+    pm.expect(json).to.have.jsonSchema(schema);
+});

@@ -1,0 +1,28 @@
+const schemas = pm.require('@blockapps/mercata-schema');
+
+const json = pm.response.json();
+
+pm.test("Valid response format", function () {
+    pm.expect(json).to.be.an('array');
+    pm.expect(json.length).to.be.greaterThan(0);
+    json.forEach((token) => {
+        pm.expect(token).to.have.property('address');
+        pm.expect(token).to.have.property('_name');
+        pm.expect(token).to.have.property('_symbol');
+        pm.expect(token).to.have.property('customDecimals');
+        pm.expect(token).to.have.property('_totalSupply');
+        pm.expect(token).to.have.property('balance');
+        pm.expect(token).to.have.property('price');
+        pm.expect(token).to.have.property('poolBalance');
+        pm.expect(token).to.have.property('images');
+        pm.expect(token.images).to.be.an('array');
+        token.images.forEach((image) => {
+            pm.expect(image).to.have.property('value');
+        });
+    });
+});
+
+pm.test("AI Likes the Schema", function () {
+    const schema = schemas.swapTokenPairs;
+    pm.expect(json).to.have.jsonSchema(schema);
+});

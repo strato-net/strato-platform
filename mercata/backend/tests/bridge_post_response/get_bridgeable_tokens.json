@@ -1,0 +1,28 @@
+const schemas = pm.require('@blockapps/mercata-schema');
+
+const json = pm.response.json();
+
+pm.test("Valid response format", function () {
+    pm.expect(json).to.be.a('array');
+    pm.expect(json.length).to.be.greaterThan(0);
+    json.forEach( (bridgeableToken) => {
+        pm.expect(bridgeableToken).to.have.property('stratoToken');
+        pm.expect(bridgeableToken).to.have.property('stratoTokenName');
+        pm.expect(bridgeableToken).to.have.property('stratoTokenSymbol');
+        pm.expect(bridgeableToken).to.have.property('maxPerTx');
+        pm.expect(bridgeableToken).to.have.property('permissions');
+        pm.expect(bridgeableToken).to.have.property('externalName');
+        pm.expect(bridgeableToken).to.have.property('externalToken');
+        pm.expect(bridgeableToken).to.have.property('externalSymbol');
+        pm.expect(bridgeableToken).to.have.property('externalChainId');
+        pm.expect(bridgeableToken).to.have.property('externalDecimals');        
+    });
+})
+
+pm.test("AI Likes the Schema", function () {
+    const schema = schemas.bridgeAbleTokens;
+    pm.expect(json).to.have.jsonSchema(schema);
+});
+
+// Set variables
+// (nothing noted as needing set)
