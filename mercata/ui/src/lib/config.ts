@@ -6,6 +6,7 @@ export interface ConfigData {
   creditCardTopUpAddress?: string;
   featuredEarnOpportunity?: string;
   stripePublishableKey: string | null;
+  meldEnabled?: boolean;
   contactEnabled?: boolean;
 }
 
