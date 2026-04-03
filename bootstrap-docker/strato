@@ -67,8 +67,6 @@ The flags are mutually exclusive:
 --wipe        - stop and remove STRATO containers and wipe out volumes.
 --compose     - fetch the docker-compose.yml of the latest STRATO release
 --pull        - pull images used in docker-compose.yml
---get-address - get the address of the running node.
---get-pubkey  - get the public key of the running node.
 --get-validators    - get the list of validating nodes in the network on the running node.
 --get-metadata      - get the node's metadata in JSON format.
 --single            - run a single node.
@@ -131,14 +129,6 @@ function _outputMetadataValue {
   fi
 }
 
-function getAddress {
-  _outputMetadataValue nodeAddress
-}
-
-function getPublicKey {
-  _outputMetadataValue nodePubKey
-}
-
 function getValidators {
   _outputMetadataValue validators
 }
@@ -173,16 +163,6 @@ while [ ${#} -gt 0 ]; do
     checkDocker
     checkComposeFile
     pullImages
-    exit 0
-    ;;
-  --get-address)
-    checkDocker
-    getAddress
-    exit 0
-    ;;
-  --get-pubkey)
-    checkDocker
-    getPublicKey
     exit 0
     ;;
   --get-validators)

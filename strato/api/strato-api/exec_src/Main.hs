@@ -43,7 +43,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
-import Core.API hiding (nodePubKey)
+import Core.API
 import Data.Aeson
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
@@ -116,12 +116,6 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
 instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
   select p = lift . select p
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible V.PublicKey (ReaderT BlocEnv m) where
-  access _ = asks nodePubKey
-
-instance {-# OVERLAPPING #-} (Monad m, Accessible V.PublicKey m) => Accessible V.PublicKey (ReaderT a m) where
-  access = lift . access
-
 instance {-# OVERLAPPING #-} Accessible (Maybe SyncStatus) IO where
   access _ = fmap SyncStatus <$> runStratoRedisIO getSyncStatus
 
@@ -179,34 +173,6 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
 
-ensureNodePubKey :: IO V.PublicKey
-ensureNodePubKey =
-  runLoggingT $
-    runVaultM (vaultUrl . urlConfig $ ethConf) waitForNodePubKey
-  where
-    waitForNodePubKey :: VaultM (LoggingT IO) V.PublicKey
-    waitForNodePubKey = do
-      getResult <- try $ fmap V.unPubKey . blocVaultWrapper $ getKey Nothing Nothing
-      case getResult of
-        Right pubKey -> return pubKey
-        Left err -> do
-          liftIO $ putStrLn $ "Vault key lookup failed: " ++ show (err :: ApiError)
-          if isMissingUserError err
-            then do
-              liftIO $ putStrLn "Node key does not exist. Creating key in Vault..."
-              _ <- blocVaultWrapper (postKey Nothing)
-              liftIO $ putStrLn "Node key created in Vault."
-              fmap V.unPubKey . blocVaultWrapper $ getKey Nothing Nothing
-            else throwIO err
-
-    isMissingUserError :: ApiError -> Bool
-    isMissingUserError (VaultWrapperError clientErr) =
-      "statusCode = 400" `T.isInfixOf` errTxt &&
-      "doesn't exist" `T.isInfixOf` errTxt
-      where
-        errTxt = T.pack (show clientErr)
-    isMissingUserError _ = False
-
 main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
@@ -247,15 +213,12 @@ main = do
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
 
-  pubKey <- ensureNodePubKey
-
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
             Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
-            Bloc.Monad.globalNonceCounter = nonceCache,
-            Bloc.Monad.nodePubKey = pubKey
+            Bloc.Monad.globalNonceCounter = nonceCache
           }
   let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
       bindPort = Conf.apiPort (Conf.apiConfig ethConf)
