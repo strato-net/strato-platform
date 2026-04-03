@@ -155,7 +155,11 @@ export const getNetworkConfigs = async (accessToken: string): Promise<NetworkCon
   });
   return data.map((c: any) => {
     if (c.ChainInfo.depositRouter) c.ChainInfo.depositRouter = ensureHexPrefix(c.ChainInfo.depositRouter);
-    return { externalChainId: c.externalChainId, chainInfo: c.ChainInfo };
+    // Include vault and rep bridge addresses from environment if available
+    const chainId = c.externalChainId;
+    c.ChainInfo.vaultAddress = process.env[`CHAIN_${chainId}_VAULT_ADDRESS`] || undefined;
+    c.ChainInfo.repBridgeAddress = process.env[`CHAIN_${chainId}_REP_BRIDGE_ADDRESS`] || undefined;
+    return { externalChainId: chainId, chainInfo: c.ChainInfo };
   });
 };
 

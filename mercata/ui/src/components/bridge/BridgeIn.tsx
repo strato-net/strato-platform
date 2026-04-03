@@ -650,15 +650,93 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setProgressError(undefined);
     
     const isNative = BigInt(selectedToken.externalToken || "0") === 0n;
+    const isStratoCanonicalReturn = selectedToken.assetFamily === "strato-canonical";
     setProgressIsNative(isNative);
-    
+
     setProgressModalOpen(true);
 
     try {
       const activeChainId = currentNetwork.chainId;
       const depositRouter = currentNetwork.depositRouter;
       const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
-      
+
+      // STRATO-canonical return flow: burn representation tokens via StratoRepresentationBridge
+      // This is a different flow from the standard DepositRouter path
+      if (isStratoCanonicalReturn && currentNetwork.repBridgeAddress) {
+        setCurrentStep("approve");
+        const depositAmount = safeParseUnits(
+          amount,
+          parseInt(selectedToken.externalDecimals || "18"),
+        );
+
+        // The user needs to approve the StratoRepresentationBridge to spend their representation tokens.
+        // The representation token address is the externalToken on this chain.
+        const repTokenAddress = ensureHexPrefix(selectedToken.externalToken) as `0x${string}`;
+        const repBridgeAddress = ensureHexPrefix(currentNetwork.repBridgeAddress) as `0x${string}`;
+        const chain = await resolveViemChain(activeChainId);
+
+        // Check current allowance
+        const allowance = await publicClient!.readContract({
+          address: repTokenAddress,
+          abi: [{
+            inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+            name: 'allowance',
+            outputs: [{ name: '', type: 'uint256' }],
+            stateMutability: 'view',
+            type: 'function'
+          }],
+          functionName: 'allowance',
+          args: [address as `0x${string}`, repBridgeAddress],
+        });
+
+        if ((allowance as bigint) < depositAmount) {
+          const approveTxHash = await writeContractAsync({
+            address: repTokenAddress,
+            abi: [{
+              inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
+              name: 'approve',
+              outputs: [{ name: '', type: 'bool' }],
+              stateMutability: 'nonpayable',
+              type: 'function'
+            }],
+            functionName: 'approve',
+            args: [repBridgeAddress, depositAmount],
+            chain,
+            account: address as `0x${string}`,
+          });
+          await publicClient!.waitForTransactionReceipt({ hash: approveTxHash });
+        }
+
+        // Burn representation tokens
+        setCurrentStep("confirm_tx");
+        const burnTxHash = await writeContractAsync({
+          address: repBridgeAddress,
+          abi: [{
+            inputs: [
+              { name: 'stratoToken', type: 'address' },
+              { name: 'from', type: 'address' },
+              { name: 'amount', type: 'uint256' }
+            ],
+            name: 'burnRepresentation',
+            outputs: [],
+            stateMutability: 'nonpayable',
+            type: 'function'
+          }],
+          functionName: 'burnRepresentation',
+          args: [targetStratoToken, address as `0x${string}`, depositAmount],
+          chain,
+          account: address as `0x${string}`,
+        });
+
+        setCurrentStep("waiting");
+        await publicClient!.waitForTransactionReceipt({ hash: burnTxHash });
+
+        setCurrentStep("complete");
+        setIsLoading(false);
+        triggerDepositRefresh();
+        return;
+      }
+
       // Set initial step based on token type
       if (!isNative) {
         // ERC20 tokens need approval

@@ -46,6 +46,7 @@ library BridgeTypes {
 
     struct AssetInfo {
         bool    enabled;          // quick toggle
+        bool    isNative;         // true for STRATO-canonical assets (USDST, GOLDST, SILVST)
         uint256 externalChainId;  // back-pointer to ChainInfo
         uint256 externalDecimals; // decimals of externalToken
         string  externalName;     // external token name

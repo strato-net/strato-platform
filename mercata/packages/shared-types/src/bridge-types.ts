@@ -15,6 +15,8 @@ export interface NetworkConfig {
     chainName: string;
     depositRouter: string;
     lastProcessedBlock: string;
+    vaultAddress?: string;          // ExternalBridgeVault address (replaces custody for new flow)
+    repBridgeAddress?: string;      // StratoRepresentationBridge address (for STRATO-native asset bridging)
   };
 }
 
@@ -25,6 +27,13 @@ export interface NetworkConfig {
 /**
  * Bridge token information
  */
+/**
+ * Asset family classification.
+ * - "external-canonical": native to external chains (USDC, ETH, WBTC) — lock on external, mint on STRATO
+ * - "strato-canonical": native to STRATO (USDST, GOLDST, SILVST) — lock on STRATO, mint representation on external
+ */
+export type AssetFamily = "external-canonical" | "strato-canonical";
+
 export interface BridgeToken {
   id: string;
   stratoToken: string;           // Key: address of the STRATO token
@@ -38,6 +47,8 @@ export interface BridgeToken {
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
   enabled: boolean;              // effective route enabled state
   isDefaultRoute: boolean;       // true when route token matches asset default token
+  isNative: boolean;             // true for STRATO-canonical assets (USDST, GOLDST, SILVST)
+  assetFamily: AssetFamily;      // asset family classification
   stratoTokenImage?: string;     // First image URL from TokenFactory images
   rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
 }
@@ -141,6 +152,60 @@ export interface WithdrawalSummaryResponse {
   totalWithdrawn30d: string;      // Total withdrawn in last 30 days in wei (string format)
   pendingWithdrawals: string;      // Pending withdrawals in wei (string format)
   availableToWithdraw: string;     // Available balance to withdraw in wei (string format)
+}
+
+// ============================================================================
+// WITHDRAWAL STATUS TYPES
+// ============================================================================
+
+/**
+ * Internal detailed withdrawal status used by the bridge service.
+ */
+export type DetailedWithdrawalStatus =
+  | "Requested"
+  | "PendingLiquidity"
+  | "Ready"
+  | "Executing"
+  | "Completed"
+  | "Cancelled"
+  | "Expired"
+  | "Rejected"
+  | "FailedRecoverable"
+  | "FailedPostExecution";
+
+/**
+ * Simplified user-facing withdrawal status.
+ */
+export type SimpleWithdrawalStatus =
+  | "Pending"
+  | "Processing"
+  | "Completed"
+  | "Failed"
+  | "Cancelled";
+
+/**
+ * Map internal detailed status to user-facing simple status.
+ */
+export function toSimpleStatus(
+  detailed: DetailedWithdrawalStatus,
+): SimpleWithdrawalStatus {
+  switch (detailed) {
+    case "Requested":
+    case "PendingLiquidity":
+    case "Ready":
+      return "Pending";
+    case "Executing":
+      return "Processing";
+    case "Completed":
+      return "Completed";
+    case "Cancelled":
+    case "Expired":
+      return "Cancelled";
+    case "Rejected":
+    case "FailedRecoverable":
+    case "FailedPostExecution":
+      return "Failed";
+  }
 }
 
 // ============================================================================

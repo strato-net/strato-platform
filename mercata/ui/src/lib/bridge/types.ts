@@ -1,4 +1,7 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction, AssetFamily, DetailedWithdrawalStatus, SimpleWithdrawalStatus, toSimpleStatus } from "@mercata/shared-types";
+
+export { toSimpleStatus };
+export type { AssetFamily, DetailedWithdrawalStatus, SimpleWithdrawalStatus };
 
 export interface BalanceResponse {
   balance: string;
@@ -14,6 +17,8 @@ export type NetworkSummary = {
   chainName: string;
   enabled: boolean;
   depositRouter: string;
+  vaultAddress?: string;
+  repBridgeAddress?: string;
 };
 
 export type BridgeContextType = {

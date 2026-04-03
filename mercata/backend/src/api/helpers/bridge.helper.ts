@@ -30,6 +30,7 @@ export type BridgeAssetInfo = {
   maxPerWithdrawal: string;
   stratoToken: string;
   enabled: boolean;
+  isNative: boolean;
 };
 
 export type BridgeableAssetRoute = {
@@ -256,12 +257,15 @@ export function enrichAssetsWithTokenData(
   return assets.map((route) => {
     const tokenKey = stripHex(route.AssetInfo.stratoToken);
     const meta = tokenMap.get(tokenKey);
+    const isNative = route.AssetInfo.isNative;
     return {
       ...route.AssetInfo,
       stratoTokenName: meta?.name ?? "",
       stratoTokenSymbol: meta?.symbol ?? "",
       stratoTokenImage: meta?.image,
       isDefaultRoute: route.isDefaultRoute,
+      isNative,
+      assetFamily: isNative ? "strato-canonical" as const : "external-canonical" as const,
       id: route.id,
     };
   });
@@ -280,6 +284,7 @@ const toBridgeAssetInfo = (value: unknown, externalToken: string, externalChainI
     maxPerWithdrawal: raw.maxPerWithdrawal != null ? String(raw.maxPerWithdrawal) : "0",
     stratoToken: normalizeBridgeAddress(raw.stratoToken),
     enabled: raw.enabled === true,
+    isNative: raw.isNative === true,
   };
 };
 
