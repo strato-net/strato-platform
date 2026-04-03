@@ -154,6 +154,7 @@ async function main() {
     : null;
 
   const safeAddress = process.env.SAFE_ADDRESS;
+  const hotWalletAddress = process.env.SAFE_HOT_WALLET_ADDRESS || null;
 
   // Load deployments
   const vaultDeployment = loadDeployment("ExternalBridgeVault", networkName);
@@ -162,8 +163,9 @@ async function main() {
 
   console.log("=== Bridge Role & Config Plan ===");
   console.log(`Network: ${networkName} (${chainId})`);
-  console.log(`Safe: ${safeAddress}`);
-  console.log(`Operator: ${operatorAddress}`);
+  console.log(`Safe (M/N): ${safeAddress}`);
+  console.log(`Hot Wallet (1/N): ${hotWalletAddress || "NOT CONFIGURED"}`);
+  console.log(`Operator EOA: ${operatorAddress}`);
   console.log(`Vault: ${vaultDeployment?.addresses?.proxy || "NOT DEPLOYED"}`);
   console.log(`RepBridge: ${repBridgeDeployment?.addresses?.proxy || "NOT DEPLOYED"}`);
   console.log(`RepTokens: ${JSON.stringify(repTokens, null, 2)}`);
@@ -171,22 +173,42 @@ async function main() {
 
   const transactions = [];
 
-  // --- 1. Grant BRIDGE_OPERATOR on ExternalBridgeVault ---
-  if (vaultDeployment && operatorAddress) {
+  // --- 1. Grant BRIDGE_OPERATOR on ExternalBridgeVault to main Safe (M/N) ---
+  if (vaultDeployment && safeAddress) {
     transactions.push(
       buildTx(vaultDeployment.addresses.proxy, ACCESS_CONTROL_ABI, "grantRole", [
         BRIDGE_OPERATOR_ROLE,
-        operatorAddress,
+        safeAddress,
       ]),
     );
   }
 
-  // --- 2. Grant BRIDGE_OPERATOR on StratoRepresentationBridge ---
-  if (repBridgeDeployment && operatorAddress) {
+  // --- 1b. Grant BRIDGE_OPERATOR on ExternalBridgeVault to hot wallet Safe (1/N) ---
+  if (vaultDeployment && hotWalletAddress) {
+    transactions.push(
+      buildTx(vaultDeployment.addresses.proxy, ACCESS_CONTROL_ABI, "grantRole", [
+        BRIDGE_OPERATOR_ROLE,
+        hotWalletAddress,
+      ]),
+    );
+  }
+
+  // --- 2. Grant BRIDGE_OPERATOR on StratoRepresentationBridge to main Safe (M/N) ---
+  if (repBridgeDeployment && safeAddress) {
     transactions.push(
       buildTx(repBridgeDeployment.addresses.proxy, ACCESS_CONTROL_ABI, "grantRole", [
         BRIDGE_OPERATOR_ROLE,
-        operatorAddress,
+        safeAddress,
+      ]),
+    );
+  }
+
+  // --- 2b. Grant BRIDGE_OPERATOR on StratoRepresentationBridge to hot wallet Safe (1/N) ---
+  if (repBridgeDeployment && hotWalletAddress) {
+    transactions.push(
+      buildTx(repBridgeDeployment.addresses.proxy, ACCESS_CONTROL_ABI, "grantRole", [
+        BRIDGE_OPERATOR_ROLE,
+        hotWalletAddress,
       ]),
     );
   }

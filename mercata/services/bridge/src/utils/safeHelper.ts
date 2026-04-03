@@ -1,11 +1,10 @@
-import { Interface, JsonRpcProvider } from "ethers";
+import { Interface } from "ethers";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import SafeApiKit from "@safe-global/api-kit";
 import Safe from "@safe-global/protocol-kit";
 import {
   config,
   ZERO_ADDRESS,
-  ERC20_ABI,
   WAD,
   getChainRpcUrl,
   getChainVaultAddress,
@@ -207,29 +206,6 @@ export async function initializeSafeForChain(chainId: number, safeAddress?: stri
   return { protocolKit, apiKit };
 }
 
-async function getHotWalletBalance(
-  rpcUrl: string,
-  hotWalletAddress: string,
-  tokenAddress: string,
-): Promise<bigint> {
-  const provider = new JsonRpcProvider(rpcUrl);
-  const isEth = ensureHexPrefix(tokenAddress) === ZERO_ADDRESS;
-
-  if (isEth) {
-    return provider.getBalance(hotWalletAddress);
-  }
-
-  const erc20 = new Interface(ERC20_ABI.concat([
-    "function balanceOf(address account) view returns (uint256)",
-  ]));
-  const data = erc20.encodeFunctionData("balanceOf", [safeChecksum(hotWalletAddress)]);
-  const result = await provider.call({
-    to: safeChecksum(tokenAddress),
-    data,
-  });
-  return BigInt(result);
-}
-
 export async function createWithdrawalProposals(
   externalChainId: number,
   withdrawals: NonEmptyArray<WithdrawalInfo>
@@ -237,7 +213,6 @@ export async function createWithdrawalProposals(
   const safeAddress = config.safe.address || "";
   const safeHotWalletAddress = config.safe.hotWalletAddress || "";
   const hasHotWallet = !!safeHotWalletAddress;
-  const rpcUrl = getChainRpcUrl(externalChainId);
 
   // Resolve vault and rep bridge addresses for this chain
   const vaultAddress = getChainVaultAddress(externalChainId);
@@ -262,44 +237,12 @@ export async function createWithdrawalProposals(
     }
   }
 
-  // Check which withdrawals can actually use the hot wallet (balance check)
-  if (hasHotWallet) {
-    // Group hot wallet withdrawals by token to check balances
-    const hotWalletWithdrawals = withdrawals.filter(w => w.useHotWallet);
-    if (hotWalletWithdrawals.length > 0) {
-      // Track remaining balance per token
-      const tokenBalances = new Map<string, bigint>();
-      for (const withdrawal of hotWalletWithdrawals) {
-        const token = ensureHexPrefix(withdrawal.externalToken);
-        if (!tokenBalances.has(token)) {
-          try {
-            const balance = await getHotWalletBalance(rpcUrl, safeHotWalletAddress, withdrawal.externalToken);
-            tokenBalances.set(token, balance);
-          } catch (error) {
-            logError("SafeService", error as Error, {
-              operation: "getHotWalletBalance",
-              token,
-              hotWalletAddress: safeHotWalletAddress,
-            });
-            tokenBalances.set(token, 0n);
-          }
-        }
-
-        const remainingBalance = tokenBalances.get(token)!;
-        const withdrawalAmount = BigInt(withdrawal.externalTokenAmount);
-        if (withdrawalAmount > remainingBalance) {
-          logInfo("SafeService", `Hot wallet insufficient balance for withdrawal ${withdrawal.withdrawalId} (need ${withdrawalAmount}, have ${remainingBalance}). Falling back to main safe.`);
-          withdrawal.useHotWallet = false;
-        } else {
-          tokenBalances.set(token, remainingBalance - withdrawalAmount);
-        }
-      }
-    }
-  } else {
-    // No hot wallet configured — force all to main safe
+  // Hot wallet routing: both Safes call the same vault/rep bridge contracts
+  // (tokens are held in those contracts, not in either Safe), so no balance
+  // check is needed. If no hot wallet is configured, fall back to main Safe.
+  if (!hasHotWallet) {
     for (const withdrawal of withdrawals) {
       if (withdrawal.useHotWallet) {
-        logInfo("SafeService", `Hot wallet not configured. Falling back to main safe for withdrawal ${withdrawal.withdrawalId}.`);
         withdrawal.useHotWallet = false;
       }
     }
