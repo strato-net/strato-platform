@@ -35,9 +35,16 @@ export interface RewardsState {
   currentSeason: number;
 }
 
+export interface BonusSource {
+  name: string;
+  amount: string;
+}
+
 export interface UserRewardsData {
   unclaimedRewards: string;
-  claimedRewards: string;  // Total claimed rewards from RewardsClaimed events
+  claimedRewards: string;
+  bonusRewards?: string;
+  bonusSources?: BonusSource[];
   activities: Array<{
     activityId: number;
     userInfo: RewardsUserInfo;
@@ -132,15 +139,17 @@ export const fetchUserRewards = async (userAddress: string, forceRefresh: boolea
   const response = await api.get(`/rewards/activities/${userAddress}`, { params });
   const data = response.data;
   
-  // Backend now returns { unclaimedRewards: string, claimedRewards: string, activities: UserActivity[] }
   const unclaimedRewards = data.unclaimedRewards || "0";
   const claimedRewards = data.claimedRewards || "0";
+  const bonusRewards = data.bonusRewards;
+  const bonusSources = data.bonusSources;
   const activities = data.activities || [];
   
-  // Transform the response to match UserRewardsData format
   return {
     unclaimedRewards,
     claimedRewards,
+    bonusRewards,
+    bonusSources,
     activities: activities.map((activity: {
       activityId: number;
       name: string;

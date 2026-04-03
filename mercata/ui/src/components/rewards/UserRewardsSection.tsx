@@ -10,7 +10,7 @@ import {
   formatRoundedWithCommas,
 } from "@/services/rewardsService";
 import { formatBalance, calculateTokenValue, safeParseUnits } from "@/utils/numberUtils";
-import { Loader2, Coins, TrendingUp, Info, Clock, Star } from "lucide-react";
+import { Loader2, Coins, TrendingUp, Info, Clock, Star, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
@@ -225,6 +225,14 @@ export const UserRewardsSection = ({
       safeBigInt(a.activity?.emissionRate || "0") > 0n
   );
 
+  const hasBonusRewards = userRewards.bonusRewards && safeBigInt(userRewards.bonusRewards) > 0n;
+  const bonusFormatted = hasBonusRewards
+    ? formatRoundedWithCommas(roundByMagnitude(
+        formatBalance(userRewards.bonusRewards!, "points", 18, 18, 18)
+          .replace(/\s*points?\s*$/i, '').trim()
+      )) + " points"
+    : null;
+
   // Calculate what user would receive if they claim:
   // - claimAllRewards: settles all activities, then claims total unclaimedRewards[user]
   // - claimRewards(activityId): settles that activity, then claims total unclaimedRewards[user]
@@ -278,8 +286,8 @@ export const UserRewardsSection = ({
 
   return (
     <div className="space-y-6">
-      {/* Total Claimable and Total Earned Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Total Claimable, Total Earned, and optionally Community Bonus Cards */}
+      <div className={`grid grid-cols-1 ${hasBonusRewards ? "md:grid-cols-3" : "md:grid-cols-2"} gap-6`}>
       {/* Total Claimable Card */}
       <Card>
         <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
@@ -338,6 +346,28 @@ export const UserRewardsSection = ({
             </p>
           </CardContent>
         </Card>
+
+        {hasBonusRewards && (
+          <Card>
+            <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
+              <div className="flex items-center gap-1.5">
+                <CardTitle className="text-base md:text-lg">Community Bonus</CardTitle>
+                <InfoTooltip content="Included in claimable total" />
+              </div>
+              <CardDescription className="text-xs md:text-sm">
+                Bonus program{userRewards.bonusSources && userRewards.bonusSources.length > 0
+                  ? `: ${userRewards.bonusSources.map((s) => s.name).join(", ")}`
+                  : ""}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-4 md:px-6">
+              <div className="flex items-center space-x-2 mb-1 md:mb-2">
+                <Gift className="h-4 w-4 md:h-5 md:w-5 text-emerald-500" />
+                <p className="text-2xl md:text-3xl font-bold">{bonusFormatted}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Activities with Stake */}

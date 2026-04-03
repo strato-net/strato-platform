@@ -307,6 +307,46 @@ export const fetchClaimedRewards = async (
 };
 
 /**
+ * Fetch bonus rewards for a specific user from DirectPayoutApplied events,
+ * broken down by activityId so the caller can resolve activity names.
+ */
+export const fetchBonusRewards = async (
+  accessToken: string,
+  rewardsAddress: string,
+  userAddress: string
+): Promise<{ total: bigint; byActivity: Map<string, bigint> }> => {
+  try {
+    const { data: events = [] } = await cirrus.get(accessToken, "/event", {
+      params: {
+        address: `eq.${rewardsAddress}`,
+        event_name: `eq.DirectPayoutApplied`,
+        "attributes->>user": `eq.${userAddress}`,
+        select: "attributes",
+      },
+    });
+
+    let total = 0n;
+    const byActivity = new Map<string, bigint>();
+    for (const event of events) {
+      try {
+        const attrs = typeof event.attributes === 'string'
+          ? JSON.parse(event.attributes)
+          : event.attributes || {};
+        if (!attrs.amount) continue;
+        const amount = BigInt(attrs.amount);
+        total += amount;
+        const actId = String(attrs.activityId ?? "unknown");
+        byActivity.set(actId, (byActivity.get(actId) || 0n) + amount);
+      } catch { /* skip */ }
+    }
+    return { total, byActivity };
+  } catch (error) {
+    console.error("Failed to fetch bonus rewards:", error);
+    return { total: 0n, byActivity: new Map() };
+  }
+};
+
+/**
  * Calculate real-time pending rewards for a user in an activity
  */
 export const calculateRealTimePendingRewards = (
