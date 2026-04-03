@@ -40,7 +40,7 @@ pipeline {
       steps {
 
         dir('strato-platform') {
-          sh 'strato-down'
+          sh 'strato-down || true'
           sh 'sudo rm -rf mynode || true'
           
           writeFile file: "run.sh", text: """#!/bin/bash
@@ -96,7 +96,7 @@ pipeline {
           docker volume prune -fa || true
         '''
         dir('strato-platform') {
-          sh 'strato-down'
+          sh 'strato-down || true'
           sh 'sudo rm -rf mynode || true'
           
           writeFile file: "run.sh", text: """#!/bin/bash
