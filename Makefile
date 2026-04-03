@@ -210,7 +210,7 @@ all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels
 
 apex: $(DOCKER_SENTINELS)/apex
 nginx: $(DOCKER_SENTINELS)/nginx
@@ -408,20 +408,7 @@ vault-nginx:
 	@echo Now building vault-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
-docker-compose: strato_docker
-	@echo Generating docker-compose files via strato-setup in container...
-	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
-	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_URL) --includeBuild \
-	    > docker-compose.push.yml
-	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
-	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_URL) \
-	    > docker-compose.yml
-	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
-	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_AWS_ECR_URL) --includeBuild \
-	    > docker-compose.push.ecr.yml
-	docker run --rm --entrypoint strato-setup $(REPO_URL)strato:$(VERSION)-$(HASH_STRATO) \
-	    --composeOnly --dockerMode=allDocker --repoUrl=$(REPO_AWS_ECR_URL) \
-	    > docker-compose.ecr.yml
+docker-compose:
 	@echo Generating vault, highway, bridge compose files...
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml

@@ -4,6 +4,8 @@ import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getRebaseFactors } from "./oracle.service";
 import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.service";
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
+import { getLoan } from "./lending.service";
+import { getVaults } from "./cdp.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
@@ -198,16 +200,19 @@ export const getEarningAssets = async (
     };
   });
 
-  const saveUsdstAsset =
-    saveUsdstInfo && saveUsdstUserInfo && BigInt(saveUsdstUserInfo.userShares || "0") > 0n
-      ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo)
-      : null;
+  const saveUsdstAsset = saveUsdstInfo?.deployed
+    ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo ?? undefined)
+    : null;
 
-  if (
-    saveUsdstAsset &&
-    !earningAssets.some((asset: EarningAsset) => asset.address.toLowerCase() === saveUsdstAsset.address.toLowerCase())
-  ) {
-    earningAssets.push(saveUsdstAsset);
+  if (saveUsdstAsset) {
+    const existingIdx = earningAssets.findIndex(
+      (asset: EarningAsset) => asset.address.toLowerCase() === saveUsdstAsset.address.toLowerCase()
+    );
+    if (existingIdx >= 0) {
+      earningAssets[existingIdx] = saveUsdstAsset;
+    } else {
+      earningAssets.push(saveUsdstAsset);
+    }
   }
 
   return earningAssets;
@@ -274,7 +279,8 @@ function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryE
     return { ...portfolioInfo,
       tokens: { ...portfolioInfo.tokens,
         [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
-          supply: totalSupply
+          supply: totalSupply,
+          ...(newInfo.data._managedAssets ? { managedAssets: BigInt(newInfo.data._managedAssets) } : {})
         }
       }
     };
@@ -529,7 +535,7 @@ export const getNetBalanceHistory = async (
   const storageFilters = [
     'data->>lpToken.neq.""',
     'data->>_symbol.like.*-LP',
-    'data->>_symbol.in.(MUSDST,SUSDST,safetyUSDST,lendUSDST)',
+    'data->>_symbol.in.(MUSDST,SUSDST,safetyUSDST,lendUSDST,saveUSDST)',
     'data->>sToken.gt.0',
     'and(data->>mToken.gt.0,data->>borrowIndex.gt.0)',
     ...(vaultConfig?.shareToken ? [`address.eq.${vaultConfig.shareToken}`] : []),
@@ -705,4 +711,51 @@ export const getPoolPriceHistory = async (
     ((s,_) => s)
   );
   return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.balance}));
+};
+
+export const getNetBalance = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number }> => {
+  const [earningAssetsResult, loanResult, vaultsResult] = await Promise.allSettled([
+    getEarningAssets(accessToken, userAddress),
+    getLoan(accessToken, userAddress),
+    getVaults(accessToken, userAddress),
+  ]);
+
+  let totalAssetValue = 0;
+  if (earningAssetsResult.status === "fulfilled") {
+    for (const asset of earningAssetsResult.value) {
+      totalAssetValue += parseFloat(asset.value || "0");
+    }
+  }
+
+  let lendingDebt = 0;
+  if (loanResult.status === "fulfilled" && loanResult.value?.totalAmountOwed) {
+    try {
+      const raw = BigInt(loanResult.value.totalAmountOwed);
+      if (raw > 1n) {
+        lendingDebt = Number(raw) / 1e18;
+      }
+    } catch { /* dust or invalid */ }
+  }
+
+  let cdpDebt = 0;
+  if (vaultsResult.status === "fulfilled") {
+    for (const vault of vaultsResult.value) {
+      try {
+        const raw = BigInt(vault.debtAmount || "0");
+        if (raw > 1n) {
+          cdpDebt += Number(raw) / 1e18;
+        }
+      } catch { /* dust or invalid */ }
+    }
+  }
+
+  const totalBorrowed = lendingDebt + cdpDebt;
+  return {
+    netBalance: totalAssetValue - totalBorrowed,
+    totalBorrowed,
+    totalAssetValue,
+  };
 };

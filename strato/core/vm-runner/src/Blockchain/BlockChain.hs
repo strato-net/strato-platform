@@ -101,6 +101,10 @@ import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
 import SolidVM.Model.SolidString (labelToText)
+import SolidVM.Model.Value (Value(..))
+import qualified Data.Aeson as Aeson
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -430,7 +434,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         , erEvents = erEvents feeResult ++ erEvents er
         }
 
-  if (erException feeResult == Nothing) || (erReturnVal feeResult == Just "(true)")
+  if (erException feeResult == Nothing) || (erReturnVal feeResult == Just (SBool True))
     then do
       $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
 
@@ -675,7 +679,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         case result of
           Left _ -> ("", [], [], []) --TODO keep the trace when the run fails
           Right r ->
-            (fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
+            (maybe "" (TL.unpack . TLE.decodeUtf8 . Aeson.encode) $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash <$> theLogs
   yield . OutEvent $ mkEventEntry <$> theEvents

@@ -80,6 +80,7 @@ import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
+import SolidVM.Model.Value (Value(..))
 import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
@@ -563,7 +564,7 @@ runArgs = runArgsWithSender sender
 runArgsBeef :: [T.Text] -> String -> ContextM ExecResults
 runArgsBeef = runArgsWithSenderBeef sender
 
-runCall :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
+runCall :: T.Text -> [T.Text] -> String -> ContextM (Maybe Value)
 runCall funcName callArgs bs = do
   let code = Code $ T.pack bs
       isRCC = False
@@ -621,9 +622,7 @@ runCall funcName callArgs bs = do
   rethrowEx er2
   return $ erReturnVal er2
 
--- SolidVM returns String instead of ByteString, test it by using the new function runCall' instead of the function runCall
--- compare the returned value (but got) with expected value (expected) in the test case
-runCall' :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
+runCall' :: T.Text -> [T.Text] -> String -> ContextM (Maybe Value)
 runCall' funcName callArgs bs = do
   let code = Code $ T.pack bs
       isRCC = False
@@ -686,7 +685,7 @@ runCall' funcName callArgs bs = do
 lastN' :: Int -> [a] -> [a]
 lastN' n xs = L.foldl' (const . drop 1) xs (drop n xs)
 
-call2 :: T.Text -> [T.Text] -> Address -> ContextM (Maybe String)
+call2 :: T.Text -> [T.Text] -> Address -> ContextM (Maybe Value)
 call2 funcName callArgs contractAddress = do
   let isRCC = False
       blockData =

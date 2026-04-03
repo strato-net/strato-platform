@@ -31,7 +31,8 @@ library
       src/
   ghc-options: -Wall -O2
   build-depends:
-      base
+      aeson
+    , base
     , base16-bytestring
     , binary
     , blockDB

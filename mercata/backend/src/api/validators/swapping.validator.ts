@@ -173,9 +173,16 @@ export function validateMultiTokenSwapArgs(args: any) {
 
 export function validateMultiTokenAddLiquidityArgs(args: any) {
   const schema = Joi.object({
-    amounts: Joi.array().items(numericStringField("amount")).min(1).required(),
+    amounts: Joi.array().items(numericStringField("amount", { allowZero: true })).min(1).required()
+      .custom((amounts, helpers) => {
+        const hasNonZero = amounts.some((a: string) => parseFloat(a) > 0);
+        if (!hasNonZero) return helpers.error("array.atLeastOnePositive");
+        return amounts;
+      }, "At least one positive amount check"),
     minMintAmount: numericStringField("MinMintAmount", { allowZero: true }),
     stakeLPToken: Joi.boolean().optional(),
+  }).messages({
+    "array.atLeastOnePositive": `"amounts" must contain at least one value greater than 0`,
   });
 
   const { error } = schema.validate(args);

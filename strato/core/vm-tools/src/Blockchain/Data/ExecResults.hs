@@ -20,11 +20,12 @@ import Blockchain.VM.VMException
 import Control.DeepSeq
 import qualified Data.Set as S
 import GHC.Generics
+import SolidVM.Model.Value (Value)
 
 data ExecResults = ExecResults
   { erRemainingTxGas :: Integer,
     erRefund :: Integer,
-    erReturnVal :: Maybe String,
+    erReturnVal :: Maybe Value,
     erTrace :: [String],
     erLogs :: [Log],
     erEvents :: [Event],
