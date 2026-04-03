@@ -12,14 +12,14 @@ STRATO TVL counts the USD value of underlying assets currently locked in STRATO 
 
 ## Data Source
 
-- Public TVL endpoint: `https://YOUR_PUBLIC_STRATO_API_HOST/api/v1/metrics/tvl`
+- Public TVL endpoint: `https://app.strato.nexus/api/metrics/tvl`
 - The endpoint is read-only and unauthenticated
 - The adapter uses the endpoint's raw asset balances and does not rely on the endpoint's precomputed USD totals
 
 ## Notes
 
+- Final adapter path in `DefiLlama/DefiLlama-Adapters`: `projects/strato/index.js`
 - Stablecoin supply is tracked separately and is not included in this TVL adapter
-- Current prod endpoint output is approximately `$7.52M` TVL using this methodology
 - STRATO should be treated as its own chain for this adapter
 
 ## Short Version
@@ -36,6 +36,7 @@ Counts underlying assets locked in STRATO DeFi contracts across CDP, lending, po
 
 ## Data Source
 
-- `https://YOUR_PUBLIC_STRATO_API_HOST/api/v1/metrics/tvl`
+- `https://app.strato.nexus/api/metrics/tvl`
 - Public, read-only, unauthenticated
+- Final adapter file path: `projects/strato/index.js`
 - Adapter uses raw balances from the endpoint

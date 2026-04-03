@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { useUser } from "@/context/UserContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits } from "@/utils/numberUtils";
@@ -123,6 +124,7 @@ const EarnSave = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useUser();
   const { tokenApys } = useEarnContext();
+  const { usdstBalance, fetchUsdstBalance } = useTokenContext();
   const { toast } = useToast();
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
   const { userRewards, loading: rewardsUserLoading } = useRewardsUserInfo();
@@ -152,7 +154,6 @@ const EarnSave = () => {
   const tvlDisplay = loadingInfo
     ? "..."
     : formatUsdAmount(effectiveInfo?.tvlUsd || "0");
-  const walletAssets = userInfo?.walletAssets || "0";
   const userShares = userInfo?.userShares || "0";
   const redeemableAssets = userInfo?.redeemableAssets || "0";
   const isConfigured = Boolean(effectiveInfo?.configured);
@@ -260,7 +261,7 @@ const EarnSave = () => {
   const metrics = [
     {
       label: "USDST Balance",
-      value: loadingInfo ? "..." : isLoggedIn ? formatTokenAmount(walletAssets) : "--",
+      value: loadingInfo ? "..." : isLoggedIn ? formatTokenAmount(usdstBalance) : "--",
       hint: "Available to save",
       icon: <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />,
     },
@@ -322,7 +323,7 @@ const EarnSave = () => {
       }
 
       setActionMode(null);
-      await refreshSaveUsdst();
+      await Promise.all([refreshSaveUsdst(), fetchUsdstBalance()]);
     } finally {
       setIsSubmitting(false);
     }
@@ -340,7 +341,7 @@ const EarnSave = () => {
         variant: "success",
       });
       setActionMode(null);
-      await refreshSaveUsdst();
+      await Promise.all([refreshSaveUsdst(), fetchUsdstBalance()]);
     } finally {
       setIsSubmitting(false);
     }
@@ -549,7 +550,7 @@ const EarnSave = () => {
             <div className="rounded-lg border border-border/70 bg-muted/40 p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span>USDST Balance</span>
-                <span className="font-medium text-foreground">{formatTokenAmount(walletAssets)}</span>
+                <span className="font-medium text-foreground">{formatTokenAmount(usdstBalance)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>saveUSDST Balance</span>

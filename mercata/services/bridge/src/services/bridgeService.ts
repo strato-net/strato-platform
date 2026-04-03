@@ -164,14 +164,14 @@ export const confirmWithdrawalBatch = async (
       throw executeError;
     }
 
-    const emailPromises = withdrawals.map(async (withdrawal) => {
+    const emailPromises = transactionProposals.map(async (proposal) => {
       try {
-        await sendEmail(withdrawal.withdrawalId!, withdrawal.externalChainId);
+        await sendEmail(proposal.safeTxHash, proposal.externalChainId);
         return "success";
       } catch (emailError) {
         logError("BridgeService", emailError as Error, {
           operation: "sendEmail",
-          withdrawalId: withdrawal.withdrawalId!,
+          safeTxHash: proposal.safeTxHash,
         });
         return "failed";
       }
