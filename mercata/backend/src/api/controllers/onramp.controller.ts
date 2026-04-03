@@ -15,10 +15,15 @@ class OnrampController {
   ): Promise<void> {
     try {
       const userAddress = req.address;
-      const clientIp =
+      let clientIp =
         (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
         req.socket?.remoteAddress ||
         "";
+
+      const isLoopback = !clientIp || /^(::ffff:)?127\.|^::1$|^0\.0\.0\.0$|^::$/.test(clientIp);
+      if (isLoopback) {
+        clientIp = "8.8.8.8";
+      }
 
       const result = await createOnrampSession(userAddress, clientIp);
       res.json({ success: true, data: result });
