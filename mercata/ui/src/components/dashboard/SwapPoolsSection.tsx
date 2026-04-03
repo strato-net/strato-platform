@@ -2,8 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CircleArrowDown, CircleArrowUp, Search, LineChart } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Search, LineChart ,HelpCircle} from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUser } from '@/context/UserContext';
 import { useTokenContext } from '@/context/TokenContext';
 import { formatBalance } from '@/utils/numberUtils';
@@ -12,7 +13,32 @@ import { Pool, PoolCoin } from '@/interface';
 import { isMultiTokenPool } from '@/helpers/swapCalculations';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
+import { useMobileTooltip } from '@/hooks/use-mobile-tooltip';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+
+// Mobile-only button tooltip component
+const MobileButtonTooltip = ({ containerClass, content }: { containerClass: string; content: string }) => {
+  const { isMobile, showTooltip, handleToggle } = useMobileTooltip(containerClass);
+
+  if (!isMobile) return null;
+
+  return (
+    <div className={`relative ${containerClass}`}>
+      <div 
+        className="inline-flex items-center cursor-help"
+        onClick={handleToggle}
+      >
+        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+      </div>
+      {showTooltip && (
+        <div className="absolute top-full right-0 mt-2 z-50 bg-popover border px-3 py-1.5 text-sm text-popover-foreground shadow-md min-w-[200px]">
+          {content}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,31 +259,42 @@ const SwapPoolsSection = () => {
                       <div className="text-sm text-muted-foreground">APY</div>
                       <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
                     </div>
-               
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex space-x-2">
-                        <Button
-                        size="sm"
-                        className="bg-strato-blue hover:bg-strato-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={() => handleOpenDepositModal(pool)}
-                        disabled={!isLoggedIn || pool.isPaused}
-                      >
-                        <CircleArrowDown className="mr-1 h-4 w-4" />
-                        <span className="hidden sm:inline">Deposit</span>
-                        <span className="sm:hidden">+</span>
-                        </Button>
-                        <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
-                        onClick={() => handleOpenWithdrawModal(pool)}
-                        disabled={!isLoggedIn || BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
-                        title={!isLoggedIn ? "Sign in to withdraw" : BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
-                      >
-                        <CircleArrowUp className="mr-1 h-4 w-4" />
-                        <span className="hidden sm:inline">Withdraw</span>
-                        <span className="sm:hidden">-</span>
-                        </Button>
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            size="sm"
+                            className="bg-strato-blue hover:bg-strato-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => handleOpenDepositModal(pool)}
+                            disabled={!isLoggedIn || pool.isPaused}
+                          >
+                            <CircleArrowDown className="mr-1 h-4 w-4" />
+                            <span className="hidden sm:inline">Deposit</span>
+                            <span className="sm:hidden">+</span>
+                          </Button>
+                          <MobileButtonTooltip 
+                            containerClass={`deposit-tooltip-${id}`}
+                            content="Deposit liquidity to this pool"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
+                            onClick={() => handleOpenWithdrawModal(pool)}
+                            disabled={!isLoggedIn || BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
+                            title={!isLoggedIn ? "Sign in to withdraw" : BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
+                          >
+                            <CircleArrowUp className="mr-1 h-4 w-4" />
+                            <span className="hidden sm:inline">Withdraw</span>
+                            <span className="sm:hidden">-</span>
+                          </Button>
+                          <MobileButtonTooltip 
+                            containerClass={`withdraw-tooltip-${id}`}
+                            content="Withdraw liquidity from this pool"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
