@@ -61,16 +61,6 @@ data CommitmentCiphertext = CommitmentCiphertext
   , ccMemo :: ByteString  -- bytes (empty for us)
   } deriving (Show, Eq)
 
--- | Create a dummy commitment ciphertext (all zeros)
-dummyCommitmentCiphertext :: CommitmentCiphertext
-dummyCommitmentCiphertext = CommitmentCiphertext
-  { ccCiphertext = [BS.replicate 32 0, BS.replicate 32 0, BS.replicate 32 0, BS.replicate 32 0]
-  , ccBlindedSenderViewingKey = BS.replicate 32 0
-  , ccBlindedReceiverViewingKey = BS.replicate 32 0
-  , ccAnnotationData = BS.empty
-  , ccMemo = BS.empty
-  }
-
 -- | Bound parameters for transaction
 data BoundParams = BoundParams
   { bpTreeNumber :: Int
@@ -159,8 +149,9 @@ createUnshieldRequest
   -> Text           -- ^ Recipient address
   -> Integer        -- ^ Chain ID
   -> Int            -- ^ Tree number
+  -> [CommitmentCiphertext]  -- ^ Ciphertexts for non-unshield outputs (change notes)
   -> UnshieldRequest
-createUnshieldRequest proof merkleRoot nullifier commitments tokenAddr amount recipient chainId treeNum =
+createUnshieldRequest proof merkleRoot nullifier commitments tokenAddr amount recipient chainId treeNum changeCiphertexts =
   let
     -- Convert nullifier to bytes32
     nullifierBytes = integerToBytes32 nullifier
@@ -185,12 +176,9 @@ createUnshieldRequest proof merkleRoot nullifier commitments tokenAddr amount re
       , cpValue = amount
       }
     
-    -- Bound params
-    -- For unshield with 2 commitments (unshield + change), we need 1 ciphertext entry
-    -- The ciphertext length must equal commitments.length - 1
-    ciphertextForChange = if length commitments > 1
-                          then [dummyCommitmentCiphertext]  -- Dummy ciphertext for change note
-                          else []
+    -- Ciphertext length must equal commitments.length - 1
+    -- (the last commitment is the unshield itself, which has no ciphertext)
+    ciphertextForChange = changeCiphertexts
     
     boundParams = BoundParams
       { bpTreeNumber = treeNum
