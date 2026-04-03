@@ -10,10 +10,18 @@ contract User {
     }
 
     function doSuccessfully(address a, string f, variadic args) public returns (variadic) {
-        try address(a).call(f, args) returns (variadic result) {
+        try do(a, f, args) returns (variadic result) {
             return result;
         } catch Error(string e) {
             revert("Failed to call " + f + " on behalf of user with error: " + e);
+        }
+    }
+
+    function doExpectingFailure(address a, string f, string expectedError, variadic args) public {
+        try do(a, f, args) returns (variadic result) {
+            revert("Expected " + f + " to fail but it succeeded");
+        } catch Error(string e) {
+            require(e == expectedError, "Expected " + f + " to fail with error: " + expectedError + " but got: " + e);
         }
     }
 }

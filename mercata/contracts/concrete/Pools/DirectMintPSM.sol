@@ -113,7 +113,7 @@ contract DirectMintPSM is Ownable {
         require(request.requester == msg.sender, "Unauthorized");
 
         // Remove burn request
-        delete burnRequests[id];
+        _deleteBurnRequest(id);
 
         emit BurnCancelled(id, request.amount, request.redeemToken, request.requester);
     }
