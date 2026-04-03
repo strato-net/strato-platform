@@ -13,12 +13,15 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { formatUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
+import { useEarnContext } from '@/context/EarnContext';
 import { usdstAddress, DEPOSIT_FEE } from "@/lib/constants";
 import { Pool, PoolCoin } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { isMultiTokenPool } from '@/helpers/swapCalculations';
+import EarnApyTooltip from '@/components/earn/EarnApyTooltip';
+import { findPoolEarnApyInfo } from '@/utils/earnUtils';
 
 const formatNumber = (value: string | number): string => {
   try {
@@ -71,6 +74,12 @@ const LiquidityDepositModal = ({
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { tokenApys } = useEarnContext();
+  const selectedPoolApyInfo = useMemo(
+    () => (selectedPool ? findPoolEarnApyInfo(tokenApys, selectedPool.address) : null),
+    [selectedPool, tokenApys]
+  );
+  const selectedPoolApyLabel = selectedPoolApyInfo ? `${selectedPoolApyInfo.total.toFixed(2)}%` : "N/A";
 
   const form = useForm<DepositFormValues>({
     defaultValues: {
@@ -529,8 +538,10 @@ const LiquidityDepositModal = ({
               {/* Pool info */}
               <div className="rounded-lg bg-muted/50 p-2 md:p-3">
                 <div className="flex justify-between items-center text-xs md:text-sm text-muted-foreground">
-                  <span>APY</span>
-                  <span className="font-medium">{selectedPool?.apy ? `${selectedPool.apy}%` : "N/A"}</span>
+                  <span>Best Available APY</span>
+                  <EarnApyTooltip info={selectedPoolApyInfo}>
+                    <span className="font-medium cursor-default">{selectedPoolApyLabel}</span>
+                  </EarnApyTooltip>
                 </div>
                 <div className="flex justify-between items-center text-xs md:text-sm mt-2 text-muted-foreground">
                   <span>Transaction fee</span>
@@ -816,8 +827,10 @@ const LiquidityDepositModal = ({
 
           <div className="rounded-lg bg-muted/50 p-2 md:p-3">
             <div className="flex justify-between items-center text-xs md:text-sm text-muted-foreground">
-              <span>APY</span>
-              <span className="font-medium">{selectedPool?.apy ? `${selectedPool.apy}%` : "N/A"}</span>
+              <span>Best Available APY</span>
+              <EarnApyTooltip info={selectedPoolApyInfo}>
+                <span className="font-medium cursor-default">{selectedPoolApyLabel}</span>
+              </EarnApyTooltip>
             </div>
             <div className="flex flex-col md:flex-row md:justify-between md:items-center text-xs md:text-sm mt-2 text-muted-foreground gap-0.5">
               <span className="shrink-0">Current pool ratio</span>

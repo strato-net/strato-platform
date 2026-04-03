@@ -2,26 +2,33 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { hiddenSwapPools, yieldBenchmarks } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
+import { buildYieldAnchorOverlapFilter, computeYieldAPYFromAnchors, getYieldWindowBounds, indexYieldHistoryRows } from "../helpers/earnYield.helper";
 import { totalDebtFromScaled, calculateAPYs } from "../helpers/lending.helper";
+import { fetchMultiTokenStablePools } from "../helpers/swapping.helper";
+import {
+  computeEquityFromMaps,
+  computeVaultPerformanceMetrics,
+  safeBigInt,
+} from "../helpers/vaultPerformance.helper";
+import { fetchAllActivities } from "./rewards.service";
+import { getSaveUsdstInfo } from "./saveUsdst.service";
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
-const { Pool, DECIMALS } = constants;
+const { Pool, DECIMALS, Vault, Token } = constants;
 const ZERO_APY = "0.00";
-
-const calcEquity = (addrs: string[], bals: Map<string, string>, pxs: Map<string, string>) =>
-  addrs.reduce((s, a) => s + BigInt(bals.get(a) || "0") * BigInt(pxs.get(a) || "0") / DECIMALS, 0n);
+const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
+const CATA_PRICE_USD = 0.25;
 
 export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]> => {
   const now = Date.now();
   const twentyFourHoursAgo = toUTCTime(new Date(now - 24 * 60 * 60 * 1000));
-  const thirtyDaysAgoTime = new Date(now - 30 * 24 * 60 * 60 * 1000);
-  const thirtyDaysAgo = toUTCTime(thirtyDaysAgoTime);
-  const thirtyDaysAgoDate = thirtyDaysAgoTime.toISOString().split("T")[0];
+  const thirtyDaysAgo = toUTCTime(new Date(now - 30 * 24 * 60 * 60 * 1000));
+  const { windowStart, windowEndExclusive, anchorsMs } = getYieldWindowBounds(now);
   const vaultAddr = constants.vault;
-  const yieldHistoryAssets = [...new Set(yieldBenchmarks.flatMap((p) => [p.tokenAddress, p.baseAddress]))];
+  const yieldHistoryKeys = [...new Set(yieldBenchmarks.flatMap((p) => [p.tokenAddress, p.baseAddress]))];
 
   const mappingOr = `(and(address.eq.${constants.lendingPool},collection_name.eq.assetConfigs,key->>key.eq.${constants.USDST}),and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${constants.liquidityPool}),and(address.eq.${constants.priceOracle},collection_name.eq.prices)${vaultAddr ? `,and(address.eq.${vaultAddr},collection_name.eq.supportedAssets)` : ""})`;
-  const eventOr = `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo})${vaultAddr ? `,and(address.eq.${vaultAddr},event_name.in.(Deposited,Withdrawn),block_timestamp.gte.${thirtyDaysAgo})` : ""})`;
+  const eventOr = `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))`;
 
   // Phase 1: 5 parallel calls
   const [
@@ -29,7 +36,9 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     { data: mappingRows },
     { data: eventRows },
     { data: pools },
-    { data: yieldHistRows },
+    { data: yieldHistoryRows },
+    { data: vaultRows },
+    saveUsdstInfo,
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
       address: `in.(${constants.lendingPool},${constants.safetyModule},${constants.sToken}${vaultAddr ? `,${vaultAddr}` : ""})`,
@@ -39,18 +48,25 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     cirrus.get(accessToken, `/${constants.Event}`, { params: { select: "address,event_name,attributes,block_timestamp", or: eventOr } }),
     cirrus.get(accessToken, `/${Pool}`, { params: {
       poolFactory: `eq.${constants.poolFactory}`,
-      select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
+      select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
     }}),
-    yieldHistoryAssets.length
+    yieldHistoryKeys.length
       ? cirrus.get(accessToken, "/history@mapping", { params: {
         address: `eq.${constants.priceOracle}`,
         collection_name: "eq.prices",
-        "key->>key": `in.(${yieldHistoryAssets.join(",")})`,
-        select: "key->>key,value::text",
-        valid_from: `lte.${thirtyDaysAgoDate}`,
-        valid_to: `gte.${thirtyDaysAgoDate}`,
+        "key->>key": `in.(${yieldHistoryKeys.join(",")})`,
+        select: "key->>key,value::text,valid_from,valid_to",
+        and: `(block_timestamp.gte.${windowStart},block_timestamp.lt.${windowEndExclusive})`,
+        or: buildYieldAnchorOverlapFilter(anchorsMs),
       }})
       : Promise.resolve({ data: [] as any[] }),
+    vaultAddr
+      ? cirrus.get(accessToken, `/${Vault}`, { params: {
+        address: `eq.${vaultAddr}`,
+        select: "shareToken",
+      }})
+      : Promise.resolve({ data: [] as any[] }),
+    getSaveUsdstInfo(accessToken).catch(() => null),
   ]);
 
   // Parse storage
@@ -60,10 +76,11 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const stRow = storageByAddr.get(constants.sToken);
   const vaultStorage: any = vaultAddr ? storageByAddr.get(vaultAddr) : null;
   const botExecutor = vaultStorage?.botExecutor;
+  const shareTokenAddress = vaultRows?.[0]?.shareToken || "";
 
   // Parse mapping
   const prices = new Map<string, string>();
-  const historicalYieldPrices = new Map<string, string>();
+  const yieldHistoryByKey = indexYieldHistoryRows(yieldHistoryRows || []);
   let lendingCfg: any = null;
   let liqBalance: string | null = null;
   const vaultAssets: string[] = [];
@@ -76,29 +93,56 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       if (addr) vaultAssets.push(addr);
     }
   }
-  for (const r of yieldHistRows || []) {
-    if (r.key) historicalYieldPrices.set(r.key, r.value || "0");
-  }
 
   // Parse events (single pass)
-  const swapEvents: any[] = [], smEvents: any[] = [], vaultDeposits: any[] = [], vaultWithdrawals: any[] = [];
+  const swapEvents: any[] = [], smEvents: any[] = [];
   for (const e of eventRows || []) {
     switch (e.event_name) {
       case "Swap": swapEvents.push(e); break;
-      case "Deposited": vaultDeposits.push(e); break;
-      case "Withdrawn": vaultWithdrawals.push(e); break;
       case "Staked": case "Redeemed": case "RewardNotified": case "ShortfallCovered": smEvents.push(e); break;
     }
   }
 
-  // Phase 2: vault APY needs bot balances + historical equity (depends on phase 1)
+  const rewardActivities = await fetchAllActivities(accessToken).catch(() => []);
+  const [{ data: poolFactoryRows }, stablePools] = await Promise.all([
+    cirrus.get(accessToken, `/${constants.PoolFactory}`, {
+      params: {
+        address: `eq.${constants.poolFactory}`,
+        select: "swapFeeRate,lpSharePercent",
+      },
+    }).catch(() => ({ data: [] as any[] })),
+    fetchMultiTokenStablePools(accessToken).catch(() => []),
+  ]);
+
+  // Phase 2: vault APY needs current balances + historical NAV context
   let vaultAPY: string | null = null;
+  let vaultRewardApy: string | null = null;
   const filteredVaultAssets = vaultAssets.filter(a => a !== "0000000000000000000000000000000000000000");
   const vaultOracle = vaultStorage?.priceOracle || constants.priceOracle;
-  if (vaultAddr && botExecutor && filteredVaultAssets.length && vaultDeposits.length) {
-    vaultAPY = await computeVaultAPY(
-      accessToken, filteredVaultAssets, botExecutor, vaultOracle, prices, vaultDeposits, vaultWithdrawals
+  const currentVaultBalances = new Map<string, string>();
+  if (vaultAddr && shareTokenAddress && botExecutor && filteredVaultAssets.length) {
+    const balances = await getCurrentVaultBalances(accessToken, filteredVaultAssets, botExecutor);
+    balances.forEach((value, key) => currentVaultBalances.set(key, value));
+
+    const vaultMetrics = await computeVaultPerformanceMetrics(
+      accessToken,
+      vaultAddr,
+      computeEquityFromMaps(filteredVaultAssets, currentVaultBalances, prices),
+      safeBigInt(await getTokenTotalSupply(accessToken, shareTokenAddress)),
+      shareTokenAddress,
+      botExecutor,
+      vaultOracle,
+      filteredVaultAssets,
+      prices
     );
+
+    vaultAPY = vaultMetrics.alpha !== "-" ? vaultMetrics.alpha : null;
+    const vaultRewardsActivity = findRewardActivity(rewardActivities, {
+      sourceContract: shareTokenAddress,
+      stakeAssetAddress: shareTokenAddress,
+      nameIncludes: ["vault"],
+    });
+    vaultRewardApy = computeRewardsApy(vaultRewardsActivity?.emissionRate, vaultRewardsActivity?.totalStakeUsd);
   }
 
   // Build result
@@ -113,41 +157,212 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     }
   }
 
-  const volumeMap = buildVolumeMap(swapEvents, prices);
-  const activePools = (pools || []).filter((p: any) =>
-    p.tokenA?.address && p.tokenB?.address &&
-    !p.isPaused && !p.isDisabled &&
-    !(p.tokenABalance === "0" && p.tokenBBalance === "0") &&
-    !hiddenSwapPools.has(p.address)
-  );
-  for (const p of activePools) {
-    const apy = computePoolAPY(p, prices, volumeMap);
-    if (apy === ZERO_APY) continue;
-    const meta = `${p.tokenA._symbol}-${p.tokenB._symbol}`;
-    const poolAddress = String(p.address ?? "").toLowerCase().replace(/^0x/, "");
-    const row = {
-      source: "swap" as const,
-      apy,
-      meta,
-      ...(poolAddress ? { poolAddress } : {}),
-    };
-    add(p.tokenA.address, row);
-    add(p.tokenB.address, row);
+  const lendingRewardsActivity = rewardActivities.find((activity) => {
+    const name = String(activity?.name || "").toLowerCase();
+    const source = normalizeAddress(activity?.sourceContract);
+    const mTokenAddress = normalizeAddress(lpData?.mToken);
+    return name.includes("lending pool liquidity") || (!!mTokenAddress && source === mTokenAddress);
+  }) || null;
+  const lendingRewardsApy = computeRewardsApy(lendingRewardsActivity?.emissionRate, lendingRewardsActivity?.totalStakeUsd);
+  if (lendingRewardsApy && lpData?.borrowableAsset) {
+    add(lpData.borrowableAsset, { source: "rewards", apy: lendingRewardsApy, meta: "lending" });
+    if (lpData.mToken) add(lpData.mToken, { source: "rewards", apy: lendingRewardsApy, meta: "lending" });
   }
 
+  const directMintRewardsActivity = findRewardActivity(rewardActivities, {
+    sourceContract: constants.mercataBridge,
+  });
+  const directMintRewardsApy = computeRewardsApy(
+    directMintRewardsActivity?.emissionRate,
+    directMintRewardsActivity?.totalStakeUsd
+  );
+  if (directMintRewardsApy) {
+    add(constants.USDST, { source: "rewards", apy: directMintRewardsApy, meta: "direct_mint" });
+  }
+
+  const saveUsdstAddress = normalizeAddress(saveUsdstInfo?.vaultAddress);
+  const saveUsdstNativeApy =
+    saveUsdstInfo?.apy && saveUsdstInfo.apy !== "-" && parseFloat(saveUsdstInfo.apy) > 0
+      ? saveUsdstInfo.apy
+      : null;
+  const saveUsdstStakeUsd =
+    saveUsdstInfo?.tvlUsd ||
+    saveUsdstInfo?.pricingAssets ||
+    saveUsdstInfo?.totalAssets ||
+    null;
+  const saveUsdstRewardsActivity = saveUsdstAddress
+    ? findRewardActivity(rewardActivities, {
+        sourceContract: saveUsdstAddress,
+        stakeAssetAddress: saveUsdstAddress,
+        nameIncludes: ["save usdst", "saveusdst"],
+      })
+    : null;
+  const saveUsdstRewardsApy = computeRewardsApy(
+    saveUsdstRewardsActivity?.emissionRate,
+    saveUsdstRewardsActivity?.totalStakeUsd ?? saveUsdstStakeUsd
+  );
+  if (saveUsdstAddress) {
+    // Reuse the native-yield source bucket so generic lookup surfaces still label it as Native APY.
+    if (saveUsdstNativeApy) {
+      add(saveUsdstAddress, { source: "lending", apy: saveUsdstNativeApy, meta: "save_usdst" });
+    }
+    if (saveUsdstRewardsApy) {
+      add(saveUsdstAddress, { source: "rewards", apy: saveUsdstRewardsApy, meta: "save_usdst" });
+    }
+  }
+
+  const baseYieldByAddr = new Map<string, number>();
   for (const pair of yieldBenchmarks) {
-    const apy = computeYieldAPY(
-      prices.get(pair.tokenAddress),
-      prices.get(pair.baseAddress),
-      historicalYieldPrices.get(pair.tokenAddress),
-      historicalYieldPrices.get(pair.baseAddress),
+    const apy = computeYieldAPYFromAnchors(
+      pair.tokenAddress,
+      pair.baseAddress,
+      prices,
+      yieldHistoryByKey,
+      anchorsMs,
     );
     if (!apy) continue;
-    add(pair.tokenAddress, { source: "yield", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
+    add(pair.tokenAddress, { source: "base", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
+    baseYieldByAddr.set(pair.tokenAddress, parseFloat(apy));
+  }
+  const vaultWeightedApy = currentVaultBalances.size > 0 && baseYieldByAddr.size > 0
+    ? weightedBaseYield(
+        filteredVaultAssets,
+        filteredVaultAssets.map((addr) => currentVaultBalances.get(addr) || "0"),
+        prices,
+        baseYieldByAddr
+      )
+    : null;
+
+  const volumeMap = buildVolumeMap(swapEvents, prices);
+  const poolFactoryData = poolFactoryRows?.[0] || null;
+  const factorySwapFeeRate = Number(poolFactoryData?.swapFeeRate || 30);
+  const factoryLpSharePercent = Number(poolFactoryData?.lpSharePercent || 7000);
+  const stablePoolAddresses = new Set(
+    (stablePools || []).map((pool: any) => normalizeAddress(pool?.address)).filter(Boolean)
+  );
+  const activePools = (pools || []).filter((p: any) =>
+    p.tokenA?.address && p.tokenB?.address && p.lpToken?.address &&
+    !p.isPaused && !p.isDisabled &&
+    !(p.tokenABalance === "0" && p.tokenBBalance === "0") &&
+    !hiddenSwapPools.has(p.address) &&
+    !stablePoolAddresses.has(normalizeAddress(p.address))
+  );
+  for (const p of activePools) {
+    const meta = `${p.tokenA._symbol}-${p.tokenB._symbol}`;
+    const poolAddress = String(p.address ?? "").toLowerCase().replace(/^0x/, "");
+    const lpTokenAddress = p.lpToken.address;
+    const swapApy = computePoolAPY(p, prices, volumeMap);
+    const tokenABaseApy = baseYieldByAddr.get(p.tokenA.address);
+    const tokenBBaseApy = baseYieldByAddr.get(p.tokenB.address);
+    const poolRewardActivity = findPoolRewardActivity(rewardActivities, {
+      poolAddress,
+      lpTokenAddress,
+    });
+    const poolRewardApy = computeRewardsApy(poolRewardActivity?.emissionRate, poolRewardActivity?.totalStakeUsd);
+
+    if (swapApy !== ZERO_APY) {
+      const row = { source: "swap" as const, apy: swapApy, meta, ...(poolAddress ? { poolAddress } : {}) };
+      add(lpTokenAddress, row);
+      add(p.tokenA.address, row);
+      add(p.tokenB.address, row);
+    }
+    if (baseYieldByAddr.size > 0) {
+      const wApy = weightedBaseYield([p.tokenA.address, p.tokenB.address], [p.tokenABalance || "0", p.tokenBBalance || "0"], prices, baseYieldByAddr);
+      if (wApy) {
+        add(lpTokenAddress, { source: "weighted_swap", apy: wApy, meta, ...(poolAddress ? { poolAddress } : {}) });
+      }
+    }
+    if (tokenABaseApy && tokenABaseApy > 0) {
+      add(p.tokenA.address, { source: "base", apy: tokenABaseApy.toFixed(2), meta, ...(poolAddress ? { poolAddress } : {}) });
+    }
+    if (tokenBBaseApy && tokenBBaseApy > 0) {
+      add(p.tokenB.address, { source: "base", apy: tokenBBaseApy.toFixed(2), meta, ...(poolAddress ? { poolAddress } : {}) });
+    }
+    if (poolRewardApy) {
+      const rewardRow = { source: "rewards" as const, apy: poolRewardApy, meta, ...(poolAddress ? { poolAddress } : {}) };
+      add(lpTokenAddress, rewardRow);
+      add(p.tokenA.address, rewardRow);
+      add(p.tokenB.address, rewardRow);
+    }
   }
 
-  if (vaultAPY && vaultAPY !== "-" && parseFloat(vaultAPY) > 0) {
-    for (const addr of filteredVaultAssets) add(addr, { source: "vault", apy: vaultAPY });
+  for (const stablePool of stablePools || []) {
+    const poolAddress = normalizeAddress(stablePool?.address);
+    const lpTokenAddress = stablePool?.lpToken;
+    const coinAddresses = (stablePool?.coins || []).map((coin: any) => coin?.tokenAddress).filter(Boolean);
+    if (!poolAddress || !lpTokenAddress || coinAddresses.length === 0 || hiddenSwapPools.has(poolAddress)) continue;
+
+    const meta = coinAddresses
+      .map((address: string) => {
+        const poolRow = (pools || []).find((pool: any) =>
+          normalizeAddress(pool?.tokenA?.address) === normalizeAddress(address) ||
+          normalizeAddress(pool?.tokenB?.address) === normalizeAddress(address)
+        );
+        if (normalizeAddress(poolRow?.tokenA?.address) === normalizeAddress(address)) return poolRow?.tokenA?._symbol;
+        if (normalizeAddress(poolRow?.tokenB?.address) === normalizeAddress(address)) return poolRow?.tokenB?._symbol;
+        return null;
+      })
+      .filter(Boolean)
+      .join("-");
+
+    let totalTvlUsd = 0;
+    for (const address of coinAddresses) {
+      const balanceRaw = stablePool?.tokenBalances?.get?.(address) || stablePool?.tokenBalances?.get?.(normalizeAddress(address)) || "0";
+      const priceRaw = prices.get(address) || prices.get(normalizeAddress(address)) || "0";
+      totalTvlUsd += Number((BigInt(balanceRaw) * BigInt(priceRaw)) / DECIMALS) / 1e18;
+    }
+
+    const volume24h = volumeMap.get(stablePool.address) || volumeMap.get(poolAddress) || 0;
+    const swapApyValue = totalTvlUsd > 0
+      ? (volume24h * (factorySwapFeeRate / 10000) * (factoryLpSharePercent / 10000) / totalTvlUsd) * 365 * 100
+      : 0;
+    const swapApy = swapApyValue > 0 ? swapApyValue.toFixed(2) : ZERO_APY;
+
+    const poolRewardActivity = findPoolRewardActivity(rewardActivities, {
+      poolAddress,
+      lpTokenAddress,
+    });
+    const poolRewardApy = computeRewardsApy(poolRewardActivity?.emissionRate, poolRewardActivity?.totalStakeUsd);
+    const weightedApy = weightedBaseYield(
+      coinAddresses,
+      coinAddresses.map((address: string) =>
+        stablePool?.tokenBalances?.get?.(address) || stablePool?.tokenBalances?.get?.(normalizeAddress(address)) || "0"
+      ),
+      prices,
+      baseYieldByAddr
+    );
+
+    if (swapApy !== ZERO_APY) {
+      const row = { source: "swap" as const, apy: swapApy, meta, poolAddress };
+      add(lpTokenAddress, row);
+      coinAddresses.forEach((address: string) => add(address, row));
+    }
+    if (weightedApy) {
+      add(lpTokenAddress, { source: "weighted_swap", apy: weightedApy, meta, poolAddress });
+    }
+    coinAddresses.forEach((address: string) => {
+      const tokenBaseApy = baseYieldByAddr.get(address);
+      if (tokenBaseApy && tokenBaseApy > 0) {
+        add(address, { source: "base", apy: tokenBaseApy.toFixed(2), meta, poolAddress });
+      }
+    });
+    if (poolRewardApy) {
+      const rewardRow = { source: "rewards" as const, apy: poolRewardApy, meta, poolAddress };
+      add(lpTokenAddress, rewardRow);
+      coinAddresses.forEach((address: string) => add(address, rewardRow));
+    }
+  }
+
+  if (shareTokenAddress) {
+    if (vaultAPY && vaultAPY !== "-" && parseFloat(vaultAPY) > 0) {
+      add(shareTokenAddress, { source: "vault", apy: vaultAPY });
+    }
+    if (vaultWeightedApy && parseFloat(vaultWeightedApy) > 0) {
+      add(shareTokenAddress, { source: "vault_weighted", apy: vaultWeightedApy });
+    }
+    if (vaultRewardApy && parseFloat(vaultRewardApy) > 0) {
+      add(shareTokenAddress, { source: "rewards", apy: vaultRewardApy, meta: "vault" });
+    }
   }
 
   const safetyAPY = computeSafetyAPY(smRow, stRow, smEvents);
@@ -155,57 +370,6 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 
   return [...map.entries()].map(([token, apys]) => ({ token, apys }));
 };
-
-async function computeVaultAPY(
-  accessToken: string,
-  assets: string[],
-  botExecutor: string,
-  oracleAddr: string,
-  prices: Map<string, string>,
-  deposits: any[],
-  withdrawals: any[],
-): Promise<string | null> {
-  try {
-    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-    const assetList = assets.join(",");
-
-    const [{ data: botBalances }, { data: histRows }] = await Promise.all([
-      cirrus.get(accessToken, "/mapping", { params: {
-        address: `in.(${assetList})`, collection_name: "eq._balances",
-        "key->>key": `eq.${botExecutor}`, select: "address,value::text",
-      }}),
-      cirrus.get(accessToken, "/history@mapping", { params: {
-        select: "address,collection_name,key->>key,value::text",
-        or: `(and(address.in.(${assetList}),collection_name.eq._balances,key->>key.eq.${botExecutor}),and(address.eq.${oracleAddr},collection_name.eq.prices,key->>key.in.(${assetList})))`,
-        valid_from: `lte.${startDate}`, valid_to: `gte.${startDate}`,
-      }}),
-    ]);
-
-    const balMap = new Map<string, string>((botBalances || []).map((b: any) => [b.address, b.value || "0"]));
-    const currentEquity = calcEquity(assets, balMap, prices);
-    if (currentEquity <= 0n) return null;
-
-    const totalDeposits = deposits.reduce((s: bigint, d: any) => s + BigInt(d.attributes?.depositValueUSD || "0"), 0n);
-    const totalWithdrawals = withdrawals.reduce((s: bigint, w: any) => s + BigInt(w.attributes?.withdrawValueUSD || "0"), 0n);
-
-    const histBalMap = new Map<string, string>();
-    const histPriceMap = new Map<string, string>();
-    for (const r of histRows || []) {
-      if (r.collection_name === "_balances") histBalMap.set(r.address, r.value || "0");
-      else if (r.collection_name === "prices") histPriceMap.set(r.key, r.value || "0");
-    }
-    const startEquity = calcEquity(assets, histBalMap, histPriceMap);
-    if (startEquity <= 0n) return null;
-
-    const profit = (currentEquity - startEquity) + totalWithdrawals - totalDeposits;
-    const periodReturn = Number(profit * DECIMALS / startEquity) / 1e18;
-    if (periodReturn <= -1 || !isFinite(periodReturn)) return null;
-
-    return ((Math.pow(1 + periodReturn, 365 / 30) - 1) * 100).toFixed(2);
-  } catch {
-    return null;
-  }
-}
 
 function computeLendingAPY(lp: any, cfg: any, availableLiquidity: string): string | null {
   const { supplyAPY: maxSupplyAPY } = calculateAPYs(cfg.interestRate ?? 0, cfg.reserveFactor ?? 1000);
@@ -271,29 +435,131 @@ function computePoolAPY(pool: any, prices: Map<string, string>, volumeMap: Map<s
   return apy.toFixed(2);
 }
 
-function computeYieldAPY(
-  tokenNowRaw?: string,
-  baseNowRaw?: string,
-  tokenStartRaw?: string,
-  baseStartRaw?: string,
-): string | null {
+function weightedBaseYield(addrs: string[], bals: string[], prices: Map<string, string>, baseYields: Map<string, number>): string | null {
+  let ws = 0, total = 0;
+  for (let i = 0; i < addrs.length; i++) {
+    const usd = Number(BigInt(bals[i] || "0") * BigInt(prices.get(addrs[i]) || "0") / DECIMALS) / 1e18;
+    total += usd;
+    ws += usd * (baseYields.get(addrs[i]) || 0);
+  }
+  return total > 0 && ws > 0 ? (ws / total).toFixed(2) : null;
+}
+
+async function getCurrentVaultBalances(
+  accessToken: string,
+  assets: string[],
+  botExecutor: string,
+): Promise<Map<string, string>> {
+  if (assets.length === 0) return new Map();
+  const { data } = await cirrus.get(accessToken, "/mapping", { params: {
+    address: `in.(${assets.join(",")})`,
+    collection_name: "eq._balances",
+    "key->>key": `eq.${botExecutor}`,
+    select: "address,value::text",
+  }});
+  return new Map((data || []).map((row: any) => [row.address, row.value || "0"]));
+}
+
+async function getTokenTotalSupply(accessToken: string, tokenAddress: string): Promise<string> {
   try {
-    const tokenNow = BigInt(tokenNowRaw || "0");
-    const baseNow = BigInt(baseNowRaw || "0");
-    const tokenStart = BigInt(tokenStartRaw || "0");
-    const baseStart = BigInt(baseStartRaw || "0");
-    if (tokenNow <= 0n || baseNow <= 0n || tokenStart <= 0n || baseStart <= 0n) return null;
+    const { data } = await cirrus.get(accessToken, `/${Token}`, { params: {
+      select: "_totalSupply::text",
+      address: `eq.${tokenAddress}`,
+    }});
+    return data?.[0]?._totalSupply || "0";
+  } catch {
+    return "0";
+  }
+}
 
-    const ratioNow = Number(tokenNow) / Number(baseNow);
-    const ratioStart = Number(tokenStart) / Number(baseStart);
-    if (!isFinite(ratioNow) || !isFinite(ratioStart) || ratioStart <= 0) return null;
+function computeRewardsApy(emissionRateRaw?: string, totalStakeUsdRaw?: string | null): string | null {
+  try {
+    if (!emissionRateRaw || !totalStakeUsdRaw) return null;
+    const emissionRate = BigInt(emissionRateRaw);
+    const totalStakeUsd = BigInt(totalStakeUsdRaw);
+    if (emissionRate <= 0n || totalStakeUsd <= 0n) return null;
 
-    const periodReturn = ratioNow / ratioStart - 1;
-    if (periodReturn <= -1 || !isFinite(periodReturn)) return null;
+    const tvlUsd = Number(totalStakeUsd) / 1e18;
+    const annualCata = (Number(emissionRate) / 1e18) * 86400 * 365;
+    if (!isFinite(tvlUsd) || tvlUsd <= 0 || !isFinite(annualCata) || annualCata <= 0) return null;
 
-    const apy = (Math.pow(1 + periodReturn, 365 / 30) - 1) * 100;
-    return apy > 0 ? apy.toFixed(2) : null;
+    const apy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
+    return apy > 0 && isFinite(apy) ? apy.toFixed(2) : null;
   } catch {
     return null;
   }
+}
+
+function normalizeAddress(value?: string | null): string {
+  return (value || "").toLowerCase().replace(/^0x/, "");
+}
+
+function findRewardActivity(
+  activities: any[],
+  options: {
+    sourceContract?: string | null;
+    stakeAssetAddress?: string | null;
+    nameIncludes?: string[];
+  }
+): any | null {
+  const normalizedSource = normalizeAddress(options.sourceContract);
+  const normalizedStakeAsset = normalizeAddress(options.stakeAssetAddress);
+  const nameMatchers = (options.nameIncludes || []).map((name) => name.toLowerCase());
+
+  const matches = activities.filter((activity) => {
+    const source = normalizeAddress(activity?.sourceContract);
+    const stakeAsset = normalizeAddress(activity?.stakeAssetAddress);
+    const name = String(activity?.name || "").toLowerCase();
+
+    if (normalizedSource && source !== normalizedSource) return false;
+    if (normalizedStakeAsset && stakeAsset && stakeAsset !== normalizedStakeAsset) return false;
+    if (nameMatchers.length > 0 && !nameMatchers.some((matcher) => name.includes(matcher))) return false;
+    return true;
+  });
+
+  if (matches.length === 0) return null;
+
+  const exactStakeAssetMatch = matches.find(
+    (activity) => normalizedStakeAsset && normalizeAddress(activity?.stakeAssetAddress) === normalizedStakeAsset
+  );
+  if (exactStakeAssetMatch) return exactStakeAssetMatch;
+
+  const withUsdStake = matches.find((activity) => safeBigInt(activity?.totalStakeUsd || "0") > 0n);
+  return withUsdStake || matches[0];
+}
+
+function findPoolRewardActivity(
+  activities: any[],
+  options: {
+    poolAddress?: string | null;
+    lpTokenAddress?: string | null;
+  }
+): any | null {
+  const normalizedPool = normalizeAddress(options.poolAddress);
+  const normalizedLpToken = normalizeAddress(options.lpTokenAddress);
+
+  const matches = activities.filter((activity) => {
+    const source = normalizeAddress(activity?.sourceContract);
+    const stakeAsset = normalizeAddress(activity?.stakeAssetAddress);
+    return (
+      (normalizedPool && source === normalizedPool) ||
+      (normalizedLpToken && source === normalizedLpToken) ||
+      (normalizedLpToken && stakeAsset === normalizedLpToken)
+    );
+  });
+
+  if (matches.length === 0) return null;
+
+  const exactLpStakeMatch = matches.find(
+    (activity) => normalizedLpToken && normalizeAddress(activity?.stakeAssetAddress) === normalizedLpToken
+  );
+  if (exactLpStakeMatch) return exactLpStakeMatch;
+
+  const exactPoolSourceMatch = matches.find(
+    (activity) => normalizedPool && normalizeAddress(activity?.sourceContract) === normalizedPool
+  );
+  if (exactPoolSourceMatch) return exactPoolSourceMatch;
+
+  const withUsdStake = matches.find((activity) => safeBigInt(activity?.totalStakeUsd || "0") > 0n);
+  return withUsdStake || matches[0];
 }

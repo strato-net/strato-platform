@@ -5,6 +5,9 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Token as TokenType, EarningAsset } from "@mercata/shared-types";
 import { formatBalance } from "@/utils/numberUtils";
+import { useEarnContext } from "@/context/EarnContext";
+import { buildEarnApyMap } from "@/utils/earnUtils";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -28,6 +31,8 @@ interface AssetsProps {
   guestMode?: boolean;
 }
 
+const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+
 const AssetsList = ({
   loading,
   tokens,
@@ -37,6 +42,11 @@ const AssetsList = ({
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
+
+  const earnByAddr = useMemo(() => {
+    return buildEarnApyMap(tokenApys, { includeVaultSources: false });
+  }, [tokenApys]);
 
   const hasEarningAssets = tokens.length > 0;
   const hasInactiveTokens = inActiveTokens.length > 0;
@@ -97,6 +107,9 @@ const AssetsList = ({
                   Asset
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                  Best Available APY
+                </th>
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Price
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
@@ -117,7 +130,7 @@ const AssetsList = ({
               {shouldShowLoading ? (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
@@ -169,6 +182,17 @@ const AssetsList = ({
                             </p>
                           </div>
                         </div>
+                      </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        {(() => {
+                          const info = tokenApysLoaded ? earnByAddr.get(normAddr(asset?.address || "")) : undefined;
+                          if (!info) return <p className="text-sm text-muted-foreground">-</p>;
+                          return (
+                            <EarnApyTooltip info={info} side="left" align="end">
+                              <span className="text-sm font-medium text-foreground cursor-default">{info.total.toFixed(2)}%</span>
+                            </EarnApyTooltip>
+                          );
+                        })()}
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
@@ -223,7 +247,7 @@ const AssetsList = ({
               ) : (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">

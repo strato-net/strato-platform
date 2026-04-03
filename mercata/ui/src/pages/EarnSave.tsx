@@ -9,6 +9,7 @@ import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/context/UserContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { api } from "@/lib/axios";
@@ -31,8 +33,7 @@ import {
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
-
-const CATA_PRICE_USD = 0.25;
+import { findBestEarnApyInfo } from "@/utils/earnUtils";
 
 const formatTokenAmount = (value: string, maxFractionDigits: number = 4): string => {
   try {
@@ -57,13 +58,6 @@ const formatExchangeRate = (exchangeRate: string): string => {
   }
 };
 
-const formatPercent = (value: string): string => {
-  if (!value || value === "-") return "-";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return "-";
-  return `${num.toFixed(2)}%`;
-};
-
 const formatUsdAmount = (value: string): string => {
   try {
     const num = Number(formatUnits(value || "0", 18));
@@ -79,44 +73,34 @@ const formatUsdAmount = (value: string): string => {
   }
 };
 
-type ActionMode = "deposit" | "redeem" | null;
-
-const getEstimatedIncentiveApyPercent = (
-  nativeApyPercent?: string | number | null,
-  emissionRate?: string,
-  totalStakeUsd?: string | null
-): string => {
-  try {
-    if (!emissionRate || !totalStakeUsd) return "-";
-
-    const nativeApy =
-      nativeApyPercent === null ||
-      nativeApyPercent === undefined ||
-      nativeApyPercent === "" ||
-      nativeApyPercent === "-"
-        ? 0
-        : Number(nativeApyPercent);
-    if (!Number.isFinite(nativeApy)) {
-      return "-";
-    }
-
-    const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
-    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) return "-";
-
-    const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
-    if (!Number.isFinite(annualCata) || annualCata < 0) return "-";
-
-    const rewardsApy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
-    const totalApy = nativeApy + rewardsApy;
-    if (!Number.isFinite(totalApy) || totalApy <= 0) {
-      return "-";
-    }
-
-    return totalApy.toFixed(2);
-  } catch {
-    return "-";
+const formatApyDisplay = (value: string | number | undefined): { label: string; className: string } => {
+  if (!value || value === "-") {
+    return { label: "--", className: "text-foreground" };
   }
+
+  const apy = Number(value);
+  if (!Number.isFinite(apy)) {
+    return { label: "--", className: "text-foreground" };
+  }
+
+  if (apy > 0) {
+    return {
+      label: `+${apy.toFixed(2)}%`,
+      className: "text-foreground",
+    };
+  }
+
+  if (apy < 0) {
+    return {
+      label: `${apy.toFixed(2)}%`,
+      className: "text-destructive",
+    };
+  }
+
+  return { label: "0.00%", className: "text-foreground" };
 };
+
+type ActionMode = "deposit" | "redeem" | null;
 
 const getPointsPerDollarPerDay = (
   emissionRate?: string,
@@ -139,6 +123,7 @@ const getPointsPerDollarPerDay = (
 const EarnSave = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useUser();
+  const { tokenApys } = useEarnContext();
   const { usdstBalance, fetchUsdstBalance } = useTokenContext();
   const { toast } = useToast();
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
@@ -199,16 +184,12 @@ const EarnSave = () => {
       return name.includes("save usdst") || name.includes("saveusdst");
     }) || [];
   }, [normalizedVaultAddress, userRewards]);
-  const incentiveYield = formatPercent(
-    getEstimatedIncentiveApyPercent(
-      effectiveInfo?.apy,
-      saveRewardsActivity?.emissionRate,
-      saveRewardsActivity?.totalStakeUsd ??
-        effectiveInfo?.tvlUsd ??
-        effectiveInfo?.pricingAssets ??
-        effectiveInfo?.totalAssets ??
-        null
-    )
+  const incentiveYieldInfo = useMemo(
+    () => findBestEarnApyInfo(tokenApys, effectiveInfo?.vaultAddress),
+    [effectiveInfo?.vaultAddress, tokenApys]
+  );
+  const incentiveYieldDisplay = formatApyDisplay(
+    incentiveYieldInfo?.total.toFixed(2)
   );
   const saveRewardPointsPerDollarPerDay = useMemo(
     () =>
@@ -471,10 +452,16 @@ const EarnSave = () => {
                           </p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground">Yield</p>
-                          <p className="mt-1 text-lg font-semibold">
-                            {loadingInfo || rewardsActivitiesLoading ? "..." : incentiveYield}
-                          </p>
+                          <p className="text-muted-foreground">Best Available APY</p>
+                          {loadingInfo || rewardsActivitiesLoading ? (
+                            <p className="mt-1 text-lg font-semibold">...</p>
+                          ) : (
+                            <EarnApyTooltip info={incentiveYieldInfo}>
+                              <p className={`mt-1 text-lg font-semibold cursor-default ${incentiveYieldDisplay.className}`}>
+                                {incentiveYieldDisplay.label}
+                              </p>
+                            </EarnApyTooltip>
+                          )}
                           <p className="text-xs text-muted-foreground mt-1">
                             Estimated annualized total yield, including rewards and native fees
                           </p>
