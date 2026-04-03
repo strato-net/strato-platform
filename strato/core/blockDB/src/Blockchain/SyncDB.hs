@@ -240,7 +240,7 @@ checkAndUpdateSyncStatus = do
 
   case (status, nodeNumber, worldNumber) of
     (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
-    (Just True, Just ntd, Just wtd) -> when (ntd < wtd) (void $ putSyncStatus False)
+    (Just True, Just ntd, Just wtd) -> when (ntd + 1 < wtd) (void $ putSyncStatus False) -- only putSyncStatus false if the node is actually falling behind
     (Nothing, Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
     (Nothing, Nothing, Just _) -> void $ putSyncStatus False
     (_, Just _, Nothing) -> void $ putSyncStatus True
