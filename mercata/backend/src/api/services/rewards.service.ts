@@ -15,6 +15,7 @@ import {
   fetchUserInfo,
   fetchUnclaimedRewards,
   fetchClaimedRewards,
+  fetchBonusRewards,
   fetchAllUsersLeaderboard
 } from "../helpers/rewards/rewards.helpers";
 
@@ -349,9 +350,16 @@ export const fetchRewardsOverview = async (
 /**
  * User activities response with unclaimed and claimed rewards
  */
+export interface BonusSource {
+  name: string;
+  amount: string;
+}
+
 export interface UserActivitiesResponse {
   unclaimedRewards: string;
-  claimedRewards: string;  // Total claimed rewards from RewardsClaimed events
+  claimedRewards: string;
+  bonusRewards: string;
+  bonusSources: BonusSource[];
   activities: UserActivity[];
 }
 
@@ -375,27 +383,29 @@ export const fetchUserActivities = async (
     const activities = Array.from(activitiesMap.values());
 
     if (activities.length === 0) {
-      // Fetch unclaimed and claimed rewards even with no activities
-      const [unclaimedRewards, claimedRewardsMap] = await Promise.all([
+      const [unclaimedRewards, claimedRewardsMap, bonusResult] = await Promise.all([
         fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
-        fetchClaimedRewards(accessToken, rewardsAddress)
+        fetchClaimedRewards(accessToken, rewardsAddress),
+        fetchBonusRewards(accessToken, rewardsAddress, userAddress)
       ]);
       const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
       return {
         unclaimedRewards,
         claimedRewards: claimedRewards.toString(),
+        bonusRewards: bonusResult.total.toString(),
+        bonusSources: [],
         activities: []
       };
     }
 
     const activityIds = activities.map((a: any) => a.activityId);
 
-    // Batch fetch all data in parallel (including claimed rewards from cached source)
-    const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap] = await Promise.all([
+    const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap, bonusResult] = await Promise.all([
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
       fetchUserInfo(accessToken, rewardsAddress, userAddress, activityIds, forceRefresh),
       fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
-      fetchClaimedRewards(accessToken, rewardsAddress,)
+      fetchClaimedRewards(accessToken, rewardsAddress),
+      fetchBonusRewards(accessToken, rewardsAddress, userAddress)
     ]);
 
     // Build shared pricing context once (used for LP/share-token TVL conversions)
@@ -455,12 +465,19 @@ export const fetchUserActivities = async (
       };
     }));
 
-    // Get claimed rewards for this user from the cached map (O(1) lookup)
     const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
+
+    const bonusSources: BonusSource[] = [];
+    for (const [actId, amount] of bonusResult.byActivity) {
+      const act = activitiesMap.get(Number(actId));
+      bonusSources.push({ name: act?.name || `Activity ${actId}`, amount: amount.toString() });
+    }
 
     return {
       unclaimedRewards,
       claimedRewards: claimedRewards.toString(),
+      bonusRewards: bonusResult.total.toString(),
+      bonusSources,
       activities: userActivities
     };
   } catch (error) {
