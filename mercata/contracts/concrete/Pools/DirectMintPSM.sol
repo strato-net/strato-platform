@@ -12,7 +12,7 @@ contract DirectMintPSM is Ownable {
 
     address public mintableToken;
     mapping(address => bool) public eligibleTokens;
-    uint public nonce; // follows MercataBridge.withdrawalCounter pattern
+    uint public burnReqCounter; // follows MercataBridge.withdrawalCounter pattern
     mapping(uint => BurnRequest) public burnRequests;
     uint public burnDelay;
 
@@ -48,7 +48,7 @@ contract DirectMintPSM is Ownable {
         emit EligibleTokenAdded(token);
     }
 
-    function removeEligibleToken(address token) public onlyOwner {
+    function removeEligibleToken(address token) external onlyOwner {
         require(eligibleTokens[token], "Token is already ineligible");
         eligibleTokens[token] = false;
         emit EligibleTokenRemoved(token);
@@ -71,28 +71,41 @@ contract DirectMintPSM is Ownable {
         emit DirectPSMMinted(msg.sender, amount, againstToken);
     }
 
+    function _deleteBurnRequest(uint id) internal {
+        delete burnRequests[id].amount;
+        delete burnRequests[id].redeemToken;
+        delete burnRequests[id].requester;
+        delete burnRequests[id].requestTime;
+    }
+
     function requestBurn(uint amount, address redeemToken) external isEligible(redeemToken) returns (uint) {
-        burnRequests[nonce] = BurnRequest(amount, redeemToken, msg.sender, block.timestamp);
-        emit BurnRequested(nonce, amount, redeemToken, msg.sender, block.timestamp);
-        return nonce++;
+        burnRequests[++burnReqCounter] = BurnRequest(amount, redeemToken, msg.sender, block.timestamp);
+        emit BurnRequested(burnReqCounter, amount, redeemToken, msg.sender, block.timestamp);
+        return burnReqCounter;
     }
 
     function completeBurn(uint id) external {
-        BurnRequest memory request = burnRequests[id];
-        require(eligibleTokens[request.redeemToken], "Redeem token is not eligible");
-        require(burnDelay == 0 || request.requestTime + burnDelay <= block.timestamp, "Burn delay not passed");
-        require(request.requester == msg.sender, "Unauthorized");
+        // Local copy
+        uint amount = burnRequests[id].amount;
+        address redeemToken = burnRequests[id].redeemToken;
+        address requester = burnRequests[id].requester;
+        uint requestTime = burnRequests[id].requestTime;
 
-        // Burn mintable token
-        Token(mintableToken).burn(address(msg.sender), request.amount);
-
-        // Redeem 1:1 with eligible token
-        require(IERC20(request.redeemToken).transfer(msg.sender, request.amount), "Transfer failed");
+        // Ensure eligibility
+        require(eligibleTokens[redeemToken], "Redeem token is not eligible");
+        require(burnDelay == 0 || requestTime + burnDelay <= block.timestamp, "Burn delay not passed");
+        require(requester == msg.sender, "Unauthorized");
 
         // Remove burn request
-        delete burnRequests[id];
+        _deleteBurnRequest(id);
 
-        emit BurnCompleted(id, request.amount, request.redeemToken, request.requester);
+        // Burn mintable token
+        Token(mintableToken).burn(address(msg.sender), amount);
+
+        // Redeem 1:1 with eligible token
+        require(IERC20(redeemToken).transfer(msg.sender, amount), "Transfer failed");
+
+        emit BurnCompleted(id, amount, redeemToken, requester);
     }
 
     function cancelBurn(uint id) external {

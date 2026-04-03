@@ -1,36 +1,27 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-/**
- * @title Test Utilities
- * @dev Provides utilities for writing Solidity unit tests with user simulation
- *
- * Usage example:
- * ```
- * import "../Util.sol";
- *
- * contract Describe_SomeContract {
- *     using TestUtils for User;
- *
- *     User user1;
- *
- *     function beforeAll() {
- *         // Create test users
- *         user1 = new User();
- *     }
- *
- *     function it_should_do_sth() {
- *         TestUtils.callAs(user1, address(contractAddr), "sth(uint256)", amount);
- *         // ... continue with assertions
- *     }
- * }
- * ```
- */
+import "../../abstract/ERC20/access/Authorizable.sol";
+// This is the import path needed for:
+// find mercata/contracts/tests -name '*.test.sol' -print0   | xargs -0 -I {} sh -c 'echo "{}" && cd "$(dirname "{}")" && solid-vm-cli test "$(basename "{}")"'
+// It doesn't work to compile this contract alone; see https://github.com/strato-net/strato-platform/issues/4905
 
 contract User {
-    function do(address a, string memory f, variadic args) public returns (variadic) {
+    function do(address a, string f, variadic args) public returns (variadic) {
         variadic result = address(a).call(f, args);
         return result;
+    }
+
+    function doSuccessfully(address a, string f, variadic args) public returns (variadic) {
+        try address(a).call(f, args) returns (variadic result) {
+            return result;
+        } catch Error(string e) {
+            revert("Failed to call " + f + " on behalf of user with error: " + e);
+        }
+    }
+}
+
+// Authorizable admin to enable callback-style ownership checks
+contract Admin is User, Authorizable {
+    constructor() {
+        bypassAuthorizations = true;
     }
 }
 
