@@ -11,6 +11,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Link } from "react-router-dom";
 import { getActivityLink } from "@/lib/rewards/activityLinks";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { useEarnContext } from "@/context/EarnContext";
+import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
+import { buildNativeRewardsApyInfo, EarnApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo } from "@/utils/earnUtils";
 
 interface ActivitiesTableProps {
   activities: Activity[];
@@ -87,11 +91,49 @@ const InfoTooltip = ({ content }: { content: string }) => {
 };
 
 export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) => {
+  const { tokenApys } = useEarnContext();
+  const { saveUsdstInfo } = useSaveUsdstContext();
   const loginButtonClass = "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
   const visibleActivities = activities.filter(
     (activity) => safeBigInt(activity?.emissionRate || "0") > 0n
   );
-  const sortedActivities = [...visibleActivities].sort((a, b) => getEstimatedApyPercent(b) - getEstimatedApyPercent(a));
+  const saveUsdstVaultAddress = saveUsdstInfo?.vaultAddress?.toLowerCase?.() || "";
+  const usdstAddress = saveUsdstInfo?.assetAddress || "";
+
+  const getBestAvailableApyInfo = (activity: Activity): EarnApyInfo | null => {
+    const lowerName = activity.name?.toLowerCase?.() || "";
+    const normalizedSource = activity.sourceContract?.toLowerCase?.() || "";
+    const stakeAssetAddress = activity.stakeAssetAddress || null;
+
+    if (lowerName.includes("swap lp")) {
+      return findPoolEarnApyInfo(tokenApys, activity.sourceContract);
+    }
+
+    if (
+      lowerName.includes("save usdst") ||
+      lowerName.includes("saveusdst") ||
+      (saveUsdstVaultAddress && normalizedSource === saveUsdstVaultAddress)
+    ) {
+      return findBestEarnApyInfo(tokenApys, saveUsdstInfo?.vaultAddress);
+    }
+
+    if (lowerName.includes("direct mint") || lowerName.includes("bridge")) {
+      return findBestEarnApyInfo(tokenApys, usdstAddress);
+    }
+
+    return (
+      findBestEarnApyInfo(tokenApys, stakeAssetAddress) ||
+      findBestEarnApyInfo(tokenApys, activity.sourceContract) ||
+      buildNativeRewardsApyInfo(null, activity.emissionRate, activity.totalStakeUsd, "rewards")
+    );
+  };
+
+  const sortedActivities = [...visibleActivities]
+    .map((activity) => ({
+      activity,
+      bestAvailableApyInfo: getBestAvailableApyInfo(activity),
+    }))
+    .sort((a, b) => (b.bestAvailableApyInfo?.total || 0) - (a.bestAvailableApyInfo?.total || 0));
 
   if (loading) {
     return (
@@ -142,7 +184,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 <TableHead>
                   <div className="flex items-center gap-1">
                  Best Available APY
-                    <InfoTooltip content="Estimated annual percentage yield from CATA incentives, assuming a $25M fully diluted valuation." />
+                    <InfoTooltip content="Best Available APY shows the highest stacked yield available for this activity, combining Native APY, Base APY, and Rewards APY when applicable. Hover over the APY value to see the full breakdown." />
                   </div>
                 </TableHead>
                 <TableHead>Type</TableHead>
@@ -163,11 +205,10 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedActivities.map((activity, index) => {
+              {sortedActivities.map(({ activity, bestAvailableApyInfo }, index) => {
                 const emissionRateStr = activity?.emissionRate || null;
                 const emissionPerDay = emissionRateStr ? formatEmissionRatePerDay(emissionRateStr) : "?";
                 const emissionPerWeek = emissionRateStr ? formatEmissionRatePerWeek(emissionRateStr) : "?";
-                const estimatedApr = getEstimatedApyPercent(activity);
                 
                 // Format total stake with denomination context
                 const totalStakeStr = activity?.totalStake || null;
@@ -214,16 +255,14 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                       ) : "?"}
                     </TableCell>
                     <TableCell>
-                      {estimatedApr < 0 ? (
+                      {!bestAvailableApyInfo ? (
                         <span className="text-muted-foreground">-</span>
                       ) : (
-                        <span className="font-medium">
-                          {estimatedApr >= 1000
-                            ? `${Math.round(estimatedApr).toLocaleString()}%`
-                            : estimatedApr >= 10
-                              ? `${estimatedApr.toFixed(0)}%`
-                              : `${estimatedApr.toFixed(1)}%`}
-                        </span>
+                        <EarnApyTooltip info={bestAvailableApyInfo}>
+                          <span className="font-medium cursor-default">
+                            {bestAvailableApyInfo.total.toFixed(2)}%
+                          </span>
+                        </EarnApyTooltip>
                       )}
                     </TableCell>
                     <TableCell>
@@ -244,7 +283,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                         {(() => {
                           const totalStakeUsd = activity?.totalStakeUsd ? BigInt(activity.totalStakeUsd) : null;
                           if (!emissionRateStr || emissionPerDay === "?" || !totalStakeUsd || totalStakeUsd === 0n) return null;
-                          const ptsPerDollarPerDayWei = (BigInt(emissionRateStr) * 86400n * BigInt(10 ** 18)) / totalStakeUsd;
+                          const ptsPerDollarPerDayWei = (BigInt(emissionRateStr) * 86400n * (10n ** 18n)) / totalStakeUsd;
                           const formatted = formatRoundedWithCommas(roundByMagnitude(formatBalance(ptsPerDollarPerDayWei.toString(), "", 18, 18, 18)));
                           return (
                             <div className="text-xs text-muted-foreground mt-1">
