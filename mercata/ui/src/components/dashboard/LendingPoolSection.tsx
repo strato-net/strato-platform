@@ -3,17 +3,20 @@ import { CircleArrowDown, CircleArrowUp, PauseCircle } from "lucide-react";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE } from "@/lib/constants";
+import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE, mUsdstAddress } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { findBestEarnApyInfo } from "@/utils/earnUtils";
 
 const LendingPoolSection = () => {
   const { isLoggedIn } = useUser();
@@ -32,6 +35,9 @@ const LendingPoolSection = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { tokenApys } = useEarnContext();
+  const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
+  const lendingDisplayApy = lendingEarnApyInfo?.total.toFixed(2);
 
   const refreshLendingData = (signal?: AbortSignal) => {
     // Pool stats are public - always fetch
@@ -546,8 +552,12 @@ const LendingPoolSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Supply APY</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.supplyAPY ? `${liquidityInfo.supplyAPY}%` : "N/A"}</span>
+                  <span className="text-muted-foreground text-sm sm:text-base">Best Available APY</span>
+                  <EarnApyTooltip info={lendingEarnApyInfo}>
+                    <span className="font-medium text-sm sm:text-base cursor-default">
+                      {lendingDisplayApy ? `${lendingDisplayApy}%` : "N/A"}
+                    </span>
+                  </EarnApyTooltip>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-muted-foreground text-sm sm:text-base">Max Supply APY</span>

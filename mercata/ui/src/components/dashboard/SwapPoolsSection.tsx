@@ -238,7 +238,7 @@ const SwapPoolsSection = () => {
                   )}
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
                     <div className="text-left sm:text-right">
-                      <div className="text-sm text-muted-foreground">APY</div>
+                      <div className="text-sm text-muted-foreground">Best Available APY</div>
                       <EarnApyTooltip info={apyInfo}>
                         <div className="font-medium cursor-default">{displayedApy}</div>
                       </EarnApyTooltip>

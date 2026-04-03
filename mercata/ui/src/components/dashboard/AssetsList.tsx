@@ -45,7 +45,7 @@ const AssetsList = ({
   const { tokenApys, tokenApysLoaded } = useEarnContext();
 
   const earnByAddr = useMemo(() => {
-    return buildEarnApyMap(tokenApys);
+    return buildEarnApyMap(tokenApys, { includeVaultSources: false });
   }, [tokenApys]);
 
   const hasEarningAssets = tokens.length > 0;
@@ -189,7 +189,7 @@ const AssetsList = ({
                           if (!info) return <p className="text-sm text-muted-foreground">-</p>;
                           return (
                             <EarnApyTooltip info={info} side="left" align="end">
-                              <span className="text-sm font-medium text-green-500 cursor-default">{info.total.toFixed(2)}%</span>
+                              <span className="text-sm font-medium text-foreground cursor-default">{info.total.toFixed(2)}%</span>
                             </EarnApyTooltip>
                           );
                         })()}

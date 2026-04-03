@@ -7,7 +7,7 @@ import { useSwapContext } from "@/context/SwapContext";
 import { useVaultContext } from "@/context/VaultContext";
 import { useEarnContext } from "@/context/EarnContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
-import { findBestEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
+import { findBestNonVaultEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
 
@@ -45,9 +45,9 @@ export default function MyPoolParticipationSection({
   }, [pools]);
 
   const resolveTokenAPY = useCallback(
-    (token: any, pool?: any): { value: string | null; info: ReturnType<typeof findBestEarnApyInfo> } => {
+    (token: any, pool?: any): { value: string | null; info: ReturnType<typeof findBestNonVaultEarnApyInfo> } => {
       if (liquidityInfo?.withdrawable?.address === token.address) {
-        const info = findBestEarnApyInfo(tokenApys, token.address);
+        const info = findBestNonVaultEarnApyInfo(tokenApys, token.address);
         return { value: info ? info.total.toFixed(2) : null, info };
       }
 
@@ -80,7 +80,7 @@ export default function MyPoolParticipationSection({
         };
       }
 
-      const info = findBestEarnApyInfo(tokenApys, token.address);
+      const info = findBestNonVaultEarnApyInfo(tokenApys, token.address);
       return {
         value: info ? info.total.toFixed(2) : null,
         info,

@@ -1,5 +1,7 @@
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
+const CATA_PRICE_USD = 0.25;
+
 export interface EarnApyBreakdownItem {
   label: string;
   apy: string;
@@ -18,7 +20,7 @@ export interface EarnApyLookupOptions {
 
 const normAddr = (value: string) => (value || "").toLowerCase().replace(/^0x/, "");
 
-const parsePositiveApy = (value?: string | null): number => {
+const parsePositiveApy = (value?: string | number | null): number => {
   if (!value || value === "-") return 0;
   const apy = Number(value);
   return Number.isFinite(apy) && apy > 0 ? apy : 0;
@@ -46,6 +48,49 @@ const buildSimpleInfo = (entry?: ApySource, source?: ApySource["source"], label?
     source,
     breakdown: [{ label, apy: entry.apy }],
   };
+};
+
+export const getRewardsApyPercent = (
+  emissionRate?: string | null,
+  totalStakeUsd?: string | null
+): number | null => {
+  try {
+    if (!emissionRate || !totalStakeUsd) return null;
+
+    const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
+    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) return null;
+
+    const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
+    if (!Number.isFinite(annualCata) || annualCata <= 0) return null;
+
+    const rewardsApy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
+    if (!Number.isFinite(rewardsApy) || rewardsApy <= 0) return null;
+
+    return Number(rewardsApy.toFixed(2));
+  } catch {
+    return null;
+  }
+};
+
+export const buildNativeRewardsApyInfo = (
+  nativeApyPercent?: string | number | null,
+  emissionRate?: string | null,
+  totalStakeUsd?: string | null,
+  source: ApySource["source"] = "base"
+): EarnApyInfo | null => {
+  const native = parsePositiveApy(nativeApyPercent);
+  const rewards = getRewardsApyPercent(emissionRate, totalStakeUsd);
+  const roundedRewards = roundRewardsApy(rewards);
+
+  const breakdown = [
+    native > 0 ? { label: "Native APY", apy: native.toFixed(2) } : null,
+    roundedRewards ? { label: "Rewards APY", apy: roundedRewards } : null,
+  ].filter((item): item is EarnApyBreakdownItem => item !== null);
+
+  if (breakdown.length === 0) return null;
+
+  const total = breakdown.reduce((sum, item) => sum + parsePositiveApy(item.apy), 0);
+  return total > 0 ? { total, source, breakdown } : null;
 };
 
 const buildLendingInfo = (apys: ApySource[]): EarnApyInfo | null => {

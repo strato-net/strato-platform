@@ -141,7 +141,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 <TableHead>Name</TableHead>
                 <TableHead>
                   <div className="flex items-center gap-1">
-                  Est. Incentive APY
+                 Best Available APY
                     <InfoTooltip content="Estimated annual percentage yield from CATA incentives, assuming a $25M fully diluted valuation." />
                   </div>
                 </TableHead>

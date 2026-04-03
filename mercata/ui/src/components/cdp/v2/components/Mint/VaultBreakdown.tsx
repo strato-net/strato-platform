@@ -8,6 +8,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import { formatUnits } from 'ethers';
 import { NumericFormat } from 'react-number-format';
 import type { VaultCandidate, WEI } from '@/components/cdp/v2/cdpTypes';
+import EarnApyTooltip from '@/components/earn/EarnApyTooltip';
 import {
   formatPercentage,
   getAssetColor,
@@ -21,7 +22,9 @@ import {
   getHFColorClass,
   WAD_UNIT,
 } from '@/components/cdp/v2/cdpUtils';
+import { useEarnContext } from '@/context/EarnContext';
 import { useTokenContext } from '@/context/TokenContext';
+import { findBestEarnApyInfo } from '@/utils/earnUtils';
 import { parseUnitsWithTruncation } from '@/utils/numberUtils';
 import { UNITS, USD, DECIMAL, ADDRESS } from '@/components/cdp/v2/cdpTypes';
 
@@ -69,6 +72,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   // Context Hooks
   // ============================================================================
 
+  const { tokenApys } = useEarnContext();
   const { earningAssets, inactiveTokens } = useTokenContext();
 
 
@@ -299,12 +303,12 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   const getGridClass = useCallback(() => {
     if (showMintAmounts) {
       return !autoAllocate 
-        ? 'grid-cols-[minmax(100px,auto)_minmax(80px,auto)_1fr_1fr_minmax(60px,auto)]' 
-        : 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr_1fr]';
+        ? 'grid-cols-[minmax(100px,auto)_minmax(110px,auto)_minmax(80px,auto)_1fr_1fr_minmax(60px,auto)]' 
+        : 'grid-cols-[minmax(120px,auto)_minmax(110px,auto)_minmax(100px,auto)_1fr_1fr]';
     }
     return !autoAllocate 
-      ? 'grid-cols-[minmax(100px,auto)_minmax(80px,auto)_1fr_minmax(60px,auto)]' 
-      : 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr]';
+      ? 'grid-cols-[minmax(100px,auto)_minmax(110px,auto)_minmax(80px,auto)_1fr_minmax(60px,auto)]' 
+      : 'grid-cols-[minmax(120px,auto)_minmax(110px,auto)_minmax(100px,auto)_1fr]';
   }, [showMintAmounts, autoAllocate]);
 
 
@@ -1207,9 +1211,10 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
             <div className="space-y-2">
               {/* Mobile-friendly scrollable container */}
               <div className="overflow-x-auto -mx-3 px-3">
-                <div className="min-w-[600px]">
+                <div className="min-w-[760px]">
                   <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${getGridClass()}`}>
                     <div className="min-w-[100px]">Asset</div>
+                    <div className="min-w-[110px]">Best Available APY</div>
                     <div className="min-w-[80px]">Stability Fee</div>
                     <div className="min-w-[120px]">Deposit</div>
                     {showMintAmounts && <div className="min-w-[120px]">Mint</div>}
@@ -1229,6 +1234,7 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                 })
                 .map((candidate) => {
                 const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(candidate.vaultConfig.stabilityFeeRate);
+                const apyInfo = findBestEarnApyInfo(tokenApys, candidate.vaultConfig.assetAddress);
                 const token = [...earningAssets, ...inactiveTokens].find(
                   t => t.address?.toLowerCase() === candidate.vaultConfig.assetAddress?.toLowerCase()
                 );
@@ -1303,6 +1309,16 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                         </div>
                       )}
                       <span className="font-medium">{candidate.vaultConfig.symbol}</span>
+                    </div>
+
+                    <div className="min-w-[110px]">
+                      {apyInfo ? (
+                        <EarnApyTooltip info={apyInfo}>
+                          <span className="font-medium cursor-default">{apyInfo.total.toFixed(2)}%</span>
+                        </EarnApyTooltip>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </div>
                     
                     {/* Stability Fee */}

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/context/UserContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
@@ -31,9 +32,7 @@ import {
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
-import { EarnApyInfo, roundRewardsApy } from "@/utils/earnUtils";
-
-const CATA_PRICE_USD = 0.25;
+import { findBestEarnApyInfo } from "@/utils/earnUtils";
 
 const formatTokenAmount = (value: string, maxFractionDigits: number = 4): string => {
   try {
@@ -102,44 +101,6 @@ const formatApyDisplay = (value: string | number | undefined): { label: string; 
 
 type ActionMode = "deposit" | "redeem" | null;
 
-const getEstimatedIncentiveApyPercent = (
-  nativeApyPercent?: string | number | null,
-  emissionRate?: string,
-  totalStakeUsd?: string | null
-): string => {
-  try {
-    if (!emissionRate || !totalStakeUsd) return "-";
-
-    const nativeApy =
-      nativeApyPercent === null ||
-      nativeApyPercent === undefined ||
-      nativeApyPercent === "" ||
-      nativeApyPercent === "-"
-        ? 0
-        : Number(nativeApyPercent);
-    if (!Number.isFinite(nativeApy)) {
-      return "-";
-    }
-
-    const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
-    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) return "-";
-
-    const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
-    if (!Number.isFinite(annualCata) || annualCata < 0) return "-";
-
-    const rewardsApy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
-    const roundedRewardsApy = Number(roundRewardsApy(rewardsApy) || "0");
-    const totalApy = nativeApy + roundedRewardsApy;
-    if (!Number.isFinite(totalApy) || totalApy <= 0) {
-      return "-";
-    }
-
-    return totalApy.toFixed(2);
-  } catch {
-    return "-";
-  }
-};
-
 const getPointsPerDollarPerDay = (
   emissionRate?: string,
   totalStakeUsd?: string | null
@@ -161,6 +122,7 @@ const getPointsPerDollarPerDay = (
 const EarnSave = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useUser();
+  const { tokenApys } = useEarnContext();
   const { toast } = useToast();
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
   const { userRewards, loading: rewardsUserLoading } = useRewardsUserInfo();
@@ -221,38 +183,12 @@ const EarnSave = () => {
       return name.includes("save usdst") || name.includes("saveusdst");
     }) || [];
   }, [normalizedVaultAddress, userRewards]);
-  const incentiveYieldRaw = getEstimatedIncentiveApyPercent(
-    effectiveInfo?.apy,
-    saveRewardsActivity?.emissionRate,
-    saveRewardsActivity?.totalStakeUsd ??
-      effectiveInfo?.tvlUsd ??
-      effectiveInfo?.pricingAssets ??
-      effectiveInfo?.totalAssets ??
-      null
+  const incentiveYieldInfo = useMemo(
+    () => findBestEarnApyInfo(tokenApys, effectiveInfo?.vaultAddress),
+    [effectiveInfo?.vaultAddress, tokenApys]
   );
-  const incentiveYieldInfo = useMemo<EarnApyInfo | null>(() => {
-    const native = Number(effectiveInfo?.apy);
-    const total = Number(incentiveYieldRaw);
-    if (!Number.isFinite(total) || total <= 0) return null;
-
-    const breakdown = [];
-    if (Number.isFinite(native) && native > 0) {
-      breakdown.push({ label: "Native APY", apy: native.toFixed(2) });
-    }
-
-    const rewards = Math.max(total - (Number.isFinite(native) && native > 0 ? native : 0), 0);
-    const roundedRewards = roundRewardsApy(rewards);
-    if (roundedRewards) {
-      breakdown.push({ label: "Rewards APY", apy: roundedRewards });
-    }
-
-    if (breakdown.length === 0) return null;
-
-    const roundedTotal = breakdown.reduce((sum, item) => sum + Number(item.apy || 0), 0);
-    return { total: roundedTotal, source: "base", breakdown };
-  }, [effectiveInfo?.apy, incentiveYieldRaw]);
   const incentiveYieldDisplay = formatApyDisplay(
-    incentiveYieldInfo ? incentiveYieldInfo.total.toFixed(2) : (incentiveYieldRaw !== "-" ? incentiveYieldRaw : undefined)
+    incentiveYieldInfo?.total.toFixed(2)
   );
   const saveRewardPointsPerDollarPerDay = useMemo(
     () =>
@@ -515,7 +451,7 @@ const EarnSave = () => {
                           </p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground">Yield</p>
+                          <p className="text-muted-foreground">Best Available APY</p>
                           {loadingInfo || rewardsActivitiesLoading ? (
                             <p className="mt-1 text-lg font-semibold">...</p>
                           ) : (
