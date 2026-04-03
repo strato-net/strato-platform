@@ -150,6 +150,7 @@ contract Describe_MercataBridge is Authorizable {
         // Set up assets
         bridge.setAsset(
             true,
+            false,
             externalChainId,
             18, // decimals
             "External Test Token",
@@ -161,6 +162,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bridge.setAsset(
             true,
+            false,
             externalChainId,
             18, // decimals
             "External USDST",
@@ -284,10 +286,11 @@ contract Describe_MercataBridge is Authorizable {
         // First set up the chain
         bridge.setChain("BSC", address(0x6666), address(0x6667), true, newChainId, 2000, address(0x7777));
 
-        bridge.setAsset(true, newChainId, decimals, name, symbol, externalToken, maxPerWithdrawal, newToken);
+        bridge.setAsset(true, false, newChainId, decimals, name, symbol, externalToken, maxPerWithdrawal, newToken);
 
-        (bool enabled, uint externalChainId, uint externalDecimals, string externalName, string externalSymbol, address _externalToken, uint _maxPerWithdrawal, address _stratoToken) = bridge.assets(externalToken, newChainId);
+        (bool enabled, bool isNative, uint externalChainId, uint externalDecimals, string externalName, string externalSymbol, address _externalToken, uint _maxPerWithdrawal, address _stratoToken) = bridge.assets(externalToken, newChainId);
         require(_externalToken == externalToken, "External token not set correctly");
+        require(!isNative, "isNative not set correctly");
         require(externalDecimals == decimals, "Decimals not set correctly");
         require(externalChainId == newChainId, "Chain ID not set correctly");
         require(keccak256(externalName) == keccak256(name), "Name not set correctly");
@@ -302,7 +305,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bridge.setAssetMetadata(externalChainId, newName, newSymbol, address(0x5555));
 
-        (,,, string externalName, string externalSymbol,,,) = bridge.assets(address(0x5555), externalChainId);
+        (,,,, string externalName, string externalSymbol,,,) = bridge.assets(address(0x5555), externalChainId);
         require(keccak256(externalName) == keccak256(newName), "Name not updated correctly");
         require(keccak256(externalSymbol) == keccak256(newSymbol), "Symbol not updated correctly");
     }
@@ -311,14 +314,14 @@ contract Describe_MercataBridge is Authorizable {
         uint256 newLimit = 2000000e18;
         bridge.setWithdrawalLimits(externalChainId, address(0x5555), newLimit);
 
-        (,,,,,, uint maxPerWithdrawal,) = bridge.assets(address(0x5555), externalChainId);
+        (,,,,,,, uint maxPerWithdrawal,) = bridge.assets(address(0x5555), externalChainId);
         require(maxPerWithdrawal == newLimit, "Token limit not updated correctly");
     }
 
     function it_bridge_reverts_set_asset_for_missing_chain() {
         bool reverted = false;
         try {
-            bridge.setAsset(true, 999, 18, "Test", "TEST", address(0x1111), 1000, address(testToken));
+            bridge.setAsset(true, false, 999, 18, "Test", "TEST", address(0x1111), 1000, address(testToken));
         } catch {
             reverted = true;
         }
@@ -552,7 +555,7 @@ contract Describe_MercataBridge is Authorizable {
 
     function it_bridge_reverts_deposit_without_permission() {
         // Non-default route should fail until explicitly enabled
-        bridge.setAsset(true, externalChainId, 18, "Test", "TEST", address(0x5555), 1000000e18, address(testToken));
+        bridge.setAsset(true, false, externalChainId, 18, "Test", "TEST", address(0x5555), 1000000e18, address(testToken));
 
         bool reverted = false;
         try {
@@ -578,6 +581,7 @@ contract Describe_MercataBridge is Authorizable {
         // Set up asset for withdrawal token
         bridge.setAsset(
             true,
+            false,
             externalChainId,
             18, // decimals
             "External Withdrawal Token",
@@ -859,7 +863,7 @@ contract Describe_MercataBridge is Authorizable {
 
         // Set up second chain
         bridge.setChain("Polygon", address(0x6666), address(0x6667), true, chainId2, 2000, address(0x7777));
-        bridge.setAsset(true, chainId2, 18, "Polygon Test", "PTEST", address(0x8888), 1000000e18, address(testToken));
+        bridge.setAsset(true, false, chainId2, 18, "Polygon Test", "PTEST", address(0x8888), 1000000e18, address(testToken));
 
         // Test deposits on both chains
         relayer.do(address(bridge), "deposit", chainId1, externalSender, address(0x5555), 1000e18, "0x1a2b3c4d5e6f", address(0x1111), address(testToken));
@@ -988,7 +992,7 @@ contract Describe_MercataBridge is Authorizable {
 
     function it_bridge_handles_zero_max_per_tx() {
         // Set asset with zero max per tx (unlimited)
-        bridge.setAsset(true, externalChainId, 18, "Test", "TEST", address(0x5555), 0, address(testToken));
+        bridge.setAsset(true, false, externalChainId, 18, "Test", "TEST", address(0x5555), 0, address(testToken));
 
         uint256 largeAmount = 5000000e18; // Very large amount
         address recipient = address(0xEEEE);
@@ -1018,6 +1022,7 @@ contract Describe_MercataBridge is Authorizable {
         // Set up asset for inactive token
         bridge.setAsset(
             true,
+            false,
             externalChainId,
             18,
             "Inactive External Token",
@@ -1526,7 +1531,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 maxPerWithdrawal = 0; // unlimited
         address usdcStratoToken = address(testToken);
 
-        bridge.setAsset(true, externalChainId, usdcDecimals, usdcName, usdcSymbol, usdcToken, maxPerWithdrawal, usdcStratoToken);
+        bridge.setAsset(true, false, externalChainId, usdcDecimals, usdcName, usdcSymbol, usdcToken, maxPerWithdrawal, usdcStratoToken);
 
         // Test conversion: 1e6 USDC should become 1e18 STRATO tokens
         uint256 externalTokenAmount = 1e6; // 1 USDC in 6-decimal format
@@ -1561,7 +1566,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 maxPerWithdrawal = 0; // unlimited
         address ethStratoToken = address(testToken);
 
-        bridge.setAsset(true, externalChainId, tokenDecimals, tokenName, tokenSymbol, ethToken, maxPerWithdrawal, ethStratoToken);
+        bridge.setAsset(true, false, externalChainId, tokenDecimals, tokenName, tokenSymbol, ethToken, maxPerWithdrawal, ethStratoToken);
 
         // Test conversion: 1e18 ETH should become 1e18 STRATO tokens (1:1 ratio)
         uint256 externalTokenAmount = 1e18; // 1 ETH in 18-decimal format
@@ -1604,7 +1609,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 maxPerWithdrawal = 0; // unlimited
         address usdcStratoToken = address(testToken);
 
-        bridge.setAsset(true, externalChainId, tokenDecimals, tokenName, tokenSymbol, usdcToken, maxPerWithdrawal, usdcStratoToken);
+        bridge.setAsset(true, false, externalChainId, tokenDecimals, tokenName, tokenSymbol, usdcToken, maxPerWithdrawal, usdcStratoToken);
 
         // Test withdrawal conversion: 1.999999 STRATO tokens should become 1.999999 USDC (rounds down)
         // 1.999999e18 STRATO tokens / 10^(18-6) = 1.999999e18 / 10^12 = 1999999 -> rounds down to 1999999
