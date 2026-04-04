@@ -82,8 +82,6 @@ contract record StablePool is Ownable {
 
     mapping (address => PriceOracle) public record rateOracles;
 
-    mapping (address => bool) public record isYieldToken;
-
     address public usdst;
 
     uint[] callAmount;
@@ -166,14 +164,6 @@ contract record StablePool is Ownable {
     function setDisabled(bool _isDisabled) external onlyOwner {
         isPaused = _isDisabled ? true : isPaused;
         isDisabled = _isDisabled;
-    }
-
-    /// @notice Flag a token as an ERC-4626-style yield token. When enabled, the pool reads
-    ///         exchangeRate() and asset() from the token to compute its rate as:
-    ///         exchangeRate(token) × oraclePrice(asset()) / 1e18
-    function setIsYieldToken(address token, bool enabled) external onlyOwner {
-        require(token != address(0), "Zero token address");
-        isYieldToken[token] = enabled;
     }
 
     function setUsdst(address _usdst) external onlyOwner {
@@ -312,7 +302,7 @@ contract record StablePool is Ownable {
         for (uint i = 0; i < coins.length; i++) {
             address tokenAddr = address(coins[i]);
             uint oraclePrice = PRECISION;
-            if (isYieldToken[tokenAddr]) {
+            if (assetTypes[i] == 3) {
                 require(usdst != address(0), "USDST address not set");
                 uint xRate = uint(address(tokenAddr).call("exchangeRate"));
                 address underlying = address(address(tokenAddr).call("asset"));
