@@ -1,10 +1,10 @@
-const TVL_ENDPOINT = 'https://YOUR_PUBLIC_STRATO_API_HOST/api/v1/metrics/tvl'
+const TVL_ENDPOINT = 'https://app.strato.nexus/api/metrics/tvl'
 const METHODOLOGY = 'Counts underlying assets locked in STRATO DeFi contracts across CDP, lending, pools, saveUSDST, safety module, and vaults. Excludes wallet balances, receipt/share tokens, protocol debt, and double counting.'
 
 // TODO: Replace with the actual STRATO launch timestamp/block expected by DefiLlama.
-const START = 0
+const START = 1775151906
 
-async function tvl(_, __, ___, { api }) {
+async function tvl(api) {
   const response = await fetch(TVL_ENDPOINT)
 
   if (!response.ok) {

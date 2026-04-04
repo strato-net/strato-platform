@@ -169,8 +169,8 @@ const LiquidityWithdrawModal = ({
           description: (
             <div className="space-y-1">
               <div>Withdrew {formattedLpAmount} {selectedPool.poolName}</div>
-              <div>New {tokenALabel} position: {tokenAAmount.toFixed(6)}</div>
-              <div>New {tokenBLabel} position: {tokenBAmount.toFixed(6)}</div>
+              <div>{tokenALabel}: ~{tokenAAmount.toFixed(6)}</div>
+              <div>{tokenBLabel}: ~{tokenBAmount.toFixed(6)}</div>
             </div>
           ),
           variant: "success",

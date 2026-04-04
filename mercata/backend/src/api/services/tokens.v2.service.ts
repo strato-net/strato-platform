@@ -279,7 +279,8 @@ function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryE
     return { ...portfolioInfo,
       tokens: { ...portfolioInfo.tokens,
         [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
-          supply: totalSupply
+          supply: totalSupply,
+          ...(newInfo.data._managedAssets ? { managedAssets: BigInt(newInfo.data._managedAssets) } : {})
         }
       }
     };
@@ -534,7 +535,7 @@ export const getNetBalanceHistory = async (
   const storageFilters = [
     'data->>lpToken.neq.""',
     'data->>_symbol.like.*-LP',
-    'data->>_symbol.in.(MUSDST,SUSDST,safetyUSDST,lendUSDST)',
+    'data->>_symbol.in.(MUSDST,SUSDST,safetyUSDST,lendUSDST,saveUSDST)',
     'data->>sToken.gt.0',
     'and(data->>mToken.gt.0,data->>borrowIndex.gt.0)',
     ...(vaultConfig?.shareToken ? [`address.eq.${vaultConfig.shareToken}`] : []),
