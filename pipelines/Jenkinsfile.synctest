@@ -170,5 +170,13 @@ pipeline {
           message: "Sync test build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
+
+    fixed {
+      slackSend(
+          channel: '#engineering',
+          color: 'good',
+          message: "Sync test build recovered: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
   }
 }
