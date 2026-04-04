@@ -2,12 +2,12 @@
  * Deploy a multi-token yield-bearing stable pool (syrupUSDC–sUSDS–saveUSDST).
  *
  * Steps performed:
- *   1. createMultiTokenStablePool via PoolFactory
+ *   1. createMultiTokenStablePool via PoolFactory (assetTypes 1,1,3; containsYieldVaults true)
  *   2. Whitelist the new pool for mint/burn on its LP token via AdminRegistry
- *   3. Configure the pool: setUsdst, setIsYieldToken (saveUSDST)
+ *   3. setUsdst on the pool (yield vault uses assetType 3, no separate flag)
  *
  * Usage:
- *   node deploy-yield-pool.js
+ *   node deploy-saveUSDST-syrupUSDC-sUSDS-pool.js
  *
  * Required environment variables (.env):
  *   OAUTH_CLIENT_SECRET, OAUTH_CLIENT_ID, OAUTH_URL, NODE_URL,
