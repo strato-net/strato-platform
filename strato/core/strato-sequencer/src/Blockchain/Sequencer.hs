@@ -21,6 +21,7 @@ module Blockchain.Sequencer (
 
 import BlockApps.Logging
 import Blockchain.Blockstanbul
+import Blockchain.EthConf (ethConf, urlConfig, vaultUrl)
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
@@ -33,14 +34,18 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Sequencer.Metrics
 import Blockchain.Sequencer.Monad
+import Blockchain.Strato.Model.Address (Address, fromPublicKey)
 import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1 (getPub)
 import Conduit
 import Control.Concurrent hiding (yield)
+import qualified Control.Exception as E
 import Control.Monad (forever, forM, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Vault (runVaultM)
 import Data.Foldable
 import Data.Maybe
 import Data.Proxy
@@ -69,6 +74,27 @@ logFF str = $logInfoS str . T.pack
 
 -- replace with this when debugging tests
 --logFF str msg = void . return $! traceShowId $! trace (T.unpack str) msg
+
+tryResolveSelfAddr ::
+  (MonadIO m, MonadLogger m, HasBlockstanbulContext m) =>
+  m (Maybe Address)
+tryResolveSelfAddr = do
+  ctx <- getBlockstanbulContext
+  case _selfAddr ctx of
+    Just addr -> return (Just addr)
+    Nothing -> do
+      let vaultUrl' = vaultUrl . urlConfig $ ethConf
+      result <- liftIO $ E.try @E.SomeException $ runLoggingT $ runVaultM vaultUrl' $ do
+        pubKey <- getPub
+        return $ fromPublicKey pubKey
+      case result of
+        Right addr -> do
+          $logInfoS "sequencer" $ "Node identity resolved: " <> T.pack (format addr)
+          putBlockstanbulContext ctx { _selfAddr = Just addr }
+          return (Just addr)
+        Left _err -> do
+          $logDebugS "sequencer" "Node identity not available from Vault yet"
+          return Nothing
 
 type MonadSequencer m =
   ( MonadLogger m,
@@ -105,9 +131,9 @@ initSequencer :: (
   ConduitT () SeqOutEvent m ()
 initSequencer = do
   let logF = logFF "sequencer"
-  ctx <- lift getBlockstanbulContext
-  let selfAddr = fromJust $ _selfAddr ctx
-  yieldToVm [VmSelfAddress selfAddr]
+  lift tryResolveSelfAddr >>= \case
+    Just addr -> yieldToVm [VmSelfAddress addr]
+    Nothing   -> logF "Node identity not yet available, will resolve lazily"
   logF "Sequencer startup"
   logF "Sequencer initialized"
   bootstrapBlockstanbul
@@ -126,6 +152,11 @@ eventHandler :: (
   ) =>
   ConduitT SeqLoopEvent SeqOutEvent m ()
 eventHandler = forever $ timeAction seqLoopTiming $ do
+  ctx <- lift getBlockstanbulContext
+  when (isNothing $ _selfAddr ctx) $
+    lift tryResolveSelfAddr >>= \case
+      Just addr -> yieldToVm [VmSelfAddress addr]
+      Nothing   -> pure ()
   logFF "sequencer/events" "Reading from fused channels..."
   maybeEvent <- await
   let event = fromMaybe (error "input stream to sequencer closed, this shouldn't happen") maybeEvent

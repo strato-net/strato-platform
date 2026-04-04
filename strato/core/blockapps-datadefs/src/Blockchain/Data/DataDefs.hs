@@ -46,6 +46,7 @@ import Database.Persist.Sql
 import Database.Persist.TH
 import GHC.Generics
 import SolidVM.Model.Storable
+import SolidVM.Model.Value (Value)
 
 share
   [mkPersist sqlSettings, mkMigrate "migrateAuto"] -- annoying: postgres doesn't like tables called user

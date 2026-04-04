@@ -57,8 +57,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Word
-import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Vector as V
 import qualified SolidVM.Model.Value as SVM
 import qualified SolidVM.Model.Type as SVMType
@@ -104,21 +102,18 @@ valueToSolidityValue = \case
   ValueArraySentinel {} -> error "TODO(tim): ValueArraySentinel"
   ValueVariadic values -> SolidityArray $ map valueToSolidityValue values
 
-svmValueToSolidityValues :: String -> Maybe [SVMType.Type] -> Maybe [SolidityValue]
-svmValueToSolidityValues "" _ = Nothing
-svmValueToSolidityValues resp mReturnTypes =
-  case Aeson.eitherDecode (BLC.pack resp) of
-    Left _ -> Nothing
-    Right svmVal -> Just $ case svmVal of
-      SVM.STuple items ->
-        let vals = map SVM.getConst (V.toList items)
-        in case mReturnTypes of
-          Just rts | length vals == length rts ->
-            zipWith svmToSolWithType vals rts
-          _ -> map svmToSol vals
-      _ -> case mReturnTypes of
-        Just [rt] -> [svmToSolWithType svmVal rt]
-        _ -> [svmToSol svmVal]
+svmValueToSolidityValues :: SVM.Value -> Maybe [SVMType.Type] -> [SolidityValue]
+svmValueToSolidityValues svmVal mReturnTypes =
+  case svmVal of
+    SVM.STuple items ->
+      let vals = map SVM.getConst (V.toList items)
+      in case mReturnTypes of
+        Just rts | length vals == length rts ->
+          zipWith svmToSolWithType vals rts
+        _ -> map svmToSol vals
+    _ -> case mReturnTypes of
+      Just [rt] -> [svmToSolWithType svmVal rt]
+      _ -> [svmToSol svmVal]
 
 svmToSol :: SVM.Value -> SolidityValue
 svmToSol (SVM.SInteger n) = SolidityValueAsString $ Text.pack $ show n

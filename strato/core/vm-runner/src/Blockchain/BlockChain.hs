@@ -102,9 +102,6 @@ import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
 import SolidVM.Model.SolidString (labelToText)
 import SolidVM.Model.Value (Value(..))
-import qualified Data.Aeson as Aeson
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -677,9 +674,9 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
       ranBlockHash = hashFunction b
       (!response, theTrace', theLogs, theEvents) =
         case result of
-          Left _ -> ("", [], [], []) --TODO keep the trace when the run fails
+          Left _ -> (Nothing, [], [], [])
           Right r ->
-            (maybe "" (TL.unpack . TLE.decodeUtf8 . Aeson.encode) $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
+            (erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash <$> theLogs
   yield . OutEvent $ mkEventEntry <$> theEvents

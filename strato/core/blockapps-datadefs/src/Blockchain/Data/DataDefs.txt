@@ -104,7 +104,7 @@ TransactionResult json
     blockHash Keccak256
     transactionHash Keccak256
     message String
-    response String
+    response (Maybe Value)
     trace String
     gasUsed Word256
     etherUsed Word256
@@ -115,7 +115,7 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
-    deriving Eq Read Show Generic
+    deriving Eq Show Generic
 
 UserN json
     email String

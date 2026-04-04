@@ -77,6 +77,7 @@ library
     , regex-compat
     , resourcet
     , servant-docs
+    , solid-vm-model
     , strato-conf
     , strato-model
     , text
