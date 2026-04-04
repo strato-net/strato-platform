@@ -117,7 +117,7 @@ async function main() {
     const createResult = await call(tokenObj, POOL_FACTORY, 'PoolFactory', 'createMultiTokenStablePool', {
       tokens:              [SYRUP_USDC, SUSDS, SAVE_USDST],
       rateMultipliers:     ['1000000000000000000', '1000000000000000000', '1000000000000000000'],
-      assetTypes:          ['1', '1', '1'],
+      assetTypes:          ['1', '1', '3'],
       oracles:             [PRICE_ORACLE, PRICE_ORACLE, PRICE_ORACLE],
       containsYieldVaults: true,
     });
@@ -165,11 +165,7 @@ async function main() {
     });
     console.log('  setUsdst submitted');
 
-    await call(tokenObj, poolAddress, 'StablePool', 'setIsYieldToken', {
-      token: SAVE_USDST,
-      enabled: true,
-    });
-    console.log('  setIsYieldToken(saveUSDST, true) submitted\n');
+    console.log('  (yield tokens identified by assetType=3, set at pool creation)\n');
 
     // ── Done ─────────────────────────────────────────────────────────────
 
