@@ -4,7 +4,6 @@ import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import PurchaseHistory from "../components/onramp/PurchaseHistory";
 import { useUser } from "@/context/UserContext";
-import { useNetwork } from "@/context/NetworkContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
 import { getConfig } from "@/lib/config";
@@ -15,14 +14,8 @@ import {
   CreditCard,
   ArrowDown,
   Wallet,
-  ExternalLink,
   Star,
 } from "lucide-react";
-
-const ONRAMP_NODES: Record<string, string[]> = {
-  testnet: ["https://buildtest.testnet.strato.nexus", "localhost:3000"],
-  mainnet: ["https://app.strato.nexus"],
-};
 
 const CRYPTO_OPTIONS = [
   { code: "USDC", label: "USDC → USDST" },
@@ -42,11 +35,6 @@ interface Quote {
 
 const OnrampV2Page = () => {
   const { isLoggedIn } = useUser();
-  const { isTestnet } = useNetwork();
-  const onrampNodeUrls = isTestnet ? ONRAMP_NODES.testnet : ONRAMP_NODES.mainnet;
-  const isOnrampNode =
-    typeof window !== "undefined" &&
-    onrampNodeUrls.some((url) => url.includes(window.location.hostname));
 
   // Form state
   const [amount, setAmount] = useState("100");
@@ -177,28 +165,6 @@ const OnrampV2Page = () => {
                   <p className="text-sm text-muted-foreground">
                     Crypto onramp is not configured on this node.
                   </p>
-                </div>
-              ) : !isOnrampNode ? (
-                <div className="rounded-xl border bg-card p-6 text-center space-y-4">
-                  <CreditCard className="h-10 w-10 text-muted-foreground mx-auto" />
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">
-                      Crypto onramp is available on the main STRATO node
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      To purchase crypto with card, bank transfer, or Apple Pay, please
-                      use the designated onramp node.
-                    </p>
-                  </div>
-                  <a
-                    href={`${onrampNodeUrls[0]}/dashboard/onramp`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                  >
-                    Go to {isTestnet ? "Testnet " : ""}Onramp
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
                 </div>
               ) : (
                 <>
