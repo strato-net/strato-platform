@@ -291,7 +291,9 @@ export const UserRewardsSection = ({
       {/* Total Claimable Card */}
       <Card>
         <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
-          <CardTitle className="text-base md:text-lg">Total Claimable Rewards</CardTitle>
+          <CardTitle className="text-base md:text-lg">
+            Total Claimable Rewards{hasBonusRewards ? " (incl. Bonus)" : ""}
+          </CardTitle>
           <CardDescription className="text-xs md:text-sm">Rewards ready to claim now</CardDescription>
         </CardHeader>
         <CardContent className="px-4 md:px-6">
@@ -354,11 +356,6 @@ export const UserRewardsSection = ({
                 <CardTitle className="text-base md:text-lg">Community Bonus</CardTitle>
                 <InfoTooltip content="Included in claimable total" />
               </div>
-              <CardDescription className="text-xs md:text-sm">
-                Bonus program{userRewards.bonusSources && userRewards.bonusSources.length > 0
-                  ? `: ${userRewards.bonusSources.map((s) => s.name).join(", ")}`
-                  : ""}
-              </CardDescription>
             </CardHeader>
             <CardContent className="px-4 md:px-6">
               <div className="flex items-center space-x-2 mb-1 md:mb-2">
