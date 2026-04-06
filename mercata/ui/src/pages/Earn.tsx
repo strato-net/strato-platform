@@ -1013,7 +1013,6 @@ const Earn = () => {
                                     {saveUsdstApyDisplay.label}
                                   </p>
                                 </EarnApyTooltip>
-                                <p className="text-xs text-muted-foreground">Best Available APY</p>
                               </td>
                               <td className="px-4 py-3">
                                 {saveUsdstRewardMeta.pointsLabel !== "-" ? (
@@ -1093,7 +1092,6 @@ const Earn = () => {
                                     {vaultAlpha.label}
                                   </p>
                                 </EarnApyTooltip>
-                                <p className="text-xs text-muted-foreground">Best Available APY</p>
                               </td>
                               <td className="px-4 py-3">
                                 {vaultRewardMeta.pointsLabel !== "-" ? (
@@ -1172,7 +1170,6 @@ const Earn = () => {
                                     {formatApyDisplay(lendingDisplayApyRaw).label}
                                   </p>
                                 </EarnApyTooltip>
-                                <p className="text-xs text-muted-foreground">Best Available APY</p>
                               </td>
                               <td className="px-4 py-3">
                                 {lendingRewardMeta.pointsLabel !== "-" ? (
@@ -1255,7 +1252,6 @@ const Earn = () => {
                                     {formatApyDisplay(getPoolDisplayApy(pool)).label}
                                   </p>
                                 </EarnApyTooltip>
-                                <p className="text-xs text-muted-foreground">Best Available APY</p>
                               </td>
                               <td className="px-4 py-3">
                                 {poolRewardMeta.pointsLabel !== "-" ? (
