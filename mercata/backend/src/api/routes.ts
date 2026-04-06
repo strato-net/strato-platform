@@ -28,6 +28,7 @@ import metalForgeRoutes from "./routes/metalForge.routes";
 import earnRoutes from "./routes/earn.routes";
 import contactRoutes from "./routes/contact.routes";
 import metricsRoutes from "./routes/metrics.routes";
+import loopRoutes from "./routes/loop.routes";
 
 const router = Router();
 
@@ -108,6 +109,9 @@ router.use("/metal-forge", metalForgeRoutes);
 
 // ----- Earn Routes -----
 router.use("/earn", earnRoutes);
+
+// ----- Loop Routes -----
+router.use("/loop", loopRoutes);
 
 // ----- Contact Routes -----
 router.use("/contact", contactRoutes);
