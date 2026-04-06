@@ -196,11 +196,21 @@ mutable m@(Sum (t :| ts)) =
         (j:js) -> Sum $ j :| js
 mutable t = bottom $ "Cannot mutate immutable value" <$ context' t
 
-varDefsToType' :: SourceAnnotation Text -> Annotated VarDefEntryF -> Type'
-varDefsToType' x BlankEntry = topType' x
+varDefsToType' :: SourceAnnotation Text -> Annotated VarDefEntryF -> SSS Type'
+varDefsToType' x BlankEntry = pure $ topType' x
 varDefsToType' _ VarDefEntry {..} = case vardefType of
-  Nothing -> topType' vardefContext
-  Just t  -> Mutable $ Static t vardefContext
+  Nothing -> pure $ topType' vardefContext
+  Just t -> case t of
+    SVMType.UnknownLabel l -> do
+      let ls = T.splitOn "." $ labelToText l
+          embedMember f [] = f ""
+          embedMember f [z] = f z
+          embedMember f (z:zs) = embedMember (MemberAccess vardefContext (f z) . textToLabel) zs
+      tcExpr (embedMember (Variable vardefContext . textToLabel) ls) >>= \case
+        Bottom{} -> pure . bottom $ "Unknown type: " <> labelToText l <$ vardefContext
+        Function _ r _ _ _ _ -> pure r
+        t' -> pure t'
+    _ -> pure . Mutable $ Static t vardefContext
 
 lookupEnum :: SolidString -> SSS [SolidString]
 lookupEnum name = do
@@ -1912,9 +1922,18 @@ statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
 
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
-  pushLocalVariables vdefs
-  let ts' = toType' (varDefsToType' x) x vdefs
-  ts' ~> maybe (pure $ topType' x) tcExpr mExpr
+  vdefs' <- traverse (varDefsToType' x) vdefs
+  pushLocalVariables $ (\(vdef, t') -> case t' of
+      Static t _ -> case vdef of
+        BlankEntry -> BlankEntry
+        _ -> vdef{vardefType = Just t}
+      _ -> vdef
+    ) <$> zip vdefs vdefs'
+  case reduceType' x vdefs' of
+    b@Bottom{} -> pure b
+    _ -> do
+      let ts' = toType x vdefs'
+      ts' ~> maybe (pure $ topType' x) tcExpr mExpr
 simpleStatementHelper _ (ExpressionStatement expr) =
   tcExpr expr
 

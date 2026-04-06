@@ -363,7 +363,12 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
               itemVar <- createVar itemVal
               return (n, itemVar)
           return $ SStruct name $ M.fromList items
-        _ -> return $ SContract name 0x0
+        _ -> case T.splitOn "." $ T.pack name of
+          [_] -> return $ SContract name 0x0
+          (n:ns) -> case M.lookup (T.unpack n) $ cc ^. CC.contracts of
+            Nothing -> return $ SContract name 0x0
+            Just c -> createDefaultValue cc c (SVMType.UnknownLabel . T.unpack $ T.intercalate "." ns)
+          _ -> return $ SContract name 0x0
 createDefaultValue _ _ x = todo "createDefaultValue" x
 
 {-
