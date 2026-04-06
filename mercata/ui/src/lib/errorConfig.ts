@@ -55,6 +55,7 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/psm/complete-burn": "PSM Burn Complete Error",
   "/psm/cancel-burn": "PSM Burn Cancel Error",
   "/psm/info": "PSM Info Error",
+  "/psm": "PSM Error",
 
   // Default
   "default": "API Error"

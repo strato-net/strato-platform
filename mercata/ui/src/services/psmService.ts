@@ -1,5 +1,5 @@
 import { api } from "@/lib/axios";
-import { parseUnitsWithTruncation } from "@/utils/numberUtils";
+import { safeParseUnits } from "@/utils/numberUtils";
 
 const DECIMALS = 18;
 
@@ -39,13 +39,13 @@ export const psmService = {
   },
 
   async mint(amount: string, againstToken: string) {
-    const amountWei = parseUnitsWithTruncation(amount, DECIMALS).toString();
+    const amountWei = safeParseUnits(amount, DECIMALS).toString();
     const response = await api.post("/psm/mint", { amount: amountWei, againstToken });
     return response.data;
   },
 
   async requestBurn(amount: string, redeemToken: string) {
-    const amountWei = parseUnitsWithTruncation(amount, DECIMALS).toString();
+    const amountWei = safeParseUnits(amount, DECIMALS).toString();
     const response = await api.post("/psm/request-burn", { amount: amountWei, redeemToken });
     return response.data;
   },
