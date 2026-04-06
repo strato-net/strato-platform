@@ -7,12 +7,9 @@ import "../Admin/AdminRegistry.sol";
 
 /// @title YieldVault
 /// @notice Minimal ERC-4626 vault for accepting deposits. Capital management
-///         functions (deployCapital, returnCapital, reportStrategyGain/Loss)
-///         will be added via contract upgrade once the yield pipeline is ready.
-///         The `deployedAssets` slot is reserved so the upgrade is storage-compatible.
+///         functions will be added via contract upgrade once the yield pipeline 
+///         is ready.
 contract record YieldVault is ERC4626, Ownable, Pausable {
-    /// @dev Reserved for future capital management — always 0 in this version.
-    uint256 public deployedAssets;
     bool public vaultInitialized;
 
     event VaultInitialized(address indexed asset, string name, string symbol);
