@@ -55,7 +55,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
 
     function totalAssets() public view override returns (uint256) {
         if (!vaultInitialized) return 0;
-        return IERC20(asset()).balanceOf(address(this)) + deployedAssets;
+        return IERC20(asset()).balanceOf(address(this));
     }
 
     function maxDeposit(address receiver) public view override returns (uint256) {
