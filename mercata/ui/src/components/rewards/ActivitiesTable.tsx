@@ -106,7 +106,10 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
     const stakeAssetAddress = activity.stakeAssetAddress || null;
 
     if (lowerName.includes("swap lp")) {
-      return findPoolEarnApyInfo(tokenApys, activity.sourceContract);
+      return (
+        findPoolEarnApyInfo(tokenApys, activity.sourceContract) ||
+        findBestEarnApyInfo(tokenApys, stakeAssetAddress || activity.sourceContract)
+      );
     }
 
     if (

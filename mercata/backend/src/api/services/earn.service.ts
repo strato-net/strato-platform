@@ -16,7 +16,6 @@ import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
 const { Pool, DECIMALS, Vault, Token } = constants;
 const ZERO_APY = "0.00";
-const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
 const CATA_PRICE_USD = 0.25;
 
 export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]> => {
@@ -438,7 +437,7 @@ function computePoolAPY(pool: any, prices: Map<string, string>, volumeMap: Map<s
 function weightedBaseYield(addrs: string[], bals: string[], prices: Map<string, string>, baseYields: Map<string, number>): string | null {
   let ws = 0, total = 0;
   for (let i = 0; i < addrs.length; i++) {
-    const usd = Number(BigInt(bals[i] || "0") * BigInt(prices.get(addrs[i]) || "0") / DECIMALS) / 1e18;
+    const usd = Number((safeBigInt(bals[i]) * safeBigInt(prices.get(addrs[i]))) / DECIMALS) / 1e18;
     total += usd;
     ws += usd * (baseYields.get(addrs[i]) || 0);
   }
