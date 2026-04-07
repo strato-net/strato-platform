@@ -1,5 +1,4 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
-const SECONDS_PER_YEAR = 31_536_000;
 const YIELD_ANCHOR_UTC_HOUR = 12;
 const DEFAULT_YIELD_WINDOW_DAYS = 30;
 const YIELD_ANCHOR_STEP_DAYS = 5;
@@ -17,37 +16,6 @@ function parseCirrusTimestamp(ts?: string): number {
 
   const hasTimezone = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/.test(ts);
   return Date.parse(hasTimezone ? ts : `${ts}Z`);
-}
-
-function getHistoryValueAtAnchor(
-  history: Map<string, YieldHistoryInterval[]>,
-  key: string,
-  anchorMs: number,
-): string | null {
-  const intervals = history.get(key);
-  if (!intervals) return null;
-
-  for (const interval of intervals) {
-    if (interval.fromMs <= anchorMs && anchorMs <= interval.toMs) {
-      return interval.value;
-    }
-  }
-
-  return null;
-}
-
-function computeRatioFromRaw(tokenRaw: string, baseRaw: string): number | null {
-  try {
-    const token = BigInt(tokenRaw);
-    const base = BigInt(baseRaw);
-    if (token <= 0n || base <= 0n) return null;
-
-    const scaledRatio = (token * 1_000_000_000n) / base;
-    const ratio = Number(scaledRatio) / 1e9;
-    return isFinite(ratio) && ratio > 0 ? ratio : null;
-  } catch {
-    return null;
-  }
 }
 
 export function indexYieldHistoryRows(rows: any[]): Map<string, YieldHistoryInterval[]> {
@@ -123,47 +91,33 @@ export function getYieldWindowBounds(
   };
 }
 
-export function computeYieldAPYFromAnchors(
-  tokenAddress: string,
-  baseAddress: string,
-  currentPrices: Map<string, string>,
+export function computeExchangeRateAPY(
+  assetAddress: string,
   history: Map<string, YieldHistoryInterval[]>,
   anchorsMs: number[],
 ): string | null {
-  const ratioPoints: { anchorMs: number; ratio: number }[] = [];
+  const intervals = history.get(assetAddress);
+  if (!intervals || anchorsMs.length < 2) return null;
 
-  for (let i = 0; i < anchorsMs.length; i++) {
-    const anchorMs = anchorsMs[i];
-    const isToday = i === anchorsMs.length - 1;
+  let startRate: bigint | null = null, startMs = 0;
+  let endRate: bigint | null = null, endMs = 0;
 
-    let tokenRaw = getHistoryValueAtAnchor(history, tokenAddress, anchorMs);
-    let baseRaw = getHistoryValueAtAnchor(history, baseAddress, anchorMs);
-
-    if (isToday) {
-      tokenRaw = tokenRaw || currentPrices.get(tokenAddress) || null;
-      baseRaw = baseRaw || currentPrices.get(baseAddress) || null;
-    }
-
-    if (!tokenRaw || !baseRaw) continue;
-
-    const ratio = computeRatioFromRaw(tokenRaw, baseRaw);
-    if (ratio === null) continue;
-
-    ratioPoints.push({ anchorMs, ratio });
+  for (const anchorMs of anchorsMs) {
+    const iv = intervals.find(i => i.fromMs <= anchorMs && anchorMs <= i.toMs);
+    if (!iv) continue;
+    const rate = BigInt(iv.value || "0");
+    if (rate <= 0n) continue;
+    if (!startRate) { startRate = rate; startMs = anchorMs; }
+    endRate = rate;
+    endMs = anchorMs;
   }
 
-  if (ratioPoints.length < 2) return null;
+  if (!startRate || !endRate || endMs <= startMs) return null;
+  const daysDelta = (endMs - startMs) / (1000 * 60 * 60 * 24);
+  if (daysDelta < 1) return null;
 
-  const start = ratioPoints[0];
-  const end = ratioPoints[ratioPoints.length - 1];
-  const deltaSeconds = (end.anchorMs - start.anchorMs) / 1000;
-  if (!isFinite(deltaSeconds) || deltaSeconds <= 0) return null;
-
-  const growth = end.ratio / start.ratio;
+  const growth = Number(endRate) / Number(startRate);
   if (!isFinite(growth) || growth <= 0) return null;
-
-  const apy = (Math.pow(growth, SECONDS_PER_YEAR / deltaSeconds) - 1) * 100;
-  if (!isFinite(apy)) return null;
-
-  return Math.max(0, apy).toFixed(2);
+  const apy = (Math.pow(growth, 365 / daysDelta) - 1) * 100;
+  return apy > 0 && isFinite(apy) ? apy.toFixed(2) : null;
 }
