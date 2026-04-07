@@ -1,6 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { hiddenSwapPools, yieldBenchmarks } from "../../config/config";
+import { hiddenSwapPools, yieldBenchmarks, compositeYieldMap } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { buildYieldAnchorOverlapFilter, computeExchangeRateAPY, getYieldWindowBounds, indexYieldHistoryRows } from "../helpers/earnYield.helper";
 import { totalDebtFromScaled, calculateAPYs } from "../helpers/lending.helper";
@@ -29,7 +29,10 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const eventOr = `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))`;
 
   // Phase 1: parallel calls
-  const exchangeRateAddrs = yieldBenchmarks.map((b) => b.tokenAddress);
+  const exchangeRateAddrs = [...new Set([
+    ...yieldBenchmarks.map((b) => b.tokenAddress),
+    ...Object.values(compositeYieldMap),
+  ])];
 
   const [
     { data: storageRows },
@@ -217,8 +220,16 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   for (const pair of yieldBenchmarks) {
     const apy = computeExchangeRateAPY(pair.tokenAddress, exchangeRateHistory, anchorsMs);
     if (!apy) continue;
-    add(pair.tokenAddress, { source: "base", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
-    baseYieldByAddr.set(pair.tokenAddress, parseFloat(apy));
+    let totalApy = parseFloat(apy);
+    // For AAVE aTokens wrapping LSTs, add the underlying staking yield
+    const underlyingAddr = compositeYieldMap[pair.tokenAddress];
+    if (underlyingAddr) {
+      const underlyingApy = computeExchangeRateAPY(underlyingAddr, exchangeRateHistory, anchorsMs);
+      if (underlyingApy) totalApy += parseFloat(underlyingApy);
+    }
+    const apyStr = totalApy.toFixed(2);
+    add(pair.tokenAddress, { source: "base", apy: apyStr, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
+    baseYieldByAddr.set(pair.tokenAddress, totalApy);
   }
   const vaultWeightedApy = currentVaultBalances.size > 0 && baseYieldByAddr.size > 0
     ? weightedBaseYield(

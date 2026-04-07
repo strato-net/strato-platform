@@ -65,7 +65,21 @@ export const yieldBenchmarks = [
   { tokenSymbol: "rETH", baseSymbol: "ETH", tokenAddress: "2e4789eb7db143576da25990a3c0298917a8a87d" },
   { tokenSymbol: "sUSDS", baseSymbol: "USDST", tokenAddress: "6e2d93d323edf1b3cc4672a909681b6a430cae64" },
   { tokenSymbol: "syrupUSDC", baseSymbol: "USDC", tokenAddress: "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca" },
+  // AAVE aTokens — yield from AAVE V3 liquidity index (getReserveNormalizedIncome)
+  { tokenSymbol: "aWETH", baseSymbol: "ETH", tokenAddress: "6d40952f0895d21d2bf20cd088f0eb9a1574583f" },
+  { tokenSymbol: "aWBTC", baseSymbol: "BTC", tokenAddress: "5f46258f73c405a58331c1a19e54add394637b06" },
+  { tokenSymbol: "aweETH", baseSymbol: "weETH", tokenAddress: "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1" },
+  { tokenSymbol: "awstETH", baseSymbol: "wstETH", tokenAddress: "2c33aa5f8bbfe3c15e356a5e87464310db1237be" },
+  { tokenSymbol: "aUSDC", baseSymbol: "USDC", tokenAddress: "465c7e3061bc239df88c37d315be52f5487959ec" },
+  { tokenSymbol: "aUSDT", baseSymbol: "USDT", tokenAddress: "7d2a2b963e1fa273b60f9b7891392903de5e66b8" },
 ];
+
+// For AAVE aTokens wrapping yield-bearing LSTs, composite APY = AAVE lending yield + underlying staking yield.
+// Maps aToken address → underlying token's exchange rate address (used to sum APYs).
+export const compositeYieldMap: Record<string, string> = {
+  "2c33aa5f8bbfe3c15e356a5e87464310db1237be": "f2aa370405030a434ae07e7826178325c675e925", // awstETH → wstETH
+  "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1": "00000000000000000000000000000000deadbeef", // aweETH → weETH
+};
 
 /*
    Network-specific defaults;
