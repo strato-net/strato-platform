@@ -2,7 +2,6 @@ import "../../abstract/ERC4626/ERC4626.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/utils/Pausable.sol";
-import "../Admin/AdminRegistry.sol";
 
 /// @title YieldVault
 /// @notice ERC-4626 vault for yield optimization. Depositors hold shares representing
@@ -18,22 +17,6 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     event CapitalReturned(address indexed from, uint256 assets, uint256 totalDeployed);
     event StrategyGainReported(uint256 profit, uint256 newTotalAssets);
     event StrategyLossReported(uint256 loss, uint256 newTotalAssets);
-
-    modifier onlyOwner() {
-        try {
-            _checkOwner();
-        } catch {
-            address myOwner = owner();
-            AdminRegistry admin = AdminRegistry(myOwner);
-            address sender = _msgSender();
-            if (myOwner == this) {
-                sender = this;
-            }
-            (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
-            return ret;
-        }
-        _;
-    }
 
     constructor(address initialOwner)
         Ownable(initialOwner)
