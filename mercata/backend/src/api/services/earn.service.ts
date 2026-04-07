@@ -2,7 +2,7 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { hiddenSwapPools, yieldBenchmarks } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
-import { buildYieldAnchorOverlapFilter, computeYieldAPYFromAnchors, getYieldWindowBounds, indexYieldHistoryRows, YieldHistoryInterval } from "../helpers/earnYield.helper";
+import { buildYieldAnchorOverlapFilter, getYieldWindowBounds, indexYieldHistoryRows, YieldHistoryInterval } from "../helpers/earnYield.helper";
 import { totalDebtFromScaled, calculateAPYs } from "../helpers/lending.helper";
 import { fetchMultiTokenStablePools } from "../helpers/swapping.helper";
 import {
@@ -24,22 +24,18 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const thirtyDaysAgo = toUTCTime(new Date(now - 30 * 24 * 60 * 60 * 1000));
   const { windowStart, windowEndExclusive, anchorsMs } = getYieldWindowBounds(now);
   const vaultAddr = constants.vault;
-  const yieldHistoryKeys = [...new Set(yieldBenchmarks.flatMap((p) => [p.tokenAddress, p.baseAddress]))];
 
   const mappingOr = `(and(address.eq.${constants.lendingPool},collection_name.eq.assetConfigs,key->>key.eq.${constants.USDST}),and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${constants.liquidityPool}),and(address.eq.${constants.priceOracle},collection_name.eq.prices)${vaultAddr ? `,and(address.eq.${vaultAddr},collection_name.eq.supportedAssets)` : ""})`;
   const eventOr = `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))`;
 
   // Phase 1: parallel calls
-  const exchangeRateTrackedAddrs = yieldBenchmarks
-    .filter((b) => b.exchangeRateTracked)
-    .map((b) => b.tokenAddress);
+  const exchangeRateAddrs = yieldBenchmarks.map((b) => b.tokenAddress);
 
   const [
     { data: storageRows },
     { data: mappingRows },
     { data: eventRows },
     { data: pools },
-    { data: yieldHistoryRows },
     { data: vaultRows },
     saveUsdstInfo,
     { data: exchangeRateRows },
@@ -54,16 +50,6 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       poolFactory: `eq.${constants.poolFactory}`,
       select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
     }}),
-    yieldHistoryKeys.length
-      ? cirrus.get(accessToken, "/history@mapping", { params: {
-        address: `eq.${constants.priceOracle}`,
-        collection_name: "eq.prices",
-        "key->>key": `in.(${yieldHistoryKeys.join(",")})`,
-        select: "key->>key,value::text,valid_from,valid_to",
-        and: `(block_timestamp.gte.${windowStart},block_timestamp.lt.${windowEndExclusive})`,
-        or: buildYieldAnchorOverlapFilter(anchorsMs),
-      }})
-      : Promise.resolve({ data: [] as any[] }),
     vaultAddr
       ? cirrus.get(accessToken, `/${Vault}`, { params: {
         address: `eq.${vaultAddr}`,
@@ -71,11 +57,11 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       }})
       : Promise.resolve({ data: [] as any[] }),
     getSaveUsdstInfo(accessToken).catch(() => null),
-    exchangeRateTrackedAddrs.length
+    exchangeRateAddrs.length
       ? cirrus.get(accessToken, "/history@mapping", { params: {
         address: `eq.${constants.priceOracle}`,
         collection_name: "eq.exchangeRates",
-        "key->>key": `in.(${exchangeRateTrackedAddrs.join(",")})`,
+        "key->>key": `in.(${exchangeRateAddrs.join(",")})`,
         select: "key->>key,value::text,valid_from,valid_to",
         and: `(block_timestamp.gte.${windowStart},block_timestamp.lt.${windowEndExclusive})`,
         or: buildYieldAnchorOverlapFilter(anchorsMs),
@@ -94,7 +80,6 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 
   // Parse mapping
   const prices = new Map<string, string>();
-  const yieldHistoryByKey = indexYieldHistoryRows(yieldHistoryRows || []);
   let lendingCfg: any = null;
   let liqBalance: string | null = null;
   const vaultAssets: string[] = [];
@@ -230,20 +215,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 
   const baseYieldByAddr = new Map<string, number>();
   for (const pair of yieldBenchmarks) {
-    // Prefer on-chain exchange rate APY from mapping history; fall back to USD price ratio
-    let apy: string | null = null;
-    if (pair.exchangeRateTracked && exchangeRateHistory.size > 0) {
-      apy = computeExchangeRateAPYFromHistory(pair.tokenAddress, exchangeRateHistory, anchorsMs);
-    }
-    if (!apy) {
-      apy = computeYieldAPYFromAnchors(
-        pair.tokenAddress,
-        pair.baseAddress,
-        prices,
-        yieldHistoryByKey,
-        anchorsMs,
-      );
-    }
+    const apy = computeExchangeRateAPYFromHistory(pair.tokenAddress, exchangeRateHistory, anchorsMs);
     if (!apy) continue;
     add(pair.tokenAddress, { source: "base", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
     baseYieldByAddr.set(pair.tokenAddress, parseFloat(apy));
