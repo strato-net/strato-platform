@@ -21,22 +21,31 @@ export const parseBonusTokenConfigs = (raw: unknown): BonusTokenConfig[] => {
       throw new Error(`Invalid bonusTokenConfigs[${idx}].maxBonusBps: required positive integer (basis points)`);
     }
 
-    if (typeof token.balanceForMaxBoost !== "string" || token.balanceForMaxBoost.trim().length === 0) {
-      throw new Error(`Invalid bonusTokenConfigs[${idx}].balanceForMaxBoost: required non-empty string`);
+    const conversionNumerator = Number(token.conversionNumerator);
+    if (!Number.isInteger(conversionNumerator) || conversionNumerator <= 0) {
+      throw new Error(`Invalid bonusTokenConfigs[${idx}].conversionNumerator: required positive integer`);
     }
 
-    try {
-      if (BigInt(token.balanceForMaxBoost.trim()) <= 0n) {
-        throw new Error(`Invalid bonusTokenConfigs[${idx}].balanceForMaxBoost: required positive integer string`);
+    const conversionDenominator = Number(token.conversionDenominator);
+    if (!Number.isInteger(conversionDenominator) || conversionDenominator <= 0) {
+      throw new Error(`Invalid bonusTokenConfigs[${idx}].conversionDenominator: required positive integer`);
+    }
+
+    if (!Array.isArray(token.includedActivityPatterns) || token.includedActivityPatterns.length === 0) {
+      throw new Error(`Invalid bonusTokenConfigs[${idx}].includedActivityPatterns: required non-empty string array`);
+    }
+    for (let i = 0; i < token.includedActivityPatterns.length; i++) {
+      if (typeof token.includedActivityPatterns[i] !== "string" || token.includedActivityPatterns[i].trim().length === 0) {
+        throw new Error(`Invalid bonusTokenConfigs[${idx}].includedActivityPatterns[${i}]: required non-empty string`);
       }
-    } catch {
-      throw new Error(`Invalid bonusTokenConfigs[${idx}].balanceForMaxBoost: required positive integer string`);
     }
 
     return {
       address: token.address.trim(),
       maxBonusBps,
-      balanceForMaxBoost: token.balanceForMaxBoost.trim(),
+      conversionNumerator,
+      conversionDenominator,
+      includedActivityPatterns: token.includedActivityPatterns as string[],
     };
   });
 };

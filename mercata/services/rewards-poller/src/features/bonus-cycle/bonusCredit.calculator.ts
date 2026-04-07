@@ -1,10 +1,12 @@
 import { getUserEmissionRates } from "../events-read/emissionRates.reader";
+import { computeStakeUsdForActivities } from "../events-read/stakeUsd.provider";
 import {
   BonusBalanceSnapshots,
   BonusCredit,
   BonusEligibleUser,
   BonusTokenBalance,
   BonusTokenConfig,
+  UserActivityInfo,
 } from "../../shared/types";
 import { logInfo } from "../../infra/observability/logger";
 import { buildBonusRuleByToken, normalizeAddressValue } from "../events-read/addressNormalization";
@@ -52,25 +54,31 @@ export const calculateAverageBalance = (snapshots: string[]): bigint => {
 const isZeroOnlySnapshotWindow = (snapshots: string[]): boolean =>
   snapshots.every((snapshot) => BigInt(snapshot) === 0n);
 
-export const calculateDynamicBonusBps = (
+export const calculateBoostCapUsd = (
   currentBalance: bigint,
   snapshots: string[],
-  maxBonusBps: number,
-  balanceForMaxBoost: bigint,
-): number => {
-  if (currentBalance <= 0n || snapshots.length === 0 || maxBonusBps <= 0 || balanceForMaxBoost <= 0n) {
-    return 0;
+  conversionNumerator: bigint,
+  conversionDenominator: bigint,
+): bigint => {
+  if (currentBalance <= 0n || snapshots.length === 0 || conversionDenominator <= 0n) {
+    return 0n;
   }
 
   const averageBalance = calculateAverageBalance(snapshots);
   const effectiveBalance = currentBalance < averageBalance ? currentBalance : averageBalance;
-  if (effectiveBalance <= 0n) return 0;
+  if (effectiveBalance <= 0n) return 0n;
 
-  const rawBonusBps = (effectiveBalance * BigInt(maxBonusBps)) / balanceForMaxBoost;
-  if (rawBonusBps <= 0n) return 0;
+  return (effectiveBalance * conversionNumerator) / conversionDenominator;
+};
 
-  const cappedBonusBps = rawBonusBps > BigInt(maxBonusBps) ? BigInt(maxBonusBps) : rawBonusBps;
-  return Number(cappedBonusBps);
+export const isIncludedActivity = (
+  activityName: string,
+  activityType: string,
+  patterns: string[],
+): boolean => {
+  if (activityType === "1") return false;
+  const lower = activityName.toLowerCase();
+  return patterns.some((p) => lower.includes(p.toLowerCase()));
 };
 
 export const buildBonusUsers = (
@@ -102,20 +110,20 @@ export const buildBonusUsers = (
         nextTokenSnapshots[user] = nextSnapshots;
       }
 
-      const dynamicBonusBps = calculateDynamicBonusBps(
+      const boostCapUsd = calculateBoostCapUsd(
         BigInt(currentBalance),
         nextSnapshots,
-        rule.maxBonusBps,
-        rule.balanceForMaxBoost,
+        rule.conversionNumerator,
+        rule.conversionDenominator,
       );
-      if (dynamicBonusBps <= 0) continue;
+      if (boostCapUsd <= 0n) continue;
 
-      const currentBonus = userBonusMap.get(user);
-      if (!currentBonus || dynamicBonusBps > currentBonus.bonusBps) {
+      const current = userBonusMap.get(user);
+      if (!current || BigInt(current.boostCapUsd) < boostCapUsd) {
         userBonusMap.set(user, {
           sourceContract: rule.sourceContract,
           user,
-          bonusBps: dynamicBonusBps,
+          boostCapUsd: boostCapUsd.toString(),
         });
       }
     }
@@ -131,31 +139,67 @@ export const buildBonusUsers = (
 
 export const calculateBonusCreditsForUsers = async (
   bonusUsers: BonusEligibleUser[],
-  intervalSeconds: number
+  intervalSeconds: number,
+  includedActivityPatterns: string[],
+  maxBonusBps: number,
 ): Promise<BonusCredit[]> => {
   if (bonusUsers.length === 0) return [];
 
   const users = bonusUsers.map((u) => u.user);
   const uniqueBonusTokens = [...new Set(bonusUsers.map((u) => u.sourceContract))];
-  const { rateByUser, bonusEventByToken } = await getUserEmissionRates(
+  const { activityBreakdownByUser, bonusEventByToken } = await getUserEmissionRates(
     users,
     uniqueBonusTokens
   );
   const interval = BigInt(Math.max(1, Math.floor(intervalSeconds)));
+  const maxBps = BigInt(maxBonusBps);
+
+  // Batch all eligible activities across all users for a single price fetch
+  const allEligibleActivities: UserActivityInfo[] = [];
+  for (const { user } of bonusUsers) {
+    const allActivities = activityBreakdownByUser.get(user) ?? [];
+    for (const a of allActivities) {
+      if (isIncludedActivity(a.activityName, a.activityType, includedActivityPatterns)) {
+        allEligibleActivities.push(a);
+      }
+    }
+  }
+  const globalStakeUsdMap = await computeStakeUsdForActivities(allEligibleActivities);
 
   const credits: BonusCredit[] = [];
   let skippedMissingInitialization = 0;
-  for (const { sourceContract, user, bonusBps } of bonusUsers) {
+
+  for (const { sourceContract, user, boostCapUsd } of bonusUsers) {
     const eventName = bonusEventByToken.get(normalizeAddressNoPrefix(sourceContract));
     if (!eventName) {
       skippedMissingInitialization += 1;
       continue;
     }
 
-    const emissionRate = rateByUser.get(user);
-    if (!emissionRate || emissionRate <= 0n || bonusBps <= 0) continue;
+    const allActivities = activityBreakdownByUser.get(user) ?? [];
+    const eligible = allActivities.filter((a) =>
+      isIncludedActivity(a.activityName, a.activityType, includedActivityPatterns)
+    );
+    if (eligible.length === 0) continue;
 
-    const bonusAmount = (emissionRate * interval * BigInt(bonusBps)) / BPS_DENOMINATOR;
+    let eligibleActivityUsd = 0n;
+    for (const a of eligible) {
+      eligibleActivityUsd += globalStakeUsdMap.get(a.activityId) ?? a.userStake;
+    }
+    if (eligibleActivityUsd <= 0n) continue;
+
+    const boostCapUsdBig = BigInt(boostCapUsd);
+    const boostedFractionBps = (boostCapUsdBig * BPS_DENOMINATOR) / eligibleActivityUsd;
+    const dynamicBonusBps = boostedFractionBps > maxBps ? maxBps : boostedFractionBps;
+    if (dynamicBonusBps <= 0n) continue;
+
+    let eligibleEmissionRate = 0n;
+    for (const a of eligible) {
+      eligibleEmissionRate += a.personalEmissionRate;
+    }
+    if (eligibleEmissionRate <= 0n) continue;
+
+    const bonusAmount = (eligibleEmissionRate * interval * dynamicBonusBps) / BPS_DENOMINATOR;
     if (bonusAmount <= 0n) continue;
 
     credits.push({

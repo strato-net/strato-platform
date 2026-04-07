@@ -4,7 +4,9 @@ import { normalizeAddressNoPrefix } from "../../shared/core/address";
 export interface BonusTokenRule {
   sourceContract: string;
   maxBonusBps: number;
-  balanceForMaxBoost: bigint;
+  conversionNumerator: bigint;
+  conversionDenominator: bigint;
+  includedActivityPatterns: string[];
 }
 
 export const buildBonusRuleByToken = (
@@ -16,7 +18,9 @@ export const buildBonusRuleByToken = (
       {
         sourceContract: config.address,
         maxBonusBps: config.maxBonusBps,
-        balanceForMaxBoost: BigInt(config.balanceForMaxBoost),
+        conversionNumerator: BigInt(config.conversionNumerator),
+        conversionDenominator: BigInt(config.conversionDenominator),
+        includedActivityPatterns: config.includedActivityPatterns,
       },
     ])
   );
