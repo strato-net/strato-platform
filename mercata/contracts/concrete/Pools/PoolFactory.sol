@@ -317,6 +317,9 @@ contract record PoolFactory is Ownable {
         for (uint i = 0; i < tokens.length; i++) {
             require(TokenFactory(tokenFactory).isTokenActive(tokens[i]), "Token not active");
             require(tokens[i] != address(0), "Zero address");
+            if (assetTypes[i] != 3) {
+                require(TokenFactory(tokenFactory).isTokenActive(tokens[i]), "Token not active");
+            }
             for (uint j = 0; j < tokens.length; j++) {
                 if (i != j) {
                     require(tokens[i] != tokens[j], "Identical addresses");
