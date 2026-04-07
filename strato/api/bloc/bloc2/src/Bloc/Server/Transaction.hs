@@ -30,6 +30,10 @@ import Bloc.Monad
 import Bloc.Server.TransactionResult
 import Bloc.Server.Utils
 import BlockApps.Logging
+import Data.ByteString (ByteString)
+import Strato.Auth.Client (newAuthEnv, runWithUserToken)
+import qualified Strato.Strato23.API.Types as VaultT
+import Strato.Strato23.Client (postSignature, getKey)
 import BlockApps.Solidity.ArgValue
 import BlockApps.Solidity.Contract ()
 import BlockApps.Solidity.Type
@@ -123,17 +127,17 @@ postBlocTransactionBody ::
     A.Selectable Keccak256 SourceMap m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
+  Text ->
   -- | SolidVM transactions
   PostBlocTransactionRequest ->
   -- | tx hash & raw tx data
   m [BlocTransactionBodyResult]
-postBlocTransactionBody (PostBlocTransactionRequest _ [] _ _) = return []
-postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs) = withCodeCollectionCache $ do
+postBlocTransactionBody _ (PostBlocTransactionRequest _ [] _ _) = return []
+postBlocTransactionBody token (PostBlocTransactionRequest mAddr txList txParams msrcs) = withCodeCollectionCache $ do
   addr <- case mAddr of
-    Nothing -> fromPublicKey <$> getPub
+    Nothing -> fromPublicKey <$> vaultGetPub token
     Just addr' -> return addr'
   fmap join . forM (partitionWith transactionType txList) $ \(ttype, txs) -> case ttype of
     TRANSFER -> do
@@ -153,7 +157,7 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
                       "mercata"
                       (fromMaybe emptyTxParams params)
                       (Just $ Code "")
-              signAndPrepare addr header
+              signAndPrepare token addr header
           )
           txsWithParams
       forM txs'' (\r -> return $ BlocTransactionBodyResult (hash' r) (Just r))
@@ -193,7 +197,7 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           argsAsSource <- lift $ constructArgValuesAndSource (Just $ contractToTypeDefs contract) (Just args) xabiArgs
 
-          tx <- lift . signAndPrepare addr $
+          tx <- lift . signAndPrepare token addr $
               TransactionHeader
                 Nothing
                 addr
@@ -229,7 +233,7 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
               typeDefs = contractToTypeDefsWithCC mCodeCollection contract
           argsAsSource <- lift $ constructArgValuesAndSource (Just typeDefs) (Just methodcallArgs) xabiArgs
-          tx <- lift . signAndPrepare addr $
+          tx <- lift . signAndPrepare token addr $
             TransactionHeader
               (Just methodcallContractAddress)
               addr
@@ -262,8 +266,7 @@ postBlocTransactionUnsigned ::
     A.Selectable Keccak256 SourceMap m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
   -- | SolidVM transactions
   PostBlocTransactionRequest ->
@@ -271,8 +274,8 @@ postBlocTransactionUnsigned ::
   m [BlocTransactionUnsignedResult]
 postBlocTransactionUnsigned (PostBlocTransactionRequest _ [] _ _) = return []
 postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams msrcs) = withCodeCollectionCache $ do
-  addr <- case mAddr of -- This is just to get the user's nonce if they didn't supply one
-    Nothing -> fromPublicKey <$> getPub
+  addr <- case mAddr of
+    Nothing -> throwIO $ UserError "Address is required for unsigned transactions"
     Just addr' -> return addr'
   fmap join . forM txList $ \tx -> case transactionType tx of
     TRANSFER -> do
@@ -400,14 +403,14 @@ postBlocTransactionParallel ::
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
+  Text ->
   Maybe String -> -- username
   Bool -> -- resolve
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
-postBlocTransactionParallel = postBlocTransaction' (Do CacheNonce)
+postBlocTransactionParallel token = postBlocTransaction' (Do CacheNonce) token
 
 postBlocTransaction ::
   ( MonadUnliftIO m,
@@ -423,14 +426,14 @@ postBlocTransaction ::
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
+  Text ->
   Maybe String -> -- username
   Bool ->
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
-postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
+postBlocTransaction token = postBlocTransaction' (Don't CacheNonce) token
 
 postBlocTransaction' ::
   ( MonadUnliftIO m,
@@ -446,18 +449,18 @@ postBlocTransaction' ::
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
   Should CacheNonce ->
+  Text ->
   Maybe String -> -- username
   Bool ->
   PostBlocTransactionRequest ->
   m [BlocTransactionResult]
-postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = withCodeCollectionCache $ do
+postBlocTransaction' cacheNonce token mUsername resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = withCodeCollectionCache $ do
   checkIsSynced
   addr <- case mAddr of
-    Nothing -> fromPublicKey <$> getPub
+    Nothing -> fromPublicKey <$> vaultGetPub token
     Just addr' -> return addr'
   let useWallet = maybe False (not . null) mUsername
   userContractAddr <- case (useWallet, mUsername) of
@@ -491,7 +494,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                 (mergeTxParams (transferpayloadTxParams p) txParams)
                 (transferpayloadMetadata p)
                 resolve
-        fmap (:[]) $ postUsersSend' cacheNonce btp
+        fmap (:[]) $ postUsersSend' cacheNonce token btp
       xs -> do
         p <- mapM fromTransfer xs
         let btlp =
@@ -499,7 +502,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                 addr
                 (map (\(TransferPayload t x m) -> SendTransaction t (mergeTxParams x txParams) m) p)
                 resolve
-        postUsersSendList' cacheNonce btlp
+        postUsersSendList' cacheNonce token btlp
     CONTRACT -> case txs of
       [] -> return []
       [x] -> do
@@ -533,7 +536,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                     (mergeTxParams (contractpayloadTxParams p) txParams)
                     (maybe (Just metadata) (\m -> Just $ metadata `Map.union` m) md)
                     resolve
-            fmap (:[]) $ postUsersContractMethod' cacheNonce bcp
+            fmap (:[]) $ postUsersContractMethod' cacheNonce token bcp
           False -> do
             let bcp =
                   ContractParameters
@@ -550,7 +553,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                         Just m -> Just $ Map.insert "VM" "SolidVM" (Map.insert "history" cn m)
                     )
                     resolve
-            fmap (:[]) $ postUsersContractSolidVM' cacheNonce bcp
+            fmap (:[]) $ postUsersContractSolidVM' cacheNonce token bcp
       xs -> do
         ps <- mapM fromContract xs
         case useWallet of
@@ -581,7 +584,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                     addr
                     methodList
                     resolve
-            postUsersContractMethodList' cacheNonce bcp
+            postUsersContractMethodList' cacheNonce token bcp
           False -> do
             payloadList <-
               mapM
@@ -605,7 +608,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                     payloadList
                     resolve
                 poster = postUsersUploadListSolidVM'
-            poster cacheNonce bclp
+            poster cacheNonce token bclp
     FUNCTION -> case txs of
       [] -> return []
       [x] -> do
@@ -639,7 +642,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
             (mergeTxParams (functionpayloadTxParams p) txParams)
             (functionpayloadMetadata p)
             resolve
-        fmap (:[]) $ postUsersContractMethod' cacheNonce bfp'
+        fmap (:[]) $ postUsersContractMethod' cacheNonce token bfp'
       xs -> do
         p <- mapM fromFunction xs
         bflp' <- flip (FunctionListParameters addr) resolve <$> traverse (\(FunctionPayload a m r x md) ->
@@ -660,7 +663,7 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
                   md
               else pure $ MethodCall a m r (mergeTxParams x txParams) md
           ) p
-        postUsersContractMethodList' cacheNonce bflp'
+        postUsersContractMethodList' cacheNonce token bflp'
   where
     fromTransfer = \case
       BlocTransfer t -> return t
@@ -673,12 +676,13 @@ postBlocTransaction' cacheNonce mUsername resolve (PostBlocTransactionRequest mA
       _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 callSignature ::
-  (MonadIO m, HasVault m) =>
+  (MonadIO m, MonadLogger m) =>
+  Text ->
   Transaction ->
   m Transaction
-callSignature unsigned = do
+callSignature token unsigned = do
   let msgHash = keccak256ToByteString $ partialTransactionHash unsigned
-  sig <- sign msgHash
+  sig <- vaultSign token msgHash
   let (r, s, v) = getSigVals sig
   return $ unsigned{TX.v = fromIntegral v, TX.r = fromIntegral r, TX.s = fromIntegral s}
 
@@ -726,17 +730,17 @@ postUsersSend' ::
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
     MonadLogger m,
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
   Should CacheNonce ->
+  Text ->
   TransferParameters ->
   m BlocTransactionResult
-postUsersSend' cacheNonce TransferParameters {..} = do
+postUsersSend' cacheNonce token TransferParameters {..} = do
   params <- getAccountTxParams cacheNonce fromAddress txParams
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   tx <-
-    signAndPrepare fromAddress $
+    signAndPrepare token fromAddress $
       TransactionHeader
         (Just toAddress)
         fromAddress
@@ -760,13 +764,13 @@ postUsersContractSolidVM' ::
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
   Should CacheNonce ->
+  Text ->
   ContractParameters ->
   m BlocTransactionResult
-postUsersContractSolidVM' cacheNonce ContractParameters {..} = do
+postUsersContractSolidVM' cacheNonce token ContractParameters {..} = do
   params <- getAccountTxParams cacheNonce fromAddr txParams
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
@@ -781,7 +785,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} = do
   argsAsSource <- constructArgValuesAndSource (Just $ contractToTypeDefs theContract) args xabiArgs
 
   tx <-
-    signAndPrepare fromAddr $
+    signAndPrepare token fromAddr $
       TransactionHeader
         Nothing
         fromAddr
@@ -809,13 +813,13 @@ postUsersUploadListSolidVM' ::
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
     HasCodeDB m,
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
   Should CacheNonce ->
+  Text ->
   ContractListParameters ->
   m [BlocTransactionResult]
-postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
+postUsersUploadListSolidVM' cacheNonce token ContractListParameters {..} = do
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractTxParams contracts
   namesTxs <- forStateT Map.empty txsWithParams $
@@ -833,7 +837,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
       argsAsSource <- lift $ constructArgValuesAndSource (Just $ contractToTypeDefs contract) (Just args) xabiArgs
 
       tx <-
-        lift . signAndPrepare fromAddr $
+        lift . signAndPrepare token fromAddr $
           TransactionHeader
             Nothing
             fromAddr
@@ -857,13 +861,13 @@ postUsersSendList' ::
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
   Should CacheNonce ->
+  Text ->
   TransferListParameters ->
   m [BlocTransactionResult]
-postUsersSendList' cacheNonce TransferListParameters {..} = do
+postUsersSendList' cacheNonce token TransferListParameters {..} = do
   txsWithParams <- genNonces cacheNonce fromAddr sendtransactionTxParams txs
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   txs'' <-
@@ -879,7 +883,7 @@ postUsersSendList' cacheNonce TransferListParameters {..} = do
                   "mercata"
                   (fromMaybe emptyTxParams params)
                   (Just $ Code "")
-          signAndPrepare fromAddr header
+          signAndPrepare token fromAddr header
       )
       txsWithParams
   hashes <- postTransactionList (Just txSizeLimit) txs''
@@ -894,13 +898,13 @@ postUsersContractMethodList' ::
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
   Should CacheNonce ->
+  Text ->
   FunctionListParameters ->
   m [BlocTransactionResult]
-postUsersContractMethodList' cacheNonce FunctionListParameters {..} = do
+postUsersContractMethodList' cacheNonce token FunctionListParameters {..} = do
   if null txs
     then return []
     else do
@@ -926,7 +930,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} = do
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
               typeDefs = contractToTypeDefsWithCC mCodeCollection contract
           argsAsSource <- lift $ constructArgValuesAndSource (Just typeDefs) (Just methodcallArgs) xabiArgs
-          tx <- lift . signAndPrepare fromAddr $
+          tx <- lift . signAndPrepare token fromAddr $
             TransactionHeader
               (Just methodcallContractAddress)
               fromAddr
@@ -955,13 +959,13 @@ postUsersContractMethod' ::
     A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
     m `Mod.Outputs` [IngestEvent],
-    HasBlocEnv m,
-    HasVault m
+    HasBlocEnv m
   ) =>
   Should CacheNonce ->
+  Text ->
   FunctionParameters ->
   m BlocTransactionResult
-postUsersContractMethod' cacheNonce FunctionParameters {..} = do
+postUsersContractMethod' cacheNonce token FunctionParameters {..} = do
   params <- getAccountTxParams cacheNonce fromAddr txParams
   txSizeLimit <- fmap txSizeLimit getBlocEnv
 
@@ -985,7 +989,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} = do
   let network = "mercata"
 
   tx <-
-    signAndPrepare fromAddr $
+    signAndPrepare token fromAddr $
       TransactionHeader
         (Just contractAddr)
         fromAddr
@@ -1074,14 +1078,15 @@ preparePostUnsignedRawTx time tx contractName' args =
       Nothing
 
 signAndPrepare ::
-  (MonadIO m, HasVault m, HasBlocEnv m) =>
+  (MonadIO m, MonadLogger m, HasBlocEnv m) =>
+  Text ->
   Address ->
   TransactionHeader ->
   m RawTransaction'
-signAndPrepare from th = do
+signAndPrepare token from th = do
   BlocEnv {gasLimit = envGasLimit} <- getBlocEnv
   time <- liftIO getCurrentTime
-  fmap (preparePostTx time from) . callSignature $ prepareUnsignedTx envGasLimit th
+  fmap (preparePostTx time from) . callSignature token $ prepareUnsignedTx envGasLimit th
 
 prepareUnsignedRawTx ::
   (MonadIO m, HasBlocEnv m) =>
@@ -1096,6 +1101,23 @@ prepareUnsignedRawTx contractName' args th = do
       msgHash = unsafeCreateKeccak256FromByteString $ keccak256ToByteString $ partialTransactionHash unsigned
       unsignedRawTx = preparePostUnsignedRawTx time unsigned contractName' args
   pure $ BlocTransactionUnsignedResult msgHash (Just unsignedRawTx)
+
+
+vaultGetPub ::
+  (MonadIO m, MonadLogger m) =>
+  Text -> m PublicKey
+vaultGetPub token = do
+  env <- liftIO $ newAuthEnv (EthConf.vaultUrl . EthConf.urlConfig $ ethConf)
+  result <- liftIO $ runWithUserToken env token (getKey Nothing Nothing)
+  either (blocError . VaultWrapperError) return (fmap VaultT.unPubKey result)
+
+vaultSign ::
+  (MonadIO m, MonadLogger m) =>
+  Text -> ByteString -> m Signature
+vaultSign token msgHash = do
+  env <- liftIO $ newAuthEnv (EthConf.vaultUrl . EthConf.urlConfig $ ethConf)
+  result <- liftIO $ runWithUserToken env token (postSignature Nothing (VaultT.MsgHash msgHash))
+  either (blocError . VaultWrapperError) return result
 
 constructArgValuesAndSource ::
   (MonadIO m, MonadLogger m) =>

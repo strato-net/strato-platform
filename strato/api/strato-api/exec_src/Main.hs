@@ -31,14 +31,12 @@ import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.SyncDB
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.SQL
-import Control.Monad.Composable.Vault
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
@@ -73,8 +71,6 @@ import Servant
 import Servant.Multipart
 import Servant.OpenApi
 import Servant.Swagger.UI
-import qualified Strato.Strato23.API.Types as V
-import Strato.Strato23.Client
 import System.Clock
 import Text.Tools
 import UnliftIO hiding (Handler)
@@ -125,37 +121,17 @@ instance {-# OVERLAPPING #-} Accessible (Maybe BestBlock) IO where
 instance {-# OVERLAPPING #-} Accessible (Maybe WorldBestBlock) IO where
   access _ = fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo
 
-type FullAPI = Header "X-USER-ACCESS-TOKEN" Text :> (CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI)
+type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
-newtype AccessToken = AccessToken { getAccessToken :: Maybe Text }
-
-instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m, Accessible VaultData m) => HasVault (ReaderT AccessToken m) where
-  sign msgHash = do
-    AccessToken jwtToken <- ask
-    case jwtToken of
-      Nothing -> error "sign: missing user access token"
-      Just token -> blocVaultWrapperWithUserToken token $ postSignature Nothing (V.MsgHash msgHash)
-  getPub = do
-    AccessToken jwtToken <- ask
-    case jwtToken of
-      Nothing -> error "getPub: missing user access token"
-      Just token -> fmap V.unPubKey . blocVaultWrapperWithUserToken token $ getKey Nothing Nothing
-  getShared _ = error "getShared ReaderT VaultData: unimplemented"
-
-fullServer ::
-  ( MonadBlocAPI n,
-    n ~ ReaderT AccessToken m
-  ) =>
-  ServerT FullAPI m
-fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (AccessToken jwtToken)) coreApiServer
-                 :<|> hoistServer (Proxy :: Proxy BlocAPI) (flip runReaderT (AccessToken jwtToken)) bloc
+fullServer :: MonadBlocAPI m => ServerT FullAPI m
+fullServer = coreApiServer :<|> bloc
 
 ----------------
 
 hoistCoreServer :: BlocEnv -> UrlMap -> Servant.Server FullAPI
 hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
-    convertErrors :: VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO))))) a -> Handler a
+    convertErrors :: ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO)))) a -> Handler a
     convertErrors x = Handler $ do
       y <- liftIO
         . try
@@ -164,7 +140,6 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
         . runCirrusM
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
-        . runVaultM (vaultUrl . urlConfig $ ethConf)
         $ x `catch` handleRuntimeError `catch` handleApiError
       case y of
         Right a -> pure a

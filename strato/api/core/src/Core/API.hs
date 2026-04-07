@@ -36,7 +36,6 @@ import           Blockchain.Strato.Discovery.Data.Peer (HasPeerDB)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
-import           Blockchain.Strato.Model.Secp256k1
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify       (Accessible, Outputs)
 import           Data.Source.Map
@@ -89,7 +88,6 @@ type MonadCoreAPI m =
     Accessible Stats.TransactionCount m,
     BlkLast.GetLastBlocks m,
     TxLast.GetLastTransactions m,
-    HasVault m,
     Selectable Account.AccountsFilterParams [AddressStateRef] m,
     Selectable Block.BlocksFilterParams [Block] m,
     Selectable Keccak256 SourceMap m,
