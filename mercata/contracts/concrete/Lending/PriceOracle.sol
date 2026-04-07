@@ -31,6 +31,7 @@ contract record PriceOracle is Ownable {
     event PriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
     event BatchPricesUpdated(address[] assets, uint256[] priceValues, uint256 timestamp);
     event RebaseFactorsUpdated(address[] assets, uint256[] factors, uint256 timestamp);
+    event ExchangeRatesUpdated(address[] assets, uint256[] rates, uint256 timestamp);
 
     constructor(address _owner) Ownable(_owner) {}
 
@@ -223,6 +224,22 @@ contract record PriceOracle is Ownable {
         }
 
         emit RebaseFactorsUpdated(assets, factors, block.timestamp);
+    }
+
+    /**
+     * @dev Emit exchange rates for yield-bearing tokens (e.g. rETH/ETH, wstETH/stETH).
+     *      Event-only — no on-chain storage. The events table provides historical data for APY calculation.
+     */
+    function setExchangeRates(address[] calldata assets, uint256[] calldata rates) external onlyOwner {
+        require(assets.length == rates.length, "Arrays length mismatch");
+        require(assets.length > 0, "Empty arrays");
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            require(assets[i] != address(0), "Invalid asset address");
+            require(rates[i] > 0, "Rate must be greater than 0");
+        }
+
+        emit ExchangeRatesUpdated(assets, rates, block.timestamp);
     }
 
     /**

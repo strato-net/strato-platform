@@ -9,6 +9,16 @@ export interface RebaseConfig {
     factorHeaders?: string;       // Comma-separated header names that receive the resolved API key
 }
 
+export interface ExchangeRateConfig {
+    rateUrl: string;             // REST endpoint (e.g. Alchemy eth_call)
+    rateMethod?: string;         // HTTP method; defaults to GET. Use POST for JSON-RPC.
+    rateBody?: string;           // JSON body template for POST requests
+    rateParse: string;           // JSON path to extract the rate value (e.g., "result")
+    ratePrecision: string;       // Native precision of the raw value: "1000000000000000000" for WAD, "1000000" for 6-decimal
+    rateApiKeyEnvVar?: string;   // Environment variable for API key
+    rateHeaders?: string;        // Comma-separated header names
+}
+
 export interface Asset {
     targetAssetAddress: string;
     constantPrice?: number;
@@ -16,6 +26,7 @@ export interface Asset {
     equivalentAssets?: string[]; // Assets with equivalent prices (e.g., ["XAUT"] for XAU)
     submit?: boolean; // Whether to submit this asset to blockchain (default: true)
     rebase?: RebaseConfig; // Rebasing token config: price = underlyingPrice × factor / precision
+    exchangeRate?: ExchangeRateConfig; // On-chain exchange rate for yield-bearing tokens (event-only, no storage)
 }
 
 export interface BatchPriceResult {
