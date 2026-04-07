@@ -213,23 +213,19 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     }
   }
 
-  // Build per-asset exchange rate APY from exchangeRates history mapping
+  // Build per-asset exchange rate APY from exchangeRates history mapping.
+  // Requires 2+ oracle data points on different calendar days before APY appears (see computeExchangeRateAPY).
   const exchangeRateHistory = indexYieldHistoryRows(exchangeRateRows || []);
 
   const baseYieldByAddr = new Map<string, number>();
-  for (const pair of yieldBenchmarks) {
-    const apy = computeExchangeRateAPY(pair.tokenAddress, exchangeRateHistory, anchorsMs);
+  for (const { tokenAddress, tokenSymbol, baseSymbol } of yieldBenchmarks) {
+    const apy = computeExchangeRateAPY(tokenAddress, exchangeRateHistory, anchorsMs);
     if (!apy) continue;
-    let totalApy = parseFloat(apy);
-    // For AAVE aTokens wrapping LSTs, add the underlying staking yield
-    const underlyingAddr = compositeYieldMap[pair.tokenAddress];
-    if (underlyingAddr) {
-      const underlyingApy = computeExchangeRateAPY(underlyingAddr, exchangeRateHistory, anchorsMs);
-      if (underlyingApy) totalApy += parseFloat(underlyingApy);
-    }
-    const apyStr = totalApy.toFixed(2);
-    add(pair.tokenAddress, { source: "base", apy: apyStr, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
-    baseYieldByAddr.set(pair.tokenAddress, totalApy);
+    const underlying = compositeYieldMap[tokenAddress];
+    const underlyingApy = underlying ? computeExchangeRateAPY(underlying, exchangeRateHistory, anchorsMs) : null;
+    const totalApy = parseFloat(apy) + (underlyingApy ? parseFloat(underlyingApy) : 0);
+    add(tokenAddress, { source: "base", apy: totalApy.toFixed(2), meta: `${tokenSymbol}/${baseSymbol}` });
+    baseYieldByAddr.set(tokenAddress, totalApy);
   }
   const vaultWeightedApy = currentVaultBalances.size > 0 && baseYieldByAddr.size > 0
     ? weightedBaseYield(
