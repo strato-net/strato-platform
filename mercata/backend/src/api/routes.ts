@@ -28,7 +28,6 @@ import metalForgeRoutes from "./routes/metalForge.routes";
 import earnRoutes from "./routes/earn.routes";
 import contactRoutes from "./routes/contact.routes";
 import metricsRoutes from "./routes/metrics.routes";
-import psmRoutes from "./routes/psm.routes";
 
 const router = Router();
 
@@ -109,9 +108,6 @@ router.use("/metal-forge", metalForgeRoutes);
 
 // ----- Earn Routes -----
 router.use("/earn", earnRoutes);
-
-// ----- PSM Routes -----
-router.use("/psm", psmRoutes);
 
 // ----- Contact Routes -----
 router.use("/contact", contactRoutes);
