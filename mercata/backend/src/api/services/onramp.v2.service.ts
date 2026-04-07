@@ -141,23 +141,31 @@ async function depositViaRouter(
 ): Promise<string> {
   const signer = getSafeSigner(chainId);
   const routerAddress = getDepositRouterAddress();
-  const tokenAddr = ethers.getAddress(externalToken);
   const stratoAddr = ethers.getAddress(`0x${stratoRecipient}`);
   const targetAddr = ethers.getAddress(`0x${targetStratoToken}`);
+  const isNativeETH = externalToken === NATIVE_ETH;
 
   console.log(
-    `[OnrampV2] Depositing via router — chainId=${chainId}, token=${tokenAddr}, ` +
+    `[OnrampV2] Depositing via router — chainId=${chainId}, ` +
+      `token=${isNativeETH ? "ETH (native)" : externalToken}, ` +
       `amount=${amount}, stratoRecipient=${stratoAddr}, targetStratoToken=${targetAddr}`
   );
 
-  await ensurePermit2Allowance(signer, tokenAddr, amount);
-
-  const nonce = BigInt(Date.now());
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
-  const signature = await signPermit2(signer, chainId, tokenAddr, amount, routerAddress, nonce, deadline);
-
   const router = new ethers.Contract(routerAddress, DEPOSIT_ROUTER_ABI, signer);
-  const tx = await router.deposit(tokenAddr, amount, stratoAddr, targetAddr, nonce, deadline, signature);
+  let tx;
+
+  if (isNativeETH) {
+    tx = await router.depositETH(stratoAddr, targetAddr, { value: amount });
+  } else {
+    const tokenAddr = ethers.getAddress(externalToken);
+    await ensurePermit2Allowance(signer, tokenAddr, amount);
+
+    const nonce = BigInt(Date.now());
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+    const signature = await signPermit2(signer, chainId, tokenAddr, amount, routerAddress, nonce, deadline);
+
+    tx = await router.deposit(tokenAddr, amount, stratoAddr, targetAddr, nonce, deadline, signature);
+  }
 
   console.log(`[OnrampV2] Router deposit tx submitted — hash=${tx.hash}`);
   const receipt = await tx.wait();
@@ -277,15 +285,17 @@ export function verifyMeldWebhook(rawBody: string, timestamp: string, signature:
 // Meld webhook handler
 // ————————————————————————————————————————————————————————————————
 
+const NATIVE_ETH = "0x0000000000000000000000000000000000000000";
+
 // Token addresses on external chains — must match DepositRouter's tokenConfig
 const EXTERNAL_TOKEN_BY_CHAIN: Record<number, Record<string, string>> = {
-  1:        { usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
-  11155111: { usdc: "0x0c86A754A29714C4Fe9C6F1359fa7099eD174c0b" },
+  1:        { eth: NATIVE_ETH, usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
+  11155111: { eth: NATIVE_ETH, usdc: "0x0c86A754A29714C4Fe9C6F1359fa7099eD174c0b" },
 };
 
 const EXTERNAL_DECIMALS: Record<string, number> = {
   eth: 18,
-  usdc: 6,
+  usdc: 18, // Transak uses 18 decimals for USDC
 };
 
 export async function handleMeldTransactionUpdate(event: any): Promise<void> {
@@ -325,7 +335,7 @@ export async function handleMeldTransactionUpdate(event: any): Promise<void> {
     const chainId = 11155111; // TODO: hardcoded to Sepolia for dev — Meld sandbox reports wrong chainId
     const externalToken = EXTERNAL_TOKEN_BY_CHAIN[chainId]?.[currency];
     const targetStratoToken = TARGET_STRATO_TOKEN[currency];
-    const decimals = 18;
+    const decimals = EXTERNAL_DECIMALS[currency];
 
     if (!externalToken || !targetStratoToken || decimals === undefined) {
       console.error(`[OnrampV2] Unsupported currency=${rawCurrency} or chainId=${chainId}`);
