@@ -4,7 +4,6 @@ import { getOraclePrices } from "./oracle.service";
 import { getCDPStats } from "./cdp.service";
 import { getPool, getPublicLiquidityInfo } from "./lending.service";
 import { getSaveUsdstInfo } from "./saveUsdst.service";
-import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
 import { getPublicSafetyModuleInfo, getSafetyModuleConfig } from "./safety.service";
 import { getVaultInfo } from "./vault.service";
 import { getPools } from "./swapping.service";
@@ -74,19 +73,6 @@ interface TvlMetrics {
       decimals: number;
       amount: string;
       priceUsd: string;
-    };
-    carryVaults: MetricBucketSummary & {
-      vaults: Array<{
-        key: string;
-        vaultAddress: string;
-        assetAddress: string;
-        assetSymbol: string;
-        shareSymbol: string;
-        decimals: number;
-        amount: string;
-        priceUsd: string;
-        totalUsd: string;
-      }>;
     };
     safetyModule: MetricBucketSummary & {
       address: string;
@@ -439,27 +425,6 @@ export const getTvlMetrics = async (accessToken: string): Promise<TvlMetrics> =>
     pow10(safetyDecimals)
   );
 
-  const carryVaultInfos = await Promise.all(
-    listVaultDefs().map((def) => getYieldVaultInfo(accessToken, def.key).catch(() => null))
-  );
-  const carryVaultVaults = carryVaultInfos
-    .filter(
-      (info): info is NonNullable<Awaited<ReturnType<typeof getYieldVaultInfo>>> =>
-        Boolean(info?.deployed && info.vaultAddress)
-    )
-    .map((info) => ({
-      key: info.key,
-      vaultAddress: info.vaultAddress,
-      assetAddress: info.assetAddress,
-      assetSymbol: info.assetSymbol,
-      shareSymbol: info.shareSymbol,
-      decimals: info.decimals,
-      amount: info.totalAssets || "0",
-      priceUsd: info.assetPriceWad || "0",
-      totalUsd: info.tvlUsd || "0",
-    }));
-  const carryVaultsTotalUsd = sumUsd(carryVaultVaults.map((v) => v.totalUsd));
-
   const vaultAssets: TvlAssetSummary[] = (vaultInfo.assets || []).map((asset: any) =>
     buildAssetSummary(tokenMap, {
       address: asset.address,
@@ -506,18 +471,6 @@ export const getTvlMetrics = async (accessToken: string): Promise<TvlMetrics> =>
         fallbackDecimals: saveDecimals,
       }),
     },
-    ...carryVaultVaults.map((cv) => ({
-      sourceBucket: "carryVaults" as const,
-      sourceKey: cv.key,
-      asset: buildAssetSummary(tokenMap, {
-        address: cv.assetAddress,
-        symbol: cv.assetSymbol,
-        amount: cv.amount,
-        priceUsd: cv.priceUsd,
-        totalUsd: cv.totalUsd,
-        fallbackDecimals: cv.decimals,
-      }),
-    })),
     {
       sourceBucket: "safetyModule",
       sourceKey: safetyAssetAddress,
@@ -547,7 +500,6 @@ export const getTvlMetrics = async (accessToken: string): Promise<TvlMetrics> =>
     sumUsd(lendingCollateralAssets.map((asset) => asset.totalUsd)),
     poolsTotalUsd,
     saveUsd,
-    carryVaultsTotalUsd,
     safetyUsd,
     vaultTotalUsd,
   ]);
@@ -586,10 +538,6 @@ export const getTvlMetrics = async (accessToken: string): Promise<TvlMetrics> =>
         decimals: saveDecimals,
         amount: saveAmount,
         priceUsd: savePrice,
-      },
-      carryVaults: {
-        totalUsd: carryVaultsTotalUsd,
-        vaults: carryVaultVaults,
       },
       safetyModule: {
         totalUsd: safetyUsd,
