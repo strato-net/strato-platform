@@ -16,6 +16,7 @@ import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
 import qualified Strato.Strato23.API.Types as VC
 import Strato.Strato23.Client
 import System.Info (os)
+import System.Process (readProcess)
 import Text.ShortDescription
 
 -- | Address strato-api binds its socket to
@@ -113,9 +114,13 @@ genEthConf :: IO EthConf
 genEthConf = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
+  localHostname <- if Opts.flags_localAuth
+    then filter (/= '\n') <$> readProcess "hostname" [] ""
+    else return "localhost"
+
   -- For local auth mode, skip vault during setup (vault-wrapper starts later)
   if Opts.flags_localAuth
-    then putStrLn "  ✓ Local auth mode: node key will be created when vault-wrapper starts"
+    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be created when vault-wrapper starts"
     else do
       (pub, _addr) <- getNodeKey
       putStrLn $ "  ✓ Node key: " ++ shortDescription pub
@@ -143,7 +148,7 @@ genEthConf = do
         }
     , urlConfig = def
         { vaultUrl = if Opts.flags_localAuth
-            then "http://localhost:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
+            then "http://" ++ localHostname ++ ":" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
             else flags_vaultUrl
         , vaultUrlDocker = if Opts.flags_localAuth
             then "http://nginx:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"

@@ -8,25 +8,32 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, apiHost, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_localAuth, flags_sslDir, flags_nodeHost)
+import Blockchain.Init.Options (flags_localAuth, flags_sslDir)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
+import System.Process (readProcess)
 
 generateDockerCompose :: IO ()
 generateDockerCompose = do
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
   
+  localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
+
   let conf = ethConf
       ssl = not $ null flags_sslDir
       portNum = show $ httpPort (networkConfig conf)
       stratoApiPort = show $ apiPort (apiConfig conf)
-      nodeHost = if ssl then flags_nodeHost else flags_nodeHost ++ ":" ++ portNum
+      nodeHost = if ssl then localHostname else localHostname ++ ":" ++ portNum
       sHost = apiHost (apiConfig conf)
       userGid = uid ++ ":" ++ gid
+
+  let hostGateway = if flags_localAuth
+        then Just [localHostname ++ ":host-gateway"]
+        else Nothing
 
   -- Disable Docker logging since we redirect stdout/stderr to files
   let noLogging = Just Logging
@@ -38,6 +45,7 @@ generateDockerCompose = do
         { image = "mercata-backend:" ++ stratoVersionTag ++ "-" ++ hashMercataBackend
         , depends_on = Just $ DependsOnList ["postgrest"]
         , init = Just True
+        , extra_hosts = hostGateway
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
@@ -91,6 +99,7 @@ generateDockerCompose = do
   let smd = def
         { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
         , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
+        , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", nodeHost)
             , ("ssl", if ssl then "true" else "false")
@@ -105,6 +114,7 @@ generateDockerCompose = do
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , depends_on = Just $ DependsOnList ["postgres", "prometheus"]
+        , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
             [ ("postgres_host", "postgres")
             , ("postgres_port", "5432")
@@ -192,6 +202,7 @@ generateDockerCompose = do
 
   let nginx = def
         { image = "nginx:" ++ stratoVersionTag ++ "-" ++ hashNginx
+        , extra_hosts = hostGateway
         , depends_on = Just $
             if flags_localAuth
               then DependsOnMap $ Map.fromList
@@ -303,12 +314,10 @@ generateDockerCompose = do
   let localAuth = def
         { image = "local-auth:" ++ stratoVersionTag ++ "-" ++ hashLocalAuth
         , depends_on = Just $ DependsOnList ["postgres"]
+        , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
             [ ("DSN", "postgres://postgres@postgres:5432/kratos?sslmode=disable")
             , ("HYDRA_DSN", "postgres://postgres@postgres:5432/hydra?sslmode=disable")
-            , ("URLS_SELF_ISSUER", "http://127.0.0.1:" ++ portNum ++ "/auth")
-            , ("URLS_LOGIN", "http://localhost:" ++ portNum ++ "/auth/ui/login")
-            , ("URLS_CONSENT", "http://localhost:" ++ portNum ++ "/auth/ui/consent")
             ]
         , healthcheck = Just Healthcheck
             { test = ["CMD", "curl", "-f", "http://localhost:4444/.well-known/openid-configuration"]

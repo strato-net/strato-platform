@@ -30,6 +30,7 @@ import Data.Maybe
 import qualified Data.Yaml as YAML
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
+import System.Process (readProcess)
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
@@ -216,6 +217,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     unless destOauthExists $ liftIO $ do
       if flags_localAuth
         then do
+          localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
           envClientId <- lookupEnv "OAUTH_CLIENT_ID"
           envClientSecret <- lookupEnv "OAUTH_CLIENT_SECRET"
           clientId <- case envClientId of
@@ -225,7 +227,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
             Just cs | not (null cs) -> return cs
             _ -> generatePassword 48
           let localOauthConfig = unlines
-                [ "discoveryUrl: \"http://localhost:" ++ show flags_httpPort ++ "/auth/.well-known/openid-configuration\""
+                [ "discoveryUrl: \"http://" ++ localHostname ++ ":" ++ show flags_httpPort ++ "/auth/.well-known/openid-configuration\""
                 , "clientId: \"" ++ clientId ++ "\""
                 , "clientSecret: \"" ++ clientSecret ++ "\""
                 ]
