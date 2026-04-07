@@ -303,32 +303,33 @@ interface ExchangeRateEntry {
 }
 
 async function collectExchangeRates(configLoader: ConfigLoader): Promise<ExchangeRateEntry[]> {
-    const collected: ExchangeRateEntry[] = [];
     const allAssets = configLoader.getAllAssets();
     const entries = Object.entries(allAssets).filter(([_, a]) => a.exchangeRate);
-    if (entries.length === 0) return collected;
+    if (entries.length === 0) return [];
 
-    for (const [assetKey, asset] of entries) {
+    const results = await Promise.all(entries.map(async ([assetKey, asset]) => {
         try {
             const rawRate = await withTimeout(
                 fetchExchangeRate(assetKey, asset.exchangeRate!),
                 TIMEOUTS.FETCH
             );
-            if (rawRate <= 0n) continue;
+            if (rawRate <= 0n) return null;
 
             const precision = BigInt(asset.exchangeRate!.ratePrecision);
             const wadRate = rawRate * 1000000000000000000n / precision;
-            if (wadRate <= 0n) continue;
+            if (wadRate <= 0n) return null;
 
-            collected.push({ targetAddress: asset.targetAssetAddress, rate: wadRate });
             logInfo('CronScheduler', `${assetKey}: exchangeRate=${wadRate} (raw=${rawRate})`);
+            return { targetAddress: asset.targetAssetAddress, rate: wadRate };
         } catch (err) {
             logError('CronScheduler', new Error(
                 `${assetKey}: exchange rate fetch failed: ${(err as Error).message}`
             ));
+            return null;
         }
-    }
-    return collected;
+    }));
+
+    return results.filter((r): r is ExchangeRateEntry => r !== null);
 }
 
 // ============================================================================
@@ -354,8 +355,10 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
         aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices),
         configLoader
     );
-    const rebaseFactors = await applyRebaseFactors(aggregatedPrices, configLoader, previousPrices);
-    const exchangeRates = await collectExchangeRates(configLoader);
+    const [rebaseFactors, exchangeRates] = await Promise.all([
+        applyRebaseFactors(aggregatedPrices, configLoader, previousPrices),
+        collectExchangeRates(configLoader),
+    ]);
 
     // Partition into valid and failed prices, excluding proxy-only assets (submit: false)
     const allAssets = configLoader.getAllAssets();
