@@ -2,7 +2,7 @@
  * Deploy a multi-token yield-bearing stable pool (syrupUSDC–sUSDS–saveUSDST).
  *
  * Steps performed:
- *   1. createMultiTokenStablePool via PoolFactory (assetTypes 1,1,3; containsYieldVaults true)
+ *   1. createMultiTokenStablePool via PoolFactory (assetTypes 1,1,3)
  *   2. Whitelist the new pool for mint/burn on its LP token via AdminRegistry
  *   3. setUsdst on the pool (yield vault uses assetType 3, no separate flag)
  *
@@ -119,7 +119,6 @@ async function main() {
       rateMultipliers:     ['1000000000000000000', '1000000000000000000', '1000000000000000000'],
       assetTypes:          ['1', '1', '3'],
       oracles:             [PRICE_ORACLE, PRICE_ORACLE, PRICE_ORACLE],
-      containsYieldVaults: true,
     });
 
     console.log('  createMultiTokenStablePool result:', JSON.stringify(createResult).slice(0, 200));
