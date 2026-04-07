@@ -6,6 +6,7 @@ import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.servic
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
 import { getLoan } from "./lending.service";
 import { getVaults } from "./cdp.service";
+import { listVaultDefs, getYieldVaultInfo, getYieldVaultUserInfo } from "./yieldVault.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
@@ -73,6 +74,40 @@ const buildSaveUsdstEarningAsset = (
     images: [],
     attributes: [],
     price,
+    collateralBalance: "0",
+    totalBalance,
+    isPoolToken: false,
+    value,
+    apy: info.apy || "0",
+  };
+};
+
+const buildYieldVaultEarningAsset = (
+  info: Awaited<ReturnType<typeof getYieldVaultInfo>>,
+  userInfo?: Awaited<ReturnType<typeof getYieldVaultUserInfo>> | null
+): EarningAsset | null => {
+  if (!info.deployed || !info.vaultAddress) return null;
+
+  const balance = userInfo?.userShares ?? "0";
+  const totalBalance = balance;
+  const value = userInfo
+    ? (Number(BigInt(userInfo.positionUsd || "0")) / 1e18).toFixed(2)
+    : "0.00";
+
+  return {
+    address: info.vaultAddress,
+    _name: info.name,
+    _symbol: info.shareSymbol,
+    _owner: "",
+    _totalSupply: info.totalShares || "0",
+    customDecimals: info.decimals,
+    description: "Carry vault",
+    status: "2",
+    _paused: info.paused,
+    balance,
+    images: [],
+    attributes: [],
+    price: info.exchangeRate || "0",
     collateralBalance: "0",
     totalBalance,
     isPoolToken: false,
@@ -215,6 +250,26 @@ export const getEarningAssets = async (
     }
   }
 
+  const yieldVaultPairs = await Promise.all(
+    listVaultDefs().map(async (def) => ({
+      info: await getYieldVaultInfo(accessToken, def.key).catch(() => null),
+      userInfo: await getYieldVaultUserInfo(accessToken, def.key, userAddress).catch(() => null),
+    }))
+  );
+  for (const { info, userInfo } of yieldVaultPairs) {
+    if (!info?.deployed) continue;
+    const yvAsset = buildYieldVaultEarningAsset(info, userInfo ?? undefined);
+    if (!yvAsset) continue;
+    const existingIdx = earningAssets.findIndex(
+      (asset: EarningAsset) => asset.address.toLowerCase() === yvAsset.address.toLowerCase()
+    );
+    if (existingIdx >= 0) {
+      earningAssets[existingIdx] = yvAsset;
+    } else {
+      earningAssets.push(yvAsset);
+    }
+  }
+
   return earningAssets;
 };
 
@@ -268,6 +323,20 @@ export const getPublicEarningAssets = async (
     !earningAssets.some((asset: EarningAsset) => asset.address.toLowerCase() === saveUsdstAsset.address.toLowerCase())
   ) {
     earningAssets.push(saveUsdstAsset);
+  }
+
+  const yieldVaultInfos = await Promise.all(
+    listVaultDefs().map((def) => getYieldVaultInfo(accessToken, def.key).catch(() => null))
+  );
+  for (const info of yieldVaultInfos) {
+    if (!info?.deployed) continue;
+    const yvAsset = buildYieldVaultEarningAsset(info, null);
+    if (
+      yvAsset &&
+      !earningAssets.some((asset: EarningAsset) => asset.address.toLowerCase() === yvAsset.address.toLowerCase())
+    ) {
+      earningAssets.push(yvAsset);
+    }
   }
 
   return earningAssets;
