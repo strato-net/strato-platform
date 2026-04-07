@@ -24,6 +24,7 @@ contract record PriceOracle is Ownable {
     mapping(address => uint256) public record lastUpdated;
     mapping(address => OracleState) public record oracleState;
     mapping(address => uint256) public record rebaseFactors;
+    mapping(address => uint256) public record exchangeRates;
 
     uint256 public queueSize = 2;  // Global queue size, synced to per-asset on push
 
@@ -227,8 +228,8 @@ contract record PriceOracle is Ownable {
     }
 
     /**
-     * @dev Emit exchange rates for yield-bearing tokens (e.g. rETH/ETH, wstETH/stETH).
-     *      Event-only — no on-chain storage. The events table provides historical data for APY calculation.
+     * @dev Set exchange rates for yield-bearing tokens (e.g. rETH/ETH, wstETH/stETH).
+     *      Stored in mapping for other contracts to read; history table used for APY calculation.
      */
     function setExchangeRates(address[] calldata assets, uint256[] calldata rates) external onlyOwner {
         require(assets.length == rates.length, "Arrays length mismatch");
@@ -237,6 +238,7 @@ contract record PriceOracle is Ownable {
         for (uint256 i = 0; i < assets.length; i++) {
             require(assets[i] != address(0), "Invalid asset address");
             require(rates[i] > 0, "Rate must be greater than 0");
+            exchangeRates[assets[i]] = rates[i];
         }
 
         emit ExchangeRatesUpdated(assets, rates, block.timestamp);

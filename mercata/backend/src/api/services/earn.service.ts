@@ -72,11 +72,13 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       : Promise.resolve({ data: [] as any[] }),
     getSaveUsdstInfo(accessToken).catch(() => null),
     exchangeRateTrackedAddrs.length
-      ? cirrus.get(accessToken, `/${constants.PriceOracleExchangeRatesEvents}`, { params: {
+      ? cirrus.get(accessToken, "/history@mapping", { params: {
         address: `eq.${constants.priceOracle}`,
-        block_timestamp: `gte.${thirtyDaysAgo}`,
-        select: "attributes,block_timestamp",
-        order: "block_timestamp.asc",
+        collection_name: "eq.exchangeRates",
+        "key->>key": `in.(${exchangeRateTrackedAddrs.join(",")})`,
+        select: "key->>key,value::text,valid_from,valid_to",
+        and: `(block_timestamp.gte.${windowStart},block_timestamp.lt.${windowEndExclusive})`,
+        or: buildYieldAnchorOverlapFilter(anchorsMs),
       }}).catch(() => ({ data: [] as any[] }))
       : Promise.resolve({ data: [] as any[] }),
   ]);
@@ -223,39 +225,17 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     }
   }
 
-  // Build per-asset exchange rate APY from ExchangeRatesUpdated events
+  // Build per-asset exchange rate APY from exchangeRates history mapping
+  const exchangeRateHistory = indexYieldHistoryRows(exchangeRateRows || []);
   const exchangeRateApyByAddr = new Map<string, string>();
-  if ((exchangeRateRows || []).length > 0) {
-    const perAsset = new Map<string, Array<{ rate: bigint; ts: number }>>();
-    for (const event of exchangeRateRows) {
-      const attrs = event.attributes || {};
-      const assets: string[] = Array.isArray(attrs.assets) ? attrs.assets : [];
-      const rates: string[] = Array.isArray(attrs.rates) ? attrs.rates : [];
-      const blockTs = new Date(event.block_timestamp).getTime();
-      for (let i = 0; i < assets.length; i++) {
-        const addr = (assets[i] || "").toLowerCase().replace(/^0x/, "");
-        if (!exchangeRateTrackedAddrs.includes(addr)) continue;
-        const rate = BigInt(rates[i] || "0");
-        if (rate <= 0n) continue;
-        if (!perAsset.has(addr)) perAsset.set(addr, []);
-        perAsset.get(addr)!.push({ rate, ts: blockTs });
-      }
-    }
-    for (const [addr, events] of perAsset) {
-      if (events.length < 2) continue;
-      const oldest = events[0];
-      const newest = events[events.length - 1];
-      const daysDelta = (newest.ts - oldest.ts) / (1000 * 60 * 60 * 24);
-      if (daysDelta < 1) continue;
-      const apy = computeExchangeRateAPY(newest.rate, oldest.rate, daysDelta);
-      if (apy) exchangeRateApyByAddr.set(addr, apy);
-    }
-  }
 
   const baseYieldByAddr = new Map<string, number>();
   for (const pair of yieldBenchmarks) {
-    // Prefer on-chain exchange rate APY; fall back to USD price ratio
-    let apy = pair.exchangeRateTracked ? exchangeRateApyByAddr.get(pair.tokenAddress) || null : null;
+    // Prefer on-chain exchange rate APY from mapping history; fall back to USD price ratio
+    let apy: string | null = null;
+    if (pair.exchangeRateTracked && exchangeRateHistory.size > 0) {
+      apy = computeExchangeRateAPYFromHistory(pair.tokenAddress, exchangeRateHistory, anchorsMs);
+    }
     if (!apy) {
       apy = computeYieldAPYFromAnchors(
         pair.tokenAddress,
@@ -456,9 +436,38 @@ function computeSafetyAPY(smRow: any, stRow: any, events: any[]): string | null 
   return ((Math.pow(1 + periodReturn, 365 / 30) - 1) * 100).toFixed(2);
 }
 
-function computeExchangeRateAPY(rateNow: bigint, rateStart: bigint, daysDelta: number): string | null {
-  if (rateNow <= 0n || rateStart <= 0n || daysDelta <= 0) return null;
-  const periodReturn = Number(rateNow) / Number(rateStart) - 1;
+function computeExchangeRateAPYFromHistory(
+  assetAddress: string,
+  history: Map<string, import("../helpers/earnYield.helper").YieldHistoryInterval[]>,
+  anchorsMs: number[],
+): string | null {
+  const intervals = history.get(assetAddress);
+  if (!intervals || anchorsMs.length < 2) return null;
+
+  // Find the earliest and latest anchors that have data
+  let startRate: bigint | null = null;
+  let startMs = 0;
+  let endRate: bigint | null = null;
+  let endMs = 0;
+
+  for (const anchorMs of anchorsMs) {
+    for (const iv of intervals) {
+      if (iv.fromMs <= anchorMs && anchorMs <= iv.toMs) {
+        const rate = BigInt(iv.value || "0");
+        if (rate <= 0n) break;
+        if (!startRate) { startRate = rate; startMs = anchorMs; }
+        endRate = rate;
+        endMs = anchorMs;
+        break;
+      }
+    }
+  }
+
+  if (!startRate || !endRate || endMs <= startMs) return null;
+  const daysDelta = (endMs - startMs) / (1000 * 60 * 60 * 24);
+  if (daysDelta < 1) return null;
+
+  const periodReturn = Number(endRate) / Number(startRate) - 1;
   if (periodReturn <= -1 || !isFinite(periodReturn)) return null;
   const apy = (Math.pow(1 + periodReturn, 365 / daysDelta) - 1) * 100;
   return apy > 0 && isFinite(apy) ? apy.toFixed(2) : null;
