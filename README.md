@@ -2,14 +2,30 @@
 
 # STRATO Platform
 
-***NOTE:** README is WIP*
+## Build and Run STRATO
 
-## Prerequisites
+### 1. Install Dependencies
 
-- Stack (build time dependency) - https://docs.haskellstack.org/en/stable/install_and_upgrade/#__tabbed_3_2
-- Docker with Compose plugin (runtime-only dependency) - https://docs.docker.com/engine/install/
-- Library dependencies:
-  - OPTION A: Install libraries system-wide (for additional details refer to `install_deps.sh`) 
+```
+git clone https://github.com/strato-net/strato-platform
+cd strato-platform
+```
+
+Choose one of the following options to install dependencies:
+
+- **OPTION A (recommended):** (Supported OS: Ubuntu 24.04, Amazon Linux 2023, macOS, Linux Mint) Run the install script which installs all dependencies automatically (Stack, Docker, libraries):
+  ```
+  ./install_deps.sh
+  ```
+- **OPTION B:** Install dependencies manually:
+  - [Stack](https://docs.haskellstack.org/en/stable/install_and_upgrade/#__tabbed_3_2) (build time)
+  - [Docker with Compose plugin](https://docs.docker.com/engine/install/) (build+runtime)
+    - Docker should run as a non-root user. Add your user to the docker group:
+      ```
+      sudo groupadd docker ; sudo usermod -aG docker $USER && newgrp docker ; docker ps
+      ```
+      For more information, refer to the [Docker post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/).
+  - Libraries:
     - Ubuntu 24.04:
       ```
       sudo apt install -y \
@@ -22,88 +38,61 @@
         postgresql-client \
         zlib1g-dev
       ```
-      
-    - Macos (requires `homebrew` - https://brew.sh/):
-      ```
-      brew install --quiet \
-        leveldb \
-        postgresql \
-        libsodium \
-        pkg-config \
-        secp256k1 \
-        xz
-      ```
-  - OPTION B: Install Nix and use the predefined packages (no need to install manually system-wide):
-    - Install Nix - https://nix.dev/install-nix.html
+    - macOS — choose one:
+      - Install libraries system-wide using [Homebrew](https://brew.sh/):
+        ```
+        brew install --quiet \
+          leveldb \
+          postgresql \
+          libsodium \
+          pkg-config \
+          secp256k1 \
+          xz
+        ```
+      - Use [Nix](https://nix.dev/install-nix.html): Install Nix and use the predefined packages in an isolated path (no need to install libraries system-wide)
 
-## Build
+### 2. Build
 
--  Build everything:
-    - OPTION A (with system-wide libraries):
-      ```
-      make
-      ```
-    - OPTION B (with Nix):
-      ```
-      NIX=true make
-      ```
-- Only build one application (e.g. mercata-backend):
-    ```
-    <CONFIG_VARS> make mercata-backend
-    ```
+> **Important:** Do not run the build or deploy commands under the root user or with the `sudo` prefix — this prevents permission issues.
 
-- Only generate docker-compose YAMLs (will overwrite the existing):
-    ```
-    <CONFIG_VARS> make docker-compose
-    ```
-
-## Run
-
-### Locally:
-- Start:
-    ```
-    ./start my_node_name
-    ```
-- Wipe:
-  ```
-  ./forceWipe
-  rm -rf my_node_name/
-  ```
-  
-### Dockerized:
-- Start:
-  - `cp docker-compose.allDocker.yml bootstrap-docker/docker-compose.yml`
-  - `cd bootstrap-docker`
-  - Update `strato-run.sh` with your credentials:
-    ```
-    NODE_HOST='localhost' \
-    network='helium' \
-    OAUTH_CLIENT_ID='localhost' \
-    OAUTH_CLIENT_SECRET='client-secret-here' \
-    ./strato
-    ```
-    - Use `network='helium'` for testnet
-    - Use `network='upquark'` for mainnet
-  - `sudo ./strato-run.sh`
-
-- Wipe:
-  ```
-  cd bootstrap-docker
-  sudo ./strato --wipe
-  ```
-
-## Git Hooks
-
-### Pre-commit: Trailing Whitespace Removal
-
-A pre-commit hook is available to automatically remove trailing whitespaces before committing.
-
-**Installation:**
-
-```bash
-cp scripts/hooks/pre-commit .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
+```
+make
 ```
 
-The hook uses `scripts/delete-trailing-whitespaces.sh --staged` to process only
-staged files and automatically re-stages them after cleaning.
+For Nix-based builds, use `NIX=true make` instead.
+
+### 3. Run
+
+Login before the very first run:
+
+```
+strato-login
+```
+
+> To obtain the credentials for your node server, submit a request for client credentials at https://support.blockapps.net
+
+
+Start the node:
+
+```
+<OPTIONAL_ENV_VARS> strato-up mynode --network=helium --nodeHost=example.com --sslDir='/path/to/ssl'
+```
+
+- `/path/to/ssl` should contain `server.pem` and `server.key` directly (no subdirectories), with read permissions for all users (`chmod 444 server.*`).
+- Do not include OAUTH variables in env vars. You can include app-related variables if needed (e.g., RPC URLs, etc.).
+- Use `--network=helium` for testnet or `--network=upquark` for mainnet (default).
+
+### 4. Stop and Wipe
+
+Stop the node:
+
+```
+strato-down
+```
+
+Stop and wipe all data:
+
+```
+strato-down
+rm -rf mynode
+```

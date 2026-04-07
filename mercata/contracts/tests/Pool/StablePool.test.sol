@@ -163,7 +163,7 @@ contract Describe_StablePool is Authorizable {
         require(output < swapAmount, "Output should be less than input due to fees and slippage");
     }
 
-    uint N = 78;
+    uint N = 70;
     uint Q = 68;
     uint256 swapAmount = 50e18;
 

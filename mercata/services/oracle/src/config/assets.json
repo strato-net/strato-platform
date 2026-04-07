@@ -87,6 +87,78 @@
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
       },
       "comment": "xStock: price = TSLA price * getCurrentMultiplier() on Ethereum / 1e18"
+    },
+    "AWETH": {
+      "targetAssetAddress": "6d40952f0895d21d2bf20cd088f0eb9a1574583f",
+      "rebase": {
+        "underlyingAsset": "ETH",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      }
+    },
+    "AWEETH": {
+      "targetAssetAddress": "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1",
+      "rebase": {
+        "underlyingAsset": "WEETH",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      }
+    },
+    "AWSTETH": {
+      "targetAssetAddress": "2c33aa5f8bbfe3c15e356a5e87464310db12376e",
+      "rebase": {
+        "underlyingAsset": "WSTETH",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      }
+    },
+    "AWBTC": {
+      "targetAssetAddress": "5f46258f73c405a58331c1a19e54add394637b06",
+      "rebase": {
+        "underlyingAsset": "WBTC",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      }
+    },
+    "AUSDC": {
+      "targetAssetAddress": "465c7e3061bc239df88c37d315be52f5487959ec",
+      "rebase": {
+        "underlyingAsset": "USDC",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      }
+    },
+    "AUSDT": {
+      "targetAssetAddress": "7d2a2b963e1fa273b60f9b7891392903de5e66b8",
+      "rebase": {
+        "underlyingAsset": "USDT",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      }
     }
   }
 }
