@@ -7,6 +7,7 @@ import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
+
 contract record StablePool is Ownable {
 
     // ============ EVENTS ============
@@ -80,6 +81,8 @@ contract record StablePool is Ownable {
     mapping (address => uint) public record rateMultipliers;
 
     mapping (address => PriceOracle) public record rateOracles;
+
+    address public usdst;
 
     uint[] callAmount;
 
@@ -161,6 +164,11 @@ contract record StablePool is Ownable {
     function setDisabled(bool _isDisabled) external onlyOwner {
         isPaused = _isDisabled ? true : isPaused;
         isDisabled = _isDisabled;
+    }
+
+    function setUsdst(address _usdst) external onlyOwner {
+        require(_usdst != address(0), "Zero address");
+        usdst = _usdst;
     }
 
     // ============ CONSTRUCTOR ============
@@ -294,7 +302,16 @@ contract record StablePool is Ownable {
         for (uint i = 0; i < coins.length; i++) {
             address tokenAddr = address(coins[i]);
             uint oraclePrice = PRECISION;
-            if (address(rateOracles[tokenAddr]) != address(0)) {
+            if (assetTypes[i] == 3) {
+                require(usdst != address(0), "USDST address not set");
+                uint xRate = uint(address(tokenAddr).call("exchangeRate"));
+                address underlying = address(address(tokenAddr).call("asset"));
+                if (address(rateOracles[tokenAddr]) != address(0) && underlying != usdst) {
+                    oraclePrice = xRate * rateOracles[tokenAddr].getAssetPrice(underlying) / PRECISION;
+                } else {
+                    oraclePrice = xRate;
+                }
+            } else if (address(rateOracles[tokenAddr]) != address(0)) {
                 oraclePrice = rateOracles[tokenAddr].getAssetPrice(tokenAddr);
             }
             rates.push(rateMultipliers[tokenAddr] * oraclePrice / PRECISION);

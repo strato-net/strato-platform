@@ -38,6 +38,7 @@ export const constants = (() => {
   const Vault = `${CONTRACT_PREFIX}Vault`;
   const VaultFactory = `${CONTRACT_PREFIX}VaultFactory`;
   const SaveUSDSTVault = `${CONTRACT_PREFIX}SaveUSDSTVault`;
+  const YieldVault = `${CONTRACT_PREFIX}YieldVault`;
   const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
   const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
   const DirectMintPSM = `${CONTRACT_PREFIX}DirectMintPSM`;
@@ -150,6 +151,7 @@ export const constants = (() => {
     Vault,
     VaultFactory,
     SaveUSDSTVault,
+    YieldVault,
     MetalForge,
     SafetyModule,
     DirectMintPSM,
