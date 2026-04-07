@@ -2,7 +2,7 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { hiddenSwapPools, yieldBenchmarks } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
-import { buildYieldAnchorOverlapFilter, computeYieldAPYFromAnchors, getYieldWindowBounds, indexYieldHistoryRows } from "../helpers/earnYield.helper";
+import { buildYieldAnchorOverlapFilter, computeYieldAPYFromAnchors, getYieldWindowBounds, indexYieldHistoryRows, YieldHistoryInterval } from "../helpers/earnYield.helper";
 import { totalDebtFromScaled, calculateAPYs } from "../helpers/lending.helper";
 import { fetchMultiTokenStablePools } from "../helpers/swapping.helper";
 import {
@@ -227,7 +227,6 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 
   // Build per-asset exchange rate APY from exchangeRates history mapping
   const exchangeRateHistory = indexYieldHistoryRows(exchangeRateRows || []);
-  const exchangeRateApyByAddr = new Map<string, string>();
 
   const baseYieldByAddr = new Map<string, number>();
   for (const pair of yieldBenchmarks) {
@@ -438,38 +437,32 @@ function computeSafetyAPY(smRow: any, stRow: any, events: any[]): string | null 
 
 function computeExchangeRateAPYFromHistory(
   assetAddress: string,
-  history: Map<string, import("../helpers/earnYield.helper").YieldHistoryInterval[]>,
+  history: Map<string, YieldHistoryInterval[]>,
   anchorsMs: number[],
 ): string | null {
   const intervals = history.get(assetAddress);
   if (!intervals || anchorsMs.length < 2) return null;
 
-  // Find the earliest and latest anchors that have data
-  let startRate: bigint | null = null;
-  let startMs = 0;
-  let endRate: bigint | null = null;
-  let endMs = 0;
+  let startRate: bigint | null = null, startMs = 0;
+  let endRate: bigint | null = null, endMs = 0;
 
   for (const anchorMs of anchorsMs) {
-    for (const iv of intervals) {
-      if (iv.fromMs <= anchorMs && anchorMs <= iv.toMs) {
-        const rate = BigInt(iv.value || "0");
-        if (rate <= 0n) break;
-        if (!startRate) { startRate = rate; startMs = anchorMs; }
-        endRate = rate;
-        endMs = anchorMs;
-        break;
-      }
-    }
+    const iv = intervals.find(i => i.fromMs <= anchorMs && anchorMs <= i.toMs);
+    if (!iv) continue;
+    const rate = BigInt(iv.value || "0");
+    if (rate <= 0n) continue;
+    if (!startRate) { startRate = rate; startMs = anchorMs; }
+    endRate = rate;
+    endMs = anchorMs;
   }
 
   if (!startRate || !endRate || endMs <= startMs) return null;
   const daysDelta = (endMs - startMs) / (1000 * 60 * 60 * 24);
   if (daysDelta < 1) return null;
 
-  const periodReturn = Number(endRate) / Number(startRate) - 1;
-  if (periodReturn <= -1 || !isFinite(periodReturn)) return null;
-  const apy = (Math.pow(1 + periodReturn, 365 / daysDelta) - 1) * 100;
+  const growth = Number(endRate) / Number(startRate);
+  if (!isFinite(growth) || growth <= 0) return null;
+  const apy = (Math.pow(growth, 365 / daysDelta) - 1) * 100;
   return apy > 0 && isFinite(apy) ? apy.toFixed(2) : null;
 }
 

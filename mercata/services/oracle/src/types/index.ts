@@ -26,7 +26,7 @@ export interface Asset {
     equivalentAssets?: string[]; // Assets with equivalent prices (e.g., ["XAUT"] for XAU)
     submit?: boolean; // Whether to submit this asset to blockchain (default: true)
     rebase?: RebaseConfig; // Rebasing token config: price = underlyingPrice × factor / precision
-    exchangeRate?: ExchangeRateConfig; // On-chain exchange rate for yield-bearing tokens (event-only, no storage)
+    exchangeRate?: ExchangeRateConfig; // On-chain exchange rate for yield-bearing tokens
 }
 
 export interface BatchPriceResult {
