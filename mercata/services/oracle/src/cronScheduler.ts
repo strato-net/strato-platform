@@ -7,7 +7,7 @@ import { fetchPreviousPrices } from './utils/priceReader';
 import { withTimeout } from './utils/apiClient';
 import { oauthClient } from './utils/oauth';
 import { ConfigLoader } from './utils/configLoader';
-import { SourceResult, AggregatedPrice, SourceConfig } from './types';
+import { SourceResult, AggregatedPrice, SourceConfig, TransactionResult } from './types';
 import { TIMEOUTS, ORACLE_CONFIG } from './utils/constants';
 
 // ============================================================================
@@ -376,15 +376,11 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
     const skipped = failedPrices.length ? `. Skipped ${failedPrices.length}: [${failedPrices.map(p => p.assetKey).join(', ')}]` : '';
     logInfo('CronScheduler', `Submitting ${validPrices.length} prices: [${validPrices.map(p => p.assetKey).join(', ')}]${skipped}`);
     
-    const result = await pushAssetPrices(validPrices);
+    const pushes: Promise<TransactionResult>[] = [pushAssetPrices(validPrices)];
+    if (rebaseFactors.length > 0) pushes.push(pushRebaseFactors(rebaseFactors));
+    if (exchangeRates.length > 0) pushes.push(pushExchangeRates(exchangeRates));
 
-    if (rebaseFactors.length > 0) {
-        await pushRebaseFactors(rebaseFactors);
-    }
-
-    if (exchangeRates.length > 0) {
-        await pushExchangeRates(exchangeRates);
-    }
+    const [result] = await Promise.all(pushes);
 
     // Log all prices (including failed ones)
     aggregatedPrices.forEach(p => logFeedUpdate(p.assetKey, p.medianPrice, p.sources, p.expectedSourceCount, result.hash, p.failed, p.error));
