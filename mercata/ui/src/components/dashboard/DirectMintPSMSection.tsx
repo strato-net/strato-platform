@@ -463,14 +463,22 @@ const DirectMintPSMSection = () => {
                     const remaining = parseInt(req.availableAt) - nowSec;
                     const available = remaining <= 0;
                     const isCancelExpanded = cancelExpandedId === req.id;
+                    const redeemTokenInfo = psmInfo?.eligibleTokens.find(
+                      (t) => t.address === req.redeemToken
+                    );
+                    const insufficientReserves =
+                      BigInt(req.amount) >
+                      BigInt(redeemTokenInfo?.psmBalance || "0");
 
                     return (
                       <div
                         key={req.id}
                         className={`rounded-lg border p-3 ${
-                          available
-                            ? "border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-950/20"
-                            : "border-yellow-200 dark:border-yellow-900 bg-yellow-50/50 dark:bg-yellow-950/20"
+                          !available
+                            ? "border-yellow-200 dark:border-yellow-900 bg-yellow-50/50 dark:bg-yellow-950/20"
+                            : insufficientReserves
+                              ? "border-border bg-muted/50 opacity-60"
+                              : "border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-950/20"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -481,13 +489,17 @@ const DirectMintPSMSection = () => {
                               {req.redeemTokenSymbol}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5">
-                              {available ? (
-                                <span className="text-green-600 dark:text-green-400 font-medium">
-                                  Available now
-                                </span>
-                              ) : (
+                              {!available ? (
                                 <span className="text-yellow-600 dark:text-yellow-400">
                                   Available in {formatTimeRemaining(remaining)}
+                                </span>
+                              ) : insufficientReserves ? (
+                                <span className="text-muted-foreground">
+                                  Insufficient PSM reserves
+                                </span>
+                              ) : (
+                                <span className="text-green-600 dark:text-green-400 font-medium">
+                                  Available now
                                 </span>
                               )}
                             </div>
@@ -499,7 +511,7 @@ const DirectMintPSMSection = () => {
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {available && (
+                            {available && !insufficientReserves && (
                               <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs px-2"
