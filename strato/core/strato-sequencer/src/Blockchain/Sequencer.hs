@@ -37,7 +37,6 @@ import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address (Address, fromPublicKey)
 import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1 (getPub)
 import Conduit
 import Control.Concurrent hiding (yield)
 import qualified Control.Exception as E
@@ -45,7 +44,7 @@ import Control.Monad (forever, forM, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
-import Control.Monad.Composable.Vault (runVaultM)
+import Control.Monad.Composable.Vault (runVaultM, getPub)
 import Data.Foldable
 import Data.Maybe
 import Data.Proxy

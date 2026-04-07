@@ -50,7 +50,6 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.SyncDB
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import ClassyPrelude (atomically)
 import Conduit
@@ -61,7 +60,7 @@ import Control.Monad (unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
-import Control.Monad.Composable.Vault (VaultM, runVaultM)
+import Control.Monad.Composable.Vault (HasVault, VaultM, runVaultM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Conduit.TMChan
