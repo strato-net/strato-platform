@@ -146,7 +146,11 @@ const buildPoolInfos = (apys: ApySource[]): EarnApyInfo[] => {
     infos.push({
       total,
       source: "swap",
-      poolAddress: swap?.poolAddress || weightedSwap?.poolAddress,
+      poolAddress:
+        swap?.poolAddress ||
+        weightedSwap?.poolAddress ||
+        base?.poolAddress ||
+        rewards?.poolAddress,
       breakdown,
     });
   });
