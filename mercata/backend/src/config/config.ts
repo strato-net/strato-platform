@@ -114,6 +114,16 @@ export const defaultSaveUsdstVaultFor: Record<string, string> = {
   "33056204878082667": "22550671fcad04a213697ac7ae4f4366e96446ed", // Upquark mainnet
 };
 
+export const defaultEthCarryVaultFor: Record<string, string> = {
+  "114784819836269": "9086237097b44199baf7318987f2eb525471c802", // Helium testnet - set after deployment
+  "33056204878082667": "", // Upquark mainnet - set after deployment
+};
+
+export const defaultWbtcCarryVaultFor: Record<string, string> = {
+  "114784819836269": "dc334495dacd0419548729dc7f821dd2eb7d92a1", // Helium testnet - set after deployment
+  "33056204878082667": "", // Upquark mainnet - set after deployment
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
@@ -124,6 +134,8 @@ export let metalForge: string = '';
 export let creditCardTopUp: string = '';
 export let vault: string = '';
 export let saveUsdstVault: string = '';
+export let ethCarryVault: string = '';
+export let wbtcCarryVault: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -194,6 +206,11 @@ export function setVaultConfig(networkId: string) {
   }
 }
 
+export function setCarryVaultConfig(networkId: string) {
+  ethCarryVault = process.env.ETH_CARRY_VAULT || defaultEthCarryVaultFor[networkId] || "";
+  wbtcCarryVault = process.env.WBTC_CARRY_VAULT || defaultWbtcCarryVaultFor[networkId] || "";
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -211,6 +228,7 @@ export async function initNetworkConfig() {
   setCreditCardTopUpConfig(networkId);
   setSaveUsdstVaultConfig(networkId);
   setVaultConfig(networkId);
+  setCarryVaultConfig(networkId);
 }
 
 /**

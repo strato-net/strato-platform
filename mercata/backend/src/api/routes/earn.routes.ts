@@ -2,6 +2,7 @@ import { Router } from "express";
 import authHandler from "../middleware/authHandler";
 import EarnController from "../controllers/earn.controller";
 import SaveUsdstController from "../controllers/saveUsdst.controller";
+import YieldVaultController from "../controllers/yieldVault.controller";
 
 const router = Router();
 
@@ -26,5 +27,12 @@ router.get("/save-usdst/user", authHandler.authorizeRequest(), SaveUsdstControll
 router.post("/save-usdst/deposit", authHandler.authorizeRequest(), SaveUsdstController.deposit);
 router.post("/save-usdst/redeem", authHandler.authorizeRequest(), SaveUsdstController.redeem);
 router.post("/save-usdst/redeem-all", authHandler.authorizeRequest(), SaveUsdstController.redeemAll);
+
+router.get("/yield-vault", authHandler.authorizeRequest(true), YieldVaultController.list);
+router.get("/yield-vault/:key/info", authHandler.authorizeRequest(true), YieldVaultController.getInfo);
+router.get("/yield-vault/:key/user", authHandler.authorizeRequest(), YieldVaultController.getUserInfo);
+router.post("/yield-vault/:key/deposit", authHandler.authorizeRequest(), YieldVaultController.deposit);
+router.post("/yield-vault/:key/redeem", authHandler.authorizeRequest(), YieldVaultController.redeem);
+router.post("/yield-vault/:key/redeem-all", authHandler.authorizeRequest(), YieldVaultController.redeemAll);
 
 export default router;
