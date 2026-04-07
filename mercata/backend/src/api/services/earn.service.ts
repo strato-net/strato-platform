@@ -2,7 +2,7 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { hiddenSwapPools, yieldBenchmarks } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
-import { buildYieldAnchorOverlapFilter, getYieldWindowBounds, indexYieldHistoryRows, YieldHistoryInterval } from "../helpers/earnYield.helper";
+import { buildYieldAnchorOverlapFilter, computeExchangeRateAPY, getYieldWindowBounds, indexYieldHistoryRows } from "../helpers/earnYield.helper";
 import { totalDebtFromScaled, calculateAPYs } from "../helpers/lending.helper";
 import { fetchMultiTokenStablePools } from "../helpers/swapping.helper";
 import {
@@ -215,7 +215,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 
   const baseYieldByAddr = new Map<string, number>();
   for (const pair of yieldBenchmarks) {
-    const apy = computeExchangeRateAPYFromHistory(pair.tokenAddress, exchangeRateHistory, anchorsMs);
+    const apy = computeExchangeRateAPY(pair.tokenAddress, exchangeRateHistory, anchorsMs);
     if (!apy) continue;
     add(pair.tokenAddress, { source: "base", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
     baseYieldByAddr.set(pair.tokenAddress, parseFloat(apy));
@@ -405,37 +405,6 @@ function computeSafetyAPY(smRow: any, stRow: any, events: any[]): string | null 
   if (periodReturn <= -1 || !isFinite(periodReturn)) return null;
 
   return ((Math.pow(1 + periodReturn, 365 / 30) - 1) * 100).toFixed(2);
-}
-
-function computeExchangeRateAPYFromHistory(
-  assetAddress: string,
-  history: Map<string, YieldHistoryInterval[]>,
-  anchorsMs: number[],
-): string | null {
-  const intervals = history.get(assetAddress);
-  if (!intervals || anchorsMs.length < 2) return null;
-
-  let startRate: bigint | null = null, startMs = 0;
-  let endRate: bigint | null = null, endMs = 0;
-
-  for (const anchorMs of anchorsMs) {
-    const iv = intervals.find(i => i.fromMs <= anchorMs && anchorMs <= i.toMs);
-    if (!iv) continue;
-    const rate = BigInt(iv.value || "0");
-    if (rate <= 0n) continue;
-    if (!startRate) { startRate = rate; startMs = anchorMs; }
-    endRate = rate;
-    endMs = anchorMs;
-  }
-
-  if (!startRate || !endRate || endMs <= startMs) return null;
-  const daysDelta = (endMs - startMs) / (1000 * 60 * 60 * 24);
-  if (daysDelta < 1) return null;
-
-  const growth = Number(endRate) / Number(startRate);
-  if (!isFinite(growth) || growth <= 0) return null;
-  const apy = (Math.pow(growth, 365 / daysDelta) - 1) * 100;
-  return apy > 0 && isFinite(apy) ? apy.toFixed(2) : null;
 }
 
 function buildVolumeMap(swapEvents: any[], prices: Map<string, string>): Map<string, number> {
