@@ -1,9 +1,6 @@
 import axios from "axios";
 import * as crypto from "crypto";
 import { ethers } from "ethers";
-import { getDepositStatus, getUserTransactions } from "./onramp.service";
-export { getDepositStatus, getUserTransactions };
-export type { OnrampTransaction } from "./onramp.service";
 
 // ————————————————————————————————————————————————————————————————
 // Meld API configuration
@@ -359,4 +356,57 @@ export async function handleMeldTransactionUpdate(event: any): Promise<void> {
   } else {
     console.log(`[OnrampV2] Transaction ${transactionId} → ${eventType} / ${status} (user=${userAddress})`);
   }
+}
+
+// ————————————————————————————————————————————————————————————————
+// Meld API — User Transactions
+// ————————————————————————————————————————————————————————————————
+
+export interface OnrampTransaction {
+  id: string;
+  status: string;
+  sourceAmount: number;
+  sourceCurrencyCode: string;
+  destinationAmount: number;
+  destinationCurrencyCode: string;
+  serviceProvider: string;
+  createdAt: string;
+  totalFee: number;
+}
+
+export async function getUserTransactions(
+  userStratoAddress: string,
+  params: { limit?: string; after?: string },
+): Promise<{ data: OnrampTransaction[]; hasMore: boolean }> {
+  if (!MELD_API_KEY) throw new Error("Meld onramp is not configured on this node");
+
+  const { data } = await axios.get(`${MELD_API_URL}/payments/transactions`, {
+    headers: meldHeaders(),
+    params: {
+      externalCustomerIds: userStratoAddress,
+      limit: params.limit || "10",
+      ...(params.after ? { after: params.after } : {}),
+    },
+  });
+
+  const rawList = Array.isArray(data) ? data : (data?.transactions || data || []);
+
+  const transactions: OnrampTransaction[] = rawList.map((tx: any) => ({
+    id: tx.id,
+    status: tx.status,
+    sourceAmount: tx.sourceAmount,
+    sourceCurrencyCode: tx.sourceCurrencyCode,
+    destinationAmount: tx.destinationAmount,
+    destinationCurrencyCode: tx.destinationCurrencyCode,
+    serviceProvider: tx.serviceProvider,
+    createdAt: tx.createdAt,
+    totalFee: tx.cryptoDetails?.totalFee ?? 0,
+  }));
+
+  const requestedLimit = parseInt(params.limit || "10", 10);
+
+  return {
+    data: transactions,
+    hasMore: transactions.length >= requestedLimit,
+  };
 }

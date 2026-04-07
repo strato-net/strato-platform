@@ -4,7 +4,6 @@ import {
   createWidgetSession,
   verifyMeldWebhook,
   handleMeldTransactionUpdate,
-  getDepositStatus,
   getUserTransactions,
 } from "../services/onramp.v2.service";
 
@@ -122,39 +121,28 @@ class OnrampV2Controller {
     }
   }
 
-  static async depositStatus(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, query } = req;
-      const txHash = query.txHash as string;
-      if (!txHash) {
-        res.status(400).json({ error: "txHash query parameter is required" });
-        return;
-      }
-      const result = await getDepositStatus(accessToken, txHash);
-      res.json({ success: true, data: result });
-    } catch (error: any) {
-      next(error);
-    }
-  }
-
   static async getTransactions(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address: userAddress, query } = req;
-      const { limit, offset } = query;
-      const params: Record<string, string> = {};
-      if (limit) params.limit = String(limit);
-      if (offset) params.offset = String(offset);
-      const result = await getUserTransactions(accessToken, userAddress, params);
+      const userAddress = req.address;
+      const { limit, after } = req.query;
+      const result = await getUserTransactions(userAddress, {
+        limit: limit ? String(limit) : undefined,
+        after: after ? String(after) : undefined,
+      });
       res.json({ success: true, data: result });
     } catch (error: any) {
+      if (error.response) {
+        console.error(`[OnrampV2] Transactions error ${error.response.status}:`, JSON.stringify(error.response.data));
+        res.status(error.response.status).json({
+          success: false,
+          error: { message: error.response.data?.message || `Meld API error (${error.response.status})` },
+        });
+        return;
+      }
       next(error);
     }
   }

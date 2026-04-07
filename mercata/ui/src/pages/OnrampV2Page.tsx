@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
-import PurchaseHistory from "../components/onramp/PurchaseHistory";
+import PurchaseHistoryV2 from "../components/onramp/PurchaseHistoryV2";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
@@ -337,7 +337,7 @@ const OnrampV2Page = () => {
                   </ol>
                 </div>
 
-                <PurchaseHistory refreshKey={purchaseRefreshKey} />
+                <PurchaseHistoryV2 refreshKey={purchaseRefreshKey} />
               </div>
             )}
           </div>
