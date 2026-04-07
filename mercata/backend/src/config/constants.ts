@@ -25,7 +25,6 @@ export const constants = (() => {
   const PriceOracle = `${CONTRACT_PREFIX}PriceOracle`;
   const PriceOracleEvents = `${CONTRACT_PREFIX}PriceOracle-PriceUpdated`;
   const PriceOracleBatchUpdateEvents = `${CONTRACT_PREFIX}PriceOracle-BatchPricesUpdated`;
-  const PriceOracleExchangeRatesEvents = `${CONTRACT_PREFIX}PriceOracle-ExchangeRatesUpdated`;
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
@@ -138,7 +137,6 @@ export const constants = (() => {
     PriceOracle,
     PriceOracleEvents,
     PriceOracleBatchUpdateEvents,
-    PriceOracleExchangeRatesEvents,
     LendingRegistry,
     PoolConfigurator,
     AdminRegistry,
