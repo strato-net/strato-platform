@@ -7,7 +7,7 @@ import {
   BonusTokenBalance,
   BonusTokenConfig,
 } from "../../shared/types";
-import { logInfo } from "../../infra/observability/logger";
+import { logInfo, logError } from "../../infra/observability/logger";
 import { buildBonusRuleByToken, normalizeAddressValue } from "../events-read/addressNormalization";
 import { normalizeAddressNoPrefix } from "../../shared/core/address";
 
@@ -159,7 +159,16 @@ export const calculateBonusCreditsForUsers = async (
     const eligible = allActivities.filter((a) => isPositionActivity(a.activityType));
     if (eligible.length === 0) continue;
 
-    const stakeUsdMap = await computeStakeUsdForActivities(eligible);
+    let stakeUsdMap: Map<string, bigint>;
+    try {
+      stakeUsdMap = await computeStakeUsdForActivities(eligible);
+    } catch (error) {
+      logError("BonusUtils", error as Error, {
+        operation: "computeStakeUsd",
+        user,
+      });
+      continue;
+    }
     let eligibleActivityUsd = 0n;
     for (const a of eligible) {
       eligibleActivityUsd += stakeUsdMap.get(a.activityId) ?? a.userStake;
