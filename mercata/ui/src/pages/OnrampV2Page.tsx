@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import PurchaseHistoryV2 from "../components/onramp/PurchaseHistoryV2";
+import OnrampProgressTracker from "../components/onramp/OnrampProgressTracker";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
@@ -47,11 +48,10 @@ const OnrampV2Page = () => {
 
   // Session state
   const [sessionLoading, setSessionLoading] = useState<string | null>(null);
-  const [purchaseInProgress, setPurchaseInProgress] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState("");
 
   const [purchaseRefreshKey, setPurchaseRefreshKey] = useState(0);
-  const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Config
   const [meldEnabled, setMeldEnabled] = useState<boolean | null>(null);
@@ -87,13 +87,6 @@ const OnrampV2Page = () => {
     }
   }, [amount, crypto]);
 
-  const stopRefresh = useCallback(() => {
-    if (refreshRef.current) {
-      clearInterval(refreshRef.current);
-      refreshRef.current = null;
-    }
-  }, []);
-
   const buyWithProvider = useCallback(
     async (quote: Quote) => {
       setSessionLoading(quote.serviceProvider);
@@ -105,14 +98,9 @@ const OnrampV2Page = () => {
           serviceProvider: quote.serviceProvider,
         });
 
-        const { widgetUrl } = data.data;
+        const { widgetUrl, sessionId } = data.data;
         window.open(widgetUrl, "meld-onramp", "width=500,height=750,scrollbars=yes,resizable=yes");
-
-        setPurchaseInProgress(true);
-        stopRefresh();
-        refreshRef.current = setInterval(() => {
-          setPurchaseRefreshKey((k) => k + 1);
-        }, 15000);
+        setActiveSessionId(sessionId);
       } catch (err: any) {
         setSessionError(
           err?.response?.data?.error?.message || "Failed to create onramp session."
@@ -121,18 +109,13 @@ const OnrampV2Page = () => {
         setSessionLoading(null);
       }
     },
-    [amount, crypto, stopRefresh]
+    [amount, crypto]
   );
 
-  const dismissBanner = useCallback(() => {
-    setPurchaseInProgress(false);
-    stopRefresh();
+  const dismissTracker = useCallback(() => {
+    setActiveSessionId(null);
     setPurchaseRefreshKey((k) => k + 1);
-  }, [stopRefresh]);
-
-  useEffect(() => {
-    return stopRefresh;
-  }, [stopRefresh]);
+  }, []);
 
   const formatProvider = (name: string) =>
     name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
@@ -168,54 +151,65 @@ const OnrampV2Page = () => {
                 </div>
               ) : (
                 <>
+                  {/* Progress Tracker */}
+                  {activeSessionId && (
+                    <OnrampProgressTracker
+                      sessionId={activeSessionId}
+                      onComplete={() => setTimeout(() => setPurchaseRefreshKey((k) => k + 1), 2000)}
+                      onDismiss={dismissTracker}
+                    />
+                  )}
+
                   {/* Amount & Crypto Selection */}
-                  <div className="rounded-xl border bg-card p-5 space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-foreground">
-                        Amount (USD)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        step="any"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="100"
-                      />
-                    </div>
+                  {!activeSessionId && (
+                    <div className="rounded-xl border bg-card p-5 space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-foreground">
+                          Amount (USD)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="any"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="100"
+                        />
+                      </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-foreground">
-                        Receive
-                      </label>
-                      <select
-                        value={crypto}
-                        onChange={(e) => {
-                          setCrypto(e.target.value);
-                          setQuotes([]);
-                        }}
-                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-foreground">
+                          Receive
+                        </label>
+                        <select
+                          value={crypto}
+                          onChange={(e) => {
+                            setCrypto(e.target.value);
+                            setQuotes([]);
+                          }}
+                          className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {CRYPTO_OPTIONS.map((opt) => (
+                            <option key={opt.code} value={opt.code}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={fetchQuotes}
+                        disabled={quoteLoading || !amount}
+                        className="w-full py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
                       >
-                        {CRYPTO_OPTIONS.map((opt) => (
-                          <option key={opt.code} value={opt.code}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
+                        {quoteLoading && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
+                        Get Quotes
+                      </button>
                     </div>
-
-                    <button
-                      onClick={fetchQuotes}
-                      disabled={quoteLoading || !amount}
-                      className="w-full py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-                    >
-                      {quoteLoading && (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      )}
-                      Get Quotes
-                    </button>
-                  </div>
+                  )}
 
                   {/* Error */}
                   {(quoteError || sessionError) && (
@@ -225,27 +219,8 @@ const OnrampV2Page = () => {
                     </div>
                   )}
 
-                  {/* Purchase In Progress Banner */}
-                  {purchaseInProgress && (
-                    <div className="flex items-center justify-between text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-3 py-2.5 rounded-lg text-sm">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                        <span>
-                          Complete the payment in the popup. Your purchase will
-                          appear in the history below once processed.
-                        </span>
-                      </div>
-                      <button
-                        onClick={dismissBanner}
-                        className="text-xs underline shrink-0 ml-2 hover:text-blue-800"
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                  )}
-
                   {/* Quotes List */}
-                  {quotes.length > 0 && (
+                  {!activeSessionId && quotes.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-foreground px-1">
                         Available Providers

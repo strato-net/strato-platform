@@ -1,6 +1,9 @@
 import axios from "axios";
 import * as crypto from "crypto";
 import { ethers } from "ethers";
+import { cirrus } from "../../utils/mercataApiHelper";
+import { constants } from "../../config/constants";
+import { getServiceToken } from "../../utils/authHelper";
 
 // ————————————————————————————————————————————————————————————————
 // Meld API configuration
@@ -221,7 +224,7 @@ export async function createWidgetSession(
   sourceAmount: string,
   destinationCurrencyCode: string,
   serviceProvider: string,
-): Promise<{ widgetUrl: string }> {
+): Promise<{ widgetUrl: string; sessionId: string }> {
   if (!MELD_API_KEY) throw new Error("Meld onramp is not configured on this node");
 
   const safeAddress = process.env.SAFE_ADDRESS;
@@ -257,6 +260,7 @@ export async function createWidgetSession(
 
   return {
     widgetUrl: data.serviceProviderWidgetUrl || data.widgetUrl,
+    sessionId: externalSessionId,
   };
 }
 
@@ -409,4 +413,105 @@ export async function getUserTransactions(
     data: transactions,
     hasMore: transactions.length >= requestedLimit,
   };
+}
+
+// ————————————————————————————————————————————————————————————————
+// Purchase Status (aggregates Meld + Cirrus)
+// ————————————————————————————————————————————————————————————————
+
+export type PurchaseStep = "purchasing" | "routing" | "bridging" | "completed" | "failed";
+
+export interface PurchaseStatus {
+  step: PurchaseStep;
+  meldStatus: string | null;
+  bridgeStatus: number | null;
+  destinationAmount: string | null;
+  destinationCurrency: string | null;
+  serviceProvider: string | null;
+}
+
+const { MercataBridge } = constants;
+
+const MELD_TERMINAL_FAILURES = new Set(["FAILED", "DECLINED", "CANCELLED", "ERROR"]);
+
+export async function getPurchaseStatus(
+  sessionId: string,
+  userStratoAddress: string,
+): Promise<PurchaseStatus> {
+  if (!MELD_API_KEY) throw new Error("Meld onramp is not configured on this node");
+
+  // 1. Check Meld transaction status
+  const { data: meldData } = await axios.get(`${MELD_API_URL}/payments/transactions`, {
+    headers: meldHeaders(),
+    params: { externalSessionIds: sessionId, limit: "1" },
+  });
+
+  const rawList = Array.isArray(meldData) ? meldData : (meldData?.transactions || meldData || []);
+  const meldTx = rawList[0];
+
+  if (!meldTx) {
+    return { step: "purchasing", meldStatus: null, bridgeStatus: null, destinationAmount: null, destinationCurrency: null, serviceProvider: null };
+  }
+
+  const meldStatus: string = meldTx.status;
+  const destinationAmount = meldTx.destinationAmount ? String(meldTx.destinationAmount) : null;
+  const destinationCurrency = meldTx.destinationCurrencyCode || null;
+  const serviceProvider = meldTx.serviceProvider || null;
+
+  if (MELD_TERMINAL_FAILURES.has(meldStatus)) {
+    return { step: "failed", meldStatus, bridgeStatus: null, destinationAmount, destinationCurrency, serviceProvider };
+  }
+
+  if (meldStatus !== "SETTLED") {
+    return { step: "purchasing", meldStatus, bridgeStatus: null, destinationAmount, destinationCurrency, serviceProvider };
+  }
+
+  // 2. Meld is SETTLED — check bridge deposit status on Cirrus
+  //    Fetch the user's latest deposit and compare timestamps in code to ensure
+  //    we're looking at a deposit from THIS session, not a previous one.
+  const accessToken = await getServiceToken();
+  const sessionTs = parseInt(sessionId.split("_")[1] || "0", 10);
+
+  // Check for any INITIATED deposit for this user (actively being processed)
+  const { data: initiatedDeposits } = await cirrus.get(accessToken, `/${MercataBridge}-deposits`, {
+    params: {
+      "value->>stratoRecipient": `eq.${userStratoAddress}`,
+      "value->>bridgeStatus": `eq.1`,
+      limit: "1",
+      select: "value",
+    },
+  });
+
+  if (initiatedDeposits?.length > 0) {
+    return { step: "bridging", meldStatus, bridgeStatus: 1, destinationAmount, destinationCurrency, serviceProvider };
+  }
+
+  // No INITIATED — fetch the latest deposit (any status) and check if it's from this session
+  const { data: latestDeposits } = await cirrus.get(accessToken, `/${MercataBridge}-deposits`, {
+    params: {
+      "value->>stratoRecipient": `eq.${userStratoAddress}`,
+      order: "block_timestamp.desc",
+      limit: "1",
+      select: "value,block_timestamp",
+    },
+  });
+
+  const latest = latestDeposits?.[0];
+  if (latest) {
+    const bridgeStatus = parseInt(latest.value?.bridgeStatus || "0", 10);
+    const depositTs = new Date(latest.block_timestamp).getTime();
+
+    // If the latest deposit was created after this session started, it's ours
+    if (sessionTs > 0 && depositTs >= sessionTs && bridgeStatus === 3) {
+      return { step: "completed", meldStatus, bridgeStatus, destinationAmount, destinationCurrency, serviceProvider };
+    }
+
+    // PENDING_REVIEW (2) — still being processed
+    if (bridgeStatus === 2 && depositTs >= sessionTs) {
+      return { step: "bridging", meldStatus, bridgeStatus, destinationAmount, destinationCurrency, serviceProvider };
+    }
+  }
+
+  // Meld settled but no matching bridge deposit yet — still routing
+  return { step: "routing", meldStatus, bridgeStatus: null, destinationAmount, destinationCurrency, serviceProvider };
 }

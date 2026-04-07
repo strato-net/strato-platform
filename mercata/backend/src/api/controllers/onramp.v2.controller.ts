@@ -5,6 +5,7 @@ import {
   verifyMeldWebhook,
   handleMeldTransactionUpdate,
   getUserTransactions,
+  getPurchaseStatus,
 } from "../services/onramp.v2.service";
 
 class OnrampV2Controller {
@@ -116,6 +117,25 @@ class OnrampV2Controller {
       }
 
       res.json({ received: true });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async purchaseStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const userAddress = req.address;
+      const sessionId = req.query.sessionId as string;
+      if (!sessionId) {
+        res.status(400).json({ error: "sessionId query parameter is required" });
+        return;
+      }
+      const result = await getPurchaseStatus(sessionId, userAddress);
+      res.json({ success: true, data: result });
     } catch (error: any) {
       next(error);
     }

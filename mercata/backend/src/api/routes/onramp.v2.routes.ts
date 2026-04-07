@@ -100,6 +100,25 @@ router.post("/webhook", OnrampV2Controller.handleWebhook);
 
 /**
  * @openapi
+ * /onramp/v2/purchase-status:
+ *   get:
+ *     summary: Get purchase progress status
+ *     description: Aggregates Meld transaction status and bridge deposit status into a single step indicator.
+ *     tags: [Onramp V2]
+ *     parameters:
+ *       - name: sessionId
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Purchase status with step, meldStatus, bridgeStatus
+ */
+router.get("/purchase-status", authHandler.authorizeRequest(), OnrampV2Controller.purchaseStatus);
+
+/**
+ * @openapi
  * /onramp/v2/transactions:
  *   get:
  *     summary: Get onramp transaction history
