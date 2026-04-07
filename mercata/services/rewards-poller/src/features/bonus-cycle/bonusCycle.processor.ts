@@ -35,7 +35,12 @@ export const processBonusCycle = async (): Promise<void> => {
     const intervalSeconds = Math.min(Math.max(1, elapsed), MAX_BONUS_INTERVAL_SECONDS);
 
     const newCredits = bonusUsers.length > 0
-      ? await calculateBonusCreditsForUsers(bonusUsers, intervalSeconds)
+      ? await calculateBonusCreditsForUsers(
+          bonusUsers,
+          intervalSeconds,
+          tokenConfigs[0].includedActivityPatterns,
+          tokenConfigs[0].maxBonusBps,
+        )
       : [];
 
     const allCredits = [...state.pendingCredits, ...newCredits];

@@ -1,3 +1,9 @@
 [
-  { "address": "3103810e081d965f5f8b19195fd7f5f859ccb4f9", "maxBonusBps": 10000, "balanceForMaxBoost": "125000000000000000000000" }
+  {
+    "address": "3103810e081d965f5f8b19195fd7f5f859ccb4f9",
+    "maxBonusBps": 10000,
+    "conversionNumerator": 4,
+    "conversionDenominator": 10,
+    "includedActivityPatterns": ["cdp", "swap lp", "save usdst"]
+  }
 ]

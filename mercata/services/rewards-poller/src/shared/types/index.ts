@@ -79,7 +79,9 @@ export interface RewardsAction {
 export interface BonusTokenConfig {
   address: string;
   maxBonusBps: number;
-  balanceForMaxBoost: string;
+  conversionNumerator: number;
+  conversionDenominator: number;
+  includedActivityPatterns: string[];
 }
 
 export interface BonusTokenBalance {
@@ -108,7 +110,17 @@ export interface BonusRunState {
 export interface BonusEligibleUser {
   sourceContract: string;
   user: string;
-  bonusBps: number;
+  boostCapUsd: string;
+}
+
+export interface UserActivityInfo {
+  activityId: string;
+  activityName: string;
+  activityType: string;
+  sourceContract: string;
+  personalEmissionRate: bigint;
+  userStake: bigint;
+  totalStake: bigint;
 }
 
 export interface EventCursor {
