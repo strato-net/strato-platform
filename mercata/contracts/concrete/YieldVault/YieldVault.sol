@@ -52,6 +52,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         __ERC20_init(name_, symbol_);
         __ERC4626_init(asset_);
         vaultInitialized = true;
+        deployedAssets = 0;
 
         emit VaultInitialized(asset_, name_, symbol_);
     }
