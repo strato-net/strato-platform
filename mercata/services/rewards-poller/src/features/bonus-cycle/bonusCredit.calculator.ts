@@ -6,7 +6,6 @@ import {
   BonusEligibleUser,
   BonusTokenBalance,
   BonusTokenConfig,
-  UserActivityInfo,
 } from "../../shared/types";
 import { logInfo } from "../../infra/observability/logger";
 import { buildBonusRuleByToken, normalizeAddressValue } from "../events-read/addressNormalization";
@@ -154,18 +153,6 @@ export const calculateBonusCreditsForUsers = async (
   const interval = BigInt(Math.max(1, Math.floor(intervalSeconds)));
   const maxBps = BigInt(maxBonusBps);
 
-  // Batch all eligible activities across all users for a single price fetch
-  const allEligibleActivities: UserActivityInfo[] = [];
-  for (const { user } of bonusUsers) {
-    const allActivities = activityBreakdownByUser.get(user) ?? [];
-    for (const a of allActivities) {
-      if (isIncludedActivity(a.activityName, a.activityType, includedActivityPatterns)) {
-        allEligibleActivities.push(a);
-      }
-    }
-  }
-  const globalStakeUsdMap = await computeStakeUsdForActivities(allEligibleActivities);
-
   const credits: BonusCredit[] = [];
   let skippedMissingInitialization = 0;
 
@@ -182,9 +169,10 @@ export const calculateBonusCreditsForUsers = async (
     );
     if (eligible.length === 0) continue;
 
+    const stakeUsdMap = await computeStakeUsdForActivities(eligible);
     let eligibleActivityUsd = 0n;
     for (const a of eligible) {
-      eligibleActivityUsd += globalStakeUsdMap.get(a.activityId) ?? a.userStake;
+      eligibleActivityUsd += stakeUsdMap.get(a.activityId) ?? a.userStake;
     }
     if (eligibleActivityUsd <= 0n) continue;
 
