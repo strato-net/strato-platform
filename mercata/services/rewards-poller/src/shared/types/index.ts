@@ -81,7 +81,6 @@ export interface BonusTokenConfig {
   maxBonusBps: number;
   conversionNumerator: number;
   conversionDenominator: number;
-  includedActivityPatterns: string[];
 }
 
 export interface BonusTokenBalance {
