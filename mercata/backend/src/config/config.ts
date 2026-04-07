@@ -115,13 +115,13 @@ export const defaultSaveUsdstVaultFor: Record<string, string> = {
 };
 
 export const defaultEthCarryVaultFor: Record<string, string> = {
-  "114784819836269": "662270a6c38710b22fb938b4295eccd0aadf8ebe", // Helium testnet - set after deployment
-  "33056204878082667": "", // Upquark mainnet - set after deployment
+  "114784819836269": "662270a6c38710b22fb938b4295eccd0aadf8ebe", // Helium testnet
+  "33056204878082667": "aebe386623bc7d46edd2c89fb821a0ad7a195555", // Upquark mainnet
 };
 
 export const defaultWbtcCarryVaultFor: Record<string, string> = {
-  "114784819836269": "f1711315b88e4510439513fd09a9d5b7d35488c0", // Helium testnet - set after deployment
-  "33056204878082667": "", // Upquark mainnet - set after deployment
+  "114784819836269": "f1711315b88e4510439513fd09a9d5b7d35488c0", // Helium testnet
+  "33056204878082667": "4535e11cddd6c82e81ff4b6d16f94d95d85e7e00", // Upquark mainnet
 };
 
 export let bridgeUrl: string | undefined;
