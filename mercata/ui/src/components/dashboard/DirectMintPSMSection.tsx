@@ -127,7 +127,8 @@ const DirectMintPSMSection = () => {
     try {
       const amountWei = safeParseUnits(redeemAmount, 18);
       const psmBal = BigInt(selectedRedeemToken.psmBalance);
-      return amountWei > 0n && amountWei <= psmBal;
+      const userBal = BigInt(psmInfo.userMintableBalance);
+      return amountWei > 0n && amountWei <= psmBal && amountWei <= userBal;
     } catch {
       return false;
     }
@@ -339,8 +340,7 @@ const DirectMintPSMSection = () => {
                     <SelectContent>
                       {(psmInfo?.eligibleTokens || []).map((t) => (
                         <SelectItem key={t.address} value={t.address}>
-                          {t.symbol || t.address.slice(0, 8)} — PSM:{" "}
-                          {formatBalance(t.psmBalance, undefined, 18, 2)}
+                          {t.symbol || t.address.slice(0, 8)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -361,14 +361,25 @@ const DirectMintPSMSection = () => {
                         className="text-blue-600 hover:underline mr-2"
                         onClick={() => {
                           const psmBal = BigInt(selectedRedeemToken.psmBalance);
-                          if (psmBal <= 0n) return;
-                          const formatted = formatUnits(psmBal, 18);
+                          const userBal = BigInt(psmInfo?.userMintableBalance || "0");
+                          const max = psmBal < userBal ? psmBal : userBal;
+                          if (max <= 0n) return;
+                          const formatted = formatUnits(max, 18);
                           const [w, f = ""] = formatted.split(".");
                           setRedeemAmount(`${w}.${f.slice(0, 18)}`);
                         }}
                       >
                         Max
                       </button>
+                      Your {psmInfo?.mintableTokenSymbol || "USDST"}:{" "}
+                      {formatBalance(
+                        psmInfo?.userMintableBalance || "0",
+                        undefined,
+                        18,
+                        2,
+                        2
+                      )}
+                      {" · "}
                       PSM reserves:{" "}
                       {formatBalance(
                         selectedRedeemToken.psmBalance,
