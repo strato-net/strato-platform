@@ -208,6 +208,12 @@ Linux)
             sudo dnf install -q -y docker
             sudo systemctl enable docker
             sudo systemctl start docker
+
+            # Add current user to docker group so Docker runs as non-root user
+            # See https://docs.docker.com/engine/install/linux-postinstall/
+            sudo groupadd docker 2>/dev/null || true
+            sudo usermod -aG docker $USER
+
             # Docker-compose
             DOCKER_CONFIG=/usr/local/lib/docker
             sudo mkdir -p $DOCKER_CONFIG/cli-plugins
@@ -324,16 +330,11 @@ Linux)
                 docker-buildx-plugin \
                 docker-compose-plugin
 
-            # Ubuntu does not automatically add the current user to the docker group (Mint Linux does),
-            # so we need to do so manually as a post-install step.
-            #
+            # Add current user to docker group so Docker runs as non-root user
             # See https://docs.docker.com/engine/install/linux-postinstall/
-            if [ "$DISTRO_NAME" = "Ubuntu" ]; then
-                sudo groupadd docker 2>/dev/null || true
-                sudo usermod -aG docker $USER
-                echo "Note: You may need to log out and back in for Docker group membership to take effect."
-            fi
-                        
+            sudo groupadd docker 2>/dev/null || true
+            sudo usermod -aG docker $USER
+
             # Install Haskell GHC and Stack
             sudo apt install -qy --no-install-recommends \
                 build-essential \
@@ -388,3 +389,12 @@ check_package_version "ubuntu-or-mint" "libsodium-dev" "1.0.18-1build3"
 check_package_version "ubuntu-or-mint" "lsb-release" "12.0-2"
 check_package_version "ubuntu-or-mint" "postgresql-client" "16+257build1.1"
 check_package_version "ubuntu-or-mint" "zlib1g-dev" "1:1.3.dfsg-3.1ubuntu2.1"
+
+echo ""
+echo "Dependencies installed successfully."
+if [ "$(uname -s)" = "Linux" ]; then
+    echo "To activate Docker group membership (to run docker commands as non-root user) in your current shell session, run:"
+    echo "  newgrp docker"
+    echo "Then verify with:"
+    echo "  docker ps"
+fi
