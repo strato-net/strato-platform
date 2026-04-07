@@ -81,10 +81,9 @@ const getLpTokenPrice = async (
 
     const priceA = oraclePrices.get(String(pool.tokenA).toLowerCase()) ?? 0n;
     const priceB = oraclePrices.get(String(pool.tokenB).toLowerCase()) ?? 0n;
-    if (priceA === 0n && priceB === 0n) return null;
+    if (priceA === 0n || priceB === 0n) return null;
 
-    const totalValueUsd = (aBal * priceA + bBal * priceB) / Q;
-    return (totalValueUsd * Q) / supply;
+    return (aBal * priceA + bBal * priceB) / supply;
   } catch (error) {
     logError("StakeUsd", error as Error, { operation: "getLpTokenPrice", sourceContract });
     return null;
