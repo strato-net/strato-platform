@@ -167,6 +167,7 @@ if [ "$CLIENT_EXISTS" != "200" ]; then
             \"response_types\": [\"code\", \"token\", \"id_token\"],
             \"scope\": \"openid offline email profile\",
             \"redirect_uris\": [\"http://${LOCAL_AUTH_HOSTNAME}:${HTTP_PORT}/auth/openidc/return\", \"http://localhost:${HTTP_PORT}/auth/openidc/return\", \"http://127.0.0.1:${HTTP_PORT}/auth/openidc/return\"],
+            \"post_logout_redirect_uris\": [\"http://${LOCAL_AUTH_HOSTNAME}:${HTTP_PORT}/\", \"http://localhost:${HTTP_PORT}/\", \"http://127.0.0.1:${HTTP_PORT}/\"],
             \"token_endpoint_auth_method\": \"client_secret_basic\"
         }" > /dev/null
     echo "OAuth client '${OAUTH_CLIENT_ID}' created."

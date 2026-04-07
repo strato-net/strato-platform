@@ -18,6 +18,7 @@ urls:
   consent: http://__HOSTNAME__:__HTTP_PORT__/auth/ui/consent
   login: http://__HOSTNAME__:__HTTP_PORT__/auth/ui/login
   logout: http://__HOSTNAME__:__HTTP_PORT__/auth/ui/logout
+  error: http://__HOSTNAME__:__HTTP_PORT__/auth/ui/error
 
 secrets:
   system:

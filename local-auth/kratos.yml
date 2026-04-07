@@ -21,6 +21,8 @@ cookies:
 
 selfservice:
   default_browser_return_url: http://__HOSTNAME__:__HTTP_PORT__/auth/ui/
+  allowed_return_urls:
+    - http://__HOSTNAME__:__HTTP_PORT__/
   
   flows:
     login:
