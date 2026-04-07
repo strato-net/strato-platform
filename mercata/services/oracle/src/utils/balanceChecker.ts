@@ -7,20 +7,26 @@ async function fetchVoucherBalance(): Promise<bigint> {
     const accessToken = await oauthClient().getAccessToken();
     const userAddr = await oauthClient().getUserAddress();
 
+    const voucherEndpoint = `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Voucher-_balances`;
     const response = await apiGet(
-        `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Voucher-_balances`,
+        voucherEndpoint,
         {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
             params: {
+                address: `eq.${CONSTANTS.VOUCHER_ADDRESS}`,
                 key: `eq.${userAddr}`,
                 select: 'balance:value::text'
             },
             timeout: 10000
         },
-        { logPrefix: 'BalanceChecker' }
+        {
+            logPrefix: 'BalanceChecker',
+            apiUrl: voucherEndpoint,
+            method: 'GET'
+        }
     );
 
     return BigInt(response.data[0]?.balance || '0');
@@ -30,8 +36,9 @@ async function fetchUSDSTBalance(): Promise<bigint> {
     const accessToken = await oauthClient().getAccessToken();
     const userAddr = await oauthClient().getUserAddress();
 
+    const tokenEndpoint = `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Token-_balances`;
     const response = await apiGet(
-        `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Token-_balances`,
+        tokenEndpoint,
         {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -44,7 +51,11 @@ async function fetchUSDSTBalance(): Promise<bigint> {
             },
             timeout: 10000
         },
-        { logPrefix: 'BalanceChecker' }
+        {
+            logPrefix: 'BalanceChecker',
+            apiUrl: tokenEndpoint,
+            method: 'GET'
+        }
     );
 
     return BigInt(response.data[0]?.balance || '0');
@@ -69,7 +80,7 @@ export async function checkBalances(): Promise<void> {
     const usdstBalanceUSD = Number(usdstBalance) / 1e18;
     
     // Check if total transactions are below minimum threshold
-    if (totalTransactions < CONSTANTS.MIN_TRANSACTIONS_THRESHOLD) {
+    if (totalTransactions <= CONSTANTS.MIN_TRANSACTIONS_THRESHOLD) {
         const error = `Total possible transactions (${totalTransactions}) below minimum threshold (${CONSTANTS.MIN_TRANSACTIONS_THRESHOLD}). Voucher: ${voucherBalanceUSD} (${voucherTransactions} txs), USDST: ${usdstBalanceUSD} (${usdstTransactions} txs)`;
         logError('BalanceChecker', new Error(error));
         

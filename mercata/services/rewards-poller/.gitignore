@@ -1,0 +1,4 @@
+rewards-poller-error.flag
+.env
+lastProcessedBlock.json
+

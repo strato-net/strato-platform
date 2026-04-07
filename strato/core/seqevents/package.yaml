@@ -11,6 +11,8 @@ library:
   source-dirs: src/
   ghc-options: -fconstraint-solver-iterations=8
   dependencies:
+    - aeson
+    - base16-bytestring
     - blockDB
     - blockstanbul
     - bytestring

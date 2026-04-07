@@ -17,6 +17,7 @@ module Handlers.Transaction
   ( TxsFilterParams (..),
     txsFilterParams,
     API,
+    postTxClient,
     getTransaction,
     getTransaction',
     postTransaction,
@@ -30,7 +31,7 @@ import BlockApps.Logging
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
-import Blockchain.Data.Transaction
+import Blockchain.Data.Transaction (Transaction, rawTX2TX, transactionHash)
 import Blockchain.EthConf (runKafkaMConfigured)
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.WrappedBlock
@@ -55,19 +56,21 @@ import Data.Conduit
 import Data.Conduit.Combinators (yieldMany)
 import Data.List
 import Data.Maybe
+import Data.Time.Clock (UTCTime)
 import qualified Data.Text as T
 import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
 import Numeric.Natural
 import SQLM
 import Servant
+import Servant.Client (ClientM, client)
 import Settings
 import SortDirection
 import System.Clock
 import Text.Format
 import UnliftIO
 
-type API =
+type GetTransactions =
   "transaction" :> QueryParam "address" Address
     :> QueryParam "from" Address
     :> QueryParam "to" Address
@@ -84,14 +87,22 @@ type API =
     :> QueryParam "blocknumber" Natural
     :> QueryParam "minblocknumber" Natural
     :> QueryParam "maxblocknumber" Natural
+    :> QueryParam "mintimestamp" UTCTime
+    :> QueryParam "maxtimestamp" UTCTime
     :> QueryParam "limit" Natural
     :> QueryParam "offset" Natural
     :> QueryParam "search" T.Text
     :> QueryParam "sortby" Sortby
     :> Get '[JSON] [RawTransaction']
-    :<|> "transaction"
+
+type PostTransaction = "transaction"
     :> ReqBody '[JSON] RawTransaction'
     :> Post '[JSON, PlainText] Keccak256
+
+type API = GetTransactions :<|> PostTransaction
+
+postTxClient :: RawTransaction' -> ClientM Keccak256
+postTxClient = client (Proxy @PostTransaction)
 
 data TxsFilterParams = TxsFilterParams
   { qtAddress :: Maybe Address,
@@ -110,6 +121,8 @@ data TxsFilterParams = TxsFilterParams
     qtBlockNumber :: Maybe Natural,
     qtMinBlockNumber :: Maybe Natural,
     qtMaxBlockNumber :: Maybe Natural,
+    qtMinTimestamp :: Maybe UTCTime,
+    qtMaxTimestamp :: Maybe UTCTime,
     qtLimit :: Maybe Natural,
     qtOffset :: Maybe Natural,
     qtSearch :: Maybe T.Text,
@@ -120,6 +133,8 @@ data TxsFilterParams = TxsFilterParams
 txsFilterParams :: TxsFilterParams
 txsFilterParams =
   TxsFilterParams
+    Nothing
+    Nothing
     Nothing
     Nothing
     Nothing
@@ -170,6 +185,8 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.==. E.val v) (fromIntegral <$> qtBlockNumber),
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.>=. E.val v) (fromIntegral <$> qtMinBlockNumber),
                       fmap (\v -> rawTx E.^. RawTransactionBlockNumber E.<=. E.val v) (fromIntegral <$> qtMaxBlockNumber),
+                      fmap (\v -> rawTx E.^. RawTransactionTimestamp E.>=. E.val v) qtMinTimestamp,
+                      fmap (\v -> rawTx E.^. RawTransactionTimestamp E.<=. E.val v) qtMaxTimestamp,
                       fmap (\search ->
                           let isWhiteSpace c = c `elem` [' ', '\n', '\t']
                               searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
@@ -200,12 +217,12 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
 
 instance {-# OVERLAPPING #-} (LoggingT IO) `Mod.Outputs` [IngestEvent] where
   output txs = do
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
     resps <- liftIO $ runKafkaMConfigured "strato-api" $ writeUnseqEvents txs
     $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 
 postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
-postTransactionC limit (RawTransaction' raw "") = do
+postTransactionC limit (RawTransaction' raw) = do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
   ts <- liftIO getCurrentMicrotime
@@ -216,8 +233,6 @@ postTransactionC limit (RawTransaction' raw "") = do
   yield ieTx
   $logInfoS "postTransaction" . T.pack $ "Successfully inserted tx: " ++ format h
   return h
-postTransactionC _ _ =
-  throwIO $ DeprecatedError "The 'next' parameter is no longer supported"
 
 postTransaction ::
   (MonadIO m, MonadLogger m, m `Mod.Outputs` [IngestEvent]) =>
@@ -233,7 +248,7 @@ postTransactionListC limit raws = do
   parserStart <- liftIO $ getTime Realtime
 
   txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
-  let txs = fmap (\(RawTransaction' raw _) -> rawTX2TX $ raw) raws
+  let txs = fmap (\(RawTransaction' raw) -> rawTX2TX $ raw) raws
       hs = fmap (toJSON . transactionHash) txs
       txr = filter success $ zip hs txs
   let num = length txs
@@ -298,19 +313,21 @@ getTransaction ::
   Maybe Natural ->
   Maybe Natural ->
   Maybe Natural ->
+  Maybe UTCTime ->
+  Maybe UTCTime ->
   Maybe Natural ->
   Maybe Natural ->
   Maybe T.Text ->
   Maybe Sortby ->
   m [RawTransaction']
-getTransaction a b c d e f g h i j k l m n o p q r s t =
-  getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q r s t)
+getTransaction a b c d e f g h i j k l m n o p q r s t u v =
+  getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q r s t u v)
 
 getTransaction' ::
   Selectable TxsFilterParams [RawTransaction] m =>
   TxsFilterParams ->
   m [RawTransaction']
-getTransaction' a = map rtToRtPrime . zip (repeat "") . fromMaybe [] <$> select (Proxy @[RawTransaction]) a
+getTransaction' a = map rtToRtPrime . fromMaybe [] <$> select (Proxy @[RawTransaction]) a
 
 transactionQueryParams :: [String]
 transactionQueryParams =
@@ -330,6 +347,8 @@ transactionQueryParams =
     "blocknumber",
     "minblocknumber",
     "maxblocknumber",
+    "mintimestamp",
+    "maxtimestamp",
     -- "index",
     --"rejected",
     "limit",

@@ -55,14 +55,14 @@ highwayWrapperError err = do
 
 data HighwayWrapperEnv = HighwayWrapperEnv
   { httpManager        :: Manager
-  , awsCredentials     :: Credentials 
+  , awsCredentials     :: Credentials
   , generatedBoundary  :: DBL.ByteString
   , awss3bucket        :: Text
   , highwayUrl         :: Text
   }
 
 data HighwayWrapperError
-  = BadGetError 
+  = BadGetError
   | BadPostError
   | UserError Text
   | RuntimeError SomeException

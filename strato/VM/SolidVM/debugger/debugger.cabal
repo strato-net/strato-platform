@@ -1,0 +1,71 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           debugger
+version:        0.0.1
+synopsis:       A debugging API that can be hooked in to any Haskell project
+description:    A debugging API that can be hooked in to any Haskell project
+category:       Debuggers
+author:         Dustin Norwood
+maintainer:     dustin@blockapps.net
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Debugger
+      Debugger.Options
+  other-modules:
+      Debugger.Init
+      Debugger.Rest
+      Debugger.Rest.Api
+      Debugger.Rest.Server
+      Debugger.Server
+      Debugger.Types
+      Debugger.Util
+      Debugger.WebSocket
+      Debugger.WebSocket.Api
+      Debugger.WebSocket.Server
+      Paths_debugger
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      QuickCheck
+    , aeson
+    , async
+    , base
+    , containers
+    , deepseq
+    , hflags
+    , monad-alter
+    , parsec
+    , quickcheck-instances
+    , servant-server
+    , source-tools
+    , text
+    , unliftio
+    , warp
+    , websockets
+  default-language: Haskell2010
+
+test-suite debugger-spec
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      DebuggerSpec
+      Spec
+      Paths_debugger
+  hs-source-dirs:
+      tests/
+  build-depends:
+      QuickCheck
+    , aeson
+    , base
+    , debugger
+    , hflags
+    , hspec
+  default-language: Haskell2010

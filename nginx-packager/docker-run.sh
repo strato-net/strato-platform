@@ -2,18 +2,20 @@
 
 set -e
 
+# Load OAuth from file if env vars not set
+if [[ -f /run/secrets/oauth_credentials.yaml ]]; then
+    OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-$(grep "discoveryUrl:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)}
+    OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-$(grep "clientId:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)}
+    OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-$(grep "clientSecret:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)}
+fi
+
 MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
 BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 blockTime=${blockTime:-13} # keep default the same as strato
 ssl=${ssl:-false}
-sslCertFileType=${sslCertFileType:-pem}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-VM_DEBUGGER=${VM_DEBUGGER:-false}
-debugPort=${debugPort:-8051}
-debugWSHost=${debugWSHost:-strato}
-debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
 SMD_DEV_MODE=${SMD_DEV_MODE:-false}
 SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
@@ -22,11 +24,20 @@ DOCS_HOST=${DOCS_HOST:-docs:8080}
 POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
 SMD_HOST=${SMD_HOST:-smd:3002}
-STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
-STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
+
+# Read config from ethconf.yaml (single source of truth)
+STRATO_HOSTNAME=$(yq '.apiConfig.apiHost' /config/ethconf.yaml)
+HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
+VAULT_URL=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml)
+INTERNAL_VAULT_URL=${INTERNAL_VAULT_URL:-http://${STRATO_HOSTNAME}:8093}
+
+if [[ -z "${VAULT_URL}" || "${VAULT_URL}" == "null" ]]; then
+  echo "urlConfig.vaultUrl is required in /config/ethconf.yaml"
+  exit 7
+fi
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -37,21 +48,12 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     echo 'OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required for OAuth. Exit'
     exit 4
   fi
-  # get oauth discovery url from strato api
-  echo "Waiting for Strato api to be available..."
-  ETH_ENDPOINT=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
-  until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx
-  do
-    echo "  Check at $(date)"
-    sleep 1
-  done
-  echo "Strato api is available"
-  OAUTH_DISCOVERY_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.oauthDiscovery)
+  # validate oauth discovery url
   if [ -z "${OAUTH_DISCOVERY_URL}" ]; then
-    echo "Could not get OAuth discovery url from strato api, but it is a required value"
+    echo "OAUTH_DISCOVERY_URL is required but not set"
     exit 5
   fi
-  if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
+  if ! curl --silent --output /dev/null --fail --location "${OAUTH_DISCOVERY_URL}"
   then
     echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
     exit 6
@@ -61,12 +63,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate nginx.conf from template according to configuration provided
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
-
-  if [ "$VM_DEBUGGER" != true ]; then
-    sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
-  fi
-  sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
-  sed -i 's/<WS_DEBUG_PORT_PLACEHOLDER>/'"$debugWSPort"'/g' /tmp/nginx.conf
 
   # This is used to remove lines from the nginx.conf
   # without having to put the entire replacement string in this file
@@ -78,16 +74,21 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i 's/<SMD_DEV_MODE_HOST_IP>/'"$SMD_DEV_MODE_HOST_IP"'/g' /tmp/nginx.conf
   fi
   # Remove SSL lines if deployment is not SSL-enabled
-  # Set SSL cert file type if SSL-enabled
   if [ "$ssl" != true ]; then
     sed -i '/#TEMPLATE_MARK_SSL/d' /tmp/nginx.conf
-  else
-    sed -i 's/<SSL_CERT_FILE_TYPE>/'"$sslCertFileType"'/g' /tmp/nginx.conf
   fi
 
   # Remove Stats lines if running in STATS_ENABLED=false
   if [ "$STATS_ENABLED" != true ] ; then
     sed -i '/#TEMPLATE_MARK_STATS_ENABLED/d' /tmp/nginx.conf
+  fi
+
+  # Remove local-auth-only routes unless local-auth discovery is configured
+  if [[ "${OAUTH_DISCOVERY_URL:-}" != *"local-auth"* ]]; then
+    sed -i '/#TEMPLATE_MARK_LOCAL_AUTH/d' /tmp/nginx.conf
+  else
+    # In local-auth mode keep the lines, but strip template markers from output
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_LOCAL_AUTH//g' /tmp/nginx.conf
   fi
 
   if [ "$SERVE_LOGS" != true ]; then
@@ -112,26 +113,45 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__STRATO_PORT_API__/$STRATO_PORT_API/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf
-  sed -i "s/__STRATO_PORT_VAULT_PROXY__/$STRATO_PORT_VAULT_PROXY/g" /tmp/nginx.conf
+  sed -i "s|__VAULT_URL__|$VAULT_URL|g" /tmp/nginx.conf
+  sed -i "s|__INTERNAL_VAULT_URL__|$INTERNAL_VAULT_URL|g" /tmp/nginx.conf
+  sed -i "s|__HTTP_PORT__|$HTTP_PORT|g" /tmp/nginx.conf
   
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf
+
+  # Generate set_real_ip_from directives for trusted proxy IPs
+  TRUST_PROXY_LINES=""
+  if [ -n "${NGINX_TRUST_PROXY_CIDRS:-}" ]; then
+    IFS=',' read -ra CIDRS <<< "$NGINX_TRUST_PROXY_CIDRS"
+    for cidr in "${CIDRS[@]}"; do
+      cidr=$(echo "$cidr" | xargs) # trim whitespace
+      if [ -n "$cidr" ]; then
+        TRUST_PROXY_LINES="${TRUST_PROXY_LINES}    set_real_ip_from ${cidr};\n"
+      fi
+    done
+  fi
+  sed -i "s|__TRUST_PROXY_CIDRS__|${TRUST_PROXY_LINES%\\\\n}|g" /tmp/nginx.conf
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########
   cp /tmp/openid.tpl.lua /tmp/openid.lua
+  cp /tmp/vault-openid.tpl.lua /tmp/vault-openid.lua
   sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
   sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
   sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
   sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*'"$OAUTH_SCOPE"'*g' /tmp/openid.lua
+  sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/vault-openid.lua
 
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
     sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
+    sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/vault-openid.lua
   else
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
     sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
+    sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/vault-openid.lua
   fi
 
   ########
@@ -140,12 +160,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
   mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
+  mv /tmp/vault-openid.lua /usr/local/openresty/nginx/lua/vault-openid.lua
   
   mv /tmp/csrf.lua /usr/local/openresty/nginx/lua/csrf.lua
-
-  if [ "$ssl" = true ] ; then
-    cp -r /tmp/ssl/* /etc/ssl/
-  fi
 fi
 
 echo 'Waiting for apex to be available...'
@@ -155,12 +172,5 @@ do
 done
 echo 'apex is available'
 
-echo 'Waiting for VaultProxy to be available with node key added to Vault...'
-until curl --silent --output /dev/null --fail --location http://${STRATO_HOSTNAME}:${STRATO_PORT_VAULT_PROXY}/strato/v2.3/key
-do
-  sleep 0.5
-done
-echo 'VaultProxy is available'
-
 echo  'nginx is now running. See the logs below...'
-openresty -g "daemon off;"
+exec openresty -g "daemon off;"

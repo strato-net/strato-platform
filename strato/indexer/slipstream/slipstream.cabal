@@ -1,0 +1,160 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           slipstream
+version:        0.1.0.0
+synopsis:       Solidity datatypes
+description:    Solidity datatypes
+category:       Web
+homepage:       https://github.com/blockapps/blockapps-haskell/slipstream
+copyright:      2016 BlockApps
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Slipstream.Data.Action
+      Blockchain.Slipstream.Data.CirrusTables
+      Blockchain.Slipstream.Events
+      Blockchain.Slipstream.MessageConsumer
+      Blockchain.Slipstream.Metrics
+      Blockchain.Slipstream.Options
+      Blockchain.Slipstream.OutputData
+      Blockchain.Slipstream.PostgresqlTypedShim
+      Blockchain.Slipstream.Processor
+      Blockchain.Slipstream.QueryFormatHelper
+      Blockchain.Slipstream.SolidityValue
+      Blockchain.Slipstream.SQL
+  other-modules:
+      Paths_slipstream
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -Werror -rtsopts
+  build-depends:
+      aeson
+    , base
+    , base16-bytestring
+    , binary
+    , bloc2
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-mpdbs
+    , bytestring
+    , classy-prelude
+    , common-log
+    , conduit
+    , containers
+    , cross-monitoring
+    , deepseq
+    , esqueleto
+    , evm-solidity
+    , extra
+    , filepath
+    , format
+    , hflags
+    , kafka-monad
+    , lens
+    , monad-alter
+    , network
+    , ordered-containers
+    , persistent
+    , persistent-postgresql
+    , postgresql-simple
+    , prometheus-client
+    , raw-strings-qq
+    , resource-pool
+    , resourcet
+    , scientific
+    , solid-vm-model
+    , source-tools
+    , sql-monad
+    , strato-conf
+    , strato-model
+    , text
+    , time
+    , transformers
+    , unliftio
+    , unliftio-core
+    , vm-tools
+  default-language: Haskell2010
+
+executable slipstream
+  main-is: Main.hs
+  other-modules:
+      Paths_slipstream
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -Werror -rtsopts
+  build-depends:
+      base
+    , bloc2
+    , blockapps-init
+    , bytestring
+    , common-log
+    , containers
+    , evm-solidity
+    , hflags
+    , kafka-monad
+    , monad-alter
+    , persistent-postgresql
+    , postgresql-simple
+    , process-monitor
+    , raw-strings-qq
+    , resourcet
+    , slipstream
+    , sql-monad
+    , strato-conf
+    , text
+    , transformers
+    , unliftio
+    , wai-middleware-prometheus
+    , warp
+  default-language: Haskell2010
+
+test-suite slipstream-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      ActionFidelitySpec
+      OutputDataSpec
+      Spec
+      Paths_slipstream
+  hs-source-dirs:
+      tests/
+  ghc-options: -Wall -Werror -rtsopts -dynamic
+  build-depends:
+      QuickCheck
+    , aeson
+    , aeson-qq
+    , base
+    , blockapps-data
+    , blockapps-haskoin
+    , blockapps-mpdbs
+    , bytestring
+    , classy-prelude
+    , common-log
+    , conduit
+    , containers
+    , core-api2
+    , data-default
+    , evm-solidity
+    , hflags
+    , hspec
+    , hspec-expectations-lifted
+    , labeled-error
+    , monad-alter
+    , ordered-containers
+    , persistent-sqlite
+    , raw-strings-qq
+    , resourcet
+    , slipstream
+    , solid-vm-model
+    , strato-model
+    , text
+    , time
+    , unliftio
+    , vm-tools
+  default-language: Haskell2010

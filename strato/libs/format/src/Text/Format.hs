@@ -9,6 +9,7 @@ where
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import Data.List (intercalate)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
@@ -41,7 +42,7 @@ instance (Format a, Format b, Format c) => Format (a, b, c) where
   format (x, y, z) = "(" ++ format x ++ ", " ++ format y ++ ", " ++ format z ++ ")"
 
 instance Format a => Format [a] where
-  format = show . map format
+  format xs = "[" ++ intercalate ", " (map format xs) ++ "]"
 
 instance Format a => Format (Maybe a) where
   format = maybe "Nothing" format

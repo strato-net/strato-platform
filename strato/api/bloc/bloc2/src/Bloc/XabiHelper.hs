@@ -125,7 +125,7 @@ tFormUs [] = EVMXabi.Using $ "for nothing, apparently"
 tFormUs (SVMXabi.Using _ t _ : _) = EVMXabi.Using $ "for " ++ t -- weird legacy code
 
 tFormIndexedType :: CCVarfDef.IndexedType -> XabiType.IndexedType
-tFormIndexedType (CCVarfDef.IndexedType x y) = XabiType.IndexedType x (tFormTypeToType y)
+tFormIndexedType (CCVarfDef.IndexedType x y _) = XabiType.IndexedType x (tFormTypeToType y)
 
 tFormTypeToType :: SolidType.Type -> XabiType.Type
 tFormTypeToType = \case

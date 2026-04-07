@@ -6,7 +6,6 @@
 --import BlockApps.Tools.Checkpoints
 import BlockApps.Tools.Code as Code
 import BlockApps.Tools.DumpKafkaSequencer
-import BlockApps.Tools.DumpKafkaStateDiff
 import BlockApps.Tools.DumpKafkaUnSequencer
 import BlockApps.Tools.DumpKafkaVMEvents
 import BlockApps.Tools.SyncStats
@@ -25,9 +24,13 @@ import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import qualified LabeledError
 import System.Console.CmdArgs
--- import System.Process
+import System.Directory
+import System.FilePath
+import System.IO
 
 data Options
   = AddTx {txJson :: String}
@@ -43,11 +46,9 @@ data Options
   | DumpKafkaSequencerVM {startingBlock :: Int}
   | DumpKafkaSequencerP2P {startingBlock :: Int}
   | DumpKafkaUnSequencer {startingBlock :: Int}
-  | DumpKafkaStateDiff {startingBlock :: Int}
   | SyncStats {}
   | FRawMP {stateRoot :: String, filename :: String}
   | Hash {hash :: String}
-  | InsertTX {}
   | Migrate {tables :: String}
   | PushBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qAddr :: Address}
   | Raw {filename :: String}
@@ -156,16 +157,6 @@ dumpKafkaVMEventsOptions =
     [ startingBlock := 0 += typ "INT"
     ]
 
-dumpKafkaStateDiffOptions :: Annotate Ann
-dumpKafkaStateDiffOptions =
-  record
-    DumpKafkaStateDiff {startingBlock = undefined}
-    [ startingBlock := 0 += typ "INT"
-    ]
-
-insertTXOptions :: Annotate Ann
-insertTXOptions =
-  record InsertTX {} []
 {-
 checkpointOptions :: Annotate Ann
 checkpointOptions =
@@ -307,12 +298,10 @@ options =
       dumpKafkaSequencerOptions,
       dumpKafkaSequencerVmOptions,
       dumpKafkaSequencerP2pOptions,
-      dumpKafkaStateDiffOptions,
       dumpKafkaUnSequencerOptions,
       syncStatsOptions,
       fRawMPOptions,
       hashOptions,
-      insertTXOptions,
       rawMPOptions,
       rawOptions,
       redisOptions,
@@ -331,9 +320,29 @@ options =
 
 main :: IO ()
 main = do
+  changeToDefaultNodeDir
   opts <- cmdArgs_ options
   run opts
 
+changeToDefaultNodeDir :: IO ()
+changeToDefaultNodeDir = do
+  home <- getHomeDirectory
+  let defaultNodeFile = home </> ".strato" </> "default-node"
+  exists <- doesFileExist defaultNodeFile
+  if exists
+    then do
+      contents <- TIO.readFile defaultNodeFile
+      let nodeDir = T.unpack $ T.strip contents
+      dirExists <- doesDirectoryExist nodeDir
+      if dirExists
+        then do
+          setCurrentDirectory nodeDir
+          hPutStrLn stderr $ "Using node directory: " ++ nodeDir
+        else do
+          hPutStrLn stderr $ "Error: Node directory not found: " ++ nodeDir
+          hPutStrLn stderr $ "Check ~/.strato/default-node or run from the node directory"
+          fail "Node directory not found"
+    else return ()
 
 run :: Options -> IO ()
 run AddTx {..} = addTx txJson
@@ -348,9 +357,7 @@ run DumpKafkaSequencerVM {..} = dumpKafkaSequencerVM (fromIntegral startingBlock
 run DumpKafkaSequencerP2P {..} = dumpKafkaSequencerP2P (fromIntegral startingBlock)
 run DumpKafkaUnSequencer {..} = dumpKafkaUnSequencer (fromIntegral startingBlock)
 run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
-run DumpKafkaStateDiff {..} = dumpKafkaStateDiff $ fromIntegral startingBlock
 run SyncStats = syncStats
-run InsertTX {} = error "strato-barometer: the insertTx tool has been deprecated."
 run Hash {..} = Hash.doit hash
 run Raw {..} = Raw.doit filename
 run Redis {..} = redis $ BC.pack key

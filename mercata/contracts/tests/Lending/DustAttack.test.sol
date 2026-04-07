@@ -171,7 +171,7 @@ contract Describe_DustAttack is Authorizable {
 
         // given time passes to accrue some interest (1 year at 5% APY)
         fastForward(365 * 24 * 60 * 60);
-        
+
         // Update oracle prices after time advancement to prevent staleness
         oracle.setAssetPrice(goldst, 2000e18);   // $2000 Gold (preserve original price)
         oracle.setAssetPrice(usdst, 1e18);       // $1 USD (preserve original price)
@@ -225,7 +225,7 @@ contract Describe_DustAttack is Authorizable {
         for (uint i = 0; i < 10; i++) {
             fastForward(365 * 24 * 60 * 60);
         }
-        
+
         // Update oracle prices after time advancement to prevent staleness
         oracle.setAssetPrice(goldst, 2000e18);   // $2000 Gold (preserve original price)
         oracle.setAssetPrice(usdst, 1e18);       // $1 USD (preserve original price)

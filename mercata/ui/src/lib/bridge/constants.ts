@@ -9,6 +9,32 @@ export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as c
 // UI Constants
 export const ITEMS_PER_PAGE = 10;
 
+export const BRIDGE_MODE_LABELS = {
+  convert: {
+    title: "Redeem to Stablecoins",
+    description: "Redeem USDST back to external stablecoins",
+    amountLabel: "Amount (USDST to withdraw)",
+  },
+  bridge: {
+    title: "Bridge Out Your Tokens",
+    description: "Bridge your tokens from STRATO to external networks",
+    amountLabel: "Amount",
+  },
+} as const;
+
+export const BRIDGE_IN_MODE_LABELS = {
+  "easy-savings": {
+    title: "Easy Savings",
+    description: "Access high saving rates by converting stablecoins to USDST and lending",
+    amountLabel: "Amount",
+  },
+  "bridge": {
+    title: "Bridge In Your Tokens",
+    description: "Bridge your tokens from external networks to STRATO",
+    amountLabel: "Amount",
+  },
+} as const;
+
 // Contract ABIs
 export const ERC20_ABI = [
   {
@@ -50,7 +76,10 @@ export const ERC20_ABI = [
 export const DEPOSIT_ROUTER_ABI = [
   // Functions
   {
-    inputs: [{ name: 'stratoAddress', type: 'address' }],
+    inputs: [
+      { name: 'stratoAddress', type: 'address' },
+      { name: 'targetStratoToken', type: 'address' }
+    ],
     name: 'depositETH',
     outputs: [],
     stateMutability: 'payable',
@@ -61,6 +90,7 @@ export const DEPOSIT_ROUTER_ABI = [
       { name: 'token', type: 'address' },
       { name: 'amount', type: 'uint256' },
       { name: 'stratoAddress', type: 'address' },
+      { name: 'targetStratoToken', type: 'address' },
       { name: 'nonce', type: 'uint256' },
       { name: 'deadline', type: 'uint256' },
       { name: 'signature', type: 'bytes' }
@@ -73,7 +103,8 @@ export const DEPOSIT_ROUTER_ABI = [
   {
     inputs: [
       { name: 'token', type: 'address' },
-      { name: 'amount', type: 'uint256' }
+      { name: 'amount', type: 'uint256' },
+      { name: 'targetStratoToken', type: 'address' }
     ],
     name: 'canDeposit',
     outputs: [{ name: '', type: 'bool' }],
@@ -156,6 +187,9 @@ export const SUPPORTED_CHAINS = {
   POLYGON_AMOY: 80002,
   OPTIMISM: 10,
   BASE: 8453,
+  BASE_SEPOLIA: 84532,
+  LINEA: 59144,
+  LINEA_SEPOLIA: 59141,
   ARBITRUM: 42161,
   ARBITRUM_NOVA: 42170,
   BSC: 56,
@@ -199,6 +233,9 @@ async function loadBuiltInChain(id: number): Promise<Chain | null> {
       case SUPPORTED_CHAINS.POLYGON_AMOY:  return chains.polygonAmoy;
       case SUPPORTED_CHAINS.OPTIMISM:      return chains.optimism;
       case SUPPORTED_CHAINS.BASE:          return chains.base;
+      case SUPPORTED_CHAINS.BASE_SEPOLIA:  return chains.baseSepolia;
+      case SUPPORTED_CHAINS.LINEA:         return chains.linea;
+      case SUPPORTED_CHAINS.LINEA_SEPOLIA: return chains.lineaSepolia;
       case SUPPORTED_CHAINS.ARBITRUM:      return chains.arbitrum;
       case SUPPORTED_CHAINS.ARBITRUM_NOVA: return chains.arbitrumNova;
       case SUPPORTED_CHAINS.BSC:           return chains.bsc;

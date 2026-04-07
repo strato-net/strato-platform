@@ -54,10 +54,6 @@ Cirrus can be used to query data in specific contracts using state data as param
 [More information about to use Cirrus can be found in our API docs.](https://docs.blockapps.net/app-design-patterns/cirrus/)
 
 ## Debugger Setup
-**NOTE: The following are required in order to use the debugger:**
-- The STRATO node must be started with `VM_DEBUGGER=true`
-- The version of STRATO must be 7.0 or higher  
-
 To set the Debugger up, click on the icon for **Run and Debug**. Click the dropdown for the box with the green play arrow. 
 
 In the dropdown, select **Add Configuration...**, which will open the `launch.json` file with a dropdown.   

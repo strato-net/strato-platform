@@ -42,9 +42,9 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Lazy as BL
 import Data.Ix
+import Data.OpenApi hiding (Format, format)
+import Data.OpenApi.Internal.Schema (named)
 import qualified Data.Primitive.ByteArray as PBA
-import Data.Swagger hiding (Format, format)
-import Data.Swagger.Internal.Schema (named)
 import qualified Data.Text as T
 import Foreign.ForeignPtr
 import Foreign.Ptr
@@ -84,9 +84,14 @@ word160ToBytes word = map (fromIntegral . (word `shiftR`)) [160 - 8, 160 - 16 ..
 
 bytesToWord160 :: [Word8] -> Word160
 bytesToWord160 bytes
-  | length bytes == 20 =
-    sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [160 - 8, 160 - 16 .. 0] bytes
-bytesToWord160 _ = error "bytesToWord160 was called with the wrong number of bytes"
+  | len == 20 = bytesToWord160' bytes
+  -- Handle bytes32 -> address cast: take lower 20 bytes (Solidity behavior)
+  | len > 20 = bytesToWord160' $ drop (len - 20) bytes
+  -- Handle shorter input: left-pad with zeros
+  | otherwise = bytesToWord160' $ replicate (20 - len) 0 ++ bytes
+  where
+    len = length bytes
+    bytesToWord160' bs = sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [160 - 8, 160 - 16 .. 0] bs
 
 slowWord256ToBytes :: Word256 -> [Word8]
 slowWord256ToBytes word = map (fromIntegral . (word `shiftR`)) [256 - 8, 256 - 16 .. 0]
@@ -197,13 +202,13 @@ instance ToSchema Word256 where
       NamedSchema
         (Just "Word256")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
             & description ?~ "Fixed-size words of 256 bits"
         )
 
 instance ToParamSchema Word256 where
-  toParamSchema _ = mempty & type_ ?~ SwaggerString
+  toParamSchema _ = mempty & type_ ?~ OpenApiString
 
 instance ToHttpApiData Word256 where
   toUrlPiece = T.pack . ("0x" ++) . flip showHex ""

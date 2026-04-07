@@ -17,7 +17,7 @@ where
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Transaction
+import Blockchain.Data.Transaction (rawTX2TX)
 import Blockchain.Model.JsonBlock
 import Control.Arrow ((&&&), (***))
 import Control.Monad.Composable.SQL
@@ -83,4 +83,4 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastBlocks (SQLM m) where
 getBlkLast :: (Monad m, GetLastBlocks m) => Integer -> m [Block']
 getBlkLast n = do
   blks <- getLastBlocks n
-  pure $ flip Block' "" <$> blks
+  pure $ Block' <$> blks

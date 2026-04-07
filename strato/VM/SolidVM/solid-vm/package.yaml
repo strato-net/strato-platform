@@ -8,11 +8,13 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.SolidVM
+    - Blockchain.SolidVM.Builtins
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
   ghc-options: -Wall -O2
   dependencies:
   - base16-bytestring
+  - base64-bytestring
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
@@ -21,12 +23,14 @@ library:
   - common-log
   - containers
   - cryptohash
+  - crypton
   - data-default
   - debugger
   - Decimal
   - deepseq
   - elliptic-curve
   - ethereum-rlp
+  - evm-solidity
   - exceptions
   - extra
   - format
@@ -39,10 +43,13 @@ library:
   - ordered-containers
   - pairing
   - parsec
+  - poseidon-hash
   - solid-vm-compiler
   - solid-vm-model
   - solid-vm-parser
+  - solid-vm-static-analysis
   - source-tools
+  - strato-conf
   - strato-model
   - text
   - time

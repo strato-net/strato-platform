@@ -131,7 +131,7 @@ exports[`CreateChain: index render component with empty values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field id=\\"input-b\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" />
+            <Field id=\\"input-b\\" name=\\"contract\\" component={[Function (anonymous)]} dir=\\"auto\\" title=\\"Contract Source\\" />
           </div>
         </div>
         <div className=\\"row\\">
@@ -215,7 +215,7 @@ exports[`CreateChain: index render component with empty values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} disabled={false} onClick={[Function]} text=\\"Create Shard\\" />
+          <Blueprint.Button intent={0} disabled={false} onClick={[Function (anonymous)]} text=\\"Create Shard\\" />
         </div>
       </div>
     </form>
@@ -282,7 +282,7 @@ exports[`CreateChain: index render component with values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\" />
           <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field id=\\"input-b\\" name=\\"contract\\" component={[Function]} dir=\\"auto\\" title=\\"Contract Source\\" />
+            <Field id=\\"input-b\\" name=\\"contract\\" component={[Function (anonymous)]} dir=\\"auto\\" title=\\"Contract Source\\" />
           </div>
         </div>
         <div className=\\"row\\">
@@ -366,7 +366,7 @@ exports[`CreateChain: index render component with values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} disabled={false} onClick={[Function]} text=\\"Create Shard\\" />
+          <Blueprint.Button intent={0} disabled={false} onClick={[Function (anonymous)]} text=\\"Create Shard\\" />
         </div>
       </div>
     </form>

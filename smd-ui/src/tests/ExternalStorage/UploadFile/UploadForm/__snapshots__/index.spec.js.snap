@@ -66,7 +66,7 @@ exports[`UploadFile: index render component (Non Oauth mode) with values 1`] = `
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={true}>
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function (anonymous)]} required={true} disabled={true}>
                 <option value=\\"User_1177_79118\\">
                   User_1177_79118
                 </option>
@@ -181,7 +181,7 @@ exports[`UploadFile: index render component (Non Oauth mode) with values 1`] = `
           </label>
         </div>
         <div className=\\"col-sm-9 smd-pad-4\\">
-          <Field id=\\"input-b\\" component={[Function]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
+          <Field id=\\"input-b\\" component={[Function (anonymous)]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
            
           <br />
           <span className=\\"error-text\\" />
@@ -242,7 +242,7 @@ exports[`UploadFile: index render component (Non Oauth mode) without values 1`] 
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={true}>
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function (anonymous)]} required={true} disabled={true}>
                 <option value={{...}} />
                 <option value=\\"0\\">
                   0
@@ -356,7 +356,7 @@ exports[`UploadFile: index render component (Non Oauth mode) without values 1`] 
           </label>
         </div>
         <div className=\\"col-sm-9 smd-pad-4\\">
-          <Field id=\\"input-b\\" component={[Function]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
+          <Field id=\\"input-b\\" component={[Function (anonymous)]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
            
           <br />
           <span className=\\"error-text\\" />
@@ -417,7 +417,7 @@ exports[`UploadFile: index render component (Oauth mode) with values 1`] = `
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={false}>
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function (anonymous)]} required={true} disabled={false}>
                 <option value={{...}} />
                 <option value=\\"Admin_1085_64667\\">
                   Admin_1085_64667
@@ -541,7 +541,7 @@ exports[`UploadFile: index render component (Oauth mode) with values 1`] = `
           </label>
         </div>
         <div className=\\"col-sm-9 smd-pad-4\\">
-          <Field id=\\"input-b\\" component={[Function]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
+          <Field id=\\"input-b\\" component={[Function (anonymous)]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
            
           <br />
           <span className=\\"error-text\\" />
@@ -602,7 +602,7 @@ exports[`UploadFile: index render component (Oauth mode) without values 1`] = `
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={false}>
+              <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function (anonymous)]} required={true} disabled={false}>
                 <option value={{...}} />
                 <option value=\\"0\\">
                   0
@@ -729,7 +729,7 @@ exports[`UploadFile: index render component (Oauth mode) without values 1`] = `
           </label>
         </div>
         <div className=\\"col-sm-9 smd-pad-4\\">
-          <Field id=\\"input-b\\" component={[Function]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
+          <Field id=\\"input-b\\" component={[Function (anonymous)]} className=\\"form-width pt-input\\" name=\\"content\\" dir=\\"auto\\" title=\\"Content\\" tabIndex=\\"4\\" required={true} />
            
           <br />
           <span className=\\"error-text\\" />

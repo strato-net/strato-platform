@@ -62,8 +62,9 @@ export const checkSafeTxStatus = async (
 
     if (tx.isExecuted && tx.isSuccessful) return "executed";
 
+    const safeAddress = (tx as any).safe || config.safe.address!;
     const allTxs = await retry(
-      () => apiKit.getMultisigTransactions(config.safe.address!, {
+      () => apiKit.getMultisigTransactions(safeAddress, {
         nonce: tx.nonce,
       } as any),
       { logPrefix: "SafeService" }

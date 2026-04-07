@@ -5,6 +5,7 @@
  */
 export const safeBigInt = (value: string | number | bigint): bigint => {
   if (typeof value === 'bigint') return value;
+  if (typeof value === 'number') return BigInt(value);
   
   const stringValue = value.toString();
   

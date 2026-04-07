@@ -24,7 +24,7 @@ const TokenDisplay: React.FC<TokenDisplayProps> = ({
         {showName && name && (
           <div className="font-medium">{name}</div>
         )}
-        <div className="text-xs text-gray-500">{symbol}</div>
+        <div className="text-xs text-muted-foreground">{symbol}</div>
       </div>
     </div>
   );

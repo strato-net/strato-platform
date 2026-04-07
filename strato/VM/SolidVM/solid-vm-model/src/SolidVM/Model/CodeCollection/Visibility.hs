@@ -13,7 +13,7 @@ import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
 import Data.Binary
-import Data.Swagger
+import Data.OpenApi
 import Data.Text (Text)
 import GHC.Generics
 import qualified Generic.Random as GR
@@ -53,10 +53,6 @@ instance ToSchema Visibility where
       ex = Public
       schemaOptions :: SchemaOptions
       schemaOptions =
-        SchemaOptions
-          { Data.Swagger.fieldLabelModifier = camelCase . dropFPrefix,
-            Data.Swagger.constructorTagModifier = id,
-            Data.Swagger.datatypeNameModifier = id,
-            Data.Swagger.allNullaryToStringTag = True,
-            Data.Swagger.unwrapUnaryRecords = True
+        defaultSchemaOptions
+          { Data.OpenApi.fieldLabelModifier = camelCase . dropFPrefix
           }

@@ -1,21 +1,21 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Sequencer.Kafka
   ( assertSequencerTopicsCreation,
     unseqEventsTopicName,
-    seqVmEventsTopicName,
+    seqVmTasksTopicName,
     seqP2pEventsTopicName,
     readUnseqEvents,
     writeUnseqEvents,
-    writeSeqVmEvents,
+    writeSeqVmTasks,
     writeSeqP2pEvents,
     emitBlockstanbulMsg,
   )
 where
 
 import qualified Blockchain.Blockstanbul as PBFT
-import Blockchain.KafkaTopics (lookupTopic)
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka.Metrics
 import Control.Monad.Change.Modify (Outputs (..))
@@ -23,19 +23,19 @@ import Control.Monad.Composable.Kafka
 import Data.Binary (Binary)
 
 unseqEventsTopicName :: TopicName
-unseqEventsTopicName = lookupTopic "unseqevents"
+unseqEventsTopicName = "unseqevents"
 
-seqVmEventsTopicName :: TopicName
-seqVmEventsTopicName = lookupTopic "seq_vm_events"
+seqVmTasksTopicName :: TopicName
+seqVmTasksTopicName = "vm_tasks"
 
 seqP2pEventsTopicName :: TopicName
-seqP2pEventsTopicName = lookupTopic "seq_p2p_events"
+seqP2pEventsTopicName = "seq_p2p_events"
 
 assertSequencerTopicsCreation :: HasKafka m => m ()
 assertSequencerTopicsCreation = do
-  createTopic unseqEventsTopicName
-  createTopic seqVmEventsTopicName
-  createTopic seqP2pEventsTopicName
+  createTopicAndWait unseqEventsTopicName
+  createTopicAndWait seqVmTasksTopicName
+  createTopicAndWait seqP2pEventsTopicName
 
 readUnseqEvents :: HasKafka k => Offset -> k [IngestEvent]
 readUnseqEvents off = do
@@ -50,10 +50,10 @@ writeUnseqEvents :: HasKafka k => [IngestEvent] -> k [ProduceResponse]
 writeUnseqEvents events = do
   produceItems unseqEventsTopicName events
 
-writeSeqVmEvents :: HasKafka k => [VmEvent] -> k [ProduceResponse]
-writeSeqVmEvents events = do
+writeSeqVmTasks :: HasKafka k => [VmTask] -> k [ProduceResponse]
+writeSeqVmTasks events = do
   recordEvents seqVMWrites events
-  produceItems seqVmEventsTopicName events
+  produceItems seqVmTasksTopicName events
 
 writeSeqP2pEvents :: HasKafka k => [P2pEvent] -> k [ProduceResponse]
 writeSeqP2pEvents events = do

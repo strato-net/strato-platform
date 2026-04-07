@@ -56,6 +56,7 @@ import Data.Maybe
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Traversable (for)
 --import Database.Persist
 import Database.Persist.Postgresql
 import Database.Esqueleto.PostgreSQL.JSON
@@ -103,11 +104,11 @@ rowToInsert row =
    in processedContract newState row
 
 
-rowToCollections :: AggregateAction -> Map.Map Text Value
+rowToCollections :: AggregateAction -> Either Text (Map.Map Text Value)
 rowToCollections row =
   let newState = case actionStorage row of
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
-   in Map.fromList newState
+   in Map.fromList <$> newState
 
 processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> [ProcessedCollectionRow]
 processedContractToProcessedCollectionRows state row =
@@ -123,7 +124,7 @@ processedContractToProcessedCollectionRows state row =
           ) $ extractValues value
         ) $ Map.toList state
       processRecord (n, t, ks, v) = processedCollectionRow n t row ks v
-   in processRecord <$> recordVMs  
+   in processRecord <$> recordVMs
 
 processedCollectionRow :: Text -> Text -> AggregateAction -> [Value] -> Value ->  ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ks v =
@@ -137,7 +138,7 @@ processedCollectionRow collection ttype AggregateAction {..} ks v =
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       collectionDataKeys = ks,
-      collectionDataValue = v 
+      collectionDataValue = v
     }
 
 parseActions :: [VME.VMEvent] -> [(Address, [AggregateAction])]
@@ -158,13 +159,13 @@ parseEvents = concatMap parseEvent
           eventBlockTimestamp = Action._blockTimestamp a,
           eventBlockNumber = Action._blockNumber a,
           eventTxSender = Action._transactionSender a,
-          eventEvent = e, 
+          eventEvent = e,
           eventIndex = idx
         }
 
 getCollectionsFromContract :: ContractF () -> [(T.Text, [SVMType.Type], SVMType.Type)] -- (collection name, key type(s), value type)
 getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . _storageDefs
-  where filterAndExtract name vd = if not (_isRecord vd) then Nothing else case extractKeys (_varType vd) of
+  where filterAndExtract name vd = case extractKeys (_varType vd) of
           ([], _) -> Nothing
           (ks, v) -> Just (T.pack name, ks, v)
         extractKeys (SVMType.Array entry _)     = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
@@ -173,13 +174,11 @@ getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . 
 
 processTheMessages ::
   ( MonadIO m
-  , HasSQL m
   , MonadLogger m
   ) =>
-  PGConnection ->
   [VME.VMEvent] ->
-  ConduitM i (Either TransactionResult [SlipstreamQuery]) m [AggregateEvent]
-processTheMessages conn messages = do
+  ConduitM () (Either TransactionResult SlipstreamQuery) m [AggregateEvent]
+processTheMessages messages = do
   case length messages of
     0 -> return ()
     1 -> $logInfoS "processTheMessages" "1 message has arrived"
@@ -195,15 +194,15 @@ processTheMessages conn messages = do
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputData . fmap concat . forM creates $ \(cc, cr) -> do
+  fkeys <- mapOutput Right . fmap concat . forM creates $ \(cc, cr) -> do
     $logInfoS "processTheMessages" $ "CodeCollection Added"
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
-    fmap concat . forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
+    fmap concat . forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do
       -- Here we will get the storageDefs attribute of the contract (c)
       -- and iterate through the Map of (Text, VariableDecl) and look for
-      -- VariableDecls that have the last attribute (isRecord) true and
-      -- thetype are mappings We will then create a table for each of
+      -- VariableDecls that have type are mapping or array.
+      -- We will then create a table for each of
       -- these collections and add a foreign key to the main table
 
       let collectionNamesAndTypes = getCollectionsFromContract c
@@ -220,9 +219,9 @@ processTheMessages conn messages = do
           $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
           pure []
         Right inheritedContracts -> pure $ map (T.pack . _contractName) inheritedContracts
-      indexFkeys <- createIndexTable conn c cc nameParts inherited
-      collectionFkeys <- catMaybes <$> traverse (createCollectionTable conn nameParts c cc inherited) collectionNamesAndTypes
-      eventFkeys <- createExpandEventTables conn c cc nameParts inherited
+      indexFkeys <- createIndexTable c cc nameParts inherited
+      collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
+      eventFkeys <- createExpandEventTables c cc nameParts inherited
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 
   inserts <- fmap concat $ do
@@ -233,9 +232,9 @@ processTheMessages conn messages = do
             let indexContract = rowToInsert row
             --get columns for abstract table
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
-            let stateDiff = rowToCollections row
-                pCollections = processedContractToProcessedCollectionRows stateDiff row --get all collection rows to insert
-            pure . Right $ BatchedInserts indexContract pCollections
+            for (rowToCollections row) $ \stateDiff -> do
+              let pCollections = processedContractToProcessedCollectionRows stateDiff row --get all collection rows to insert
+              pure $ BatchedInserts indexContract pCollections
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -243,33 +242,32 @@ processTheMessages conn messages = do
   let insertsByCodeHash = rights inserts
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
-  
-  mapOutput Right . outputData $ do
+
+  mapOutput Right $ do
     forM_ insertsByCodeHash $ \ins -> do
 --      lift $ insertIndexTable2 $ insertToStorage $ indexInsert ins
-      insertIndexTable conn $ indexInsert ins
+      insertIndexTable $ indexInsert ins
       unless (null $ collectionInserts ins) $
-        insertCollectionTable conn $ collectionInserts ins
+        insertCollectionTable $ collectionInserts ins
 
-    forM_ delegatecalls $ insertDelegatecall conn
+    forM_ delegatecalls insertDelegatecall
 
   let processedEventArrays = concatMap aggEventToCollectionRows events'
 
   when (not (null events')) $ do
-    mapOutput Right . outputData $ pipeInsertGlobalEventTable conn events'
+    mapOutput Right $ pipeInsertGlobalEventTable events'
     unless (null processedEventArrays) $
-      mapOutput Right . outputData $ insertCollectionTable conn processedEventArrays
+      mapOutput Right $ insertCollectionTable processedEventArrays
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"
-    mapOutput Right . outputData $ createFkeyFunctions conn fkeys
-    mapOutput Right . outputData $ notifyPostgREST conn
+    mapOutput Right $ createFkeyFunctions fkeys
+    mapOutput Right $ notifyPostgREST
 
   $logInfoS "processTheMessages" . T.pack $
     "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
-  forM_ transactionResults $ \txr -> do
-    void . lift $ putTransactionResult txr
+  yieldMany $ Left <$> transactionResults
 
   return events'
 {-

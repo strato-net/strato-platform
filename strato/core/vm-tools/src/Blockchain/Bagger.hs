@@ -25,7 +25,6 @@ import qualified Blockchain.Data.AddressStateDB as DD
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TXOrigin as TO
-import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResult
 import Blockchain.Database.MerklePatricia (StateRoot (..))
@@ -39,7 +38,8 @@ import Blockchain.Timing
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
-import Blockchain.VMOptions
+import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
+import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.Verification as V
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -52,12 +52,12 @@ import qualified Data.Binary as Bin
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
+import Data.Function (on)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
-import Executable.EVMFlags (flags_maxTxsPerBlock)
 import Text.Format
 
 {-# NOINLINE baggerBlockHash #-}
@@ -66,7 +66,6 @@ baggerBlockHash = hash "This is the bagger block hash. It is a dummy value used 
 
 type MonadBagger m =
   ( VMBase m,
-    Mod.Accessible IsBlockstanbul m,
     Mod.Accessible TRC.Cache m,
     Mod.Modifiable B.BaggerState m,
     Mod.Yields m TransactionResult
@@ -82,9 +81,6 @@ data TxMiningResult = TxMiningResult
 
 type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> Address -> m TxMiningResult
 
-
-isBlockstanbul :: (Functor m, Mod.Accessible IsBlockstanbul m) => m Bool
-isBlockstanbul = unIsBlockstanbul <$> Mod.access (Mod.Proxy @IsBlockstanbul)
 
 getBaggerState :: Mod.Modifiable B.BaggerState m => m B.BaggerState
 getBaggerState = Mod.get (Mod.Proxy @B.BaggerState)
@@ -176,7 +172,7 @@ getCachedRunResults bd = do
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, Keccak256) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
   NonceTooLow s q expected OutputTx {otHash = hsh, otBaseTx = bt} ->
-    (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hsh)
+    (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (TD.nonce bt) ++ ")", hsh)
   BalanceTooLow s q needed actual OutputTx {otHash = hsh} ->
     (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hsh)
   GasLimitTooLow s q _ OutputTx {otHash = hsh} ->
@@ -299,7 +295,7 @@ makeNewBlock mineTransactions mSelfAddress = do
           let lastSR = B.lastExecutedStateRoot cache
           let lastSHA = B.bestBlockSHA cache
           let lastHead = B.bestBlockHeader cache
-          let promoted = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
+          let promoted = take ((fromInteger (Conf.maxTxsPerBlock (quarryConfig ethConf))) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
           let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty
           let remGas = B.remainingGas cache
@@ -316,7 +312,7 @@ makeNewBlock mineTransactions mSelfAddress = do
                     txsDroppedCallback [f] []
                     let theRejectedTx = rejectedTx f
                     purgeFromPending theRejectedTx
-                    return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx)
+                    return (nsr, nbg, lastExec ++ rtx, filter (on (/=) otSigner theRejectedTx) urtx)
                   x -> error (show x)
 
             let !newMiningCache =
@@ -397,7 +393,7 @@ logReady prefix address OutputTx {otHash = h, otBaseTx = t} = do
   $logDebugS "Bagger.logReady+status " . T.pack $ prefix
   $logDebugS "Bagger.logReady+address" . T.pack $ format address
   $logDebugS "Bagger.logReady+hash   " . T.pack $ format h
-  $logDebugS "Bagger.logReady+nonce  " . T.pack $ show (TD.transactionNonce t)
+  $logDebugS "Bagger.logReady+nonce  " . T.pack $ show (TD.nonce t)
   $logDebugS "Bagger.logReady++++++++" "+++++++++++++++++++"
 
 logDiscard :: (MonadLogger m) => String -> Address -> Integer -> OutputTx -> m ()
@@ -407,7 +403,7 @@ logDiscard prefix address expectation OutputTx {otHash = h, otBaseTx = t} = do
   $logDebugS "Bagger.logDiscard=expect " . T.pack $ show expectation
   $logDebugS "Bagger.logDiscard=address" . T.pack $ format address
   $logDebugS "Bagger.logDiscard=hash   " . T.pack $ format h
-  $logDebugS "Bagger.logDiscard=nonce  " . T.pack $ show (TD.transactionNonce t)
+  $logDebugS "Bagger.logDiscard=nonce  " . T.pack $ show (TD.nonce t)
   $logDebugS "Bagger.logDiscard========" "==================="
 
 logDiscard' :: (MonadLogger m) => String -> Address -> OutputTx -> m ()
@@ -416,7 +412,7 @@ logDiscard' prefix address OutputTx {otHash = h, otBaseTx = t} = do
   $logDebugS "Bagger.logDiscard'-status " . T.pack $ prefix
   $logDebugS "Bagger.logDiscard'-address" . T.pack $ format address
   $logDebugS "Bagger.logDiscard'-hash   " . T.pack $ format h
-  $logDebugS "Bagger.logDiscard'-nonce  " . T.pack $ show (TD.transactionNonce t)
+  $logDebugS "Bagger.logDiscard'-nonce  " . T.pack $ show (TD.nonce t)
   $logDebugS "Bagger.logDiscard'--------" "-------------------"
 
 addToQueued :: MonadBagger m => BaggerStage -> OutputTx -> m ()
@@ -546,12 +542,12 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
   state <- lift getBaggerState
   let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
-      txn = TD.transactionNonce bt
+      txn = TD.nonce bt
       txFee = B.calculateIntrinsicTxFee state t
       txSize = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt
-  when (intrinsicGas >= flags_gasLimit)
+  when (intrinsicGas >= Conf.gasLimit (networkConfig ethConf))
     . throwE
-    $ GasLimitExceeded Validation Incoming intrinsicGas flags_gasLimit t
+    $ GasLimitExceeded Validation Incoming intrinsicGas (Conf.gasLimit (networkConfig ethConf)) t
   (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
   when (addressNonce > txn)
     . throwE
@@ -559,9 +555,9 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   when (addressBalance < txFee)
     . throwE
     $ BalanceTooLow Validation Incoming txFee addressBalance t
-  when (txSize >= toInteger flags_txSizeLimit)
+  when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
     . throwE
-    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger flags_txSizeLimit) t
+    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
   when (otHash t `S.member` knownFailedTxs) $ do
     liftIO $ putStrLn $ "################################ otHash = " ++ format (otHash t)
     throwE $ KnownFailedTX Validation Incoming t
@@ -592,7 +588,6 @@ buildFromMiningCache :: MonadBagger m => m OutputBlock
 buildFromMiningCache = do
   $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
   state <- getBaggerState
-  isPBFT <- isBlockstanbul
   let cache = B.miningCache state
   let uncles = []
   let parentHash = B.bestBlockSHA cache
@@ -604,8 +599,7 @@ buildFromMiningCache = do
   let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
-  when isPBFT $
-    cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
+  cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
   return
     OutputBlock
       { obOrigin = TO.Quarry,

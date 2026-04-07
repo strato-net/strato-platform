@@ -1,0 +1,144 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           ethereum-discovery
+version:        0.1.0.0
+author:         jamshid
+maintainer:     jim
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Strato.Discovery.Data.MemPeerDB
+      Blockchain.Strato.Discovery.Data.Peer
+      Blockchain.Strato.Discovery.Data.PeerIOWiring
+      Blockchain.Strato.Discovery.ContextLite
+      Blockchain.Strato.Discovery.UDP
+      Blockchain.Strato.Discovery.UDPServer
+      Blockchain.Strato.Discovery.P2PUtil
+      Executable.EthereumDiscovery
+      Executable.EthDiscoverySetup
+      Executable.Options
+  other-modules:
+      Blockchain.Strato.Discovery.Data.PeerDefinition
+      Blockchain.Strato.Discovery.Metrics
+      Paths_ethereum_discovery
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      base
+    , base16-bytestring
+    , binary
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , bytestring
+    , common-log
+    , composable-monads-base
+    , containers
+    , cpu
+    , crypto-pubkey-types
+    , data-default
+    , either
+    , entropy
+    , errors
+    , esqueleto
+    , ethereum-encryption
+    , ethereum-rlp
+    , exceptions
+    , format
+    , hedis
+    , hflags
+    , http-client
+    , iproute
+    , labeled-error
+    , lens
+    , monad-alter
+    , mtl
+    , network
+    , network-uri
+    , persistent
+    , persistent-postgresql
+    , prometheus-client
+    , random
+    , split
+    , strato-conf
+    , strato-model
+    , strato-redis-blockdb
+    , text
+    , time
+    , unliftio
+    , unliftio-core
+    , vault-monad
+  default-language: Haskell2010
+
+executable ethereum-discover
+  main-is: Main.hs
+  other-modules:
+      Paths_ethereum_discovery
+  hs-source-dirs:
+      exec_src/ethereumDiscovery/
+  ghc-options: -Wall -O2
+  build-depends:
+      base
+    , blockapps-init
+    , common-log
+    , ethereum-discovery
+    , format
+    , hflags
+    , monad-logger
+    , mtl
+    , network
+    , process-monitor
+    , resourcet
+    , strato-conf
+    , strato-networks
+    , text
+    , unliftio
+    , vault-monad
+  default-language: Haskell2010
+
+executable strato-network-monitor
+  main-is: Main.hs
+  other-modules:
+      NetworkInterface
+      NetworkInterfaceEvent
+      Paths_ethereum_discovery
+  hs-source-dirs:
+      exec_src/networkMonitor/
+  ghc-options: -Wall -O2
+  build-depends:
+      base
+    , common-log
+    , containers
+    , ethereum-discovery
+    , format
+    , hflags
+    , network
+    , network-info
+    , text
+  default-language: Haskell2010
+
+test-suite ethereum-discover-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Blockchain.Strato.Discovery.UDPSpec
+      Paths_ethereum_discovery
+  hs-source-dirs:
+      test/
+  ghc-options: -Wall -O2 -Wall -Werror -dynamic
+  build-depends:
+      base
+    , ethereum-discovery
+    , ethereum-rlp
+    , format
+    , hspec
+    , network
+    , strato-model
+  default-language: Haskell2010

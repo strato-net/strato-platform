@@ -30,12 +30,12 @@ source-repository head
 flag ecdh
   description: Enable (experimental) ECDH APIs
   manual: True
-  default: False
+  default: True
 
 flag recovery
   description: Enable signature key recovery APIs
   manual: True
-  default: False
+  default: True
 
 flag schnorr
   description: Enable BIP-340 (Schnorr) APIs

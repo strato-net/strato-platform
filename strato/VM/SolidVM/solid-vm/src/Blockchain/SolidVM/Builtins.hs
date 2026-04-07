@@ -4,16 +4,36 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Blockchain.SolidVM.Builtins where
+module Blockchain.SolidVM.Builtins
+  ( -- * Monadic ABI functions (need MonadSM)
+    encodeDynamicValue,
+    abiEncode,
+    abiEncodePacked,
 
+    -- * Non-ABI builtins
+    push,
+    modExp,
+    ecAdd,
+    ecMul,
+    ecPairing,
+    poseidonHash,
+  )
+where
+
+import BlockApps.Solidity.ABI.Codec
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
+import Blockchain.Strato.Model.Address (addressToByteString)
 import Blockchain.VM.SolidException
-import qualified Data.ByteString.Char8 as BC
+import Control.Monad ((<=<))
+import qualified Crypto.Hash.Poseidon as Poseidon
 import Data.Curve                   (Form(Weierstrass), Coordinates(Affine))
 import Data.Curve.Weierstrass.BN254 (BN254, Fq, Fr, Point(..), add, mul)
+import Data.Foldable (fold)
 import Data.Pairing                 (pairing)
 import Data.Pairing.BN254           (Fq2, G2', GT')
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import GHC.Exts (IsList(fromList))
 import qualified SolidVM.Model.Storable as MS
@@ -84,3 +104,58 @@ ecPairing = maybe False doPairing . toTrios
               acc = mconcat [pairing (point g1) (toG2 (x2,y2)) | (g1,x2,y2) <- trios]
 
            in acc == mempty
+
+-- | Poseidon hash - ZK-friendly hash function over BN254 scalar field
+-- Takes a list of integers (field elements) and returns their Poseidon hash
+poseidonHash :: [Integer] -> Integer
+poseidonHash inputs = Poseidon.fromF $ Poseidon.poseidon (map Poseidon.toF inputs)
+
+--------------------------------------------------------------------------------
+-- Monadic ABI functions (need MonadSM for variable dereferencing)
+--------------------------------------------------------------------------------
+
+encodeDynamicValue :: MonadSM m => Value -> m B.ByteString
+encodeDynamicValue (SBytes bs) = pure $
+  encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
+encodeDynamicValue (SString s) = pure $
+  let bs = BC.pack s
+  in encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
+encodeDynamicValue (SArray vec) = do
+  elems <- traverse weakGetVar (V.toList vec)
+  encoded <- abiEncode elems
+  pure $ encodeUint256 (fromIntegral $ length elems) <> encoded
+encodeDynamicValue v = pure $ encodeStaticValue v
+
+-- | Standard ABI encoding of a list of values.
+-- Uses head/tail encoding: static values go directly in the head,
+-- dynamic values get an offset pointer in the head and data in the tail.
+abiEncode :: MonadSM m => [Value] -> m B.ByteString
+abiEncode vals = do
+  let n = length vals
+      headSize = n * 32
+      -- Build head and tail simultaneously
+      go [] _ headAcc tailAcc = pure (headAcc, tailAcc)
+      go (v:vs) tailOffset headAcc tailAcc
+        | isDynamicValue v = do
+            encoded <- encodeDynamicValue v
+            let offsetWord = encodeUint256 (fromIntegral tailOffset)
+            go vs (tailOffset + B.length encoded) (headAcc <> offsetWord) (tailAcc <> encoded)
+        | otherwise =
+            go vs tailOffset (headAcc <> encodeStaticValue v) tailAcc
+  uncurry (<>) <$> go vals headSize B.empty B.empty
+
+-- | Packed ABI encoding — no padding, no offsets.
+abiEncodePacked :: MonadSM m => [Value] -> m B.ByteString
+abiEncodePacked = fmap fold . traverse encodeValuePacked
+  where
+    encodeValuePacked :: MonadSM m => Value -> m B.ByteString
+    encodeValuePacked (SBool True)       = pure $ B.singleton 1
+    encodeValuePacked (SBool False)      = pure $ B.singleton 0
+    encodeValuePacked (SAddress addr _)  = pure $ addressToByteString addr
+    encodeValuePacked (SInteger n)       = pure $ encodeInt256 n
+    encodeValuePacked (SString s)        = pure $ BC.pack s
+    encodeValuePacked (SBytes bs)        = pure bs
+    encodeValuePacked (SEnumVal _ _ w)   = pure $ encodeUint256 (fromIntegral w)
+    encodeValuePacked (SArray vec)       = fold <$> traverse (encodeValuePacked <=< weakGetVar) vec
+    encodeValuePacked SNULL              = pure B.empty
+    encodeValuePacked _                  = pure B.empty

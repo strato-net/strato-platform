@@ -12,7 +12,7 @@
 module Bloc.API.AbiBin where
 
 import Data.Aeson
-import Data.Swagger
+import Data.OpenApi
 import Data.Text (Text)
 import GHC.Generics
 import Test.QuickCheck.Instances ()

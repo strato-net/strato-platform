@@ -47,7 +47,7 @@ SyncTask
 $(deriveFormat ''SyncTask)
 
 instance ShortDescription SyncTask where
-  shortDescription SyncTask{..} = "SyncTask: chiliad #" ++ show syncTaskChiliad ++ " (" ++ 
+  shortDescription SyncTask{..} = "SyncTask: chiliad #" ++ show syncTaskChiliad ++ " (" ++
     case syncTaskStatus of
       Assigned -> "assigned to " ++ show syncTaskHost ++ " at " ++ show syncTaskAssignmentTime
       Finished -> "FINISHED"

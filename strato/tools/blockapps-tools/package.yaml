@@ -60,6 +60,8 @@ executables:
       - blockapps-tools
       - bytestring
       - cmdargs
+      - directory
+      - filepath
       - labeled-error
       - merkle-patricia-db
       - process

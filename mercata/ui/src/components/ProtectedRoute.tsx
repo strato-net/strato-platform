@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
+import { redirectToLogin } from '@/lib/auth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,24 +13,16 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     // Only redirect if not loading and not authenticated
     if (!loading && !isLoggedIn) {
       // Redirect to login page if not authenticated
-      window.location.href = '/login';
+      redirectToLogin();
     }
   }, [isLoggedIn, loading]);
 
-  // Show loading state while checking authentication
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
-  }
-
   // Don't render anything if not authenticated (will redirect)
-  if (!isLoggedIn) {
+  if (!loading && !isLoggedIn) {
     return null;
   }
 
+  // Render children even while loading - let them handle their own loading states
   return <>{children}</>;
 };
 

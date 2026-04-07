@@ -1,0 +1,100 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-genesis
+version:        0.0.1
+synopsis:       A tool to setup the DBs for a Strato instance
+description:    A tool to setup the DBs for a Strato instance
+category:       Data Structures
+author:         Jamshid
+maintainer:     jamshidnh@gmail.com
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Data.AddressInfo
+      Blockchain.Data.CodeInfo
+      Blockchain.Data.CodeInfoOld
+      Blockchain.Data.GenesisBlock
+      Blockchain.Data.GenesisInfo
+      Blockchain.GenesisBlocks.Builder
+      Blockchain.GenesisBlocks.Contracts.Decide
+      Blockchain.GenesisBlocks.Contracts.GovernanceV2
+      Blockchain.GenesisBlocks.Contracts.Mercata
+      Blockchain.GenesisBlocks.Contracts.TH
+      Blockchain.GenesisBlocks.Contracts.UserRegistry
+      Blockchain.GenesisBlocks.HeliumGenesisBlock
+      Blockchain.GenesisBlocks.Instances.GenesisAssets
+      Blockchain.GenesisBlocks.Instances.GenesisEscrows
+      Blockchain.GenesisBlocks.Instances.GenesisReserves
+  other-modules:
+      Paths_strato_genesis
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      aeson
+    , aeson-casing
+    , base
+    , base16-bytestring
+    , binary
+    , blockapps-data
+    , blockapps-mpdbs
+    , bytestring
+    , common-log
+    , containers
+    , crypto-api
+    , data-default
+    , directory
+    , ethereum-rlp
+    , file-embed
+    , filepath
+    , format
+    , json-stream
+    , labeled-error
+    , lens
+    , merkle-patricia-db
+    , monad-alter
+    , scientific
+    , solid-vm-compiler
+    , solid-vm-model
+    , split
+    , strato-model
+    , template-haskell
+    , text
+    , time
+    , vector
+    , vm-tools
+  default-language: Haskell2010
+
+test-suite strato-genesis-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      GenerationSpec
+      JsonSpec
+      Spec
+      Paths_strato_genesis
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -dynamic
+  build-depends:
+      aeson
+    , base
+    , blockapps-data
+    , bytestring
+    , containers
+    , hspec
+    , json-stream
+    , labeled-error
+    , merkle-patricia-db
+    , strato-genesis
+    , strato-model
+    , text
+    , time
+    , vector
+  default-language: Haskell2010

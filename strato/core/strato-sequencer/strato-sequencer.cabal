@@ -1,0 +1,138 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-sequencer
+version:        0.1.0.0
+category:       Blockchain
+author:         Ilya Ostrovskiy
+maintainer:     ilya@blockapps.net
+copyright:      2016 BlockApps Inc
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Sequencer
+      Blockchain.Sequencer.Bootstrap
+      Blockchain.Sequencer.CablePackage
+      Blockchain.Sequencer.DB.DependentBlockDB
+      Blockchain.Sequencer.DB.Metrics
+      Blockchain.Sequencer.DB.SeenTransactionDB
+      Blockchain.Sequencer.Metrics
+      Blockchain.Sequencer.Monad
+      Flags
+  other-modules:
+      Paths_strato_sequencer
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
+  build-depends:
+      alarmclock
+    , base
+    , binary
+    , blockDB
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-init
+    , blockapps-vault-wrapper-api
+    , blockapps-vault-wrapper-client
+    , blockstanbul
+    , bytestring
+    , classy-prelude
+    , clock
+    , common-log
+    , conduit
+    , containers
+    , directory
+    , format
+    , hflags
+    , http-client
+    , kafka-monad
+    , labeled-error
+    , lens
+    , leveldb-haskell
+    , monad-alter
+    , mtl
+    , prometheus-client
+    , resourcet
+    , seqevents
+    , stm-chans
+    , stm-conduit
+    , strato-conf
+    , strato-model
+    , strato-redis-blockdb
+    , text
+    , time
+    , transformers
+    , vault-monad
+  default-language: Haskell2010
+
+executable forced-config-change
+  main-is: ForcedConfigChange.hs
+  hs-source-dirs:
+      exec-src
+  ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
+  build-depends:
+      base
+    , blockstanbul
+    , hflags
+    , kafka-monad
+    , seqevents
+    , strato-conf
+  default-language: Haskell2010
+
+executable strato-sequencer
+  main-is: Main.hs
+  hs-source-dirs:
+      exec-src
+  ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
+  build-depends:
+      async
+    , base
+    , blockDB
+    , blockapps-data
+    , blockapps-init
+    , blockstanbul
+    , common-log
+    , format
+    , hedis
+    , hflags
+    , process-monitor
+    , prometheus-client
+    , seqevents
+    , stm
+    , stm-chans
+    , strato-conf
+    , strato-genesis
+    , strato-model
+    , strato-redis-blockdb
+    , strato-sequencer
+    , text
+    , vault-monad
+    , wai-middleware-prometheus
+    , warp
+  default-language: Haskell2010
+
+benchmark send-to-blockstanbul
+  type: exitcode-stdio-1.0
+  main-is: BlockstanbulSend.hs
+  other-modules:
+      Paths_strato_sequencer
+  hs-source-dirs:
+      bench/
+  ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto -dynamic
+  build-depends:
+      base
+    , blockapps-data
+    , blockstanbul
+    , classy-prelude
+    , containers
+    , mtl
+    , resourcet
+    , stm-chans
+    , strato-sequencer
+    , unliftio
+  default-language: Haskell2010

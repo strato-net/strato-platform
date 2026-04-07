@@ -1,5 +1,0 @@
-
-contract record D {
-  constructor () {
-  }
-}

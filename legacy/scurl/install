@@ -1,9 +1,0 @@
-	
-mkdir -p ~/.local/bin
-mkdir -p ~/.local/share/bash-completion/completions
-
-cp login ~/.local/bin/
-cp scurl ~/.local/bin/
-
-cp scurl.bash ~/.local/share/bash-completion/completions/
-

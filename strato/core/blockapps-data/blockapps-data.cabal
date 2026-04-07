@@ -1,0 +1,87 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockapps-data
+version:        0.0.1
+synopsis:       A Haskell version of an Ethereum client
+description:    The client described in the Ethereum Yellowpaper
+category:       Data Structures
+author:         Jamshid
+maintainer:     jamshidnh@gmail.com
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Constants
+      Blockchain.Data.AddressStateRef
+      Blockchain.Data.Block
+      Blockchain.Data.BlockDB
+      Blockchain.Data.BlockHeader
+      Blockchain.Data.ChainInfo
+      Blockchain.Data.Enode
+      Blockchain.Data.EventDB
+      Blockchain.Data.Extra
+      Blockchain.Data.Log
+      Blockchain.Data.LogDB
+      Blockchain.Data.RawTransaction
+      Blockchain.Data.Transaction
+      Blockchain.Data.TransactionDef
+      Blockchain.Data.TransactionResult
+      Blockchain.DB.DetailsDB
+      Blockchain.DB.SQLDB
+      Blockchain.DBM
+      Blockchain.Verification
+  other-modules:
+      Paths_blockapps_data
+  hs-source-dirs:
+      src/
+  default-extensions:
+      TemplateHaskell
+  ghc-options: -Wall -O2
+  build-depends:
+      QuickCheck
+    , aeson
+    , base
+    , base-unicode-symbols
+    , base16-bytestring
+    , binary
+    , blockapps-datadefs
+    , blockapps-secp256k1-haskell
+    , bytestring
+    , bytestring-arbitrary
+    , clock
+    , common-log
+    , composable-monads-base
+    , containers
+    , data-default
+    , deepseq
+    , esqueleto
+    , ethereum-rlp
+    , filepath
+    , format
+    , generic-arbitrary
+    , generic-random
+    , labeled-error
+    , lens
+    , merkle-patricia-db
+    , monad-logger
+    , network
+    , openapi3
+    , persistent
+    , persistent-postgresql
+    , quickcheck-instances
+    , regex-compat
+    , resourcet
+    , servant-docs
+    , strato-conf
+    , strato-model
+    , text
+    , time
+    , transformers
+    , unliftio
+    , unliftio-core
+  default-language: Haskell2010

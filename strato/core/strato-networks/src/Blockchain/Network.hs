@@ -88,6 +88,9 @@ getParams "upquark" =
           }
       ]
 
+getParams "lithium" =
+  return Nothing -- local development network, no external peers
+
 
 
 

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Plus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
+import { parseJsonBigInt } from '@/utils/numberUtils';
 import * as React from 'react';
 
 type CreateAdminIssueFormValues = {
@@ -101,7 +102,10 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     }
     if (tag === 'array') {
       try {
-        const arr = JSON.parse(value);
+        const arr = parseJsonBigInt<any[]>(value, { fallback: null });
+        if (arr === null) {
+          return [false, 'Invalid JSON'];
+        }
         if (!Array.isArray(arr)) {
           return [false, 'Invalid array'];
         }
@@ -117,8 +121,8 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
             return [success, prev];
           }
         }, [true, []]);
-      } catch {
-        return [false, 'Invalid JSON'];
+      } catch (e) {
+        return [false, `Array validation error: ${e instanceof Error ? e.message : String(e)}`];
       }
     }
     return [true, `"${value.trim().replace("\"","\\\"")}"`];
@@ -137,23 +141,24 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     // Clean up whitespace and empty args
     const trimmedTarget = values.target.trim();
     const trimmedFunc = values.func.trim();
-    const argsArray = values.args
-      .map((a, i) => {
-        const [success, v] = validateFunctionArg(functionArgs[i][1].type || {}, a.value);
-        if (!success) {
-          throw v;
-        }
-        return v;
-      });
-
-    // Build payload with JSON-stringified target/func, and a JSON array for args
-    const payload = {
-      target: trimmedTarget,
-      func: trimmedFunc,
-      args: argsArray, // already a string[]
-    };
-
+    
     try {
+      const argsArray = values.args
+        .map((a, i) => {
+          const [success, v] = validateFunctionArg(functionArgs[i][1].type || {}, a.value);
+          if (!success) {
+            throw new Error(typeof v === 'string' ? v : 'Invalid argument');
+          }
+          return v;
+        });
+
+      // Build payload with JSON-stringified target/func, and a JSON array for args
+      const payload = {
+        target: trimmedTarget,
+        func: trimmedFunc,
+        args: argsArray,
+      };
+
       await handleCastVoteOnIssue(payload.target, payload.func, payload.args);
 
       toast({
@@ -167,14 +172,12 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
         args: [{ value: '' }],
       });
 
-      onOpenChange(false); // close the modal
+      onOpenChange(false);
     } catch (err) {
-      // Let your global interceptor handle toasts if you prefer;
-      // this is a friendly fallback.
       console.error('Create admin issue failed:', err);
       toast({
-        title: 'Failed to create issue',
-        description: 'Please check the inputs and try again.',
+        title: 'Validation Failed',
+        description: err instanceof Error ? err.message : 'Please check the inputs and try again.',
         variant: 'destructive',
       });
     }
@@ -202,7 +205,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                 required: 'Contract address is required',
                 validate: (v) => {
                   const [success, w] = validateFunctionArg({tag: 'Address'}, v);
-                  return success || w;
+                  return success ? true : (typeof w === 'string' ? w : 'Invalid address');
                 },
               }}
               render={({ field }) => (
@@ -300,7 +303,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                         required: 'Argument is required',
                         validate: (v) => {
                           const [success, w] = validateFunctionArg(abiType, v);
-                          return success || w;
+                          return success ? true : (typeof w === 'string' ? w : 'Invalid argument');
                         },
                         // add per-type validation here if desired (e.g., address, uint, etc.)
                       }}

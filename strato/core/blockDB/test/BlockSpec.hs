@@ -49,7 +49,7 @@ predicate _ = False
 main :: IO ()
 main = hspecWith (configAddFilter predicate defaultConfig) spec
 
-spec :: Spec  
+spec :: Spec
 spec = do
   describe "ExtraData txcounts" $ do
     it "does not parse a legacy extradata" $
@@ -287,7 +287,7 @@ ecWhoSignedThisTransaction :: Transaction -> Maybe Address
 ecWhoSignedThisTransaction tx = fromPublicKey <$> recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
-      sig = Signature (SEC.CompactRecSig (intToBSS $ transactionR tx) (intToBSS $ transactionS tx) (transactionV tx - 0x1b))
+      sig = Signature (SEC.CompactRecSig (intToBSS $ r tx) (intToBSS $ s tx) (v tx - 0x1b))
       mesg = keccak256ToByteString $ partialTransactionHash tx
 
 blockRoundTrip :: Spec

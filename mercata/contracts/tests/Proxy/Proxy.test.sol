@@ -84,7 +84,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         // Ensure the functions may be called through the proxy
         feeCollector.withdrawToken(address(USDST), address(user1), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 100e18, "User1 should have 100 USDST");
-        
+
         // Cleanup
         Token(USDST).burn(address(user1), 100e18);
         require(ERC20(USDST).balanceOf(address(user1)) == 0, "User1 should have 0 USDST");
@@ -125,7 +125,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         address feeCollectorImpl = address(new FeeCollector(this)); // "this" is impl owner; should be ignored
         require(address(feeCollectorImpl) != address(0), "FeeCollector address is 0");
         FeeCollector feeCollector = FeeCollector(address(new Proxy(feeCollectorImpl, address(user1))));
-        
+
         try Ownable(feeCollector).transferOwnership(address(user2))
             { revert("Ownership transfer should fail"); } catch {}
 
@@ -136,7 +136,7 @@ contract Describe_BadDebt_Basic is Authorizable {
 
         // Cleanup
         Token(USDST).burn(address(feeCollector), 100e18);
-        require(ERC20(USDST).balanceOf(address(feeCollector)) == 0, "FeeCollector should have 0 USDST");   
+        require(ERC20(USDST).balanceOf(address(feeCollector)) == 0, "FeeCollector should have 0 USDST");
     }
 
     function it_proxy_can_upgrade_proxy() public {
@@ -174,7 +174,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         // Test that admins array access should be possible for fresh proxied AdminRegistry
         AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(fresh_admin_registry), this)));
         fresh_proxied_admin_registry.initialize([this]);
-        require(fresh_proxied_admin_registry.admins(0) == this, "First admin should be this");  
+        require(fresh_proxied_admin_registry.admins(0) == this, "First admin should be this");
 
         // Test that admins array access should be possible for mercata's AdminRegistry
         require(m.adminRegistry().admins(0) == this, "First admin should be this");

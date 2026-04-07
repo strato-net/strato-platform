@@ -18,7 +18,7 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
-import Blockchain.Data.Transaction
+import Blockchain.Data.Transaction (insertTXIfNew', transactionHash)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
@@ -91,7 +91,7 @@ putBlocks blockList makeHashOne = do
   let blocksWithHashes = (\b -> (b, blockHash b)) <$> blockList
   sqlQuery $
     forM blocksWithHashes $ \(b, hash') -> do
-      insertTXIfNew' (BlockHash $ blockHash b) (Just $ number $ blockBlockData b) (blockReceiptTransactions b)
+      insertTXIfNew' (BlockHash $ blockHash b) (Just $ number $ blockBlockData b) (timestamp $ blockBlockData b) (blockReceiptTransactions b)
 
       existingBlockData <- SQL.selectList [BlockDataRefHash SQL.==. blockHash b] []
 

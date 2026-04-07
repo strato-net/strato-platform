@@ -1,314 +1,116 @@
-import { useEffect, useState } from "react";
-import { safeParseUnits } from "@/utils/numberUtils";
-import { formatUnits } from "ethers";
-import { useToast } from "@/hooks/use-toast";
-import { useLendingContext } from "@/context/LendingContext";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from 'react-router-dom';
 import { useUser } from "@/context/UserContext";
-import { useUserTokens } from "@/context/UserTokensContext";
+import { useCDP } from '@/context/CDPContext';
+import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useUserTokens } from '@/context/UserTokensContext';
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
-import MobileSidebar from "../components/dashboard/MobileSidebar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CollateralData } from "@/interface";
-import PositionSection from "@/components/Positions";
-import CollateralModal from "@/components/borrow/CollateralModal";
-import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants";
-import BorrowForm from "@/components/borrow/BorrowForm";
-import RepayForm from "@/components/borrow/RepayForm";
-import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
-import { useBalancePolling } from "@/hooks/useSmartPolling";
+import Mint from '@/components/cdp/v2/components/Mint/Mint';
+import DebtPosition from '@/components/cdp/v2/components/DebtPosition';
+import VaultsList from '@/components/cdp/VaultsList';
+import BadDebtView from '@/components/cdp/BadDebtView';
+import LiquidationsView from '@/components/cdp/LiquidationsView';
+import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 const Borrow = () => {
-  const { userAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useUserTokens();
-  const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
-  const [borrowLoading, setBorrowLoading] = useState(false);
-  const [modalState, setModalState] = useState<{
-    isOpen: boolean;
-    type: "supply" | "withdraw" | null;
-  }>({ isOpen: false, type: null });
-  const [modalLoading, setModalLoading] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [repayLoading, setRepayLoading] = useState(false);
-  const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
-
-  const { toast } = useToast();
-  const {
-    refreshLoans,
-    loans,
-    borrowAsset: borrowAssetFn,
-    collateralInfo,
-    loadingCollateral,
-    refreshCollateral,
-    supplyCollateral,
-    withdrawCollateral,
-    repayLoan: repayLoanFn,
-    repayAll,
-    withdrawCollateralMax,
-    borrowMax
-  } = useLendingContext();
-
-  // Use the new smart polling hook for balance updates
-  const { startPolling, stopPolling } = useBalancePolling(
-    userAddress || "",
-    fetchUsdstBalance,
-    (amount) => amount && parseFloat(amount) > 0
-  );
+  const { isLoggedIn } = useUser();
+  const { refreshVaults } = useCDP();
+  const { refetch: refetchRewards } = useRewardsUserInfo();
+  const { fetchTokens } = useUserTokens();
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState('vaults');
+  const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
+  const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
 
   useEffect(() => {
-    document.title = "Borrow Assets | STRATO Mercata";
+    document.title = "Borrow | STRATO";
   }, []);
 
-
-  // Refresh data when page loads and when userAddress changes
   useEffect(() => {
-    if (userAddress) {
-      const refreshData = async () => {
-        try {
-          await Promise.all([
-            refreshLoans(),
-            refreshCollateral(),
-            fetchUsdstBalance(userAddress),
-          ]);
-        } catch (error) {
-          console.error("Error refreshing data:", error);
-        }
-      };
-      refreshData();
+    const subtabParam = searchParams.get('subtab');
+    if (subtabParam && ['vaults', 'bad-debt', 'liquidations'].includes(subtabParam)) {
+      setActiveTab(subtabParam);
     }
-  }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
+  }, [searchParams]);
 
-    useEffect(() => {
-    if (collateralInfo && Array.isArray(collateralInfo)) {
-      // Only show assets that have a balance > 0
-      const eligibleWithBalance = collateralInfo.filter((item) => 
-        BigInt(item.userBalance || 0) > 0n
-      );
-      setEligibleCollateral(eligibleWithBalance);
-    }
-  }, [collateralInfo])
+  const refreshAllCDPComponents = useCallback(async () => {
+    setVaultsRefreshTrigger(prev => prev + 1);
+    setMintPlannerRefreshTrigger(prev => prev + 1);
+    refreshVaults();
+    await Promise.all([
+      refetchRewards(),
+      fetchTokens(),
+    ]);
+  }, [refreshVaults, refetchRewards, fetchTokens]);
 
-  const handleSupply = (asset) => {
-    setSelectedAsset(asset);
-    setModalState({ isOpen: true, type: "supply" });
-  };
+  const handleVaultActionSuccess = useCallback(async () => {
+    await refreshAllCDPComponents();
+  }, [refreshAllCDPComponents]);
 
-  const handleWithdraw = (asset) => {
-    setSelectedAsset(asset);
-    setModalState({ isOpen: true, type: "withdraw" });
-  };
-
-  const closeModal = () => {
-    setSelectedAsset(null);
-    setModalState({ isOpen: false, type: null });
-  };
-
-  const executeSupply = async (asset: CollateralData, amount: string) => {
-    try {
-      setModalLoading(true);
-      await supplyCollateral({
-        asset: asset.address,
-        amount: safeParseUnits(amount).toString(),
-      });
-      toast({
-        title: "Supply Initiated",
-        description: `You supplied ${amount} ${asset._symbol}`,
-        variant: "success",
-      });
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
-      // Refresh all data after successful supply
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
-      ]);
-    } catch (error) {
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
-    }
-  };
-
-  const executeWithdraw = async (asset: CollateralData, amount: string) => {
-    try {
-      setModalLoading(true);
-      if (amount === 'ALL') {
-        await withdrawCollateralMax({ asset: asset.address });
-      } else {
-        await withdrawCollateral({
-          asset: asset.address,
-          amount: safeParseUnits(amount).toString(),
-        });
-      }
-      toast({
-        title: "Withdraw Initiated",
-        description: `Withdrawal submitted: ${amount === 'ALL' ? 'max available' : amount} ${asset._symbol}`,
-        variant: "success",
-      });
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
-      // Refresh all data after successful withdraw
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
-      ]);
-    } catch (error) {
-      console.log(error, "error");
-      setModalLoading(false);
-      setModalState({ isOpen: false, type: null });
-      // Error toast is now handled globally by axios interceptor
-    }
-  };
-
-
-  const executeEmbeddedBorrow = async (amount: string) => {
-    try {
-      setBorrowLoading(true);
-      if (amount === 'ALL') {
-        await borrowMax();
-        toast({
-          title: "Borrow Initiated",
-          description: `Borrowed max available USDST`,
-          variant: "success",
-        });
-      } else {
-        await borrowAssetFn({ amount: safeParseUnits(amount).toString() });
-        toast({
-          title: "Borrow Initiated",
-          description: `You borrowed ${amount} USDST`,
-          variant: "success",
-        });
-      }
-      setBorrowLoading(false);
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
-      ]);
-    } catch (error) {
-      setBorrowLoading(false);
-    }
-  };
-
-  const executeEmbeddedRepay = async (amount: string) => {
-    try {
-      setRepayLoading(true);
-      if (amount === 'ALL') {
-        const res = await repayAll();
-        const sent = res?.estimatedDebtAtRead ? formatUnits(BigInt(res.estimatedDebtAtRead)) : 'all';
-        toast({
-          title: "Success",
-          description: `Successfully repaid ${sent} USDST`,
-          variant: "success",
-        });
-      } else {
-        const res = await repayLoanFn({ amount: safeParseUnits(amount).toString() } as any);
-        const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent)) : amount;
-        toast({
-          title: "Success",
-          description: `Successfully repaid ${sent} USDST`,
-          variant: "success",
-        });
-      }
-      setRepayLoading(false);
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
-      ]);
-    } catch (error) {
-      console.error("Error repaying loan:", error);
-      setRepayLoading(false);
-    }
-  };
+  const handleQuickMintSuccess = useCallback(async () => {
+    await refreshAllCDPComponents();
+  }, [refreshAllCDPComponents]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <DashboardSidebar />
-      <MobileSidebar 
-        isOpen={isMobileSidebarOpen} 
-        onClose={() => setIsMobileSidebarOpen(false)} 
-      />
-      <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: 'var(--sidebar-width, 0rem)' }}>
-        <DashboardHeader title="Borrow" onMenuClick={() => setIsMobileSidebarOpen(true)} />
 
-        <main className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* Left Column - Borrow/Repay Tabbed Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Borrow & Repay</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="borrow" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="borrow">Borrow</TabsTrigger>
-                    <TabsTrigger value="repay">Repay</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="borrow">
-                    <BorrowForm
-                      loans={loans}
-                      borrowLoading={borrowLoading}
-                      onBorrow={executeEmbeddedBorrow}
-                      usdstBalance={usdstBalance}
-                      voucherBalance={voucherBalance}
-                      collateralInfo={eligibleCollateral}
-                      startPolling={startPolling}
-                      stopPolling={stopPolling}
-                    />
-                  </TabsContent>
-                  <TabsContent value="repay">
-                    <RepayForm
-                      loans={loans}
-                      repayLoading={repayLoading}
-                      onRepay={executeEmbeddedRepay}
-                      usdstBalance={usdstBalance}
-                      voucherBalance={voucherBalance}
-                    />
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
+      <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
+        <DashboardHeader title="Borrow" />
 
-            {/* Right Column - Your Position */}
-            <div>
-              <PositionSection loanData={loans} userCollaterals={collateralInfo} />
-            </div>
-          </div>
-          <CollateralManagementTable
-            collateralInfo={collateralInfo}
-            loadingCollateral={loadingCollateral}
-            loans={loans}
-            onSupply={handleSupply}
-            onWithdraw={handleWithdraw}
-          />
+        <main className="p-4 md:p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-3 md:mb-4 h-auto">
+              <TabsTrigger value="vaults" className="text-xs md:text-sm py-2 px-1 md:px-3">
+                Vaults
+              </TabsTrigger>
+              <TabsTrigger value="bad-debt" className="text-xs md:text-sm py-2 px-1 md:px-3">
+                Bad Debt
+              </TabsTrigger>
+              <TabsTrigger value="liquidations" className="text-xs md:text-sm py-2 px-1 md:px-3">
+                Liquidations
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="vaults">
+              {!isLoggedIn && (
+                <GuestSignInBanner message="Sign in to create vaults and mint USDST" />
+              )}
+              <div className="flex flex-col lg:flex-row gap-6">
+                <div className={isLoggedIn ? "w-full lg:w-[60%]" : "w-full"}>
+                  <Mint
+                    onSuccess={handleQuickMintSuccess}
+                    refreshTrigger={mintPlannerRefreshTrigger}
+                    guestMode={!isLoggedIn}
+                  />
+                </div>
+                {isLoggedIn && (
+                  <div className="w-full lg:w-[40%] space-y-6">
+                    <DebtPosition refreshTrigger={vaultsRefreshTrigger} />
+                    <VaultsList
+                      refreshTrigger={vaultsRefreshTrigger}
+                      onVaultActionSuccess={handleVaultActionSuccess}
+                    />
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="bad-debt">
+              <BadDebtView guestMode={!isLoggedIn} />
+            </TabsContent>
+            <TabsContent value="liquidations">
+              {!isLoggedIn && (
+                <GuestSignInBanner message="Sign in to view and liquidate CDP positions" />
+              )}
+              <LiquidationsView guestMode={!isLoggedIn} />
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
 
-
-      {modalState.isOpen && modalState.type && (
-        <CollateralModal 
-            type={modalState.type}
-            loading={modalLoading}
-            asset={selectedAsset}
-            loanData={loans}
-            isOpen={modalState.isOpen}
-            onClose={closeModal}
-            onAction={(amount) => {
-              if (modalState.type === "supply") {
-                executeSupply(selectedAsset, amount);
-              } else if (modalState.type === "withdraw") {
-                executeWithdraw(selectedAsset, amount);
-              }
-            }}
-            usdstBalance={usdstBalance}
-            voucherBalance={voucherBalance}
-            transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
-        />
-      )}
-
+      <MobileBottomNav />
     </div>
   );
 };

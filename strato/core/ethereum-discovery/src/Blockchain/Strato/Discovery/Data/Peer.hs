@@ -1,11 +1,13 @@
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
+{-# OPTIONS -fno-warn-orphans #-}
 
 
 
@@ -27,8 +29,7 @@ module Blockchain.Strato.Discovery.Data.Peer
     ClosestPeers(..),
     UnbondedPeersForUDP(..),
     PeerLastBestBlockHash(..),
-    buildPeer,
-    createPeer,
+    mkPeer,
     pointToNodeID,
     nodeIDToPoint,
     thisPeer,
@@ -68,23 +69,38 @@ import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                                 as B
 import qualified Data.ByteString.Base16                          as B16
 import qualified Data.ByteString.Char8                           as BC
+import           Data.Default
 import           Data.IP
 import           Data.List                                       (sortBy)
 import qualified Data.Set                                        as Set
-import           Data.String
 import qualified Data.Text                                       as T
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import qualified Database.Persist.Postgresql                     as SQL
 import           GHC.Bits                                        (xor)
-import qualified LabeledError
 import           Network.Socket
-import           Network.URI                                     (URI (..),
-                                                                  URIAuth (..))
-import qualified Network.URI                                     as URI
 import           Numeric.Natural
 import           Text.Format
 import           UnliftIO
+
+instance Default PPeer where
+  def = PPeer
+    { pPeerPubkey = Nothing
+    , pPeerHost = Host ""
+    , pPeerIp = Nothing
+    , pPeerUdpPort = 30303
+    , pPeerTcpPort = 30303
+    , pPeerLastMsg = T.pack "msg"
+    , pPeerEnableTime = jamshidBirth
+    , pPeerUdpEnableTime = jamshidBirth
+    , pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0
+    , pPeerBondState = 0
+    , pPeerActiveState = 0
+    , pPeerDisableException = T.pack "None"
+    , pPeerNextDisableWindowSeconds = 5
+    , pPeerNextUdpDisableWindowSeconds = 5
+    , pPeerDisableExpiration = jamshidBirth
+    }
 
 newtype AvailablePeers = AvailablePeers {unAvailablePeers :: [PPeer]}
 
@@ -174,62 +190,26 @@ pPeerString PPeer {..} = hostToString pPeerHost ++ ":" ++ show pPeerTcpPort
 jamshidBirth :: UTCTime
 jamshidBirth = posixSecondsToUTCTime 0
 
-createPeer :: String -> Either String PPeer
-createPeer peerString = buildPeer <$> parseEnode peerString
-
-buildPeer :: (Maybe String, Host, Int) -> PPeer
-buildPeer (mpk, host, p) = buildPeerPoint (stringToPoint <$> mpk, host, p)
-
-buildPeerPoint :: (Maybe Point, Host, Int) -> PPeer
-buildPeerPoint (pubkeyMaybe, host, p) =
-  let peer =
-        PPeer
-          { pPeerPubkey = pubkeyMaybe,
-            pPeerHost = host,
-            pPeerIp = Nothing,
-            pPeerUdpPort = p,
-            pPeerTcpPort = 30303,
-            pPeerNumSessions = 0,
-            pPeerLastTotalDifficulty = 0,
-            pPeerLastMsg = T.pack "msg",
-            pPeerLastMsgTime = jamshidBirth,
-            pPeerEnableTime = jamshidBirth,
-            pPeerUdpEnableTime = jamshidBirth,
-            pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0,
-            pPeerBondState = 0,
-            pPeerActiveState = 0,
-            pPeerVersion = T.pack "61", -- fix
-            pPeerDisableException = T.pack "None",
-            pPeerNextDisableWindowSeconds = 5,
-            pPeerNextUdpDisableWindowSeconds = 5,
-            pPeerDisableExpiration = jamshidBirth
-          }
-   in peer
-
-parseEnode :: String -> Either String (Maybe String, Host, Int)
-parseEnode enode =
-  case mUriAuth of
-    Nothing -> Left $ "Invalid enode: " ++ enode
-    (Just uriAuth) -> Right (parsePublicKey uriAuth, parseHostname uriAuth, parsePort uriAuth)
-  where
-    mUriAuth = URI.parseURI enode >>= validateURIScheme >>= URI.uriAuthority
-
-validateURIScheme :: URI -> Maybe URI
-validateURIScheme uri =
-  if URI.uriScheme uri == "enode:"
-  then Just uri
-  else Nothing
-
-parsePublicKey :: URIAuth -> Maybe String
-parsePublicKey uriAuth = case filter (/= '@') $ URI.uriUserInfo uriAuth of
-  []        -> Nothing
-  publicKey -> Just publicKey
-
-parseHostname :: URIAuth -> Host
-parseHostname uriAuth = fromString $ filter (\ch -> ch /= '[' && ch /= ']') (URI.uriRegName uriAuth)
-
-parsePort :: URIAuth -> Int
-parsePort uriAuth = LabeledError.read "Peer/parsePort" $ filter (/= ':') (URI.uriPort uriAuth)
+-- | Create a new peer with sensible defaults. Peer starts enabled (timestamps set to now).
+mkPeer :: MonadIO m
+       => Maybe Point    -- ^ pubkey (Nothing for bootnodes, Just for discovered peers)
+       -> Host           -- ^ host address
+       -> Maybe IP       -- ^ resolved IP (if known)
+       -> UDPPort        -- ^ UDP port
+       -> TCPPort        -- ^ TCP port
+       -> m PPeer
+mkPeer pubkey host ip (UDPPort udpPort) (TCPPort tcpPort) = do
+  curTime <- liftIO getCurrentTime
+  return def
+    { pPeerPubkey = pubkey
+    , pPeerHost = host
+    , pPeerIp = ip
+    , pPeerUdpPort = udpPort
+    , pPeerTcpPort = tcpPort
+    , pPeerEnableTime = curTime
+    , pPeerUdpEnableTime = curTime
+    , pPeerDisableExpiration = curTime
+    }
 
 thisPeer :: PPeer -> [SQL.Filter PPeer]
 thisPeer peer = [PPeerHost SQL.==. pPeerHost peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]

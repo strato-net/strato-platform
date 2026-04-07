@@ -49,7 +49,7 @@ contract Describe_TokenFactory {
             1000000e18,
             18
         );
-        
+
         require(tokenAddress != address(0), "Token should be created");
         require(factory.isFactoryToken(tokenAddress), "Token should be registered as factory token");
         require(factory.allTokens(0) != address(0) && factory.allTokens(1) == address(0), "Token should be added to allTokens array");
@@ -67,7 +67,7 @@ contract Describe_TokenFactory {
             18,
             user1
         );
-        
+
         require(tokenAddress != address(0), "Token should be created");
         require(factory.isFactoryToken(tokenAddress), "Token should be registered as factory token");
         require(Ownable(tokenAddress).owner() == user1, "Token should have correct initial owner");
@@ -84,7 +84,7 @@ contract Describe_TokenFactory {
             1000e18,
             18
         );
-        
+
         address token2 = factory.createToken(
             "Token 2",
             "Description 2",
@@ -95,7 +95,7 @@ contract Describe_TokenFactory {
             2000e18,
             18
         );
-        
+
         require(factory.allTokens(1) != address(0) && factory.allTokens(2) == address(0), "Should have 2 tokens");
         require(factory.isFactoryToken(token1), "Token 1 should be registered");
         require(factory.isFactoryToken(token2), "Token 2 should be registered");
@@ -112,7 +112,7 @@ contract Describe_TokenFactory {
             5000000e18,
             6
         );
-        
+
         Token token = Token(tokenAddress);
         require(keccak256(ERC20(token).name()) == keccak256("My Token"), "Token name not set correctly");
         require(keccak256(ERC20(token).symbol()) == keccak256("MTK"), "Token symbol not set correctly");
@@ -133,13 +133,13 @@ contract Describe_TokenFactory {
             1000000e18,
             18
         );
-        
+
         Token token = Token(tokenAddress);
         require(!factory.isTokenActive(tokenAddress), "New token should not be active (PENDING status)");
-        
+
         token.setStatus(2); // ACTIVE
         require(factory.isTokenActive(tokenAddress), "Token should be active after status change");
-        
+
         token.setStatus(3); // LEGACY
         require(!factory.isTokenActive(tokenAddress), "Token should not be active when LEGACY");
     }
@@ -157,7 +157,7 @@ contract Describe_TokenFactory {
             1000000e18,
             18
         );
-        
+
         require(!factory.isFactoryToken(otherToken), "Non-factory token should not be registered");
         require(!factory.isTokenActive(otherToken), "Non-factory token should not be considered active");
     }
@@ -176,7 +176,7 @@ contract Describe_TokenFactory {
             1000e18,
             18
         );
-        
+
         address token2 = factory.createToken(
             "Token 2",
             "Description 2",
@@ -187,13 +187,13 @@ contract Describe_TokenFactory {
             2000e18,
             18
         );
-        
+
         // Create new factory
         TokenFactory newFactory = new TokenFactory(owner);
-        
+
         // Migrate tokens
         factory.migrateTokensToFactory(address(newFactory));
-        
+
         // Check that tokens now point to new factory
         require(address(Token(token1).tokenFactory()) == address(newFactory), "Token 1 should point to new factory");
         require(address(Token(token2).tokenFactory()) == address(newFactory), "Token 2 should point to new factory");
@@ -212,7 +212,7 @@ contract Describe_TokenFactory {
             1000e18,
             18
         );
-        
+
         address token2 = otherFactory.createToken(
             "Token 2",
             "Description 2",
@@ -223,14 +223,14 @@ contract Describe_TokenFactory {
             2000e18,
             18
         );
-        
+
         // Register migrated tokens
         address[] memory tokens = new address[](2);
         tokens[0] = token1;
         tokens[1] = token2;
-        
+
         factory.registerMigratedTokens(tokens);
-        
+
         require(factory.isFactoryToken(token1), "Token 1 should be registered");
         require(factory.isFactoryToken(token2), "Token 2 should be registered");
         require(factory.allTokens(1) != address(0) && factory.allTokens(2) == address(0), "Should have 2 tokens in allTokens array");
@@ -249,7 +249,7 @@ contract Describe_TokenFactory {
             0,
             0
         );
-        
+
         require(tokenAddress != address(0), "Empty token should still be created");
         require(factory.isFactoryToken(tokenAddress), "Empty token should be registered");
     }
@@ -265,7 +265,7 @@ contract Describe_TokenFactory {
             1000000000e18, // 1 billion tokens
             18
         );
-        
+
         require(tokenAddress != address(0), "Large token should be created");
         require(ERC20(tokenAddress).totalSupply() == 1000000000e18, "Large token should have correct supply");
     }
@@ -281,7 +281,7 @@ contract Describe_TokenFactory {
             1000000e6,
             6
         );
-        
+
         address token8 = factory.createToken(
             "Token 8",
             "Description",
@@ -292,7 +292,7 @@ contract Describe_TokenFactory {
             1000000e8,
             8
         );
-        
+
         require(Token(token6).decimals() == 6, "Token should have 6 decimals");
         require(Token(token8).decimals() == 8, "Token should have 8 decimals");
     }
@@ -310,7 +310,7 @@ contract Describe_TokenFactory {
                 18
             );
         }
-        
+
         require(factory.allTokens(4) != address(0) && factory.allTokens(5) == address(0), "Should have created 5 tokens");
     }
 
@@ -328,7 +328,7 @@ contract Describe_TokenFactory {
             1000e18,
             18
         );
-        
+
         address token2 = factory.createTokenWithInitialOwner(
             "Workflow Token 2",
             "Description 2",
@@ -340,24 +340,24 @@ contract Describe_TokenFactory {
             18,
             owner
         );
-        
+
         // 2. Verify tokens are registered
         require(factory.allTokens(1) != address(0) && factory.allTokens(2) == address(0), "Should have 2 tokens");
         require(factory.isFactoryToken(token1), "Token 1 should be registered");
         require(factory.isFactoryToken(token2), "Token 2 should be registered");
-        
+
         // 3. Activate tokens
         Token(token1).setStatus(2); // ACTIVE
         Token(token2).setStatus(2); // ACTIVE
-        
+
         // 4. Verify active status
         require(factory.isTokenActive(token1), "Token 1 should be active");
         require(factory.isTokenActive(token2), "Token 2 should be active");
-        
+
         // 5. Create new factory and migrate
         TokenFactory newFactory = new TokenFactory(owner);
         factory.migrateTokensToFactory(address(newFactory));
-        
+
         // 6. Verify migration
         require(address(Token(token1).tokenFactory()) == address(newFactory), "Token 1 should be migrated");
         require(address(Token(token2).tokenFactory()) == address(newFactory), "Token 2 should be migrated");

@@ -1,0 +1,14 @@
+{
+  "name": "strato-local-auth-ui",
+  "version": "1.0.0",
+  "description": "Login UI for STRATO local auth (Kratos + Hydra)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "cookie-parser": "^1.4.6"
+  }
+}

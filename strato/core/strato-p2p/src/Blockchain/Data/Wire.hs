@@ -20,7 +20,7 @@ import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.PubKey ()
 import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
+import Blockchain.Data.Transaction (Transaction)
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256

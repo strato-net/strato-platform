@@ -35,8 +35,8 @@ import Data.Data
 import Data.Default
 import Data.List
 import qualified Data.Map.Strict as M
+import Data.OpenApi hiding (Format, format)
 import qualified Data.Set as S
-import Data.Swagger hiding (Format, format)
 import qualified Data.Text as T
 import Database.Persist.Sql
 import qualified GHC.Generics as GHCG

@@ -42,11 +42,13 @@ module Control.Monad.Composable.Kafka (
   conduitBatchSource,
   conduitBatchSourceUsingEnv,
   createKafkaEnv,
-  createTopic
+  createTopic,
+  createTopicAndWait
   ) where
 
 import Blockchain.MilenaTools
 import Conduit
+import Control.Concurrent (threadDelay)
 import Control.Lens
 import Control.Monad (forM_, void)
 import Control.Monad.Composable.Base
@@ -62,6 +64,8 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
 import Data.List
+import qualified Data.Map as M
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import Network.Kafka hiding (createTopic)
 import qualified Network.Kafka as Milena
@@ -264,3 +268,29 @@ createTopic name = do
     [] -> return ()
     [(_, TopicAlreadyExists)] -> return () -- No problem, it was already there
     _ -> error $ "Error creating kafka topic " ++ show name ++ ": " ++ show errors
+
+createTopicAndWait :: HasKafka m => TopicName -> m ()
+createTopicAndWait name = do
+  createTopic name
+  waitForLeader (50 :: Int)  -- max 50 retries * 100ms = 5 seconds
+  where
+    waitForLeader 0 = error $ "Timed out waiting for Kafka leader election on topic: " ++ show name
+    waitForLeader retries = do
+      ready <- execKafka $ do
+        updateMetadata name
+        mTmd <- use $ stateTopicMetadata . at name
+        case mTmd of
+          Nothing -> return False
+          Just tmd -> do
+            brokers <- use stateBrokers
+            let partitions = tmd ^. partitionsMetadata
+                leaderIds = map (\p -> p ^. partitionMetadataLeader) partitions
+                hasPartitions = not (null partitions)
+                allLeadersAssigned = all (\l -> isJust (l ^. leaderId)) leaderIds
+                allBrokersExist = all (\l -> M.member l brokers) leaderIds
+            return (hasPartitions && allLeadersAssigned && allBrokersExist)
+      if ready
+        then return ()
+        else do
+          liftIO $ threadDelay 100000  -- 100ms
+          waitForLeader (retries - 1)

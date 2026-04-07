@@ -10,11 +10,11 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
+import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Event 
+import Blockchain.Event
 import qualified Control.Monad.Change.Alter as A
 import Data.Maybe (catMaybes)
 
@@ -33,10 +33,10 @@ checkParentChildValidity Block {blockBlockData = c} parentBSum = do
 
 
 verifyOmmersRoot :: HasStateDB m => Block -> m (Maybe BlockVerificationFailureDetails)
-verifyOmmersRoot Block {blockBlockData = bd, blockBlockUncles = bu} = 
+verifyOmmersRoot Block {blockBlockData = bd, blockBlockUncles = bu} =
   let inBlockOmmersHash = getBlockOmmersHash bd
       derivedOmmersHash = hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
-  in if inBlockOmmersHash /= derivedOmmersHash 
+  in if inBlockOmmersHash /= derivedOmmersHash
         then return $ Just $ UnclesMismatch (BlockDelta inBlockOmmersHash derivedOmmersHash)
         else return Nothing
 
@@ -48,5 +48,5 @@ checkValidity parentBSum b = do
 
 isNonceValid :: (Address `A.Alters` AddressState) f => OutputTx -> f Bool
 isNonceValid ot@OutputTx {otSigner = txAddr} =
-  let tNonce = transactionNonce $ otBaseTx ot
+  let tNonce = TD.nonce $ otBaseTx ot
    in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy txAddr

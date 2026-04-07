@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+BOOTSTRAP_DOCKER_VERSION=3
+
 Green='\033[0;32m'
 Red='\033[0;31m'
 Yellow='\033[0;33m'
@@ -38,23 +40,32 @@ function checkComposeFile {
   else
     echo -e "${Yellow}Using the existing docker-compose.yml${NC}"
   fi
-  
+
   if ! grep -q '^[[:space:]]*strato:' docker-compose.yml; then
-    echo -e "${Red}Wrong docker-compose.yml provided - no 'strato' service found in it. Use the docker-compose.allDocker.yml as the docker-compose.yml${NC}"
+    echo -e "${Red}Wrong docker-compose.yml provided - no 'strato' service found in it.${NC}"
     exit 4
+  fi
+
+  # Check bootstrap-docker version compatibility
+  min_version=$(grep -oP '#bootstrap-docker-min-version:\K.*' docker-compose.yml 2>/dev/null || true)
+  if [ -n "$min_version" ]; then
+    if [ "$(printf '%s\n' "$min_version" "$BOOTSTRAP_DOCKER_VERSION" | sort -V | head -1)" != "$min_version" ]; then
+      echo -e "${Red}This docker-compose.yml requires bootstrap-docker version >= ${min_version}, but this is version ${BOOTSTRAP_DOCKER_VERSION}. Please update the strato bootstrap scripts.${NC}"
+      exit 3
+    fi
   fi
 }
 
 function help {
-  echo -e "${Yellow}STRATO Mercata run script${NC}
-Kickstart a STRATO Mercata node.
+  echo -e "${Yellow}STRATO  run script${NC}
+Kickstart a STRATO node.
 
 ${Yellow}Optional flags:${NC}
 The flags are mutually exclusive:
 --help|-h     - this help.
 --down        - remove strato containers and leave all volumes intact.
 --wipe        - stop and remove STRATO containers and wipe out volumes.
---compose     - fetch the docker-compose.yml of the latest STRATO Mercata release
+--compose     - fetch the docker-compose.yml of the latest STRATO release
 --pull        - pull images used in docker-compose.yml
 --get-address - get the address of the running node.
 --get-pubkey  - get the public key of the running node.
@@ -67,6 +78,8 @@ The flags are mutually exclusive:
 function wipe {
   echo -e "${Yellow}Removing STRATO containers and wiping out volumes${NC}"
   ${docker_compose} down -v -t 0 --remove-orphans
+  sudo rm -rf nodedata/
+  sudo rm -rf logs/
 }
 
 function down {
@@ -75,8 +88,8 @@ function down {
 }
 
 function getCompose {
-  echo -e "${Yellow}Fetching the docker-compose.yml of the latest STRATO Mercata release...${NC}"
-  curl -fLo docker-compose.yml https://github.com/blockapps/strato-getting-started/releases/download/$(curl -s -L https://github.com/blockapps/strato-getting-started/releases/latest | grep -om1 '"/blockapps/strato-getting-started/releases/tag/[^"]*' | grep -oE "[^/]+$")/docker-compose.yml
+  echo -e "${Yellow}Fetching the docker-compose.yml of the latest STRATO release...${NC}"
+  curl -fLo docker-compose.yml https://github.com/strato-net/strato-platform/releases/download/$(curl -s -L https://github.com/strato-net/strato-platform/releases/latest | grep -om1 '"/strato-net/strato-platform/releases/tag/[^"]*' | grep -oE "[^/]+$")/docker-compose.yml
   echo -e "${Yellow}docker-compose.yml downloaded successfully.${NC}"
 }
 
@@ -191,12 +204,14 @@ while [ ${#} -gt 0 ]; do
 done
 
 checkDocker
+
+# Ensure docker-compose.yml exists (download from releases if missing)
 checkComposeFile
 
 export NODE_HOST=${NODE_HOST:-localhost}
 export OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-'https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration'}
 export network=${network:-helium}
-export VAULT_URL=${VAULT_URL:-'https://vault.blockapps.net:8093'}
+export VAULT_URL=${VAULT_URL:-'https://vault.blockapps.net:8093/strato/v2.3'}
 export HTTP_PORT=${HTTP_PORT:-80}
 export HTTPS_PORT=${HTTPS_PORT:-443}
 
@@ -256,6 +271,50 @@ if [ ${main_port} != "80" ] && [ ${main_port} != "443" ] && [[ ${NODE_HOST} != *
 fi
 ## END OF PARAMETERS VALIDATION
 
+# RUN STRATO-SETUP TO GENERATE NODE CONFIG
+if [ ! -f nodedata/.ethereumH/ethconf.yaml ]; then
+  rm -rf nodedata/
+  echo -e "${Yellow}Running strato-setup to generate node configuration...${NC}"
+
+  # Determine STRATO_IMAGE from docker-compose.yml if not set
+  if [ -z "${STRATO_IMAGE}" ]; then
+    STRATO_IMAGE=$(grep -oP 'image:\s*\${STRATO_IMAGE:-\K[^}]+' docker-compose.yml | head -1)
+    echo "Using STRATO_IMAGE from docker-compose.yml: ${STRATO_IMAGE}"
+  fi
+
+    # Extract REPO_URL from STRATO_IMAGE if not already set
+    # e.g., "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/strato:16.7-xxx" -> "406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/"
+    if [ -z "${REPO_URL}" ] && [ -n "${STRATO_IMAGE}" ]; then
+      REPO_URL=$(echo "${STRATO_IMAGE}" | sed 's|strato:.*||')
+      echo "Derived REPO_URL: ${REPO_URL}"
+    fi
+  
+  # Create OAuth credentials for strato-setup
+  mkdir -p "${HOME}/.secrets"
+  cat > "${HOME}/.secrets/strato_credentials.yaml" << EOF
+discoveryUrl: "${OAUTH_DISCOVERY_URL}"
+clientId: "${OAUTH_CLIENT_ID}"
+clientSecret: "${OAUTH_CLIENT_SECRET}"
+EOF
+
+  docker run --rm \
+    --entrypoint strato-setup \
+    -v "$(pwd)":/node \
+    -v "${HOME}/.secrets:/root/.secrets:ro" \
+    ${postgres_password:+-e postgres_password="${postgres_password}"} \
+    "${STRATO_IMAGE}" \
+    /node/nodedata --dockerMode=allDocker --network="${network}" --vaultUrl="${VAULT_URL}" --repoUrl="${REPO_URL:-}" \
+    --pghost=postgres --kafkahost=kafka --redisHost=redis --httpPort="${HTTP_PORT}"
+
+  # Fix ownership for non-root containers
+  sudo chown -R ${DOCKER_UID:-1000}:${DOCKER_GID:-1000} nodedata/ logs/ 2>/dev/null || true
+
+  # Move generated docker-compose.yml to current directory (strato-setup creates it in the node dir)
+  mv nodedata/docker-compose.yml docker-compose.yml
+
+  echo -e "${Green}Node configuration generated.${NC}"
+fi
+
 # COMPOSE FILE PRE-PROCESSING
 function cleanup {
   rm docker-compose-temp.yml
@@ -272,6 +331,9 @@ else
   fi
 fi
 # END OF COMPOSE FILE PRE-PROCESSING
+
+mkdir -p nodedata/
+mkdir -p logs/
 
 ${docker_compose} -f docker-compose-temp.yml up -d --remove-orphans
 

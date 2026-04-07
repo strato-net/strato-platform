@@ -1,6 +1,7 @@
 name: strato-init
 version: 0.0.1
 build-type: Simple
+
 author: Jamshid
 maintainer: jamshidnh@gmail.com
 synopsis: A tool to setup the DBs for a Strato instance
@@ -15,10 +16,21 @@ dependencies:
 
 library:
   source-dirs: src/
+  exposed-modules:
+    - Blockchain.Init.ComposeTypes
+    - Blockchain.Init.DockerCompose
+    - Blockchain.Init.DockerComposeAllDocker
+    - Blockchain.Init.EthConf
+    - Blockchain.Init.Generator
+    - Blockchain.Init.BuildMetadata
+    - Blockchain.Init.BuildMetadata.TH
+    - Blockchain.Init.Monad
+    - Blockchain.Init.Options
   dependencies:
   - aeson
   - base16-bytestring
   - blockapps-data
+  - data-default
   - blockapps-datadefs
   - blockapps-mpdbs
   - blockapps-vault-wrapper-api
@@ -29,11 +41,9 @@ library:
   - conduit
   - containers
   - directory
-  - ethereum-discovery
   - ethereum-rlp
   - evm-solidity
   - exceptions
-  - file-embed
   - filepath
   - format
   - hflags
@@ -46,10 +56,14 @@ library:
   - monad-alter
   - nibblestring
   - persistent-postgresql
+  - entropy
+  - file-embed
+  - process
   - raw-strings-qq
   - redis-monad
   - resourcet
   - servant-client
+  - strato-auth
   - solid-vm
   - solid-vm-compiler
   - solid-vm-model
@@ -58,13 +72,14 @@ library:
   - strato-genesis
   - strato-index
   - strato-model
-  - strato-networks
   - strato-sequencer
   - strato-statediff
   # - strato-p2p
+  - template-haskell
   - text
   - transformers
   - turtle
+  - unix
   - unliftio
   - vm-tools
   - yaml
@@ -78,7 +93,6 @@ executables:
     dependencies:
       - common-log
       - hflags
-      - kafka-monad
       - strato-init
       - strato-model
 
@@ -89,7 +103,11 @@ executables:
     main: GenesisBuilder.hs
     dependencies:
       - aeson
+      - blockapps-data
+      - blockapps-mpdbs
       - bytestring
+      - common-log
+      - conduit
       - data-default
       - strato-genesis
       - strato-init

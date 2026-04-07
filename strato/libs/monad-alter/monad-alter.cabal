@@ -1,0 +1,44 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           monad-alter
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/monad-alter#readme>
+homepage:       https://github.com/githubuser/monad-alter#readme
+bug-reports:    https://github.com/githubuser/monad-alter/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2019 Author name here
+license:        Apache-2.0
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/monad-alter
+
+library
+  exposed-modules:
+      Control.Comonad.Change.Alter
+      Control.Monad.Change
+      Control.Monad.Change.Alter
+      Control.Monad.Change.Modify
+  other-modules:
+      Paths_monad_alter
+  hs-source-dirs:
+      src
+  ghc-options: -Werror
+  build-depends:
+      base
+    , comonad
+    , containers
+    , data-default
+    , lens
+    , mtl
+    , transformers
+  default-language: Haskell2010

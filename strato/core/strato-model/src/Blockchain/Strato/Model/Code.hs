@@ -11,7 +11,7 @@ import Control.Lens.Operators
 import Data.Aeson
 import Data.Binary
 import Data.Data
-import Data.Swagger hiding (Format, format)
+import Data.OpenApi hiding (Format, format)
 import Data.Text (Text)
 import Database.Persist.TH
 import GHC.Generics
@@ -45,7 +45,7 @@ instance ToSchema Code where
       NamedSchema
         (Just "Code")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ toJSON (Code "contract test{}")
             & description ?~ "Code Bytestring"
         )

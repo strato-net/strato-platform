@@ -9,9 +9,9 @@ module Strato.Strato23.Server where
 
 import Control.Lens ((&), (.~), (?~))
 import Data.Proxy
-import Data.Swagger as Swag
+import Data.OpenApi as Swag
 import Servant
-import Servant.Swagger (toSwagger)
+import Servant.OpenApi (toOpenApi)
 import Strato.Strato23.API
 import Strato.Strato23.Monad
 import Strato.Strato23.Server.Key
@@ -32,18 +32,17 @@ vaultWrapper =
     :<|> postPassword
     :<|> verifyPassword
 
-serveVaultWrapper :: VaultWrapperEnv -> Server VaultWrapperAPI
+serveVaultWrapper :: VaultWrapperEnv -> Servant.Server VaultWrapperAPI
 serveVaultWrapper env = hoistServer serverProxy (enterVaultWrapper env) vaultWrapper
 
 serverProxy :: Proxy VaultWrapperAPI
 serverProxy = Proxy
 
-vaultWrapperSwagger :: Swagger
+vaultWrapperSwagger :: OpenApi
 vaultWrapperSwagger =
-  toSwagger (Proxy @VaultWrapperAPI)
+  toOpenApi (Proxy @VaultWrapperAPI)
     & info . title .~ "Vault Wrapper API"
     & info . Swag.version .~ "2.3"
     & info . description ?~ "This is the V2.3 API for Vault Wrapper"
-    & basePath ?~ "/strato/v2.3"
 
-type VaultWrapperDocsAPI = "swagger.json" :> Get '[JSON] Swagger
+type VaultWrapperDocsAPI = "openapi.json" :> Get '[JSON] OpenApi

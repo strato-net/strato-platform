@@ -130,17 +130,18 @@ const LendingPoolOverview = () => {
     <div className="space-y-6">
       {/* System Control */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5" />
-              <span>System Control</span>
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 md:space-x-2 shrink-0">
+              <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="text-base md:text-xl whitespace-nowrap">System Control</span>
             </span>
             <Button
               onClick={handleTogglePause}
               disabled={pauseLoading}
               variant={isPaused ? "destructive" : "default"}
-              className={`flex items-center space-x-2 ${!isPaused ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+              size="sm"
+              className={`flex items-center gap-1 md:space-x-2 text-xs md:text-sm ${!isPaused ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
             >
               {pauseLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -149,7 +150,7 @@ const LendingPoolOverview = () => {
               ) : (
                 <Pause className="h-4 w-4" />
               )}
-              <span>{isPaused ? 'Unpause System' : 'Pause System'}</span>
+              <span className="whitespace-nowrap">{isPaused ? 'Unpause System' : 'Pause System'}</span>
             </Button>
           </CardTitle>
           <CardDescription>

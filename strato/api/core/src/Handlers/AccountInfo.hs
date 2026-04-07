@@ -220,7 +220,7 @@ getAccount a b c d e f g h i j k l m n =
 getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
   addrs <- fromMaybe [] <$> select (Proxy @[AddressStateRef]) a
-  return . map asrToAsrPrime $ zip (repeat "") addrs
+  return $ map asrToAsrPrime addrs
 
 accountQueryParams :: [String]
 accountQueryParams =

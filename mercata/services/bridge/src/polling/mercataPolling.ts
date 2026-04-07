@@ -20,16 +20,16 @@ import { checkBalances } from "../utils/balanceCheck";
 
 export const startWithdrawalRequestPolling = (): void => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
+
   const poll = async () => {
     try {
       // Check Voucher and USDST balances regularly
       await checkBalances();
-      
-      const initiatedWithdrawals: WithdrawalInfo[] = await getWithdrawalsByStatus("1");
 
-      if (initiatedWithdrawals.length > 0) {
-        await confirmWithdrawalBatch(initiatedWithdrawals as NonEmptyArray<WithdrawalInfo>);
-      }
+      const initiatedWithdrawals: WithdrawalInfo[] = await getWithdrawalsByStatus("1");
+      if (initiatedWithdrawals.length === 0) return;
+
+      await confirmWithdrawalBatch(initiatedWithdrawals as NonEmptyArray<WithdrawalInfo>);
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
         operation: "startWithdrawalRequestPolling",

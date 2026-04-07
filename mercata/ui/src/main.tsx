@@ -23,13 +23,14 @@ if (gaId && gaId.trim() !== '') {
   gtagScript.async = true;
   document.head.appendChild(gtagScript);
 
-  // Initialize dataLayer and gtag
+  // Initialize dataLayer and gtag (expose gtag globally for custom event tracking)
   (window as any).dataLayer = (window as any).dataLayer || [];
-  function gtag(...args: any[]) {
-    (window as any).dataLayer.push(args);
-  }
-  gtag('js', new Date());
-  gtag('config', gaId);
+  // Must use 'arguments' object (not rest params) for gtag.js compatibility
+  (window as any).gtag = function () {
+    (window as any).dataLayer.push(arguments);
+  };
+  (window as any).gtag('js', new Date());
+  (window as any).gtag('config', gaId);
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

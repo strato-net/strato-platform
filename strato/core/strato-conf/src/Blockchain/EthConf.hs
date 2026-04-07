@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Blockchain.EthConf
   (
@@ -13,9 +14,11 @@ module Blockchain.EthConf
 where
 
 import Blockchain.EthConf.Model
+import Control.Exception (catch, IOException)
 import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
+import Data.Default
 import Data.String
 import Data.Yaml
 import qualified Database.Redis as Redis
@@ -27,9 +30,10 @@ import System.IO.Unsafe
 -- got re-read anyway
 {-# NOINLINE ethConf #-}
 ethConf :: EthConf
-ethConf = unsafePerformIO $ do
-  contents <- B.readFile ".ethereumH/ethconf.yaml"
-  return $ (either (error . show) id . decodeEither') contents
+ethConf = unsafePerformIO $
+  (do contents <- B.readFile ".ethereumH/ethconf.yaml"
+      return $ (either (error . show) id . decodeEither') contents)
+  `catch` (\(_ :: IOException) -> return def)
 
 {- CONFIG: clobber connection string -}
 

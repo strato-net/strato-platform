@@ -87,26 +87,26 @@ const CRSlider: React.FC<CRSliderProps> = ({
     return `CR = Collateral Value ÷ Debt Value\n$${collateralFormatted} ÷ $${debtFormatted} = ${crFormatted}%`;
   };
 
-  console.log(projectedCR, sliderMin);
-
   return (
     <TooltipProvider>
       <div className="space-y-3">
         {/* CR Display with Tooltip */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex justify-between items-center text-sm font-medium cursor-help">
-              <span>Collateralization Ratio (CR)</span>
+            <div className="flex justify-between items-start cursor-help">
+              <span className="text-base font-bold">Collateralization Ratio (CR)</span>
               <span className={
-                projectedCR >= 999999 
-                  ? 'text-green-600' 
-                  : isAtMinCR
-                    ? 'text-yellow-600 font-bold'
-                    : isPositionDangerous 
-                      ? 'text-red-600 font-bold' 
-                      : ''
+                `text-3xl font-bold ${
+                  projectedCR >= 999999 
+                    ? 'text-green-600' 
+                    : isAtMinCR
+                      ? 'text-yellow-600'
+                      : isPositionDangerous 
+                        ? 'text-red-600' 
+                        : 'text-foreground'
+                }`
               }>
-                {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 1) : '0.0%'}
+                {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 0) : '0%'}
               </span>
             </div>
           </TooltipTrigger>
@@ -136,20 +136,20 @@ const CRSlider: React.FC<CRSliderProps> = ({
         {/* Custom track styling when out of bounds */}
         {isOutOfBounds && !isSliderDisabled && (
           <div className="absolute inset-0 pointer-events-none">
-            <div className="w-full h-2 bg-gray-200 rounded-full mt-2"></div>
+            <div className="w-full h-2 bg-muted rounded-full mt-2"></div>
           </div>
         )}
       </div>
       
       {/* Slider Labels */}
-      <div className="flex justify-between text-xs text-gray-500">
+      <div className="flex justify-between text-sm text-muted-foreground mt-2">
         <span>{formatPercentage(minCR)}</span>
         <span>{formatPercentage(sliderMax)}</span>
       </div>
       
       {/* Status message */}
       {isOutOfBounds && !isSliderDisabled && (
-        <div className="text-center text-sm text-blue-600">
+        <div className="text-center text-base text-blue-600">
           {projectedCR+0.1 < sliderMin 
             ? `CR below minimum safe threshold (${formatPercentage(sliderMin)}) - Click slider to set new CR`
             : projectedCR > sliderMax 
@@ -160,7 +160,7 @@ const CRSlider: React.FC<CRSliderProps> = ({
       )}
       
       {isSliderDisabled && (
-        <div className="text-center text-sm text-gray-500">
+        <div className="text-center text-base text-muted-foreground">
           {isInfinite 
             ? "No debt - CR is infinite"
             : "Slider disabled"

@@ -18,6 +18,7 @@ const router = Router();
  *             type: object
  *             required:
  *               - externalChainId
+ *               - externalToken
  *               - stratoToken
  *               - stratoTokenAmount
  *               - externalRecipient
@@ -28,15 +29,15 @@ const router = Router();
  *               stratoToken:
  *                 type: string
  *                 description: STRATO token contract address to withdraw
+ *               externalToken:
+ *                 type: string
+ *                 description: External chain token contract address (or zero/native address mapping)
  *               stratoTokenAmount:
  *                 type: string
  *                 description: Amount of the STRATO token to withdraw (decimal string)
  *               externalRecipient:
  *                 type: string
  *                 description: Recipient address on the external chain
- *               targetStratoToken:
- *                 type: string
- *                 description: Optional STRATO token address to mint on redemption
  *     responses:
  *       200:
  *         description: Withdrawal transaction submitted
@@ -61,9 +62,92 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
 
 /**
  * @openapi
+ * /bridge/requestDepositAction:
+ *   post:
+ *     summary: "Request a post-deposit action (auto-save to lending pool, auto-forge metal, etc.)"
+ *     tags: [Bridge]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - externalChainId
+ *               - externalTxHash
+ *               - action
+ *             properties:
+ *               externalChainId:
+ *                 type: string
+ *                 description: External chain identifier (numeric string)
+ *               externalTxHash:
+ *                 type: string
+ *                 description: External transaction hash
+ *               action:
+ *                 type: number
+ *                 description: "Deposit action type (1 = AUTO_SAVE, 2 = AUTO_FORGE)"
+ *               targetToken:
+ *                 type: string
+ *                 description: "Action-specific target token address (e.g. metal token for AUTO_FORGE, omit for AUTO_SAVE)"
+ *     responses:
+ *       200:
+ *         description: Deposit action request submitted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     hash:
+ *                       type: string
+ */
+router.post("/requestDepositAction", authHandler.authorizeRequest(), BridgeController.requestDepositAction);
+
+/**
+ * @openapi
+ * /bridge/depositActions:
+ *   get:
+ *     summary: "List available post-deposit actions (earn, forge metal) with oracle prices"
+ *     tags: [Bridge]
+ *     responses:
+ *       200:
+ *         description: List of virtual deposit action routes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                   stratoToken:
+ *                     type: string
+ *                   stratoTokenSymbol:
+ *                     type: string
+ *                   depositAction:
+ *                     type: number
+ *                     description: "1 = AUTO_SAVE, 2 = AUTO_FORGE"
+ *                   routeType:
+ *                     type: string
+ *                     description: "earn | forge"
+ *                   oraclePrice:
+ *                     type: string
+ *                     description: WAD-scaled oracle price for the output token
+ */
+router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.getDepositActions);
+
+/**
+ * @openapi
  * /bridge/bridgeableTokens/{chainId}:
  *   get:
- *     summary: List tokens that can withdraw to a chain
+ *     summary: List enabled bridge routes for a chain
  *     tags: [Bridge]
  *     parameters:
  *       - name: chainId
@@ -74,7 +158,7 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
  *           type: string
  *     responses:
  *       200:
- *         description: Available bridgeable assets
+ *         description: Available enabled bridge routes for the chain
  *         content:
  *           application/json:
  *             schema:
@@ -82,6 +166,12 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
  *               items:
  *                 type: object
  *                 properties:
+ *                   id:
+ *                     type: string
+ *                   isDefaultRoute:
+ *                     type: boolean
+ *                   enabled:
+ *                     type: boolean
  *                   stratoToken:
  *                     type: string
  *                   stratoTokenName:
@@ -98,46 +188,6 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
  *                     type: string
  */
 router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
-
-/**
- * @openapi
- * /bridge/redeemableTokens/{chainId}:
- *   get:
- *     summary: List tokens eligible for redemption
- *     tags: [Bridge]
- *     parameters:
- *       - name: chainId
- *         in: path
- *         required: true
- *         description: External chain identifier (numeric string)
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Tokens that can be redeemed on the target chain
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   stratoToken:
- *                     type: string
- *                   stratoTokenName:
- *                     type: string
- *                   stratoTokenSymbol:
- *                     type: string
- *                   externalToken:
- *                     type: string
- *                   externalName:
- *                     type: string
- *                   externalSymbol:
- *                     type: string
- *                   externalChainId:
- *                     type: string
- */
-router.get("/redeemableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getRedeemableTokens);
 
 /**
  * @openapi
@@ -224,5 +274,33 @@ router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeControl
  *                   type: integer
  */
 router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
+
+/**
+ * @openapi
+ * /bridge/withdrawalSummary:
+ *   get:
+ *     summary: Get withdrawal summary statistics for the authenticated user
+ *     tags: [Bridge]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Withdrawal summary statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalWithdrawn30d:
+ *                   type: string
+ *                   description: Total withdrawn in last 30 days in wei (string format)
+ *                 pendingWithdrawals:
+ *                   type: number
+ *                   description: Count of pending withdrawals
+ *                 availableToWithdraw:
+ *                   type: string
+ *                   description: Available balance to withdraw in wei (string format)
+ */
+router.get("/withdrawalSummary", authHandler.authorizeRequest(), BridgeController.getWithdrawalSummary);
 
 export default router;

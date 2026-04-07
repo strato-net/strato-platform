@@ -22,7 +22,7 @@ module Blockchain.Stream.Action (
 
   ActionData(..),
   actionDataStorageDiffs,
-  
+
   DataDiff(..),
   Delegatecall(..),
 
@@ -185,7 +185,7 @@ data Delegatecall = Delegatecall
     _delegatecallOrganization :: Maybe Text,
     _delegatecallContractName :: Text
   }
-  deriving (Eq, Show, Read, Generic, NFData)
+  deriving (Eq, Ord, Show, Read, Generic, NFData)
 
 --makeLenses ''Delegatecall
 
@@ -227,7 +227,7 @@ data Action = Action
     _blockNumber :: Integer,
     _transactionSender :: Address,
     _actionData :: OMap.OMap Address ActionData,
-    _newCodeCollections :: [(Text, CodeCollection)],
+    _newCodeCollections :: OMap.OMap (Text, Keccak256) CodeCollection,
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
   }

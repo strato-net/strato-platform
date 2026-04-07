@@ -25,8 +25,8 @@ import Data.Aeson.Types hiding (fieldLabelModifier)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
-import Data.Swagger
-import Data.Swagger.Internal.Schema (named)
+import Data.OpenApi
+import Data.OpenApi.Internal.Schema (named)
 import qualified Data.Text as T
 import GHC.Generics
 import qualified LabeledError
@@ -51,7 +51,7 @@ instance ToSchema Version where
       NamedSchema
         (Just "Version")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ "{\"version\" : \"1\"}"
             & description ?~ "Check to see if vault server is alive, and version the vault is running. Contains an Int for the version number."
         )
@@ -79,7 +79,7 @@ instance ToSchema AddressAndKey where
       NamedSchema
         (Just "AddressAndKey")
         ( mempty
-            & type_ ?~ SwaggerString
+            & type_ ?~ OpenApiString
             & example ?~ "address : 186aaf1491177570eab131275a678ded7cf8157f, pubkey : 04642f59c13697153aed4ebf469c31ede0b36551d7a253601a6cd1997dd53d0952e884aa07a71aecce9562b5954e62788990cd872eeff52477ff657933fadb51ea"
             & description ?~ "Ethereum address and public key"
         )

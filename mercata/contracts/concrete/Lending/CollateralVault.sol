@@ -7,13 +7,13 @@ import "./LendingRegistry.sol";
  * @notice Holds and tracks collateral for active loans; enforces collateralization requirements.
  * @dev Only callable by LendingPool for adding or removing user collateral.
  */
- 
+
 contract record CollateralVault is Ownable {
     event CollateralAdded(address indexed user, address indexed asset, uint amount);
     event CollateralRemoved(address indexed user, address indexed asset, uint amount);
 
     LendingRegistry public registry;
-    
+
     // user => asset => amount
     mapping(address => mapping(address => uint)) public record userCollaterals;
 
@@ -50,7 +50,7 @@ contract record CollateralVault is Ownable {
      */
     function removeCollateral(address borrower, address asset, uint amount) public onlyLendingPool {
         require(userCollaterals[borrower][asset] >= amount, "Insufficient collateral");
-        userCollaterals[borrower][asset] -= amount; 
+        userCollaterals[borrower][asset] -= amount;
         require(IERC20(asset).transfer(borrower, amount), "Transfer failed");
         emit CollateralRemoved(borrower, asset, amount);
     }
@@ -87,4 +87,4 @@ contract record CollateralVault is Ownable {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
     }
-} 
+}

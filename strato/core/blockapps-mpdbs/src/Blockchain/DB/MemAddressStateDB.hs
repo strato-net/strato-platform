@@ -30,6 +30,7 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Strato.Model.Address
 import Control.DeepSeq
+import Data.Binary
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
@@ -62,6 +63,8 @@ runNewMemAddressStateDB f = runMemAddressStateDB f M.empty
 data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show, Eq, Generic)
 
 instance NFData AddressStateModification
+
+instance Binary AddressStateModification
 
 instance Format AddressStateModification where
   format (ASModification addressState) = "Address Modified:\n" ++ format addressState

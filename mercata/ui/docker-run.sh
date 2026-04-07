@@ -8,4 +8,4 @@ window.ENV = {
 };
 EOF
 
-serve -s dist -l 8080
+exec serve -s dist -l 8080

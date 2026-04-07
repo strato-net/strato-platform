@@ -27,7 +27,6 @@ module SolidVM.Model.CodeCollection.Contract
     constructor,
     contractType,
     importedFrom,
-    isContractRecord,
     contractContext,
   )
 where
@@ -40,8 +39,8 @@ import Data.Aeson as A
 import Data.Binary
 import Data.Default
 import Data.Map (Map, empty, fromList)
+import Data.OpenApi
 import Data.Source
-import Data.Swagger
 import GHC.Generics
 import SolidVM.Model.CodeCollection.ConstantDecl
 import qualified SolidVM.Model.CodeCollection.Event as SolidVM
@@ -74,30 +73,28 @@ data ContractF a = Contract
     _usings :: Map SolidString [UsingF a],
     _contractType :: ContractType,
     _importedFrom :: Maybe Address,
-    _isContractRecord :: Bool,
     _contractContext :: a
   }
   deriving (Eq, Generic, NFData, Functor, Foldable, Traversable)
 
 instance (Show a) => Show (ContractF a) where
   show (Contract {..}) =
-    (CL.underline "\nContractF") 
-    ++ CL.cyan "\n_contractName\t" ++ show _contractName 
-    ++ CL.cyan "\n_parents\t" ++ show _parents 
-    ++ CL.cyan "\n_constants\t" ++ show _constants 
-    ++ CL.cyan "\n_storageDefs\t" ++ show _storageDefs 
-    ++ CL.cyan "\n_userDefined\t" ++ show _userDefined 
-    ++ CL.cyan "\n_enums\t" ++ show _enums 
-    ++ CL.cyan "\n_structs\t" ++ show _structs 
-    ++ CL.cyan "\n_errors\t" ++ show _errors 
-    ++ CL.cyan "\n_events\t" ++ show _events 
-    ++ CL.cyan "\n_functions\t" ++ show _functions 
-    ++ CL.cyan "\n_constructor\t" ++ show _constructor 
-    ++ CL.cyan "\n_modifiers\t" ++ show _modifiers 
-    ++ CL.cyan "\n_usings\t" ++ show _usings 
-    ++ CL.cyan "\n_contractType\t" ++ show _contractType 
-    ++ CL.cyan "\n_importedFrom\t" ++ show _importedFrom 
-    ++ CL.cyan "\n_isContractRecord\t" ++ show _isContractRecord 
+    (CL.underline "\nContractF")
+    ++ CL.cyan "\n_contractName\t" ++ show _contractName
+    ++ CL.cyan "\n_parents\t" ++ show _parents
+    ++ CL.cyan "\n_constants\t" ++ show _constants
+    ++ CL.cyan "\n_storageDefs\t" ++ show _storageDefs
+    ++ CL.cyan "\n_userDefined\t" ++ show _userDefined
+    ++ CL.cyan "\n_enums\t" ++ show _enums
+    ++ CL.cyan "\n_structs\t" ++ show _structs
+    ++ CL.cyan "\n_errors\t" ++ show _errors
+    ++ CL.cyan "\n_events\t" ++ show _events
+    ++ CL.cyan "\n_functions\t" ++ show _functions
+    ++ CL.cyan "\n_constructor\t" ++ show _constructor
+    ++ CL.cyan "\n_modifiers\t" ++ show _modifiers
+    ++ CL.cyan "\n_usings\t" ++ show _usings
+    ++ CL.cyan "\n_contractType\t" ++ show _contractType
+    ++ CL.cyan "\n_importedFrom\t" ++ show _importedFrom
     ++ CL.cyan "\n_contractContext\t" ++ show _contractContext
 
 instance Semigroup (ContractF a) where
@@ -118,7 +115,6 @@ instance Semigroup (ContractF a) where
         _usings = _usings c1 <> _usings c2,
         _contractType = _contractType c1,
         _importedFrom = _importedFrom c1 <|> _importedFrom c2,
-        _isContractRecord = _isContractRecord c1 || _isContractRecord c2,
         _contractContext = _contractContext c1
       }
 
@@ -149,7 +145,6 @@ instance Default a => Default (ContractF a) where
         _usings = empty,
         _contractType = ContractType,
         _importedFrom = Nothing,
-        _isContractRecord = False,
         _contractContext = def
       }
 
@@ -180,7 +175,6 @@ instance Arbitrary Contract where
               _usings = empty,
               _contractType = ContractType,
               _importedFrom = Nothing,
-              _isContractRecord = False,
               _contractContext = a
             }
       ]

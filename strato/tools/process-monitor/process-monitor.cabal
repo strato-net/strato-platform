@@ -1,0 +1,45 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           process-monitor
+version:        0.0.1
+synopsis:       A per-process resource monitor for STRATO services
+description:    A per-process resource monitor for STRATO services
+category:       Monitoring?
+author:         Dustin
+maintainer:     dustin@blockapps.net
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Data.Metrics
+      Data.ProcessInfo
+      Instrumentation
+  other-modules:
+      Paths_process_monitor
+  hs-source-dirs:
+      src/
+  build-depends:
+      base
+    , containers
+    , prometheus-client
+    , text
+  default-language: Haskell2010
+
+executable process-monitor-exe
+  main-is: Main.hs
+  hs-source-dirs:
+      exec_src/
+  build-depends:
+      async
+    , base
+    , process
+    , process-monitor
+    , prometheus-client
+    , wai-middleware-prometheus
+    , warp
+  default-language: Haskell2010

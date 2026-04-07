@@ -36,8 +36,6 @@ import           Data.Binary
 import           Data.Data
 import           Data.Maybe                        (fromJust)
 import qualified GHC.Generics                      as GHCG
-import           Test.QuickCheck
-import           Test.QuickCheck.Arbitrary.Generic
 import qualified Text.Colors                       as CL
 import           Text.Format
 import           Text.Tools
@@ -292,6 +290,7 @@ instance TransactionLike OutputTx where
   txDestination = txDestination . otBaseTx
   txGasLimit = txGasLimit . otBaseTx
   txCode = txCode . otBaseTx
+  txChainId = txChainId . otBaseTx
 
   morphTx t =
     OutputTx
@@ -312,18 +311,3 @@ instance BlockLike BlockHeader OutputTx OutputBlock where
 
   blockOrdering = number . obBlockData
   buildBlock = OutputBlock TO.Morphism
-
-instance Arbitrary IngestTx where
-  arbitrary = genericArbitrary
-
-instance Arbitrary IngestBlock where
-  arbitrary = genericArbitrary
-
-instance Arbitrary SequencedBlock where
-  arbitrary = genericArbitrary
-
-instance Arbitrary OutputTx where
-  arbitrary = genericArbitrary
-
-instance Arbitrary OutputBlock where
-  arbitrary = genericArbitrary

@@ -35,6 +35,11 @@ contract Describe_Mercata is Authorizable {
         require(address(m.liquidityPool().registry().lendingPool()) != address(0), "LiquidityPool's LendingPool address is 0");
     }
 
+    function it_deploys_save_usdst_vault() {
+        require(address(m.saveUSDSTVault()) != address(0), "SaveUSDSTVault address is 0");
+        require(m.saveUSDSTVault().asset() == address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), "SaveUSDSTVault asset mismatch");
+    }
+
     function it_can_create_tokens() {
         address t = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         require(t != address(0), "Failed to create Token");
@@ -189,6 +194,22 @@ contract Describe_Mercata is Authorizable {
         uint[2] input = [1517,41];
         bool success = v.verifyProof(a, b, c, input);
         require(success, "Groth16 proof failed!");
+    }
+
+    function it_can_verify_p256() {
+        string message = "Hallelujah!";
+        uint r = 29576957218913890340491659409841852068033084215229700711255507061323143814549;
+        uint s = 101557168712526122138100485234540408883990559892858822894344366649907264877720;
+        uint x = 16241039676017158139658647491575996736571373479493265913891396969380226787542;
+        uint y = 59216528153676978070808029460682524906485316850686665728311789336192423162328;
+        bytes pub = bytes(0x0423e81a4a99319639971cff670b796702ebd275f76b39056ecc06c25911cbe8d682eb5e007feea20a52a2dc4268dd1518975c14889c8d9e58c9861ef49839f1d8);
+        bytes authenticatorData = bytes(0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631d00000000);
+        bytes clientDataJSON = bytes('{"type":"webauthn.get","challenge":"SGFsbGVsdWphaCE","origin":"http://localhost:8085","crossOrigin":false}');
+        bytes clientDataHash = sha256(clientDataJSON);
+        bytes fullData = authenticatorData + bytes(clientDataHash);
+        bytes h = sha256(fullData);
+        require(verifyP256(h, r, s, x, y), "P256 verification by pubkey coordinates failed");
+        require(verifyP256(h, r, s, pub), "P256 verification by pubkey bytestring failed");
     }
 
     string output;

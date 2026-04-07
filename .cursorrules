@@ -1,5 +1,18 @@
 # Cursor Rules
 
+## Jenkins Credentials
+- Jenkins credentials are stored at: /home/golemshid/.config/cursor/jenkins_credentials
+- Source this file to get JENKINS_USER, JENKINS_TOKEN, JENKINS_URL
+
+## CRITICAL: Git Commit/Push Rules
+
+- NEVER run `git commit` or `git push` without the user explicitly saying "commit" or "push" in their most recent message
+- ALWAYS show `git diff` output and wait for user approval before any commit
+- If you find yourself about to commit: STOP, show the diff, and ask first
+- This rule has NO exceptions
+
+---
+
 - Always pick the simplest possible way
 
 - When demonstrating behavior, don't just tell me that something works

@@ -1,0 +1,33 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           format
+version:        0.1.0.0
+author:         jamshid
+maintainer:     j
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Text.Colors
+      Text.Format
+      Text.Format.Template
+      Text.ShortDescription
+      Text.Tools
+  other-modules:
+      Paths_format
+  hs-source-dirs:
+      src
+  build-depends:
+      base
+    , base16-bytestring
+    , bytestring
+    , common-log
+    , template-haskell
+    , text
+    , time
+  default-language: Haskell2010

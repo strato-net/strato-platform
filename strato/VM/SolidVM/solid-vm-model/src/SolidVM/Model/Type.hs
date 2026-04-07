@@ -11,7 +11,7 @@ import Data.Aeson hiding (Array, String)
 import Data.Binary
 import Data.Int (Int32)
 import Data.Maybe (fromMaybe)
-import Data.Swagger
+import Data.OpenApi
 import GHC.Generics
 import qualified Generic.Random as GR
 import SolidVM.Model.SolidString
@@ -63,7 +63,7 @@ instance Arbitrary Type where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSchema Type where
   declareNamedSchema proxy =
-    genericDeclareNamedSchemaUnrestricted defaultSchemaOptions proxy
+    genericDeclareNamedSchema defaultSchemaOptions proxy
       & mapped . name ?~ "Solidity type"
       & mapped . schema . description ?~ "Represents a soldity type"
       & mapped . schema . example ?~ toJSON Address {isPayable = False}

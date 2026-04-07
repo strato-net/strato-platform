@@ -60,4 +60,4 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 fi
 
 echo  'nginx is now running. See the logs below...'
-openresty -g "daemon off;"
+exec openresty -g "daemon off;"

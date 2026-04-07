@@ -38,8 +38,8 @@ import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
 import Data.Map.Strict (Map)
+import Data.OpenApi
 import Data.Source
-import Data.Swagger
 import GHC.Generics
 import SolidVM.Model.CodeCollection.ConstantDecl
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
@@ -91,12 +91,8 @@ type Xabi = Positioned XabiF
 
 soliditySchemaOptions :: SchemaOptions
 soliditySchemaOptions =
-  SchemaOptions
-    { fieldLabelModifier = camelCase . dropFPrefix,
-      constructorTagModifier = id,
-      datatypeNameModifier = id,
-      allNullaryToStringTag = True,
-      unwrapUnaryRecords = True
+  defaultSchemaOptions
+    { Data.OpenApi.fieldLabelModifier = camelCase . dropFPrefix
     }
 
 makeLenses ''XabiF

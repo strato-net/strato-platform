@@ -75,6 +75,18 @@ router.post("/price", authHandler.authorizeRequest(), OracleController.setPrice)
  *         in: path
  *         required: true
  *         schema: { type: string }
+ *       - name: duration
+ *         in: query
+ *         required: false
+ *         description: Time duration (1d, 7d, 1m, 3m, 6m, 1y, all). Defaults to 1m.
+ *         schema:
+ *           type: string
+ *       - name: end
+ *         in: query
+ *         required: false
+ *         description: End timestamp (ISO string). Defaults to now.
+ *         schema:
+ *           type: string
  *       - name: order
  *         in: query
  *         required: false
@@ -98,5 +110,39 @@ router.post("/price", authHandler.authorizeRequest(), OracleController.setPrice)
  *                   type: integer
 */
 router.get("/price-history/:assetAddress", authHandler.authorizeRequest(true), OracleController.getPriceHistory);
+
+/**
+ * @openapi
+ * /oracle/strato-price-history/{assetAddress}:
+ *   get:
+ *     summary: Retrieve STRATO (swap-implied) price history across all pools
+ *     description: >
+ *       Computes a historical USD price for the asset from swap events in every
+ *       pool it participates in (volatile, stable, and multi-token stable).
+ *       Uses historical oracle prices for each counterpart token and aggregates
+ *       across pools with a volume-weighted hourly average.
+ *     tags: [Oracle]
+ *     parameters:
+ *       - name: assetAddress
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Historical STRATO price data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 totalCount:
+ *                   type: integer
+ */
+router.get("/strato-price-history/:assetAddress", authHandler.authorizeRequest(true), OracleController.getStratoPriceHistory);
 
 export default router;

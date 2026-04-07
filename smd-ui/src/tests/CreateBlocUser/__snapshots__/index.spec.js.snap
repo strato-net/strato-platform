@@ -17,7 +17,7 @@ Object {
 exports[`createBlocUser: index render component with values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"accounts-create-user-button\\" text=\\"Create User\\" />
-  <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function: mockConstructor]} title=\\"Create New User\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+  <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function: mockConstructor] { _isMockFunction: true, getMockImplementation: [Function (anonymous)], mock: Object [Object: null prototype] { calls: [], instances: [] }, mockClear: [Function (anonymous)], mockReset: [Function (anonymous)], mockReturnValueOnce: [Function (anonymous)], mockReturnValue: [Function (anonymous)], mockImplementationOnce: [Function (anonymous)], mockImplementation: [Function (anonymous)], mockReturnThis: [Function (anonymous)], mockRestore: [Function (anonymous)] }} title=\\"Create New User\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body bloc-user-form\\">
         <div className=\\"pt-form-group\\">
@@ -64,7 +64,7 @@ exports[`createBlocUser: index render component with values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Create User\\" />
+          <Blueprint.Button intent={0} onClick={[Function (anonymous)]} text=\\"Create User\\" />
         </div>
       </div>
     </form>
@@ -75,7 +75,7 @@ exports[`createBlocUser: index render component with values 1`] = `
 exports[`createBlocUser: index render component without values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.Button onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"accounts-create-user-button\\" text=\\"Create User\\" />
-  <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function: mockConstructor]} title=\\"Create New User\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+  <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function: mockConstructor] { _isMockFunction: true, getMockImplementation: [Function (anonymous)], mock: Object [Object: null prototype] { calls: [], instances: [] }, mockClear: [Function (anonymous)], mockReset: [Function (anonymous)], mockReturnValueOnce: [Function (anonymous)], mockReturnValue: [Function (anonymous)], mockImplementationOnce: [Function (anonymous)], mockImplementation: [Function (anonymous)], mockReturnThis: [Function (anonymous)], mockRestore: [Function (anonymous)] }} title=\\"Create New User\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body bloc-user-form\\">
         <div className=\\"pt-form-group\\">
@@ -116,7 +116,7 @@ exports[`createBlocUser: index render component without values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button intent={0} onClick={[Function]} text=\\"Create User\\" />
+          <Blueprint.Button intent={0} onClick={[Function (anonymous)]} text=\\"Create User\\" />
         </div>
       </div>
     </form>

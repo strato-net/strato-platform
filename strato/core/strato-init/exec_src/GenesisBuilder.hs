@@ -6,10 +6,18 @@
 
 {-# OPTIONS -fno-warn-orphans      #-}
 
+import BlockApps.Logging (runStdoutLoggingT)
+import Blockchain.DB.CodeDB (addCode)
+import Blockchain.Data.Block (blockBlockData)
+import qualified Blockchain.Data.BlockHeader as BH
+import Blockchain.Data.GenesisBlock (genesisInfoToGenesisBlock)
 import Blockchain.Data.GenesisInfo
 import Blockchain.GenesisBlocks.Builder
+import Blockchain.Init.Monad (runSetupDBMInDir)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Validator
+import Conduit (runResourceT)
+import Control.Monad (void)
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
@@ -26,7 +34,6 @@ import System.Environment
 data Options = Options
   { optValidators :: [Validator],
     optAdmins :: [Address],
-    optFaucets :: [Address],
     optInput :: GenesisInfo,
     optOutputName :: String
   }
@@ -37,7 +44,6 @@ defaultOptions =
   Options
     { optValidators = [],
       optAdmins = [],
-      optFaucets = [],
       optInput = error "Uninitialized input genesis info",
       optOutputName = "outputGenesisBlock.json"
     }
@@ -72,20 +78,6 @@ options =
       )
       "The .json filepath containing admin information. Must be a valid array of JSON object with \
       \ commonName, org, and orgUnit fields",
-    Option
-      ['f']
-      ["faucets"]
-      ( ReqArg
-          ( \s opts -> do
-              faucetsStr <- readFile s
-              let eFaucets = Ae.eitherDecodeStrict (C8.pack faucetsStr) :: Either String [Address]
-                  !faucets = either error id eFaucets
-              return opts {optFaucets = faucets}
-          )
-          "Faucets"
-      )
-      "The .json filepath containing faucet account information. Must be a valid array of JSON strings containing \
-      \ 40 ASCII hex characters",
     Option
       ['i']
       ["input"]
@@ -128,6 +120,16 @@ main = do
   --------------------------------- GENERATE GENESIS INFO ------------------------------------
   --------------------------------------------------------------------------------------------
 
-  let gi' = buildGenesisInfo optFaucets optValidators optAdmins def
-  B.writeFile optOutputName . BL.toStrict $ Ae.encode gi'
+  let gi' = buildGenesisInfo optValidators optAdmins def
+
+  -- Compute the correct stateRoot by populating the MPT in a temp directory
+  -- (avoids locking conflicts with running strato processes)
+  computedStateRoot <- runStdoutLoggingT $ runResourceT $ runSetupDBMInDir "/tmp/genesis-builder-db" $ do
+    void $ addCode mempty
+    genesisBlock <- genesisInfoToGenesisBlock gi'
+    return $ BH.stateRoot $ blockBlockData genesisBlock
+
+  let gi'' = gi' { Blockchain.Data.GenesisInfo.stateRoot = computedStateRoot }
+  B.writeFile optOutputName . BL.toStrict $ Ae.encode gi''
   putStrLn $ "Done. Output genesis block info was written to " ++ optOutputName
+  putStrLn $ "Computed stateRoot: " ++ show computedStateRoot

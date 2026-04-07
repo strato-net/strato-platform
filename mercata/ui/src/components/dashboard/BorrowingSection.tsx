@@ -1,27 +1,19 @@
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { NewLoanData } from "@/interface";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
+import { getTextColor } from "@/utils/lendingUtils";
 
 interface BorrowingSectionProps {
   loanData?: NewLoanData;
+  guestMode?: boolean;
 }
 
-const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
+const BorrowingSection = ({ loanData, guestMode = false }: BorrowingSectionProps) => {
   const navigate = useNavigate()
-
-  function getTextColor(value: number, maxValue = 10) {
-    const clamped = Math.min(Math.max(value, 1), maxValue);
-    const ratio = (clamped - 1) / (maxValue - 1);
-
-    const red = Math.round(255 * (1 - ratio));
-    const green = Math.round(255 * ratio);
-
-    return `rgb(${red}, ${green}, 0)`;
-  }
 
   // Calculate available borrowing power from loanData
   const availableBorrowingPower = loanData?.maxAvailableToBorrowUSD 
@@ -57,17 +49,26 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
   const riskLevel = calculateRiskLevel();
 
   return (
-    <Card className="border border-gray-100 shadow-sm">
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 space-y-2 sm:space-y-0">
+    <Card className="border border-border shadow-sm">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 space-y-4 sm:space-y-0">
         <div>
           <CardTitle className="text-xl font-bold">My Borrowing</CardTitle>
-          <CardDescription className="text-gray-500">Leverage your assets with secured loans</CardDescription>
+          <CardDescription className="text-muted-foreground">Leverage your assets with secured loans</CardDescription>
         </div>
-        <div className="hidden sm:block">
-          <Button onClick={()=> navigate('/dashboard/borrow')} className="flex items-center gap-2">
-            <ArrowUpRight size={16} /> Start Borrowing
-          </Button>
-        </div>
+        {/* Mobile: full width button */}
+        <Button 
+          onClick={() => navigate('/dashboard/borrow')} 
+          className="w-full sm:hidden flex items-center justify-center gap-2"
+        >
+          <Plus size={16} /> Borrow
+        </Button>
+        {/* Desktop: small button */}
+        <Button 
+          onClick={() => navigate('/dashboard/borrow')} 
+          className="hidden sm:flex items-center gap-2"
+        >
+          <Plus size={16} /> Borrow
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="py-4">
@@ -78,32 +79,34 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
             {/* Added extra spacing with mt-8 to separate indicators from data */}
             <div className="flex flex-col gap-2 mt-8">
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-gray-600 text-sm sm:text-base">Available Borrowing Power</span>
+                <span className="text-muted-foreground text-sm sm:text-base">Available Borrowing Power</span>
                 <span className="font-semibold text-sm sm:text-base">
-                  {availableBorrowingPower.toLocaleString("en-US", {
+                  {guestMode ? "-" : `${availableBorrowingPower.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
-                  })} USDST
+                  })} USDST`}
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-gray-600 text-sm sm:text-base">Total Amount Owed</span>
+                <span className="text-muted-foreground text-sm sm:text-base">Total Amount Owed</span>
                 <span className="font-semibold text-sm sm:text-base">
-                  {currentBorrowed.toLocaleString("en-US", {
+                  {guestMode ? "-" : `${currentBorrowed.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
-                  })} USDST
+                  })} USDST`}
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-gray-600 text-sm sm:text-base">Interest Rate</span>
-                <span className="font-semibold text-sm sm:text-base">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
+                <span className="text-muted-foreground text-sm sm:text-base">Interest Rate</span>
+                <span className="font-semibold text-sm sm:text-base">
+                  {guestMode ? "-" : `${((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%`}
+                </span>
               </div>
 
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-gray-600 text-sm sm:text-base">Health Factor</span>
-                <span className="font-semibold text-sm sm:text-base" style={{ color: getTextColor((loanData?.healthFactor || 0)) }}>
-                  {(() => {
+                <span className="text-muted-foreground text-sm sm:text-base">Health Factor</span>
+                <span className="font-semibold text-sm sm:text-base" style={{ color: guestMode ? undefined : getTextColor((loanData?.healthFactor || 0), 3, currentBorrowed === 0) }}>
+                  {guestMode ? "-" : (() => {
                     // Check if there's no outstanding debt
                     if (currentBorrowed === 0) {
                       return "No Loan";
@@ -116,13 +119,6 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
                   })()}
                 </span>
               </div>
-            </div>
-            
-            {/* Mobile Button */}
-            <div className="sm:hidden mt-6">
-              <Button onClick={()=> navigate('/dashboard/borrow')} className="flex items-center justify-center gap-2 w-full">
-                <ArrowUpRight size={16} /> Start Borrowing
-              </Button>
             </div>
           </div>
         </div>

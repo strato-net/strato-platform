@@ -1,0 +1,102 @@
+name: airlock
+version: 0.1.0
+build-type: Simple
+author: BlockApps
+maintainer: engineering@blockapps.net
+synopsis: Railgun privacy wallet CLI for STRATO
+category: Blockchain
+description: |
+  Airlock is a command line wallet for Railgun privacy transactions on STRATO.
+  Supports shielding, unshielding, and managing private token balances.
+license: Apache-2.0
+
+data-files:
+  - circuits/01x02/*
+  - data/english.txt
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Railgun.Keys
+    - Railgun.Shield
+    - Railgun.Unshield
+    - Railgun.Transfer
+    - Railgun.Crypto
+    - Railgun.BIP39
+    - Railgun.Types
+    - Railgun.API
+    - Railgun.Scan
+    - Railgun.Balance
+    - Railgun.Merkle
+    - Railgun.Witness
+    - Railgun.Prover
+    - Railgun.Signing
+  dependencies:
+    - aeson
+    - baby-jubjub
+    - base16-bytestring
+    - poseidon-hash
+    - base64-bytestring
+    - bloc2api
+    - bloc2client
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
+    - bytestring
+    - containers
+    - cryptonite
+    - evm-solidity
+    - filepath
+    - http-client
+    - http-types
+    - memory
+    - process
+    - servant-client
+    - servant-client-core
+    - core-api2
+    - strato-auth
+    - strato-conf
+    - strato-model
+    - temporary
+    - text
+    - yaml
+    - transformers
+    - vector
+    - directory
+    # Groth16 provers
+    - groth16-native
+    - groth16-snarkjs
+    - groth16-rapidsnark
+
+executables:
+  airlock:
+    source-dirs: exec_src/
+    main: Main.hs
+    other-modules: []
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - aeson
+      - airlock
+      - base16-bytestring
+      - bloc2api
+      - bytestring
+      - core-api2
+      - directory
+      - filepath
+      - http-client
+      - http-client-tls
+      - http-types
+      - network-uri
+      - optparse-applicative
+      - servant-client
+      - strato-auth
+      - strato-conf
+      - strato-model
+      - text
+      - time
+      - yaml

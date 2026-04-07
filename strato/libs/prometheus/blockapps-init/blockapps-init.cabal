@@ -1,0 +1,36 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockapps-init
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      BlockApps.Init
+  other-modules:
+      Paths_blockapps_init
+  hs-source-dirs:
+      src
+  build-depends:
+      base
+    , common-log
+    , cross-monitoring
+    , prometheus-client
+    , resourcet
+    , text
+    , unix
+  default-language: Haskell2010
+
+executable test-reload
+  main-is: TestReload.hs
+  hs-source-dirs:
+      exec_src/
+  build-depends:
+      base
+    , blockapps-init
+  default-language: Haskell2010

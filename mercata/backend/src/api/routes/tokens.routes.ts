@@ -231,6 +231,70 @@ router.post("/transfer", authHandler.authorizeRequest(), TokensController.transf
 
 /**
  * @openapi
+ * /tokens/bulk-transfer:
+ *   post:
+ *     summary: Transfer tokens to multiple recipients in bulk
+ *     tags: [Tokens]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - address
+ *               - transfers
+ *             properties:
+ *               address:
+ *                 type: string
+ *                 description: Token contract address
+ *               transfers:
+ *                 type: array
+ *                 description: Array of transfer items (max 100)
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - to
+ *                     - value
+ *                   properties:
+ *                     to:
+ *                       type: string
+ *                       description: Recipient address
+ *                     value:
+ *                       type: string
+ *                       description: Transfer amount (wei string)
+ *     responses:
+ *       200:
+ *         description: Bulk transfer results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       to:
+ *                         type: string
+ *                       value:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       hash:
+ *                         type: string
+ *                       error:
+ *                         type: string
+ *                 successCount:
+ *                   type: integer
+ *                 failureCount:
+ *                   type: integer
+ */
+router.post("/bulk-transfer", authHandler.authorizeRequest(), TokensController.bulkTransfer);
+
+/**
+ * @openapi
  * /tokens/approve:
  *   post:
  *     summary: Approve a spender for token allowances

@@ -6,6 +6,9 @@
     "scripts": {
         "deploy": "node deploy/deploy.js",
         "upgrade": "node deploy/upgrade.js",
+        "bridge:ops": "node deploy/bridge-usdc-route-migration.js",
+        "bridge:ops:testnet": "node deploy/bridge-usdc-route-migration.js --env testnet",
+        "bridge:ops:prod": "node deploy/bridge-usdc-route-migration.js --env prod",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "dependencies": {

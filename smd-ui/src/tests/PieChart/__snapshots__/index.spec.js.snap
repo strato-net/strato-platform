@@ -1,48 +1,46 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`Test PieChart index should render component properly 1`] = `
-initialize {
-  "0": Object {
+LoadedCheerio {
+  "0": Element {
     "attribs": Object {
       "class": "pt-card pt-dark",
     },
     "children": Array [
-      Object {
+      Element {
         "attribs": Object {
           "class": "row",
         },
         "children": Array [
-          Object {
+          Element {
             "attribs": Object {
               "class": "col-sm-12 text-center",
             },
             "children": Array [
-              Object {
+              Element {
                 "attribs": Object {},
                 "children": Array [
-                  Object {
-                    "data": "Last 15 Transactions by Type",
-                    "next": null,
-                    "parent": [Circular],
-                    "prev": null,
-                    "type": "text",
-                  },
+                  Last 15 Transactions by Type,
                 ],
+                "endIndex": null,
                 "name": "h4",
                 "namespace": "http://www.w3.org/1999/xhtml",
                 "next": null,
                 "parent": [Circular],
                 "prev": null,
+                "startIndex": null,
                 "type": "tag",
                 "x-attribsNamespace": Object {},
                 "x-attribsPrefix": Object {},
               },
             ],
+            "endIndex": null,
             "name": "div",
             "namespace": "http://www.w3.org/1999/xhtml",
             "next": null,
             "parent": [Circular],
             "prev": null,
+            "startIndex": null,
             "type": "tag",
             "x-attribsNamespace": Object {
               "class": undefined,
@@ -52,29 +50,32 @@ initialize {
             },
           },
         ],
+        "endIndex": null,
         "name": "div",
         "namespace": "http://www.w3.org/1999/xhtml",
-        "next": Object {
+        "next": Element {
           "attribs": Object {
             "class": "row",
           },
           "children": Array [
-            Object {
+            Element {
               "attribs": Object {
                 "class": "col-sm-12",
               },
               "children": Array [
-                Object {
+                Element {
                   "attribs": Object {
                     "id": "pc",
                     "style": "height:189px;",
                   },
                   "children": Array [],
+                  "endIndex": null,
                   "name": "div",
                   "namespace": "http://www.w3.org/1999/xhtml",
                   "next": null,
                   "parent": [Circular],
                   "prev": null,
+                  "startIndex": null,
                   "type": "tag",
                   "x-attribsNamespace": Object {
                     "id": undefined,
@@ -86,11 +87,13 @@ initialize {
                   },
                 },
               ],
+              "endIndex": null,
               "name": "div",
               "namespace": "http://www.w3.org/1999/xhtml",
               "next": null,
               "parent": [Circular],
               "prev": null,
+              "startIndex": null,
               "type": "tag",
               "x-attribsNamespace": Object {
                 "class": undefined,
@@ -100,11 +103,13 @@ initialize {
               },
             },
           ],
+          "endIndex": null,
           "name": "div",
           "namespace": "http://www.w3.org/1999/xhtml",
           "next": null,
           "parent": [Circular],
           "prev": [Circular],
+          "startIndex": null,
           "type": "tag",
           "x-attribsNamespace": Object {
             "class": undefined,
@@ -115,6 +120,7 @@ initialize {
         },
         "parent": [Circular],
         "prev": null,
+        "startIndex": null,
         "type": "tag",
         "x-attribsNamespace": Object {
           "class": undefined,
@@ -123,27 +129,29 @@ initialize {
           "class": undefined,
         },
       },
-      Object {
+      Element {
         "attribs": Object {
           "class": "row",
         },
         "children": Array [
-          Object {
+          Element {
             "attribs": Object {
               "class": "col-sm-12",
             },
             "children": Array [
-              Object {
+              Element {
                 "attribs": Object {
                   "id": "pc",
                   "style": "height:189px;",
                 },
                 "children": Array [],
+                "endIndex": null,
                 "name": "div",
                 "namespace": "http://www.w3.org/1999/xhtml",
                 "next": null,
                 "parent": [Circular],
                 "prev": null,
+                "startIndex": null,
                 "type": "tag",
                 "x-attribsNamespace": Object {
                   "id": undefined,
@@ -155,11 +163,13 @@ initialize {
                 },
               },
             ],
+            "endIndex": null,
             "name": "div",
             "namespace": "http://www.w3.org/1999/xhtml",
             "next": null,
             "parent": [Circular],
             "prev": null,
+            "startIndex": null,
             "type": "tag",
             "x-attribsNamespace": Object {
               "class": undefined,
@@ -169,46 +179,45 @@ initialize {
             },
           },
         ],
+        "endIndex": null,
         "name": "div",
         "namespace": "http://www.w3.org/1999/xhtml",
         "next": null,
         "parent": [Circular],
-        "prev": Object {
+        "prev": Element {
           "attribs": Object {
             "class": "row",
           },
           "children": Array [
-            Object {
+            Element {
               "attribs": Object {
                 "class": "col-sm-12 text-center",
               },
               "children": Array [
-                Object {
+                Element {
                   "attribs": Object {},
                   "children": Array [
-                    Object {
-                      "data": "Last 15 Transactions by Type",
-                      "next": null,
-                      "parent": [Circular],
-                      "prev": null,
-                      "type": "text",
-                    },
+                    Last 15 Transactions by Type,
                   ],
+                  "endIndex": null,
                   "name": "h4",
                   "namespace": "http://www.w3.org/1999/xhtml",
                   "next": null,
                   "parent": [Circular],
                   "prev": null,
+                  "startIndex": null,
                   "type": "tag",
                   "x-attribsNamespace": Object {},
                   "x-attribsPrefix": Object {},
                 },
               ],
+              "endIndex": null,
               "name": "div",
               "namespace": "http://www.w3.org/1999/xhtml",
               "next": null,
               "parent": [Circular],
               "prev": null,
+              "startIndex": null,
               "type": "tag",
               "x-attribsNamespace": Object {
                 "class": undefined,
@@ -218,11 +227,13 @@ initialize {
               },
             },
           ],
+          "endIndex": null,
           "name": "div",
           "namespace": "http://www.w3.org/1999/xhtml",
           "next": [Circular],
           "parent": [Circular],
           "prev": null,
+          "startIndex": null,
           "type": "tag",
           "x-attribsNamespace": Object {
             "class": undefined,
@@ -231,6 +242,7 @@ initialize {
             "class": undefined,
           },
         },
+        "startIndex": null,
         "type": "tag",
         "x-attribsNamespace": Object {
           "class": undefined,
@@ -240,25 +252,23 @@ initialize {
         },
       },
     ],
+    "endIndex": null,
     "name": "div",
     "namespace": "http://www.w3.org/1999/xhtml",
     "next": null,
-    "parent": null,
-    "prev": null,
-    "root": Object {
-      "attribs": Object {},
+    "parent": Document {
       "children": Array [
         [Circular],
       ],
-      "name": "root",
-      "namespace": "http://www.w3.org/1999/xhtml",
+      "endIndex": null,
       "next": null,
       "parent": null,
       "prev": null,
+      "startIndex": null,
       "type": "root",
-      "x-attribsNamespace": Object {},
-      "x-attribsPrefix": Object {},
     },
+    "prev": null,
+    "startIndex": null,
     "type": "tag",
     "x-attribsNamespace": Object {
       "class": undefined,
@@ -267,12 +277,97 @@ initialize {
       "class": undefined,
     },
   },
-  "_root": [Circular],
+  "_root": LoadedCheerio {
+    "0": Document {
+      "children": Array [
+        Element {
+          "attribs": Object {},
+          "children": Array [
+            Element {
+              "attribs": Object {},
+              "children": Array [],
+              "endIndex": null,
+              "name": "head",
+              "namespace": "http://www.w3.org/1999/xhtml",
+              "next": Element {
+                "attribs": Object {},
+                "children": Array [],
+                "endIndex": null,
+                "name": "body",
+                "namespace": "http://www.w3.org/1999/xhtml",
+                "next": null,
+                "parent": [Circular],
+                "prev": [Circular],
+                "startIndex": null,
+                "type": "tag",
+                "x-attribsNamespace": Object {},
+                "x-attribsPrefix": Object {},
+              },
+              "parent": [Circular],
+              "prev": null,
+              "startIndex": null,
+              "type": "tag",
+              "x-attribsNamespace": Object {},
+              "x-attribsPrefix": Object {},
+            },
+            Element {
+              "attribs": Object {},
+              "children": Array [],
+              "endIndex": null,
+              "name": "body",
+              "namespace": "http://www.w3.org/1999/xhtml",
+              "next": null,
+              "parent": [Circular],
+              "prev": Element {
+                "attribs": Object {},
+                "children": Array [],
+                "endIndex": null,
+                "name": "head",
+                "namespace": "http://www.w3.org/1999/xhtml",
+                "next": [Circular],
+                "parent": [Circular],
+                "prev": null,
+                "startIndex": null,
+                "type": "tag",
+                "x-attribsNamespace": Object {},
+                "x-attribsPrefix": Object {},
+              },
+              "startIndex": null,
+              "type": "tag",
+              "x-attribsNamespace": Object {},
+              "x-attribsPrefix": Object {},
+            },
+          ],
+          "endIndex": null,
+          "name": "html",
+          "namespace": "http://www.w3.org/1999/xhtml",
+          "next": null,
+          "parent": [Circular],
+          "prev": null,
+          "startIndex": null,
+          "type": "tag",
+          "x-attribsNamespace": Object {},
+          "x-attribsPrefix": Object {},
+        },
+      ],
+      "endIndex": null,
+      "next": null,
+      "parent": null,
+      "prev": null,
+      "startIndex": null,
+      "type": "root",
+      "x-mode": "quirks",
+    },
+    "_root": [Circular],
+    "length": 1,
+    "options": Object {
+      "decodeEntities": true,
+      "xml": false,
+    },
+  },
   "length": 1,
   "options": Object {
     "decodeEntities": true,
-    "normalizeWhitespace": false,
-    "withDomLvl1": true,
     "xml": false,
   },
 }

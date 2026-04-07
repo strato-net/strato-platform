@@ -10,7 +10,7 @@ import "./PriceOracle.sol";
  * @notice Central registry contract storing addresses of core lending protocol components.
  * @dev Can only be updated by the PoolConfigurator contract via access control or ownership.
  */
- 
+
 contract record LendingRegistry is Ownable {
     // All components at top level - no grouping needed
     LendingPool public lendingPool;
@@ -21,7 +21,7 @@ contract record LendingRegistry is Ownable {
 
     event ComponentsUpdated(
         address indexed lendingPool,
-        address indexed liquidityPool, 
+        address indexed liquidityPool,
         address indexed collateralVault,
         address rateStrategy,
         address priceOracle
@@ -50,13 +50,13 @@ contract record LendingRegistry is Ownable {
         require(_collateralVault != address(0), "Invalid collateralVault address");
         require(_rateStrategy != address(0), "Invalid rateStrategy address");
         require(_priceOracle != address(0), "Invalid priceOracle address");
-        
+
         lendingPool = LendingPool(_lendingPool);
         liquidityPool = LiquidityPool(_liquidityPool);
         collateralVault = CollateralVault(_collateralVault);
         rateStrategy = RateStrategy(_rateStrategy);
         priceOracle = PriceOracle(_priceOracle);
-        
+
         emit ComponentsUpdated(_lendingPool, _liquidityPool, _collateralVault, _rateStrategy, _priceOracle);
     }
 
@@ -133,4 +133,4 @@ contract record LendingRegistry is Ownable {
     function getPriceOracle() external view returns (address) {
         return address(priceOracle);
     }
-} 
+}

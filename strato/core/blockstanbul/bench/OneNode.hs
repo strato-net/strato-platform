@@ -14,7 +14,7 @@ runBlockstanbul :: StateT BlockstanbulContext (LoggingT IO) a -> IO a
 runBlockstanbul = runNoLoggingT . flip evalStateT benchContext
 
 instance HasBlockstanbulContext (StateT BlockstanbulContext (LoggingT IO)) where
-  getBlockstanbulContext = gets Just
+  getBlockstanbulContext = get
   putBlockstanbulContext = put
 
 sendAllMessagesBench :: Int -> Int -> IO [OutEvent]

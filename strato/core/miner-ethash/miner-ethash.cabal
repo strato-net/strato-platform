@@ -1,0 +1,65 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           miner-ethash
+version:        0.1.0.0
+category:       System
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Strato.Mining.Ethash.Cache
+      Blockchain.Strato.Mining.Ethash.Constants
+      Blockchain.Strato.Mining.Ethash.Dataset
+      Blockchain.Strato.Mining.Ethash.Hashimoto
+      Blockchain.Strato.Mining.Ethash.TimeIt
+  other-modules:
+      Blockchain.Strato.Mining.Ethash.Util
+  hs-source-dirs:
+      src/
+  ghc-options: -Wall -O2
+  build-depends:
+      arithmoi
+    , array
+    , base
+    , binary
+    , bytestring
+    , strato-model
+    , time
+  default-language: Haskell2010
+
+executable miner-ethash
+  main-is: Main.hs
+  other-modules:
+      Paths_miner_ethash
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -O2
+  build-depends:
+      array
+    , base
+    , binary
+    , bytestring
+    , miner-ethash
+    , mmap
+  default-language: Haskell2010
+
+executable mkDataset
+  main-is: mkDataset.hs
+  other-modules:
+      Main
+      Paths_miner_ethash
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -Wall -O2
+  build-depends:
+      array
+    , base
+    , binary
+    , bytestring
+    , miner-ethash
+  default-language: Haskell2010

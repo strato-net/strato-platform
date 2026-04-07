@@ -37,15 +37,15 @@ export const CopyableHash: React.FC<CopyableHashProps> = ({
   return (
     <div className={`space-y-1 ${className}`}>
       <div 
-        className="bg-gray-100 p-2 rounded text-xs font-mono cursor-pointer hover:bg-gray-200 transition-colors border"
+        className="bg-muted p-2 rounded text-xs font-mono cursor-pointer hover:bg-muted/80 transition-colors border border-border"
         onClick={copyToClipboard}
         title="Click to copy transaction hash"
       >
-        {showLabel && <span className="text-gray-600">{label} </span>}
+        {showLabel && <span className="text-muted-foreground">{label} </span>}
         <span className="text-blue-600 select-all">{displayHash}</span>
       </div>
       {showInstructions && (
-        <p className="text-xs text-gray-500">Click hash to copy</p>
+        <p className="text-xs text-muted-foreground">Click hash to copy</p>
       )}
     </div>
   );

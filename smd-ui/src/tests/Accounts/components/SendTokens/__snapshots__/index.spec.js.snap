@@ -221,7 +221,7 @@ exports[`SendTokens: index render Oauth mode with values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
   <form>
-    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={true} onClose={[Function (anonymous)]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
         <div>
           <div className=\\"row\\">
@@ -395,7 +395,7 @@ exports[`SendTokens: index render Oauth mode with values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
+          <Blueprint.Button onClick={[Function (anonymous)]} disabled={true} text=\\"Send Tokens\\" />
         </div>
       </div>
     </Blueprint.Dialog>
@@ -407,7 +407,7 @@ exports[`SendTokens: index render Oauth mode without values 1`] = `
 "<div className=\\"smd-pad-16\\">
   <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" text=\\"Send Tokens\\" />
   <form>
-    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
+    <Blueprint.Dialog iconName=\\"inbox\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"Send Tokens\\" style={{...}} className=\\"pt-dark send-tokens-dialog\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
         <div>
           <div className=\\"row\\">
@@ -577,7 +577,7 @@ exports[`SendTokens: index render Oauth mode without values 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function: onClick]} />
-          <Blueprint.Button onClick={[Function]} disabled={true} text=\\"Send Tokens\\" />
+          <Blueprint.Button onClick={[Function (anonymous)]} disabled={true} text=\\"Send Tokens\\" />
         </div>
       </div>
     </Blueprint.Dialog>

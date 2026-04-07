@@ -3,7 +3,7 @@ import { withRouter, Link } from "react-router-dom";
 import { connect } from "react-redux";
 // import mixpanelWrapper from "../../lib/mixpanelWrapper";
 import "./menubar.css";
-import logo from "./strato-mercata-beta-white.png";
+import logo from "./strato-dark.png";
 import { env } from "../../env";
 import {
   Popover,

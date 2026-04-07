@@ -1,0 +1,47 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockapps-datadefs
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.Data.DataDefs
+      Blockchain.Data.PersistTypes
+      Blockchain.Data.TransactionResultStatus
+      Blockchain.Data.TXOrigin
+  other-modules:
+      Paths_blockapps_datadefs
+  hs-source-dirs:
+      src/
+  default-extensions:
+      TemplateHaskell
+  ghc-options: -Wall -O2 -fconstraint-solver-iterations=20
+  build-depends:
+      QuickCheck
+    , aeson
+    , base
+    , base16-bytestring
+    , binary
+    , bytestring
+    , crypto-pubkey-types
+    , deepseq
+    , ethereum-encryption
+    , evm-solidity
+    , format
+    , generic-arbitrary
+    , generic-random
+    , labeled-error
+    , openapi3
+    , persistent
+    , solid-vm-model
+    , strato-model
+    , text
+    , time
+    , transformers
+  default-language: Haskell2010

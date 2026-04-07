@@ -69,12 +69,13 @@ const ActivityFeedFilters = memo(({
     : eventNames;
 
   // Deduplicate event names to prevent "DepositedDeposited" when "All Contracts" is selected
+  // Sort event names alphabetically
   const uniqueEventNames = Array.from(
     new Map(availableEvents.map(event => [event.name, event])).values()
-  );
+  ).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <div className="mb-4 sm:mb-6 p-3 sm:p-4 border rounded-lg bg-gray-50">
+    <div className="mb-4 sm:mb-6 p-3 sm:p-4 border rounded-lg bg-muted/50 border-border">
       <div className="flex items-center gap-2 mb-2 sm:mb-3">
         <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
         <span className="text-sm sm:text-base font-medium">Filters</span>
@@ -93,7 +94,7 @@ const ActivityFeedFilters = memo(({
 
       <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
-          <label className="text-xs sm:text-sm font-medium text-gray-700 sm:min-w-fit">Contract:</label>
+          <label className="text-xs sm:text-sm font-medium text-foreground sm:min-w-fit">Contract:</label>
           <Select
             value={filters.contract_name || "all"}
             onValueChange={handleContractChange}
@@ -113,7 +114,7 @@ const ActivityFeedFilters = memo(({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
-          <label className="text-xs sm:text-sm font-medium text-gray-700 sm:min-w-fit">Event:</label>
+          <label className="text-xs sm:text-sm font-medium text-foreground sm:min-w-fit">Event:</label>
           <Select
             value={filters.event_name || "all"}
             onValueChange={handleEventChange}
@@ -134,7 +135,7 @@ const ActivityFeedFilters = memo(({
 
         {userAddress && (
           <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-2">
-            <div className="hidden sm:block w-px h-6 bg-gray-300 mx-2"></div>
+            <div className="hidden sm:block w-px h-6 bg-border mx-2"></div>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -145,7 +146,7 @@ const ActivityFeedFilters = memo(({
                     className={`h-9 transition-all duration-200 relative ${
                       filters.transaction_sender 
                         ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md scale-105" 
-                        : "hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 hover:scale-105"
+                        : "hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 hover:scale-105"
                     }`}
                   >
                     {filters.transaction_sender && (
@@ -176,7 +177,7 @@ const ActivityFeedFilters = memo(({
             </Badge>
           )}
           {filters.transaction_sender && (
-            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
               My Transactions
             </Badge>
           )}

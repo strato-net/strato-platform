@@ -335,7 +335,7 @@ contract PermissionManager is RestStatus {
     }
     return (result);
   }
-  
+
   // STUB base function - must be overriden
   function canModifyMap(address _address) returns (bool) {
     return false;
@@ -663,7 +663,7 @@ contract Hashmap is UnsafeHashmap {
       return false;
     }
 
-    return super.contains(_key);    
+    return super.contains(_key);
   }
 
   /**

@@ -1,0 +1,62 @@
+#!/bin/bash
+# Setup restish for STRATO. Usage: ./setup-restish.sh [host:port]
+set -e
+
+HOST="${1:-localhost:8081}"
+
+# Mac uses ~/Library/Application Support/restish, Linux uses ~/.config/restish
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    DIR="$HOME/Library/Application Support/restish"
+else
+    DIR="$HOME/.config/restish"
+fi
+
+# Auth helper goes in a path without spaces
+HELPER_DIR="$HOME/.local/bin"
+
+mkdir -p "$DIR"
+mkdir -p "$HELPER_DIR"
+
+echo "Authenticating..."
+strato-auth
+TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
+
+echo "Fetching OpenAPI spec from $HOST..."
+if ! curl -sf -H "Authorization: Bearer $TOKEN" "http://$HOST/strato-api/openapi.json" -o "$DIR/strato-openapi3.json"; then
+    echo "Error: Failed to fetch spec from http://$HOST/strato-api/openapi.json"
+    exit 1
+fi
+
+echo "Creating auth helper..."
+cat > "$HELPER_DIR/strato-auth-helper.sh" << 'EOF'
+#!/bin/bash
+strato-auth >/dev/null
+TOKEN=$(jq -r '.access_token' ~/.secrets/stratoToken)
+echo "{\"headers\":{\"Authorization\":[\"Bearer $TOKEN\"]}}"
+EOF
+chmod +x "$HELPER_DIR/strato-auth-helper.sh"
+
+echo "Configuring restish..."
+CONFIG='{"base":"http://'"$HOST"'/strato-api","spec_files":["'"$DIR"'/strato-openapi3.json"],"profiles":{"default":{"auth":{"name":"external-tool","params":{"commandline":"'"$HELPER_DIR"'/strato-auth-helper.sh","omitbody":"true"}}}}}'
+
+if [ -f "$DIR/apis.json" ]; then
+    jq --argjson cfg "$CONFIG" '.strato = $cfg' "$DIR/apis.json" > "$DIR/apis.json.tmp"
+    mv "$DIR/apis.json.tmp" "$DIR/apis.json"
+else
+    echo "{\"strato\":$CONFIG}" > "$DIR/apis.json"
+fi
+
+echo "Setting up shell completions..."
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    mkdir -p ~/.zsh/completions
+    restish completion zsh > ~/.zsh/completions/_restish
+    if ! grep -q 'fpath.*\.zsh/completions' ~/.zshrc 2>/dev/null; then
+        echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+        echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+    fi
+else
+    mkdir -p ~/.local/share/bash-completion/completions
+    restish completion bash > ~/.local/share/bash-completion/completions/restish
+fi
+
+echo "Done. Open a new terminal, then test: restish strato --help"

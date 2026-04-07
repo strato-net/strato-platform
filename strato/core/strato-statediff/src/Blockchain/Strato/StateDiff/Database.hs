@@ -20,7 +20,7 @@ import Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff
-import Blockchain.Data.Transaction
+import Blockchain.Data.Transaction (codePtrHash, codePtrName)
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString as BS

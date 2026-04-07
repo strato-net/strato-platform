@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -9,10 +10,17 @@ module Main where
 
 import BlockApps.Init
 import BlockApps.Logging (LogLevel (..), flags_minLogLevel)
-import Control.Monad
+import Control.Exception (SomeException, try)
+import Control.Monad (forM_, void, when)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Logger (runNoLoggingT)
+import Control.Monad.Reader (runReaderT)
 import Data.Cache
 import Data.IORef
 import Data.Pool
+import Data.String (fromString)
+import Database.Persist.Sql (rawExecute)
+import Database.Persist.Postgresql (withPostgresqlConn)
 import Database.PostgreSQL.Simple
 import HFlags
 import Network.HTTP.Client hiding (Proxy)
@@ -27,7 +35,9 @@ import qualified Strato.Strato23.API as Strato23
 import qualified Strato.Strato23.Database.Migrations as Strato23
 import qualified Strato.Strato23.Monad as Strato23
 import qualified Strato.Strato23.Server as Strato23
+import qualified Strato.Strato23.Server.Password as Strato23Pass
 import System.Clock
+import qualified Data.Text as T
 import System.IO
   ( BufferMode (..),
     hSetBuffering,
@@ -52,6 +62,16 @@ main = do
       "   :      :   : :  : :  :  : :: : :  :          :: :  : :    :   : :  :   : :  :        :       : :: ::   :   : :"
     ]
   _ <- $initHFlags "Setup Vault Wrapper DBs"
+
+  -- Create database if it doesn't exist (postgres should be ready via docker --wait)
+  let adminConnStr = fromString $ "host=" <> flags_pghost <> " port=" <> flags_pgport <> " user=" <> flags_pguser <> " password=" <> flags_password <> " dbname=postgres"
+      createDbQuery = "CREATE DATABASE " <> fromString flags_database <> " WITH ENCODING 'UTF8'"
+  runNoLoggingT $ withPostgresqlConn adminConnStr $ \backend -> do
+    result <- liftIO $ try $ runReaderT (rawExecute createDbQuery []) backend
+    case result of
+      Left (_ :: SomeException) -> liftIO $ putStrLn $ "Database " <> flags_database <> " already exists or could not be created"
+      Right () -> return ()
+
   let dbConnectInfo =
         ConnectInfo
           { connectHost = flags_pghost,
@@ -75,6 +95,14 @@ main = do
   password <- newIORef Nothing
   cache <- newCache . Just $ TimeSpec (fromIntegral flags_keyStoreCacheTimeout) 0
   let env = Strato23.VaultWrapperEnv mgr pool password cache
+
+  -- Initialize vault password from file if provided (for local deployments)
+  when (not (null flags_vaultPasswordFile)) $ do
+    vaultPassword <- filter (/= '\n') <$> readFile flags_vaultPasswordFile
+    putStrLn $ "Initializing vault password from: " ++ flags_vaultPasswordFile
+    _ <- Strato23.runVaultToIO env (Strato23Pass.postPassword (T.pack vaultPassword))
+    putStrLn "Vault password initialized."
+
   run flags_port (appVaultWrapper env)
 
 appVaultWrapper :: Strato23.VaultWrapperEnv -> Application

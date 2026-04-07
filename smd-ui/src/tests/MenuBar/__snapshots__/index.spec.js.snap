@@ -17,7 +17,7 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
     <div>
-      <Blueprint.Dialog className=\\"pt-dark\\" iconName=\\"user\\" isOpen={false} onClose={[Function]} title=\\"My Profile\\" canOutsideClickClose={true}>
+      <Blueprint.Dialog className=\\"pt-dark\\" iconName=\\"user\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"My Profile\\" canOutsideClickClose={true}>
         <div className=\\"pt-dialog-body\\">
           <div>
             <h4>
@@ -29,7 +29,7 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
         </div>
         <div className=\\"pt-dialog-footer\\">
           <div className=\\"pt-dialog-footer-actions\\">
-            <Blueprint.Button className=\\"pt-minimal\\" intent={3} onClick={[Function]} text=\\"Close\\" />
+            <Blueprint.Button className=\\"pt-minimal\\" intent={3} onClick={[Function (anonymous)]} text=\\"Close\\" />
           </div>
         </div>
       </Blueprint.Dialog>
@@ -64,7 +64,7 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
     <div>
-      <Blueprint.Dialog className=\\"pt-dark\\" iconName=\\"user\\" isOpen={false} onClose={[Function]} title=\\"My Profile\\" canOutsideClickClose={true}>
+      <Blueprint.Dialog className=\\"pt-dark\\" iconName=\\"user\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"My Profile\\" canOutsideClickClose={true}>
         <div className=\\"pt-dialog-body\\">
           <div>
             <h4>
@@ -76,7 +76,7 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
         </div>
         <div className=\\"pt-dialog-footer\\">
           <div className=\\"pt-dialog-footer-actions\\">
-            <Blueprint.Button className=\\"pt-minimal\\" intent={3} onClick={[Function]} text=\\"Close\\" />
+            <Blueprint.Button className=\\"pt-minimal\\" intent={3} onClick={[Function (anonymous)]} text=\\"Close\\" />
           </div>
         </div>
       </Blueprint.Dialog>

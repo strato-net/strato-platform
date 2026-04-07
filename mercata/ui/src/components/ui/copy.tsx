@@ -16,7 +16,7 @@ const CopyButton = ({ address }) => {
       <TooltipTrigger asChild>
         <button
           onClick={copyToClipboard}
-          className={`ml-1 transition-colors duration-200 ${copied ? "text-green-600" : "text-gray-400 hover:text-gray-600"
+          className={`ml-1 transition-colors duration-200 ${copied ? "text-green-600" : "text-muted-foreground hover:text-foreground"
             }`}
           aria-label="Copy address"
           onBlur={() => setCopied(false)}

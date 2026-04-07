@@ -31,6 +31,8 @@ import {
   topUpJuniorNote,
   claimJuniorNote,
   getCDPStats,
+  getInterestAccrued,
+  getVaultCandidates,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -56,6 +58,20 @@ class CDPController {
       const { accessToken, address: userAddress } = req;
       const vaults = await getVaults(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(vaults);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getVaultCandidates(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await getVaultCandidates(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
@@ -474,6 +490,20 @@ class CDPController {
       const { accessToken, address: userAddress } = req;
       const stats = await getCDPStats(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(stats);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getInterestAccrued(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await getInterestAccrued(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

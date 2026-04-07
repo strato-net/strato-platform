@@ -10,7 +10,7 @@ module Blockchain.Bagger.TransactionList
   )
 where
 
-import Blockchain.Data.TransactionDef
+import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Data.Foldable (foldl')
 import qualified Data.Map.Strict as M
@@ -18,13 +18,13 @@ import qualified Data.Map.Strict as M
 type TransactionList = M.Map Integer OutputTx
 
 nonce :: OutputTx -> Integer
-nonce = transactionNonce . otBaseTx
+nonce = TD.nonce . otBaseTx
 
 --emptyTransactionList :: TransactionList
 --emptyTransactionList = M.empty
 
 singletonTransactionList :: OutputTx -> TransactionList
-singletonTransactionList t = M.singleton (transactionNonce $ otBaseTx t) t
+singletonTransactionList t = M.singleton (TD.nonce $ otBaseTx t) t
 
 -- should replace TXs with identical nonces but different gas cost to one with higher gas cost
 -- returns (Maybe <txThatWasReplaced/txToDropFromSeen>, newTransactionList)

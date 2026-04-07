@@ -1,0 +1,191 @@
+cabal-version: 2.2
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           groth16-rapidsnark
+version:        0.1.0
+synopsis:       Groth16 prover via FFI to rapidsnark
+description:    Native FFI bindings to rapidsnark for fast Groth16 proof generation.
+                .
+                Builds rapidsnark from vendored source (pure C++, generic field arithmetic).
+                No cmake, nasm, or external setup required - just stack build.
+                .
+                Requirements:
+                  - g++ (C++ compiler)  
+                  - libgmp-dev (GNU Multiple Precision library)
+                .
+                Note: This package includes rapidsnark which is licensed under LGPL v3.
+                See NOTICE.md for license details.
+author:         BlockApps
+maintainer:     info@blockapps.net
+license:        NONE
+build-type:     Simple
+extra-source-files:
+    NOTICE.md
+    vendor/ffiasm/c/alt_bn128.cpp
+    vendor/ffiasm/c/curve.cpp
+    vendor/ffiasm/c/f12field.cpp
+    vendor/ffiasm/c/f2field.cpp
+    vendor/ffiasm/c/f6field.cpp
+    vendor/ffiasm/c/fft.cpp
+    vendor/ffiasm/c/misc.cpp
+    vendor/ffiasm/c/msm.cpp
+    vendor/ffiasm/c/multiexp.cpp
+    vendor/ffiasm/c/naf.cpp
+    vendor/ffiasm/c/scalar.cpp
+    vendor/ffiasm/c/splitparstr.cpp
+    vendor/rapidsnark/build/fq.cpp
+    vendor/rapidsnark/build/fq_generic.cpp
+    vendor/rapidsnark/build/fq_raw_generic.cpp
+    vendor/rapidsnark/build/fr.cpp
+    vendor/rapidsnark/build/fr_generic.cpp
+    vendor/rapidsnark/build/fr_raw_generic.cpp
+    vendor/rapidsnark/src/binfile_utils.cpp
+    vendor/rapidsnark/src/fileloader.cpp
+    vendor/rapidsnark/src/groth16.cpp
+    vendor/rapidsnark/src/logger.cpp
+    vendor/rapidsnark/src/prover.cpp
+    vendor/rapidsnark/src/wtns_utils.cpp
+    vendor/rapidsnark/src/zkey_utils.cpp
+    vendor/ffiasm/c/alt_bn128.hpp
+    vendor/ffiasm/c/curve.hpp
+    vendor/ffiasm/c/exp.hpp
+    vendor/ffiasm/c/exp2.hpp
+    vendor/ffiasm/c/f12field.hpp
+    vendor/ffiasm/c/f2field.hpp
+    vendor/ffiasm/c/f6field.hpp
+    vendor/ffiasm/c/fft.hpp
+    vendor/ffiasm/c/misc.hpp
+    vendor/ffiasm/c/msm.hpp
+    vendor/ffiasm/c/multiexp.hpp
+    vendor/ffiasm/c/naf.hpp
+    vendor/ffiasm/c/pointparallelprocessor.hpp
+    vendor/ffiasm/c/polynomial.hpp
+    vendor/ffiasm/c/scalar.hpp
+    vendor/ffiasm/c/splitparstr.hpp
+    vendor/json/single_include/nlohmann/json.hpp
+    vendor/rapidsnark/build/fq.hpp
+    vendor/rapidsnark/build/fq_element.hpp
+    vendor/rapidsnark/build/fr.hpp
+    vendor/rapidsnark/build/fr_element.hpp
+    vendor/rapidsnark/src/binfile_utils.hpp
+    vendor/rapidsnark/src/fileloader.hpp
+    vendor/rapidsnark/src/groth16.hpp
+    vendor/rapidsnark/src/logger.hpp
+    vendor/rapidsnark/src/logging.hpp
+    vendor/rapidsnark/src/random_generator.hpp
+    vendor/rapidsnark/src/wtns_utils.hpp
+    vendor/rapidsnark/src/zkey_utils.hpp
+    vendor/circom_witness.h
+    vendor/rapidsnark/src/prover.h
+    vendor/wasm3/m3_bind.h
+    vendor/wasm3/m3_code.h
+    vendor/wasm3/m3_compile.h
+    vendor/wasm3/m3_config.h
+    vendor/wasm3/m3_config_platforms.h
+    vendor/wasm3/m3_core.h
+    vendor/wasm3/m3_env.h
+    vendor/wasm3/m3_exception.h
+    vendor/wasm3/m3_exec.h
+    vendor/wasm3/m3_exec_defs.h
+    vendor/wasm3/m3_function.h
+    vendor/wasm3/m3_info.h
+    vendor/wasm3/m3_math_utils.h
+    vendor/wasm3/wasm3.h
+    vendor/wasm3/wasm3_defs.h
+    vendor/circom_witness.c
+    vendor/wasm3/m3_bind.c
+    vendor/wasm3/m3_code.c
+    vendor/wasm3/m3_compile.c
+    vendor/wasm3/m3_core.c
+    vendor/wasm3/m3_env.c
+    vendor/wasm3/m3_exec.c
+    vendor/wasm3/m3_function.c
+    vendor/wasm3/m3_info.c
+    vendor/wasm3/m3_module.c
+    vendor/wasm3/m3_parse.c
+    vendor/wasm3/LICENSE
+
+library
+  exposed-modules:
+      Groth16.Prover
+      Groth16.Prover.FFI
+      Groth16.Witness
+      Groth16.Witness.FFI
+  other-modules:
+      Paths_groth16_rapidsnark
+  autogen-modules:
+      Paths_groth16_rapidsnark
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+  cc-options: -std=c99 -O2 -fPIC -Wno-unused-parameter -Wno-unused-variable -Dd_m3HasFloat=0
+  cxx-options: -std=c++17 -O2 -fPIC -Wno-address-of-packed-member -Wno-unused-parameter
+  include-dirs:
+      vendor/rapidsnark/src
+      vendor/rapidsnark/build
+      vendor/ffiasm/c
+      vendor/json/single_include
+      vendor/wasm3
+      vendor
+  c-sources:
+      vendor/wasm3/m3_bind.c
+      vendor/wasm3/m3_code.c
+      vendor/wasm3/m3_compile.c
+      vendor/wasm3/m3_core.c
+      vendor/wasm3/m3_env.c
+      vendor/wasm3/m3_exec.c
+      vendor/wasm3/m3_function.c
+      vendor/wasm3/m3_info.c
+      vendor/wasm3/m3_module.c
+      vendor/wasm3/m3_parse.c
+      vendor/circom_witness.c
+  cxx-sources:
+      vendor/rapidsnark/src/prover.cpp
+      vendor/rapidsnark/src/binfile_utils.cpp
+      vendor/rapidsnark/src/zkey_utils.cpp
+      vendor/rapidsnark/src/wtns_utils.cpp
+      vendor/rapidsnark/src/fileloader.cpp
+      vendor/rapidsnark/src/logger.cpp
+      vendor/rapidsnark/build/fr.cpp
+      vendor/rapidsnark/build/fr_generic.cpp
+      vendor/rapidsnark/build/fr_raw_generic.cpp
+      vendor/rapidsnark/build/fq.cpp
+      vendor/rapidsnark/build/fq_generic.cpp
+      vendor/rapidsnark/build/fq_raw_generic.cpp
+      vendor/ffiasm/c/misc.cpp
+      vendor/ffiasm/c/naf.cpp
+      vendor/ffiasm/c/splitparstr.cpp
+      vendor/ffiasm/c/alt_bn128.cpp
+  extra-libraries:
+      gmp
+      pthread
+      stdc++
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , directory
+    , filepath
+    , process
+    , temporary
+    , text
+    , vector
+  default-language: Haskell2010
+
+test-suite test-ffi
+  type: exitcode-stdio-1.0
+  main-is: TestFFI.hs
+  other-modules:
+      Paths_groth16_rapidsnark
+  autogen-modules:
+      Paths_groth16_rapidsnark
+  hs-source-dirs:
+      test
+  ghc-options: -Wall
+  build-depends:
+      base
+    , groth16-rapidsnark
+  default-language: Haskell2010

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { api } from "@/lib/axios";
+import { useUser } from "@/context/UserContext";
 
 interface OraclePrice {
   asset: string;
@@ -19,6 +20,7 @@ interface OracleContextType {
 const OracleContext = createContext<OracleContextType | undefined>(undefined);
 
 export const OracleProvider = ({ children }: { children: ReactNode }) => {
+  const { isLoggedIn } = useUser();
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export const OracleProvider = ({ children }: { children: ReactNode }) => {
   }, [prices]);
 
   const fetchPrice = useCallback(async (assetAddress: string): Promise<string | null> => {
-    if (!assetAddress) return null;
+    if (!assetAddress || !isLoggedIn) return null;
     
     setLoading(true);
     setError(null);
@@ -62,9 +64,10 @@ export const OracleProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   const fetchAllPrices = useCallback(async (): Promise<void> => {
+    if (!isLoggedIn) return;
     setLoading(true);
     setError(null);
     
@@ -87,16 +90,18 @@ export const OracleProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   const refreshPrices = useCallback(async (): Promise<void> => {
     await fetchAllPrices();
   }, [fetchAllPrices]);
 
-  // Fetch all prices on context initialization
+  // Fetch all prices on context initialization, but only if logged in
   useEffect(() => {
-    fetchAllPrices();
-  }, [fetchAllPrices]);
+    if (isLoggedIn) {
+      fetchAllPrices();
+    }
+  }, [fetchAllPrices, isLoggedIn]);
 
   const contextValue: OracleContextType = {
     prices,

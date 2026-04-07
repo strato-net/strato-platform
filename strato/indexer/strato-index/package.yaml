@@ -16,16 +16,21 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-mpdbs
   - blockDB
   - common-log
   - containers
   - format
   - kafka-monad
   - monad-alter
+  - persistent-postgresql
   - seqevents
   - strato-conf
   - strato-model
+  - strato-statediff
   - text
+  - transformers
+  - unliftio
 
 executables:
   strato-api-indexer:
@@ -46,6 +51,7 @@ executables:
       - strato-conf
       - strato-index
       - strato-model
+      - strato-statediff
     other-modules:
       - Wiring
 
@@ -60,6 +66,7 @@ executables:
       - containers
       - evm-solidity
       - hflags
+      - kafka-monad
       - monad-alter
       - process-monitor
       - redis-monad

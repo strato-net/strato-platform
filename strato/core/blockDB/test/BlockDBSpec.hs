@@ -137,7 +137,7 @@ spec = around (withConn 1) $ do
         ("Couldn't recover parent hash for child " ++ format cHash ++ " and parent " ++ format pHash)
         (Just pHash)
         (blockHash <$> r)
- 
+
     it "Should get genesis from chain" $ \conn -> do
       g <- liftIO makeGenesisBlock
       let genHash = blockHeaderHash g

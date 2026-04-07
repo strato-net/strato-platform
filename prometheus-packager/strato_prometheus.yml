@@ -37,15 +37,6 @@ scrape_configs:
       - target_label: instance
         replacement: '__NODE_HOST_MARKER__'
 
-# TODO enable when /metrics is implemented in vault-proxy
-#   - job_name: 'vault-proxy'
-#     metrics_path: '/metrics'
-#     static_configs:
-#       - targets: ['__STRATO_HOSTNAME__:8013']
-#     metric_relabel_configs:
-#       - target_label: instance
-#         replacement: '__NODE_HOST_MARKER__'
-
   - job_name: 'vm-runner'
     metrics_path: '/metrics'
     static_configs:

@@ -1,0 +1,9 @@
+# Build artifacts
+dist-newstyle/
+.stack-work/
+
+# Binary files
+bin/
+
+# Large generated files (can be regenerated with snarkjs zkey export json)
+circuits/01x02/circuit_pk.json

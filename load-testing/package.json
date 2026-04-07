@@ -1,0 +1,26 @@
+{
+  "name": "strato-load-testing",
+  "version": "1.0.0",
+  "description": "STRATO blockchain load testing framework",
+  "private": true,
+  "scripts": {
+    "test:deploy": "ts-node src/cli.ts --scenario contractDeploy",
+    "test:calls": "ts-node src/cli.ts --scenario functionCall",
+    "test:mixed": "ts-node src/cli.ts --scenario mixedWorkload",
+    "test:all": "ts-node src/cli.ts",
+    "test:quick": "ts-node src/cli.ts --batch-size 5 --batch-count 2"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "commander": "^12.1.0",
+    "js-yaml": "^4.1.0",
+    "simple-oauth2": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.14.0",
+    "@types/simple-oauth2": "^5.0.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  }
+}

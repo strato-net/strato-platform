@@ -77,8 +77,10 @@ executables:
       - postgresql-simple
       - slipstream
       - sql-monad
+      - strato-conf
       - text
       - transformers
+      - unliftio
       - wai-middleware-prometheus
       - warp
 

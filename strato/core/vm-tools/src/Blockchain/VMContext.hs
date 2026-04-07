@@ -11,7 +11,6 @@
 
 module Blockchain.VMContext
   ( CurrentBlockHash (..),
-    IsBlockstanbul (..),
     withCurrentBlockHash,
     VMBase,
     ContextDBs (..),
@@ -38,9 +37,7 @@ module Blockchain.VMContext
     baggerState,
     bestBlockInfo,
     vmGasCap,
-    hasBlockstanbul,
     selfAddress,
-    blockRequested,
     runningTests,
     txRunResultsCache,
     debugSettings,
@@ -86,7 +83,7 @@ import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
-import Blockchain.Model.SyncState
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
@@ -116,7 +113,6 @@ import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
 import Debugger
-import Executable.EVMFlags
 import GHC.Generics
 import SolidVM.Model.Storable
 import SolidVM.Model.Value
@@ -204,9 +200,6 @@ knownExpensiveTxs =
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
   deriving (Generic, NFData, Show)
 
-newtype IsBlockstanbul = IsBlockstanbul {unIsBlockstanbul :: Bool}
-  deriving (Generic, NFData, Show, Eq)
-
 newtype GasCap = GasCap {unVmGasCap :: Gas}
   deriving (Generic, NFData, Show, Eq)
 
@@ -258,8 +251,6 @@ data ContextState = ContextState
     _baggerState :: !BaggerState,
     _bestBlockInfo :: !ContextBestBlockInfo,
     _vmGasCap :: !Gas,
-    _hasBlockstanbul :: !Bool,
-    _blockRequested :: !Bool,
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
@@ -275,9 +266,7 @@ instance Default ContextState where
       { _memDBs = def,
         _baggerState = defaultBaggerState,
         _bestBlockInfo = Unspecified,
-        _vmGasCap = Gas flags_gasLimit,
-        _hasBlockstanbul = True,
-        _blockRequested = False,
+        _vmGasCap = Gas (Conf.gasLimit $ networkConfig ethConf),
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
@@ -309,14 +298,10 @@ type VMBase m =
     Mod.Modifiable ContextState m,
     Mod.Accessible ContextState m,
     Mod.Modifiable MemDBs m,
-    Mod.Accessible MemDBs m,
     Mod.Modifiable BlockHashRoot m,
-    Mod.Modifiable GenesisRoot m,
-    Mod.Modifiable BestBlockRoot m,
     Mod.Modifiable CurrentBlockHash m,
     Mod.Modifiable GasCap m,
     HasMemAddressStateDB m,
-    A.Selectable Address AddressState m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
@@ -325,8 +310,7 @@ type VMBase m =
     (N.NibbleString `A.Alters` N.NibbleString) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m,
-    (Keccak256 `A.Alters` BlockSummary) m,
-    Mod.Accessible (Maybe WorldBestBlock) m
+    (Keccak256 `A.Alters` BlockSummary) m
   )
 
 withCurrentBlockHash ::
@@ -373,8 +357,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       let ldbOptions =
             DB.defaultOptions
               { DB.createIfMissing = True,
-                DB.cacheSize = flags_ldbCacheSize,
-                DB.blockSize = flags_ldbBlockSize
+                DB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
+                DB.blockSize = Conf.blockSize (levelDBConfig ethConf)
               }
       let openDB base = DB.open (tmpdir ++ base) ldbOptions
       sdb <- openDB stateDBPath
@@ -416,9 +400,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             { _memDBs = cmemDBs,
               _baggerState = defaultBaggerState,
               _bestBlockInfo = Unspecified,
-              _hasBlockstanbul = False,
               _vmGasCap = 100000,
-              _blockRequested = False,
               _runningTests = True,
               _txRunResultsCache = cache,
               _debugSettings = Nothing,
@@ -440,16 +422,15 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
 
 initContext ::
   (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
-  Maybe DebugSettings ->
   m Context
-initContext dSettings = do
+initContext = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
   conn <- createPostgresqlPool connStr 20
   let ldbOptions =
         DB.defaultOptions
           { DB.createIfMissing = True,
-            DB.cacheSize = flags_ldbCacheSize,
-            DB.blockSize = flags_ldbBlockSize
+            DB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
+            DB.blockSize = Conf.blockSize (levelDBConfig ethConf)
           }
   sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
   hdb <- DB.open (dbDir "h" ++ hashDBPath) ldbOptions
@@ -472,8 +453,6 @@ initContext dSettings = do
     newIORef $
       def
         & txRunResultsCache .~ cache
-        & debugSettings .~ dSettings
-        & hasBlockstanbul .~ flags_blockstanbul
   que <- newTQueueIO
   pure
     Context
@@ -484,13 +463,12 @@ initContext dSettings = do
 
 runContextM ::
   (MonadUnliftIO m, MonadLoggerIO m) =>
-  Maybe DebugSettings ->
   ReaderT Context (ResourceT m) a ->
   m (a, ContextState)
-runContextM dSettings f = do
+runContextM f = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
   runResourceT $ do
-    ctx <- initContext dSettings
+    ctx <- initContext
     runContextM' ctx f
 
 runContextM' ::
@@ -505,10 +483,9 @@ runContextM' ctx f = do
 
 evalContextM ::
   (MonadUnliftIO m, MonadLoggerIO m) =>
-  Maybe DebugSettings ->
   ReaderT Context (ResourceT m) a ->
   m a
-evalContextM d f = fst <$> runContextM d f
+evalContextM f = fst <$> runContextM f
 
 evalContextM' ::
   MonadUnliftIO m =>
@@ -519,10 +496,9 @@ evalContextM' ctx f = fst <$> runContextM' ctx f
 
 execContextM ::
   (MonadUnliftIO m, MonadLoggerIO m) =>
-  Maybe DebugSettings ->
   ReaderT Context (ResourceT m) a ->
   m ContextState
-execContextM d f = snd <$> runContextM d f
+execContextM f = snd <$> runContextM f
 
 execContextM' ::
   MonadUnliftIO m =>

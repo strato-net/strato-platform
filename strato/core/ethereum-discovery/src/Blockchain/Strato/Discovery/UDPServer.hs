@@ -24,7 +24,6 @@ import           Blockchain.Strato.Discovery.P2PUtil
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Host
-import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Control.Monad                           (forM_, when, unless)
 import           Control.Monad.Catch
@@ -55,7 +54,7 @@ runEthUDPServer minPeers = do
   udpHandshakeServer minPeers
 
 connectMe ::
-  (MonadIO m, MonadFail m, MonadLogger m) =>
+  (MonadIO m, MonadFail m, MonadLogger m, MonadCatch m) =>
   UDPPort ->
   m Socket
 connectMe (UDPPort port') = do
@@ -74,7 +73,8 @@ connectMe (UDPPort port') = do
         Nothing
         (Just (show port'))
   sock <- liftIO $ socket (addrFamily serveraddr) Datagram defaultProtocol
-  liftIO $ bind sock (addrAddress serveraddr)
+  liftIO (bind sock (addrAddress serveraddr)) `catch` \(e :: IOError) ->
+    throwM $ userError $ "Failed to bind UDP port " ++ show port' ++ ": " ++ show e
 
   return sock
 
@@ -232,29 +232,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
       else do
         forM_ neighbors $ \(Neighbor (Endpoint addr' (UDPPort udpPort) (TCPPort tcpPort)) nodeID) -> do
           $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
-          curTime <- liftIO getCurrentTime
-          let peer =
-                PPeer
-                  { pPeerPubkey = Just $ nodeIDToPoint nodeID,
-                    pPeerHost = Host $ T.pack $ format addr',
-                    pPeerIp = Nothing,
-                    pPeerUdpPort = udpPort,
-                    pPeerTcpPort = tcpPort,
-                    pPeerNumSessions = 0,
-                    pPeerLastTotalDifficulty = 0,
-                    pPeerLastMsg = T.pack "msg",
-                    pPeerLastMsgTime = curTime,
-                    pPeerEnableTime = curTime,
-                    pPeerUdpEnableTime = curTime,
-                    pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0,
-                    pPeerBondState = 0,
-                    pPeerActiveState = 0,
-                    pPeerVersion = T.pack "61", -- fix
-                    pPeerDisableException = T.pack "None",
-                    pPeerNextDisableWindowSeconds = 5,
-                    pPeerNextUdpDisableWindowSeconds = 5,
-                    pPeerDisableExpiration = posixSecondsToUTCTime 0
-                  }
+          peer <- mkPeer (Just $ nodeIDToPoint nodeID) (Host $ T.pack $ format addr') Nothing (UDPPort udpPort) (TCPPort tcpPort)
           addPeer peer
         case thePeer of
           Nothing -> pure ()
@@ -263,30 +241,8 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
             whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to reset peer disable: " ++ show err
   where
     ip = addressIP addr
-    addPeer' (UDPPort peerUdpPort) (TCPPort peerTcpPort) = do
-      curTime <- liftIO getCurrentTime
-      let peer =
-            PPeer
-              { pPeerPubkey = Just otherPubKey,
-                pPeerHost = Host $ T.pack $ show ip,
-                pPeerIp = Just ip,
-                pPeerUdpPort = fromIntegral peerUdpPort,
-                pPeerTcpPort = fromIntegral peerTcpPort,
-                pPeerNumSessions = 0,
-                pPeerLastTotalDifficulty = 0,
-                pPeerLastMsg = T.pack "msg",
-                pPeerLastMsgTime = curTime,
-                pPeerEnableTime = curTime,
-                pPeerUdpEnableTime = curTime,
-                pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0,
-                pPeerBondState = 0,
-                pPeerActiveState = 0,
-                pPeerVersion = T.pack "61", -- fix
-                pPeerDisableException = T.pack "None",
-                pPeerNextDisableWindowSeconds = 5,
-                pPeerNextUdpDisableWindowSeconds = 5,
-                pPeerDisableExpiration = posixSecondsToUTCTime 0
-              }
+    addPeer' udpPort tcpPort = do
+      peer <- mkPeer (Just otherPubKey) (Host $ T.pack $ show ip) (Just ip) udpPort tcpPort
       addPeer peer
 
 getAddrPort :: SockAddr -> Either DiscoverException PortNumber

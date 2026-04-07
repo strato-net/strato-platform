@@ -1,0 +1,61 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           poseidon-hash
+version:        0.1.0.0
+synopsis:       Poseidon hash function for ZK-SNARKs (BN254 curve)
+description:    A pure Haskell implementation of the Poseidon hash function,
+                designed for efficient computation inside ZK-SNARK circuits.
+                Uses the BN254 (alt_bn128) scalar field.
+category:       Cryptography
+author:         BlockApps
+maintainer:     info@blockapps.net
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+library
+  exposed-modules:
+      Crypto.Hash.Poseidon
+      Crypto.Hash.Poseidon.Field
+      Crypto.Hash.Poseidon.Constants
+  other-modules:
+      Paths_poseidon_hash
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -O2
+  build-depends:
+      base >=4.14 && <5
+    , vector >=0.12 && <0.14
+  default-language: Haskell2010
+
+executable poseidon
+  main-is: Main.hs
+  other-modules:
+      Paths_poseidon_hash
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -O2
+  build-depends:
+      base >=4.14 && <5
+    , poseidon-hash
+  default-language: Haskell2010
+
+test-suite poseidon-hash-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_poseidon_hash
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -O2 -Wall
+  build-depends:
+      base >=4.14 && <5
+    , hspec >=2.7 && <2.12
+    , poseidon-hash
+  default-language: Haskell2010

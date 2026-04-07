@@ -18,6 +18,7 @@ contract record AdminRegistry is Ownable {
     event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
     event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
+    event IssueDismissed(address sender, string issueId);
 
     bool public initialized = false;
 
@@ -53,6 +54,20 @@ contract record AdminRegistry is Ownable {
 
     function isAdminAddress(address _admin) external returns (bool) {
         return adminMap[_admin] > 0;
+    }
+
+    function dismissIssue(string _issueId) external {
+        require(currentIssues[_issueId], "Issue does not exist or is not active");
+        require(votes[_issueId].length == 1, "Only issues with a single vote can be dismissed");
+        require(votes[_issueId][0] == msg.sender, "Only the proposer can dismiss their issue");
+
+        for (uint i = 0; i < votes[_issueId].length; i++) {
+            votesMap[_issueId][votes[_issueId][i]] = 0;
+            votes[_issueId][i] = address(0);
+        }
+        votes[_issueId].length = 0;
+        delete currentIssues[_issueId];
+        emit IssueDismissed(msg.sender, _issueId);
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {

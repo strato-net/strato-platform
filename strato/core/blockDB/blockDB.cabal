@@ -1,0 +1,90 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockDB
+version:        0.0.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.BlockDB
+      Blockchain.DB.Witnessable
+      Blockchain.Model.JsonBlock
+      Blockchain.Model.SyncState
+      Blockchain.Model.SyncTask
+      Blockchain.Model.WrappedBlock
+      Blockchain.SyncDB
+  other-modules:
+      Paths_blockDB
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -fconstraint-solver-iterations=8
+  build-depends:
+      QuickCheck
+    , aeson
+    , base >=4.7 && <5
+    , binary
+    , blockapps-data
+    , blockapps-datadefs
+    , bytestring
+    , common-log
+    , containers
+    , data-default
+    , deepseq
+    , esqueleto
+    , ethereum-rlp
+    , format
+    , generic-arbitrary
+    , hedis
+    , labeled-error
+    , lens
+    , mtl
+    , openapi3
+    , persistent
+    , random
+    , raw-strings-qq
+    , sql-monad
+    , strato-model
+    , strato-redis-blockdb
+    , text
+    , time
+  default-language: Haskell2010
+
+test-suite blockdb-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      BlockDBSpec
+      BlockSpec
+      Spec
+      Paths_blockDB
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -O0 -Wall -rtsopts -fno-warn-unused-do-bind -dynamic
+  build-depends:
+      HUnit
+    , QuickCheck
+    , aeson
+    , aeson-diff
+    , base >=4.7 && <5
+    , binary
+    , blockDB
+    , blockapps-data
+    , blockapps-secp256k1-haskell
+    , bytestring
+    , containers
+    , ethereum-rlp
+    , format
+    , hedis
+    , hspec
+    , http-api-data
+    , labeled-error
+    , lens-family
+    , strato-model
+    , strato-redis-blockdb
+    , text
+    , vector
+  default-language: Haskell2010

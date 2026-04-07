@@ -50,8 +50,8 @@ import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
 import Data.Binary
 import Data.Map.Strict (Map)
+import Data.OpenApi
 import Data.Source
-import Data.Swagger
 import Data.Text (Text)
 import GHC.Generics
 import qualified Generic.Random as GR
@@ -66,12 +66,8 @@ import qualified Text.Colors as CL
 --------------------------------------------------------------------------------
 soliditySchemaOptions :: SchemaOptions
 soliditySchemaOptions =
-  SchemaOptions
-    { fieldLabelModifier = camelCase . dropFPrefix,
-      constructorTagModifier = id,
-      datatypeNameModifier = id,
-      allNullaryToStringTag = True,
-      unwrapUnaryRecords = True
+  defaultSchemaOptions
+    { Data.OpenApi.fieldLabelModifier = camelCase . dropFPrefix
     }
 
 --------------------------------------------------------------------------------

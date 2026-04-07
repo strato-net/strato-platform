@@ -76,6 +76,7 @@ export interface SafeTransactionData {
   senderSignature: any;
   nonce: number;
   externalChainId: number;
+  isHot: boolean;
 }
 
 export interface PreparedWithdrawal {
@@ -94,6 +95,7 @@ export interface DepositArgs {
   externalTokenAmount: string;
   externalTxHash: string;
   stratoRecipient: string;
+  targetStratoToken: string;
 }
 
 export interface ConfirmDepositArgs {
@@ -134,6 +136,7 @@ export interface WithdrawalInfo {
   timestamp: string;
 
   withdrawalId: string;
+  useHotWallet?: boolean;
 }
 
 export interface ChainInfo {

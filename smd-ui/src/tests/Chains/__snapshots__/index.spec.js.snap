@@ -186,13 +186,13 @@ exports[`Chains: index filter chain 1`] = `
     </div>
     <div className=\\"row\\">
       <div className=\\"col-sm-1 smd-pad-16 text-left\\">
-        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
+        <Blueprint.Button onClick={[Function (anonymous)]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
       </div>
       <div className=\\"col-sm-2 text-center\\" style={{...}}>
         Rows 1-21
       </div>
       <div className=\\"col-sm-1 smd-pad-16 text-right\\">
-        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={true} />
+        <Blueprint.Button onClick={[Function (anonymous)]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={true} />
       </div>
     </div>
   </div>
@@ -399,13 +399,13 @@ exports[`Chains: index render component with empty values 1`] = `
     </div>
     <div className=\\"row\\">
       <div className=\\"col-sm-1 smd-pad-16 text-left\\">
-        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
+        <Blueprint.Button onClick={[Function (anonymous)]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
       </div>
       <div className=\\"col-sm-2 text-center\\" style={{...}}>
         Rows 1-1
       </div>
       <div className=\\"col-sm-1 smd-pad-16 text-right\\">
-        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={true} />
+        <Blueprint.Button onClick={[Function (anonymous)]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={true} />
       </div>
     </div>
   </div>
@@ -460,13 +460,13 @@ exports[`Chains: index render component with values 1`] = `
     </div>
     <div className=\\"row\\">
       <div className=\\"col-sm-1 smd-pad-16 text-left\\">
-        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
+        <Blueprint.Button onClick={[Function (anonymous)]} className=\\"pt-icon-arrow-left\\" text=\\"Previous\\" disabled={true} />
       </div>
       <div className=\\"col-sm-2 text-center\\" style={{...}}>
         Rows 1-21
       </div>
       <div className=\\"col-sm-1 smd-pad-16 text-right\\">
-        <Blueprint.Button onClick={[Function]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={true} />
+        <Blueprint.Button onClick={[Function (anonymous)]} className=\\"pt-icon-arrow-right\\" text=\\"Next\\" disabled={true} />
       </div>
     </div>
   </div>

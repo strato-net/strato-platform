@@ -1,6 +1,6 @@
-[![STRATO Mercata logo](https://www.stratomercata.com/images/stratomercata.com/2025.10.11/strato-mercata-logo.png)](https://stratomercata.com)
+[![STRATO Mercata logo](https://strato.nexus/images/strato.nexus/2025.10.11/strato-logo.png)](https://strato.nexus)
 
-# STRATO Mercata Platform
+# STRATO Platform
 
 ***NOTE:** README is WIP*
 
@@ -18,7 +18,9 @@
         libpq-dev \
         libsecp256k1-dev \
         libsodium-dev \
-        postgresql-client
+        pkg-config \
+        postgresql-client \
+        zlib1g-dev
       ```
       
     - Macos (requires `homebrew` - https://brew.sh/):
@@ -89,3 +91,19 @@
   cd bootstrap-docker
   sudo ./strato --wipe
   ```
+
+## Git Hooks
+
+### Pre-commit: Trailing Whitespace Removal
+
+A pre-commit hook is available to automatically remove trailing whitespaces before committing.
+
+**Installation:**
+
+```bash
+cp scripts/hooks/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+The hook uses `scripts/delete-trailing-whitespaces.sh --staged` to process only
+staged files and automatically re-stages them after cleaning.

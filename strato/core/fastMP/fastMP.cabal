@@ -1,0 +1,115 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           fastMP
+version:        0.1.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      BatchMerge
+      FastMP
+      KV
+      LevelDBTools
+      ReverseOrderedKVs
+  other-modules:
+      Paths_fastMP
+  hs-source-dirs:
+      src
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base
+    , base16-bytestring
+    , bytestring
+    , common-log
+    , conduit
+    , ethereum-rlp
+    , format
+    , leveldb-haskell
+    , merkle-patricia-db
+    , monad-alter
+    , monad-loops
+    , nibblestring
+    , resourcet
+    , strato-model
+    , text
+    , transformers
+  default-language: Haskell2010
+
+executable fastMP-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_fastMP
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base
+    , base16-bytestring
+    , bytestring
+    , ethereum-rlp
+    , fastMP
+    , format
+    , leveldb-haskell
+    , merkle-patricia-db
+    , nibblestring
+    , resourcet
+  default-language: Haskell2010
+
+executable insertLDB
+  main-is: insertLDB.hs
+  other-modules:
+      Main
+      Paths_fastMP
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base
+    , bytestring
+    , conduit
+    , fastMP
+    , labeled-error
+    , leveldb-haskell
+  default-language: Haskell2010
+
+executable insertMP
+  main-is: insertMP.hs
+  other-modules:
+      Main
+      Paths_fastMP
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base
+    , bytestring
+    , ethereum-rlp
+    , fastMP
+    , format
+    , labeled-error
+    , leveldb-haskell
+    , merkle-patricia-db
+    , monad-alter
+    , nibblestring
+    , transformers
+  default-language: Haskell2010
+
+executable makeSampleKVs
+  main-is: makeSampleKVs.hs
+  other-modules:
+      Main
+      Paths_fastMP
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base
+    , base16-bytestring
+    , bytestring
+    , strato-model
+  default-language: Haskell2010

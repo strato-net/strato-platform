@@ -1,0 +1,80 @@
+/*
+  Minimal PatternFly shims so login.css + mercata.css render correctly
+  without loading the full PatternFly framework.
+*/
+:root {
+  --pf-global--primary-color--100: #3452FE;
+  --pf-global--danger-color--200: #c9190b;
+  --pf-global--FontSize--xs: 12px;
+  --pf-global--FontSize--sm: 14px;
+  --pf-global--FontSize--md: 16px;
+  --pf-global--spacer--xs: 4px;
+  --pf-global--spacer--sm: 8px;
+  --pf-global--BoxShadow--lg: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-pf-page { width: 100%; }
+
+.form-group { margin-bottom: 15px; }
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pf-c-form-control,
+input[type="text"].pf-c-form-control,
+input[type="email"].pf-c-form-control,
+input[type="password"].pf-c-form-control {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 15px;
+  font-family: inherit;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.pf-c-form-control:focus {
+  border-color: var(--pf-global--primary-color--100);
+  box-shadow: 0 0 0 1px var(--pf-global--primary-color--100);
+}
+
+.login-pf-settings {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 5px;
+}
+
+.login-pf-settings .checkbox label {
+  font-weight: 400;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.login-pf-settings a {
+  font-size: 13px;
+}
+
+ul { padding-left: 20px; margin: 10px 0; }
+li { margin-bottom: 5px; }

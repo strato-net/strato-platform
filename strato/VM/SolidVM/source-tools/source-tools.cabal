@@ -1,0 +1,56 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           source-tools
+version:        0.0.1.0
+author:         dustin@blockapps.net
+maintainer:     dustin@blockapps.net
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Data.Source
+      Data.Source.Annotation
+      Data.Source.Diagnostic
+      Data.Source.Map
+      Data.Source.Position
+      Data.Source.Severity
+  other-modules:
+      Paths_source_tools
+  hs-source-dirs:
+      src
+  build-depends:
+      QuickCheck
+    , aeson
+    , base
+    , binary
+    , bytestring
+    , containers
+    , data-default
+    , deepseq
+    , ethereum-rlp
+    , hashable
+    , lens
+    , openapi3
+    , parsec
+    , quickcheck-instances
+    , text
+  default-language: Haskell2010
+
+test-suite source-tools-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs:
+      test/
+  build-depends:
+      QuickCheck
+    , aeson
+    , base
+    , hspec
+    , source-tools
+    , text
+  default-language: Haskell2010

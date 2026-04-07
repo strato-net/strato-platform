@@ -12,7 +12,6 @@ levelDBConfig:
   path: ""
 
 quarryConfig:
-  coinbaseAddress: "57"
   lazyBlocks: false
 
 blockConfig:

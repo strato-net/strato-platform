@@ -61,7 +61,6 @@ The nginx configuration is generated at runtime from templates:
 | `ssl` | Enable SSL/TLS | `false` |
 | `sslCertFileType` | SSL certificate file type | `pem` |
 | `blockTime` | Block time for timeout calculation | `13` |
-| `VM_DEBUGGER` | Enable VM debugger endpoints | `false` |
 | `STATS_ENABLED` | Enable statistics endpoints | `true` |
 | `SMD_DEV_MODE` | Enable SMD development mode | `false` |
 | `APEX_HOST` | Apex service host | `apex:3009` |

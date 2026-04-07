@@ -28,6 +28,16 @@ library BytesUtils {
         return dst;
     }
 
+    function substring(bytes b, uint start, uint end) internal pure returns (bytes) {
+        require(end > start, "substring: end index must be greater than starting index");
+        require(end <= b.length, "substring: end index out of bounds");
+        bytes ret = new bytes(end - start);
+        for (uint i = start; i < end; i++) {
+            ret[i - start] = b[i];
+        }
+        return ret;
+    }
+
     function b16decode(bytes b) internal pure returns (bytes) {
         bool isEven = b.length % 2 == 0;
         uint offset = isEven ? 0 : 1;
@@ -79,7 +89,7 @@ library StringUtils {
     function substring(string s, uint start) internal pure returns (string) {
         return substring(s, start, s.length);
     }
-    
+
     function substring(string s, uint start, uint end) internal pure returns (string) {
         require(end > start, "substring: end index must be greater than starting index");
         bytes b = bytes(s);

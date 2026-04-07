@@ -32,11 +32,13 @@ library BridgeTypes {
         address stratoToken;         // STRATO token to burn
         uint256 stratoTokenAmount;   // STRATO token amount to burn
         uint256 timestamp;           // timestamp of the withdrawal
+        bool    useHotWallet;        // Whether to prefer hot wallet for withdrawal
     }
 
     struct ChainInfo {
         string  chainName;
         address custody;            // custody on that chain
+        address hotWallet;          // wallet used for hot withdrawals
         address depositRouter;      // contract users interact with on L1/L2
         bool    enabled;            // quick toggle
         uint256 lastProcessedBlock; // last processed block on the chain for polling
@@ -51,5 +53,18 @@ library BridgeTypes {
         address externalToken;    // token address on external chain
         uint256 maxPerWithdrawal; // hard ceiling for withdrawals; 0 means "unlimited"
         address stratoToken;      // STRATO token to mint (ETHst, USDST, etc)
+    }
+
+    /// @notice Post-deposit action types for confirmDeposit dispatch
+    enum DepositAction {
+        NONE,        // default — mint directly to recipient
+        AUTO_SAVE,   // deposit into lending pool
+        AUTO_FORGE   // forge metal via MetalForge
+    }
+
+    /// @notice Request for a post-deposit action, stored until confirmDeposit executes it
+    struct DepositActionRequest {
+        DepositAction action;     // which action to perform
+        address       targetToken; // action-specific: metal token for AUTO_FORGE, unused for AUTO_SAVE
     }
 }

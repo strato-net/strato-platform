@@ -129,7 +129,7 @@ authorization_params = { hd="blockapps.net" },
 --   return req
 -- end,
 
--- use_pkce = false,
+use_pkce = true,
 -- when set to true the "Proof Key for Code Exchange" as
 -- defined in RFC 7636 will be used. The code challenge
 -- method will alwas be S256

@@ -1,0 +1,54 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockapps-vault-wrapper-api
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/API#readme>
+homepage:       https://github.com/githubuser/API#readme
+bug-reports:    https://github.com/githubuser/API/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2018 Author name here
+license:        Apache-2.0
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/API
+
+library
+  exposed-modules:
+      Strato.Strato23.API
+      Strato.Strato23.API.Key
+      Strato.Strato23.API.Password
+      Strato.Strato23.API.Ping
+      Strato.Strato23.API.Signature
+      Strato.Strato23.API.Types
+      Strato.Strato23.API.Users
+      Strato.Strato23.Crypto
+  other-modules:
+      Paths_blockapps_vault_wrapper_api
+  hs-source-dirs:
+      src
+  build-depends:
+      aeson
+    , aeson-casing
+    , base
+    , base16-bytestring
+    , bytestring
+    , cryptonite
+    , labeled-error
+    , lens
+    , openapi3
+    , saltine
+    , servant
+    , servant-server
+    , strato-model
+    , text
+  default-language: Haskell2010

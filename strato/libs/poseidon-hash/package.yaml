@@ -1,0 +1,46 @@
+name: poseidon-hash
+version: 0.1.0.0
+synopsis: Poseidon hash function for ZK-SNARKs (BN254 curve)
+description: |
+  A pure Haskell implementation of the Poseidon hash function,
+  designed for efficient computation inside ZK-SNARK circuits.
+  Uses the BN254 (alt_bn128) scalar field.
+license: MIT
+author: BlockApps
+maintainer: info@blockapps.net
+category: Cryptography
+extra-source-files:
+  - README.md
+
+ghc-options:
+  - -Wall
+  - -O2
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Crypto.Hash.Poseidon
+    - Crypto.Hash.Poseidon.Field
+    - Crypto.Hash.Poseidon.Constants
+  dependencies:
+    - base >= 4.14 && < 5
+    - vector >= 0.12 && < 0.14
+
+executables:
+  poseidon:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+      - base >= 4.14 && < 5
+      - poseidon-hash
+
+tests:
+  poseidon-hash-test:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -Wall
+    dependencies:
+      - base >= 4.14 && < 5
+      - poseidon-hash
+      - hspec >= 2.7 && < 2.12

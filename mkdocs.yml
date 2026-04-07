@@ -1,0 +1,142 @@
+site_name: STRATO Technical Docs
+site_description: STRATO platform technical documentation (use-case first, end-user + developer)
+site_url: https://docs.strato.nexus
+site_author: BlockApps
+copyright: Copyright &copy; 2026 BlockApps - STRATO Platform
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - navigation.expand
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - content.action.view
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/telegram
+      link: https://t.me/strato_net
+      name: Telegram Community
+    - icon: fontawesome/solid/circle-question
+      link: https://support.blockapps.net
+      name: Support Portal
+    - icon: fontawesome/solid/book
+      link: https://docs.strato.nexus
+      name: Documentation
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+      fallback_to_build_date: true
+      enable_git_follow: false
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+docs_dir: techdocs
+
+nav:
+  # === INTRODUCTION ===
+  - Home: index.md
+  - Quick Start: quick-start.md
+  - Core Concepts: concepts.md
+  
+  # === GETTING STARTED ===
+  - Getting Started:
+      - First-Time User: scenarios/first-time-user.md
+  
+  # === USER GUIDES ===
+  - User Guides:
+      - Borrow USDST: guides/borrow.md
+      - Mint USDST (CDP): guides/mint-cdp.md
+      - Swap Tokens: guides/swap.md
+      - Provide Liquidity: guides/liquidity.md
+      - Bridge Assets: guides/bridge.md
+      - Manage Rewards: guides/rewards.md
+  
+  # === USER SCENARIOS (END-TO-END) ===
+  - User Scenarios:
+      - Grow Your Position: scenarios/grow-position.md
+      - Maximize Yield: scenarios/maximize-yield.md
+      - DCA Strategy: scenarios/dca-strategy.md
+      - Platform Migration: scenarios/platform-migration.md
+      - Portfolio Rebalancing: scenarios/portfolio-rebalancing.md
+      - Risk Management & Hedging: scenarios/risk-hedging.md
+      - Leverage Long Position: scenarios/leverage-long.md
+      - Multi-Asset Strategy: scenarios/multi-asset-strategy.md
+      - Collateral Optimization: scenarios/collateral-optimization.md
+      - Arbitrage & Market Making: scenarios/arbitrage-market-making.md
+      - Withdrawals: scenarios/withdrawals.md
+  
+  # === CONTRIBUTING TO STRATO ===
+  - Contributing to STRATO:
+      - Setup: contribute/setup.md
+      - Architecture: contribute/architecture.md
+      - Contributing Guidelines: contribute/contributing.md
+  
+  # === BUILDING APPS ON STRATO ===
+  - Building Apps on STRATO:
+      - Getting Started:
+          - Overview: build-apps/overview.md
+          - System Architecture: reference/architecture.md
+          - Quick Start (5 min): build-apps/quickstart.md
+      - Building:
+          - Integration Guide: build-apps/integration.md
+          - E2E Examples: build-apps/e2e.md
+      - Reference:
+          - Contracts: build-apps/contract-addresses.md
+          - API Cheat Sheet: build-apps/quick-reference.md
+  
+  # === API REFERENCE ===
+  - API Reference:
+      - App API (Getting Started): reference/api.md
+      - Interactive Reference (Swagger): reference/interactive-api.md
+      - Core Platform API (Advanced): reference/strato-node-api.md
+  
+  # === SAFETY & FAQ ===
+  - Safety & Risk: safety.md
+  - FAQ: faq.md
+
+

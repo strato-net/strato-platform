@@ -308,8 +308,8 @@ instance BlockHeaderLike BlockHeader where
     bh BlockHeaderV2 {} = 2
 
   morphBlockHeader b = case blockHeaderVersion b of
-    1 -> 
-      BlockHeader { 
+    1 ->
+      BlockHeader {
         number = blockHeaderBlockNumber b,
         parentHash = blockHeaderParentHash b,
         ommersHash = blockHeaderOmmersHash b,
@@ -326,8 +326,8 @@ instance BlockHeaderLike BlockHeader where
         timestamp = blockHeaderTimestamp b,
         mixHash = blockHeaderMixHash b
       }
-    2 -> 
-      BlockHeaderV2 { 
+    2 ->
+      BlockHeaderV2 {
         number = blockHeaderBlockNumber b,
         parentHash = blockHeaderParentHash b,
         stateRoot = MP.StateRoot $ blockHeaderStateRoot b,

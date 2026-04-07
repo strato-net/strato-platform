@@ -24,6 +24,7 @@ module Blockchain.BlockChain
 where
 
 import BlockApps.Logging
+import BlockApps.Solidity.ABI (decodeABIArgs, valueToArgText, funcArgTypes)
 import qualified Blockchain.Bagger as Bagger
 import Blockchain.Bagger.Transactions
 import qualified Blockchain.DB.AddressStateDB as NoCache
@@ -43,10 +44,12 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
+import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
+import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
@@ -57,7 +60,6 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.Stream.Action hiding (blockHash)
 import qualified Blockchain.Stream.Action as Action
@@ -69,6 +71,8 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
+import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress)
+import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Conduit
 import Control.Applicative ((<|>))
@@ -96,6 +100,11 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
+import SolidVM.Model.SolidString (labelToText)
+import SolidVM.Model.Value (Value(..))
+import qualified Data.Aeson as Aeson
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -208,27 +217,12 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             ++ ", "
             ++ show (length otxs)
             ++ "TXs)."
-        when flags_debug $ do
-          bhr <- Mod.get (Proxy @BlockHashRoot)
-          $logDebugS "addBlock" $ T.pack $ "Old blockhash root: " ++ format bhr
-          mcr <- getChainRoot $ blockHash b
-          case mcr of
-            Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate old chain root. Using emptyTriePtr"
-            Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
         putBlockHeaderInChainDB bd
 
-        when flags_debug $ do
-          bhr' <- Mod.get (Proxy @BlockHashRoot)
-          $logDebugS "addBlock" $ T.pack $ "New blockhash root after inserting header: " ++ format bhr'
-          mcr' <- getChainRoot $ blockHash b
-          case mcr' of
-            Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after inserting header. Using emptyTriePtr"
-            Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr
-
         bSum <- setParentStateRoot b
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
-        when (computeNetworkID == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
+        when (Conf.networkID (networkConfig ethConf) == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
 
         let pHash = proposalHash bd
             mSig = getProposerSeal bd  -- Signature is Maybe type
@@ -245,19 +239,11 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
         verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
-        case verifyBlockResult of 
+        case verifyBlockResult of
           failures@(_:_) -> do
             lift $ P.incCounter vmBlocksInvalid
             pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
           _ -> do
-            when flags_debug $ do
-              bhr'' <- Mod.get (Proxy @BlockHashRoot)
-              $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
-              mcr'' <- getChainRoot $ blockHash b
-              case mcr'' of
-                Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
-                Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
-
             lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
@@ -265,10 +251,10 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             pure []
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
-verifyBlock :: 
+verifyBlock ::
   HasStateDB m =>
-  Block -> 
-  ([TxRunResult], Maybe MP.StateRoot) -> 
+  Block ->
+  ([TxRunResult], Maybe MP.StateRoot) ->
   BlockSummary ->
   m [BlockVerificationFailureDetails]
 verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
@@ -297,7 +283,7 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
   flushMemStorageTxDBToBlockDB
 
   yield . OutVMEvents =<< sendNewActionMessage b trrs
-  
+
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   flushMemAddressStateTxToBlockDB
   flushMemAddressStateTxToBlockDB
@@ -325,7 +311,7 @@ sendNewActionMessage b trrs = do
         _blockNumber=blockHeaderBlockNumber bd,
         _transactionSender=0x0,
         _actionData=O.fromList $ M.toList recombined,
-        _newCodeCollections=[],
+        _newCodeCollections=O.empty,
         _events=Seq.fromList $ concat $ map (either (const []) erEvents . trrResult) trrs,
         _delegatecalls=mconcat $ map (either (const Seq.empty) (fromMaybe Seq.empty . fmap _delegatecalls . erAction) . trrResult) trrs
         }
@@ -368,7 +354,7 @@ addTransactions blockData txs proposer =
       let remainingBlockGas =
             case result of
               Left _ -> blockGas
-              Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
+              Right execResult -> blockGas - (TD.gasLimit bt - calculateReturned bt execResult)
 
       go remainingBlockGas rest (trrs `DL.snoc` trr)
 
@@ -393,7 +379,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
               putAddressStateTxDBMap M.empty
               putMemRawStorageTxMap M.empty
               return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmas tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
-            else do 
+            else do
               case erException execResult of
                 Just (Left (TooMuchGas limit actual)) -> do
                   putAddressStateTxDBMap M.empty
@@ -404,7 +390,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
                   putMemRawStorageTxMap M.empty
                   return $ Bagger.TxMiningResult (Just $ TFInsufficientFunds limit actual tx) (DL.toList ran) unran remGas
                 _ -> do
-                  let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
+                  let nextRemGas = remGas - (TD.gasLimit bt - calculateReturned bt execResult)
                   flushMemAddressStateTxToBlockDB
                   flushMemStorageTxDBToBlockDB
                   mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs mSelfAddress
@@ -416,7 +402,7 @@ addTransaction ::
   BlockHeader ->
   Integer ->
   OutputTx ->
-  Address -> 
+  Address ->
   ExceptT TransactionFailureCause m ExecResults
 addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   nonceValid <- lift $ isNonceValid t
@@ -425,15 +411,15 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   let maxGas = fromIntegral (maxBound :: Int)
   acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
 
-  when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
-  unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
+  when (TD.gasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (TD.gasLimit bt) remainingBlockGas t
+  unless nonceValid $ throwE $ TFNonceMismatch (TD.nonce bt) acctNonce t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
-  when (txSize >= toInteger flags_txSizeLimit)
+  when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
     . throwE
-    $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
+    $ TFTXSizeLimitExceeded txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
 
   let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
-      adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
+      adjustedTxGasLimit = bool (TD.gasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
   feeResult <- payFees b availableGas tAddr t proposer
@@ -448,7 +434,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         , erEvents = erEvents feeResult ++ erEvents er
         }
 
-  if (erException feeResult == Nothing) || (erReturnVal feeResult == Just "(true)")
+  if (erException feeResult == Nothing) || (erReturnVal feeResult == Just (SBool True))
     then do
       $logInfoS "runCodeForTransaction" "decide() function successful, running TX"
 
@@ -494,8 +480,57 @@ runCodeForTransaction ::
   ExceptT TransactionFailureCause m ExecResults
 runCodeForTransaction b availableGas tAddr t proposer =
   let ut = otBaseTx t
-   in if isContractCreationTX ut
-        then do
+   in case ut of
+        TD.EthereumTX {TD.ethTo = Just toAddr, TD.value = val, TD.txData = callData}
+          | B.null callData && val > 0 -> do
+            let nativeAddr = nativeTokenAddress (contractsConfig ethConf)
+                recipientArg = T.pack $ "0x" ++ formatAddressWithoutColor toAddr
+                amountArg = T.pack $ show val
+            $logInfoS "runCodeForTransaction" $ T.pack $
+              "EthereumTX native transfer: " ++ show val ++ " to " ++ format toAddr ++ " -> nativeToken.transfer"
+            lift $
+              SolidVM.call
+                b
+                nativeAddr
+                tAddr
+                proposer
+                (fromIntegral availableGas)
+                tAddr
+                (txHash ut)
+                "transfer"
+                [recipientArg, amountArg]
+                Nothing
+          | otherwise -> do
+            when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $
+              "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
+            let selector = B.take 4 callData
+                argsBytes = B.drop 4 callData
+            lift (resolveFunction toAddr selector) >>= \case
+              Nothing -> throwE $ TFCodeCollectionNotFound toAddr
+                ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
+              Just (fName, func) -> do
+                let argTexts = map valueToArgText $ decodeABIArgs argsBytes (funcArgTypes func)
+                    fnStr = T.unpack (labelToText fName)
+                $logInfoS "runCodeForTransaction" $ T.pack $
+                  "EthereumTX resolved: " ++ fnStr ++ "(" ++ intercalate ", " (map T.unpack argTexts) ++ ") on " ++ format toAddr
+                lift $
+                  SolidVM.call
+                    b
+                    toAddr
+                    tAddr
+                    proposer
+                    (fromIntegral availableGas)
+                    tAddr
+                    (txHash ut)
+                    (labelToText fName)
+                    argTexts
+                    Nothing
+
+        TD.EthereumTX {TD.ethTo = Nothing} ->
+          throwE $ TFCodeCollectionNotFound (Address 0)
+            "EthereumTX contract creation (raw EVM bytecode) not supported" t
+
+        _ | isContractCreationTX ut -> do
           when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
@@ -510,24 +545,25 @@ runCodeForTransaction b availableGas tAddr t proposer =
               proposer
               availableGas
               newAddress
-              (transactionCode ut)
+              (TD.code ut)
               (txHash ut)
               (fromJust $ txContractName ut)
               (txArgs ut)
-        else do
-          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
+
+        _ -> do
+          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (TD.to ut)
 
           lift $
             SolidVM.call
                   b -- blockData
-                  (transactionTo ut) -- codeAddress
+                  (TD.to ut) -- codeAddress
                   tAddr -- sender
                   proposer -- proposer
                   (fromIntegral availableGas) -- availableGas
                   tAddr -- origin
                   (txHash ut) -- txHash
-                  (transactionFuncName ut)
-                  (transactionArgs ut)
+                  (TD.funcName ut)
+                  (TD.args ut)
                   Nothing
 
 payFees ::
@@ -575,7 +611,7 @@ zeroBytesLength t =
         then length $ filter (== 0) $ B.unpack $ transactionData bt
         else length $ filter (== 0) $ B.unpack $ codeBytes' bt --is ContractCreationTX
   where
-    codeBytes' bt = case transactionCode bt of
+    codeBytes' bt = case TD.code bt of
       Code cb -> cb
       PtrToCode _ -> "" -- TODO: lookup code?
 
@@ -631,7 +667,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
             Just ex ->
               let fmt = either show show ex
                in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
-      gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
+      gasUsed = fromInteger $ TD.gasLimit t - gasRemaining
       etherUsed = gasUsed
 
       beforeAddresses = S.fromList [x | (x, ASModification _) <- M.toList beforeMap]
@@ -643,7 +679,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         case result of
           Left _ -> ("", [], [], []) --TODO keep the trace when the run fails
           Right r ->
-            (fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
+            (maybe "" (TL.unpack . TLE.decodeUtf8 . Aeson.encode) $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash <$> theLogs
   yield . OutEvent $ mkEventEntry <$> theEvents
@@ -671,12 +707,12 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
 
 extractCodeCollectionAddedMessages :: Action.Action -> [VMEvent]
 extractCodeCollectionAddedMessages a =
-  let mkCCAnouncement (userName, cc) =
+  let mkCCAnouncement ((userName, _), cc) =
         CodeCollectionAdded
               { codeCollection = const () <$> cc,
                 creator = userName
               }
-  in map mkCCAnouncement $ _newCodeCollections a
+  in map mkCCAnouncement . O.assocs $ _newCodeCollections a
 
 printTransactionMessage ::
   MonadLogger m =>
@@ -685,7 +721,7 @@ printTransactionMessage ::
   NominalDiffTime ->
   m ()
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
-  let tNonce = transactionNonce $ otBaseTx ot
+  let tNonce = TD.nonce $ otBaseTx ot
   multilineLog "printTx/err" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
@@ -696,7 +732,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left e
       ]
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right results) deltaT = do
   let t = otBaseTx ot
-      tNonce = transactionNonce t
+      tNonce = TD.nonce t
       extra =
         if isMessageTX t
           then ""
@@ -781,7 +817,6 @@ completeDiff ::
     HasHashDB m,
     Mod.Modifiable MemDBs m,
     Mod.Modifiable CurrentBlockHash m,
-    Mod.Modifiable BestBlockRoot m,
     HasMemAddressStateDB m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
@@ -799,3 +834,4 @@ completeDiff src' dst hsh num = withCurrentBlockHash hsh $ do
   runConduit $
     SD.stateDiff Nothing num hsh src' dst
       .| mapM_C (yield . OutStateDiff)
+

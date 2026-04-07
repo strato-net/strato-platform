@@ -163,6 +163,7 @@ router.post("/collateral/withdraw-max", authHandler.authorizeRequest(), LendingC
  *               additionalProperties: true
  */
 router.get("/collateral", authHandler.authorizeRequest(), LendingController.getCollateralAndBalance);
+router.get("/collateral/public", authHandler.authorizeRequest(true), LendingController.getPublicCollateralInfo);
 router.post("/collateral", authHandler.authorizeRequest(), LendingController.supplyCollateral);
 router.delete("/collateral", authHandler.authorizeRequest(), LendingController.withdrawCollateral);
 
@@ -182,6 +183,7 @@ router.delete("/collateral", authHandler.authorizeRequest(), LendingController.w
  *               additionalProperties: true
  */
 router.get("/liquidity", authHandler.authorizeRequest(), LendingController.getLiquidityAndBalance);
+router.get("/liquidity/public", authHandler.authorizeRequest(true), LendingController.getPublicLiquidityInfo);
 
 /**
  * @openapi
@@ -264,14 +266,10 @@ router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
  *             type: object
  *             required:
  *               - amount
- *               - stakeMToken
  *             properties:
  *               amount:
  *                 type: string
  *                 description: Liquidity amount to deposit (decimal string)
- *               stakeMToken:
- *                 type: boolean
- *                 description: Whether to automatically stake the resulting mTokens
  *     responses:
  *       200:
  *         description: Deposit transaction payload
@@ -291,14 +289,10 @@ router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
  *             type: object
  *             required:
  *               - amount
- *               - includeStakedMToken
  *             properties:
  *               amount:
  *                 type: string
  *                 description: Liquidity amount to withdraw (decimal string)
- *               includeStakedMToken:
- *                 type: boolean
- *                 description: Whether to include staked mTokens in the withdrawal
  *     responses:
  *       200:
  *         description: Withdrawal transaction payload
@@ -640,6 +634,7 @@ router.post("/admin/unpause", authHandler.authorizeRequest(), LendingController.
  *               additionalProperties: true
  */
 router.get("/safety/info", authHandler.authorizeRequest(), SafetyController.getInfo);
+router.get("/safety/info/public", authHandler.authorizeRequest(true), SafetyController.getPublicInfo);
 
 /**
  * @openapi
@@ -655,14 +650,10 @@ router.get("/safety/info", authHandler.authorizeRequest(), SafetyController.getI
  *             type: object
  *             required:
  *               - amount
- *               - stakeSToken
  *             properties:
  *               amount:
  *                 type: string
  *                 description: Amount of USDST to stake (decimal string)
- *               stakeSToken:
- *                 type: boolean
- *                 description: Whether to immediately stake the received sUSDST
  *     responses:
  *       200:
  *         description: Stake transaction payload
@@ -705,14 +696,10 @@ router.post("/safety/cooldown", authHandler.authorizeRequest(), SafetyController
  *             type: object
  *             required:
  *               - sharesAmount
- *               - includeStakedSToken
  *             properties:
  *               sharesAmount:
  *                 type: string
  *                 description: Amount of sUSDST to redeem (decimal string)
- *               includeStakedSToken:
- *                 type: boolean
- *                 description: Whether to include staked sUSDST when redeeming
  *     responses:
  *       200:
  *         description: Redemption transaction payload
@@ -740,5 +727,78 @@ router.post("/safety/redeem", authHandler.authorizeRequest(), SafetyController.r
  *               additionalProperties: true
  */
 router.post("/safety/redeem-all", authHandler.authorizeRequest(), SafetyController.redeemAll);
+
+/**
+ * @openapi
+ * /lending/interest:
+ *   get:
+ *     summary: Get estimated protocol revenue from lending pool for multiple time periods
+ *     description: |
+ *       Returns the estimated protocol revenue (FeeCollector portion) from lending interest.
+ *       
+ *       Revenue calculation:
+ *       - Total interest accrues on borrowed debt
+ *       - Only `reserveFactor` portion of interest goes to reserves
+ *       - Of reserves, only `(10000 - safetyShareBps) / 10000` portion goes to FeeCollector as revenue
+ *       
+ *       Formula: revenue = interest × (reserveFactor / 10000) × ((10000 - safetyShareBps) / 10000)
+ *     tags: [Lending]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Estimated protocol revenue for daily, weekly, monthly, YTD, and all-time periods
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalDailyRevenueUSD:
+ *                   type: string
+ *                   description: Total daily protocol revenue in USD (18 decimals)
+ *                 totalWeeklyRevenueUSD:
+ *                   type: string
+ *                   description: Total weekly protocol revenue in USD (18 decimals)
+ *                 totalMonthlyRevenueUSD:
+ *                   type: string
+ *                   description: Total monthly protocol revenue in USD (18 decimals)
+ *                 totalYtdRevenueUSD:
+ *                   type: string
+ *                   description: Total year-to-date protocol revenue in USD (18 decimals)
+ *                 totalAllTimeRevenueUSD:
+ *                   type: string
+ *                   description: Total all-time protocol revenue in USD (18 decimals)
+ *                 borrowableAsset:
+ *                   type: object
+ *                   properties:
+ *                     asset:
+ *                       type: string
+ *                       description: Borrowable asset contract address
+ *                     symbol:
+ *                       type: string
+ *                       description: Asset symbol (e.g., USDST)
+ *                     totalDebtUSD:
+ *                       type: string
+ *                       description: Total debt in USD for this asset (18 decimals)
+ *                     annualRatePercent:
+ *                       type: number
+ *                       description: Annual interest rate as percentage
+ *                     dailyRevenueUSD:
+ *                       type: string
+ *                       description: Daily protocol revenue in USD (18 decimals)
+ *                     weeklyRevenueUSD:
+ *                       type: string
+ *                       description: Weekly protocol revenue in USD (18 decimals)
+ *                     monthlyRevenueUSD:
+ *                       type: string
+ *                       description: Monthly protocol revenue in USD (18 decimals)
+ *                     ytdRevenueUSD:
+ *                       type: string
+ *                       description: Year-to-date protocol revenue in USD (18 decimals)
+ *                     allTimeRevenueUSD:
+ *                       type: string
+ *                       description: All-time protocol revenue in USD (18 decimals)
+ */
+router.get("/interest", authHandler.authorizeRequest(true), LendingController.getInterestAccrued);
 
 export default router;

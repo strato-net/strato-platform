@@ -19,7 +19,7 @@ function getUserCount() {
         }
       }
   ).then(count => {
-    const newUserCount = (count >= 1) ? count - 1 : count  // Excluding the faucet account address coming from a genesis block
+    const newUserCount = count
     if (userCount !== newUserCount) {
       userCount = newUserCount
       emitter.emit(ON_SOCKET_PUBLISH_EVENTS, USERS_COUNT, userCount)

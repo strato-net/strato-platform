@@ -148,6 +148,7 @@ export interface RawWithdrawData {
     mintUSDST: boolean;
     timestamp: string;
     requestedAt: string;
+    useHotWallet?: boolean;
   };
   // Backend enriched fields
   status: string;
@@ -197,7 +198,9 @@ export interface CollateralData {
   isCollateralized: boolean;
   liquidationThreshold: string; // Possibly in basis points (e.g., "8000" = 80%)
   ltv: string; // Loan-to-Value ratio (e.g., "7500" = 75%)
-  maxBorrowingPower: string; // Usually a percent string
+  maxBorrowingPower: string; // Borrowing power from supplied collateral (collateralizedAmount * price * ltv)
+  unsuppliedBorrowingPower: string; // Potential borrowing power from user balance (userBalance * price * ltv)
+  unsuppliedLTCollateralValue: string; // LT-weighted value of unsupplied balance (userBalance * price * lt)
   userBalance: string;
   userBalanceValue: string;
   _name: string;
@@ -227,6 +230,7 @@ export interface TokenInfo {
   _totalSupply: string;
   exchangeRate?: string;
   maxWithdrawableUSDST?: string;
+  userBalanceTotal?: string;
 }
 
 export interface LiquidityData {
@@ -248,6 +252,10 @@ export interface LiquidityData {
   // new (optional)
   totalAmountOwed?: string;
   totalAmountOwedPreview?: string;
+  userTotalDepositedUsd?: string;
+  userTotalWithdrawnUsd?: string;
+  userNetInvestedUsd?: string;
+  userAllTimeEarningsUsd?: string;
   isPaused: boolean;              // LendingPool pause status
 }
 
@@ -310,7 +318,8 @@ export type NewLoanData = {
   healthFactor: number;
   healthFactorRaw: string;
   totalBorrowingPowerUSD: string;
-  totalCollateralValueUSD: string;
+  totalCollateralValueUSD: string;      // risk-adjusted by LT (for health factor)
+  totalCollateralValueSupplied: string; // full supplied collat $ value (for display)
   maxAvailableToBorrowUSD: string;
   interestRate: number;                // bps
   isAboveLiquidationThreshold: boolean;
@@ -360,8 +369,7 @@ export interface PoolPollingConfig {
   fromAsset: any;
   toAsset: any;
   getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
-  fetchUsdstBalance: (userAddress: string) => Promise<void>;
-  userAddress: string;
+  fetchUsdstBalance: () => Promise<void>;
   interval?: number;
 }
 
@@ -369,7 +377,6 @@ export interface SafetyModuleData {
   totalAssets: string;
   totalShares: string;
   userShares: string;
-  userSharesStaked: string;
   userSharesTotal: string;
   userCooldownStart: string;
   cooldownSeconds: string;
@@ -383,4 +390,9 @@ export interface SafetyModuleData {
   maxRedeemableTotal: string;
   redeemValue: string;
   redeemValueTotal: string;
+  apy?: string;
+  userTotalDepositedUsd?: string;
+  userTotalWithdrawnUsd?: string;
+  userNetInvestedUsd?: string;
+  userAllTimeEarningsUsd?: string;
 }

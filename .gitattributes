@@ -1,0 +1,2 @@
+# Expand git format placeholders when creating archives (e.g., GitHub zip downloads)
+strato/core/strato-conf/src/Blockchain/Strato/Version.hs export-subst

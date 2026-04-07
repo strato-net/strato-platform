@@ -21,7 +21,7 @@ library:
     - parsec
     - QuickCheck
     - quickcheck-instances
-    - swagger2
+    - openapi3
     - text
 
 tests:

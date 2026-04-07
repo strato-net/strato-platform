@@ -51,7 +51,7 @@ library:
   - servant-docs
   - strato-conf
   - strato-model
-  - swagger2
+  - openapi3
   - text
   - time
   - transformers

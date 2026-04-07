@@ -27,8 +27,8 @@ dumpKafkaSequencer ofs = do
 dumpKafkaSequencerVM :: Offset -> IO ()
 dumpKafkaSequencerVM startingBlock | startingBlock /= 0 = error "startingBlock currently can only equal 0"
 dumpKafkaSequencerVM _ = runStderrLoggingT $ runKafkaMConfigured "queryStrato" $
-  consume "queryStrato" "queryStrato" seqVmEventsTopicName $ \() seqEvents -> do
-    liftIO . putStrLn . unlines $ format <$> (seqEvents :: [VmEvent])
+  consume "queryStrato" "queryStrato" seqVmTasksTopicName $ \() seqEvents -> do
+    liftIO . putStrLn . unlines $ format <$> (seqEvents :: [VmTask])
     return ()
 
 --ignoring startingBlock for now, might fix this later, but it won't apply to RabbitMQ

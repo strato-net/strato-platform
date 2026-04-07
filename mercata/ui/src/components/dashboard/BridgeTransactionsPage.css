@@ -2,6 +2,10 @@
   margin: 0 !important;
 }
 
+.custom-tabs .ant-tabs-nav::before {
+  border-bottom: none !important;
+}
+
 .custom-tabs .ant-tabs-tab {
   padding: 8px 16px !important;
   margin: 0 !important;
@@ -46,4 +50,28 @@
 
 .custom-tabs .ant-tabs-tab {
   flex: 1 !important;
-} 
+}
+
+/* Dark mode styles for Ant Design message/toast */
+.dark .ant-message .ant-message-notice-content {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .ant-message-success .anticon {
+  color: hsl(142.1 76.2% 36.3%) !important; /* green-600 */
+}
+
+.dark .ant-message-error .anticon {
+  color: hsl(0 84.2% 60.2%) !important; /* red-500 */
+}
+
+.dark .ant-message-info .anticon {
+  color: hsl(217.2 91.2% 59.8%) !important; /* blue-500 */
+}
+
+.dark .ant-message-warning .anticon {
+  color: hsl(45.4 93.4% 47.5%) !important; /* yellow-500 */
+}

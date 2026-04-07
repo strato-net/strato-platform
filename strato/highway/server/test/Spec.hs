@@ -112,7 +112,7 @@ fourMBBasicTest highwaytestnetaccesskeyid
                                , highwaytesting_filename    = "4mbtest.txt" :: Text
                                , highwaytesting_filetype    = "text/plain" :: Text
                                , highwaytesting_data        = fourmbtestdata
-                               } 
+                               }
     let multipart          = toMultipart fourmbtestdatatype
     mgr                    <- newManager tlsManagerSettings
     let puts3fileclientenv = mkClientEnv mgr
@@ -138,7 +138,7 @@ fourMBBasicTest highwaytestnetaccesskeyid
                                                     BaseUrl { baseUrlScheme = Http
                                                             , baseUrlHost   = (T.unpack highwaytestneturl)
                                                             , baseUrlPort   = 8080
-                                                            , baseUrlPath   = "" 
+                                                            , baseUrlPath   = ""
                                                             }
         let gets3filetesting' = runClientM (highwayGetS3FileTesting hash')
         eresponse'            <- liftIO $ gets3filetesting' gets3filetestingclientenv
@@ -149,7 +149,7 @@ fourMBBasicTest highwaytestnetaccesskeyid
             cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)
                                                           (DBC8.pack highwaytestnetsecretaccesskey)
             let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
-                                                       , Aws.credentials = cr 
+                                                       , Aws.credentials = cr
                                                        , Aws.logger      = Aws.defaultLog Aws.Warning
                                                        , Aws.proxy       = Nothing
                                                        }
@@ -193,7 +193,7 @@ fiveMBBasicTest highwaytestnetaccesskeyid
                                , highwaytesting_filename    = "5mbtest.txt" :: Text
                                , highwaytesting_filetype    = "text/plain" :: Text
                                , highwaytesting_data        = fivembtestdata
-                               } 
+                               }
     let multipart          = toMultipart fivembtestdatatype
     mgr                    <- newManager tlsManagerSettings
     let puts3fileclientenv = mkClientEnv mgr
@@ -206,7 +206,7 @@ fiveMBBasicTest highwaytestnetaccesskeyid
     let putS3File'         = runClientM (highwayPutS3File (boundary,multipart))
     eresponse              <- liftIO $ putS3File' puts3fileclientenv
     case eresponse of
-      Left clienterr -> 
+      Left clienterr ->
         assertFailure $ "Error: \n" ++ show clienterr
       Right response -> do
         let hash'               = T.pack $
@@ -219,7 +219,7 @@ fiveMBBasicTest highwaytestnetaccesskeyid
                                                     BaseUrl { baseUrlScheme = Http
                                                             , baseUrlHost   = (T.unpack highwaytestneturl)
                                                             , baseUrlPort   = 8080
-                                                            , baseUrlPath   = "" 
+                                                            , baseUrlPath   = ""
                                                             }
         let gets3filetesting' = runClientM (highwayGetS3FileTesting hash')
         eresponse'            <- liftIO $ gets3filetesting' gets3filetestingclientenv
@@ -230,7 +230,7 @@ fiveMBBasicTest highwaytestnetaccesskeyid
             cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)
                                                           (DBC8.pack highwaytestnetsecretaccesskey)
             let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
-                                                       , Aws.credentials = cr 
+                                                       , Aws.credentials = cr
                                                        , Aws.logger      = Aws.defaultLog Aws.Warning
                                                        , Aws.proxy       = Nothing
                                                        }
@@ -267,7 +267,7 @@ sixMBBasicTest highwaytestneturl =
                               , highwaytesting_filename    = "6mbtest.txt" :: Text
                               , highwaytesting_filetype    = "text/plain" :: Text
                               , highwaytesting_data        = sixmbtestdata
-                              } 
+                              }
     let multipart          = toMultipart sixmbtestdatatype
     mgr                    <- newManager tlsManagerSettings
     let puts3fileclientenv = mkClientEnv mgr
@@ -280,7 +280,7 @@ sixMBBasicTest highwaytestneturl =
     let putS3File'         = runClientM (highwayPutS3File (boundary,multipart))
     eresponse              <- liftIO $ putS3File' puts3fileclientenv
     case eresponse of
-      Left clienterr -> 
+      Left clienterr ->
         case clienterr of
           FailureResponse _ resp     -> do
             let rsp = responseStatusCode resp
@@ -315,7 +315,7 @@ filenameLengthTest highwaytestneturl =
                                   , highwaytesting_filename    = T.pack filenamethatstoolong
                                   , highwaytesting_filetype    = "text/plain" :: Text
                                   , highwaytesting_data        = fourmbtestdata
-                                  } 
+                                  }
     let multipart            = toMultipart fourmbtestdatatype
     mgr                      <- newManager tlsManagerSettings
     let puts3fileclientenv   = mkClientEnv mgr
@@ -370,7 +370,7 @@ main = do
                   aroundAll_ ( highwayTestingSetup highwayawsaccesskeyid
                                                    highwayawssecretaccesskey
                                                    highwayawss3bucket
-                                                   (T.pack highwaytestneturl) 
+                                                   (T.pack highwaytestneturl)
                              ) $ do
                     describe "highway" $ do
                       describe "base tests" $ do
@@ -403,7 +403,7 @@ main = do
                   cr
                   boundary
                   (T.pack highwaytestnets3bucket)
-                  highwaytestneturl 
+                  highwaytestneturl
       bracket (liftIO $ forkIO $ Warp.run 8080 (appHighwayWrapper env))
               killThread
               (const action)
@@ -411,7 +411,7 @@ main = do
         appHighwayWrapper :: HighwayWrapperEnv
                           -> Application
         appHighwayWrapper env' =
-          cors (const $ Just policy) 
+          cors (const $ Just policy)
           . serveWithContext
               ( Proxy
                   @( HighwayWrapperAPI

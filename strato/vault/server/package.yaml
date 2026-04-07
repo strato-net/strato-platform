@@ -38,9 +38,9 @@ library:
     - product-profunctors
     - profunctors
     - saltine
-    - servant-swagger
+    - servant-openapi3
     - strato-model
-    - swagger2
+    - openapi3
     - transformers
     - unliftio
     - resource-pool
@@ -62,10 +62,15 @@ executables:
       - common-log
       - hflags
       - http-client
+      - monad-logger
+      - mtl
+      - persistent
+      - persistent-postgresql
       - postgresql-simple
       - resource-pool
       - servant-options
       - servant-server
+      - text
       - wai-cors
       - wai-extra
       - wai-middleware-prometheus

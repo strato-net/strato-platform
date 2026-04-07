@@ -184,11 +184,11 @@ instance Format TxRejection where
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (NonceTooLow stage queue needed tx) =
-  Failure (show stage) (Just $ show queue) IncorrectNonce (Just needed) (Just . TD.transactionNonce $ otBaseTx tx) Nothing
+  Failure (show stage) (Just $ show queue) IncorrectNonce (Just needed) (Just . TD.nonce $ otBaseTx tx) Nothing
 txRejectionToAPIFailureCause (BalanceTooLow stage queue needed actual _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.InsufficientFunds (Just needed) (Just actual) Nothing
 txRejectionToAPIFailureCause (GasLimitTooLow stage queue needed tx) =
-  Failure (show stage) (Just $ show queue) IntrinsicGasExceedsLimit (Just needed) (Just . TD.transactionGasLimit $ otBaseTx tx) Nothing
+  Failure (show stage) (Just $ show queue) IntrinsicGasExceedsLimit (Just needed) (Just . TD.gasLimit $ otBaseTx tx) Nothing
 txRejectionToAPIFailureCause (LessLucrative stage queue newTx _) =
   Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatKeccak256WithoutColor (otHash newTx))
 txRejectionToAPIFailureCause (CodeNotFound stage queue address name _) =

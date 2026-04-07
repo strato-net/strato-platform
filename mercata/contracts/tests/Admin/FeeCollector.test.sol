@@ -70,11 +70,11 @@ contract Describe_FeeCollector {
     function it_fee_collector_can_withdraw_tokens() {
         uint256 amount = 1000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         uint256 ownerBalanceBefore = ERC20(token1).balanceOf(owner);
         feeCollector.withdrawToken(address(token1), owner, amount);
         uint256 ownerBalanceAfter = ERC20(token1).balanceOf(owner);
-        
+
         require(ownerBalanceAfter == ownerBalanceBefore + amount, "Owner balance not updated correctly");
         require(ERC20(token1).balanceOf(address(feeCollector)) == 0, "FeeCollector balance not updated correctly");
     }
@@ -82,11 +82,11 @@ contract Describe_FeeCollector {
     function it_fee_collector_can_withdraw_to_different_recipient() {
         uint256 amount = 1000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         uint256 userBalanceBefore = ERC20(token1).balanceOf(address(user1));
         feeCollector.withdrawToken(address(token1), address(user1), amount);
         uint256 userBalanceAfter = ERC20(token1).balanceOf(address(user1));
-        
+
         require(userBalanceAfter == userBalanceBefore + amount, "Recipient balance not updated correctly");
         require(ERC20(token1).balanceOf(address(feeCollector)) == 0, "FeeCollector balance not updated correctly");
     }
@@ -95,9 +95,9 @@ contract Describe_FeeCollector {
         uint256 totalAmount = 1000e18;
         uint256 withdrawAmount = 300e18;
         token1.mint(address(feeCollector), totalAmount);
-        
+
         feeCollector.withdrawToken(address(token1), owner, withdrawAmount);
-        
+
         require(ERC20(token1).balanceOf(owner) == withdrawAmount, "Owner balance not correct");
         require(ERC20(token1).balanceOf(address(feeCollector)) == totalAmount - withdrawAmount, "FeeCollector balance not correct");
     }
@@ -107,10 +107,10 @@ contract Describe_FeeCollector {
         uint256 amount2 = 2000e18;
         token1.mint(address(feeCollector), amount1);
         token2.mint(address(feeCollector), amount2);
-        
+
         feeCollector.withdrawToken(address(token1), owner, amount1);
         feeCollector.withdrawToken(address(token2), owner, amount2);
-        
+
         require(ERC20(token1).balanceOf(owner) == amount1, "Token1 balance not correct");
         require(ERC20(token2).balanceOf(owner) == amount2, "Token2 balance not correct");
         require(ERC20(token1).balanceOf(address(feeCollector)) == 0, "Token1 FeeCollector balance not zero");
@@ -122,7 +122,7 @@ contract Describe_FeeCollector {
     function it_fee_collector_reverts_withdrawal_by_non_owner() {
         uint256 amount = 1000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         bool reverted = false;
         try {
             user1.do(address(feeCollector), "withdrawToken", address(token1), owner, amount);
@@ -135,9 +135,9 @@ contract Describe_FeeCollector {
     function it_fee_collector_reverts_withdrawal_after_ownership_transfer() {
         uint256 amount = 1000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         Ownable(feeCollector).transferOwnership(address(user1));
-        
+
         bool reverted = false;
         try {
             feeCollector.withdrawToken(address(token1), owner, amount);
@@ -150,13 +150,13 @@ contract Describe_FeeCollector {
     function it_fee_collector_allows_withdrawal_by_new_owner() {
         uint256 amount = 1000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         Ownable(feeCollector).transferOwnership(address(user1));
-        
+
         uint256 userBalanceBefore = ERC20(token1).balanceOf(address(user1));
         user1.do(address(feeCollector), "withdrawToken", address(token1), address(user1), amount);
         uint256 userBalanceAfter = ERC20(token1).balanceOf(address(user1));
-        
+
         require(userBalanceAfter == userBalanceBefore + amount, "New owner should be able to withdraw");
     }
 
@@ -165,7 +165,7 @@ contract Describe_FeeCollector {
     function it_fee_collector_reverts_with_zero_token_address() {
         uint256 amount = 1000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         bool reverted = false;
         try {
             feeCollector.withdrawToken(zeroAddress, owner, amount);
@@ -178,7 +178,7 @@ contract Describe_FeeCollector {
     function it_fee_collector_reverts_with_zero_recipient_address() {
         uint256 amount = 1000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         bool reverted = false;
         try {
             feeCollector.withdrawToken(address(token1), zeroAddress, amount);
@@ -191,7 +191,7 @@ contract Describe_FeeCollector {
     function it_fee_collector_reverts_with_zero_amount() {
         uint256 amount = 1000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         bool reverted = false;
         try {
             feeCollector.withdrawToken(address(token1), owner, 0);
@@ -205,7 +205,7 @@ contract Describe_FeeCollector {
         uint256 amount = 1000e18;
         uint256 withdrawAmount = 2000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         bool reverted = false;
         try {
             feeCollector.withdrawToken(address(token1), owner, withdrawAmount);
@@ -220,9 +220,9 @@ contract Describe_FeeCollector {
     function it_fee_collector_handles_large_amounts() {
         uint256 largeAmount = 2**256 - 1;
         token1.mint(address(feeCollector), largeAmount);
-        
+
         feeCollector.withdrawToken(address(token1), owner, largeAmount);
-        
+
         require(ERC20(token1).balanceOf(owner) == largeAmount, "Large amount withdrawal should work");
         require(ERC20(token1).balanceOf(address(feeCollector)) == 0, "FeeCollector balance should be zero");
     }
@@ -232,13 +232,13 @@ contract Describe_FeeCollector {
         uint256 withdrawal1 = 3000e18;
         uint256 withdrawal2 = 2000e18;
         uint256 withdrawal3 = 5000e18;
-        
+
         token1.mint(address(feeCollector), totalAmount);
-        
+
         feeCollector.withdrawToken(address(token1), address(user1), withdrawal1);
         feeCollector.withdrawToken(address(token1), address(user2), withdrawal2);
         feeCollector.withdrawToken(address(token1), address(user3), withdrawal3);
-        
+
         require(ERC20(token1).balanceOf(address(user1)) == withdrawal1, "User1 balance not correct");
         require(ERC20(token1).balanceOf(address(user2)) == withdrawal2, "User2 balance not correct");
         require(ERC20(token1).balanceOf(address(user3)) == withdrawal3, "User3 balance not correct");
@@ -249,11 +249,11 @@ contract Describe_FeeCollector {
         uint256 totalAmount = 1000e18;
         uint256 withdrawalAmount = 100e18;
         token1.mint(address(feeCollector), totalAmount);
-        
+
         for (uint i = 0; i < 10; i++) {
             feeCollector.withdrawToken(address(token1), owner, withdrawalAmount);
         }
-        
+
         require(ERC20(token1).balanceOf(owner) == totalAmount, "Total withdrawn should equal minted amount");
         require(ERC20(token1).balanceOf(address(feeCollector)) == 0, "FeeCollector balance should be zero");
     }
@@ -263,7 +263,7 @@ contract Describe_FeeCollector {
     function it_fee_collector_emits_withdrawn_event() {
         uint256 amount = 1000e18;
         token1.mint(address(feeCollector), amount);
-        
+
         feeCollector.withdrawToken(address(token1), owner, amount);
         // Note: Event testing would require more complex setup in this test framework
         require(ERC20(token1).balanceOf(owner) == amount, "Withdrawal should update balance");
@@ -274,13 +274,13 @@ contract Describe_FeeCollector {
     function it_fee_collector_works_with_different_token_types() {
         uint256 amount1 = 1000e18;
         uint256 amount2 = 2000e18;
-        
+
         token1.mint(address(feeCollector), amount1);
         token2.mint(address(feeCollector), amount2);
-        
+
         feeCollector.withdrawToken(address(token1), address(user1), amount1);
         feeCollector.withdrawToken(address(token2), address(user2), amount2);
-        
+
         require(ERC20(token1).balanceOf(address(user1)) == amount1, "Token1 withdrawal failed");
         require(ERC20(token2).balanceOf(address(user2)) == amount2, "Token2 withdrawal failed");
     }
@@ -288,13 +288,13 @@ contract Describe_FeeCollector {
     function it_fee_collector_handles_mixed_operations() {
         uint256 initialAmount = 5000e18;
         token1.mint(address(feeCollector), initialAmount);
-        
+
         // Multiple withdrawals to different recipients
         feeCollector.withdrawToken(address(token1), address(user1), 1000e18);
         feeCollector.withdrawToken(address(token1), address(user2), 2000e18);
         feeCollector.withdrawToken(address(token1), address(user3), 1500e18);
         feeCollector.withdrawToken(address(token1), owner, 500e18);
-        
+
         require(ERC20(token1).balanceOf(address(user1)) == 1000e18, "User1 balance incorrect");
         require(ERC20(token1).balanceOf(address(user2)) == 2000e18, "User2 balance incorrect");
         require(ERC20(token1).balanceOf(address(user3)) == 1500e18, "User3 balance incorrect");

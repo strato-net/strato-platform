@@ -27,7 +27,7 @@ const AssetCard = ({ title, type, image, logoColor, logoText, description }: Ass
       <div className="text-left">
         <div className="text-sm font-semibold text-blue-600 mb-1">{type}</div>
         <h3 className="text-xl font-bold mb-2">{title}</h3>
-        <p className="text-gray-600 text-sm mb-6">{description}</p>
+        <p className="text-muted-foreground text-sm mb-6">{description}</p>
         <a 
           href="#view-project" 
           className="inline-flex items-center text-strato-blue hover:text-strato-purple font-medium text-sm transition-colors"

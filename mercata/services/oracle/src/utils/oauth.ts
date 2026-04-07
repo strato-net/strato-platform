@@ -1,5 +1,5 @@
-import axios from 'axios';
 import { logInfo, logError } from './logger';
+import { apiGet, apiPost } from './apiClient';
 
 
 const TOKEN_LIFETIME_THRESHOLD_SECONDS = 10;
@@ -10,11 +10,16 @@ class OAuthClient {
     private clientSecret: string;
     private username: string;
     private password: string;
-    
+
     private accessToken: string | null = null;
     private tokenExpiry: number | null = null;
     private tokenEndpoint: string | null = null;
     private userAddress: string | null = null;
+
+    // Promise deduplication: concurrent callers share one in-flight request
+    private refreshPromise: Promise<string> | null = null;
+    private discoveryPromise: Promise<string> | null = null;
+    private addressPromise: Promise<string> | null = null;
 
     constructor() {
         this.discoveryUrl = process.env.OAUTH_DISCOVERY_URL!;
@@ -29,21 +34,35 @@ class OAuthClient {
             return this.tokenEndpoint;
         }
 
-        try {
-            logInfo('OAuth', 'Discovering token endpoint...');
-            const response = await axios.get(this.discoveryUrl, { timeout: 10000 });
-            this.tokenEndpoint = response.data.token_endpoint;
-            
-            if (!this.tokenEndpoint) {
-                throw new Error('Token endpoint not found in discovery document');
-            }
-            
-            logInfo('OAuth', `Token endpoint discovered: ${this.tokenEndpoint}`);
-            return this.tokenEndpoint;
-        } catch (error: any) {
-            logError('OAuth', new Error(`Error discovering token endpoint: ${error.message}`));
-            throw new Error(`OAuth discovery failed: ${error.message}`);
+        // Deduplicate concurrent discovery requests
+        if (this.discoveryPromise) {
+            return this.discoveryPromise;
         }
+
+        this.discoveryPromise = (async () => {
+            try {
+                logInfo('OAuth', 'Discovering token endpoint...');
+                const response = await apiGet(
+                    this.discoveryUrl,
+                    { timeout: 10000 },
+                    { logPrefix: 'OAuth', apiUrl: this.discoveryUrl, method: 'GET' }
+                );
+                this.tokenEndpoint = response.data.token_endpoint;
+
+                if (!this.tokenEndpoint) {
+                    throw new Error('Token endpoint not found in discovery document');
+                }
+
+                logInfo('OAuth', `Token endpoint discovered: ${this.tokenEndpoint}`);
+                return this.tokenEndpoint;
+            } catch (error: any) {
+                throw new Error(`OAuth discovery failed: ${error.message}`);
+            } finally {
+                this.discoveryPromise = null;
+            }
+        })();
+
+        return this.discoveryPromise;
     }
 
     async getAccessToken(): Promise<string> {
@@ -52,15 +71,23 @@ class OAuthClient {
             return this.accessToken;
         }
 
-        // Request new token
-        await this.refreshToken();
-        return this.accessToken!;
+        // Deduplicate concurrent refresh requests
+        if (this.refreshPromise) {
+            return this.refreshPromise;
+        }
+
+        this.refreshPromise = this.refreshToken().finally(() => {
+            this.refreshPromise = null;
+        });
+
+        return this.refreshPromise;
     }
 
     async refreshToken(): Promise<string> {
+        let tokenEndpoint: string | undefined;
         try {
             // Get the token endpoint from discovery
-            const tokenEndpoint = await this.getTokenEndpoint();
+            tokenEndpoint = await this.getTokenEndpoint();
 
             // Use password grant to authenticate as the specific username
             const tokenData = new URLSearchParams();
@@ -70,26 +97,30 @@ class OAuthClient {
             tokenData.append('client_id', this.clientId);
             tokenData.append('client_secret', this.clientSecret);
 
-            const response = await axios.post(tokenEndpoint, tokenData, {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json'
+            const response = await apiPost(
+                tokenEndpoint,
+                tokenData,
+                {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json'
+                    },
+                    timeout: 10000
                 },
-                timeout: 10000
-            });
+                { logPrefix: 'OAuth', apiUrl: tokenEndpoint, method: 'POST' }
+            );
 
             if (response.data.access_token) {
                 this.accessToken = response.data.access_token;
                 const expiresIn = response.data.expires_in || 3600; // Default 1 hour
                 this.tokenExpiry = Date.now() + (expiresIn * 1000);
-                
+
                 return this.accessToken!;
             } else {
                 throw new Error('No access token in response');
             }
         } catch (error: any) {
             const errorMessage = error.response?.data?.error_description || error.response?.data?.error || error.message;
-            logError('OAuth', new Error(`Error getting access token: ${errorMessage}`));
             throw new Error(`OAuth authentication failed: ${errorMessage}`);
         }
     }
@@ -113,20 +144,38 @@ class OAuthClient {
             return this.userAddress;
         }
 
-        const accessToken = await this.getAccessToken();
-        const response = await axios.get(
-            `${process.env.STRATO_NODE_URL}/strato/v2.3/key`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 10000
-            }
-        );
+        // Deduplicate concurrent address requests
+        if (this.addressPromise) {
+            return this.addressPromise;
+        }
 
-        this.userAddress = response.data.address;
-        return this.userAddress!;
+        this.addressPromise = (async () => {
+            const keyEndpoint = `${process.env.STRATO_NODE_URL}/strato/v2.3/key`;
+            try {
+                const accessToken = await this.getAccessToken();
+                const response = await apiGet(
+                    keyEndpoint,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        timeout: 10000
+                    },
+                    { logPrefix: 'OAuth', apiUrl: keyEndpoint, method: 'GET' }
+                );
+
+                this.userAddress = response.data.address;
+                return this.userAddress!;
+            } catch (error: any) {
+                const errorMessage = error.response?.data?.message || error.message;
+                throw new Error(`Failed to get user address: ${errorMessage}`);
+            } finally {
+                this.addressPromise = null;
+            }
+        })();
+
+        return this.addressPromise;
     }
 
 

@@ -1,0 +1,40 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           blockapps-haskoin
+version:        1.0.0.1
+synopsis:       Blockapps fork of the "haskoin" library
+description:    A fork from an outdated commit, which our infrastructure happens to depend upon. . This package needs to be maintained until we remove the dependencies from it from our codebase.
+category:       Bitcoin, Finance, Network
+stability:      stable
+author:         Philippe Laprade, Jean-Pierre Rupp
+maintainer:     plaprade+hackage@gmail.com
+license:        PublicDomain
+license-file:   UNLICENSE
+build-type:     Simple
+
+library
+  exposed-modules:
+      Network.Haskoin.Crypto.BigWord
+  other-modules:
+      Network.Haskoin.Crypto.Curve
+      Network.Haskoin.Crypto.NumberTheory
+      Network.Haskoin.Util
+      Paths_blockapps_haskoin
+  hs-source-dirs:
+      ./
+  ghc-options: -Wall
+  build-depends:
+      QuickCheck
+    , aeson
+    , base
+    , base16-bytestring
+    , binary
+    , bytestring
+    , deepseq
+    , hashable
+    , text
+  default-language: Haskell2010

@@ -13,7 +13,7 @@ import Control.Lens
 import Control.Monad.Except (ExceptT (..), MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.State.Class (MonadState)
-import Control.Monad.Trans.Control 
+import Control.Monad.Trans.Control
 import Control.Monad.Trans.State
 import Data.ByteString.Char8 (ByteString)
 import Data.List.NonEmpty (NonEmpty (..))
@@ -400,7 +400,7 @@ withAddressHandle address kafkaAction = do
       stateConnections .= (at address ?~ newPool $ conns)
       return newPool
     Just p -> return p
-  tryKafka $ liftBaseWith (\runInIO -> 
+  tryKafka $ liftBaseWith (\runInIO ->
     Pool.withResource pool (\handle -> runInIO (kafkaAction handle))
     ) >>= restoreM
 

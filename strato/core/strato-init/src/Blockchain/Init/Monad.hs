@@ -13,7 +13,8 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 
 module Blockchain.Init.Monad (
-  runSetupDBM
+  runSetupDBM,
+  runSetupDBMInDir
   ) where
 
 import BlockApps.Logging
@@ -25,11 +26,9 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Init.Options (flags_vaultWrapperUrl)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -40,18 +39,14 @@ import Data.IORef
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
-import Network.HTTP.Client (defaultManagerSettings, newManager)
-import Servant.Client
 import SolidVM.Model.Storable
-import qualified Strato.Strato23.API as VC
-import qualified Strato.Strato23.Client as VC
+import System.Directory (createDirectoryIfMissing)
 
 data SetupDBs = SetupDBs
   { stateDB :: StateDB,
     stateRoots :: IORef (M.Map (Maybe Word256) MP.StateRoot),
     hashDB :: HashDB,
     codeDB :: CodeDB,
-    vaultDB :: ClientEnv,
     localStorageTx :: IORef (M.Map (Address, StoragePath) BasicValue),
     localStorageBlock :: IORef (M.Map (Address, StoragePath) BasicValue),
     localAddressStateTx :: IORef (M.Map Address AddressStateModification),
@@ -62,35 +57,22 @@ type HasDBs m = Mod.Accessible SetupDBs m
 
 runSetupDBM :: (MonadResource m, MonadFail m) =>
                ReaderT SetupDBs m b -> m b
-runSetupDBM mv = do
-  let open path = DB.open (".ethereumH" ++ path) DB.defaultOptions {DB.createIfMissing = True, DB.cacheSize = 1024}
+runSetupDBM = runSetupDBMInDir ".ethereumH"
+
+-- | Run setup with databases in a specified directory.
+-- Useful for genesis-builder which needs its own temp database to avoid locking conflicts.
+runSetupDBMInDir :: (MonadResource m, MonadFail m) =>
+                    FilePath -> ReaderT SetupDBs m b -> m b
+runSetupDBMInDir baseDir mv = do
+  liftIO $ createDirectoryIfMissing True baseDir
+  let open path = DB.open (baseDir ++ path) DB.defaultOptions {DB.createIfMissing = True, DB.cacheSize = 1024}
   sdb <- open stateDBPath
   srRef <- liftIO $ newIORef M.empty
   hdb <- HashDB <$> open hashDBPath
   cdb <- CodeDB <$> open codeDBPath
   [m1, m2] <- liftIO . replicateM 2 . newIORef $ M.empty
   [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
-  vdb <- do
-    mgr <- liftIO $ newManager defaultManagerSettings
-    url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
-    return $ mkClientEnv mgr url
-  runReaderT mv $ SetupDBs sdb srRef hdb cdb vdb m1 m2 m3 m4
-
-waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
-waitOnVault action = do
-  res <- action
-  case res of
-    Left _ -> waitOnVault action
-    Right val -> return val
-
-instance (Monad m, MonadIO m, MonadLogger m, HasDBs m) => HasVault m where
-  getPub = do
-    env <- Mod.access Mod.Proxy
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) $ vaultDB env
-  sign bs = do
-    env <- Mod.access Mod.Proxy
-    waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash bs)) $ vaultDB env
-  getShared _ = error "should not be calling getShared in strato-init"
+  runReaderT mv $ SetupDBs sdb srRef hdb cdb m1 m2 m3 m4
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
   lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< fmap stateRoots (Mod.access Mod.Proxy)
@@ -139,7 +121,7 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m
   lookup _ = genericLookupCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
   insert _ = genericInsertCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
   delete _ = genericDeleteCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
- 
+
 instance {-# OVERLAPPING #-} Monad m => A.Selectable FilePath (Either String String) (ReaderT SetupDBs m) where
   select _ _ = pure Nothing
 

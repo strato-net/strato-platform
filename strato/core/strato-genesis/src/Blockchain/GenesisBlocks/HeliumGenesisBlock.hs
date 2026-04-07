@@ -410,7 +410,7 @@ wbtc = BridgeAssetInfo
   0x29f2d40b0605204364af54ec677bd022da425d03
   0
   0x7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9
-  
+
 
 paxg :: BridgeAssetInfo
 paxg = BridgeAssetInfo
@@ -447,7 +447,7 @@ usdt = BridgeAssetInfo
 
 heliumConfig :: HeliumGenesisBlockConfig
 heliumConfig = HeliumGenesisBlockConfig
-  validators
+  heliumValidators
   admins
   blockappsTestAddress
   [sepolia]
@@ -587,7 +587,8 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
              , (goldstLpTokenAddress, Delegatecall goldstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
              , (silvstPoolAddress, Delegatecall silvstPoolAddress poolImplAddress (Just "BlockApps") "Pool")
              , (silvstLpTokenAddress, Delegatecall silvstLpTokenAddress tokenImplAddress (Just "BlockApps") "Token")
-             ]
+             ],
+         validators = hgbc_validators
         }
 
 ownedByBlockApps :: [(B.ByteString, BasicValue)]
@@ -1340,8 +1341,8 @@ silvstLpToken = SolidVMContractWithStorage silvstLpTokenAddress 0 proxy $ toPath
 --      , ("_balances[" <> addrBS blockappsAddress <> "]", BInteger $ 200_000 * oneE18)
 --      ]
 
-validators :: [Validator]
-validators = [
+heliumValidators :: [Validator]
+heliumValidators = [
   Validator 0x0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82, --Node1
   Validator 0xbdd3fe1b9a87a88cff8259528c0a4d6464625713, --Node2
   Validator 0xebcd85c4212e53a2546cbcea765c1de531b14fb1, --Node3
@@ -1350,6 +1351,33 @@ validators = [
 
 admins :: [Address]
 admins = [blockappsTestAddress]
+
+-- Lithium network configuration
+lithiumValidatorAddress :: Address
+lithiumValidatorAddress = 0x98e97f0514e425532cd3ffd5c36349c18f6ad365
+
+lithiumValidators :: [Validator]
+lithiumValidators = [Validator lithiumValidatorAddress]
+
+lithiumAdmins :: [Address]
+lithiumAdmins = [lithiumValidatorAddress]
+
+lithiumConfig :: HeliumGenesisBlockConfig
+lithiumConfig = HeliumGenesisBlockConfig
+  lithiumValidators
+  lithiumAdmins
+  lithiumValidatorAddress
+  [sepolia]
+  [eth, wbtc, paxg, usdc, usdt]
+  (bridgeRelayerAddress, 100_000 * oneE18)
+  ((,100_000 * oneE18) <$> [oracleAddress1, oracleAddress2])
+
+-- Lithium genesis block with funded validator account
+lithiumGenesisBlock :: GenesisInfo
+lithiumGenesisBlock = 
+  let baseGenesis = genesisBlockTemplate lithiumConfig
+      fundedValidator = NonContract lithiumValidatorAddress 1809251394333065553493296640760748560207343510400633813116524750123642650624
+  in baseGenesis { addressInfo = fundedValidator : addressInfo baseGenesis }
 
 descriptions :: M.Map Text Text
 descriptions = M.fromList

@@ -30,7 +30,7 @@ npm run deploy
 - `OAUTH_CLIENT_ID` - OAuth client ID
 - `OAUTH_CLIENT_SECRET` - OAuth client secret
 
-**Output**: Prints all deployed contract addresses and provides ready-to-paste `.env` snippets.
+**Output**: Prints all deployed contract addresses, including `SaveUSDSTVault`, and provides ready-to-paste `.env` snippets.
 
 #### `upgrade.js`
 Script for upgrading existing proxy contracts to new implementations.
@@ -135,7 +135,6 @@ UPGRADES=(
   101c Token Tokens/Token.sol '{"initialOwner": "deadbeef"}'
   101d Pool Pools/Pool.sol '{"initialOwner": "deadbeef"}'
   101e Token Tokens/Token.sol '{"initialOwner": "deadbeef"}'
-  101f RewardsChef Rewards/RewardsChef.sol '{"initialOwner": "deadbeef"}'
 )
 
 # Process in groups of 4

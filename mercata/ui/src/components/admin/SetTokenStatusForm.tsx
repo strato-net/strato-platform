@@ -96,7 +96,7 @@ const SetTokenStatusModal = ({ open, onOpenChange, token }: SetTokenStatusModalP
                         <SelectItem key={status.value} value={status.value.toString()}>
                           <div className="flex flex-col">
                             <span className="font-medium">{status.label}</span>
-                            <span className="text-xs text-gray-500">{status.description}</span>
+                            <span className="text-xs text-muted-foreground">{status.description}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -123,8 +123,8 @@ const SetTokenStatusModal = ({ open, onOpenChange, token }: SetTokenStatusModalP
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Changing token status affects how the token behaves across the platform. Only the TokenFactory 
-                contract can call this function. Ensure you have the proper permissions before attempting this operation.
+                Changing token status affects how the token behaves across the platform.
+                Only the token owner can call this function.
               </AlertDescription>
             </Alert>
 

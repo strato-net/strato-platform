@@ -48,15 +48,15 @@ const formatTooltipValue = (value: string | number): string => {
 };
 
 const renderLoadingState = (message: string) => (
-  <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
+  <div className="flex items-center justify-center h-80 bg-muted/50 rounded-md">
     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-    <p className="text-gray-500 ml-3">{message}</p>
+    <p className="text-muted-foreground ml-3">{message}</p>
   </div>
 );
 
 const renderEmptyState = (message: string) => (
-  <div className="flex items-center justify-center h-80 bg-gray-100 rounded-md">
-    <p className="text-gray-500">{message}</p>
+  <div className="flex items-center justify-center h-80 bg-muted/50 rounded-md">
+    <p className="text-muted-foreground">{message}</p>
   </div>
 );
 
@@ -159,7 +159,7 @@ const PriceChart: React.FC<PriceChartProps> = ({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         {subtitle && (
-          <p className="text-sm text-gray-600">{subtitle}</p>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
         )}
       </CardHeader>
       <CardContent className="overflow-hidden">

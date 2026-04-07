@@ -1,7 +1,8 @@
-import { config } from "../config";
+import { config, WAD } from "../config";
 import {
   getEnabledChains,
   getBridgeInfo,
+  getRebaseFactors,
 } from "../services/cirrusService";
 import { depositBatch } from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
@@ -14,7 +15,7 @@ import {
 import { logError, logInfo } from "../utils/logger";
 import { normalizeAddress } from "../utils/utils";
 
-// DepositInitiated(uint256,string,address,uint256,address) keccak256 hash
+// DepositRouted(address,uint256,address,address,address,uint96) keccak256 hash
 import { DEPOSIT_EVENT_SIGNATURE } from "../config";
 
 const parseDepositEvents = async (logs: any[], externalChainId: number): Promise<DepositArgs[]> => {
@@ -22,9 +23,11 @@ const parseDepositEvents = async (logs: any[], externalChainId: number): Promise
     const externalToken = normalizeAddress(log.topics[1]);
     const externalSender = normalizeAddress(log.topics[2]);
     const stratoRecipient = normalizeAddress(log.topics[3]);
-    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId)
-    // Data layout: [amount(32 bytes)][depositId(32 bytes)]
+    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)
+    // Data layout: [amount(32 bytes)][targetStratoToken(32 bytes)][depositId(32 bytes)]
     const externalTokenAmount = BigInt("0x" + log.data.substring(2, 66)).toString();
+    const targetStratoTokenWord = log.data.substring(66, 130);
+    const targetStratoToken = normalizeAddress("0x" + targetStratoTokenWord.slice(-40));
 
     return {
       externalChainId,
@@ -32,7 +35,8 @@ const parseDepositEvents = async (logs: any[], externalChainId: number): Promise
       externalToken,
       externalTokenAmount,
       externalTxHash: log.transactionHash,
-      stratoRecipient
+      stratoRecipient,
+      targetStratoToken,
     };
   });
 };
@@ -79,7 +83,23 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
     );
     const failedParses = validDeposits.length - filteredDeposits.length;
 
-    // Process valid deposits first
+    // Apply rebase factor for xStock tokens (divide by currentMultiplier to get underlying shares)
+    if (filteredDeposits.length > 0) {
+      const targetTokens = [...new Set(filteredDeposits.map(d => d.targetStratoToken))];
+      const factors = await getRebaseFactors(targetTokens);
+      for (const deposit of filteredDeposits) {
+        const stratoKey = deposit.targetStratoToken.toLowerCase().replace(/^0x/, "");
+        const factor = factors.get(stratoKey);
+        if (factor) {
+          const original = BigInt(deposit.externalTokenAmount);
+          const adjusted = (original * WAD) / factor;
+          logInfo("AlchemyPolling", `Rebasing deposit ${deposit.externalTxHash}: ${original} → ${adjusted} (factor=${factor})`);
+          deposit.externalTokenAmount = adjusted.toString();
+        }
+      }
+    }
+
+    // Process valid deposits
     if (filteredDeposits.length > 0) {
       await depositBatch(filteredDeposits as NonEmptyArray<DepositArgs>);
       depositsProcessed = true;

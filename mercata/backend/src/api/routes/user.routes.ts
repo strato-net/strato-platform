@@ -214,6 +214,35 @@ router.post("/admin/vote/by-id", authHandler.authorizeRequest(), UserController.
 
 /**
  * @openapi
+ * /user/admin/dismiss:
+ *   post:
+ *     summary: Dismiss an issue (only works if proposer is the only voter)
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - issueId
+ *             properties:
+ *               issueId:
+ *                 type: string
+ *                 description: The ID of the issue to dismiss
+ *     responses:
+ *       200:
+ *         description: Issue dismissed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/dismiss", authHandler.authorizeRequest(), UserController.dismissIssue);
+
+/**
+ * @openapi
  * /user/admin/issues:
  *   get:
  *     summary: List open administrative issues
@@ -228,5 +257,39 @@ router.post("/admin/vote/by-id", authHandler.authorizeRequest(), UserController.
  *               additionalProperties: true
  */
 router.get("/admin/issues", authHandler.authorizeRequest(), UserController.getOpenIssues);
+
+/**
+ * @openapi
+ * /user/admin/issues/executed:
+ *   get:
+ *     summary: List executed administrative issues with pagination
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Paginated executed issues
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 executed:
+ *                   type: array
+ *                 executedTotal:
+ *                   type: integer
+ */
+router.get("/admin/issues/executed", authHandler.authorizeRequest(), UserController.getExecutedIssues);
 
 export default router;

@@ -8,6 +8,7 @@ export const CONSTANTS = {
     GAS_FEE_VOUCHER: BigInt(process.env.GAS_FEE_VOUCHER || '100') * BigInt(1e16),
     MIN_TRANSACTIONS_THRESHOLD: BigInt(process.env.MIN_TRANSACTIONS_THRESHOLD || '100'),
     USDST_ADDRESS: process.env.USDST_ADDRESS || '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
+    VOUCHER_ADDRESS: process.env.VOUCHER_ADDRESS || '000000000000000000000000000000000000100e',
 };
 
 // Gas parameters for transactions
@@ -18,9 +19,17 @@ export const GAS_PARAMS = {
 
 // Timeout configurations
 export const TIMEOUTS = { 
-    SUBMIT: 30000, 
-    WAIT: 120000, 
-    STATUS: 10000 
+    SUBMIT: 20000, 
+    WAIT: 180000,
+    STATUS: 10000,
+    FETCH: 30000,
+};
+
+// Oracle configuration
+export const ORACLE_CONFIG = {
+    MIN_VALID_SOURCES: 3,
+    MAX_SOURCE_DIVERGENCE_PERCENT: 5,    // Alert if sources differ by >5%
+    MAX_PRICE_CHANGE_PERCENT: 20,        // Alert if price changed >20% from last
 };
 
 // Retry delay configurations

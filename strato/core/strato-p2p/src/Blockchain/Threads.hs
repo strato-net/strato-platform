@@ -54,7 +54,7 @@ formatThread threadId = do
           ThreadFinished -> " [ThreadFinished]"
           _ -> ""
   return $ "(" ++ show threadId ++ ") " ++ fromMaybe "" maybeLabel ++ statusString
-  
+
 
 data ParsedLabel = ParsedLabel {
   thePeer :: String,
@@ -79,7 +79,7 @@ getPeersByThreads = do
 
   maybeThreadLabels <- liftIO $ sequence $ map threadLabel activeThreadIds
 
-  let peerThreadGroups = Map.toList $ Map.fromListWith (++) $ 
+  let peerThreadGroups = Map.toList $ Map.fromListWith (++) $
                          [(p, [(l, s)]) | ParsedLabel p l s <- map parseLabel [ v | Just v <- maybeThreadLabels]]
 
   return $ map (fmap (summarizeThreadState . sort)) $ filter ((/= "") . fst) $ peerThreadGroups

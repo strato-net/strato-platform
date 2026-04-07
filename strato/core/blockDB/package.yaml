@@ -34,6 +34,7 @@ library:
   - generic-arbitrary
   - hedis
   - labeled-error
+  - lens
   - mtl
   - persistent
   - raw-strings-qq
@@ -41,7 +42,7 @@ library:
   - sql-monad
   - strato-model
   - strato-redis-blockdb
-  - swagger2
+  - openapi3
   - time
   - text
 

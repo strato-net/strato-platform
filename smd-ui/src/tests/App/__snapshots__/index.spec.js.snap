@@ -16,26 +16,26 @@ Object {
 exports[`App: index componentDidMount 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) isCollapsed={true} toggleCollapse={[Function]} />
-  <SideBar isCollapsed={true} toggleCollapse={[Function]} />
+  <withRouter(Connect(MenuBar)) isCollapsed={true} toggleCollapse={[Function (anonymous)]} />
+  <SideBar isCollapsed={true} toggleCollapse={[Function (anonymous)]} />
   <main id=\\"outer-container\\">
     <Switch>
       <Route exact={true} path=\\"/\\" component={[undefined]}>
         <Redirect to=\\"/home\\" push={false} />
       </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/home\\" component={[Function: C] { displayName: 'withRouter(Connect(Dashboard))', WrappedComponent: [Function: Dashboard], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/accounts\\" component={[Function: C] { displayName: 'withRouter(Connect(Accounts))', WrappedComponent: [Function: Accounts], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/external_storage\\" component={[Function: C] { displayName: 'withRouter(Connect(ExternalStorage))', WrappedComponent: [Function: ExternalStorage], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
-      <Route exact={true} path=\\"/blocks\\" component={[Function: Connect]} />
-      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/shards\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/transactions\\" component={[Function: Connect]} />
-      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/searchresults\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/blocks\\" component={[Function: Connect] { WrappedComponent: [Function: ReduxForm], displayName: 'Connect(ReduxForm)', childContextTypes: { storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, contextTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, propTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C] { displayName: 'withRouter(Connect(BlockView))', WrappedComponent: [Function: BlockView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/shards\\" component={[Function: C] { displayName: 'withRouter(Connect(Chains))', WrappedComponent: [Function: Chains], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/transactions\\" component={[Function: Connect] { WrappedComponent: [Function: ReduxForm], displayName: 'Connect(ReduxForm)', childContextTypes: { storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, contextTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, propTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C] { displayName: 'withRouter(Connect(TransactionView))', WrappedComponent: [Function: TransactionView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts\\" component={[Function: C] { displayName: 'withRouter(Connect(ReduxForm))', WrappedComponent: [Function: ReduxForm], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C] { displayName: 'withRouter(Connect(ContractQuery))', WrappedComponent: [Function: ContractQuery], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/code_editor\\" component={[Function: C] { displayName: 'withRouter(Connect(ReduxForm))', WrappedComponent: [Function: ReduxForm], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/searchresults\\" component={[Function: C] { displayName: 'withRouter(Connect(SearchResults))', WrappedComponent: [Function: SearchResults], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
     </Switch>
   </main>
 </div>"
@@ -44,26 +44,26 @@ exports[`App: index componentDidMount 1`] = `
 exports[`App: index componentDidMount 2`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) isCollapsed={true} toggleCollapse={[Function]} />
-  <SideBar isCollapsed={true} toggleCollapse={[Function]} />
+  <withRouter(Connect(MenuBar)) isCollapsed={true} toggleCollapse={[Function (anonymous)]} />
+  <SideBar isCollapsed={true} toggleCollapse={[Function (anonymous)]} />
   <main id=\\"outer-container\\">
     <Switch>
       <Route exact={true} path=\\"/\\" component={[undefined]}>
         <Redirect to=\\"/home\\" push={false} />
       </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/home\\" component={[Function: C] { displayName: 'withRouter(Connect(Dashboard))', WrappedComponent: [Function: Dashboard], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/accounts\\" component={[Function: C] { displayName: 'withRouter(Connect(Accounts))', WrappedComponent: [Function: Accounts], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/external_storage\\" component={[Function: C] { displayName: 'withRouter(Connect(ExternalStorage))', WrappedComponent: [Function: ExternalStorage], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
-      <Route exact={true} path=\\"/blocks\\" component={[Function: Connect]} />
-      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/shards\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/transactions\\" component={[Function: Connect]} />
-      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/searchresults\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/blocks\\" component={[Function: Connect] { WrappedComponent: [Function: ReduxForm], displayName: 'Connect(ReduxForm)', childContextTypes: { storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, contextTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, propTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C] { displayName: 'withRouter(Connect(BlockView))', WrappedComponent: [Function: BlockView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/shards\\" component={[Function: C] { displayName: 'withRouter(Connect(Chains))', WrappedComponent: [Function: Chains], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/transactions\\" component={[Function: Connect] { WrappedComponent: [Function: ReduxForm], displayName: 'Connect(ReduxForm)', childContextTypes: { storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, contextTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, propTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C] { displayName: 'withRouter(Connect(TransactionView))', WrappedComponent: [Function: TransactionView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts\\" component={[Function: C] { displayName: 'withRouter(Connect(ReduxForm))', WrappedComponent: [Function: ReduxForm], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C] { displayName: 'withRouter(Connect(ContractQuery))', WrappedComponent: [Function: ContractQuery], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/code_editor\\" component={[Function: C] { displayName: 'withRouter(Connect(ReduxForm))', WrappedComponent: [Function: ReduxForm], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/searchresults\\" component={[Function: C] { displayName: 'withRouter(Connect(SearchResults))', WrappedComponent: [Function: SearchResults], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
     </Switch>
   </main>
 </div>"
@@ -72,26 +72,26 @@ exports[`App: index componentDidMount 2`] = `
 exports[`App: index render component 1`] = `
 "<div className=\\"App\\">
   <Connect(LoadingBar) style={{...}} />
-  <withRouter(Connect(MenuBar)) isCollapsed={true} toggleCollapse={[Function]} />
-  <SideBar isCollapsed={true} toggleCollapse={[Function]} />
+  <withRouter(Connect(MenuBar)) isCollapsed={true} toggleCollapse={[Function (anonymous)]} />
+  <SideBar isCollapsed={true} toggleCollapse={[Function (anonymous)]} />
   <main id=\\"outer-container\\">
     <Switch>
       <Route exact={true} path=\\"/\\" component={[undefined]}>
         <Redirect to=\\"/home\\" push={false} />
       </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/home\\" component={[Function: C] { displayName: 'withRouter(Connect(Dashboard))', WrappedComponent: [Function: Dashboard], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/accounts\\" component={[Function: C] { displayName: 'withRouter(Connect(Accounts))', WrappedComponent: [Function: Accounts], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/external_storage\\" component={[Function: C] { displayName: 'withRouter(Connect(ExternalStorage))', WrappedComponent: [Function: ExternalStorage], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
-      <Route exact={true} path=\\"/blocks\\" component={[Function: Connect]} />
-      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/shards\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/transactions\\" component={[Function: Connect]} />
-      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/searchresults\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/blocks\\" component={[Function: Connect] { WrappedComponent: [Function: ReduxForm], displayName: 'Connect(ReduxForm)', childContextTypes: { storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, contextTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, propTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C] { displayName: 'withRouter(Connect(BlockView))', WrappedComponent: [Function: BlockView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/shards\\" component={[Function: C] { displayName: 'withRouter(Connect(Chains))', WrappedComponent: [Function: Chains], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/transactions\\" component={[Function: Connect] { WrappedComponent: [Function: ReduxForm], displayName: 'Connect(ReduxForm)', childContextTypes: { storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, contextTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } }, propTypes: { store: [Function: bound checkType] { isRequired: [Function: bound checkType] }, storeSubscription: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C] { displayName: 'withRouter(Connect(TransactionView))', WrappedComponent: [Function: TransactionView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts\\" component={[Function: C] { displayName: 'withRouter(Connect(ReduxForm))', WrappedComponent: [Function: ReduxForm], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C] { displayName: 'withRouter(Connect(ContractQuery))', WrappedComponent: [Function: ContractQuery], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/code_editor\\" component={[Function: C] { displayName: 'withRouter(Connect(ReduxForm))', WrappedComponent: [Function: ReduxForm], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/searchresults\\" component={[Function: C] { displayName: 'withRouter(Connect(SearchResults))', WrappedComponent: [Function: SearchResults], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
     </Switch>
   </main>
 </div>"

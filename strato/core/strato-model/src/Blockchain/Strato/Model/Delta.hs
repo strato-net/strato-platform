@@ -27,7 +27,7 @@ import Data.Function (on)
 import Data.List (find)
 import GHC.Generics
 
-data Delta a b = Delta 
+data Delta a b = Delta
   { _added   :: [a] -> [a]
   , _removed :: [b] -> [b]
   }

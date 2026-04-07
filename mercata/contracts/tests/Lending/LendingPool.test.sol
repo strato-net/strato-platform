@@ -746,7 +746,7 @@ contract Describe_LendingPool_Basic is Authorizable {
 
         require_equal(IERC20(USDST).balanceOf(address(m.feeCollector())), fees, "Wrong FeeCollector balance after sweep");
         require_equal(IERC20(USDST).balanceOf(address(m.safetyModule())), toSafety, "Wrong SafetyModule balance after sweep");
-        
+
         uint256 smManagedAssetsAfter = sm.totalAssets();
         require_equal(smManagedAssetsAfter, smManagedAssetsBefore + toSafety, "SafetyModule managed assets should increase by safety share amount");
     }
@@ -768,7 +768,7 @@ contract Describe_LendingPool_Basic is Authorizable {
 
         require_equal(IERC20(USDST).balanceOf(address(m.feeCollector())), fees, "Wrong FeeCollector balance after sweep");
         require_equal(IERC20(USDST).balanceOf(address(m.safetyModule())), toSafety, "Wrong SafetyModule balance after sweep");
-        
+
         uint256 smManagedAssetsAfter = sm.totalAssets();
         require_equal(smManagedAssetsAfter, smManagedAssetsBefore + toSafety, "SafetyModule managed assets should increase by safety share amount");
     }
@@ -790,7 +790,7 @@ contract Describe_LendingPool_Basic is Authorizable {
 
         require_equal(IERC20(USDST).balanceOf(address(m.feeCollector())), fees, "Wrong FeeCollector balance after sweep");
         require_equal(IERC20(USDST).balanceOf(address(m.safetyModule())), toSafety, "Wrong SafetyModule balance after sweep");
-        
+
         uint256 smManagedAssetsAfter = sm.totalAssets();
         require_equal(smManagedAssetsAfter, smManagedAssetsBefore + toSafety, "SafetyModule managed assets should increase by safety share amount");
     }

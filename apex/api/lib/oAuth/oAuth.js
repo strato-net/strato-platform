@@ -18,11 +18,9 @@ async function createKey(accessToken, userParams = null) {
 
       userParams = userParams == null ? {} : userParams;
 
-      const userAccount = await ax.post(process.env.vaultProxyUrl, userParams, '/strato/v2.3/key', {
-        "x-user-access-token": accessToken,
+      const userAccount = await ax.post(process.env.vaultUrl, userParams, '/key', {
+        "Authorization": `Bearer ${accessToken}`,
       });
-      //faucet user so they can do stuff
-      await waitFaucet(userAccount.address);
       
       return {
         status: RestStatus.OK,
@@ -46,8 +44,8 @@ async function getKey(accessToken, userQuery = null) {
   try {
     const query = userQuery ? `?${querystring.stringify(userQuery)}` : '';
 
-    const userAccount = await ax.get(process.env.vaultProxyUrl, `/strato/v2.3/key${query}`, {
-      "x-user-access-token": accessToken,
+    const userAccount = await ax.get(process.env.vaultUrl, `/key${query}`, {
+      "Authorization": `Bearer ${accessToken}`,
     });
 
     return {
@@ -69,35 +67,6 @@ async function getOrCreateKey(userUniqueName, userQuery = null){
   }
 }
 
-
-
-//===================
-// Helper functions
-//===================
-
-async function waitFaucet(address) {
-  const params = {
-    address: address
-  }
-
-  //faucet
-  await ax.postue(process.env.stratoRoot, params, '/faucet')
-
-  //wait for update
-  const sleep = function (ms) {
-    return new Promise(resolve => setTimeout(resolve, ms))
-  };
-
-  let res = [];
-  do {
-    await sleep(400);
-    const query = `?${querystring.stringify(params)}`;
-
-    res = await ax.get(process.env.stratoRoot, `/account${query}`)
-
-  } while (res.length < 1);
-
-}
 
 
 //===================

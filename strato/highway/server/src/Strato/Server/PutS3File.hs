@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeOperators       #-}
 
 module Strato.Server.PutS3File
-  ( putS3File 
+  ( putS3File
   )
 where
 
@@ -24,7 +24,7 @@ import           System.FilePath (takeExtension)
 import           Strato.Monad
 import           Blockchain.Strato.Model.Keccak256
 
-putS3File :: MultipartData Mem 
+putS3File :: MultipartData Mem
           -> HighwayM Text
 putS3File multipartdata =
   --Ensure we have only a single file input via form.

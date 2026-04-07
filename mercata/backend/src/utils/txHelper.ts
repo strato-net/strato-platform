@@ -58,18 +58,20 @@ export const postAndWaitForTx = async (
       return result.hash;
     });
 
-    const finalResults = await until(
-      (results: any[]) => {
-        const failedTx = results.find(r => r?.status === "Failure");
-        if (failedTx) {
-          // Extract the actual error message from the failed transaction
-          const errorMessage = failedTx.txResult?.message || failedTx.error || failedTx.message || "Transaction failed";
-          const extractedMessage = extractErrorMessage(errorMessage);
-          // Blockchain errors are typically client errors (400) since they're due to user input/state
-          throw new StratoError(extractedMessage, 400);
-        }
-        return results.every(r => r?.status !== "Pending");
-      },
+    const done = (results: any[]) => {
+      const failedTx = results.find(r => r?.status === "Failure");
+      if (failedTx) {
+        // Extract the actual error message from the failed transaction
+        const errorMessage = failedTx.txResult?.message || failedTx.error || failedTx.message || "Transaction failed";
+        const extractedMessage = extractErrorMessage(errorMessage);
+        // Blockchain errors are typically client errors (400) since they're due to user input/state
+        throw new StratoError(extractedMessage, 400);
+      }
+      return results.every(r => r?.status !== "Pending");
+    };
+
+    const finalResults = done(results) ? results : await until(
+      done,
       async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,
       timeout
     );

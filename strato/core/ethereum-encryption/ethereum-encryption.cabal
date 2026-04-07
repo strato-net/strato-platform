@@ -1,0 +1,52 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           ethereum-encryption
+version:        0.1.0.0
+author:         jamshid
+maintainer:     jim
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Blockchain.AESCTR
+      Blockchain.Data.PubKey
+      Blockchain.ECIES
+      Blockchain.Error
+      Blockchain.EthEncryptionException
+      Blockchain.Frame
+      Blockchain.Handshake
+      Blockchain.RLPx
+  other-modules:
+      Paths_ethereum_encryption
+  hs-source-dirs:
+      src
+  other-extensions:
+      OverloadedStrings
+  ghc-options: -Wall -O2
+  build-depends:
+      Crypto
+    , base
+    , base16-bytestring
+    , binary
+    , bytestring
+    , cipher-aes
+    , common-log
+    , conduit
+    , conduit-extra
+    , crypto-pubkey-types
+    , cryptohash
+    , cryptonite
+    , entropy
+    , ethereum-rlp
+    , format
+    , lifted-base
+    , memory
+    , strato-model
+    , text
+    , unix
+  default-language: Haskell2010

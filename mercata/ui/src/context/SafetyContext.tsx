@@ -14,9 +14,9 @@ type SafetyContextType = {
   safetyInfo: SafetyModuleData | null;
   loading: boolean;
   refreshSafetyInfo: (signal?: AbortSignal) => void;
-  stakeSafety: (args: { amount: string; stakeSToken: boolean }) => Promise<void>;
+  stakeSafety: (args: { amount: string }) => Promise<void>;
   startCooldown: () => Promise<void>;
-  redeemSafety: (args: { sharesAmount: string; includeStakedSToken: boolean }) => Promise<void>;
+  redeemSafety: (args: { sharesAmount: string }) => Promise<void>;
   redeemAllSafety: () => Promise<void>;
 };
 
@@ -25,15 +25,15 @@ const SafetyContext = createContext<SafetyContextType | undefined>(undefined);
 export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
   const [safetyInfo, setSafetyInfo] = useState<SafetyModuleData | null>(null);
   const [loading, setLoading] = useState(false);
-  const { userAddress } = useUser();
+  const { isLoggedIn } = useUser();
 
   const refreshSafetyInfo = useCallback(
     async (signal?: AbortSignal) => {
-      if (!userAddress) return;
-
+      // Use different API endpoints based on login status
       try {
         setLoading(true);
-        const response = await api.get("/lending/safety/info", { signal });
+        const endpoint = isLoggedIn ? "/lending/safety/info" : "/lending/safety/info/public";
+        const response = await api.get(endpoint, { signal });
         setSafetyInfo(response.data);
       } catch (error) {
         if (signal?.aborted) return;
@@ -43,56 +43,55 @@ export const SafetyProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
       }
     },
-    [userAddress]
+    [isLoggedIn]
   );
 
   const stakeSafety = useCallback(
-    async ({ amount, stakeSToken }: { amount: string; stakeSToken: boolean }) => {
-      if (!userAddress) throw new Error("User not connected");
+    async ({ amount }: { amount: string }) => {
+      if (!isLoggedIn) throw new Error("User not connected");
 
-      const response = await api.post("/lending/safety/stake", { amount, stakeSToken });
+      const response = await api.post("/lending/safety/stake", { amount });
       refreshSafetyInfo();
       return response.data;
     },
-    [userAddress, refreshSafetyInfo]
+    [isLoggedIn, refreshSafetyInfo]
   );
 
   const startCooldown = useCallback(async () => {
-    if (!userAddress) throw new Error("User not connected");
+    if (!isLoggedIn) throw new Error("User not connected");
 
     const response = await api.post("/lending/safety/cooldown");
     refreshSafetyInfo();
     return response.data;
-  }, [userAddress, refreshSafetyInfo]);
+  }, [isLoggedIn, refreshSafetyInfo]);
 
   const redeemSafety = useCallback(
-    async ({ sharesAmount, includeStakedSToken }: { sharesAmount: string; includeStakedSToken: boolean }) => {
-      if (!userAddress) throw new Error("User not connected");
+    async ({ sharesAmount }: { sharesAmount: string }) => {
+      if (!isLoggedIn) throw new Error("User not connected");
 
-      const response = await api.post("/lending/safety/redeem", { sharesAmount, includeStakedSToken });
+      const response = await api.post("/lending/safety/redeem", { sharesAmount });
       refreshSafetyInfo();
       return response.data;
     },
-    [userAddress, refreshSafetyInfo]
+    [isLoggedIn, refreshSafetyInfo]
   );
 
   const redeemAllSafety = useCallback(async () => {
-    if (!userAddress) throw new Error("User not connected");
+    if (!isLoggedIn) throw new Error("User not connected");
 
     const response = await api.post("/lending/safety/redeem-all");
     refreshSafetyInfo();
     return response.data;
-  }, [userAddress, refreshSafetyInfo]);
+  }, [isLoggedIn, refreshSafetyInfo]);
 
-  // Auto-refresh on user address change
+  // Auto-refresh on mount
   useEffect(() => {
-    if (!userAddress) return;
     const abortController = new AbortController();
     refreshSafetyInfo(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, [userAddress, refreshSafetyInfo]);
+  }, [refreshSafetyInfo]);
 
   // Auto-refresh timer for cooldown/window status
   useEffect(() => {

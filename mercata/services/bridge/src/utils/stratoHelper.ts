@@ -46,6 +46,36 @@ export const until = async <T>(
 };
 
 /**
+ * Evaluate immediate status from resolve=true response
+ * Returns TxResponse if definitive result, undefined if polling needed
+ */
+const getImmediateResult = (
+  response: any[],
+): TxResponse | undefined => {
+  const first = response[0];
+  const status = first?.status;
+
+  switch (status) {
+    case "Success":
+      return { status: "Success", hash: first.hash };
+    case "Failed":
+    case "Failure": {
+      const msg =
+        first.txResult?.message ||
+        first.error ||
+        first.message ||
+        "Transaction failed";
+      throw new Error(extractErrorMessage(msg));
+    }
+    case "Pending":
+    case undefined:
+    default:
+      // Pending, undefined, or unknown status: fall back to polling
+      return undefined;
+  }
+};
+
+/**
  * Post transaction and wait for completion
  */
 export const postAndWaitForTx = async (
@@ -63,7 +93,13 @@ export const postAndWaitForTx = async (
     return r.hash;
   });
 
-  // Poll for results
+  // Check for immediate result from resolve=true
+  const immediate = getImmediateResult(response);
+  if (immediate) {
+    return immediate;
+  }
+
+  // Fallback to polling for results
   const results = await until(
     (res: TxResult[]) => {
       const failed = res.find((r) => r?.status === "Failure");

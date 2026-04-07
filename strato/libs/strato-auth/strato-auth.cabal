@@ -1,0 +1,69 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           strato-auth
+version:        0.1.0.0
+synopsis:       OAuth authentication library for STRATO CLI tools
+description:    Provides transparent OAuth device flow authentication for Servant clients and raw HTTP requests
+build-type:     Simple
+
+library
+  exposed-modules:
+      Strato.Auth
+      Strato.Auth.Client
+      Strato.Auth.ClientCredentials
+      Strato.Auth.Retry
+      Strato.Auth.Token
+  other-modules:
+      Paths_strato_auth
+  hs-source-dirs:
+      src
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , base64
+    , bytestring
+    , directory
+    , filelock
+    , filepath
+    , http-client
+    , http-client-tls
+    , http-types
+    , modern-uri
+    , req
+    , servant-client
+    , servant-client-core
+    , text
+    , time
+    , yaml
+  default-language: Haskell2010
+
+executable strato-auth
+  main-is: Main.hs
+  other-modules:
+      Paths_strato_auth
+  hs-source-dirs:
+      exec_src
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , base64
+    , bytestring
+    , directory
+    , filelock
+    , filepath
+    , http-client
+    , http-client-tls
+    , http-types
+    , modern-uri
+    , req
+    , servant-client
+    , servant-client-core
+    , strato-auth
+    , text
+    , time
+    , yaml
+  default-language: Haskell2010

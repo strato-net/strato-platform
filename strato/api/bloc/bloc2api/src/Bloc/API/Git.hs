@@ -10,8 +10,8 @@ module Bloc.API.Git where
 import Data.Aeson
 import Data.ByteString.Char8 (pack, unpack)
 import Data.ByteString.Lazy (fromStrict, toStrict)
+import Data.OpenApi
 import Data.Proxy
-import Data.Swagger
 import Development.GitRev
 import GHC.Generics
 import Servant.API

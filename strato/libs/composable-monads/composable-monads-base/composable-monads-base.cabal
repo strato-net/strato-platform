@@ -1,0 +1,24 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           composable-monads-base
+version:        0.1.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Control.Monad.Composable.Base
+  other-modules:
+      Paths_composable_monads_base
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      base >=4.7 && <5
+    , mtl
+    , transformers
+  default-language: Haskell2010

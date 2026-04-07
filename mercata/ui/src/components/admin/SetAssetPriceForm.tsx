@@ -96,7 +96,7 @@ const SetAssetPriceForm = () => {
                     Choose the token to update pricing for
                   </FormDescription>
                   {selectedToken && (
-                    <div className="text-base font-medium text-gray-700 mt-1">
+                    <div className="text-base font-medium text-foreground mt-1">
                       Current price: $
                       {(() => {
                         try {
@@ -146,7 +146,7 @@ const SetAssetPriceForm = () => {
                   <FormLabel>New Price (USD)</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                       <Input className="pl-10" placeholder="0.00" {...field} />
                     </div>
                   </FormControl>

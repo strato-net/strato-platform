@@ -13,8 +13,8 @@ import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
 import qualified Data.Binary as Binary
 import qualified Data.ByteString.Lazy as BL
-import Data.Swagger
-import qualified Data.Swagger as Sw
+import Data.OpenApi
+import qualified Data.OpenApi as OPENAPI
 import Data.Text (Text)
 import Data.Word
 import GHC.Generics
@@ -71,4 +71,4 @@ instance ToSchema PostTransaction where
 ------------
 
 stratoSchemaOptions :: SchemaOptions
-stratoSchemaOptions = defaultSchemaOptions {Sw.fieldLabelModifier = camelCase . dropFPrefix}
+stratoSchemaOptions = defaultSchemaOptions {OPENAPI.fieldLabelModifier = camelCase . dropFPrefix}

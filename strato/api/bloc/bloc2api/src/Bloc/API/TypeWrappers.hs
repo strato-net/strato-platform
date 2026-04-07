@@ -9,9 +9,9 @@ module Bloc.API.TypeWrappers where
 import Blockchain.Strato.Model.ExtendedWord
 import Control.Applicative
 import Data.Aeson
+import Data.OpenApi hiding (value)
+import Data.OpenApi.Internal.Schema (named)
 import Data.Proxy
-import Data.Swagger
-import Data.Swagger.Internal.Schema (named)
 import Data.Word
 import GHC.Generics
 import Generic.Random

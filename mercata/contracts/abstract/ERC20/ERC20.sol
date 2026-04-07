@@ -52,6 +52,15 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata { //MERCATA_COMPATIBI
     }
 
     /**
+     * Rename the token with a new name and symbol.
+     * @dev The above one-time initializer notwithstanding, ERC20s can be renamed by calling this function.
+     */
+    function __ERC20_rename(string name_, string symbol_) internal {
+        _name = name_;
+        _symbol = symbol_;
+    }
+
+    /**
      * @dev Sets the values for {name} and {symbol}.
      *
      * All two of these values are immutable: they can only be set once during

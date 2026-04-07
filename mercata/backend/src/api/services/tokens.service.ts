@@ -5,9 +5,8 @@ import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
-import { createCompletePriceMap } from "../helpers/oracle.helper";
+import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getBridgeAssets } from "./bridge.service";
 import { getTokenDetails } from "../helpers/cirrusHelpers";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher, CollateralVault } = constants;
@@ -54,8 +53,7 @@ export const getTokens = async (
       });
 
     // Process price data
-    const rawPrices = lendingResponse.oracle?.prices || [];
-    const priceMap = await createCompletePriceMap(accessToken, rawPrices);
+    const priceMap = await getCompletePriceMap(accessToken);
 
     return (response.data as any[]).map((token) => ({
       ...token,
@@ -128,16 +126,7 @@ export const getBalance = async (
         "value->>collateral": `gt.0`
       }
     }),
-    // Get all oracle prices (includes LP token prices via createCompletePriceMap)
-    getOraclePrices(accessToken).then(async (priceMap) => {
-      // Convert Map to array format for createCompletePriceMap
-      const rawPriceArray = Array.from(priceMap.entries()).map(([key, value]) => ({
-        key,
-        value: parseFloat(value)
-      }));
-      // Use createCompletePriceMap to include LP token and mToken prices
-      return await createCompletePriceMap(accessToken, rawPriceArray);
-    })
+    getCompletePriceMap(accessToken)
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -161,14 +150,14 @@ export const getBalance = async (
   const allTokens = [
     ...balanceData.map((t: any) => ({
       ...t,
-      price: rawPrices.get(t.address) || "0",
+      price: (rawPrices.get(t.address) || 0n).toString(),
       collateralBalance: (collateralMap.get(t.address) || 0n).toString(),
     })),
     ...tokensWithCollateralOnly.map((a) => ({
       address: a,
       user: address,
       balance: "0",
-      price: rawPrices.get(a) || "0",
+      price: (rawPrices.get(a) || 0n).toString(),
       collateralBalance: (collateralMap.get(a) || 0n).toString(),
       token: tokenDetails.get(a),
     })),
@@ -248,6 +237,70 @@ export const transferToken = async (
   } catch (error) {
     throw error;
   }
+};
+
+export interface BulkTransferItem {
+  to: string;
+  value: string;
+}
+
+export interface BulkTransferResult {
+  to: string;
+  value: string;
+  status: string;
+  hash?: string;
+  error?: string;
+}
+
+/**
+ * Execute bulk transfers for a single token to multiple recipients
+ * Processes transfers sequentially to ensure proper nonce handling
+ */
+export const bulkTransferToken = async (
+  accessToken: string,
+  userAddress: string,
+  tokenAddress: string,
+  transfers: BulkTransferItem[]
+): Promise<{ results: BulkTransferResult[]; successCount: number; failureCount: number }> => {
+  const results: BulkTransferResult[] = [];
+  let successCount = 0;
+  let failureCount = 0;
+
+  for (const transfer of transfers) {
+    try {
+      const tx = await buildFunctionTx({
+        contractName: extractContractName(Token),
+        contractAddress: tokenAddress,
+        method: "transfer",
+        args: {
+          to: transfer.to,
+          value: transfer.value,
+        },
+      }, userAddress, accessToken);
+
+      const { status, hash } = await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      );
+
+      results.push({
+        to: transfer.to,
+        value: transfer.value,
+        status,
+        hash,
+      });
+      successCount++;
+    } catch (error: any) {
+      results.push({
+        to: transfer.to,
+        value: transfer.value,
+        status: "failure",
+        error: error.message || "Transfer failed",
+      });
+      failureCount++;
+    }
+  }
+
+  return { results, successCount, failureCount };
 };
 
 // Approve an allowance for a spender
@@ -354,30 +407,18 @@ export const getVoucherBalance = async (
 /**
  * Get all tokens with their total supply for stats
  * Includes price data for market cap calculation
- * Only returns bridgeable tokens + USDST, GOLDST, SILVST
+ * Returns all tokens that have an oracle price
  */
 export const getTokenStats = async (
   accessToken: string
 ): Promise<{ tokens: any[], totalMarketCap: string }> => {
   try {
-    // Get bridgeable tokens
-    const bridgeAssets = await getBridgeAssets(accessToken);
-    
-    // Create a set of allowed token addresses
-    const allowedTokens = new Set<string>();
-    
-    // Add all bridgeable token addresses
-    for (const [_, assetInfo] of bridgeAssets) {
-      if (assetInfo.stratoToken && assetInfo.enabled) {
-        allowedTokens.add(assetInfo.stratoToken);
-      }
-    }
-
-    // Fetch all tokens with total supply
     const [tokensResponse, priceData] = await Promise.all([
       cirrus.get(accessToken, `/${Token}`, {
         params: {
-          select: "address,_name,_symbol,_totalSupply::text"
+          select: "address,_name,_symbol,_totalSupply::text",
+          status: `eq.2`,
+          _totalSupply: `gt.0`
         }
       }),
       getOraclePrices(accessToken)
@@ -392,18 +433,9 @@ export const getTokenStats = async (
     }
 
     const tokens = tokensResponse.data || [];
-    
-    // Filter tokens to only include:
-    // 1. Bridgeable tokens (already in allowedTokens set)
-    // 2. USDST, GOLDST, SILVST by address
-    const filteredTokens = tokens.filter((token: any) => {
-      const address = token.address;
-      return allowedTokens.has(token.address) || 
-             address === '937efa7e3a77e20bbdbd7c0d32b6514f368c1010' || // USDST
-             address === 'cdc93d30182125e05eec985b631c7c61b3f63ff0' || // GOLDST
-             address === '2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94' // SILVST
-    });
-    // Map prices to tokens and calculate market cap
+
+    const filteredTokens = tokens.filter((token: any) => priceData.has(token.address));
+
     const tokensWithMarketCap = filteredTokens.map((token: any) => {
       const price = BigInt(priceData.get(token.address) || "0");
       const totalSupply = BigInt(token._totalSupply || "0");
