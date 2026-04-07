@@ -70,16 +70,8 @@ export const calculateBoostCapUsd = (
   return (effectiveBalance * conversionNumerator) / conversionDenominator;
 };
 
-export const isIncludedActivity = (
-  activityName: string,
-  activityType: string,
-  patterns: string[],
-): boolean => {
-  if (activityType === "1") return false;
-  if (patterns.length === 0) return true;
-  const lower = activityName.toLowerCase();
-  return patterns.some((p) => lower.includes(p.toLowerCase()));
-};
+export const isPositionActivity = (activityType: string): boolean =>
+  activityType !== "1";
 
 export const buildBonusUsers = (
   tokenConfigs: BonusTokenConfig[],
@@ -140,7 +132,6 @@ export const buildBonusUsers = (
 export const calculateBonusCreditsForUsers = async (
   bonusUsers: BonusEligibleUser[],
   intervalSeconds: number,
-  includedActivityPatterns: string[],
   maxBonusBps: number,
 ): Promise<BonusCredit[]> => {
   if (bonusUsers.length === 0) return [];
@@ -165,9 +156,7 @@ export const calculateBonusCreditsForUsers = async (
     }
 
     const allActivities = activityBreakdownByUser.get(user) ?? [];
-    const eligible = allActivities.filter((a) =>
-      isIncludedActivity(a.activityName, a.activityType, includedActivityPatterns)
-    );
+    const eligible = allActivities.filter((a) => isPositionActivity(a.activityType));
     if (eligible.length === 0) continue;
 
     const stakeUsdMap = await computeStakeUsdForActivities(eligible);

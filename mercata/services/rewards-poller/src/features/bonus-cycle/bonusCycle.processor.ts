@@ -38,7 +38,6 @@ export const processBonusCycle = async (): Promise<void> => {
       ? await calculateBonusCreditsForUsers(
           bonusUsers,
           intervalSeconds,
-          tokenConfigs[0].includedActivityPatterns,
           tokenConfigs[0].maxBonusBps,
         )
       : [];
