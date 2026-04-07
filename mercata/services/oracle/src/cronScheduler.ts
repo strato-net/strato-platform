@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
-import { fetchPrices, generateConstantPrices, fetchRebaseFactor } from './adapters/genericRestAdapter';
-import { pushAssetPrices, pushRebaseFactors } from './utils/oraclePusher';
+import { fetchPrices, generateConstantPrices, fetchRebaseFactor, fetchExchangeRate } from './adapters/genericRestAdapter';
+import { pushAssetPrices, pushRebaseFactors, pushExchangeRates } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
 import { fetchPreviousPrices } from './utils/priceReader';
 import { withTimeout } from './utils/apiClient';
@@ -294,6 +294,44 @@ async function applyRebaseFactors(
 }
 
 // ============================================================================
+// Step 3b: Collect Exchange Rates (yield-bearing tokens)
+// ============================================================================
+
+interface ExchangeRateEntry {
+    targetAddress: string;
+    rate: bigint;
+}
+
+async function collectExchangeRates(configLoader: ConfigLoader): Promise<ExchangeRateEntry[]> {
+    const collected: ExchangeRateEntry[] = [];
+    const allAssets = configLoader.getAllAssets();
+    const entries = Object.entries(allAssets).filter(([_, a]) => a.exchangeRate);
+    if (entries.length === 0) return collected;
+
+    for (const [assetKey, asset] of entries) {
+        try {
+            const rawRate = await withTimeout(
+                fetchExchangeRate(assetKey, asset.exchangeRate!),
+                TIMEOUTS.FETCH
+            );
+            if (rawRate <= 0n) continue;
+
+            const precision = BigInt(asset.exchangeRate!.ratePrecision);
+            const wadRate = rawRate * 1000000000000000000n / precision;
+            if (wadRate <= 0n) continue;
+
+            collected.push({ targetAddress: asset.targetAssetAddress, rate: wadRate });
+            logInfo('CronScheduler', `${assetKey}: exchangeRate=${wadRate} (raw=${rawRate})`);
+        } catch (err) {
+            logError('CronScheduler', new Error(
+                `${assetKey}: exchange rate fetch failed: ${(err as Error).message}`
+            ));
+        }
+    }
+    return collected;
+}
+
+// ============================================================================
 // Main Orchestrator
 // ============================================================================
 
@@ -317,7 +355,8 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
         configLoader
     );
     const rebaseFactors = await applyRebaseFactors(aggregatedPrices, configLoader, previousPrices);
-    
+    const exchangeRates = await collectExchangeRates(configLoader);
+
     // Partition into valid and failed prices, excluding proxy-only assets (submit: false)
     const allAssets = configLoader.getAllAssets();
     const validPrices: AggregatedPrice[] = [];
@@ -339,7 +378,11 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
     if (rebaseFactors.length > 0) {
         await pushRebaseFactors(rebaseFactors);
     }
-    
+
+    if (exchangeRates.length > 0) {
+        await pushExchangeRates(exchangeRates);
+    }
+
     // Log all prices (including failed ones)
     aggregatedPrices.forEach(p => logFeedUpdate(p.assetKey, p.medianPrice, p.sources, p.expectedSourceCount, result.hash, p.failed, p.error));
 }

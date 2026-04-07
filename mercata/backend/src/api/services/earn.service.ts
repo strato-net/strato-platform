@@ -29,7 +29,11 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const mappingOr = `(and(address.eq.${constants.lendingPool},collection_name.eq.assetConfigs,key->>key.eq.${constants.USDST}),and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${constants.liquidityPool}),and(address.eq.${constants.priceOracle},collection_name.eq.prices)${vaultAddr ? `,and(address.eq.${vaultAddr},collection_name.eq.supportedAssets)` : ""})`;
   const eventOr = `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))`;
 
-  // Phase 1: 5 parallel calls
+  // Phase 1: parallel calls
+  const exchangeRateTrackedAddrs = yieldBenchmarks
+    .filter((b) => b.exchangeRateTracked)
+    .map((b) => b.tokenAddress);
+
   const [
     { data: storageRows },
     { data: mappingRows },
@@ -38,6 +42,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     { data: yieldHistoryRows },
     { data: vaultRows },
     saveUsdstInfo,
+    { data: exchangeRateRows },
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
       address: `in.(${constants.lendingPool},${constants.safetyModule},${constants.sToken}${vaultAddr ? `,${vaultAddr}` : ""})`,
@@ -66,6 +71,14 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       }})
       : Promise.resolve({ data: [] as any[] }),
     getSaveUsdstInfo(accessToken).catch(() => null),
+    exchangeRateTrackedAddrs.length
+      ? cirrus.get(accessToken, `/${constants.PriceOracleExchangeRatesEvents}`, { params: {
+        address: `eq.${constants.priceOracle}`,
+        block_timestamp: `gte.${thirtyDaysAgo}`,
+        select: "attributes,block_timestamp",
+        order: "block_timestamp.asc",
+      }}).catch(() => ({ data: [] as any[] }))
+      : Promise.resolve({ data: [] as any[] }),
   ]);
 
   // Parse storage
@@ -210,15 +223,48 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     }
   }
 
+  // Build per-asset exchange rate APY from ExchangeRatesUpdated events
+  const exchangeRateApyByAddr = new Map<string, string>();
+  if ((exchangeRateRows || []).length > 0) {
+    const perAsset = new Map<string, Array<{ rate: bigint; ts: number }>>();
+    for (const event of exchangeRateRows) {
+      const attrs = event.attributes || {};
+      const assets: string[] = Array.isArray(attrs.assets) ? attrs.assets : [];
+      const rates: string[] = Array.isArray(attrs.rates) ? attrs.rates : [];
+      const blockTs = new Date(event.block_timestamp).getTime();
+      for (let i = 0; i < assets.length; i++) {
+        const addr = (assets[i] || "").toLowerCase().replace(/^0x/, "");
+        if (!exchangeRateTrackedAddrs.includes(addr)) continue;
+        const rate = BigInt(rates[i] || "0");
+        if (rate <= 0n) continue;
+        if (!perAsset.has(addr)) perAsset.set(addr, []);
+        perAsset.get(addr)!.push({ rate, ts: blockTs });
+      }
+    }
+    for (const [addr, events] of perAsset) {
+      if (events.length < 2) continue;
+      const oldest = events[0];
+      const newest = events[events.length - 1];
+      const daysDelta = (newest.ts - oldest.ts) / (1000 * 60 * 60 * 24);
+      if (daysDelta < 1) continue;
+      const apy = computeExchangeRateAPY(newest.rate, oldest.rate, daysDelta);
+      if (apy) exchangeRateApyByAddr.set(addr, apy);
+    }
+  }
+
   const baseYieldByAddr = new Map<string, number>();
   for (const pair of yieldBenchmarks) {
-    const apy = computeYieldAPYFromAnchors(
-      pair.tokenAddress,
-      pair.baseAddress,
-      prices,
-      yieldHistoryByKey,
-      anchorsMs,
-    );
+    // Prefer on-chain exchange rate APY; fall back to USD price ratio
+    let apy = pair.exchangeRateTracked ? exchangeRateApyByAddr.get(pair.tokenAddress) || null : null;
+    if (!apy) {
+      apy = computeYieldAPYFromAnchors(
+        pair.tokenAddress,
+        pair.baseAddress,
+        prices,
+        yieldHistoryByKey,
+        anchorsMs,
+      );
+    }
     if (!apy) continue;
     add(pair.tokenAddress, { source: "base", apy, meta: `${pair.tokenSymbol}/${pair.baseSymbol}` });
     baseYieldByAddr.set(pair.tokenAddress, parseFloat(apy));
@@ -408,6 +454,14 @@ function computeSafetyAPY(smRow: any, stRow: any, events: any[]): string | null 
   if (periodReturn <= -1 || !isFinite(periodReturn)) return null;
 
   return ((Math.pow(1 + periodReturn, 365 / 30) - 1) * 100).toFixed(2);
+}
+
+function computeExchangeRateAPY(rateNow: bigint, rateStart: bigint, daysDelta: number): string | null {
+  if (rateNow <= 0n || rateStart <= 0n || daysDelta <= 0) return null;
+  const periodReturn = Number(rateNow) / Number(rateStart) - 1;
+  if (periodReturn <= -1 || !isFinite(periodReturn)) return null;
+  const apy = (Math.pow(1 + periodReturn, 365 / daysDelta) - 1) * 100;
+  return apy > 0 && isFinite(apy) ? apy.toFixed(2) : null;
 }
 
 function buildVolumeMap(swapEvents: any[], prices: Map<string, string>): Map<string, number> {

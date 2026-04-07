@@ -11,13 +11,40 @@
       "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d"
     },
     "RETH": {
-      "targetAssetAddress": "2e4789eb7db143576da25990a3c0298917a8a87d"
+      "targetAssetAddress": "2e4789eb7db143576da25990a3c0298917a8a87d",
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xae78736Cd615f374D3085123A210448E74Fc6393\",\"data\":\"0xe6aa216c\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "Rocket Pool rETH: getExchangeRate() returns rETH/ETH rate in WAD"
+      }
     },
     "SUSDS": {
-      "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
+      "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64",
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD\",\"data\":\"0x07a2d13a0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "Sky sUSDS: convertToAssets(1e18) returns sUSDS/USDS rate in WAD"
+      }
     },
     "SYRUPUSDC": {
-      "targetAssetAddress": "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca"
+      "targetAssetAddress": "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca",
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x80ac24aA929eaF5013f6436cdA2a7ba190f5Cc0b\",\"data\":\"0x07a2d13a00000000000000000000000000000000000000000000000000000000000f4240\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "Maple syrupUSDC: convertToAssets(1e6) returns syrupUSDC/USDC rate in 6-decimal"
+      }
     },
     "USDC": {
       "targetAssetAddress": "6aeacaa19c68e53035bf495d15e0a328fc600ba8"
@@ -33,7 +60,16 @@
       "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
     },
     "WSTETH":{
-      "targetAssetAddress": "f2aa370405030a434ae07e7826178325c675e925"
+      "targetAssetAddress": "f2aa370405030a434ae07e7826178325c675e925",
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\",\"data\":\"0x035faf82\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "Lido wstETH: stEthPerToken() returns wstETH/stETH rate in WAD"
+      }
     },
     "XAG": {
       "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",

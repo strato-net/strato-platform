@@ -1,5 +1,5 @@
 import { apiRequest } from '../utils/apiClient';
-import { SourceConfig, BatchPriceResult, Asset, RebaseConfig } from '../types';
+import { SourceConfig, BatchPriceResult, Asset, RebaseConfig, ExchangeRateConfig } from '../types';
 import { logError, logInfo } from '../utils/logger';
 
 function extractNestedProperty(obj: any, path: string): any {
@@ -366,4 +366,70 @@ export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig):
 
     logInfo('RebaseFactor', `${assetKey}: factor=${factor} (parse="${rebase.factorParse}")`);
     return factor;
+}
+
+/**
+ * Fetch an on-chain exchange rate for a yield-bearing token (e.g., rETH/ETH via Rocket Pool).
+ * Same mechanism as fetchRebaseFactor but uses ExchangeRateConfig fields.
+ */
+export async function fetchExchangeRate(assetKey: string, config: ExchangeRateConfig): Promise<bigint> {
+    let url = config.rateUrl;
+    const stratoUrl = process.env.STRATO_NODE_URL || '';
+    url = url.replace(/\$\{STRATO_NODE_URL\}/g, stratoUrl);
+
+    const apiKey = config.rateApiKeyEnvVar ? process.env[config.rateApiKeyEnvVar] || '' : '';
+    if (apiKey) {
+        url = url.replace(/\$\{API_KEY\}/g, apiKey);
+    }
+
+    const method = (config.rateMethod || 'GET').toUpperCase();
+    const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {})
+    };
+    if (config.rateHeaders && apiKey) {
+        config.rateHeaders.split(',').forEach(h => {
+            const name = h.trim();
+            headers[name] = name === 'Authorization' ? `Bearer ${apiKey}` : apiKey;
+        });
+    }
+
+    const requestConfig: any = { method, url, headers };
+    if (method === 'POST' && config.rateBody) {
+        requestConfig.data = JSON.parse(config.rateBody);
+    }
+
+    const response = await apiRequest(requestConfig, {
+        logPrefix: 'ExchangeRate',
+        apiUrl: url,
+        method
+    });
+
+    const raw = extractNestedProperty(response.data, config.rateParse);
+    if (raw === undefined || raw === null) {
+        logError('ExchangeRate', new Error(`${assetKey}: no value at path "${config.rateParse}"`));
+        return 0n;
+    }
+
+    let rawStr = String(raw).trim();
+
+    if (rawStr.startsWith('0x') && rawStr.length > 66) {
+        rawStr = rawStr.slice(0, 66);
+    }
+
+    let rate: bigint;
+    try {
+        rate = BigInt(rawStr);
+    } catch {
+        logError('ExchangeRate', new Error(`${assetKey}: invalid rate value "${rawStr}"`));
+        return 0n;
+    }
+
+    if (rate <= 0n) {
+        logError('ExchangeRate', new Error(`${assetKey}: invalid rate value "${rawStr}"`));
+        return 0n;
+    }
+
+    logInfo('ExchangeRate', `${assetKey}: rate=${rate} (parse="${config.rateParse}")`);
+    return rate;
 }
