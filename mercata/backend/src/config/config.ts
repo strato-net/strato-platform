@@ -115,12 +115,12 @@ export const defaultSaveUsdstVaultFor: Record<string, string> = {
 };
 
 export const defaultEthCarryVaultFor: Record<string, string> = {
-  "114784819836269": "9086237097b44199baf7318987f2eb525471c802", // Helium testnet - set after deployment
+  "114784819836269": "662270a6c38710b22fb938b4295eccd0aadf8ebe", // Helium testnet - set after deployment
   "33056204878082667": "", // Upquark mainnet - set after deployment
 };
 
 export const defaultWbtcCarryVaultFor: Record<string, string> = {
-  "114784819836269": "dc334495dacd0419548729dc7f821dd2eb7d92a1", // Helium testnet - set after deployment
+  "114784819836269": "f1711315b88e4510439513fd09a9d5b7d35488c0", // Helium testnet - set after deployment
   "33056204878082667": "", // Upquark mainnet - set after deployment
 };
 
