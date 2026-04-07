@@ -99,7 +99,7 @@
       "exchangeRate": {
         "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xCd5fE23C85820F7B72D0926FC9b05b43E359b7e0\",\"data\":\"0x679aefce\"},\"latest\"]}",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee\",\"data\":\"0x679aefce\"},\"latest\"]}",
         "rateParse": "result",
         "ratePrecision": "1000000000000000000",
         "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
@@ -113,7 +113,7 @@
         "underlyingAsset": "ETH",
         "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
         "factorParse": "result",
         "factorPrecision": "1000000000000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
@@ -121,7 +121,7 @@
       "exchangeRate": {
         "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
         "rateParse": "result",
         "ratePrecision": "1000000000000000000000000000",
         "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
@@ -155,7 +155,7 @@
         "underlyingAsset": "WEETH",
         "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "factorMethod": "POST",
-        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7e0\"},\"latest\"]}",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
         "factorParse": "result",
         "factorPrecision": "1000000000000000000000000000",
         "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
@@ -163,7 +163,7 @@
       "exchangeRate": {
         "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
         "rateMethod": "POST",
-        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7e0\"},\"latest\"]}",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
         "rateParse": "result",
         "ratePrecision": "1000000000000000000000000000",
         "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
