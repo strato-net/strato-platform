@@ -442,9 +442,15 @@ export async function runBalanceWatcher(operatorAccessToken: string): Promise<vo
       const lastTopUp = c.lastTopUpAt ? new Date(c.lastTopUpAt).getTime() : 0;
       const cooldownMs = c.cooldownMinutes * 60 * 1000;
       if (Date.now() - lastTopUp < cooldownMs) continue;
+      const configuredAmount = BigInt(c.topUpAmount);
+      const deficit = threshold - balance;
+      const desiredAmount = configuredAmount > deficit ? configuredAmount : deficit;
+      const usdstBalance = BigInt(await getUsdstBalanceForUser(operatorAccessToken, c.userAddress));
+      const actualAmount = usdstBalance < desiredAmount ? usdstBalance : desiredAmount;
+      if (actualAmount <= 0n) continue;
       await executeTopUp(operatorAccessToken, {
         userAddress: c.userAddress,
-        stratoTokenAmount: c.topUpAmount,
+        stratoTokenAmount: actualAmount.toString(),
         externalChainId: c.destinationChainId,
         externalRecipient: c.cardWalletAddress,
         externalToken: c.externalToken,

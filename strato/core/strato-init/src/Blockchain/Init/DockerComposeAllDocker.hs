@@ -41,7 +41,6 @@ generateDockerComposeAllDocker = do
         , init = Just True
         , environment = Just $ Map.fromList
             [ ("NODE_URL", "http://nginx")
-            , ("BASE_URL", "https://${NODE_HOST}")
             , ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
             , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
             , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA}")
@@ -65,6 +64,7 @@ generateDockerComposeAllDocker = do
             , ("BA_USERNAME", "${BA_USERNAME}")
             , ("BA_PASSWORD", "${BA_PASSWORD}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
+            , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
@@ -284,7 +284,7 @@ generateDockerComposeAllDocker = do
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /docker-run.sh >> /logs/nginx.log 2>&1"]
         , ports = Just [portNum ++ ":" ++ portNum, "443:443"]
-        , volumes = Just ["./logs:/logs", "./ssl:/tmp/ssl:ro", "./nodedata/secrets:/run/secrets:ro", "./nodedata/.ethereumH:/config:ro"]
+        , volumes = Just ["./logs:/logs", "./secrets/ssl:/etc/ssl/strato:ro", "./nodedata/secrets:/run/secrets:ro", "./nodedata/.ethereumH:/config:ro"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
             { test = ["CMD", "curl", "--silent", "--output", "/dev/null", "--fail", "localhost:" ++ portNum ++ "/_ping"]

@@ -5,6 +5,7 @@ import {
   getBorrowingHistory,
   getEarningAssets,
   getPublicEarningAssets,
+  getNetBalance,
   getNetBalanceHistory,
   getPoolPriceHistory,
   getTokens
@@ -61,6 +62,20 @@ class TokensV2Controller {
       const { accessToken } = req;
       const tokens = await getPublicEarningAssets(accessToken);
       res.status(RestStatus.OK).json(tokens);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getNetBalanceSnapshot(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await getNetBalance(accessToken, userAddress);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

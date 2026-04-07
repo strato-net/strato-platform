@@ -64,6 +64,8 @@ interface RevenuePeriod {
 interface ProtocolRevenueResponse {
   totalRevenue: string;
   revenueByPeriod: RevenuePeriod;
+  pendingRevenue?: string;
+  lastAccrual?: number;
 }
 
 interface AggregatedRevenueResponse {
@@ -72,6 +74,8 @@ interface AggregatedRevenueResponse {
     cdp: ProtocolRevenueResponse;
     lending: ProtocolRevenueResponse;
     swap: ProtocolRevenueResponse;
+    stablePool: ProtocolRevenueResponse;
+    metalForge: ProtocolRevenueResponse;
     gas: ProtocolRevenueResponse;
   };
   aggregated: RevenuePeriod;
@@ -104,12 +108,22 @@ const StratoStats = () => {
   // Protocol Revenue state
   const [cdpTotalRevenue, setCdpTotalRevenue] = useState<string>('0');
   const [cdpRevenueByPeriod, setCdpRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+  const [cdpPendingRevenue, setCdpPendingRevenue] = useState<string>('0');
+  const [cdpLastAccrual, setCdpLastAccrual] = useState<number>(0);
 
   const [swapTotalRevenue, setSwapTotalRevenue] = useState<string>('0');
   const [swapRevenueByPeriod, setSwapRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
 
+  const [stablePoolTotalRevenue, setStablePoolTotalRevenue] = useState<string>('0');
+  const [stablePoolRevenueByPeriod, setStablePoolRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+
+  const [metalForgeTotalRevenue, setMetalForgeTotalRevenue] = useState<string>('0');
+  const [metalForgeRevenueByPeriod, setMetalForgeRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+
   const [lendingTotalRevenue, setLendingTotalRevenue] = useState<string>('0');
   const [lendingRevenueByPeriod, setLendingRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
+  const [lendingPendingRevenue, setLendingPendingRevenue] = useState<string>('0');
+  const [lendingLastAccrual, setLendingLastAccrual] = useState<number>(0);
 
   const [gasTotalRevenue, setGasTotalRevenue] = useState<string>('0');
   const [gasRevenueByPeriod, setGasRevenueByPeriod] = useState<RevenuePeriod>(createEmptyRevenuePeriod());
@@ -172,12 +186,22 @@ const StratoStats = () => {
 
       setCdpTotalRevenue(response.data.byProtocol.cdp.totalRevenue);
       setCdpRevenueByPeriod(response.data.byProtocol.cdp.revenueByPeriod);
+      setCdpPendingRevenue(response.data.byProtocol.cdp.pendingRevenue || '0');
+      setCdpLastAccrual(response.data.byProtocol.cdp.lastAccrual || 0);
 
       setSwapTotalRevenue(response.data.byProtocol.swap.totalRevenue);
       setSwapRevenueByPeriod(response.data.byProtocol.swap.revenueByPeriod);
 
+      setStablePoolTotalRevenue(response.data.byProtocol.stablePool.totalRevenue);
+      setStablePoolRevenueByPeriod(response.data.byProtocol.stablePool.revenueByPeriod);
+
+      setMetalForgeTotalRevenue(response.data.byProtocol.metalForge.totalRevenue);
+      setMetalForgeRevenueByPeriod(response.data.byProtocol.metalForge.revenueByPeriod);
+
       setLendingTotalRevenue(response.data.byProtocol.lending.totalRevenue);
       setLendingRevenueByPeriod(response.data.byProtocol.lending.revenueByPeriod);
+      setLendingPendingRevenue(response.data.byProtocol.lending.pendingRevenue || '0');
+      setLendingLastAccrual(response.data.byProtocol.lending.lastAccrual || 0);
 
       setGasTotalRevenue(response.data.byProtocol.gas.totalRevenue);
       setGasRevenueByPeriod(response.data.byProtocol.gas.revenueByPeriod);
@@ -455,7 +479,7 @@ const StratoStats = () => {
                 </div>
 
                 {/* Revenue Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">CDP Revenue</CardTitle>
@@ -471,6 +495,16 @@ const StratoStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} CDP fees
                       </p>
+                      {!revenueLoading && BigInt(cdpPendingRevenue || '0') > 0n && (
+                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                          +${formatLargeNumber(parseFloat(formatUnits(BigInt(cdpPendingRevenue), 18)))} pending
+                          {cdpLastAccrual > 0 && (
+                            <span className="text-muted-foreground">
+                              {' '}(since {Math.round((Date.now() / 1000 - cdpLastAccrual) / 3600)}h ago)
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -489,6 +523,16 @@ const StratoStats = () => {
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} lending fees
                       </p>
+                      {!revenueLoading && BigInt(lendingPendingRevenue || '0') > 0n && (
+                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                          +${formatLargeNumber(parseFloat(formatUnits(BigInt(lendingPendingRevenue), 18)))} pending
+                          {lendingLastAccrual > 0 && (
+                            <span className="text-muted-foreground">
+                              {' '}(since {Math.round((Date.now() / 1000 - lendingLastAccrual) / 3600)}h ago)
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -506,6 +550,42 @@ const StratoStats = () => {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} swap fees
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Stable Pool Revenue</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(stablePoolRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} stable pool fees
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Metal Forge Revenue</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {revenueLoading ? (
+                          <Skeleton className="h-8 w-24" />
+                        ) : (
+                          `$${formatLargeNumber(parseFloat(formatUnits(BigInt(metalForgeRevenueByPeriod[selectedPeriod].total || '0'), 18)))}`
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedPeriod === 'allTime' ? 'All-time' : selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} metal mint fees
                       </p>
                     </CardContent>
                   </Card>

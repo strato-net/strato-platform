@@ -37,9 +37,11 @@ import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transfe
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useUser } from "@/context/UserContext";
+import { useNetwork } from "@/context/NetworkContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
+import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import {
   Select,
@@ -51,7 +53,7 @@ import {
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
@@ -264,6 +266,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     triggerDepositRefresh,
   } = useBridgeContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
+  const { contactEnabled } = useNetwork();
   const navigate = useNavigate();
 
   // State -- fundingMode can be controlled externally or managed internally
@@ -289,6 +292,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const [selectedPayToken, setSelectedPayToken] = useState<PayTokenConfig | null>(null);
   const [selectedMetal, setSelectedMetal] = useState<MetalConfig | null>(null);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<DepositStep>("confirm_tx");
   const [progressTxHash, setProgressTxHash] = useState<string>();
   const [progressError, setProgressError] = useState<string>();
@@ -794,11 +798,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         throw new Error(`Transaction reverted on ${selectedNetwork} network. No funds were deposited on STRATO. Please try again.`);
       }
 
-      const externalDecimals = parseInt(selectedToken.externalDecimals || "18");
-      const decimalDiff = 18 - externalDecimals;
-      const amount18Decimals = decimalDiff >= 0 
-        ? (depositAmount * BigInt(10 ** decimalDiff)).toString()
-        : depositAmount.toString();
+      const externalDecimals = BigInt(selectedToken.externalDecimals || "18");
+      const factor = BigInt(selectedToken.rebaseFactor || WAD);
+      const decimalDiff = 18n - externalDecimals;
+      const amount18Decimals = depositAmount * 10n ** decimalDiff;
+      const adjustedAmount = (amount18Decimals * WAD / factor).toString();
 
       const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
       const action = selectedAction?.action || 0;
@@ -811,7 +815,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           externalSender: address,
           stratoRecipient: userAddress,
           stratoToken: selectedToken.stratoToken,
-          stratoTokenAmount: amount18Decimals,
+          stratoTokenAmount: adjustedAmount,
           bridgeStatus: "1",
         },
         block_timestamp: new Date().toISOString(),
@@ -1171,6 +1175,30 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
             </Link>
           </div>
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              fundingMode === "metals" && contactEnabled ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-500/10 p-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="bg-blue-500 rounded-full p-1 shrink-0">
+                  <Gem className="w-3 h-3 text-white" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setContactModalOpen(true)}
+                className="inline-flex items-center gap-1 shrink-0 font-semibold text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 underline underline-offset-2"
+              >
+                <Mail className="w-3 h-3" />
+                Contact us {"\u2192"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {networkError && (
@@ -1192,6 +1220,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             setProgressError(undefined);
           }}
         />
+        {contactEnabled && (
+          <ContactInquiryModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
+        )}
       </div>
     );
 };

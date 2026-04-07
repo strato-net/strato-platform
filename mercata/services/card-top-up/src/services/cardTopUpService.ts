@@ -108,20 +108,23 @@ export async function runTopUpCycle(): Promise<void> {
         logInfo("CardTopUp", `Card ${c.id} has pending top-up(s), skipping`);
         continue;
       }
-      const topUpAmount = BigInt(c.topUpAmount);
+      const configuredAmount = BigInt(c.topUpAmount);
+      const deficit = threshold - balance;
+      const desiredAmount = configuredAmount > deficit ? configuredAmount : deficit;
       const usdstBalance = await getUsdstBalance(token, c.userAddress);
-      if (usdstBalance < topUpAmount) {
-        logInfo("CardTopUp", `Card ${c.id} user ${c.userAddress} has insufficient USDST balance (${usdstBalance} < ${topUpAmount}), skipping`);
+      const actualAmount = usdstBalance < desiredAmount ? usdstBalance : desiredAmount;
+      if (actualAmount <= 0n) {
+        logInfo("CardTopUp", `Card ${c.id} user ${c.userAddress} has insufficient USDST balance, skipping`);
         continue;
       }
       await executeTopUp(token, {
         userAddress: c.userAddress,
-        stratoTokenAmount: c.topUpAmount,
+        stratoTokenAmount: actualAmount.toString(),
         externalChainId: c.destinationChainId,
         externalRecipient: c.cardWalletAddress,
         externalToken: c.externalToken,
       });
-      logInfo("CardTopUp", `Topped up card ${c.id} for ${c.userAddress}`);
+      logInfo("CardTopUp", `Topped up card ${c.id} for ${c.userAddress} with ${actualAmount}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       logError("CardTopUp", message, { cardId: c.id, userAddress: c.userAddress });

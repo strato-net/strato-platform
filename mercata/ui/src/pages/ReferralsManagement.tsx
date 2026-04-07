@@ -156,7 +156,7 @@ const ReferralsManagement = () => {
   }
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { getTransferableTokens } = useTokenContext();
+  const { getTransferableTokens, fetchUsdstBalance } = useTokenContext();
   const [referrals, setReferrals] = useState<UserReferral[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -230,8 +230,11 @@ const ReferralsManagement = () => {
           title: "Success",
           description: "Referral cancelled successfully. Your tokens have been returned.",
         });
-        // Refresh the list
+        // Refresh the list and token balances
         await fetchReferrals();
+        const tokens = await getTransferableTokens();
+        setAllTokens(tokens);
+        fetchUsdstBalance();
       }
     } catch (error: any) {
       const errorMsg = error?.response?.data?.error || error?.message || "Failed to cancel referral";

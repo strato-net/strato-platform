@@ -21,6 +21,7 @@ export interface EarningAsset extends Token {
   value: string;
   apy?: string;
   rebaseFactor?: string;
+  rebasingExternalSymbol?: string;
 }
 
 export interface BalanceSnapshot {

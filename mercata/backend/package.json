@@ -29,6 +29,7 @@
   "dependencies": {
     "@hapi/joi": "^17.1.1",
     "@mercata/shared-types": "file:../packages/shared-types",
+    "@sendgrid/mail": "^8.1.6",
     "@types/json-bigint": "^1.0.4",
     "axios": "^1.13.6",
     "cors": "^2.8.5",

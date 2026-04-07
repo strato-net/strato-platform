@@ -142,12 +142,17 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
         return poolData;
       }
 
-      // No 2-token pool — check for a multi-token pool where both tokens have balance > 0
-      const multiPool = pools.find(p =>
-        p.coins && p.coins.length > 2 &&
-        p.coins.some(c => c.address === tokenA && BigInt(c.poolBalance || "0") > 0n) &&
-        p.coins.some(c => c.address === tokenB && BigInt(c.poolBalance || "0") > 0n)
-      );
+      // No pool from API — check local pools for a multi-token pool where both tokens have balance > 0
+      // Pick the one with the highest liquidity
+      const multiPool = pools
+        .filter(p =>
+          !p.isDisabled &&
+          p.coins && p.coins.length > 2 &&
+          p.coins.some(c => c.address === tokenA && BigInt(c.poolBalance || "0") > 0n) &&
+          p.coins.some(c => c.address === tokenB && BigInt(c.poolBalance || "0") > 0n)
+        )
+        .sort((a, b) => parseFloat(b.totalLiquidityUSD || "0") - parseFloat(a.totalLiquidityUSD || "0"))
+        [0] || null;
       if (multiPool) {
         setPool(multiPool);
         setFromAsset(prev => {

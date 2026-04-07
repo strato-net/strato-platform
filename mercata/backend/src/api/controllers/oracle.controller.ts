@@ -4,6 +4,7 @@ import {
   setPrice,
   getPrice,
   getPriceHistory,
+  getStratoPriceHistory,
 } from "../services/oracle.service";
 import { validateGetPriceHistoryInput, validateGetPriceQuery, validateSetPriceInput } from "../validators/oracle.validators";
 
@@ -51,6 +52,24 @@ class OracleController {
       validateGetPriceHistoryInput(assetAddress);
 
       const result = await getPriceHistory(accessToken, assetAddress, query as Record<string, string | undefined>);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getStratoPriceHistory(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, params, query } = req;
+      const { assetAddress } = params;
+
+      validateGetPriceHistoryInput(assetAddress);
+
+      const result = await getStratoPriceHistory(accessToken, assetAddress, query as Record<string, string | undefined>);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
