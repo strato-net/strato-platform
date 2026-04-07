@@ -1,22 +1,15 @@
 import axios from "axios";
 import * as crypto from "crypto";
-import { buildFunctionTx } from "../../utils/txBuilder";
-import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato, cirrus } from "../../utils/mercataApiHelper";
-import { StratoPaths, constants } from "../../config/constants";
-import { extractContractName } from "../../utils/utils";
-import { openIdTokenEndpoint } from "../../config/config";
+import { ethers } from "ethers";
 import { getDepositStatus, getUserTransactions } from "./onramp.service";
 export { getDepositStatus, getUserTransactions };
 export type { OnrampTransaction } from "./onramp.service";
-
-const { MercataBridge, mercataBridge } = constants;
 
 // ————————————————————————————————————————————————————————————————
 // Meld API configuration
 // ————————————————————————————————————————————————————————————————
 
-const MELD_API_URL = process.env.MELD_API_URL || "https://api.meld.io";
+const MELD_API_URL = process.env.MELD_API_URL;
 const MELD_API_KEY = process.env.MELD_API_KEY;
 const MELD_WEBHOOK_SECRET = process.env.MELD_WEBHOOK_SECRET;
 const MELD_WEBHOOK_URL = process.env.MELD_WEBHOOK_URL;
@@ -37,113 +30,140 @@ function meldHeaders(): Record<string, string> {
 }
 
 // ————————————————————————————————————————————————————————————————
-// Bridge deposit constants (same token/chain maps as v1)
+// Ethereum / DepositRouter configuration
 // ————————————————————————————————————————————————————————————————
 
-const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
+const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
-const EXTERNAL_TOKEN_BY_CHAIN: Record<number, Record<string, string>> = {
-  1: { eth: ZERO_ADDRESS, usdc: "a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" },
-  11155111: { eth: ZERO_ADDRESS, usdc: "94a9d9ac8a22534e3faca9f4e7f2e2cf85d5e4c8" }
-};
+const DEPOSIT_ROUTER_ABI = [
+  "function deposit(address token, uint256 amount, address stratoAddress, address targetStratoToken, uint256 nonce, uint256 deadline, bytes signature) external",
+  "function depositETH(address stratoAddress, address targetStratoToken) external payable",
+];
+
+const ERC20_ABI = [
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+];
+
 
 const TARGET_STRATO_TOKEN: Record<string, string> = {
   eth: "93fb7295859b2d70199e0a4883b7c320cf874e6c",
-  usdc: constants.USDST,
+  usdc: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
 };
 
-const EXTERNAL_DECIMALS: Record<string, number> = {
-  eth: 18,
-  usdc: 6,
-};
+function getChainRpcUrl(chainId: number): string {
+  const url = process.env[`CHAIN_${chainId}_RPC_URL`];
+  if (!url) throw new Error(`CHAIN_${chainId}_RPC_URL is not configured`);
+  return url;
+}
 
-// ————————————————————————————————————————————————————————————————
-// Bridge admin token (ROPC grant — same as v1)
-// ————————————————————————————————————————————————————————————————
+function getDepositRouterAddress(): string {
+  const addr = process.env.DEPOSIT_ROUTER_ADDRESS;
+  if (!addr) throw new Error("DEPOSIT_ROUTER_ADDRESS is not configured");
+  return addr;
+}
 
-let cachedBridgeToken: { token: string; expiresAt: number } | null = null;
-
-async function getBridgeAdminToken(): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  if (cachedBridgeToken && cachedBridgeToken.expiresAt > now + 30) {
-    return cachedBridgeToken.token;
-  }
-
-  const username = process.env.BA_USERNAME;
-  const password = process.env.BA_PASSWORD;
-  if (!username || !password) {
-    throw new Error("BA_USERNAME and BA_PASSWORD must be configured for bridge deposits");
-  }
-  if (!openIdTokenEndpoint) {
-    throw new Error("OpenID token endpoint not initialized");
-  }
-
-  const response = await axios.post(
-    openIdTokenEndpoint,
-    new URLSearchParams({
-      grant_type: "password",
-      username,
-      password,
-      client_id: process.env.OAUTH_CLIENT_ID || "",
-      client_secret: process.env.OAUTH_CLIENT_SECRET || "",
-      scope: "openid email profile",
-    }),
-    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-  );
-
-  const { access_token, expires_in } = response.data;
-  if (!access_token) throw new Error("No access token returned from ROPC grant");
-
-  cachedBridgeToken = { token: access_token, expiresAt: now + (expires_in || 300) };
-  return access_token;
+function getSafeSigner(chainId: number): ethers.Wallet {
+  const pk = process.env.SAFE_PRIVATE_KEY;
+  if (!pk) throw new Error("SAFE_PRIVATE_KEY is not configured");
+  const provider = new ethers.JsonRpcProvider(getChainRpcUrl(chainId));
+  return new ethers.Wallet(pk, provider);
 }
 
 // ————————————————————————————————————————————————————————————————
-// Bridge deposit helpers
+// Permit2 helpers
 // ————————————————————————————————————————————————————————————————
 
-function toRawAmount(humanAmount: string, decimals: number): string {
-  const [whole = "0", frac = ""] = humanAmount.split(".");
-  const paddedFrac = frac.padEnd(decimals, "0").slice(0, decimals);
-  return BigInt(whole + paddedFrac).toString();
+const PERMIT2_TYPES = {
+  PermitTransferFrom: [
+    { name: "permitted", type: "TokenPermissions" },
+    { name: "spender", type: "address" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+  TokenPermissions: [
+    { name: "token", type: "address" },
+    { name: "amount", type: "uint256" },
+  ],
+};
+
+async function signPermit2(
+  signer: ethers.Wallet,
+  chainId: number,
+  token: string,
+  amount: bigint,
+  spender: string,
+  nonce: bigint,
+  deadline: bigint,
+): Promise<string> {
+  const domain = {
+    name: "Permit2",
+    chainId,
+    verifyingContract: PERMIT2_ADDRESS,
+  };
+
+  const message = {
+    permitted: { token, amount },
+    spender,
+    nonce,
+    deadline,
+  };
+
+  return signer.signTypedData(domain, PERMIT2_TYPES, message);
 }
 
-async function depositOnStrato(
-  externalChainId: number,
-  externalSender: string,
+// ————————————————————————————————————————————————————————————————
+// DepositRouter call
+// ————————————————————————————————————————————————————————————————
+
+async function ensurePermit2Allowance(
+  signer: ethers.Wallet,
+  tokenAddress: string,
+  amount: bigint,
+): Promise<void> {
+  const token = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+  const allowance: bigint = await token.allowance(signer.address, PERMIT2_ADDRESS);
+
+  if (allowance >= amount) return;
+
+  console.log(`[OnrampV2] Approving Permit2 for token ${tokenAddress}`);
+  const tx = await token.approve(PERMIT2_ADDRESS, ethers.MaxUint256);
+  await tx.wait();
+  console.log(`[OnrampV2] Permit2 approved — txHash=${tx.hash}`);
+}
+
+async function depositViaRouter(
+  chainId: number,
   externalToken: string,
-  externalTokenAmount: string,
-  externalTxHash: string,
+  amount: bigint,
   stratoRecipient: string,
   targetStratoToken: string,
-): Promise<void> {
-  const accessToken = await getBridgeAdminToken();
-
-  const tx = await buildFunctionTx({
-    contractName: extractContractName(MercataBridge),
-    contractAddress: mercataBridge,
-    method: "deposit",
-    args: {
-      externalChainId,
-      externalSender,
-      externalToken,
-      externalTokenAmount,
-      externalTxHash,
-      stratoRecipient,
-      targetStratoToken,
-    },
-  });
+): Promise<string> {
+  const signer = getSafeSigner(chainId);
+  const routerAddress = getDepositRouterAddress();
+  const tokenAddr = ethers.getAddress(externalToken);
+  const stratoAddr = ethers.getAddress(`0x${stratoRecipient}`);
+  const targetAddr = ethers.getAddress(`0x${targetStratoToken}`);
 
   console.log(
-    `[OnrampV2] Calling deposit — chainId=${externalChainId}, token=${externalToken}, ` +
-      `amount=${externalTokenAmount}, txHash=${externalTxHash}, recipient=${stratoRecipient}`
+    `[OnrampV2] Depositing via router — chainId=${chainId}, token=${tokenAddr}, ` +
+      `amount=${amount}, stratoRecipient=${stratoAddr}, targetStratoToken=${targetAddr}`
   );
 
-  await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, tx)
-  );
+  await ensurePermit2Allowance(signer, tokenAddr, amount);
 
-  console.log(`[OnrampV2] deposit succeeded — bridge service will verify and confirm`);
+  const nonce = BigInt(Date.now());
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+  const signature = await signPermit2(signer, chainId, tokenAddr, amount, routerAddress, nonce, deadline);
+
+  const router = new ethers.Contract(routerAddress, DEPOSIT_ROUTER_ABI, signer);
+  const tx = await router.deposit(tokenAddr, amount, stratoAddr, targetAddr, nonce, deadline, signature);
+
+  console.log(`[OnrampV2] Router deposit tx submitted — hash=${tx.hash}`);
+  const receipt = await tx.wait();
+  console.log(`[OnrampV2] Router deposit confirmed — block=${receipt?.blockNumber}`);
+
+  return tx.hash;
 }
 
 // ————————————————————————————————————————————————————————————————
@@ -155,6 +175,12 @@ function normalizeMeldCurrency(code: string): string {
   if (lower === "eth" || lower.startsWith("eth_")) return "eth";
   if (lower === "usdc" || lower.startsWith("usdc_")) return "usdc";
   return lower;
+}
+
+function toRawAmount(humanAmount: string, decimals: number): bigint {
+  const [whole = "0", frac = ""] = humanAmount.split(".");
+  const paddedFrac = frac.padEnd(decimals, "0").slice(0, decimals);
+  return BigInt(whole + paddedFrac);
 }
 
 // ————————————————————————————————————————————————————————————————
@@ -193,8 +219,8 @@ export async function createWidgetSession(
 ): Promise<{ widgetUrl: string }> {
   if (!MELD_API_KEY) throw new Error("Meld onramp is not configured on this node");
 
-  const hotWallet = process.env.ONRAMP_HOT_WALLET_ADDRESS;
-  if (!hotWallet) throw new Error("ONRAMP_HOT_WALLET_ADDRESS is not configured");
+  const safeAddress = process.env.SAFE_ADDRESS;
+  if (!safeAddress) throw new Error("SAFE_ADDRESS is not configured");
 
   const redirectUrl = process.env.MELD_REDIRECT_URL || "";
   const externalSessionId = `strato_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -205,7 +231,7 @@ export async function createWidgetSession(
     `${MELD_API_URL}/crypto/session/widget`,
     {
       sessionData: {
-        walletAddress: hotWallet,
+        walletAddress: safeAddress,
         countryCode: "US",
         sourceCurrencyCode: "USD",
         sourceAmount,
@@ -243,7 +269,6 @@ export function verifyMeldWebhook(rawBody: string, timestamp: string, signature:
   hmac.update(data);
   const computed = hmac.digest("base64url");
 
-  // Meld uses base64url with padding
   const padded = computed + "=".repeat((4 - (computed.length % 4)) % 4);
   return padded === signature || computed === signature;
 }
@@ -251,6 +276,17 @@ export function verifyMeldWebhook(rawBody: string, timestamp: string, signature:
 // ————————————————————————————————————————————————————————————————
 // Meld webhook handler
 // ————————————————————————————————————————————————————————————————
+
+// Token addresses on external chains — must match DepositRouter's tokenConfig
+const EXTERNAL_TOKEN_BY_CHAIN: Record<number, Record<string, string>> = {
+  1:        { usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
+  11155111: { usdc: "0x0c86A754A29714C4Fe9C6F1359fa7099eD174c0b" },
+};
+
+const EXTERNAL_DECIMALS: Record<string, number> = {
+  eth: 18,
+  usdc: 6,
+};
 
 export async function handleMeldTransactionUpdate(event: any): Promise<void> {
   const payload = event.payload;
@@ -273,49 +309,42 @@ export async function handleMeldTransactionUpdate(event: any): Promise<void> {
     );
 
     const tx = txData.transaction;
+    console.log(`[OnrampV2] Transaction data:`, tx);
     const cryptoDetails = tx.cryptoDetails;
     const rawCurrency: string = tx.destinationCurrencyCode;
     const amount: string = String(tx.destinationAmount);
     const txHash: string | undefined = cryptoDetails?.blockchainTransactionId;
     const chainIdStr: string | undefined = cryptoDetails?.chainId;
 
-    if (!txHash || !rawCurrency || !amount || !chainIdStr) {
-      console.error(`[OnrampV2] Missing transaction details in SETTLED webhook — ` +
-        `txHash=${txHash}, currency=${rawCurrency}, amount=${amount}, chainId=${chainIdStr}`);
+    if (!rawCurrency || !amount || !chainIdStr) {
+      console.error(`[OnrampV2] Missing transaction details — currency=${rawCurrency}, amount=${amount}, chainId=${chainIdStr}`);
       return;
     }
 
     const currency = normalizeMeldCurrency(rawCurrency);
-    const chainId = parseInt(chainIdStr, 10);
+    const chainId = 11155111; // TODO: hardcoded to Sepolia for dev — Meld sandbox reports wrong chainId
     const externalToken = EXTERNAL_TOKEN_BY_CHAIN[chainId]?.[currency];
     const targetStratoToken = TARGET_STRATO_TOKEN[currency];
-    const decimals = EXTERNAL_DECIMALS[currency];
+    const decimals = 18;
 
-    if (externalToken === undefined || targetStratoToken === undefined || decimals === undefined) {
-      console.error(`[OnrampV2] Unsupported currency=${rawCurrency} (normalized=${currency}) or chainId=${chainId}`);
+    if (!externalToken || !targetStratoToken || decimals === undefined) {
+      console.error(`[OnrampV2] Unsupported currency=${rawCurrency} or chainId=${chainId}`);
       return;
     }
 
-    const externalTokenAmount = toRawAmount(amount, decimals);
-    const hotWallet = (process.env.ONRAMP_HOT_WALLET_ADDRESS || "").replace(/^0x/, "");
-    const normalizedTxHash = txHash.replace(/^0x/, "");
+    const rawAmount = toRawAmount(amount, decimals);
 
     try {
-      await depositOnStrato(
+      const routerTxHash = await depositViaRouter(
         chainId,
-        hotWallet,
         externalToken,
-        externalTokenAmount,
-        normalizedTxHash,
+        rawAmount,
         userAddress,
         targetStratoToken,
       );
+      console.log(`[OnrampV2] Deposit routed — routerTxHash=${routerTxHash}, bridge service will confirm`);
     } catch (err: any) {
-      if (err.message?.includes("MB: duplicate deposit")) {
-        console.log(`[OnrampV2] Deposit already recorded for txHash=${normalizedTxHash} — skipping`);
-      } else {
-        console.error(`[OnrampV2] deposit FAILED — ${err.message}`);
-      }
+      console.error(`[OnrampV2] depositViaRouter FAILED — ${err.message}`);
     }
   } else {
     console.log(`[OnrampV2] Transaction ${transactionId} → ${eventType} / ${status} (user=${userAddress})`);
