@@ -31,8 +31,8 @@ export const parseBonusTokenConfigs = (raw: unknown): BonusTokenConfig[] => {
       throw new Error(`Invalid bonusTokenConfigs[${idx}].conversionDenominator: required positive integer`);
     }
 
-    if (!Array.isArray(token.includedActivityPatterns) || token.includedActivityPatterns.length === 0) {
-      throw new Error(`Invalid bonusTokenConfigs[${idx}].includedActivityPatterns: required non-empty string array`);
+    if (!Array.isArray(token.includedActivityPatterns)) {
+      throw new Error(`Invalid bonusTokenConfigs[${idx}].includedActivityPatterns: required string array (empty = all position activities)`);
     }
     for (let i = 0; i < token.includedActivityPatterns.length; i++) {
       if (typeof token.includedActivityPatterns[i] !== "string" || token.includedActivityPatterns[i].trim().length === 0) {

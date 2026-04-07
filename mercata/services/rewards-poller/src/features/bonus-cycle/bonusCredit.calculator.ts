@@ -76,6 +76,7 @@ export const isIncludedActivity = (
   patterns: string[],
 ): boolean => {
   if (activityType === "1") return false;
+  if (patterns.length === 0) return true;
   const lower = activityName.toLowerCase();
   return patterns.some((p) => lower.includes(p.toLowerCase()));
 };
