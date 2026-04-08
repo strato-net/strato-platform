@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 {-# OPTIONS -fno-warn-incomplete-uni-patterns #-}
 {-# OPTIONS -fno-warn-missing-export-lists #-}
 
@@ -5,16 +7,23 @@ module WaitAnyOrInterrupt where
 
 import Control.Concurrent (myThreadId)
 import Control.Concurrent.Async (Async, waitAny)
-import Control.Exception (catch, throwTo, AsyncException(UserInterrupt))
-import System.Posix.Signals (installHandler, sigTERM, sigINT, Handler(CatchOnce))
+import Control.Exception (Exception, catch, throwTo)
+import Data.Typeable (Typeable)
+import System.Posix.Signals (installHandler, sigTERM, sigINT, sigHUP, sigQUIT, Handler(CatchOnce))
 
-waitAnyOrInterrupt :: [Async a] -> IO (Maybe (Async a, a))
+data InterruptSignal = InterruptSignal String
+  deriving (Show, Typeable)
+
+instance Exception InterruptSignal
+
+waitAnyOrInterrupt :: [Async a] -> IO (Either String (Async a, a))
 waitAnyOrInterrupt asyncs = do
   mainThread <- myThreadId
-  -- Make SIGTERM and SIGINT throw UserInterrupt to the main thread
-  let handler = CatchOnce $ throwTo mainThread UserInterrupt
-  _ <- installHandler sigTERM handler Nothing
-  _ <- installHandler sigINT handler Nothing
+  let install sig name = installHandler sig (CatchOnce $ throwTo mainThread (InterruptSignal name)) Nothing
+  _ <- install sigTERM "SIGTERM"
+  _ <- install sigINT "SIGINT"
+  _ <- install sigHUP "SIGHUP"
+  _ <- install sigQUIT "SIGQUIT"
   catch
-    (Just <$> waitAny asyncs)
-    (\UserInterrupt -> return Nothing)
+    (Right <$> waitAny asyncs)
+    (\(InterruptSignal name) -> return (Left name))

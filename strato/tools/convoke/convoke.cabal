@@ -26,6 +26,7 @@ executable convoke
     , shellwords
     , stm
     , text
+    , time
     , typed-process
     , unix
   default-language: Haskell2010
