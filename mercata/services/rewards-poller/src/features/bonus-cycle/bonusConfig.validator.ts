@@ -16,26 +16,20 @@ export const parseBonusTokenConfigs = (raw: unknown): BonusTokenConfig[] => {
       throw new Error(`Invalid bonusTokenConfigs[${idx}].address: required non-empty string`);
     }
 
-    const maxBonusBps = Number(token.maxBonusBps);
-    if (!Number.isInteger(maxBonusBps) || maxBonusBps <= 0) {
-      throw new Error(`Invalid bonusTokenConfigs[${idx}].maxBonusBps: required positive integer (basis points)`);
+    const maxMultiplier = Number(token.maxMultiplier);
+    if (!(maxMultiplier > 1)) {
+      throw new Error(`Invalid bonusTokenConfigs[${idx}].maxMultiplier: required number > 1`);
     }
 
-    const conversionNumerator = Number(token.conversionNumerator);
-    if (!Number.isInteger(conversionNumerator) || conversionNumerator <= 0) {
-      throw new Error(`Invalid bonusTokenConfigs[${idx}].conversionNumerator: required positive integer`);
-    }
-
-    const conversionDenominator = Number(token.conversionDenominator);
-    if (!Number.isInteger(conversionDenominator) || conversionDenominator <= 0) {
-      throw new Error(`Invalid bonusTokenConfigs[${idx}].conversionDenominator: required positive integer`);
+    const conversionRate = Number(token.conversionRate);
+    if (!(conversionRate > 0 && conversionRate <= 1)) {
+      throw new Error(`Invalid bonusTokenConfigs[${idx}].conversionRate: required number in (0, 1]`);
     }
 
     return {
       address: token.address.trim(),
-      maxBonusBps,
-      conversionNumerator,
-      conversionDenominator,
+      maxMultiplier,
+      conversionRate,
     };
   });
 };

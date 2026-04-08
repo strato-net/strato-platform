@@ -1,8 +1,7 @@
 [
   {
     "address": "3103810e081d965f5f8b19195fd7f5f859ccb4f9",
-    "maxBonusBps": 10000,
-    "conversionNumerator": 4,
-    "conversionDenominator": 10
+    "maxMultiplier": 2,
+    "conversionRate": 0.3
   }
 ]

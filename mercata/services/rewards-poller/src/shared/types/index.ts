@@ -78,9 +78,8 @@ export interface RewardsAction {
 
 export interface BonusTokenConfig {
   address: string;
-  maxBonusBps: number;
-  conversionNumerator: number;
-  conversionDenominator: number;
+  maxMultiplier: number;
+  conversionRate: number;
 }
 
 export interface BonusTokenBalance {
