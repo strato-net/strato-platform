@@ -8,7 +8,7 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, apiHost, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_localAuth, flags_sslDir, flags_nodeHost)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir, flags_nodeHost)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
@@ -23,6 +23,7 @@ generateDockerCompose = do
   let conf = ethConf
       ssl = not $ null flags_sslDir
       portNum = show $ httpPort (networkConfig conf)
+      rpcPort = "8545"
       stratoApiPort = show $ apiPort (apiConfig conf)
       nodeHost = if ssl then flags_nodeHost else flags_nodeHost ++ ":" ++ portNum
       sHost = apiHost (apiConfig conf)
@@ -210,13 +211,19 @@ generateDockerCompose = do
         , environment = Just $ Map.fromList $
             [ ("STRATO_PORT_API", stratoApiPort)
             , ("STRATO_PORT_VAULT_PROXY", "8013")
+            , ("JSONRPC_ENABLED", if flags_jsonrpc then "true" else "false")
+            , ("RPC_PORT", rpcPort)
             , ("ssl", if ssl then "true" else "false")
             ]
             ++ if flags_localAuth
                then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
                     ]
                else []
-        , ports = Just [portNum ++ ":" ++ portNum, "443:443"]
+        , ports = Just $
+            [portNum ++ ":" ++ portNum, "443:443"]
+            ++ if flags_jsonrpc
+               then [rpcPort ++ ":" ++ rpcPort]
+               else []
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/ssl:/etc/ssl/strato:ro"

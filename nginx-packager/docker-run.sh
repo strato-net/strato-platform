@@ -27,6 +27,8 @@ SMD_HOST=${SMD_HOST:-smd:3002}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
+RPC_PORT=${RPC_PORT:-8545}
+JSONRPC_ENABLED=${JSONRPC_ENABLED:-false}
 
 # Read config from ethconf.yaml (single source of truth)
 STRATO_HOSTNAME=$(yq '.apiConfig.apiHost' /config/ethconf.yaml)
@@ -76,6 +78,12 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # Remove SSL lines if deployment is not SSL-enabled
   if [ "$ssl" != true ]; then
     sed -i '/#TEMPLATE_MARK_SSL/d' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MARK_JSONRPC_PLAIN/d' /tmp/nginx.conf
+  fi
+
+  if [ "$JSONRPC_ENABLED" != true ]; then
+    sed -i '/#TEMPLATE_MARK_JSONRPC/d' /tmp/nginx.conf
   fi
 
   # Remove Stats lines if running in STATS_ENABLED=false
@@ -116,6 +124,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s|__VAULT_URL__|$VAULT_URL|g" /tmp/nginx.conf
   sed -i "s|__INTERNAL_VAULT_URL__|$INTERNAL_VAULT_URL|g" /tmp/nginx.conf
   sed -i "s|__HTTP_PORT__|$HTTP_PORT|g" /tmp/nginx.conf
+  sed -i "s|__RPC_PORT__|$RPC_PORT|g" /tmp/nginx.conf
   
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf
