@@ -257,24 +257,12 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
 
         WithdrawalRequest storage r = requests[requestId];
         require(r.exists, "YieldVault: bad request");
-        require(requestId == queueHead, "YieldVault: only head cancelable in v1");
-        require(claimableAssets[_msgSender()] == 0, "YieldVault: request already processed");
+        require(r.shares > 0, "YieldVault: already processed");
 
         uint256 shares = r.shares;
-        uint64 next = r.next;
-        require(shares > 0, "YieldVault: already processed");
-
+        r.shares = 0;
         totalQueuedShares -= shares;
         activeRequestId[_msgSender()] = 0;
-
-        delete requests[requestId];
-        delete requestOwner[requestId];
-        if (next == 0) {
-            delete queueHead;
-            delete queueTail;
-        } else {
-            queueHead = next;
-        }
 
         _transfer(address(this), _msgSender(), shares);
         emit WithdrawalCanceled(requestId, _msgSender(), shares);
