@@ -5,7 +5,7 @@ module Blockchain.Init.DockerCompose (generateDockerCompose) where
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (apiConfig, apiPort, apiHost, networkConfig, httpPort)
+import Blockchain.EthConf.Model (networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_localAuth, flags_sslDir)
@@ -26,14 +26,8 @@ generateDockerCompose = do
   let conf = ethConf
       ssl = not $ null flags_sslDir
       portNum = show $ httpPort (networkConfig conf)
-      stratoApiPort = show $ apiPort (apiConfig conf)
-      nodeHost = if ssl then localHostname else localHostname ++ ":" ++ portNum
-      sHost = apiHost (apiConfig conf)
       userGid = uid ++ ":" ++ gid
-
-  let hostGateway = if flags_localAuth
-        then Just [localHostname ++ ":host-gateway"]
-        else Nothing
+      hostGateway = Just [localHostname ++ ":host-gateway"]
 
   -- Disable Docker logging since we redirect stdout/stderr to files
   let noLogging = Just Logging
@@ -52,8 +46,7 @@ generateDockerCompose = do
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , environment = Just $ Map.fromList
-            [ ("NODE_URL", "http://nginx:" ++ portNum)
-            , ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
+            [ ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
             , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
             , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA}")
             , ("RPC_URL_SEPOLIA_FALLBACK", "${RPC_URL_SEPOLIA_FALLBACK}")
@@ -100,10 +93,6 @@ generateDockerCompose = do
         { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
         , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
         , extra_hosts = hostGateway
-        , environment = Just $ Map.fromList
-            [ ("NODE_HOST", nodeHost)
-            , ("ssl", if ssl then "true" else "false")
-            ]
         , volumes = Just ["./logs:/logs"]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
@@ -119,9 +108,6 @@ generateDockerCompose = do
             [ ("postgres_host", "postgres")
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
-            , ("STRATO_HOSTNAME", sHost)
-            , ("STRATO_PORT_API", stratoApiPort)
-            , ("STRATO_PORT_VAULT_PROXY", "8013")
             ]
         , volumes = Just
             [ "./logs:/logs"
@@ -219,9 +205,7 @@ generateDockerCompose = do
                 ["apex", "docs", "postgrest", "prometheus", "smd", "mercata-backend", "mercata-ui"]
         
         , environment = Just $ Map.fromList $
-            [ ("STRATO_PORT_API", stratoApiPort)
-            , ("STRATO_PORT_VAULT_PROXY", "8013")
-            , ("ssl", if ssl then "true" else "false")
+            [ ("ssl", if ssl then "true" else "false")
             ]
             ++ if flags_localAuth
                then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
@@ -297,9 +281,7 @@ generateDockerCompose = do
   let prometheus = def
         { image = "prometheus:" ++ stratoVersionTag ++ "-" ++ hashPrometheus
         , user = Just userGid
-        , environment = Just $ Map.fromList
-            [ ("NODE_HOST", nodeHost)
-            ]
+        , extra_hosts = hostGateway
         , volumes = Just
             [ "./logs:/logs"
             , "./prometheus:/prometheus"

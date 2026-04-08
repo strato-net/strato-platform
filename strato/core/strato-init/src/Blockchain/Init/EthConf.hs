@@ -25,13 +25,6 @@ getApiListenAddress
   | os == "linux" = "172.17.0.1"
   | otherwise = "127.0.0.1"
 
--- | Address Docker containers use to reach strato-api on the host
-getApiHost :: String
-getApiHost
-  | flags_apiIPAddress /= "" = flags_apiIPAddress
-  | os == "linux" = "172.17.0.1"
-  | otherwise = "host.docker.internal"
-
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
 getRailgunProxyForNetwork :: String -> Maybe Address
@@ -65,7 +58,6 @@ runtimeConfig = def
       }
   , apiConfig = def
       { apiListenAddress = getApiListenAddress
-      , apiHost = getApiHost
       }
   , contractsConfig = ContractsConf
       { railgunProxy = getRailgunProxyForNetwork flags_network
@@ -114,9 +106,12 @@ genEthConf :: IO EthConf
 genEthConf = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
-  localHostname <- if Opts.flags_localAuth
-    then filter (/= '\n') <$> readProcess "hostname" [] ""
-    else return "localhost"
+  localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
+
+  let ssl = not $ null flags_sslDir
+      !nodeBaseUrl = (if ssl then "https://" else "http://")
+        ++ localHostname
+        ++ if ssl then "" else ":" ++ show flags_httpPort
 
   -- For local auth mode, skip vault during setup (vault-wrapper starts later)
   if Opts.flags_localAuth
@@ -147,11 +142,9 @@ genEthConf = do
         , mempoolLivenessCutoff = flags_mempoolLivenessCutoff
         }
     , urlConfig = def
-        { vaultUrl = if Opts.flags_localAuth
-            then "http://" ++ localHostname ++ ":" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
-            else flags_vaultUrl
-        , vaultUrlDocker = if Opts.flags_localAuth
-            then "http://nginx:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
+        { nodeUrl = nodeBaseUrl
+        , vaultUrl = if Opts.flags_localAuth
+            then nodeBaseUrl ++ "/vault/strato/v2.3"
             else flags_vaultUrl
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
