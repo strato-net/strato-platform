@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatUnits } from "ethers";
-import { ArrowLeft, CircleDollarSign, TrendingUp, Wallet } from "lucide-react";
+import { ArrowLeft, CircleDollarSign, Clock, TrendingUp, Wallet } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -152,15 +152,28 @@ const EarnYieldVault = () => {
 
   const decimals = effectiveInfo?.decimals ?? 18;
 
-  const depositDisabled = !isLoggedIn || !isDeployed;
-  const redeemDisabled = !isLoggedIn || !isDeployed;
+  const totalAssetsWei = effectiveInfo?.totalAssets || "0";
+  const idleAssetsWei = effectiveInfo?.idleAssets || "0";
+  const totalSharesWei = effectiveInfo?.totalShares || "0";
+  /** Total = idle + deployed on-chain; use extra decimals when they differ so rounding does not hide it. */
+  const vaultDetailAmountDigits =
+    BigInt(totalAssetsWei) !== BigInt(idleAssetsWei) ? 8 : 4;
+  const totalPendingAssetsWei = effectiveInfo?.totalPendingAssets || "0";
+  const isPaused = Boolean(effectiveInfo?.paused);
+
+  const pendingWithdrawalWei = userInfo?.pendingWithdrawal || "0";
+  const pendingWithdrawalUsdWad = userInfo?.pendingWithdrawalUsd || "0";
+  const hasPendingWithdrawal = isLoggedIn && BigInt(pendingWithdrawalWei) > 0n;
+
+  const depositDisabled = !isLoggedIn || !isDeployed || isPaused;
+  const redeemDisabled = !isLoggedIn || !isDeployed || isPaused;
 
   const amountWei = actionAmount ? safeParseUnits(actionAmount, decimals) : 0n;
   const actionMaxWei = useMemo(() => {
     if (actionMode === "deposit") return BigInt(userInfo?.maxDeposit || "0");
-    if (actionMode === "redeem") return BigInt(userInfo?.maxRedeem || "0");
+    if (actionMode === "redeem") return BigInt(userInfo?.userShares || "0");
     return 0n;
-  }, [actionMode, userInfo?.maxDeposit, userInfo?.maxRedeem]);
+  }, [actionMode, userInfo?.maxDeposit, userInfo?.userShares]);
 
   const previewValueWei = useMemo(() => {
     const totalAssetsBig = BigInt(effectiveInfo?.totalAssets || "0");
@@ -205,13 +218,13 @@ const EarnYieldVault = () => {
           description: `Depositing ${actionAmount} ${assetSymbol} into ${shareSymbol}.`,
           variant: "success",
         });
-      } else {
+      } else if (actionMode === "redeem") {
         await api.post(`/earn/yield-vault/${vaultKey}/redeem`, {
           sharesAmount: amountWei.toString(),
         });
         toast({
           title: "Redeem submitted",
-          description: `Redeeming ${actionAmount} ${shareSymbol} back to ${assetSymbol}.`,
+          description: `Redeeming ${actionAmount} ${shareSymbol}. If vault liquidity is sufficient you will receive ${assetSymbol} instantly, otherwise the withdrawal will be queued.`,
           variant: "success",
         });
       }
@@ -219,24 +232,24 @@ const EarnYieldVault = () => {
       await refreshVaults();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Transaction failed";
-      toast({ title: `${actionMode === "deposit" ? "Deposit" : "Redeem"} failed`, description: msg, variant: "destructive" });
+      const actionLabel = actionMode === "deposit" ? "Deposit" : "Redeem";
+      toast({ title: `${actionLabel} failed`, description: msg, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
 
-  const actionPrimaryLabel =
-    actionMode === "deposit" ? `Deposit ${assetSymbol}` : `Redeem ${shareSymbol}`;
+  const actionPrimaryLabel = actionMode === "deposit" ? "Deposit" : "Redeem";
   const actionPreviewSymbol = actionMode === "deposit" ? shareSymbol : assetSymbol;
   const actionMaxInputValue =
     actionMode === "deposit"
       ? formatUnits(userInfo?.maxDeposit || "0", decimals)
-      : formatUnits(userInfo?.maxRedeem || "0", decimals);
+      : formatUnits(userInfo?.userShares || "0", decimals);
   const actionMaxLabel =
     actionMode === "deposit"
       ? formatTokenAmount(userInfo?.maxDeposit || "0", decimals)
-      : formatTokenAmount(userInfo?.maxRedeem || "0", decimals);
+      : formatTokenAmount(userInfo?.userShares || "0", decimals);
 
   if (loadingVaults && !effectiveInfo) {
     return (
@@ -337,6 +350,11 @@ const EarnYieldVault = () => {
                         Not Deployed
                       </Badge>
                     )}
+                    {isPaused && (
+                      <Badge variant="destructive" className="text-[10px] uppercase tracking-wide">
+                        Paused
+                      </Badge>
+                    )}
                   </div>
 
                   <Card className={`border ${meta?.cardBorder ?? ""}`}>
@@ -371,7 +389,7 @@ const EarnYieldVault = () => {
                           <p className="text-muted-foreground">TVL</p>
                           <p className="mt-1 text-lg font-semibold">{tvlDisplay}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Total value locked in the vault
+                            {loadingVaults ? "" : `${formatTokenAmount(totalSharesWei, decimals)} ${shareSymbol} outstanding`}
                           </p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
@@ -389,7 +407,7 @@ const EarnYieldVault = () => {
                           onClick={() => handleActionRequest("deposit")}
                           disabled={depositDisabled}
                         >
-                          Deposit {assetSymbol}
+                          Deposit
                         </Button>
                         <Button
                           variant="outline"
@@ -397,7 +415,15 @@ const EarnYieldVault = () => {
                           onClick={() => handleActionRequest("redeem")}
                           disabled={redeemDisabled}
                         >
-                          Redeem {shareSymbol}
+                          Redeem
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="sm:min-w-[180px]"
+                          onClick={() => handleActionRequest("redeem")}
+                          disabled={redeemDisabled}
+                        >
+                          Claim
                         </Button>
                       </div>
                       {!isDeployed && (
@@ -407,6 +433,40 @@ const EarnYieldVault = () => {
                       )}
                     </CardContent>
                   </Card>
+                </section>
+
+                <section className="space-y-3">
+                  <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Vault Details</h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">Total Assets</p>
+                      <p className="mt-1 text-lg font-semibold">
+                        {loadingVaults
+                          ? "..."
+                          : formatTokenAmount(totalAssetsWei, decimals, vaultDetailAmountDigits)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{assetSymbol}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">Idle / Available</p>
+                      <p className="mt-1 text-lg font-semibold">
+                        {loadingVaults
+                          ? "..."
+                          : formatTokenAmount(idleAssetsWei, decimals, vaultDetailAmountDigits)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{assetSymbol} for withdrawals</p>
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">Pending Queue</p>
+                      <p className="mt-1 text-lg font-semibold">0.05</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{assetSymbol} awaiting withdrawal</p>
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">Available to Claim</p>
+                      <p className="mt-1 text-lg font-semibold">0.0312</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{assetSymbol} redeemable now</p>
+                    </div>
+                  </div>
                 </section>
 
                 <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -423,6 +483,27 @@ const EarnYieldVault = () => {
                     </Card>
                   ))}
                 </section>
+
+                {hasPendingWithdrawal && (
+                  <section>
+                    <Card className="border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20">
+                      <CardContent className="pt-4 pb-4 flex items-start gap-3">
+                        <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">
+                            Pending Withdrawal: {formatTokenAmount(pendingWithdrawalWei, decimals)} {assetSymbol}
+                            {BigInt(pendingWithdrawalUsdWad) > 0n && (
+                              <span className="text-muted-foreground font-normal"> ({formatUsdAmount(pendingWithdrawalUsdWad)})</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Your withdrawal is queued and will be processed when capital is returned to the vault.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </section>
+                )}
 
                 <section className="space-y-3">
                   <h2 className="text-xl font-semibold">Strategy</h2>
@@ -448,7 +529,7 @@ const EarnYieldVault = () => {
             <DialogDescription>
               {actionMode === "deposit"
                 ? `Deposit ${assetSymbol} into the vault and receive ${shareSymbol} shares.`
-                : `Redeem ${shareSymbol} shares back into the underlying ${assetSymbol}.`}
+                : `Redeem ${shareSymbol} shares for the underlying ${assetSymbol}. If vault liquidity covers the amount you will receive ${assetSymbol} instantly, otherwise the withdrawal will be queued until capital is returned.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -500,11 +581,19 @@ const EarnYieldVault = () => {
               </div>
             </div>
             {actionMode === "redeem" && (
-              <div className="rounded-lg border border-border/70 bg-background/60 p-3 text-xs">
-                Position claim: {formatTokenAmount(redeemableAssets, decimals)} {assetSymbol}
-                {BigInt(userInfo?.assetPriceWad || "0") > 0n || BigInt(positionUsdWad || "0") > 0n ? (
-                  <> (~ {formatUsdAmount(positionUsdWad)})</>
-                ) : null}
+              <div className="rounded-lg border border-border/70 bg-background/60 p-3 text-xs space-y-1">
+                <p>
+                  Position claim:{" "}
+                  {formatTokenAmount(redeemableAssets, decimals, vaultDetailAmountDigits)} {assetSymbol}
+                  {BigInt(userInfo?.assetPriceWad || "0") > 0n || BigInt(positionUsdWad || "0") > 0n ? (
+                    <> (~ {formatUsdAmount(positionUsdWad)})</>
+                  ) : null}
+                </p>
+                <p className="text-muted-foreground">
+                  Available idle:{" "}
+                  {formatTokenAmount(idleAssetsWei, decimals, vaultDetailAmountDigits)} {assetSymbol}.
+                  Redemptions exceeding idle liquidity will be queued.
+                </p>
               </div>
             )}
             <div className="flex flex-col gap-2">

@@ -28,6 +28,7 @@ export type YieldVaultInfo = {
   tvlUsd: string;
   apy: string;
   paused: boolean;
+  totalPendingAssets: string;
 };
 
 export type YieldVaultUserInfo = YieldVaultInfo & {
@@ -37,6 +38,8 @@ export type YieldVaultUserInfo = YieldVaultInfo & {
   positionUsd: string;
   maxDeposit: string;
   maxRedeem: string;
+  pendingWithdrawal: string;
+  pendingWithdrawalUsd: string;
 };
 
 type YieldVaultContextType = {

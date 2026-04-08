@@ -40,6 +40,7 @@ export interface YieldVaultInfo {
   tvlUsd: string;
   apy: string;
   paused: boolean;
+  totalPendingAssets: string;
 }
 
 export interface YieldVaultUserInfo extends YieldVaultInfo {
@@ -50,6 +51,8 @@ export interface YieldVaultUserInfo extends YieldVaultInfo {
   positionUsd: string;
   maxDeposit: string;
   maxRedeem: string;
+  pendingWithdrawal: string;
+  pendingWithdrawalUsd: string;
 }
 
 /** Keys and display metadata only; addresses come from config / env. */
@@ -126,6 +129,7 @@ function emptyInfo(def: YieldVaultDef | null, key: string): YieldVaultInfo {
     tvlUsd: "0",
     apy: "-",
     paused: false,
+    totalPendingAssets: "0",
   };
 }
 
@@ -138,6 +142,8 @@ function emptyUserInfo(def: YieldVaultDef | null, key: string): YieldVaultUserIn
     positionUsd: "0",
     maxDeposit: "0",
     maxRedeem: "0",
+    pendingWithdrawal: "0",
+    pendingWithdrawalUsd: "0",
   };
 }
 
@@ -148,7 +154,7 @@ const getVaultState = async (
   const { data } = await cirrus.get(serviceToken, `/${YieldVault}`, {
     params: {
       address: `eq.${vaultAddress}`,
-      select: "address,_asset,_totalSupply::text,_symbol,_name,_paused,vaultInitialized,deployedAssets::text,_underlyingDecimals",
+      select: "address,_asset,_totalSupply::text,_symbol,_name,_paused,vaultInitialized,deployedAssets::text,totalPendingAssets::text,_underlyingDecimals",
     },
   });
   return data?.[0] || null;
@@ -182,6 +188,25 @@ const getShareBalance = async (
     },
   });
   return data?.[0]?.value || "0";
+};
+
+const getPendingWithdrawal = async (
+  accessToken: string,
+  vaultAddress: string,
+  userAddress: string
+): Promise<string> => {
+  try {
+    const { data } = await cirrus.get(accessToken, `/${YieldVault}-pendingWithdrawals`, {
+      params: {
+        address: `eq.${vaultAddress}`,
+        key: `eq.${userAddress}`,
+        select: "value::text",
+      },
+    });
+    return data?.[0]?.value || "0";
+  } catch {
+    return "0";
+  }
 };
 
 const getFirstDepositDate = async (
@@ -337,9 +362,12 @@ export const getYieldVaultInfo = async (
     }),
   ]);
 
-  const idleAssets = parseBigIntLike(liveAssetBalance);
+  const rawIdle = parseBigIntLike(liveAssetBalance);
   const deployedAssets = parseBigIntLike(vaultState.deployedAssets);
-  const totalAssets = idleAssets + deployedAssets;
+  const totalPendingAssets = parseBigIntLike(vaultState.totalPendingAssets);
+  const idleAssets = rawIdle > totalPendingAssets ? rawIdle - totalPendingAssets : 0n;
+  const gross = rawIdle + deployedAssets;
+  const totalAssets = gross > totalPendingAssets ? gross - totalPendingAssets : 0n;
   const totalShares = parseBigIntLike(vaultState._totalSupply);
   const decimals = Number(vaultState._underlyingDecimals ?? 18);
   const exchangeRate = getExchangeRate(totalAssets, totalShares);
@@ -358,7 +386,7 @@ export const getYieldVaultInfo = async (
       }
     }
   }
-  const tvlUsd = underlyingUsdWad(idleAssets + deployedAssets, assetPrice, decimals);
+  const tvlUsd = underlyingUsdWad(totalAssets, assetPrice, decimals);
   const apy = await computeApy(serviceToken, def.address, assetAddress, totalAssets, totalShares);
 
   return {
@@ -379,6 +407,7 @@ export const getYieldVaultInfo = async (
     tvlUsd: tvlUsd.toString(),
     apy,
     paused: Boolean(vaultState._paused),
+    totalPendingAssets: totalPendingAssets.toString(),
   };
 };
 
@@ -391,9 +420,10 @@ export const getYieldVaultUserInfo = async (
   const def = resolveVaultDef(key);
   if (!info.deployed) return emptyUserInfo(def, key);
 
-  const [walletAssetsRaw, userSharesRaw] = await Promise.all([
+  const [walletAssetsRaw, userSharesRaw, pendingWithdrawalRaw] = await Promise.all([
     getAssetBalance(accessToken, info.assetAddress, userAddress),
     getShareBalance(accessToken, info.vaultAddress, userAddress),
+    getPendingWithdrawal(accessToken, info.vaultAddress, userAddress),
   ]);
 
   const walletAssets = parseBigIntLike(walletAssetsRaw);
@@ -416,6 +446,9 @@ export const getYieldVaultUserInfo = async (
   const assetPrice = parseBigIntLike(info.assetPriceWad);
   const positionUsd = underlyingUsdWad(redeemableAssets, assetPrice, info.decimals);
 
+  const pendingWithdrawal = parseBigIntLike(pendingWithdrawalRaw);
+  const pendingWithdrawalUsd = underlyingUsdWad(pendingWithdrawal, assetPrice, info.decimals);
+
   return {
     ...info,
     walletAssets: walletAssets.toString(),
@@ -424,6 +457,8 @@ export const getYieldVaultUserInfo = async (
     positionUsd: positionUsd.toString(),
     maxDeposit: walletAssets.toString(),
     maxRedeem: maxRedeem.toString(),
+    pendingWithdrawal: pendingWithdrawal.toString(),
+    pendingWithdrawalUsd: pendingWithdrawalUsd.toString(),
   };
 };
 
@@ -470,8 +505,8 @@ export const redeemYieldVault = async (
     {
       contractName: "YieldVault",
       contractAddress: info.vaultAddress,
-      method: "redeem",
-      args: { shares: sharesAmount, receiver: userAddress, ownerAddr: userAddress },
+      method: "redeemOrQueue",
+      args: { shares: sharesAmount },
     },
     userAddress,
     accessToken
@@ -488,9 +523,9 @@ export const redeemAllYieldVault = async (
   userAddress: string
 ): Promise<{ status: string; hash: string }> => {
   const userInfo = await getYieldVaultUserInfo(accessToken, key, userAddress);
-  const redeemable = parseBigIntLike(userInfo.maxRedeem);
-  if (redeemable <= 0n) {
-    throw new Error("No redeemable shares (vault may have capital deployed or no shares held)");
+  const shares = parseBigIntLike(userInfo.userShares);
+  if (shares <= 0n) {
+    throw new Error("No shares held");
   }
-  return await redeemYieldVault(accessToken, key, userAddress, userInfo.maxRedeem);
+  return await redeemYieldVault(accessToken, key, userAddress, userInfo.userShares);
 };
