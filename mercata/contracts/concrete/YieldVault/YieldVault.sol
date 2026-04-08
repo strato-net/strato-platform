@@ -137,16 +137,6 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         return _mulDiv(shares, assetsBase, supply, roundUp);
     }
 
-    function maxDeposit(address receiver) public view override returns (uint256) {
-        if (!vaultInitialized || paused()) return 0;
-        return super.maxDeposit(receiver);
-    }
-
-    function maxMint(address receiver) public view override returns (uint256) {
-        if (!vaultInitialized || paused()) return 0;
-        return super.maxMint(receiver);
-    }
-
     function maxWithdraw(address owner_) public view override returns (uint256) {
         if (!vaultInitialized || paused()) return 0;
         uint256 ownerAssets = _convertToAssets(balanceOf(owner_), false);
