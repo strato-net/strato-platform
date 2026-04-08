@@ -56,7 +56,9 @@ pipeline {
               --sslDir='/home/ec2-user/cloudflare-ssl/'
           """
           sh "chmod +x run.sh"
-          sh "./run.sh"
+          withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+            sh "./run.sh"
+          }
           script {
             def lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
             // First check if blocks are flowing within the first 5 minutes
