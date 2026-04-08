@@ -27,7 +27,7 @@ const DepositsPage = () => {
       <DashboardSidebar />
 
       <div className="h-screen flex flex-col transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
-        <DashboardHeader title="Fund" subtitle="Bring assets onto STRATO and start earning" />
+        <DashboardHeader title="Fund" />
         <main className="flex-1 p-4 md:p-6 pb-16 md:pb-6 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to deposit and start earning" />

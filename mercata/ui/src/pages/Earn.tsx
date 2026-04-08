@@ -24,6 +24,7 @@ import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useYieldVaultContext } from "@/context/YieldVaultContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useToast } from "@/hooks/use-toast";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
@@ -36,6 +37,8 @@ import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { CircleArrowDown, PiggyBank, Star, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import stratoVaultLogo from "@/assets/strato-vault-logo.png";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { EarnApyInfo, buildNativeRewardsApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
 import {
   mUsdstAddress,
   LENDING_DEPOSIT_FEE,
@@ -44,7 +47,6 @@ import {
 
 const WAD = BigInt(10) ** BigInt(18);
 const TOP_OPPORTUNITY_MIN_POOL_TVL = 100000n * WAD;
-const CATA_PRICE_USD = 0.25;
 
 const safeBigInt = (value: string | undefined | null): bigint => {
   if (!value) return BigInt(0);
@@ -168,51 +170,6 @@ const formatCarryVaultApyDisplayForLive = (
   }
   return formatApyDisplay(apy);
 };
-
-const getEstimatedIncentiveApy = (
-  nativeApyPercent?: string | number | null,
-  emissionRate?: string,
-  totalStakeUsd?: string | null
-): number => {
-  try {
-    const nativeApy =
-      nativeApyPercent === null ||
-      nativeApyPercent === undefined ||
-      nativeApyPercent === "" ||
-      nativeApyPercent === "-"
-        ? 0
-        : Number(nativeApyPercent);
-    const hasNativeApy = Number.isFinite(nativeApy) && nativeApy > 0;
-    if (!Number.isFinite(nativeApy)) {
-      return Number.NEGATIVE_INFINITY;
-    }
-
-    if (!emissionRate || !totalStakeUsd) {
-      return hasNativeApy ? Number(nativeApy.toFixed(2)) : Number.NEGATIVE_INFINITY;
-    }
-
-    const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
-    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) {
-      return hasNativeApy ? Number(nativeApy.toFixed(2)) : Number.NEGATIVE_INFINITY;
-    }
-
-    const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
-    if (!Number.isFinite(annualCata) || annualCata < 0) {
-      return hasNativeApy ? Number(nativeApy.toFixed(2)) : Number.NEGATIVE_INFINITY;
-    }
-
-    const rewardsApy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
-    const totalApy = nativeApy + rewardsApy;
-    if (!Number.isFinite(totalApy) || totalApy <= 0) {
-      return hasNativeApy ? Number(nativeApy.toFixed(2)) : Number.NEGATIVE_INFINITY;
-    }
-
-    return Number(totalApy.toFixed(2));
-  } catch {
-    return Number.NEGATIVE_INFINITY;
-  }
-};
-
 const formatPointsMultiplier = (scaledTenths: bigint): string => {
   const whole = scaledTenths / 10n;
   const frac = scaledTenths % 10n;
@@ -306,6 +263,7 @@ const Earn = () => {
   const { vaults: yieldVaults, userVaults: yieldUserVaults, loading: yieldVaultsLoading } =
     useYieldVaultContext();
   const { earningAssets, usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
   const { activities: rewardsActivities } = useRewardsActivities();
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
@@ -458,26 +416,6 @@ const Earn = () => {
     }) || null;
   }, [rewardsActivities, saveUsdstAsset?.address]);
 
-  const saveUsdstNativeApy = saveUsdstInfo?.apy ?? saveUsdstAsset?.apy;
-
-  const saveUsdstEstimatedApy = useMemo(() => {
-    return getEstimatedIncentiveApy(
-      saveUsdstNativeApy,
-      saveUsdstRewardsActivity?.emissionRate,
-      saveUsdstRewardsActivity?.totalStakeUsd ??
-        saveUsdstInfo?.tvlUsd ??
-        saveUsdstInfo?.pricingAssets ??
-        saveUsdstInfo?.totalAssets ??
-        null
-    );
-  }, [
-    saveUsdstNativeApy,
-    saveUsdstInfo?.tvlUsd,
-    saveUsdstInfo?.pricingAssets,
-    saveUsdstInfo?.totalAssets,
-    saveUsdstRewardsActivity,
-  ]);
-
   const saveUsdstTvl = useMemo(() => {
     if (saveUsdstInfo?.deployed && saveUsdstInfo.tvlUsd) {
       return saveUsdstInfo.tvlUsd;
@@ -493,6 +431,21 @@ const Earn = () => {
 
     return saveUsdstRewardsActivity?.totalStakeUsd || "0";
   }, [saveUsdstInfo, saveUsdstRewardsActivity]);
+
+  const saveUsdstApyInfo = useMemo<EarnApyInfo | null>(
+    () => findBestEarnApyInfo(tokenApys, saveUsdstInfo?.vaultAddress || saveUsdstAsset?.address),
+    [saveUsdstAsset?.address, saveUsdstInfo?.vaultAddress, tokenApys]
+  );
+
+  const vaultEarnApyInfo = useMemo(() => findVaultEarnApyInfo(tokenApys), [tokenApys]);
+  const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
+  const getPoolEarnApyInfo = (pool: Pool) => findPoolEarnApyInfo(tokenApys, pool.address);
+  const getPoolDisplayApy = (pool: Pool) => {
+    const info = getPoolEarnApyInfo(pool);
+    return info ? info.total.toFixed(2) : undefined;
+  };
+  const saveUsdstDisplayApyRaw = saveUsdstApyInfo?.total.toFixed(2);
+  const lendingDisplayApyRaw = lendingEarnApyInfo?.total.toFixed(2);
 
   const getOpportunityTvl = (opportunity: OpportunityRow): bigint => {
     if (opportunity.kind === "saveUsdst") return safeBigInt(saveUsdstTvl);
@@ -578,60 +531,18 @@ const Earn = () => {
     return `$${formatUsd(depositedUsd.toString())}`;
   };
 
-  const allOpportunities = useMemo<OpportunityRow[]>(() => {
-    const rows: OpportunityRow[] = [];
-
-    if (activeFilter === "all" || activeFilter === "vaults") {
-      rows.push({ kind: "saveUsdst", apySortValue: saveUsdstEstimatedApy });
-      rows.push({ kind: "vault", apySortValue: parseApy(vaultState.alpha) });
-      for (let i = 0; i < YIELD_VAULTS.length; i++) {
-        const yv = yieldVaults[YIELD_VAULTS[i].key];
-        rows.push({ kind: "yieldVault", apySortValue: yv?.deployed ? parseApy(yv.apy) : Number.NEGATIVE_INFINITY, vaultIndex: i });
-      }
-    }
-
-    if (activeFilter === "all" || activeFilter === "pools") {
-      rows.push({ kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) });
-      for (const pool of sortedPools) {
-        rows.push({ kind: "pool", apySortValue: parseApy(pool.apy), pool });
-      }
-    }
-
-    return rows.sort(compareOpportunities);
-  }, [activeFilter, liquidityInfo?.supplyAPY, saveUsdstEstimatedApy, saveUsdstTvl, sortedPools, vaultState.alpha, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied, yieldVaults]);
-
-  const vaultAlpha = formatApyDisplay(vaultState.alpha);
-  const rankedTopCandidates = useMemo<OpportunityRow[]>(() => {
-    const candidates: OpportunityRow[] = [
-      { kind: "saveUsdst", apySortValue: saveUsdstEstimatedApy },
-      { kind: "vault", apySortValue: parseApy(vaultState.alpha) },
-      ...YIELD_VAULTS.map((v, i) => ({
-        kind: "yieldVault" as const,
-        apySortValue: yieldVaults[v.key]?.deployed ? parseApy(yieldVaults[v.key]?.apy) : Number.NEGATIVE_INFINITY,
-        vaultIndex: i,
-      })),
-      { kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) },
-      ...sortedPools.map((pool) => ({
-        kind: "pool" as const,
-        apySortValue: parseApy(pool.apy),
-        pool,
-      })),
-    ];
-    const rankedCandidates = [...candidates].sort(compareOpportunities);
-    return rankedCandidates.filter(isEligibleForTopOpportunity).length > 0
-      ? rankedCandidates.filter(isEligibleForTopOpportunity)
-      : rankedCandidates;
-  }, [liquidityInfo?.supplyAPY, liquidityInfo?.totalUSDSTSupplied, saveUsdstEstimatedApy, saveUsdstTvl, sortedPools, vaultState.alpha, vaultState.totalEquity, yieldVaults]);
-
   const rewardActivityByContract = useMemo(() => {
-    const map = new Map<string, { emissionRate: bigint }>();
+    const map = new Map<string, { emissionRate: bigint; totalStakeUsd: string | null }>();
     for (const activity of rewardsActivities || []) {
       const contract = activity.sourceContract?.toLowerCase();
       if (!contract) continue;
       try {
-        map.set(contract, { emissionRate: BigInt(activity.emissionRate || "0") });
+        map.set(contract, {
+          emissionRate: BigInt(activity.emissionRate || "0"),
+          totalStakeUsd: activity.totalStakeUsd ?? null,
+        });
       } catch {
-        map.set(contract, { emissionRate: 0n });
+        map.set(contract, { emissionRate: 0n, totalStakeUsd: activity.totalStakeUsd ?? null });
       }
     }
     return map;
@@ -678,15 +589,84 @@ const Earn = () => {
   const vaultRewardMeta = getRewardMeta(vaultState.shareTokenAddress);
   const lendingRewardMeta = getRewardMeta(mUsdstAddress);
   const saveUsdstRewardMeta = getRewardMeta(saveUsdstRewardsActivity?.sourceContract || saveUsdstAsset?.address);
+  const vaultRewardActivity = rewardActivityByContract.get(vaultState.shareTokenAddress?.toLowerCase() || "");
+  const resolvedVaultApyInfo = useMemo(
+    () =>
+      vaultEarnApyInfo ||
+      buildNativeRewardsApyInfo(
+        vaultState.alpha,
+        vaultRewardActivity?.emissionRate ? vaultRewardActivity.emissionRate.toString() : null,
+        vaultRewardActivity?.totalStakeUsd ?? vaultState.totalEquity ?? null,
+        "vault"
+      ),
+    [
+      vaultEarnApyInfo,
+      vaultRewardActivity?.emissionRate,
+      vaultRewardActivity?.totalStakeUsd,
+      vaultState.alpha,
+      vaultState.totalEquity,
+    ]
+  );
+  const vaultDisplayApyRaw = resolvedVaultApyInfo
+    ? resolvedVaultApyInfo.total.toFixed(2)
+    : vaultState.alpha;
+  const allOpportunities = useMemo<OpportunityRow[]>(() => {
+    const rows: OpportunityRow[] = [];
+
+    if (activeFilter === "all" || activeFilter === "vaults") {
+      rows.push({ kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) });
+      rows.push({ kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) });
+      for (let i = 0; i < YIELD_VAULTS.length; i++) {
+        const yv = yieldVaults[YIELD_VAULTS[i].key];
+        rows.push({
+          kind: "yieldVault",
+          apySortValue: yv?.deployed ? parseApy(yv.apy) : Number.NEGATIVE_INFINITY,
+          vaultIndex: i,
+        });
+      }
+    }
+
+    if (activeFilter === "all" || activeFilter === "pools") {
+      rows.push({ kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) });
+      for (const pool of sortedPools) {
+        rows.push({ kind: "pool", apySortValue: parseApy(getPoolDisplayApy(pool)), pool });
+      }
+    }
+
+    return rows.sort(compareOpportunities);
+  }, [activeFilter, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied]);
+
+  const vaultAlpha = formatApyDisplay(vaultDisplayApyRaw);
+  const rankedTopCandidates = useMemo<OpportunityRow[]>(() => {
+    const candidates: OpportunityRow[] = [
+      { kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) },
+      { kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) },
+      ...YIELD_VAULTS.map((v, i) => ({
+        kind: "yieldVault" as const,
+        apySortValue: yieldVaults[v.key]?.deployed ? parseApy(yieldVaults[v.key]?.apy) : Number.NEGATIVE_INFINITY,
+        vaultIndex: i,
+      })),
+      { kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) },
+      ...sortedPools.map((pool) => ({
+        kind: "pool" as const,
+        apySortValue: parseApy(getPoolDisplayApy(pool)),
+        pool,
+      })),
+    ];
+    const rankedCandidates = [...candidates].sort(compareOpportunities);
+    return rankedCandidates.filter(isEligibleForTopOpportunity).length > 0
+      ? rankedCandidates.filter(isEligibleForTopOpportunity)
+      : rankedCandidates;
+  }, [lendingDisplayApyRaw, liquidityInfo?.totalUSDSTSupplied, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, yieldVaults]);
   const getOpportunityMeta = (opportunity: OpportunityRow) => {
     if (opportunity.kind === "saveUsdst") {
       return {
         title: "Savings Vault",
         subtitle: "Stable USD savings with yield plus rewards",
-        apyRaw: saveUsdstEstimatedApy,
+        apyRaw: saveUsdstDisplayApyRaw,
         tvl: saveUsdstTvl,
         badge: "Savings Vault",
-        rateLabel: "APY",
+        rateLabel: "Best Available APY",
         actionLabel: "Deposit",
         onCardClick: () => navigate("/dashboard/earn-save"),
         onActionClick: () => navigate("/dashboard/earn-save"),
@@ -697,10 +677,10 @@ const Earn = () => {
       return {
         title: "Diversified Vault",
         subtitle: "Diversified real assets: gold, silver, ETH, BTC, stables - actively managed",
-        apyRaw: vaultState.alpha,
+        apyRaw: vaultDisplayApyRaw,
         tvl: vaultState.totalEquity,
         badge: "Diversified Vault",
-        rateLabel: "APY",
+        rateLabel: "Best Available APY",
         actionLabel: "Deposit",
         onCardClick: () => navigate("/dashboard/earn-vault"),
         onActionClick: () => handleVaultDepositClick(),
@@ -728,10 +708,10 @@ const Earn = () => {
       return {
         title: "USDST Lending Pool",
         subtitle: "Earn yield by supplying USDST liquidity",
-        apyRaw: liquidityInfo?.supplyAPY?.toString(),
+        apyRaw: lendingDisplayApyRaw,
         tvl: liquidityInfo?.totalUSDSTSupplied?.toString() || "0",
         badge: "Lending",
-        rateLabel: "APY",
+        rateLabel: "Best Available APY",
         actionLabel: "Deposit",
         onCardClick: () => navigate("/dashboard/earn-lending"),
         onActionClick: () => handleLendingDepositClick(),
@@ -742,15 +722,22 @@ const Earn = () => {
     return {
       title: pool.poolName,
       subtitle: `Earn fees on ${pool.poolName.replace(" Pool", "")} swaps`,
-      apyRaw: pool.apy,
+      apyRaw: getPoolDisplayApy(pool),
       tvl: pool.totalLiquidityUSD,
       badge: "Pool",
-      rateLabel: "APY",
+      rateLabel: "Best Available APY",
       actionLabel: "Deposit",
       onCardClick: () => navigateToPoolDetails(pool),
       onActionClick: () => handlePoolDeposit(pool),
       pool,
     };
+  };
+  const getOpportunityApyInfo = (opportunity: OpportunityRow): EarnApyInfo | null => {
+    if (opportunity.kind === "saveUsdst") return saveUsdstApyInfo;
+    if (opportunity.kind === "vault") return resolvedVaultApyInfo;
+    if (opportunity.kind === "yieldVault") return null;
+    if (opportunity.kind === "lending") return lendingEarnApyInfo;
+    return getPoolEarnApyInfo(opportunity.pool);
   };
 
   const configuredFeaturedOpportunity = useMemo<OpportunityRow | null>(() => {
@@ -758,15 +745,15 @@ const Earn = () => {
     if (!key) return null;
 
     if (key === "save-usdst" || key === "saveusdst") {
-      return { kind: "saveUsdst", apySortValue: saveUsdstEstimatedApy };
+      return { kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) };
     }
 
     if (key === "vault") {
-      return { kind: "vault", apySortValue: parseApy(vaultState.alpha) };
+      return { kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) };
     }
 
     if (key === "lending") {
-      return { kind: "lending", apySortValue: parseApy(liquidityInfo?.supplyAPY) };
+      return { kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) };
     }
 
     const yieldVaultIdx = YIELD_VAULTS.findIndex((v) => v.key === key);
@@ -778,17 +765,19 @@ const Earn = () => {
       const targetAddress = normalizeAddress(key.slice(5));
       const pool = sortedPools.find((candidate) => normalizeAddress(candidate.address) === targetAddress);
       if (pool) {
-        return { kind: "pool", apySortValue: parseApy(pool.apy), pool };
+        return { kind: "pool", apySortValue: parseApy(getPoolDisplayApy(pool)), pool };
       }
     }
 
     return null;
   }, [
     featuredOpportunityKey,
-    liquidityInfo?.supplyAPY,
-    saveUsdstEstimatedApy,
+    lendingDisplayApyRaw,
+    saveUsdstDisplayApyRaw,
     sortedPools,
-    vaultState.alpha,
+    tokenApys,
+    tokenApysLoaded,
+    vaultDisplayApyRaw,
   ]);
 
   const topOpportunity = useMemo<OpportunityRow>(() => {
@@ -807,7 +796,8 @@ const Earn = () => {
     );
   }, [configuredFeaturedOpportunity, rankedTopCandidates]);
 
-  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, saveUsdstEstimatedApy, saveUsdstTvl, vaultState.alpha, vaultState.totalEquity, liquidityInfo?.supplyAPY, liquidityInfo?.totalUSDSTSupplied, navigate]);
+  const topOpportunityMeta = useMemo(() => getOpportunityMeta(topOpportunity), [topOpportunity, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied, navigate]);
+  const topOpportunityApyInfo = useMemo(() => getOpportunityApyInfo(topOpportunity), [topOpportunity, saveUsdstApyInfo, resolvedVaultApyInfo, lendingEarnApyInfo, tokenApys]);
   const topOpportunityApy = useMemo(() => {
     if (topOpportunity.kind === "yieldVault") {
       const cfg = YIELD_VAULTS[topOpportunity.vaultIndex];
@@ -821,14 +811,20 @@ const Earn = () => {
     () => (configuredFeaturedOpportunity ? getOpportunityMeta(configuredFeaturedOpportunity) : null),
     [
       configuredFeaturedOpportunity,
-      saveUsdstEstimatedApy,
+      saveUsdstDisplayApyRaw,
       saveUsdstTvl,
-      vaultState.alpha,
+      tokenApys,
+      tokenApysLoaded,
+      vaultDisplayApyRaw,
       vaultState.totalEquity,
-      liquidityInfo?.supplyAPY,
+      lendingDisplayApyRaw,
       liquidityInfo?.totalUSDSTSupplied,
       navigate,
     ]
+  );
+  const featuredOpportunityApyInfo = useMemo(
+    () => (configuredFeaturedOpportunity ? getOpportunityApyInfo(configuredFeaturedOpportunity) : null),
+    [configuredFeaturedOpportunity, saveUsdstApyInfo, resolvedVaultApyInfo, lendingEarnApyInfo, tokenApys]
   );
   const featuredOpportunityApy = useMemo(() => {
     if (!configuredFeaturedOpportunity || !featuredOpportunityMeta) {
@@ -906,7 +902,7 @@ const Earn = () => {
               {configuredFeaturedOpportunity && featuredOpportunityMeta && (
                 <div>
                   <Card
-                    className="border border-amber-500/40 dark:border-amber-400/35 bg-gradient-to-br from-[#fffaf0] to-[#fff4db] dark:from-[#24190a] dark:to-[#2b1d0c] shadow-sm cursor-pointer h-full"
+                    className="h-full cursor-pointer rounded-[22px] border border-amber-300/70 bg-gradient-to-br from-[#fff9ef] via-[#fff7ea] to-[#fff2dc] shadow-[0_6px_18px_rgba(217,119,6,0.07)] dark:border-amber-400/35 dark:from-[#24190a] dark:via-[#2a1c0c] dark:to-[#2b1d0c]"
                     role="button"
                     tabIndex={0}
                     onClick={featuredOpportunityMeta.onCardClick}
@@ -917,74 +913,76 @@ const Earn = () => {
                       }
                     }}
                   >
-                    <CardContent className="pt-3 pb-3 px-4 md:px-4 space-y-2">
-                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5 w-fit rounded-md bg-background/70 dark:bg-white/10">
+                    <CardContent className="space-y-4 px-4 pb-4 pt-4 md:px-5 md:pb-5 md:pt-5">
+                      <p className="text-sm font-semibold text-foreground/90">
                         Featured Opportunity
-                      </Badge>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-3">
-                            {configuredFeaturedOpportunity.kind === "saveUsdst" ? (
-                              <div className="w-12 h-12 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 flex items-center justify-center shrink-0">
-                                <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                              </div>
-                            ) : configuredFeaturedOpportunity.kind === "vault" ? (
-                              <img
-                                src={stratoVaultLogo}
-                                alt="STRATO Vault"
-                                className="w-12 h-12 rounded-full object-cover shrink-0"
-                              />
-                            ) : configuredFeaturedOpportunity.kind === "yieldVault" ? (
-                              <div className={`w-12 h-12 rounded-full ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconBg} flex items-center justify-center shrink-0`}>
-                                <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconColor}`} />
-                              </div>
-                            ) : configuredFeaturedOpportunity.kind === "lending" ? (
-                              <div className="w-12 h-12 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
-                                <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                              </div>
-                            ) : (
-                              <TokenPairIcon pool={configuredFeaturedOpportunity.pool} size="lg" />
-                            )}
-                            <div className="min-w-0">
-                              <h3 className="text-2xl md:text-[26px] leading-none font-semibold tracking-tight">{featuredOpportunityMeta.title}</h3>
-                              <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
-                                {featuredOpportunityMeta.subtitle}
-                              </p>
-                            </div>
+                      </p>
+                      <div className="flex items-start gap-3.5">
+                        {configuredFeaturedOpportunity.kind === "saveUsdst" ? (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
+                            <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                           </div>
-                        </div>
-                        <div className="text-left md:text-right shrink-0">
-                          <p className="text-xs md:text-sm uppercase tracking-wide text-muted-foreground">
-                            {featuredOpportunityMeta.rateLabel}
-                          </p>
-                          <p className={`text-2xl md:text-[32px] leading-none font-semibold ${featuredOpportunityApy.className}`}>
-                            {featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
-                          </p>
-                          <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
-                            {configuredFeaturedOpportunity.kind === "yieldVault" ? (
-                              <>
-                                TVL{" "}
-                                {(() => {
-                                  const vd =
-                                    yieldVaults[
-                                      YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].key
-                                    ];
-                                  const s = formatYieldVaultTvlUsd(vd);
-                                  return s === "--" ? "--" : `$${s}`;
-                                })()}
-                              </>
-                            ) : (
-                              <>TVL ${formatUsd(featuredOpportunityMeta.tvl)}</>
-                            )}
-                          </p>
-                          <div className="mt-1 flex items-center gap-2 md:justify-end">
-                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-md">{featuredOpportunityMeta.badge}</Badge>
-                            <Badge className="text-[10px] px-2 py-0.5 rounded-md bg-amber-600 hover:bg-amber-600 text-white">Featured</Badge>
+                        ) : configuredFeaturedOpportunity.kind === "vault" ? (
+                          <img
+                            src={stratoVaultLogo}
+                            alt="STRATO Vault"
+                            className="h-12 w-12 shrink-0 rounded-full object-cover"
+                          />
+                        ) : configuredFeaturedOpportunity.kind === "yieldVault" ? (
+                          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconBg}`}>
+                            <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconColor}`} />
                           </div>
+                        ) : configuredFeaturedOpportunity.kind === "lending" ? (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
+                            <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                        ) : (
+                          <TokenPairIcon pool={configuredFeaturedOpportunity.pool} size="lg" />
+                        )}
+                        <div className="min-w-0 pt-1">
+                          <h3 className="text-[26px] leading-[1.08] font-semibold tracking-tight md:text-[30px]">
+                            {featuredOpportunityMeta.title}
+                          </h3>
+                          <p className="mt-1 max-w-[28rem] text-[13px] leading-[1.35] text-muted-foreground md:text-sm">
+                            {featuredOpportunityMeta.subtitle}
+                          </p>
                         </div>
                       </div>
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
+                        <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                          {featuredOpportunityMeta.rateLabel}
+                        </p>
+                        <EarnApyTooltip info={featuredOpportunityApyInfo}>
+                          <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${featuredOpportunityApy.className} cursor-default`}>
+                            {featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
+                          </span>
+                        </EarnApyTooltip>
+                        <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                          TVL
+                        </p>
+                        <p className="text-sm font-medium text-foreground/80 md:text-sm">
+                          {configuredFeaturedOpportunity.kind === "yieldVault"
+                            ? (() => {
+                                const vd =
+                                  yieldVaults[
+                                    YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].key
+                                  ];
+                                const s = formatYieldVaultTvlUsd(vd);
+                                return s === "--" ? "--" : `$${s}`;
+                              })()
+                            : `$${formatUsd(featuredOpportunityMeta.tvl)}`}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary" className="rounded-md border-0 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-none dark:bg-white/10">
+                          {featuredOpportunityMeta.badge}
+                        </Badge>
+                        <Badge className="rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-amber-600">
+                          Featured
+                        </Badge>
+                      </div>
                       <Button
-                        className="w-full h-8 rounded-lg bg-amber-600 hover:bg-amber-600 text-white font-medium"
+                        className="h-10 w-full rounded-xl bg-amber-600 text-[15px] font-semibold text-white hover:bg-amber-600"
                         variant="default"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1005,7 +1003,7 @@ const Earn = () => {
 
                 <div>
                 <Card
-                  className="border border-blue-500/40 dark:border-blue-400/35 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a] shadow-sm cursor-pointer h-full"
+                  className="h-full cursor-pointer rounded-[22px] border border-blue-300/70 bg-gradient-to-br from-[#f8fbff] via-[#f4f8ff] to-[#edf3ff] shadow-[0_6px_18px_rgba(37,99,235,0.07)] dark:border-blue-400/35 dark:from-[#0f1a33] dark:via-[#101a35] dark:to-[#111c3a]"
                   role="button"
                   tabIndex={0}
                   onClick={topOpportunityMeta.onCardClick}
@@ -1016,71 +1014,73 @@ const Earn = () => {
                     }
                   }}
                 >
-                  <CardContent className="pt-3 pb-3 px-4 md:px-4 space-y-2">
-                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5 w-fit rounded-md bg-background/70 dark:bg-white/10">
+                  <CardContent className="space-y-4 px-4 pb-4 pt-4 md:px-5 md:pb-5 md:pt-5">
+                    <p className="text-sm font-semibold text-foreground/90">
                       Top Opportunity
-                    </Badge>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-3">
-                          {topOpportunity.kind === "saveUsdst" ? (
-                          <div className="w-12 h-12 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 flex items-center justify-center shrink-0">
-                            <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                            </div>
-                          ) : topOpportunity.kind === "vault" ? (
-                            <img
-                              src={stratoVaultLogo}
-                              alt="STRATO Vault"
-                            className="w-12 h-12 rounded-full object-cover shrink-0"
-                            />
-                          ) : topOpportunity.kind === "yieldVault" ? (
-                          <div className={`w-12 h-12 rounded-full ${YIELD_VAULTS[topOpportunity.vaultIndex].iconBg} flex items-center justify-center shrink-0`}>
-                            <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[topOpportunity.vaultIndex].iconColor}`} />
-                            </div>
-                          ) : topOpportunity.kind === "lending" ? (
-                          <div className="w-12 h-12 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
-                            <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                          ) : (
-                            <TokenPairIcon pool={topOpportunity.pool} size="lg" />
-                          )}
-                          <div className="min-w-0">
-                          <h3 className="text-2xl md:text-[26px] leading-none font-semibold tracking-tight">{topOpportunityMeta.title}</h3>
-                          <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
-                              {topOpportunityMeta.subtitle}
-                            </p>
-                          </div>
+                    </p>
+                    <div className="flex items-start gap-3.5">
+                      {topOpportunity.kind === "saveUsdst" ? (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
+                          <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                         </div>
-                      </div>
-                      <div className="text-left md:text-right shrink-0">
-                        <p className="text-xs md:text-sm uppercase tracking-wide text-muted-foreground">
-                          {topOpportunityMeta.rateLabel}
-                        </p>
-                      <p className={`text-2xl md:text-[32px] leading-none font-semibold ${topOpportunityApy.className}`}>
-                          {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
-                        </p>
-                      <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
-                          {topOpportunity.kind === "yieldVault" ? (
-                            <>
-                              TVL{" "}
-                              {(() => {
-                                const vd = yieldVaults[YIELD_VAULTS[topOpportunity.vaultIndex].key];
-                                const s = formatYieldVaultTvlUsd(vd);
-                                return s === "--" ? "--" : `$${s}`;
-                              })()}
-                            </>
-                          ) : (
-                            <>TVL ${formatUsd(topOpportunityMeta.tvl)}</>
-                          )}
-                        </p>
-                      <div className="mt-1 flex items-center gap-2 md:justify-end">
-                          <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-md">{topOpportunityMeta.badge}</Badge>
-                          <Badge className="text-[10px] px-2 py-0.5 rounded-md bg-blue-600 hover:bg-blue-600 text-white">Top Ranked</Badge>
+                      ) : topOpportunity.kind === "vault" ? (
+                        <img
+                          src={stratoVaultLogo}
+                          alt="STRATO Vault"
+                          className="h-12 w-12 shrink-0 rounded-full object-cover"
+                        />
+                      ) : topOpportunity.kind === "yieldVault" ? (
+                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[topOpportunity.vaultIndex].iconBg}`}>
+                          <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[topOpportunity.vaultIndex].iconColor}`} />
                         </div>
+                      ) : topOpportunity.kind === "lending" ? (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
+                          <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                      ) : (
+                        <TokenPairIcon pool={topOpportunity.pool} size="lg" />
+                      )}
+                      <div className="min-w-0 pt-1">
+                        <h3 className="text-[26px] leading-[1.08] font-semibold tracking-tight md:text-[30px]">
+                          {topOpportunityMeta.title}
+                        </h3>
+                        <p className="mt-1 max-w-[28rem] text-[13px] leading-[1.35] text-muted-foreground md:text-sm">
+                          {topOpportunityMeta.subtitle}
+                        </p>
                       </div>
                     </div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
+                      <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                        {topOpportunityMeta.rateLabel}
+                      </p>
+                      <EarnApyTooltip info={topOpportunityApyInfo}>
+                        <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${topOpportunityApy.className} cursor-default`}>
+                          {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
+                        </span>
+                      </EarnApyTooltip>
+                      <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                        TVL
+                      </p>
+                      <p className="text-sm font-medium text-foreground/80 md:text-sm">
+                        {topOpportunity.kind === "yieldVault"
+                          ? (() => {
+                              const vd = yieldVaults[YIELD_VAULTS[topOpportunity.vaultIndex].key];
+                              const s = formatYieldVaultTvlUsd(vd);
+                              return s === "--" ? "--" : `$${s}`;
+                            })()
+                          : `$${formatUsd(topOpportunityMeta.tvl)}`}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary" className="rounded-md border-0 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-none dark:bg-white/10">
+                        {topOpportunityMeta.badge}
+                      </Badge>
+                      <Badge className="rounded-md bg-blue-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-600">
+                        Top Ranked
+                      </Badge>
+                    </div>
                     <Button
-                    className="w-full h-8 rounded-lg bg-blue-600 hover:bg-blue-600 text-white font-medium"
+                      className="h-10 w-full rounded-xl bg-blue-600 text-[15px] font-semibold text-white hover:bg-blue-600"
                       variant="default"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1152,7 +1152,7 @@ const Earn = () => {
                     <thead className="bg-muted/40">
                       <tr className="border-b border-border/50">
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Opportunity</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Yield</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Best Available APY</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Rewards</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">TVL</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Position</th>
@@ -1163,7 +1163,7 @@ const Earn = () => {
                     <tbody>
                       {allOpportunities.map((opportunity) => {
                         if (opportunity.kind === "saveUsdst") {
-                          const saveUsdstApyDisplay = formatApyDisplay(saveUsdstEstimatedApy);
+                          const saveUsdstApyDisplay = formatApyDisplay(saveUsdstDisplayApyRaw);
                           return (
                             <tr
                               key="save-usdst"
@@ -1188,10 +1188,11 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${saveUsdstApyDisplay.className}`}>
-                                  {saveUsdstApyDisplay.label}
-                                </p>
-                                <p className="text-xs text-muted-foreground">APY</p>
+                                <EarnApyTooltip info={saveUsdstApyInfo}>
+                                  <p className={`text-sm font-semibold ${saveUsdstApyDisplay.className} cursor-default`}>
+                                    {saveUsdstApyDisplay.label}
+                                  </p>
+                                </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
                                 {saveUsdstRewardMeta.pointsLabel !== "-" ? (
@@ -1266,10 +1267,11 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${vaultAlpha.className}`}>
-                                  {vaultAlpha.label}
-                                </p>
-                                <p className="text-xs text-muted-foreground">APY</p>
+                                <EarnApyTooltip info={resolvedVaultApyInfo}>
+                                  <p className={`text-sm font-semibold ${vaultAlpha.className} cursor-default`}>
+                                    {vaultAlpha.label}
+                                  </p>
+                                </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
                                 {vaultRewardMeta.pointsLabel !== "-" ? (
@@ -1430,10 +1432,11 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {formatApyDisplay(liquidityInfo?.supplyAPY).label}
-                                </p>
-                                <p className="text-xs text-muted-foreground">APY</p>
+                                <EarnApyTooltip info={lendingEarnApyInfo}>
+                                  <p className="text-sm font-semibold cursor-default">
+                                    {formatApyDisplay(lendingDisplayApyRaw).label}
+                                  </p>
+                                </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
                                 {lendingRewardMeta.pointsLabel !== "-" ? (
@@ -1488,6 +1491,7 @@ const Earn = () => {
 
                         const { pool } = opportunity;
                         const poolRewardMeta = getRewardMeta(pool.lpToken?.address);
+                        const poolApyInfo = getPoolEarnApyInfo(pool);
                         return (
                           <Fragment key={pool.address}>
                             <tr
@@ -1510,10 +1514,11 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-semibold">
-                                  {formatApyDisplay(pool.apy).label}
-                                </p>
-                                <p className="text-xs text-muted-foreground">APY</p>
+                                <EarnApyTooltip info={poolApyInfo}>
+                                  <p className="text-sm font-semibold cursor-default">
+                                    {formatApyDisplay(getPoolDisplayApy(pool)).label}
+                                  </p>
+                                </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
                                 {poolRewardMeta.pointsLabel !== "-" ? (

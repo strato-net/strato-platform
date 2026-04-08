@@ -13,6 +13,9 @@ import { isMultiTokenPool } from '@/helpers/swapCalculations';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useEarnContext } from "@/context/EarnContext";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { findPoolEarnApyInfo } from "@/utils/earnUtils";
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,6 +29,7 @@ const SwapPoolsSection = () => {
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { isLoggedIn } = useUser();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { tokenApys } = useEarnContext();
 
   useEffect(() => {
     fetchPools();
@@ -147,7 +151,11 @@ const SwapPoolsSection = () => {
             <div>No pools available</div>
           </div>
         ) : (
-          filteredPools.map((pool, id) => (
+          filteredPools.map((pool, id) => {
+            const apyInfo = findPoolEarnApyInfo(tokenApys, pool.address);
+            const displayedApy = apyInfo ? `${apyInfo.total.toFixed(2)}%` : "N/A";
+
+            return (
             <Card key={id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 gap-4">
@@ -230,8 +238,10 @@ const SwapPoolsSection = () => {
                   )}
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
                     <div className="text-left sm:text-right">
-                      <div className="text-sm text-muted-foreground">APY</div>
-                      <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
+                      <div className="text-sm text-muted-foreground">Best Available APY</div>
+                      <EarnApyTooltip info={apyInfo}>
+                        <div className="font-medium cursor-default">{displayedApy}</div>
+                      </EarnApyTooltip>
                     </div>
                
                     <div className="flex flex-col items-end gap-1">
@@ -264,7 +274,7 @@ const SwapPoolsSection = () => {
                 </div>
               </CardContent>
             </Card>
-          ))
+          )})
         )}
       </div>
 
