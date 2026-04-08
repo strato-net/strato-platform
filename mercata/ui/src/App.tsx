@@ -37,6 +37,7 @@ import EarnSave from "./pages/EarnSave";
 import EarnVault from "./pages/EarnVault";
 import EarnLending from "./pages/EarnLending";
 import EarnPools from "./pages/EarnPools";
+import EarnYieldVault from "./pages/EarnYieldVault";
 import OnrampPage from "./pages/OnrampPage";
 import CreditCardPage from "./pages/CreditCard";
 
@@ -65,6 +66,7 @@ import { SwapProvider } from "@/context/SwapContext";
 import { NetworkProvider } from "@/context/NetworkContext";
 import { VaultProvider } from "@/context/VaultContext";
 import { SaveUsdstProvider } from "@/context/SaveUsdstContext";
+import { YieldVaultProvider } from "@/context/YieldVaultContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
@@ -196,230 +198,240 @@ const App = () => {
                                   <EarnProvider>
                                     <VaultProvider>
                                       <SaveUsdstProvider>
-                                        <TooltipProvider>
-                                          <Toaster />
-                                          <BrowserRouter>
-                                            <UsdstBalanceBox />
-                                            <Routes>
-                                          <Route path="/" element={<Index />} />
-                                          <Route path="/claim" element={<Claim />} />
-                                          <Route
-                                            path="/dashboard"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <Dashboard />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/swap"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <SwapAsset />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/deposits"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <DepositsPage />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/deposits/:id"
-                                            element={
-                                              <ProtectedRoute>
-                                                <AssetDetail />
-                                              </ProtectedRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/borrow"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <Borrow />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/advanced"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <Advanced />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/vault"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <Vault />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/earn-vault"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <EarnVault />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/earn"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <Earn />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/earn-save"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <EarnSave />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/earn-lending"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <EarnLending />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/earn-pools"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <EarnPools />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/credit-card"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <CreditCardPage />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/activity"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <ActivityFeed />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/transfer"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <Transfer />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-                                          <Route
-                                            path="/dashboard/admin"
-                                            element={
-                                              <ProtectedRoute>
-                                                <AdminRoute>
-                                                  <Admin />
-                                                </AdminRoute>
-                                              </ProtectedRoute>
-                                            }
-                                          />
-
-                                          <Route
-                                            path="/bridge-transactions"
-                                            element={
-                                              <ProtectedRoute>
-                                                <BridgeTransactionsPage />
-                                              </ProtectedRoute>
-                                            }
-                                          />
-
-                                          <Route
-                                            path="/metal-transactions"
-                                            element={
-                                              <ProtectedRoute>
-                                                <MetalTransactionsPage />
-                                              </ProtectedRoute>
-                                            }
-                                          />
-
-                                          <Route
-                                            path="/dashboard/stats"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <StratoStats />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-
-                                          <Route
-                                            path="/dashboard/withdrawals"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <WithdrawalsPage />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-
-                                          <Route
-                                            path="/dashboard/rewards"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <Rewards />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-
-                                          <Route
-                                            path="/dashboard/refer"
-                                            element={
-                                              <ProtectedRoute>
-                                                <ReferFriend />
-                                              </ProtectedRoute>
-                                            }
-                                          />
-
-                                          <Route
-                                            path="/dashboard/referrals"
-                                            element={
-                                              <GuestAccessibleRoute>
-                                                <ReferralsManagement />
-                                              </GuestAccessibleRoute>
-                                            }
-                                          />
-
-                                          <Route
-                                            path="/dashboard/trading-desk"
-                                            element={
-                                              <ProtectedRoute>
-                                                <PriceTracking />
-                                              </ProtectedRoute>
-                                            }
-                                          />
-
-                                          <Route
-                                            path="/dashboard/onramp"
-                                            element={
-                                              <ProtectedRoute>
-                                                <OnrampPage />
-                                              </ProtectedRoute>
-                                            }
-                                          />
-
-                                          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                                          <Route path="*" element={<NotFound />} />
-                                            </Routes>
-                                          </BrowserRouter>
-                                        </TooltipProvider>
+                                        <YieldVaultProvider>
+                                          <TooltipProvider>
+                                            <Toaster />
+                                            <BrowserRouter>
+                                              <UsdstBalanceBox />
+                                              <Routes>
+                                                <Route path="/" element={<Index />} />
+                                                <Route path="/claim" element={<Claim />} />
+                                                <Route
+                                                  path="/dashboard"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Dashboard />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/swap"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <SwapAsset />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/deposits"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <DepositsPage />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/deposits/:id"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <AssetDetail />
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/borrow"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Borrow />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/advanced"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Advanced />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/vault"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Vault />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/earn-vault"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <EarnVault />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/earn"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Earn />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/earn-save"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <EarnSave />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/earn-lending"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <EarnLending />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/earn-yield-vault"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <EarnYieldVault />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/earn-pools"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <EarnPools />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/credit-card"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <CreditCardPage />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/activity"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <ActivityFeed />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/transfer"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Transfer />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/admin"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <AdminRoute>
+                                                        <Admin />
+                                                      </AdminRoute>
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+      
+                                                <Route
+                                                  path="/bridge-transactions"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <BridgeTransactionsPage />
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+      
+                                                <Route
+                                                  path="/metal-transactions"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <MetalTransactionsPage />
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+      
+                                                <Route
+                                                  path="/dashboard/stats"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <StratoStats />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+      
+                                                <Route
+                                                  path="/dashboard/withdrawals"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <WithdrawalsPage />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+      
+                                                <Route
+                                                  path="/dashboard/rewards"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Rewards />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+      
+                                                <Route
+                                                  path="/dashboard/refer"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <ReferFriend />
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+      
+                                                <Route
+                                                  path="/dashboard/referrals"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <ReferralsManagement />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+      
+                                                <Route
+                                                  path="/dashboard/trading-desk"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <PriceTracking />
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+      
+                                                <Route
+                                                  path="/dashboard/onramp"
+                                                  element={
+                                                    <ProtectedRoute>
+                                                      <OnrampPage />
+                                                    </ProtectedRoute>
+                                                  }
+                                                />
+      
+                                                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                                                <Route path="*" element={<NotFound />} />
+                                              </Routes>
+                                            </BrowserRouter>
+                                          </TooltipProvider>
+                                        </YieldVaultProvider>
                                       </SaveUsdstProvider>
                                     </VaultProvider>
                                   </EarnProvider>
