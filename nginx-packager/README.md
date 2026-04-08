@@ -15,7 +15,7 @@ OpenResty-based nginx reverse proxy for STRATO platform with OAuth2/OIDC authent
   - Mercata UI (`/`)
   - STRATO API (`/strato-api/`)
   - Blockchain API (`/bloc/v2.2/`)
-  - Ethereum JSON-RPC (dedicated RPC port, default `8545`)
+  - Ethereum JSON-RPC (`/rpc`, enabled when `JSONRPC_ENABLED=true`)
   - Apex API (`/apex-api/`)
   - Cirrus Search (`/cirrus/search/`)
   - SMD UI (`/smd/`)
@@ -69,8 +69,8 @@ The nginx configuration is generated at runtime from templates:
 | `POSTGREST_HOST` | PostgREST service host | `postgrest:3001` |
 | `PROMETHEUS_HOST` | Prometheus service host | `prometheus:9090` |
 | `SMD_HOST` | SMD service host | `smd:3002` |
-| `JSONRPC_ENABLED` | Enable the dedicated Ethereum JSON-RPC nginx listener | `false` |
-| `RPC_PORT` | Dedicated external nginx port for Ethereum JSON-RPC | `8545` |
+| `JSONRPC_ENABLED` | Enable the `/rpc` reverse proxy to Ethereum JSON-RPC | `false` |
+| `RPC_PORT` | Internal Ethereum JSON-RPC upstream port used by nginx | `8545` |
 | `STRATO_HOSTNAME` | STRATO service hostname | `strato` |
 | `STRATO_PORT_API` | STRATO API port | `3000` |
 | `STRATO_PORT_VAULT_PROXY` | Vault proxy port | `8013` |
@@ -97,7 +97,6 @@ nginx:
   ports:
     - "443:443"
     - "80:80"
-    - "8545:8545"
 ```
 
 ## Security

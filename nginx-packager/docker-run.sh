@@ -78,8 +78,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # Remove SSL lines if deployment is not SSL-enabled
   if [ "$ssl" != true ]; then
     sed -i '/#TEMPLATE_MARK_SSL/d' /tmp/nginx.conf
-  else
-    sed -i '/#TEMPLATE_MARK_JSONRPC_PLAIN/d' /tmp/nginx.conf
   fi
 
   if [ "$JSONRPC_ENABLED" != true ]; then

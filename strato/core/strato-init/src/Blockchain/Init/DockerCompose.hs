@@ -219,11 +219,7 @@ generateDockerCompose = do
                then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
                     ]
                else []
-        , ports = Just $
-            [portNum ++ ":" ++ portNum, "443:443"]
-            ++ if flags_jsonrpc
-               then [rpcPort ++ ":" ++ rpcPort]
-               else []
+        , ports = Just [portNum ++ ":" ++ portNum, "443:443"]
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/ssl:/etc/ssl/strato:ro"
