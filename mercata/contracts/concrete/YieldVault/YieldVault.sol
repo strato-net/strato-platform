@@ -520,7 +520,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     function maxDeploy() public view returns (uint256) {
         if (!vaultInitialized || paused()) return 0;
 
-        uint256 freeIdle = _freeIdleForQueueProcessing();
+        uint256 freeIdle = _freeIdleForInstantWithdrawals();
         uint256 minIdleRequirement = _minIdleRequirement();
         if (freeIdle <= minIdleRequirement) return 0;
         return freeIdle - minIdleRequirement;
