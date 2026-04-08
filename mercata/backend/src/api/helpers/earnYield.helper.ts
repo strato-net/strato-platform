@@ -1,3 +1,5 @@
+import backfillRows from "../../config/exchangeRateBackfill.json";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const YIELD_ANCHOR_UTC_HOUR = 12;
 const DEFAULT_YIELD_WINDOW_DAYS = 30;
@@ -89,6 +91,12 @@ export function getYieldWindowBounds(
     windowEndExclusive: `${endDateExclusive} 00:00:00 UTC`,
     anchorsMs: buildYieldAnchors(nowMs, days),
   };
+}
+
+// Temporary: merge pre-fetched historical exchange rates with live Cirrus data.
+// Remove once the oracle has 30+ days of real history.
+export function mergeBackfillRows(cirrusRows: any[]): any[] {
+  return [...backfillRows, ...cirrusRows];
 }
 
 export function computeExchangeRateAPY(

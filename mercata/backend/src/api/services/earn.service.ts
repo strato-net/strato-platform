@@ -2,7 +2,7 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { hiddenSwapPools, yieldBenchmarks, compositeYieldMap } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
-import { buildYieldAnchorOverlapFilter, computeExchangeRateAPY, getYieldWindowBounds, indexYieldHistoryRows } from "../helpers/earnYield.helper";
+import { buildYieldAnchorOverlapFilter, computeExchangeRateAPY, getYieldWindowBounds, indexYieldHistoryRows, mergeBackfillRows } from "../helpers/earnYield.helper";
 import { totalDebtFromScaled, calculateAPYs } from "../helpers/lending.helper";
 import { fetchMultiTokenStablePools } from "../helpers/swapping.helper";
 import {
@@ -215,7 +215,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 
   // Build per-asset exchange rate APY from exchangeRates history mapping.
   // Requires 2+ oracle data points on different calendar days before APY appears (see computeExchangeRateAPY).
-  const exchangeRateHistory = indexYieldHistoryRows(exchangeRateRows || []);
+  const exchangeRateHistory = indexYieldHistoryRows(mergeBackfillRows(exchangeRateRows || []));
 
   const baseYieldByAddr = new Map<string, number>();
   for (const { tokenAddress, tokenSymbol, baseSymbol } of yieldBenchmarks) {
