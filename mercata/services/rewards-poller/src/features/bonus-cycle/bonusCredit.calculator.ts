@@ -13,7 +13,7 @@ import { normalizeAddressNoPrefix } from "../../shared/core/address";
 
 export const MAX_BONUS_INTERVAL_SECONDS = 24 * 60 * 60;
 export const BONUS_SNAPSHOT_WINDOW = 28;
-const BPS_DENOMINATOR = 10000n;
+const SCALE = 10n ** 18n;
 const DIRECT_PAYOUT_BLOCK_NUMBER = 1;
 const DIRECT_PAYOUT_EVENT_INDEX = 1;
 
@@ -56,10 +56,9 @@ const isZeroOnlySnapshotWindow = (snapshots: string[]): boolean =>
 export const calculateBoostCapUsd = (
   currentBalance: bigint,
   snapshots: string[],
-  conversionNumerator: bigint,
-  conversionDenominator: bigint,
+  conversionRate: number,
 ): bigint => {
-  if (currentBalance <= 0n || snapshots.length === 0 || conversionDenominator <= 0n) {
+  if (currentBalance <= 0n || snapshots.length === 0 || conversionRate <= 0) {
     return 0n;
   }
 
@@ -67,7 +66,8 @@ export const calculateBoostCapUsd = (
   const effectiveBalance = currentBalance < averageBalance ? currentBalance : averageBalance;
   if (effectiveBalance <= 0n) return 0n;
 
-  return (effectiveBalance * conversionNumerator) / conversionDenominator;
+  const rateScaled = BigInt(Math.round(conversionRate * 1e18));
+  return (effectiveBalance * rateScaled) / SCALE;
 };
 
 export const isPositionActivity = (activityType: string): boolean =>
@@ -105,8 +105,7 @@ export const buildBonusUsers = (
       const boostCapUsd = calculateBoostCapUsd(
         BigInt(currentBalance),
         nextSnapshots,
-        rule.conversionNumerator,
-        rule.conversionDenominator,
+        rule.conversionRate,
       );
       if (boostCapUsd <= 0n) continue;
 
@@ -132,7 +131,7 @@ export const buildBonusUsers = (
 export const calculateBonusCreditsForUsers = async (
   bonusUsers: BonusEligibleUser[],
   intervalSeconds: number,
-  maxBonusBps: number,
+  maxMultiplier: number,
 ): Promise<BonusCredit[]> => {
   if (bonusUsers.length === 0) return [];
 
@@ -143,7 +142,7 @@ export const calculateBonusCreditsForUsers = async (
     uniqueBonusTokens
   );
   const interval = BigInt(Math.max(1, Math.floor(intervalSeconds)));
-  const maxBps = BigInt(maxBonusBps);
+  const multiplierMinusOne = BigInt(Math.round((maxMultiplier - 1) * 1e18));
 
   const credits: BonusCredit[] = [];
   let skippedMissingInitialization = 0;
@@ -176,9 +175,10 @@ export const calculateBonusCreditsForUsers = async (
     if (eligibleActivityUsd <= 0n) continue;
 
     const boostCapUsdBig = BigInt(boostCapUsd);
-    const boostedFractionBps = (boostCapUsdBig * BPS_DENOMINATOR) / eligibleActivityUsd;
-    const dynamicBonusBps = boostedFractionBps > maxBps ? maxBps : boostedFractionBps;
-    if (dynamicBonusBps <= 0n) continue;
+    const coverageScaled = boostCapUsdBig >= eligibleActivityUsd
+      ? SCALE
+      : (boostCapUsdBig * SCALE) / eligibleActivityUsd;
+    if (coverageScaled <= 0n) continue;
 
     let eligibleEmissionRate = 0n;
     for (const a of eligible) {
@@ -186,7 +186,7 @@ export const calculateBonusCreditsForUsers = async (
     }
     if (eligibleEmissionRate <= 0n) continue;
 
-    const bonusAmount = (eligibleEmissionRate * interval * dynamicBonusBps) / BPS_DENOMINATOR;
+    const bonusAmount = (eligibleEmissionRate * interval * coverageScaled * multiplierMinusOne) / (SCALE * SCALE);
     if (bonusAmount <= 0n) continue;
 
     credits.push({
