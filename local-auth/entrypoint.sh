@@ -9,7 +9,7 @@ if [ ! -f /config/ethconf.yaml ]; then
     exit 1
 fi
 HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
-LOCAL_AUTH_HOSTNAME=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml | sed 's|http://||' | cut -d: -f1)
+LOCAL_AUTH_HOSTNAME=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml | sed 's|http://||' | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
 echo "Read httpPort from ethconf.yaml: ${HTTP_PORT}"
 echo "Read hostname from ethconf.yaml vaultUrl: ${LOCAL_AUTH_HOSTNAME}"
 
