@@ -100,7 +100,9 @@ pipeline {
             --sslDir='/home/ubuntu/letsencrypt-ssl'
         """
         sh 'chmod +x run.sh'
-        sh './run.sh'
+        withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+          sh './run.sh'
+        }
 
         sh 'docker ps'
         script {
