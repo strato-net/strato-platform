@@ -225,25 +225,6 @@ const EarnYieldVault = () => {
     }
   };
 
-  const handleRedeemAll = async () => {
-    if (isSubmitting) return;
-    try {
-      setIsSubmitting(true);
-      await api.post(`/earn/yield-vault/${vaultKey}/redeem-all`);
-      toast({
-        title: "Redeem submitted",
-        description: `Redeeming your full ${shareSymbol} balance back to ${assetSymbol}.`,
-        variant: "success",
-      });
-      setActionMode(null);
-      await refreshVaults();
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Redeem failed";
-      toast({ title: "Redeem failed", description: msg, variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const actionPrimaryLabel =
     actionMode === "deposit" ? `Deposit ${assetSymbol}` : `Redeem ${shareSymbol}`;
@@ -534,16 +515,6 @@ const EarnYieldVault = () => {
               >
                 {isSubmitting ? "Submitting..." : actionPrimaryLabel}
               </Button>
-              {actionMode === "redeem" && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  disabled={BigInt(userInfo?.maxRedeem || "0") <= 0n || isSubmitting}
-                  onClick={handleRedeemAll}
-                >
-                  Redeem All
-                </Button>
-              )}
             </div>
           </div>
         </DialogContent>
