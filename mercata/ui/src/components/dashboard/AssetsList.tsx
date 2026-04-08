@@ -91,12 +91,12 @@ const AssetsList = ({
       <div>
         {!isDashboard && (
           <div className="p-4 text-right border-b border-border flex justify-between">
-            <span className="font-bold">Earning Assets</span>
+            <span className="font-bold">Earning Assets / Best Available APY</span>
           </div>
         )}
         {isDashboard && (
           <div className="p-3 md:p-4 text-right flex justify-between">
-            <span className="font-bold text-sm md:text-base">Earning Assets</span>
+            <span className="font-bold text-sm md:text-base">Earning Assets / Best Available APY</span>
           </div>
         )}
         <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
@@ -180,6 +180,20 @@ const AssetsList = ({
                             <p className="hidden md:block text-muted-foreground text-xs truncate">
                               {asset?._name || ""}
                             </p>
+                            <div className="mt-1 flex items-center gap-1.5 text-[11px] leading-tight text-muted-foreground md:hidden">
+                              <span className="shrink-0">APY</span>
+                              {(() => {
+                                const info = tokenApysLoaded ? earnByAddr.get(normAddr(asset?.address || "")) : undefined;
+                                if (!info) return <span className="min-w-0">-</span>;
+                                return (
+                                  <EarnApyTooltip info={info} side="bottom" align="start">
+                                    <span className="min-w-0 font-medium text-foreground cursor-default">
+                                      {info.total.toFixed(2)}%
+                                    </span>
+                                  </EarnApyTooltip>
+                                );
+                              })()}
+                            </div>
                           </div>
                         </div>
                       </td>

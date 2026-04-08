@@ -143,7 +143,7 @@ export default function MyPoolParticipationSection({
     <Card className="rounded-xl shadow-sm w-full mb-6">
       <CardHeader className="pb-2 md:pb-4">
         <CardTitle className="text-base md:text-lg font-semibold text-foreground">
-          My Pool Participation
+          My Pool Participation / Best Available APY
         </CardTitle>
       </CardHeader>
 
@@ -177,26 +177,40 @@ export default function MyPoolParticipationSection({
                     <div
                       className="grid grid-cols-3 md:grid-cols-4 items-center bg-muted/30 px-3 md:px-4 py-2.5 md:py-3 rounded-lg"
                     >
-                      <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
-                        <Link
-                          to={`/dashboard/deposits/${token.address}`}
-                          className="font-medium text-sm md:text-base text-blue-600 hover:text-blue-800 underline transition-colors truncate"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {token._symbol || token._name}
-                        </Link>
-                        {canExpand && (
-                          <button 
-                            className="cursor-pointer hover:opacity-70 shrink-0 p-0.5"
-                            onClick={() => toggleExpanded(token.address)}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+                          <Link
+                            to={`/dashboard/deposits/${token.address}`}
+                            className="font-medium text-sm md:text-base text-blue-600 hover:text-blue-800 underline transition-colors truncate"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            {isExpanded ? (
-                              <ChevronUp size={14} className="md:w-4 md:h-4" />
-                            ) : (
-                              <ChevronDown size={14} className="md:w-4 md:h-4" />
-                            )}
-                          </button>
-                        )}
+                            {token._symbol || token._name}
+                          </Link>
+                          {canExpand && (
+                            <button 
+                              className="cursor-pointer hover:opacity-70 shrink-0 p-0.5"
+                              onClick={() => toggleExpanded(token.address)}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp size={14} className="md:w-4 md:h-4" />
+                              ) : (
+                                <ChevronDown size={14} className="md:w-4 md:h-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <div className="md:hidden mt-1 flex items-center gap-1 text-[11px] leading-none text-muted-foreground min-w-0">
+                          <span className="shrink-0">APY</span>
+                          {anyLoading ? (
+                            <span className="truncate">Loading...</span>
+                          ) : apy ? (
+                            <EarnApyTooltip info={apyInfo}>
+                              <span className="font-medium text-foreground cursor-default whitespace-nowrap">{apy}%</span>
+                            </EarnApyTooltip>
+                          ) : (
+                            <span className="truncate">N/A</span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="text-right md:text-center text-sm md:text-base font-semibold text-foreground">
@@ -204,9 +218,7 @@ export default function MyPoolParticipationSection({
                       </div>
 
                       <div className="hidden md:flex text-center font-semibold text-foreground justify-center">
-                        {guestMode ? (
-                          "N/A"
-                        ) : anyLoading ? (
+                        {anyLoading ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
                         ) : apy ? (
                           <EarnApyTooltip info={apyInfo}>

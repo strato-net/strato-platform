@@ -755,7 +755,7 @@ const Earn = () => {
               {configuredFeaturedOpportunity && featuredOpportunityMeta && (
                 <div>
                   <Card
-                    className="border border-amber-500/40 dark:border-amber-400/35 bg-gradient-to-br from-[#fffaf0] to-[#fff4db] dark:from-[#24190a] dark:to-[#2b1d0c] shadow-sm cursor-pointer h-full"
+                    className="h-full cursor-pointer rounded-[22px] border border-amber-300/70 bg-gradient-to-br from-[#fff9ef] via-[#fff7ea] to-[#fff2dc] shadow-[0_6px_18px_rgba(217,119,6,0.07)] dark:border-amber-400/35 dark:from-[#24190a] dark:via-[#2a1c0c] dark:to-[#2b1d0c]"
                     role="button"
                     tabIndex={0}
                     onClick={featuredOpportunityMeta.onCardClick}
@@ -766,58 +766,62 @@ const Earn = () => {
                       }
                     }}
                   >
-                    <CardContent className="pt-3 pb-3 px-4 md:px-4 space-y-2">
-                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5 w-fit rounded-md bg-background/70 dark:bg-white/10">
+                    <CardContent className="space-y-4 px-4 pb-4 pt-4 md:px-5 md:pb-5 md:pt-5">
+                      <p className="text-sm font-semibold text-foreground/90">
                         Featured Opportunity
-                      </Badge>
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-3">
-                            {configuredFeaturedOpportunity.kind === "saveUsdst" ? (
-                              <div className="w-12 h-12 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 flex items-center justify-center shrink-0">
-                                <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                              </div>
-                            ) : configuredFeaturedOpportunity.kind === "vault" ? (
-                              <img
-                                src={stratoVaultLogo}
-                                alt="STRATO Vault"
-                                className="w-12 h-12 rounded-full object-cover shrink-0"
-                              />
-                            ) : configuredFeaturedOpportunity.kind === "lending" ? (
-                              <div className="w-12 h-12 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
-                                <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                              </div>
-                            ) : (
-                              <TokenPairIcon pool={configuredFeaturedOpportunity.pool} size="lg" />
-                            )}
-                            <div className="min-w-0">
-                              <h3 className="text-2xl md:text-[26px] leading-none font-semibold tracking-tight">{featuredOpportunityMeta.title}</h3>
-                              <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
-                                {featuredOpportunityMeta.subtitle}
-                              </p>
-                            </div>
+                      </p>
+                      <div className="flex items-start gap-3.5">
+                        {configuredFeaturedOpportunity.kind === "saveUsdst" ? (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
+                            <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                           </div>
+                        ) : configuredFeaturedOpportunity.kind === "vault" ? (
+                          <img
+                            src={stratoVaultLogo}
+                            alt="STRATO Vault"
+                            className="h-12 w-12 shrink-0 rounded-full object-cover"
+                          />
+                        ) : configuredFeaturedOpportunity.kind === "lending" ? (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
+                            <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                        ) : (
+                          <TokenPairIcon pool={configuredFeaturedOpportunity.pool} size="lg" />
+                        )}
+                        <div className="min-w-0 pt-1">
+                          <h3 className="text-[26px] leading-[1.08] font-semibold tracking-tight md:text-[30px]">
+                            {featuredOpportunityMeta.title}
+                          </h3>
+                          <p className="mt-1 max-w-[28rem] text-[13px] leading-[1.35] text-muted-foreground md:text-sm">
+                            {featuredOpportunityMeta.subtitle}
+                          </p>
                         </div>
-                        <div className="text-left md:text-right shrink-0">
-                          <p className="text-xs md:text-sm uppercase tracking-wide text-muted-foreground">
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-end justify-between gap-3">
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground md:text-xs">
                             {featuredOpportunityMeta.rateLabel}
                           </p>
                           <EarnApyTooltip info={featuredOpportunityApyInfo}>
-                            <p className={`text-2xl md:text-[32px] leading-none font-semibold ${featuredOpportunityApy.className} cursor-default`}>
+                            <span className={`text-[24px] leading-none font-semibold md:text-[28px] ${featuredOpportunityApy.className} cursor-default`}>
                               {featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
-                            </p>
+                            </span>
                           </EarnApyTooltip>
-                          <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
-                            TVL ${formatUsd(featuredOpportunityMeta.tvl)}
-                          </p>
-                          <div className="mt-1 flex items-center gap-2 md:justify-end">
-                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-md">{featuredOpportunityMeta.badge}</Badge>
-                            <Badge className="text-[10px] px-2 py-0.5 rounded-md bg-amber-600 hover:bg-amber-600 text-white">Featured</Badge>
-                          </div>
                         </div>
+                        <p className="text-[13px] text-muted-foreground md:text-sm">
+                          TVL ${formatUsd(featuredOpportunityMeta.tvl)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary" className="rounded-md border-0 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-none dark:bg-white/10">
+                          {featuredOpportunityMeta.badge}
+                        </Badge>
+                        <Badge className="rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-amber-600">
+                          Featured
+                        </Badge>
                       </div>
                       <Button
-                        className="w-full h-8 rounded-lg bg-amber-600 hover:bg-amber-600 text-white font-medium"
+                        className="h-10 w-full rounded-xl bg-amber-600 text-[15px] font-semibold text-white hover:bg-amber-600"
                         variant="default"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -838,7 +842,7 @@ const Earn = () => {
 
                 <div>
                 <Card
-                  className="border border-blue-500/40 dark:border-blue-400/35 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a] shadow-sm cursor-pointer h-full"
+                  className="h-full cursor-pointer rounded-[22px] border border-blue-300/70 bg-gradient-to-br from-[#f8fbff] via-[#f4f8ff] to-[#edf3ff] shadow-[0_6px_18px_rgba(37,99,235,0.07)] dark:border-blue-400/35 dark:from-[#0f1a33] dark:via-[#101a35] dark:to-[#111c3a]"
                   role="button"
                   tabIndex={0}
                   onClick={topOpportunityMeta.onCardClick}
@@ -849,58 +853,62 @@ const Earn = () => {
                     }
                   }}
                 >
-                  <CardContent className="pt-3 pb-3 px-4 md:px-4 space-y-2">
-                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5 w-fit rounded-md bg-background/70 dark:bg-white/10">
+                  <CardContent className="space-y-4 px-4 pb-4 pt-4 md:px-5 md:pb-5 md:pt-5">
+                    <p className="text-sm font-semibold text-foreground/90">
                       Top Opportunity
-                    </Badge>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-3">
-                          {topOpportunity.kind === "saveUsdst" ? (
-                          <div className="w-12 h-12 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 flex items-center justify-center shrink-0">
-                            <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                            </div>
-                          ) : topOpportunity.kind === "vault" ? (
-                            <img
-                              src={stratoVaultLogo}
-                              alt="STRATO Vault"
-                            className="w-12 h-12 rounded-full object-cover shrink-0"
-                            />
-                          ) : topOpportunity.kind === "lending" ? (
-                          <div className="w-12 h-12 rounded-full bg-blue-500/15 dark:bg-blue-400/15 flex items-center justify-center shrink-0">
-                            <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                          ) : (
-                            <TokenPairIcon pool={topOpportunity.pool} size="lg" />
-                          )}
-                          <div className="min-w-0">
-                          <h3 className="text-2xl md:text-[26px] leading-none font-semibold tracking-tight">{topOpportunityMeta.title}</h3>
-                          <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
-                              {topOpportunityMeta.subtitle}
-                            </p>
-                          </div>
+                    </p>
+                    <div className="flex items-start gap-3.5">
+                      {topOpportunity.kind === "saveUsdst" ? (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
+                          <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                         </div>
-                      </div>
-                      <div className="text-left md:text-right shrink-0">
-                        <p className="text-xs md:text-sm uppercase tracking-wide text-muted-foreground">
-                          {topOpportunityMeta.rateLabel}
-                        </p>
-                      <EarnApyTooltip info={topOpportunityApyInfo}>
-                        <p className={`text-2xl md:text-[32px] leading-none font-semibold ${topOpportunityApy.className} cursor-default`}>
-                            {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
-                          </p>
-                      </EarnApyTooltip>
-                      <p className="mt-0.5 text-xs md:text-sm text-muted-foreground">
-                          TVL ${formatUsd(topOpportunityMeta.tvl)}
-                        </p>
-                      <div className="mt-1 flex items-center gap-2 md:justify-end">
-                          <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-md">{topOpportunityMeta.badge}</Badge>
-                          <Badge className="text-[10px] px-2 py-0.5 rounded-md bg-blue-600 hover:bg-blue-600 text-white">Top Ranked</Badge>
+                      ) : topOpportunity.kind === "vault" ? (
+                        <img
+                          src={stratoVaultLogo}
+                          alt="STRATO Vault"
+                          className="h-12 w-12 shrink-0 rounded-full object-cover"
+                        />
+                      ) : topOpportunity.kind === "lending" ? (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-500/15 dark:bg-blue-400/15">
+                          <CircleArrowDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
+                      ) : (
+                        <TokenPairIcon pool={topOpportunity.pool} size="lg" />
+                      )}
+                      <div className="min-w-0 pt-1">
+                        <h3 className="text-[26px] leading-[1.08] font-semibold tracking-tight md:text-[30px]">
+                          {topOpportunityMeta.title}
+                        </h3>
+                        <p className="mt-1 max-w-[28rem] text-[13px] leading-[1.35] text-muted-foreground md:text-sm">
+                          {topOpportunityMeta.subtitle}
+                        </p>
                       </div>
                     </div>
+                    <div className="space-y-1">
+                      <div className="flex items-end justify-between gap-3">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground md:text-xs">
+                          {topOpportunityMeta.rateLabel}
+                        </p>
+                        <EarnApyTooltip info={topOpportunityApyInfo}>
+                          <span className={`text-[24px] leading-none font-semibold md:text-[28px] ${topOpportunityApy.className} cursor-default`}>
+                            {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
+                          </span>
+                        </EarnApyTooltip>
+                      </div>
+                      <p className="text-[13px] text-muted-foreground md:text-sm">
+                        TVL ${formatUsd(topOpportunityMeta.tvl)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary" className="rounded-md border-0 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-none dark:bg-white/10">
+                        {topOpportunityMeta.badge}
+                      </Badge>
+                      <Badge className="rounded-md bg-blue-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-600">
+                        Top Ranked
+                      </Badge>
+                    </div>
                     <Button
-                    className="w-full h-8 rounded-lg bg-blue-600 hover:bg-blue-600 text-white font-medium"
+                      className="h-10 w-full rounded-xl bg-blue-600 text-[15px] font-semibold text-white hover:bg-blue-600"
                       variant="default"
                       onClick={(e) => {
                         e.stopPropagation();

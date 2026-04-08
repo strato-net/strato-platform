@@ -179,8 +179,8 @@ const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBad
   </button>
 );
 
-/** Responsive visible-card count based on container width: 5 desktop / 4 tablet / 3 mobile */
-const colsForWidth = (w: number) => (w >= 700 ? 5 : w >= 480 ? 4 : 3);
+/** Responsive visible-card count based on container width: 5 desktop / 4 tablet / 3 mobile / 2 narrow mobile */
+const colsForWidth = (w: number) => (w >= 700 ? 5 : w >= 480 ? 4 : w >= 380 ? 3 : 2);
 
 const ScrollRow = ({ children }: { children: React.ReactNode }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -213,9 +213,10 @@ const ScrollRow = ({ children }: { children: React.ReactNode }) => {
     el.scrollBy({ left: dir * Math.floor(el.clientWidth / cols), behavior: "smooth" });
   };
 
+  const visibleCols = Math.min(cols, Math.max(count, 1));
   const needsScroll = count > cols;
-  const gapPx = (cols - 1) * 8;
-  const colWidth = `calc((100% - ${gapPx}px) / ${cols})`;
+  const gapPx = (visibleCols - 1) * 8;
+  const colWidth = `calc((100% - ${gapPx}px) / ${visibleCols})`;
   const gridStyle: React.CSSProperties = {
     gridTemplateColumns: `repeat(${count || 1}, ${colWidth})`,
     ...(needsScroll ? { overflowX: "auto", scrollbarWidth: "none" } as const : {}),
