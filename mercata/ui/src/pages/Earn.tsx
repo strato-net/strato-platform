@@ -948,18 +948,19 @@ const Earn = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-end justify-between gap-3">
-                          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground md:text-xs">
-                            {featuredOpportunityMeta.rateLabel}
-                          </p>
-                          <EarnApyTooltip info={featuredOpportunityApyInfo}>
-                            <span className={`text-[24px] leading-none font-semibold md:text-[28px] ${featuredOpportunityApy.className} cursor-default`}>
-                              {featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
-                            </span>
-                          </EarnApyTooltip>
-                        </div>
-                        <p className="text-[13px] text-muted-foreground md:text-sm">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
+                        <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                          {featuredOpportunityMeta.rateLabel}
+                        </p>
+                        <EarnApyTooltip info={featuredOpportunityApyInfo}>
+                          <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${featuredOpportunityApy.className} cursor-default`}>
+                            {featuredOpportunityApy.label === "-" ? "-" : featuredOpportunityApy.label}
+                          </span>
+                        </EarnApyTooltip>
+                        <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                          TVL
+                        </p>
+                        <p className="text-sm font-medium text-foreground/80 md:text-sm">
                           {configuredFeaturedOpportunity.kind === "yieldVault"
                             ? (() => {
                                 const vd =
@@ -967,9 +968,9 @@ const Earn = () => {
                                     YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].key
                                   ];
                                 const s = formatYieldVaultTvlUsd(vd);
-                                return `TVL ${s === "--" ? "--" : `$${s}`}`;
+                                return s === "--" ? "--" : `$${s}`;
                               })()
-                            : `TVL $${formatUsd(featuredOpportunityMeta.tvl)}`}
+                            : `$${formatUsd(featuredOpportunityMeta.tvl)}`}
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -1048,25 +1049,26 @@ const Earn = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-end justify-between gap-3">
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground md:text-xs">
-                          {topOpportunityMeta.rateLabel}
-                        </p>
-                        <EarnApyTooltip info={topOpportunityApyInfo}>
-                          <span className={`text-[24px] leading-none font-semibold md:text-[28px] ${topOpportunityApy.className} cursor-default`}>
-                            {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
-                          </span>
-                        </EarnApyTooltip>
-                      </div>
-                      <p className="text-[13px] text-muted-foreground md:text-sm">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
+                      <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                        {topOpportunityMeta.rateLabel}
+                      </p>
+                      <EarnApyTooltip info={topOpportunityApyInfo}>
+                        <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${topOpportunityApy.className} cursor-default`}>
+                          {topOpportunityApy.label === "-" ? "-" : topOpportunityApy.label}
+                        </span>
+                      </EarnApyTooltip>
+                      <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                        TVL
+                      </p>
+                      <p className="text-sm font-medium text-foreground/80 md:text-sm">
                         {topOpportunity.kind === "yieldVault"
                           ? (() => {
                               const vd = yieldVaults[YIELD_VAULTS[topOpportunity.vaultIndex].key];
                               const s = formatYieldVaultTvlUsd(vd);
-                              return `TVL ${s === "--" ? "--" : `$${s}`}`;
+                              return s === "--" ? "--" : `$${s}`;
                             })()
-                          : `TVL $${formatUsd(topOpportunityMeta.tvl)}`}
+                          : `$${formatUsd(topOpportunityMeta.tvl)}`}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
