@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Table, Select, Space, Card } from 'antd';
+import { Table, Select, Card } from 'antd';
 import { CopyOutlined, FrownOutlined } from '@ant-design/icons';
 import RefreshButton from '@/components/common/RefreshButton';
 import { useBridgeContext } from '@/context/BridgeContext';
@@ -238,16 +238,11 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
 
   return (
     <div className="space-y-4 ant-table-themed">
-      <Card className="bg-card rounded-xl shadow-sm border border-border">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <Space
-            size="large"
-            direction={isMobile ? "vertical" : "horizontal"}
-            className={isMobile ? "w-full" : ""}
-            style={isMobile ? { width: '100%' } : {}}
-          >
-            <div className={isMobile ? "w-full" : ""}>
-              <label className="block text-sm font-medium text-foreground mb-1">
+      <Card className="bg-card rounded-xl shadow-sm border border-border [&_.ant-card-body]:p-3 md:[&_.ant-card-body]:p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className={isMobile ? "grid w-full grid-cols-2 gap-2.5" : "flex flex-wrap items-end gap-4"}>
+            <div className={isMobile ? "min-w-0" : ""}>
+              <label className="mb-1 block text-xs font-medium text-foreground md:text-sm">
                 Type
               </label>
               <Select
@@ -256,6 +251,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                   setSelectedType(v === '' ? '' : v as 'bridge' | 'convert');
                   setCurrentPage(1);
                 }}
+                size={isMobile ? "middle" : "large"}
                 style={{ width: isMobile ? '100%' : 150 }}
                 options={[
                   { value: '', label: 'All Types' },
@@ -264,9 +260,9 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                 ]}
               />
             </div>
-            <div className={isMobile ? "w-full" : ""}>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                Status Filter
+            <div className={isMobile ? "min-w-0" : ""}>
+              <label className="mb-1 block text-xs font-medium text-foreground md:text-sm">
+                Status
               </label>
               <Select
                 value={withdrawalStatus || 0}
@@ -274,13 +270,14 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                   setWithdrawalStatus(v || 0);
                   setCurrentPage(1);
                 }}
+                size={isMobile ? "middle" : "large"}
                 style={{ width: isMobile ? '100%' : 150 }}
                 options={BRIDGE_STATUS_OPTIONS}
               />
             </div>
-            <div className={isMobile ? "w-full" : ""}>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                Chain Filter
+            <div className={isMobile ? "col-span-2 min-w-0" : ""}>
+              <label className="mb-1 block text-xs font-medium text-foreground md:text-sm">
+                Chain
               </label>
               <Select
                 value={selectedChainId || 0}
@@ -288,6 +285,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                   setSelectedChainId(v || 0);
                   setCurrentPage(1);
                 }}
+                size={isMobile ? "middle" : "large"}
                 style={{ width: isMobile ? '100%' : 150 }}
                 options={[
                   { value: 0, label: 'All Chains' },
@@ -295,9 +293,13 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                 ]}
               />
             </div>
-          </Space>
-          <div className={isMobile ? "w-full flex justify-end" : "shrink-0"}>
-            <RefreshButton onRefresh={handleRefresh} loading={isRefreshing} />
+          </div>
+          <div className={isMobile ? "flex justify-end" : "shrink-0"}>
+            <RefreshButton
+              onRefresh={handleRefresh}
+              loading={isRefreshing}
+              className={isMobile ? "!h-8 !rounded-lg !px-3 !text-xs" : undefined}
+            />
           </div>
         </div>
       </Card>

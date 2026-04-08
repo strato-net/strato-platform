@@ -5,9 +5,10 @@ interface RefreshButtonProps {
   onRefresh?: () => void;
   disabled?: boolean;
   loading?: boolean;
+  className?: string;
 }
 
-const RefreshButton = ({ onRefresh, disabled, loading }: RefreshButtonProps) => {
+const RefreshButton = ({ onRefresh, disabled, loading, className }: RefreshButtonProps) => {
   if (!onRefresh) return null;
 
   return (
@@ -16,7 +17,7 @@ const RefreshButton = ({ onRefresh, disabled, loading }: RefreshButtonProps) => 
       icon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}
       onClick={onRefresh}
       disabled={disabled || loading}
-      className="flex items-center gap-2"
+      className={className || "flex items-center gap-2"}
     >
       Refresh
     </Button>
