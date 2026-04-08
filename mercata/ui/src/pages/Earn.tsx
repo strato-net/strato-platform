@@ -1668,3 +1668,4 @@ const Earn = () => {
 };
 
 export default Earn;
+
