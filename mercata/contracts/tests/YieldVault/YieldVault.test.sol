@@ -2,6 +2,7 @@ import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
+import "../../concrete/Proxy/Proxy.sol";
 import "../../concrete/YieldVault/YieldVault.sol";
 
 contract User {
@@ -45,6 +46,12 @@ contract Describe_YieldVault is Authorizable {
 
     function _approveStrategy(address strategy) internal {
         vault.setStrategyApproval(strategy, true);
+    }
+
+    function _deployProxiedVault() internal returns (YieldVault proxiedVault) {
+        address impl = address(new YieldVault(address(this)));
+        proxiedVault = YieldVault(address(new Proxy(impl, address(this))));
+        proxiedVault.initialize(asset, "ETH Carry Vault", "carryETH");
     }
 
     function it_initializes_correctly() public {
@@ -498,5 +505,24 @@ contract Describe_YieldVault is Authorizable {
             reverted = true;
         }
         require(reverted, "instant redeem should revert while queue is open");
+    }
+
+    function it_proxy_single_open_request_keeps_head_and_tail_aligned() public {
+        User alice = new User();
+        User strategy = new User();
+
+        vault = _deployProxiedVault();
+        require(vault.nextRequestId() == 1, "proxied vault should initialize nextRequestId");
+
+        _mintAndDeposit(alice, 100e18);
+        _approveStrategy(address(strategy));
+        vault.deployCapital(address(strategy), 80e18);
+        alice.do(address(vault), "requestRedeem(uint256,address,address)", 100e18, address(alice), address(alice));
+
+        uint64 requestId = vault.activeRequestId(address(alice));
+        require(requestId != 0, "request should exist");
+        require(vault.queueHead() == requestId, "proxy queue head should match request id");
+        require(vault.queueTail() == requestId, "proxy queue tail should match request id");
+        require(vault.totalQueuedShares() == 100e18, "proxy queue should retain queued shares");
     }
 }
