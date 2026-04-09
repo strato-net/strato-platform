@@ -469,4 +469,34 @@ contract Describe_YieldVault is Authorizable {
         require(vault.maxWithdraw(address(bob)) == 0, "reserved claimable assets should block instant withdrawals");
         require(vault.maxRedeem(address(bob)) == 0, "bob redeem should be fully blocked until more idle arrives");
     }
+
+    function it_open_queue_blocks_instant_exits_and_deployment_after_capital_returns() public {
+        User alice = new User();
+        User bob = new User();
+        User strategy = new User();
+
+        _mintAndDeposit(alice, 100e18);
+        _mintAndDeposit(bob, 100e18);
+        _approveStrategy(address(strategy));
+        vault.deployCapital(address(strategy), 150e18);
+
+        alice.do(address(vault), "requestRedeem(uint256,address,address)", 100e18, address(alice), address(alice));
+
+        Token(asset).mint(address(strategy), 100e18);
+        strategy.do(asset, "approve", address(vault), INFINITY);
+        vault.returnCapital(address(strategy), 100e18);
+
+        require(vault.freeIdleForInstantWithdrawals() == 0, "open queue should zero instant idle");
+        require(vault.maxWithdraw(address(bob)) == 0, "returned idle should not be available to non-queued users");
+        require(vault.maxRedeem(address(bob)) == 0, "returned idle should not enable instant redeem");
+        require(vault.maxDeploy() == 0, "returned idle should not be redeployable while queue is open");
+        require(vault.freeIdleForQueueProcessing() == 150e18, "returned idle should remain available for queue processing");
+
+        bool reverted = false;
+        try bob.do(address(vault), "redeem(uint256,address,address)", 10e18, address(bob), address(bob)) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "instant redeem should revert while queue is open");
+    }
 }
