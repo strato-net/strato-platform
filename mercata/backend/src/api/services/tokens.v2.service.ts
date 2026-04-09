@@ -90,9 +90,17 @@ const buildYieldVaultEarningAsset = (
 
   const balance = userInfo?.userShares ?? "0";
   const totalBalance = balance;
-  const value = userInfo
-    ? (Number(BigInt(userInfo.positionUsd || "0")) / 1e18).toFixed(2)
-    : "0.00";
+  let value = "0.00";
+  if (userInfo) {
+    const positionUsd = BigInt(userInfo.positionUsd || "0");
+    const assetPrice = BigInt(info.assetPriceWad || "0");
+    const unit = BigInt(10) ** BigInt(info.decimals || 18);
+    const claimableUsd = assetPrice > 0n ? (BigInt(userInfo.claimableAssets || "0") * assetPrice) / unit : 0n;
+    const queuedUsd = userInfo.pendingWithdrawal
+      ? (assetPrice > 0n ? (BigInt(userInfo.pendingWithdrawal.estimatedAssets || "0") * assetPrice) / unit : 0n)
+      : 0n;
+    value = (Number(positionUsd + claimableUsd + queuedUsd) / 1e18).toFixed(2);
+  }
 
   return {
     address: info.vaultAddress,
@@ -107,7 +115,7 @@ const buildYieldVaultEarningAsset = (
     balance,
     images: [],
     attributes: [],
-    price: info.exchangeRate || "0",
+    price: ((BigInt(info.exchangeRate || "0") * BigInt(info.assetPriceWad || "0")) / BigInt(1e18)).toString(),
     collateralBalance: "0",
     totalBalance,
     isPoolToken: false,
