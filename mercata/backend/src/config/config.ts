@@ -59,14 +59,27 @@ export const hiddenSwapPools: Set<string> = new Set([
   "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user
 ]);
 
-// Yield-bearing tokens benchmarked against a base asset for ratio-growth APY.
-// Verified on both https://app.strato.nexus and https://node1.testnet.strato.nexus (2026-03-26).
+// Yield-bearing tokens. APY computed from on-chain exchange rate history mapping.
 export const yieldBenchmarks = [
-  { tokenSymbol: "wstETH", baseSymbol: "ETH", tokenAddress: "f2aa370405030a434ae07e7826178325c675e925", baseAddress: "93fb7295859b2d70199e0a4883b7c320cf874e6c" },
-  { tokenSymbol: "rETH", baseSymbol: "ETH", tokenAddress: "2e4789eb7db143576da25990a3c0298917a8a87d", baseAddress: "93fb7295859b2d70199e0a4883b7c320cf874e6c" },
-  { tokenSymbol: "sUSDS", baseSymbol: "USDST", tokenAddress: "6e2d93d323edf1b3cc4672a909681b6a430cae64", baseAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010" },
-  { tokenSymbol: "syrupUSDC", baseSymbol: "USDC", tokenAddress: "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca", baseAddress: "6aeacaa19c68e53035bf495d15e0a328fc600ba8" },
+  { tokenSymbol: "wstETH", baseSymbol: "ETH", tokenAddress: "f2aa370405030a434ae07e7826178325c675e925" },
+  { tokenSymbol: "rETH", baseSymbol: "ETH", tokenAddress: "2e4789eb7db143576da25990a3c0298917a8a87d" },
+  { tokenSymbol: "sUSDS", baseSymbol: "USDST", tokenAddress: "6e2d93d323edf1b3cc4672a909681b6a430cae64" },
+  { tokenSymbol: "syrupUSDC", baseSymbol: "USDC", tokenAddress: "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca" },
+  // AAVE aTokens — yield from AAVE V3 liquidity index (getReserveNormalizedIncome)
+  { tokenSymbol: "aWETH", baseSymbol: "ETH", tokenAddress: "6d40952f0895d21d2bf20cd088f0eb9a1574583f" },
+  { tokenSymbol: "aWBTC", baseSymbol: "BTC", tokenAddress: "5f46258f73c405a58331c1a19e54add394637b06" },
+  { tokenSymbol: "aweETH", baseSymbol: "weETH", tokenAddress: "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1" },
+  { tokenSymbol: "awstETH", baseSymbol: "wstETH", tokenAddress: "2c33aa5f8bbfe3c15e356a5e87464310db1237be" },
+  { tokenSymbol: "aUSDC", baseSymbol: "USDC", tokenAddress: "465c7e3061bc239df88c37d315be52f5487959ec" },
+  { tokenSymbol: "aUSDT", baseSymbol: "USDT", tokenAddress: "7d2a2b963e1fa273b60f9b7891392903de5e66b8" },
 ];
+
+// For AAVE aTokens wrapping yield-bearing LSTs, composite APY = AAVE lending yield + underlying staking yield.
+// Maps aToken address → underlying token's exchange rate address (used to sum APYs).
+export const compositeYieldMap: Record<string, string> = {
+  "2c33aa5f8bbfe3c15e356a5e87464310db1237be": "f2aa370405030a434ae07e7826178325c675e925", // awstETH → wstETH
+  "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1": "00000000000000000000000000000000deadbeef", // aweETH → weETH
+};
 
 /*
    Network-specific defaults;
@@ -114,6 +127,16 @@ export const defaultSaveUsdstVaultFor: Record<string, string> = {
   "33056204878082667": "22550671fcad04a213697ac7ae4f4366e96446ed", // Upquark mainnet
 };
 
+export const defaultEthCarryVaultFor: Record<string, string> = {
+  "114784819836269": "662270a6c38710b22fb938b4295eccd0aadf8ebe", // Helium testnet - set after deployment
+  "33056204878082667": "", // Upquark mainnet - set after deployment
+};
+
+export const defaultWbtcCarryVaultFor: Record<string, string> = {
+  "114784819836269": "f1711315b88e4510439513fd09a9d5b7d35488c0", // Helium testnet - set after deployment
+  "33056204878082667": "", // Upquark mainnet - set after deployment
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
@@ -124,6 +147,8 @@ export let metalForge: string = '';
 export let creditCardTopUp: string = '';
 export let vault: string = '';
 export let saveUsdstVault: string = '';
+export let ethCarryVault: string = '';
+export let wbtcCarryVault: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -194,6 +219,11 @@ export function setVaultConfig(networkId: string) {
   }
 }
 
+export function setCarryVaultConfig(networkId: string) {
+  ethCarryVault = process.env.ETH_CARRY_VAULT || defaultEthCarryVaultFor[networkId] || "";
+  wbtcCarryVault = process.env.WBTC_CARRY_VAULT || defaultWbtcCarryVaultFor[networkId] || "";
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -211,6 +241,7 @@ export async function initNetworkConfig() {
   setCreditCardTopUpConfig(networkId);
   setSaveUsdstVaultConfig(networkId);
   setVaultConfig(networkId);
+  setCarryVaultConfig(networkId);
 }
 
 /**

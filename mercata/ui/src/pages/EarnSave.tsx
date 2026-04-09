@@ -9,6 +9,7 @@ import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/context/UserContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits } from "@/utils/numberUtils";
@@ -30,8 +33,7 @@ import {
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
-
-const CATA_PRICE_USD = 0.25;
+import { findBestEarnApyInfo } from "@/utils/earnUtils";
 
 const formatTokenAmount = (value: string, maxFractionDigits: number = 4): string => {
   try {
@@ -56,13 +58,6 @@ const formatExchangeRate = (exchangeRate: string): string => {
   }
 };
 
-const formatPercent = (value: string): string => {
-  if (!value || value === "-") return "-";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return "-";
-  return `${num.toFixed(2)}%`;
-};
-
 const formatUsdAmount = (value: string): string => {
   try {
     const num = Number(formatUnits(value || "0", 18));
@@ -78,44 +73,34 @@ const formatUsdAmount = (value: string): string => {
   }
 };
 
-type ActionMode = "deposit" | "redeem" | null;
-
-const getEstimatedIncentiveApyPercent = (
-  nativeApyPercent?: string | number | null,
-  emissionRate?: string,
-  totalStakeUsd?: string | null
-): string => {
-  try {
-    if (!emissionRate || !totalStakeUsd) return "-";
-
-    const nativeApy =
-      nativeApyPercent === null ||
-      nativeApyPercent === undefined ||
-      nativeApyPercent === "" ||
-      nativeApyPercent === "-"
-        ? 0
-        : Number(nativeApyPercent);
-    if (!Number.isFinite(nativeApy)) {
-      return "-";
-    }
-
-    const tvlUsd = Number(BigInt(totalStakeUsd)) / 1e18;
-    if (!Number.isFinite(tvlUsd) || tvlUsd <= 0) return "-";
-
-    const annualCata = (Number(BigInt(emissionRate)) / 1e18) * 86400 * 365;
-    if (!Number.isFinite(annualCata) || annualCata < 0) return "-";
-
-    const rewardsApy = ((annualCata * CATA_PRICE_USD) / tvlUsd) * 100;
-    const totalApy = nativeApy + rewardsApy;
-    if (!Number.isFinite(totalApy) || totalApy <= 0) {
-      return "-";
-    }
-
-    return totalApy.toFixed(2);
-  } catch {
-    return "-";
+const formatApyDisplay = (value: string | number | undefined): { label: string; className: string } => {
+  if (!value || value === "-") {
+    return { label: "--", className: "text-foreground" };
   }
+
+  const apy = Number(value);
+  if (!Number.isFinite(apy)) {
+    return { label: "--", className: "text-foreground" };
+  }
+
+  if (apy > 0) {
+    return {
+      label: `+${apy.toFixed(2)}%`,
+      className: "text-foreground",
+    };
+  }
+
+  if (apy < 0) {
+    return {
+      label: `${apy.toFixed(2)}%`,
+      className: "text-destructive",
+    };
+  }
+
+  return { label: "0.00%", className: "text-foreground" };
 };
+
+type ActionMode = "deposit" | "redeem" | null;
 
 const getPointsPerDollarPerDay = (
   emissionRate?: string,
@@ -138,6 +123,8 @@ const getPointsPerDollarPerDay = (
 const EarnSave = () => {
   const navigate = useNavigate();
   const { isLoggedIn } = useUser();
+  const { tokenApys } = useEarnContext();
+  const { usdstBalance, fetchUsdstBalance } = useTokenContext();
   const { toast } = useToast();
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
   const { userRewards, loading: rewardsUserLoading } = useRewardsUserInfo();
@@ -167,7 +154,6 @@ const EarnSave = () => {
   const tvlDisplay = loadingInfo
     ? "..."
     : formatUsdAmount(effectiveInfo?.tvlUsd || "0");
-  const walletAssets = userInfo?.walletAssets || "0";
   const userShares = userInfo?.userShares || "0";
   const redeemableAssets = userInfo?.redeemableAssets || "0";
   const isConfigured = Boolean(effectiveInfo?.configured);
@@ -198,16 +184,12 @@ const EarnSave = () => {
       return name.includes("save usdst") || name.includes("saveusdst");
     }) || [];
   }, [normalizedVaultAddress, userRewards]);
-  const incentiveYield = formatPercent(
-    getEstimatedIncentiveApyPercent(
-      effectiveInfo?.apy,
-      saveRewardsActivity?.emissionRate,
-      saveRewardsActivity?.totalStakeUsd ??
-        effectiveInfo?.tvlUsd ??
-        effectiveInfo?.pricingAssets ??
-        effectiveInfo?.totalAssets ??
-        null
-    )
+  const incentiveYieldInfo = useMemo(
+    () => findBestEarnApyInfo(tokenApys, effectiveInfo?.vaultAddress),
+    [effectiveInfo?.vaultAddress, tokenApys]
+  );
+  const incentiveYieldDisplay = formatApyDisplay(
+    incentiveYieldInfo?.total.toFixed(2)
   );
   const saveRewardPointsPerDollarPerDay = useMemo(
     () =>
@@ -279,7 +261,7 @@ const EarnSave = () => {
   const metrics = [
     {
       label: "USDST Balance",
-      value: loadingInfo ? "..." : isLoggedIn ? formatTokenAmount(walletAssets) : "--",
+      value: loadingInfo ? "..." : isLoggedIn ? formatTokenAmount(usdstBalance) : "--",
       hint: "Available to save",
       icon: <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />,
     },
@@ -341,7 +323,7 @@ const EarnSave = () => {
       }
 
       setActionMode(null);
-      await refreshSaveUsdst();
+      await Promise.all([refreshSaveUsdst(), fetchUsdstBalance()]);
     } finally {
       setIsSubmitting(false);
     }
@@ -359,7 +341,7 @@ const EarnSave = () => {
         variant: "success",
       });
       setActionMode(null);
-      await refreshSaveUsdst();
+      await Promise.all([refreshSaveUsdst(), fetchUsdstBalance()]);
     } finally {
       setIsSubmitting(false);
     }
@@ -470,10 +452,16 @@ const EarnSave = () => {
                           </p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground">Yield</p>
-                          <p className="mt-1 text-lg font-semibold">
-                            {loadingInfo || rewardsActivitiesLoading ? "..." : incentiveYield}
-                          </p>
+                          <p className="text-muted-foreground">Best Available APY</p>
+                          {loadingInfo || rewardsActivitiesLoading ? (
+                            <p className="mt-1 text-lg font-semibold">...</p>
+                          ) : (
+                            <EarnApyTooltip info={incentiveYieldInfo}>
+                              <p className={`mt-1 text-lg font-semibold cursor-default ${incentiveYieldDisplay.className}`}>
+                                {incentiveYieldDisplay.label}
+                              </p>
+                            </EarnApyTooltip>
+                          )}
                           <p className="text-xs text-muted-foreground mt-1">
                             Estimated annualized total yield, including rewards and native fees
                           </p>
@@ -562,7 +550,7 @@ const EarnSave = () => {
             <div className="rounded-lg border border-border/70 bg-muted/40 p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span>USDST Balance</span>
-                <span className="font-medium text-foreground">{formatTokenAmount(walletAssets)}</span>
+                <span className="font-medium text-foreground">{formatTokenAmount(usdstBalance)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>saveUSDST Balance</span>

@@ -299,12 +299,12 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
   const getGridClass = useCallback(() => {
     if (showMintAmounts) {
       return !autoAllocate 
-        ? 'grid-cols-[minmax(100px,auto)_minmax(80px,auto)_1fr_1fr_minmax(60px,auto)]' 
-        : 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr_1fr]';
+        ? 'grid-cols-[minmax(100px,auto)_minmax(90px,auto)_1fr_1fr_minmax(60px,auto)]' 
+        : 'grid-cols-[minmax(120px,auto)_minmax(90px,auto)_1fr_1fr]';
     }
     return !autoAllocate 
-      ? 'grid-cols-[minmax(100px,auto)_minmax(80px,auto)_1fr_minmax(60px,auto)]' 
-      : 'grid-cols-[minmax(120px,auto)_minmax(100px,auto)_1fr]';
+      ? 'grid-cols-[minmax(100px,auto)_minmax(90px,auto)_1fr_minmax(60px,auto)]' 
+      : 'grid-cols-[minmax(120px,auto)_minmax(90px,auto)_1fr]';
   }, [showMintAmounts, autoAllocate]);
 
 
@@ -1207,10 +1207,10 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
             <div className="space-y-2">
               {/* Mobile-friendly scrollable container */}
               <div className="overflow-x-auto -mx-3 px-3">
-                <div className="min-w-[600px]">
+                <div className="min-w-[640px]">
                   <div className={`grid gap-2 text-xs font-medium text-muted-foreground pb-2 border-b border-border ${getGridClass()}`}>
                     <div className="min-w-[100px]">Asset</div>
-                    <div className="min-w-[80px]">Stability Fee</div>
+                    <div className="min-w-[90px]">Stability Fee</div>
                     <div className="min-w-[120px]">Deposit</div>
                     {showMintAmounts && <div className="min-w-[120px]">Mint</div>}
                     {!autoAllocate && <div className="text-right pr-3 min-w-[60px]">HF</div>}
@@ -1304,9 +1304,9 @@ const VaultBreakdown: React.FC<VaultBreakdownProps> = ({
                       )}
                       <span className="font-medium">{candidate.vaultConfig.symbol}</span>
                     </div>
-                    
+
                     {/* Stability Fee */}
-                    <div className="text-muted-foreground min-w-[80px]">{formatPercentage(stabilityFeeRate)}</div>
+                    <div className="text-muted-foreground min-w-[90px]">{formatPercentage(stabilityFeeRate)}</div>
                     
                     {/* Deposit Input */}
                     <div className="space-y-1 min-w-[120px]">

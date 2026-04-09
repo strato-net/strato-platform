@@ -1,13 +1,13 @@
 import cron from 'node-cron';
 import { logInfo, logError, logWarning, logFeedUpdate } from './utils/logger';
-import { fetchPrices, generateConstantPrices, fetchRebaseFactor } from './adapters/genericRestAdapter';
-import { pushAssetPrices, pushRebaseFactors } from './utils/oraclePusher';
+import { fetchPrices, generateConstantPrices, fetchRebaseFactor, fetchExchangeRate } from './adapters/genericRestAdapter';
+import { pushAssetPrices, pushRebaseFactors, pushExchangeRates } from './utils/oraclePusher';
 import { checkBalances } from './utils/balanceChecker';
 import { fetchPreviousPrices } from './utils/priceReader';
 import { withTimeout } from './utils/apiClient';
 import { oauthClient } from './utils/oauth';
 import { ConfigLoader } from './utils/configLoader';
-import { SourceResult, AggregatedPrice, SourceConfig } from './types';
+import { SourceResult, AggregatedPrice, SourceConfig, TransactionResult } from './types';
 import { TIMEOUTS, ORACLE_CONFIG } from './utils/constants';
 
 // ============================================================================
@@ -294,6 +294,45 @@ async function applyRebaseFactors(
 }
 
 // ============================================================================
+// Step 3b: Collect Exchange Rates (yield-bearing tokens)
+// ============================================================================
+
+interface ExchangeRateEntry {
+    targetAddress: string;
+    rate: bigint;
+}
+
+async function collectExchangeRates(configLoader: ConfigLoader): Promise<ExchangeRateEntry[]> {
+    const allAssets = configLoader.getAllAssets();
+    const entries = Object.entries(allAssets).filter(([_, a]) => a.exchangeRate);
+    if (entries.length === 0) return [];
+
+    const results = await Promise.all(entries.map(async ([assetKey, asset]) => {
+        try {
+            const rawRate = await withTimeout(
+                fetchExchangeRate(assetKey, asset.exchangeRate!),
+                TIMEOUTS.FETCH
+            );
+            if (rawRate <= 0n) return null;
+
+            const precision = BigInt(asset.exchangeRate!.ratePrecision);
+            const wadRate = rawRate * 1000000000000000000n / precision;
+            if (wadRate <= 0n) return null;
+
+            logInfo('CronScheduler', `${assetKey}: exchangeRate=${wadRate} (raw=${rawRate})`);
+            return { targetAddress: asset.targetAssetAddress, rate: wadRate };
+        } catch (err) {
+            logError('CronScheduler', new Error(
+                `${assetKey}: exchange rate fetch failed: ${(err as Error).message}`
+            ));
+            return null;
+        }
+    }));
+
+    return results.filter((r): r is ExchangeRateEntry => r !== null);
+}
+
+// ============================================================================
 // Main Orchestrator
 // ============================================================================
 
@@ -316,8 +355,11 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
         aggregatePrices(configLoader, sourceResults, marketClosed, previousPrices),
         configLoader
     );
-    const rebaseFactors = await applyRebaseFactors(aggregatedPrices, configLoader, previousPrices);
-    
+    const [rebaseFactors, exchangeRates] = await Promise.all([
+        applyRebaseFactors(aggregatedPrices, configLoader, previousPrices),
+        collectExchangeRates(configLoader),
+    ]);
+
     // Partition into valid and failed prices, excluding proxy-only assets (submit: false)
     const allAssets = configLoader.getAllAssets();
     const validPrices: AggregatedPrice[] = [];
@@ -334,12 +376,12 @@ async function processAllAssets(configLoader: ConfigLoader): Promise<void> {
     const skipped = failedPrices.length ? `. Skipped ${failedPrices.length}: [${failedPrices.map(p => p.assetKey).join(', ')}]` : '';
     logInfo('CronScheduler', `Submitting ${validPrices.length} prices: [${validPrices.map(p => p.assetKey).join(', ')}]${skipped}`);
     
-    const result = await pushAssetPrices(validPrices);
+    const pushes: Promise<TransactionResult>[] = [pushAssetPrices(validPrices)];
+    if (rebaseFactors.length > 0) pushes.push(pushRebaseFactors(rebaseFactors));
+    if (exchangeRates.length > 0) pushes.push(pushExchangeRates(exchangeRates));
 
-    if (rebaseFactors.length > 0) {
-        await pushRebaseFactors(rebaseFactors);
-    }
-    
+    const [result] = await Promise.all(pushes);
+
     // Log all prices (including failed ones)
     aggregatedPrices.forEach(p => logFeedUpdate(p.assetKey, p.medianPrice, p.sources, p.expectedSourceCount, result.hash, p.failed, p.error));
 }
