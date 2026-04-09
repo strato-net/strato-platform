@@ -3,6 +3,7 @@ import cors from "cors";
 import routes from "./api/routes";
 import { initOpenIdConfig, initNetworkConfig } from "./config/config";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
+import { startTokenApysRefresh } from "./api/services/earn.cache";
 
 const PORT = process.env.PORT || 3001;
 
@@ -32,6 +33,7 @@ app.use(errorHandler);
     await initNetworkConfig();
     app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
+      startTokenApysRefresh();
     });
   } catch (error) {
     console.error("Failed to initialize server:", error);
