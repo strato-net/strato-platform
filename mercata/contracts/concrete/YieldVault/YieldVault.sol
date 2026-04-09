@@ -32,7 +32,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     mapping(address => bool) public approvedStrategies;
     mapping(address => uint256) public strategyDebt;
 
-    uint64 public nextRequestId = 1;
+    uint64 public nextRequestId;
     uint64 public queueHead;
     uint64 public queueTail;
     uint256 public totalQueuedShares;
@@ -94,6 +94,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         __ERC4626_init(asset_);
         vaultInitialized = true;
         minIdleBps = 0;
+        nextRequestId = 1;
 
         emit VaultInitialized(asset_, name_, symbol_);
     }
@@ -497,8 +498,9 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
 
     function maxDeploy() public view returns (uint256) {
         if (!vaultInitialized || paused()) return 0;
+        if (totalQueuedShares > 0) return 0;
 
-        uint256 freeIdle = _freeIdleForInstantWithdrawals();
+        uint256 freeIdle = _freeIdleForQueueProcessing();
         uint256 minIdleRequirement = _minIdleRequirement();
         if (freeIdle <= minIdleRequirement) return 0;
         return freeIdle - minIdleRequirement;
@@ -517,10 +519,10 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     }
 
     function _freeIdleForInstantWithdrawals() internal view returns (uint256) {
+        if (totalQueuedShares > 0) return 0;
         uint256 idle = _idleBalance();
-        uint256 reserved = totalClaimableAssets + previewRedeem(totalQueuedShares);
-        if (idle <= reserved) return 0;
-        return idle - reserved;
+        if (idle <= totalClaimableAssets) return 0;
+        return idle - totalClaimableAssets;
     }
 
     function _freeIdleForQueueProcessing() internal view returns (uint256) {
