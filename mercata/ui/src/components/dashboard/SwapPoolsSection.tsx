@@ -15,7 +15,7 @@ import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useEarnContext } from "@/context/EarnContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
-import { findPoolEarnApyInfo } from "@/utils/earnUtils";
+import { findBestEarnApyInfo } from "@/utils/earnUtils";
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,7 +152,7 @@ const SwapPoolsSection = () => {
           </div>
         ) : (
           filteredPools.map((pool, id) => {
-            const apyInfo = findPoolEarnApyInfo(tokenApys, pool.address);
+            const apyInfo = findBestEarnApyInfo(tokenApys, pool.lpToken?.address);
             const displayedApy = apyInfo ? `${apyInfo.total.toFixed(2)}%` : "N/A";
 
             return (

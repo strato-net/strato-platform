@@ -439,7 +439,7 @@ const Earn = () => {
 
   const vaultEarnApyInfo = useMemo(() => findVaultEarnApyInfo(tokenApys), [tokenApys]);
   const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
-  const getPoolEarnApyInfo = (pool: Pool) => findPoolEarnApyInfo(tokenApys, pool.address);
+  const getPoolEarnApyInfo = (pool: Pool) => findBestEarnApyInfo(tokenApys, pool.lpToken?.address);
   const getPoolDisplayApy = (pool: Pool) => {
     const info = getPoolEarnApyInfo(pool);
     return info ? info.total.toFixed(2) : undefined;
