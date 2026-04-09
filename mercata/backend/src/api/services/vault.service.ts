@@ -12,7 +12,6 @@ import * as config from "../../config/config";
 
 const {
   Vault,
-  VaultFactory,
   Token,
   PriceOracle,
 } = constants;
@@ -146,42 +145,10 @@ export interface UserActivityItem {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Get vault factory address or throw error
+ * Get the vault address from config (resolved at startup via initNetworkConfig).
  */
-const getVaultFactoryAddress = (): string => {
-  if (!config.vaultFactory) {
-    throw new Error("Vault factory address not configured");
-  }
-  return config.vaultFactory;
-};
-
-/**
- * Get the primary vault address from VaultFactory
- * For now, we use the first vault in the factory's allVaults array
- */
-const getVaultAddress = async (accessToken: string): Promise<string | null> => {
-  try {
-    const vaultFactoryAddress = getVaultFactoryAddress();
-    // In Cirrus, arrays are stored in separate tables: ContractName-arrayName
-    const { data } = await cirrus.get(accessToken, `/${VaultFactory}-allVaults`, {
-      params: {
-        select: "value",
-        address: `eq.${vaultFactoryAddress}`,
-        order: "key.asc",
-        limit: "1",
-      },
-    });
-
-    if (!data?.length || !data[0]?.value) {
-      return null;
-    }
-
-    // Return the first vault (primary vault)
-    return data[0].value;
-  } catch (error) {
-    console.error("Error fetching vault address:", error);
-    return null;
-  }
+const getVaultAddress = (): string | null => {
+  return config.vault || null;
 };
 
 /**
@@ -192,44 +159,41 @@ const getVaultData = async (
   vaultAddress: string
 ): Promise<Record<string, any> | null> => {
   try {
-    // Get basic vault info
-    const { data: vaultData } = await cirrus.get(accessToken, `/${Vault}`, {
-      params: {
-        select: "address,shareToken,botExecutor,_paused,priceOracle",
-        address: `eq.${vaultAddress}`,
-      },
-    });
+    const [{ data: vaultData }, { data: supportedAssetsData }, { data: minReserveData }] =
+      await Promise.all([
+        cirrus.get(accessToken, `/${Vault}`, {
+          params: {
+            select: "address,shareToken,botExecutor,_paused,priceOracle",
+            address: `eq.${vaultAddress}`,
+          },
+        }),
+        cirrus.get(accessToken, `/${Vault}-supportedAssets`, {
+          params: {
+            select: "value",
+            address: `eq.${vaultAddress}`,
+          },
+        }),
+        cirrus.get(accessToken, `/${Vault}-minReserve`, {
+          params: {
+            select: "key,value::text",
+            address: `eq.${vaultAddress}`,
+          },
+        }),
+      ]);
 
-    if (!vaultData?.[0]) {
-      return null;
+    if (!vaultData?.[0]) return null;
+
+    const minReserveMap = new Map<string, string>();
+    for (const item of minReserveData || []) {
+      if (item.key) {
+        minReserveMap.set(item.key.toLowerCase(), item.value || "0");
+      }
     }
 
-    const vault = vaultData[0];
-
-    // Get supported assets from array table
-    const { data: supportedAssetsData } = await cirrus.get(accessToken, `/${Vault}-supportedAssets`, {
-      params: {
-        select: "value",
-        address: `eq.${vaultAddress}`,
-      },
-    });
-
-    const supportedAssets = supportedAssetsData.map((asset: any) => asset.value);
-    // Get min reserves from mapping table
-    const { data: minReserveData } = await cirrus.get(accessToken, `/${Vault}-minReserve`, {
-      params: {
-        select: "key,value::text",
-        address: `eq.${vaultAddress}`,
-      },
-    });
-
     return {
-      ...vault,
-      supportedAssets: supportedAssets || [],
-      minReserve: (minReserveData || []).map((item: any) => ({
-        asset: item.key,
-        amount: item.value,
-      })),
+      ...vaultData[0],
+      supportedAssets: (supportedAssetsData || []).map((a: any) => a.value),
+      minReserveMap,
     };
   } catch (error) {
     console.error("Error fetching vault data:", error);
@@ -332,6 +296,98 @@ const getTokenTotalSupply = async (
     console.error(`Error fetching total supply for ${tokenAddress}:`, error);
     return "0";
   }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BATCH HELPERS — single Cirrus query instead of N
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const getBatchTokenInfo = async (
+  accessToken: string,
+  tokenAddresses: string[]
+): Promise<Map<string, { symbol: string; name: string; images?: { value: string }[] }>> => {
+  const result = new Map<string, { symbol: string; name: string; images?: { value: string }[] }>();
+  if (!tokenAddresses.length) return result;
+
+  try {
+    const { data } = await cirrus.get(accessToken, `/${Token}`, {
+      params: {
+        address: `in.(${tokenAddresses.join(",")})`,
+        select: `address,_symbol,_name,images:${Token}-images(value)`,
+      },
+    });
+
+    for (const token of data || []) {
+      result.set(token.address, {
+        symbol: token._symbol || "UNKNOWN",
+        name: token._name || "Unknown Token",
+        images: token.images,
+      });
+    }
+  } catch (error) {
+    console.error("Error batch fetching token info:", error);
+  }
+
+  for (const addr of tokenAddresses) {
+    if (!result.has(addr)) {
+      result.set(addr, { symbol: "UNKNOWN", name: "Unknown Token" });
+    }
+  }
+  return result;
+};
+
+const getBatchBalances = async (
+  accessToken: string,
+  tokenAddresses: string[],
+  holderAddress: string
+): Promise<Map<string, string>> => {
+  const result = new Map<string, string>();
+  if (!tokenAddresses.length) return result;
+
+  try {
+    const { data } = await cirrus.get(accessToken, `/${Token}-_balances`, {
+      params: {
+        address: `in.(${tokenAddresses.join(",")})`,
+        key: `eq.${holderAddress}`,
+        select: "address,value::text",
+      },
+    });
+
+    for (const row of data || []) {
+      result.set(row.address, row.value || "0");
+    }
+  } catch (error) {
+    console.error("Error batch fetching balances:", error);
+  }
+
+  return result;
+};
+
+const getBatchPrices = async (
+  accessToken: string,
+  oracleAddress: string,
+  assetAddresses: string[]
+): Promise<Map<string, string>> => {
+  const result = new Map<string, string>();
+  if (!assetAddresses.length) return result;
+
+  try {
+    const { data } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, {
+      params: {
+        address: `eq.${oracleAddress}`,
+        key: `in.(${assetAddresses.join(",")})`,
+        select: "key,value::text",
+      },
+    });
+
+    for (const row of data || []) {
+      result.set(row.key, row.value || "0");
+    }
+  } catch (error) {
+    console.error("Error batch fetching prices:", error);
+  }
+
+  return result;
 };
 
 /**
@@ -447,35 +503,6 @@ const getDepositsWithdrawalsInPeriod = async (
 };
 
 /**
- * Calculate historical equity for the vault at a specific date
- */
-const getHistoricalEquity = async (
-  accessToken: string,
-  vaultAddress: string,
-  botExecutor: string,
-  priceOracleAddress: string,
-  supportedAssets: string[],
-  date: string // Format: YYYY-MM-DD
-): Promise<bigint> => {
-  let totalEquity = 0n;
-
-  for (const assetAddress of supportedAssets) {
-    const balance = await getHistoricalTokenBalance(accessToken, assetAddress, botExecutor, date);
-    const balanceBN = safeBigInt(balance);
-
-    const price = await getHistoricalAssetPrice(accessToken, priceOracleAddress, assetAddress, date);
-    const priceBN = safeBigInt(price);
-
-    if (priceBN > 0n) {
-      totalEquity += (balanceBN * priceBN) / WAD;
-    }
-  }
-
-  return totalEquity;
-};
-
-
-/**
  * Get the first deposit timestamp for the vault
  */
 const getFirstDepositDate = async (
@@ -557,23 +584,28 @@ const getPerformanceMetrics = async (
     const histTotalSupply = safeBigInt(histStorage?.[0]?.data?._totalSupply);
     if (histTotalSupply <= 0n) return noData;
 
-    // Historical balances and prices per asset (needed for both equity and HODL)
+    // Fetch all historical balances and prices in parallel
+    const [histBalances, histPrices] = await Promise.all([
+      Promise.all(supportedAssets.map(addr =>
+        getHistoricalTokenBalance(accessToken, addr, botExecutor, startDate)
+      )),
+      Promise.all(supportedAssets.map(addr =>
+        getHistoricalAssetPrice(accessToken, priceOracleAddress, addr, startDate)
+      )),
+    ]);
+
     let histEquity = 0n;
     let hodlEquity = 0n;
 
-    for (const assetAddress of supportedAssets) {
-      const histBalance = await getHistoricalTokenBalance(accessToken, assetAddress, botExecutor, startDate);
-      const histBalanceBN = safeBigInt(histBalance);
-
-      const histPrice = await getHistoricalAssetPrice(accessToken, priceOracleAddress, assetAddress, startDate);
-      const histPriceBN = safeBigInt(histPrice);
+    for (let i = 0; i < supportedAssets.length; i++) {
+      const histBalanceBN = safeBigInt(histBalances[i]);
+      const histPriceBN = safeBigInt(histPrices[i]);
 
       if (histPriceBN > 0n) {
         histEquity += (histBalanceBN * histPriceBN) / WAD;
       }
 
-      // HODL: same historical balances, but at today's prices
-      const currentPriceBN = safeBigInt(currentPrices.get(assetAddress));
+      const currentPriceBN = safeBigInt(currentPrices.get(supportedAssets[i]));
       if (currentPriceBN > 0n) {
         hodlEquity += (histBalanceBN * currentPriceBN) / WAD;
       }
@@ -678,7 +710,7 @@ export interface UserTokenBalance {
 export const getVaultShareTokenAddress = async (
   accessToken: string
 ): Promise<string> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   if (!vaultAddress) return "";
   const vaultData = await getVaultData(accessToken, vaultAddress);
   return vaultData?.shareToken || "";
@@ -691,7 +723,7 @@ export const getVaultShareTokenAddress = async (
 export const getVaultHistoryConfig = async (
   accessToken: string
 ): Promise<{ shareToken: string; botExecutor: string; supportedAssets: string[] } | null> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   if (!vaultAddress) return null;
   const vaultData = await getVaultData(accessToken, vaultAddress);
   if (!vaultData) return null;
@@ -711,7 +743,7 @@ export const getVaultHistoryConfig = async (
 export const getVaultShareTokenPrice = async (
   accessToken: string
 ): Promise<{ shareTokenAddress: string; pricePerShare: string }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
 
   if (!vaultAddress) {
     return { shareTokenAddress: "", pricePerShare: "0" };
@@ -763,7 +795,7 @@ export const getUserBalances = async (
   accessToken: string,
   userAddress: string
 ): Promise<{ balances: UserTokenBalance[] }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
 
   if (!vaultAddress) {
     return { balances: [] };
@@ -809,7 +841,7 @@ export const getUserBalances = async (
  * Get comprehensive vault info (global state)
  */
 export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     return {
@@ -838,23 +870,26 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
   const botExecutor = vaultData.botExecutor;
   const paused = vaultData._paused || false;
   const priceOracleAddress = vaultData.priceOracle || "";
+  const minReserveMap = vaultData.minReserveMap;
 
-  // Get supported assets - already extracted as string array from getVaultData
   const supportedAssetAddresses: string[] = (vaultData.supportedAssets || [])
     .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000");
 
-  // Get share token info
-  const shareTokenInfo = await getTokenInfo(accessToken, shareToken);
-  const totalShares = await getTokenTotalSupply(accessToken, shareToken);
+  const allTokenAddresses = [shareToken, ...supportedAssetAddresses];
 
-  // Build min reserve map
-  const minReserveMap = new Map<string, string>();
-  for (const entry of vaultData.minReserve || []) {
-    if (entry.asset) {
-      minReserveMap.set(entry.asset.toLowerCase(), entry.amount || "0");
-    }
+  // Single parallel phase: batch token info + batch balances + batch prices + total supply
+  const [tokenInfoMap, balanceMap, priceMap, totalShares] = await Promise.all([
+    getBatchTokenInfo(accessToken, allTokenAddresses),
+    getBatchBalances(accessToken, supportedAssetAddresses, botExecutor),
+    getBatchPrices(accessToken, priceOracleAddress, supportedAssetAddresses),
+    getTokenTotalSupply(accessToken, shareToken),
+  ]);
+
+  const shareTokenInfo = tokenInfoMap.get(shareToken);
+  if (!shareTokenInfo) {
+    throw new Error("Share token info not found");
   }
-  // Calculate totals and build asset list
+
   let totalEquity = 0n;
   let withdrawableEquity = 0n;
   const assets: VaultAsset[] = [];
@@ -862,8 +897,9 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
   const currentPrices = new Map<string, string>();
 
   for (const assetAddress of supportedAssetAddresses) {
-    const tokenInfo = await getTokenInfo(accessToken, assetAddress);
-    const balance = await getTokenBalance(accessToken, assetAddress, botExecutor);
+    const info = tokenInfoMap.get(assetAddress);
+    if (!info) continue;
+    const balance = balanceMap.get(assetAddress) || "0";
     const balanceBN = safeBigInt(balance);
 
     const minReserve = minReserveMap.get(assetAddress.toLowerCase()) || "0";
@@ -872,7 +908,7 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     const withdrawable = balanceBN > minReserveBN ? (balanceBN - minReserveBN).toString() : "0";
     const withdrawableBN = safeBigInt(withdrawable);
 
-    const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
+    const priceUsd = priceMap.get(assetAddress) || "0";
     const priceBN = safeBigInt(priceUsd);
     currentPrices.set(assetAddress, priceUsd);
 
@@ -888,14 +924,14 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
 
     assets.push({
       address: assetAddress,
-      symbol: tokenInfo.symbol,
-      name: tokenInfo.name,
+      symbol: info.symbol,
+      name: info.name,
       balance,
       minReserve,
       withdrawable,
       priceUsd,
       valueUsd,
-      images: tokenInfo.images,
+      images: info.images,
     });
   }
 
@@ -942,7 +978,7 @@ export const getUserPosition = async (
   accessToken: string,
   userAddress: string
 ): Promise<UserPosition> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     return {
@@ -1007,7 +1043,7 @@ export const deposit = async (
   userAddress: string,
   body: { token: string; amount: string }
 ): Promise<{ status: string; hash: string; sharesMinted?: string }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     throw new Error("Vault not found");
@@ -1057,7 +1093,7 @@ export const getWithdrawPreview = async (
   accessToken: string,
   amountUsd: string
 ): Promise<{ basket: WithdrawBasketItem[] }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
 
   if (!vaultAddress) {
     return { basket: [] };
@@ -1074,14 +1110,7 @@ export const getWithdrawPreview = async (
   const supportedAssetAddresses: string[] = (vaultData.supportedAssets || [])
     .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000");
 
-  // Build min reserve map
-  const minReserveMap = new Map<string, string>();
-  for (const entry of vaultData.minReserve || []) {
-    if (entry.asset) {
-      minReserveMap.set(entry.asset.toLowerCase(), entry.amount || "0");
-    }
-  }
-
+  const { minReserveMap } = vaultData;
   const amountUsdBN = safeBigInt(amountUsd);
 
   // Calculate withdrawable equity (same as contract)
@@ -1174,7 +1203,7 @@ export const withdraw = async (
   userAddress: string,
   body: { amountUsd: string }
 ): Promise<{ status: string; hash: string; basket?: WithdrawalBasketItem[] }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     throw new Error("Vault not found");
@@ -1205,7 +1234,7 @@ export const pause = async (
   accessToken: string,
   userAddress: string
 ): Promise<{ status: string; hash: string }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     throw new Error("Vault not found");
@@ -1230,7 +1259,7 @@ export const unpause = async (
   accessToken: string,
   userAddress: string
 ): Promise<{ status: string; hash: string }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     throw new Error("Vault not found");
@@ -1256,7 +1285,7 @@ export const setMinReserve = async (
   userAddress: string,
   body: { token: string; minReserve: string }
 ): Promise<{ status: string; hash: string }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     throw new Error("Vault not found");
@@ -1284,7 +1313,7 @@ export const setBotExecutor = async (
   userAddress: string,
   body: { executor: string }
 ): Promise<{ status: string; hash: string }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     throw new Error("Vault not found");
@@ -1312,7 +1341,7 @@ export const addSupportedAsset = async (
   userAddress: string,
   body: { token: string }
 ): Promise<{ status: string; hash: string }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     throw new Error("Vault not found");
@@ -1340,7 +1369,7 @@ export const removeSupportedAsset = async (
   userAddress: string,
   body: { token: string }
 ): Promise<{ status: string; hash: string }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     throw new Error("Vault not found");
@@ -1368,7 +1397,7 @@ export const getTransactions = async (
   accessToken: string,
   limit: number = 10
 ): Promise<{ transactions: VaultTransaction[] }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
     return { transactions: [] };
@@ -1484,7 +1513,7 @@ export const getUserActivity = async (
   userAddress: string,
   limit: number = 20
 ): Promise<{ activity: UserActivityItem[] }> => {
-  const vaultAddress = await getVaultAddress(accessToken);
+  const vaultAddress = getVaultAddress();
 
   if (!vaultAddress) {
     return { activity: [] };
