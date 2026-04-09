@@ -7,7 +7,7 @@ import { useSwapContext } from "@/context/SwapContext";
 import { useVaultContext } from "@/context/VaultContext";
 import { useEarnContext } from "@/context/EarnContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
-import { findBestNonVaultEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
+import { findBestEarnApyInfo, findBestNonVaultEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
 
@@ -61,7 +61,7 @@ export default function MyPoolParticipationSection({
           pool ||
           lpTokenPoolMap.get(normAddr(token.address)) ||
           pools?.find((candidate: any) => candidate.lpToken?._symbol === token._symbol);
-        const info = resolvedPool ? findPoolEarnApyInfo(tokenApys, resolvedPool.address) : null;
+        const info = findBestEarnApyInfo(tokenApys, resolvedPool?.lpToken?.address || token.address);
         return {
           value: info ? info.total.toFixed(2) : null,
           info,
