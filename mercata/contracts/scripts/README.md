@@ -4,6 +4,23 @@ This directory contains utility scripts for the Mercata contracts system.
 
 ## Available Scripts
 
+### Yield Vault Live Tools
+**Location**: `yield-vault-live/`
+
+Read-only and direct-call tools for inspecting and exercising deployed
+`YieldVault` contracts on STRATO testnet/mainnet using an authenticated bearer
+token from `strato-auth`.
+
+- **Script**: `inspectLiveVault.js` - Inspect live vault state, mappings, and current recommended next calls
+- **Script**: `vaultDirectFlow.js` - Send direct calls such as strategy approval, deposit, deploy, return, and redeem
+
+**Usage**:
+```bash
+cd yield-vault-live
+node inspectLiveVault.js
+node vaultDirectFlow.js inspect
+```
+
 ### Token Transfer Script
 **Location**: `token-transfer/`
 
@@ -26,10 +43,14 @@ See the `token-transfer/README.md` for detailed documentation.
 ```
 scripts/
 ├── README.md                 # This file
-└── token-transfer/           # Token transfer utilities
-    ├── contestTransfer.js    # Transfer script
-    ├── README.md            # Documentation
-    └── env.example          # Sample environment config
+├── token-transfer/           # Token transfer utilities
+│   ├── contestTransfer.js    # Transfer script
+│   ├── README.md             # Documentation
+│   └── env.example           # Sample environment config
+└── yield-vault-live/         # Live deployed vault inspection/call tools
+    ├── common.js             # Shared auth/query/transaction helpers
+    ├── inspectLiveVault.js   # Read-only live state inspector
+    └── vaultDirectFlow.js    # Direct call CLI for live vault testing
 ```
 
 ## Adding New Scripts
