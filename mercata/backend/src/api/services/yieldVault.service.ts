@@ -105,13 +105,13 @@ const previewRedeemAssets = (shares: bigint, totalAssets: bigint, totalShares: b
   if (shares <= 0n) return 0n;
   if (totalShares <= 0n) return shares;
   if (totalAssets <= 0n) return 0n;
-  return (shares * totalAssets) / totalShares;
+  return (shares * (totalAssets + 1n)) / (totalShares + 1n);
 };
 
 const previewRedeemShares = (assets: bigint, totalAssets: bigint, totalShares: bigint): bigint => {
   if (assets <= 0n) return 0n;
   if (totalAssets <= 0n || totalShares <= 0n) return assets;
-  return (assets * totalShares) / totalAssets;
+  return (assets * (totalShares + 1n)) / (totalAssets + 1n);
 };
 
 const tokenDecimalsUnit = (underlyingDecimals: number): bigint => {
