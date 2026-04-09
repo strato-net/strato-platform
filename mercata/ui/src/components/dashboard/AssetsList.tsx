@@ -187,7 +187,7 @@ const AssetsList = ({
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
-                          {!asset?.price
+                          {!asset?.price || asset.price === "0"
                             ? "-"
                             : formatBalance(asset.price, undefined, 18, 2, 2, true)}
                         </p>
