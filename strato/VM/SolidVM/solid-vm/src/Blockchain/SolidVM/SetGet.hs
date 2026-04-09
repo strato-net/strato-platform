@@ -12,6 +12,7 @@
 module Blockchain.SolidVM.SetGet
   ( setVar,
     weakGetVar,
+    getStorageValue,
     getVar,
     getIntEither,
     getIntValEither,
@@ -107,22 +108,22 @@ setVal :: MonadSM m => Value -> Value -> m ()
 setVal (SUserDefined a _ _) (SUserDefined _ _ _) =
   when (True) (internalError "Unimplemented feature user defined types" (a))
 setVal (SReference dst) (SReference src) = do
-  len <- getInt (Constant $ SReference $ src `apSnoc` MS.Field "length")
-  setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger len
+  len <- getInt (Constant $ SReference $ src `MS.snoc` MS.Field "length")
+  setVal (SReference $ dst `MS.snoc` MS.Field "length") $ SInteger len
   forM_ [0 .. len - 1] $ \i -> do
     let i' = BC.pack $ show i
-    setVal (SReference $ dst `apSnoc` MS.Index i')
-      =<< getVar (Constant $ SReference $ src `apSnoc` MS.Index i')
+    setVal (SReference $ dst `MS.snoc` MS.Index i')
+      =<< getVar (Constant $ SReference $ src `MS.snoc` MS.Index i')
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
-    setVal (SReference $ dst `apSnoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
+    setVal (SReference $ dst `MS.snoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
 setVal (SReference dst) (SArray fs) = do
   let len = length fs
-  setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger $ fromIntegral len
+  setVal (SReference $ dst `MS.snoc` MS.Field "length") $ SInteger $ fromIntegral len
   forM_ [0 .. len - 1] $ \i -> do
     let i' = BC.pack $ show i
     elementVal <- getVar $ fs V.! i
-    setVal (SReference $ dst `apSnoc` MS.Index i') elementVal
+    setVal (SReference $ dst `MS.snoc` MS.Index i') elementVal
 setVal (STuple dstVector) (STuple srcVector) =
   if V.length dstVector /= V.length srcVector
     then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
@@ -134,8 +135,10 @@ setVal (STuple dstVector) (STuple srcVector) =
         return (dstItem, srcItemVal)
       forM_ zipped' $ \(dstItem, srcItemVal) -> do
         setVar dstItem srcItemVal
-setVal dst@(SReference (AddressPath addr path)) src = do
-  ro <- readOnly <$> getCurrentCallInfo
+setVal dst@(SReference path) src = do
+  cci <- getCurrentCallInfo
+  let ro = readOnly cci
+      addr = currentAddress cci
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
   basicSrc <- case src of
     SString s -> pure . Just . MS.BString . UTF8.fromString $ s
@@ -151,16 +154,21 @@ setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or 
 setVal (SNULL) _ = return ()
 setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
+getStorageValue :: HasSolidStorageDB m => Address -> MS.StoragePath -> m Value
+getStorageValue addr key = do
+  theValue <- getSolidStorageKeyVal' addr key
+  case theValue of
+    MS.BDefault -> pure $ SReference key
+    _ -> pure $ fromBasic theValue
+
 weakGetVar :: MonadIO m => Variable -> m Value
 weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
 --fromm variable to value
 getVar :: MonadSM m => Variable -> m Value
-getVar (Constant (SReference addressedPath@(AddressPath addr key))) = do
-  theValue <- getSolidStorageKeyVal' addr key
-  case theValue of
-    MS.BDefault -> pure $ SReference addressedPath
-    _ -> pure $ fromBasic theValue
+getVar (Constant (SReference key)) = do
+  ca <- currentAddress <$> getCurrentCallInfo
+  getStorageValue ca key
 getVar (Constant (SStruct s ma)) = do
   resolved <-
     mapM
@@ -289,8 +297,10 @@ getBytesVal = \case
   v -> typeError "getAddress" $ show v
 
 deleteVar :: MonadSM m => Variable -> m ()
-deleteVar (Constant (SReference (AddressPath addr path))) = do
-  ro <- readOnly <$> getCurrentCallInfo
+deleteVar (Constant (SReference path)) = do
+  cci <- getCurrentCallInfo
+  let ro = readOnly cci
+      addr = currentAddress cci
   when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
   markDiffForAction addr path $ MS.BDefault
   putSolidStorageKeyVal' addr path $ MS.BDefault

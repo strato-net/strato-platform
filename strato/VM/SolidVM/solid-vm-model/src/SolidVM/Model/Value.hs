@@ -4,15 +4,12 @@
 module SolidVM.Model.Value
   ( Variable (..),
     Value (..),
-    AddressPath (..),
     ValList,
     rlpEncodeVariable,
     rlpEncodeValue,
     rlpEncodeValues,
     createVar,
     coerceType,
-    apSnoc,
-    apSnocList,
     defaultValue,
     createDefaultValue,
     valEquals,
@@ -53,22 +50,6 @@ import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
-import Text.Printf
-
-data AddressPath = AddressPath
-  { apAddress :: Address,
-    apPath :: MS.StoragePath
-  }
-  deriving (Eq)
-
-apSnoc :: AddressPath -> MS.StoragePathPiece -> AddressPath
-apSnoc (AddressPath loc path) piece = AddressPath loc $! path `MS.snoc` piece
-
-apSnocList :: AddressPath -> [MS.StoragePathPiece] -> AddressPath
-apSnocList (AddressPath loc path) pieces = AddressPath loc $! path `MS.snocList` pieces
-
-instance Show AddressPath where
-  show (AddressPath a p) = printf "%s//%s" (show a) (show p)
 
 data Variable
   = Variable (IORef Value)
@@ -116,7 +97,7 @@ data Value
     -- | SStaticCall Value (Maybe Variable)
     -- | SCall Value (Maybe Variable)
     SNULL
-  | SReference AddressPath -- An alias to an existing variable, so that modifications
+  | SReference MS.StoragePath -- An alias to an existing variable, so that modifications
   -- can be canonicalized
   | SHexDecodeAndTrim -- Hack to implement blockapps-sol's bytes32ToString without
   -- supporting indexing into bytes32s.
@@ -420,8 +401,8 @@ valueTypeName (SVariadic _) = "Variadic"
 
 -- | Format instance for human-readable Value output in error messages
 instance Format Value where
-  format (SReference (AddressPath addr path)) =
-    "Reference(" ++ take 10 (show addr) ++ ".../" ++ BC.unpack (MS.unparsePath path) ++ ")"
+  format (SReference path) =
+    "Reference(" ++ BC.unpack (MS.unparsePath path) ++ ")"
   format (SInteger n) = "Integer(" ++ show n ++ ")"
   format (SBool b) = "Bool(" ++ show b ++ ")"
   format (SString s) = "String(" ++ show (take 20 s) ++ if length s > 20 then "...)" else ")"

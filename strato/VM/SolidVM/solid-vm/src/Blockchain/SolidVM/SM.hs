@@ -662,15 +662,8 @@ getVariableOfName name = do
           t "contract" $ Constant $ SContractDef name
 
       maybeStorageItem :: Maybe Variable
-      maybeStorageItem =
-        -- TODO(tim): This might just be restricted to a field name
-        if name `elem` M.keys (currentContract currentCallInfo ^. CC.storageDefs)
-          then
-            Just . Constant . SReference $
-              AddressPath
-                (currentAddress currentCallInfo)
-                (MS.singleton $ BC.pack $ labelToString name)
-          else Nothing
+      maybeStorageItem = Constant (SReference . MS.singleton . BC.pack $ labelToString name)
+                      <$ M.lookup name (currentContract currentCallInfo ^. CC.storageDefs)
 
       maybeThis :: Maybe Variable
       maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAddress (currentAddress currentCallInfo) False

@@ -449,8 +449,13 @@ call' from to' fnCalltype functionName valList = do
                 Right (funcTocall, _) -> funcTocall
                 _ -> functionName
             )
+      nullifyRefs = \case
+        Just (SReference r) | shouldPushSender -> getStorageValue storageAddress r >>= \case
+          SReference _ -> pure $ Just SNULL
+          v            -> pure $ Just v
+        v -> pure v
 
-  f <- case (M.lookup functionName' functionsIncludingConstructor, fnCalltype) of
+  f <- (nullifyRefs =<<) <$> case (M.lookup functionName' functionsIncludingConstructor, fnCalltype) of
       -- Standard contract call
       -- (Just theFunction, _)
       (Just theFunction, CC.DefaultCall) -> do
@@ -516,7 +521,7 @@ call' from to' fnCalltype functionName valList = do
                           _ -> Just n
                         ) <$> fields
                   fieldVals <- for fieldsToLoad $ \fieldName ->
-                    getVar $ Constant $ SReference $ path `apSnoc` MS.Field (BC.pack $ labelToString fieldName)
+                    getVar $ Constant $ SReference $ path `MS.snoc` MS.Field (BC.pack $ labelToString fieldName)
                   fieldVars <- traverse createVar fieldVals
                   pure . STuple $ V.fromList fieldVars
               handleSimple path = do
@@ -528,17 +533,17 @@ call' from to' fnCalltype functionName valList = do
           -- right now I just ignore this and allow anything to be called as a getter
           case args' of
             [] -> do
-              let path = AddressPath storageAddress $ MS.singleton $ BC.pack $ labelToString functionName
-              withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
-                SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
-                SVMType.UnknownLabel s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
-                _ -> pure $ handleSimple path
+              let path = MS.singleton $ BC.pack $ labelToString functionName
+              pure . withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
+                SVMType.Struct _ s -> (<|>) <$> handleStruct s path <*> handleSimple path
+                SVMType.UnknownLabel s -> (<|>) <$> handleStruct s path <*> handleSimple path
+                _ -> handleSimple path
             _ -> do
-              let path = apSnocList (AddressPath storageAddress . MS.singleton $ BC.pack $ labelToString functionName) args'
-              withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
-                SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
-                SVMType.UnknownLabel s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
-                _ -> pure $ handleSimple path
+              let path = MS.snocList (MS.singleton $ BC.pack $ labelToString functionName) args'
+              pure . withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
+                SVMType.Struct _ s -> (<|>) <$> handleStruct s path <*> handleSimple path
+                SVMType.UnknownLabel s -> (<|>) <$> handleStruct s path <*> handleSimple path
+                _ -> handleSimple path
         Nothing -> case M.lookup "fallback" functionsIncludingConstructor of
           Just fallbackFunc -> do
             mCallInfo <- getCurrentCallInfoIfExists
@@ -1016,7 +1021,7 @@ doWhile condition code = do
     Just SContinue -> doWhile condition code
     _ -> return result
 
-expToPath :: MonadSM m => CC.Expression -> m AddressPath
+expToPath :: MonadSM m => CC.Expression -> m MS.StoragePath
 expToPath (CC.Variable _ x) = do
   callInfo <- getCurrentCallInfo
   let path = MS.singleton $ BC.pack $ labelToString x
@@ -1026,7 +1031,7 @@ expToPath (CC.Variable _ x) = do
       case val of
         SReference apt -> return apt
         _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
-    Nothing -> return $ AddressPath (currentAddress callInfo) path
+    Nothing -> return path
 expToPath x@(CC.IndexAccess _ parent mIndex) = do
   parPath <- do
     parvar <- expToVar parent
@@ -1039,7 +1044,7 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
   -- Helium network ID = 114784819836269
   -- Blocks before 25000 on helium have TXs that relied on the buggy behavior, so preserve it there
   let isHeliumPreFork = Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < 25000
-  pure . apSnoc parPath $ case idx of
+  pure . MS.snoc parPath $ case idx of
     SAddress a _ -> MS.Index . BC.pack $ show a
     SInteger i -> MS.Index . BC.pack $ show i
     SBool b -> MS.Index $ bool "false" "true" b
@@ -1054,7 +1059,7 @@ expToPath (CC.MemberAccess _ parent field) = do
     parvar <- expToVar parent
     case parvar of
       _ -> expToPath parent
-  return . apSnoc apt . MS.Field $ BC.pack $ labelToString field
+  return . MS.snoc apt . MS.Field $ BC.pack $ labelToString field
 expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: MonadSM m => CC.Expression -> m Variable
@@ -1237,8 +1242,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
               Nothing -> case constName `M.lookup` CC._storageDefs cont of
                 Just _ -> do
                   -- Storage variables from parent contracts are stored in the current contract
-                  addr <- getCurrentAddress
-                  return . Constant . SReference $ AddressPath addr (MS.singleton $ BC.pack $ labelToString constName)
+                  return . Constant . SReference $ MS.singleton $ BC.pack $ labelToString constName
                 Nothing -> unknownConstant "member access" (labelToString contractName' ++ "." ++ labelToString constName)
           Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
     (SBuiltinVariable "block", "proposer") -> do
@@ -1285,7 +1289,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
     (SBytes bs, "length") -> return . Constant . SInteger . fromIntegral $ B.length bs
     (SNULL, "length") -> return . Constant $ SInteger 0
-    (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
+    (SReference p, itemName) -> return . Constant . SReference $ MS.snoc p $ MS.Field $ BC.pack $ labelToString itemName
     ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
     m -> typeError ("illegal member access: " ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
 expToVar' x@(CC.IndexAccess _ _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
@@ -1604,8 +1608,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             Just sci -> sci
             Nothing -> expToVar' expr
           case var of
-            Constant (SReference (AddressPath address (MS.StoragePath pieces))) -> do
-              val' <- getVar $ Constant $ SReference $ AddressPath address $ MS.StoragePath $ init pieces
+            Constant (SReference (MS.StoragePath pieces)) -> do
+              val' <- getVar $ Constant $ SReference $ MS.StoragePath $ init pieces
               case (val', last pieces) of
                 (SContract _ toAddress, MS.Field funcName) -> do
                   fromAddress <- getCurrentAddress
@@ -1970,6 +1974,7 @@ expToVarAdd expr1 expr2 = do
           _ -> typeError "expToVarAdd" $ show (i1, i2)
         SNULL -> case i2 of
           SNULL -> return $ Constant SNULL
+          SReference _ -> return $ Constant SNULL
           _ -> addEm i2 i1
         SReference ap1 -> case i2 of
           SReference ap2 -> if ap1 == ap2
@@ -2551,7 +2556,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
 
     forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
       v <- expToVar e
-      setVar (Constant (SReference (AddressPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+      setVar (Constant (SReference (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
     forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
       case theType of
