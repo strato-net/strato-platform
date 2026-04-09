@@ -525,4 +525,32 @@ contract Describe_YieldVault is Authorizable {
         require(vault.queueTail() == requestId, "proxy queue tail should match request id");
         require(vault.totalQueuedShares() == 100e18, "proxy queue should retain queued shares");
     }
+
+    function it_proxy_full_process_of_last_request_clears_queue_pointers() public {
+        User alice = new User();
+        User strategy = new User();
+
+        vault = _deployProxiedVault();
+        _mintAndDeposit(alice, 100e18);
+        _approveStrategy(address(strategy));
+        vault.deployCapital(address(strategy), 80e18);
+        alice.do(address(vault), "requestRedeem(uint256,address,address)", 100e18, address(alice), address(alice));
+
+        Token(asset).mint(address(strategy), 80e18);
+        strategy.do(asset, "approve", address(vault), INFINITY);
+        vault.returnCapital(address(strategy), 80e18);
+
+        vault.processQueue(1, INFINITY);
+
+        require(vault.totalQueuedShares() == 0, "queued shares should clear after full processing");
+        require(vault.totalClaimableAssets() == 100e18, "processed assets should become claimable");
+        require(vault.queueHead() == 0, "queue head should clear after final processed request");
+        require(vault.queueTail() == 0, "queue tail should clear after final processed request");
+
+        alice.do(address(vault), "claim(address)", address(alice));
+
+        require(vault.totalClaimableAssets() == 0, "claim should clear reserved assets");
+        require(vault.queueHead() == 0, "queue head should stay clear after claim");
+        require(vault.queueTail() == 0, "queue tail should stay clear after claim");
+    }
 }

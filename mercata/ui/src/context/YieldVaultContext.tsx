@@ -22,12 +22,27 @@ export type YieldVaultInfo = {
   decimals: number;
   totalAssets: string;
   idleAssets: string;
+  deployedAssets: string;
   totalShares: string;
   exchangeRate: string;
   assetPriceWad: string;
   tvlUsd: string;
   apy: string;
   paused: boolean;
+  minIdleBps: string;
+  totalQueuedShares: string;
+  totalClaimableAssets: string;
+  strategyHoldings: {
+    strategyAddress: string;
+    deployedAssets: string;
+  }[];
+};
+
+export type YieldVaultPendingWithdrawal = {
+  requestId: string;
+  shares: string;
+  estimatedAssets: string;
+  receiver: string;
 };
 
 export type YieldVaultUserInfo = YieldVaultInfo & {
@@ -37,6 +52,10 @@ export type YieldVaultUserInfo = YieldVaultInfo & {
   positionUsd: string;
   maxDeposit: string;
   maxRedeem: string;
+  maxWithdraw: string;
+  claimableAssets: string;
+  activeRequestId: string;
+  pendingWithdrawal: YieldVaultPendingWithdrawal | null;
 };
 
 type YieldVaultContextType = {
@@ -113,11 +132,13 @@ export const YieldVaultProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setUserVaults({});
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (
         controller.signal.aborted ||
-        error?.name === "AbortError" ||
-        error?.code === "ERR_CANCELED"
+        (error instanceof Error && (
+          error.name === "AbortError" ||
+          "code" in error && error.code === "ERR_CANCELED"
+        ))
       ) {
         return;
       }
