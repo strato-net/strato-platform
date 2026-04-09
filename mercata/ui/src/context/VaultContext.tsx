@@ -351,16 +351,20 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
     await fetchUserActivity(showLoading);
   }, [fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions, fetchUserActivity]);
 
-  // Initialize on mount and when logged in
+  // Public data — fetch once on mount
   useEffect(() => {
     fetchVaultInfo(true);
     fetchTransactions(true);
+  }, [fetchVaultInfo, fetchTransactions]);
+
+  // User data — fetch when login state changes
+  useEffect(() => {
     if (isLoggedIn) {
       fetchUserPosition();
       fetchUserBalances();
       fetchUserActivity(true);
     }
-  }, [isLoggedIn, fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions, fetchUserActivity]);
+  }, [isLoggedIn, fetchUserPosition, fetchUserBalances, fetchUserActivity]);
 
   // Cleanup abort controller on unmount
   useEffect(() => {
