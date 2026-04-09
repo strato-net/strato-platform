@@ -101,8 +101,6 @@ export interface VaultInfo {
 export interface UserPosition {
   userShares: string;
   userValueUsd: string;
-  allTimeDeposits: string;
-  allTimeEarnings: string;
 }
 
 export interface WithdrawalBasketItem {
@@ -639,57 +637,6 @@ const getPerformanceMetrics = async (
   }
 };
 
-/**
- * Get user's total deposited and withdrawn USD values from events
- * Used to calculate all-time earnings
- */
-const getUserDepositWithdrawTotals = async (
-  accessToken: string,
-  vaultAddress: string,
-  userAddress: string
-): Promise<{ totalDepositedUsd: bigint; totalWithdrawnUsd: bigint }> => {
-  try {
-    // Fetch all Deposited events for this user
-    const { data: depositEvents } = await cirrus.get(accessToken, `/${Vault}-Deposited`, {
-      params: {
-        select: "depositValueUSD::text",
-        address: `eq.${vaultAddress}`,
-        user: `eq.${userAddress}`,
-      },
-    });
-
-    // Fetch all Withdrawn events for this user
-    const { data: withdrawEvents } = await cirrus.get(accessToken, `/${Vault}-Withdrawn`, {
-      params: {
-        select: "withdrawValueUSD::text",
-        address: `eq.${vaultAddress}`,
-        user: `eq.${userAddress}`,
-      },
-    });
-
-    // Sum up all deposits
-    let totalDepositedUsd = 0n;
-    for (const event of depositEvents || []) {
-      if (event.depositValueUSD) {
-        totalDepositedUsd += BigInt(event.depositValueUSD);
-      }
-    }
-
-    // Sum up all withdrawals
-    let totalWithdrawnUsd = 0n;
-    for (const event of withdrawEvents || []) {
-      if (event.withdrawValueUSD) {
-        totalWithdrawnUsd += BigInt(event.withdrawValueUSD);
-      }
-    }
-
-    return { totalDepositedUsd, totalWithdrawnUsd };
-  } catch (error) {
-    console.error("Error fetching user deposit/withdraw totals:", error);
-    return { totalDepositedUsd: 0n, totalWithdrawnUsd: 0n };
-  }
-};
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PUBLIC SERVICE FUNCTIONS
@@ -761,24 +708,22 @@ export const getVaultShareTokenPrice = async (
   const supportedAssetAddresses: string[] = (vaultData.supportedAssets || [])
     .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000");
 
-  // Calculate total equity: sum of (balance * price) for each asset
+  const [balanceMap, priceMap, totalShares] = await Promise.all([
+    getBatchBalances(accessToken, supportedAssetAddresses, botExecutor),
+    getBatchPrices(accessToken, priceOracleAddress, supportedAssetAddresses),
+    getTokenTotalSupply(accessToken, shareToken),
+  ]);
+
   let totalEquity = 0n;
   for (const assetAddress of supportedAssetAddresses) {
-    const balance = await getTokenBalance(accessToken, assetAddress, botExecutor);
-    const balanceBN = safeBigInt(balance);
-    const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
-    const priceBN = safeBigInt(priceUsd);
-
+    const balanceBN = safeBigInt(balanceMap.get(assetAddress));
+    const priceBN = safeBigInt(priceMap.get(assetAddress));
     if (priceBN > 0n) {
       totalEquity += (balanceBN * priceBN) / WAD;
     }
   }
 
-  // Get total shares
-  const totalShares = await getTokenTotalSupply(accessToken, shareToken);
   const totalSharesBN = safeBigInt(totalShares);
-
-  // NAV per share
   let pricePerShare = WAD.toString();
   if (totalSharesBN > 0n && totalEquity > 0n) {
     pricePerShare = ((totalEquity * WAD) / totalSharesBN).toString();
@@ -978,61 +923,47 @@ export const getUserPosition = async (
   accessToken: string,
   userAddress: string
 ): Promise<UserPosition> => {
+  const noPosition: UserPosition = { userShares: "0", userValueUsd: "0" };
+
   const vaultAddress = getVaultAddress();
-  
-  if (!vaultAddress) {
-    return {
-      userShares: "0",
-      userValueUsd: "0",
-      allTimeDeposits: "0",
-      allTimeEarnings: "0",
-    };
-  }
+  if (!vaultAddress) return noPosition;
 
   const vaultData = await getVaultData(accessToken, vaultAddress);
-  
-  if (!vaultData?.shareToken) {
-    return {
-      userShares: "0",
-      userValueUsd: "0",
-      allTimeDeposits: "0",
-      allTimeEarnings: "0",
-    };
-  }
+  if (!vaultData?.shareToken) return noPosition;
 
   const shareToken = vaultData.shareToken;
+  const botExecutor = vaultData.botExecutor;
+  const priceOracleAddress = vaultData.priceOracle || "";
+  const supportedAssetAddresses: string[] = (vaultData.supportedAssets || [])
+    .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000");
 
-  // Get user's share balance
-  const userShares = await getTokenBalance(accessToken, shareToken, userAddress);
+  const [userShares, totalShares, balanceMap, priceMap] = await Promise.all([
+    getTokenBalance(accessToken, shareToken, userAddress),
+    getTokenTotalSupply(accessToken, shareToken),
+    getBatchBalances(accessToken, supportedAssetAddresses, botExecutor),
+    getBatchPrices(accessToken, priceOracleAddress, supportedAssetAddresses),
+  ]);
+
   const userSharesBN = safeBigInt(userShares);
-
-  // Get total shares
-  const totalShares = await getTokenTotalSupply(accessToken, shareToken);
   const totalSharesBN = safeBigInt(totalShares);
 
-  // Get vault info for NAV calculation
-  const vaultInfo = await getVaultInfo(accessToken);
-  const navPerShare = safeBigInt(vaultInfo.navPerShare);
+  let totalEquity = 0n;
+  for (const assetAddress of supportedAssetAddresses) {
+    const balanceBN = safeBigInt(balanceMap.get(assetAddress));
+    const priceBN = safeBigInt(priceMap.get(assetAddress));
+    if (priceBN > 0n) {
+      totalEquity += (balanceBN * priceBN) / WAD;
+    }
+  }
 
-  // Calculate user's USD value
+  let navPerShare = WAD;
+  if (totalSharesBN > 0n && totalEquity > 0n) {
+    navPerShare = (totalEquity * WAD) / totalSharesBN;
+  }
+
   const userValueUsd = userSharesBN > 0n ? ((userSharesBN * navPerShare) / WAD).toString() : "0";
 
-  // Calculate all-time earnings
-  // earnings = currentValueUsd - (totalDepositedUsd - totalWithdrawnUsd)
-  const { totalDepositedUsd, totalWithdrawnUsd } = await getUserDepositWithdrawTotals(
-    accessToken,
-    vaultAddress,
-    userAddress
-  );
-  const netDeposited = totalDepositedUsd - totalWithdrawnUsd;
-  const allTimeEarnings = (safeBigInt(userValueUsd) - netDeposited).toString();
-
-  return {
-    userShares,
-    userValueUsd,
-    allTimeDeposits: totalDepositedUsd.toString(),
-    allTimeEarnings,
-  };
+  return { userShares, userValueUsd };
 };
 
 /**
