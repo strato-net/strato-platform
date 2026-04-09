@@ -565,6 +565,59 @@ export const fetchAllActivities = async (
 };
 
 /**
+ * Lightweight variant of fetchAllActivities for the earn/token-apys endpoint.
+ * Skips the expensive getCompletePriceMap call (~8 cirrus calls) and instead
+ * accepts an external oracle price map to compute totalStakeUsd.
+ */
+export const fetchActivitiesWithPrices = async (
+  accessToken: string,
+  oraclePrices: Map<string, string>,
+): Promise<SystemActivity[]> => {
+  const rewardsAddress = getRewardsAddress();
+
+  const [activitiesMap, activityStatesMap] = await Promise.all([
+    fetchActivities(accessToken, rewardsAddress),
+    fetchActivityStates(accessToken, rewardsAddress)
+  ]);
+
+  const activities = Array.from(activitiesMap.values());
+  if (activities.length === 0) return [];
+
+  return activities.map((activity: any) => {
+    const activityId = activity.activityId;
+    const state = activityStatesMap.get(activityId);
+    const baseActivity = {
+      activityId,
+      name: activity.name || "",
+      activityType: parseActivityType(activity.activityType),
+      emissionRate: activity.emissionRate || "0",
+      accRewardPerStake: state?.accRewardPerStake || "0",
+      lastUpdateTime: state?.lastUpdateTime || "0",
+      totalStake: state?.totalStake || "0",
+      sourceContract: activity.sourceContract || "",
+    };
+    const { stakeDenomination, stakeAssetAddress } = inferStakeSemantics(baseActivity);
+
+    // Compute totalStakeUsd using the caller's price map
+    let totalStakeUsd: string | null = null;
+    if (stakeDenomination === "usd_notional") {
+      totalStakeUsd = baseActivity.totalStake || "0";
+    } else if (stakeAssetAddress) {
+      const price = oraclePrices.get(stakeAssetAddress.toLowerCase()) || oraclePrices.get(stakeAssetAddress);
+      if (price) totalStakeUsd = mulDiv1e18(baseActivity.totalStake, price);
+    }
+
+    return {
+      ...baseActivity,
+      stakeDenomination,
+      stakeAssetAddress,
+      stakeUnitPriceUsd: null,
+      totalStakeUsd,
+    };
+  });
+};
+
+/**
  * Leaderboard entry
  */
 export interface LeaderboardEntry {

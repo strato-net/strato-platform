@@ -4,13 +4,13 @@ import { hiddenSwapPools, yieldBenchmarks, compositeYieldMap } from "../../confi
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import { buildYieldAnchorOverlapFilter, computeExchangeRateAPY, getYieldWindowBounds, indexYieldHistoryRows, mergeBackfillRows } from "../helpers/earnYield.helper";
 import { totalDebtFromScaled, calculateAPYs } from "../helpers/lending.helper";
-import { fetchMultiTokenStablePools } from "../helpers/swapping.helper";
+import { calculateLPTokenPrice, fetchMultiTokenStablePools } from "../helpers/swapping.helper";
 import {
   computeEquityFromMaps,
   computeVaultPerformanceMetrics,
   safeBigInt,
 } from "../helpers/vaultPerformance.helper";
-import { fetchAllActivities } from "./rewards.service";
+import { fetchActivitiesWithPrices } from "./rewards.service";
 import { getSaveUsdstInfo } from "./saveUsdst.service";
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
@@ -42,6 +42,8 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     { data: vaultRows },
     saveUsdstInfo,
     { data: exchangeRateRows },
+    { data: poolFactoryRows },
+    stablePools,
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
       address: `in.(${constants.lendingPool},${constants.safetyModule},${constants.sToken}${vaultAddr ? `,${vaultAddr}` : ""})`,
@@ -51,7 +53,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     cirrus.get(accessToken, `/${constants.Event}`, { params: { select: "address,event_name,attributes,block_timestamp", or: eventOr } }),
     cirrus.get(accessToken, `/${Pool}`, { params: {
       poolFactory: `eq.${constants.poolFactory}`,
-      select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
+      select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol,_totalSupply::text),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
     }}),
     vaultAddr
       ? cirrus.get(accessToken, `/${Vault}`, { params: {
@@ -70,6 +72,13 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
         or: buildYieldAnchorOverlapFilter(anchorsMs),
       }}).catch(() => ({ data: [] as any[] }))
       : Promise.resolve({ data: [] as any[] }),
+    cirrus.get(accessToken, `/${constants.PoolFactory}`, {
+      params: {
+        address: `eq.${constants.poolFactory}`,
+        select: "swapFeeRate,lpSharePercent",
+      },
+    }).catch(() => ({ data: [] as any[] })),
+    fetchMultiTokenStablePools(accessToken).catch(() => []),
   ]);
 
   // Parse storage
@@ -105,46 +114,70 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     }
   }
 
-  const rewardActivities = await fetchAllActivities(accessToken).catch(() => []);
-  const [{ data: poolFactoryRows }, stablePools] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.PoolFactory}`, {
-      params: {
-        address: `eq.${constants.poolFactory}`,
-        select: "swapFeeRate,lpSharePercent",
-      },
-    }).catch(() => ({ data: [] as any[] })),
-    fetchMultiTokenStablePools(accessToken).catch(() => []),
-  ]);
+  // Enrich oracle prices with LP token prices (computed from pool data already in Phase 1)
+  const enrichedPrices = new Map(prices);
+  for (const p of pools || []) {
+    if (p.lpToken?.address && p.lpToken._totalSupply && p.tokenA?.address && p.tokenB?.address) {
+      const lpPrice = calculateLPTokenPrice(
+        p.tokenABalance || "0", p.tokenBBalance || "0",
+        prices.get(p.tokenA.address) || "0", prices.get(p.tokenB.address) || "0",
+        p.lpToken._totalSupply
+      );
+      if (lpPrice !== "0") enrichedPrices.set(p.lpToken.address, lpPrice);
+    }
+  }
 
-  // Phase 2: vault APY needs current balances + historical NAV context
+  // Add save-USDST vault price from Phase 1 saveUsdstInfo
+  const saveUsdstAddr = (saveUsdstInfo as any)?.vaultAddress;
+  if (saveUsdstAddr) {
+    const pricingAssets = BigInt((saveUsdstInfo as any)?.pricingAssets || "0");
+    const totalShares = BigInt((saveUsdstInfo as any)?.totalShares || "0");
+    if (totalShares > 0n && pricingAssets > 0n) {
+      enrichedPrices.set(saveUsdstAddr.toLowerCase().replace(/^0x/, ""), ((pricingAssets * DECIMALS) / totalShares).toString());
+    }
+  }
+
+  // Phase 2: vault balances (light) + vault metrics & rewards (heavy, parallelized)
   let vaultAPY: string | null = null;
   let vaultRewardApy: string | null = null;
   const filteredVaultAssets = vaultAssets.filter(a => a !== "0000000000000000000000000000000000000000");
   const vaultOracle = vaultStorage?.priceOracle || constants.priceOracle;
   const currentVaultBalances = new Map<string, string>();
+  let rewardActivities: any[] = [];
+
   if (vaultAddr && shareTokenAddress && botExecutor && filteredVaultAssets.length) {
-    const balances = await getCurrentVaultBalances(accessToken, filteredVaultAssets, botExecutor);
+    // Light calls: get vault balances + share supply
+    const [balances, totalSupply] = await Promise.all([
+      getCurrentVaultBalances(accessToken, filteredVaultAssets, botExecutor),
+      getTokenTotalSupply(accessToken, shareTokenAddress),
+    ]);
     balances.forEach((value, key) => currentVaultBalances.set(key, value));
 
-    const vaultMetrics = await computeVaultPerformanceMetrics(
-      accessToken,
-      vaultAddr,
-      computeEquityFromMaps(filteredVaultAssets, currentVaultBalances, prices),
-      safeBigInt(await getTokenTotalSupply(accessToken, shareTokenAddress)),
-      shareTokenAddress,
-      botExecutor,
-      vaultOracle,
-      filteredVaultAssets,
-      prices
-    );
+    const vaultEquity = computeEquityFromMaps(filteredVaultAssets, currentVaultBalances, prices);
+    const totalSupplyBig = safeBigInt(totalSupply);
+    if (totalSupplyBig > 0n && vaultEquity > 0n) {
+      enrichedPrices.set(shareTokenAddress, ((vaultEquity * (10n ** 18n)) / totalSupplyBig).toString());
+    }
 
+    // Heavy calls: vault metrics + reward activities in parallel
+    const [vaultMetrics, activities] = await Promise.all([
+      computeVaultPerformanceMetrics(
+        accessToken, vaultAddr, vaultEquity, totalSupplyBig,
+        shareTokenAddress, botExecutor, vaultOracle, filteredVaultAssets, prices
+      ),
+      fetchActivitiesWithPrices(accessToken, enrichedPrices).catch(() => []),
+    ]);
+    rewardActivities = activities;
     vaultAPY = vaultMetrics.alpha !== "-" ? vaultMetrics.alpha : null;
+
     const vaultRewardsActivity = findRewardActivity(rewardActivities, {
       sourceContract: shareTokenAddress,
       stakeAssetAddress: shareTokenAddress,
       nameIncludes: ["vault"],
     });
     vaultRewardApy = computeRewardsApy(vaultRewardsActivity?.emissionRate, vaultRewardsActivity?.totalStakeUsd);
+  } else {
+    rewardActivities = await fetchActivitiesWithPrices(accessToken, enrichedPrices).catch(() => []);
   }
 
   // Build result
