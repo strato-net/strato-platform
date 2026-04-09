@@ -16,6 +16,7 @@ import CollateralConfigManager from '@/components/admin/CollateralConfigManager'
 import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
 import VaultAdminTab from '@/components/admin/VaultAdminTab';
+import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -205,6 +206,7 @@ const Admin = () => {
           </TabsContent>
           <TabsContent value="vault" className="space-y-6">
             <VaultAdminTab />
+            <YieldVaultAdminTab />
           </TabsContent>
         </Tabs>
       </div>

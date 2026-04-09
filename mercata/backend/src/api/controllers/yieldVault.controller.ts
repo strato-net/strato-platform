@@ -1,13 +1,19 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
+  claimYieldVault,
+  deployYieldVaultCapital,
   depositYieldVault,
   getYieldVaultInfo,
   getYieldVaultUserInfo,
+  reportYieldVaultStrategyLoss,
   listVaultDefs,
   redeemAllYieldVault,
   redeemYieldVault,
   resolveVaultDef,
+  returnYieldVaultCapital,
+  setYieldVaultMinIdleBps,
+  setYieldVaultStrategyApproval,
 } from "../services/yieldVault.service";
 
 const isPositiveIntegerString = (value: unknown): value is string => {
@@ -27,6 +33,20 @@ const requireVaultKey = (req: Request, res: Response): string | null => {
     return null;
   }
   return key;
+};
+
+const isHexAddress = (value: unknown): value is string =>
+  typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+
+const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
+
+const isBpsString = (value: unknown): value is string => {
+  if (!isPositiveIntegerString(value)) return false;
+  try {
+    return BigInt(value) <= 10000n;
+  } catch {
+    return false;
+  }
 };
 
 class YieldVaultController {
@@ -97,6 +117,121 @@ class YieldVaultController {
       const key = requireVaultKey(req, res);
       if (!key) return;
       const result = await redeemAllYieldVault(req.accessToken, key, req.address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async claim(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const result = await claimYieldVault(req.accessToken, key, req.address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setStrategyApproval(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const { strategy, approved } = req.body || {};
+      if (!isHexAddress(strategy) || !isBoolean(approved)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid strategy approval payload" });
+        return;
+      }
+      const result = await setYieldVaultStrategyApproval(
+        req.accessToken,
+        key,
+        req.address as string,
+        strategy,
+        approved
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setMinIdleBps(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const { minIdleBps } = req.body || {};
+      if (!isBpsString(minIdleBps)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid min idle bps" });
+        return;
+      }
+      const result = await setYieldVaultMinIdleBps(req.accessToken, key, req.address as string, minIdleBps);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deployCapital(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const { strategy, assets } = req.body || {};
+      if (!isHexAddress(strategy) || !isPositiveIntegerString(assets)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid deploy payload" });
+        return;
+      }
+      const result = await deployYieldVaultCapital(
+        req.accessToken,
+        key,
+        req.address as string,
+        strategy,
+        assets
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async returnCapital(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const { strategy, assets } = req.body || {};
+      if (!isHexAddress(strategy) || !isPositiveIntegerString(assets)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid return payload" });
+        return;
+      }
+      const result = await returnYieldVaultCapital(
+        req.accessToken,
+        key,
+        req.address as string,
+        strategy,
+        assets
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async reportLoss(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const { strategy, loss } = req.body || {};
+      if (!isHexAddress(strategy) || !isPositiveIntegerString(loss)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid loss payload" });
+        return;
+      }
+      const result = await reportYieldVaultStrategyLoss(
+        req.accessToken,
+        key,
+        req.address as string,
+        strategy,
+        loss
+      );
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

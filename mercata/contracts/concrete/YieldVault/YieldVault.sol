@@ -380,9 +380,11 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         activeRequestId[owner_] = 0;
         delete requestOwner[current];
         delete requests[current];
-        queueHead = next;
         if (next == 0) {
+            delete queueHead;
             queueTail = 0;
+        } else {
+            queueHead = next;
         }
         return next;
     }
