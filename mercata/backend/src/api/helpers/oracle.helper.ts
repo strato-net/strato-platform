@@ -153,7 +153,7 @@ const addYieldVaultTokenPrices = async (
     const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
       params: {
         address: `eq.${vaultAddress}`,
-        select: "address,_asset,deployedAssets::text,_totalSupply::text",
+        select: "address,_asset,deployedAssets::text,totalClaimableAssets::text,_totalSupply::text",
       },
     });
     const v = rows?.[0];
@@ -169,9 +169,11 @@ const addYieldVaultTokenPrices = async (
 
     const idle = BigInt(balRows?.[0]?.value || "0");
     const deployed = BigInt(v.deployedAssets || "0");
-    const totalAssets = idle + deployed;
+    const claimable = BigInt(v.totalClaimableAssets || "0");
+    const gross = idle + deployed;
+    const activeAssets = gross > claimable ? gross - claimable : gross;
     const totalShares = BigInt(v._totalSupply || "0");
-    const pricePerShare = totalShares === 0n ? DECIMALS : (totalAssets * DECIMALS) / totalShares;
+    const pricePerShare = totalShares === 0n ? DECIMALS : (activeAssets * DECIMALS) / totalShares;
     priceMap.set(v.address, pricePerShare.toString());
   }
 };

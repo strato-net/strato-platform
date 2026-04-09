@@ -95,6 +95,13 @@ const formatUsdAmount = (value: string): string => {
   }
 };
 
+/** Oracle USD (WAD) from underlying base units — matches backend `underlyingUsdWad` / TVL / positionUsd. */
+const underlyingUsdWad = (amountWei: bigint, priceWad: bigint, d: number): bigint => {
+  if (priceWad <= 0n || amountWei <= 0n) return 0n;
+  const unit = 10n ** BigInt(d);
+  return (amountWei * priceWad) / unit;
+};
+
 type ActionMode = "deposit" | "redeem" | null;
 
 const EarnYieldVault = () => {
@@ -154,16 +161,45 @@ const EarnYieldVault = () => {
 
   const totalAssetsWei = effectiveInfo?.totalAssets || "0";
   const idleAssetsWei = effectiveInfo?.idleAssets || "0";
+  const activeAssetsWei = effectiveInfo?.activeAssets || "0";
   const totalSharesWei = effectiveInfo?.totalShares || "0";
   /** Total = idle + deployed on-chain; use extra decimals when they differ so rounding does not hide it. */
   const vaultDetailAmountDigits =
     BigInt(totalAssetsWei) !== BigInt(idleAssetsWei) ? 8 : 4;
-  const totalPendingAssetsWei = effectiveInfo?.totalPendingAssets || "0";
+  const totalQueuedSharesWei = effectiveInfo?.totalQueuedShares || "0";
+  const totalClaimableAssetsWei = effectiveInfo?.totalClaimableAssets || "0";
+  /** Matches contract freeIdleForInstantWithdrawals(): 0 when queue active, else idle − claimable. */
+  const freeIdleWei = (() => {
+    if (BigInt(totalQueuedSharesWei) > 0n) return "0";
+    const idle = BigInt(idleAssetsWei);
+    const claimable = BigInt(totalClaimableAssetsWei);
+    return (idle > claimable ? idle - claimable : 0n).toString();
+  })();
   const isPaused = Boolean(effectiveInfo?.paused);
 
-  const pendingWithdrawalWei = userInfo?.pendingWithdrawal || "0";
-  const pendingWithdrawalUsdWad = userInfo?.pendingWithdrawalUsd || "0";
-  const hasPendingWithdrawal = isLoggedIn && BigInt(pendingWithdrawalWei) > 0n;
+  const claimableAssetsWei = userInfo?.claimableAssets || "0";
+  const hasClaimable = isLoggedIn && BigInt(claimableAssetsWei) > 0n;
+  const hasQueuedRequest = isLoggedIn && BigInt(userInfo?.activeRequestId || "0") > 0n;
+  const queuedSharesWei = userInfo?.queuedShares || "0";
+
+  const assetPriceWadStr = effectiveInfo?.assetPriceWad || "0";
+  const claimUsdWad = useMemo(() => {
+    return underlyingUsdWad(
+      BigInt(claimableAssetsWei || "0"),
+      BigInt(assetPriceWadStr || "0"),
+      decimals
+    ).toString();
+  }, [claimableAssetsWei, assetPriceWadStr, decimals]);
+  /** Preview underlying for queued shares — same (shares × (activeAssets+1)) / (totalShares+1) as backend redeemable calc. */
+  const queuedUnderlyingUsdWad = useMemo(() => {
+    const qs = BigInt(queuedSharesWei || "0");
+    const aa = BigInt(activeAssetsWei || "0");
+    const ts = BigInt(totalSharesWei || "0");
+    const p = BigInt(assetPriceWadStr || "0");
+    if (qs <= 0n || ts <= 0n) return "0";
+    const underlyingWei = (qs * (aa + 1n)) / (ts + 1n);
+    return underlyingUsdWad(underlyingWei, p, decimals).toString();
+  }, [queuedSharesWei, activeAssetsWei, totalSharesWei, assetPriceWadStr, decimals]);
 
   const depositDisabled = !isLoggedIn || !isDeployed || isPaused;
   const redeemDisabled = !isLoggedIn || !isDeployed || isPaused;
@@ -176,20 +212,20 @@ const EarnYieldVault = () => {
   }, [actionMode, userInfo?.maxDeposit, userInfo?.userShares]);
 
   const previewValueWei = useMemo(() => {
-    const totalAssetsBig = BigInt(effectiveInfo?.totalAssets || "0");
+    const activeAssetsBig = BigInt(effectiveInfo?.activeAssets || "0");
     const totalSharesBig = BigInt(effectiveInfo?.totalShares || "0");
     if (amountWei <= 0n) return 0n;
 
     if (actionMode === "deposit") {
-      if (totalAssetsBig <= 0n || totalSharesBig <= 0n) return amountWei;
-      return (amountWei * (totalSharesBig + 1n)) / (totalAssetsBig + 1n);
+      if (activeAssetsBig <= 0n || totalSharesBig <= 0n) return amountWei;
+      return (amountWei * (totalSharesBig + 1n)) / (activeAssetsBig + 1n);
     }
     if (actionMode === "redeem") {
-      if (totalAssetsBig <= 0n || totalSharesBig <= 0n) return 0n;
-      return (amountWei * (totalAssetsBig + 1n)) / (totalSharesBig + 1n);
+      if (activeAssetsBig <= 0n || totalSharesBig <= 0n) return 0n;
+      return (amountWei * (activeAssetsBig + 1n)) / (totalSharesBig + 1n);
     }
     return 0n;
-  }, [actionMode, amountWei, effectiveInfo?.totalAssets, effectiveInfo?.totalShares]);
+  }, [actionMode, amountWei, effectiveInfo?.activeAssets, effectiveInfo?.totalShares]);
 
   const isActionAmountValid = amountWei > 0n && amountWei <= actionMaxWei;
 
@@ -239,6 +275,44 @@ const EarnYieldVault = () => {
     }
   };
 
+
+  const handleClaim = async () => {
+    if (!isLoggedIn || isSubmitting) return;
+    try {
+      setIsSubmitting(true);
+      await api.post(`/earn/yield-vault/${vaultKey}/claim`);
+      toast({
+        title: "Claim submitted",
+        description: `Claiming ${formatTokenAmount(claimableAssetsWei, decimals)} ${assetSymbol}.`,
+        variant: "success",
+      });
+      await refreshVaults();
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Transaction failed";
+      toast({ title: "Claim failed", description: msg, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!isLoggedIn || isSubmitting) return;
+    try {
+      setIsSubmitting(true);
+      await api.post(`/earn/yield-vault/${vaultKey}/cancel-request`);
+      toast({
+        title: "Request cancelled",
+        description: `Your queued withdrawal has been cancelled and shares returned.`,
+        variant: "success",
+      });
+      await refreshVaults();
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Transaction failed";
+      toast({ title: "Cancel failed", description: msg, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const actionPrimaryLabel = actionMode === "deposit" ? "Deposit" : "Redeem";
   const actionPreviewSymbol = actionMode === "deposit" ? shareSymbol : assetSymbol;
@@ -417,14 +491,6 @@ const EarnYieldVault = () => {
                         >
                           Redeem
                         </Button>
-                        <Button
-                          variant="outline"
-                          className="sm:min-w-[180px]"
-                          onClick={() => handleActionRequest("redeem")}
-                          disabled={redeemDisabled}
-                        >
-                          Claim
-                        </Button>
                       </div>
                       {!isDeployed && (
                         <p className="text-xs text-muted-foreground">
@@ -437,7 +503,7 @@ const EarnYieldVault = () => {
 
                 <section className="space-y-3">
                   <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Vault Details</h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
                       <p className="text-xs text-muted-foreground">Total Assets</p>
                       <p className="mt-1 text-lg font-semibold">
@@ -452,19 +518,9 @@ const EarnYieldVault = () => {
                       <p className="mt-1 text-lg font-semibold">
                         {loadingVaults
                           ? "..."
-                          : formatTokenAmount(idleAssetsWei, decimals, vaultDetailAmountDigits)}
+                          : formatTokenAmount(freeIdleWei, decimals, vaultDetailAmountDigits)}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{assetSymbol} for withdrawals</p>
-                    </div>
-                    <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
-                      <p className="text-xs text-muted-foreground">Pending Queue</p>
-                      <p className="mt-1 text-lg font-semibold">0.05</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{assetSymbol} awaiting withdrawal</p>
-                    </div>
-                    <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
-                      <p className="text-xs text-muted-foreground">Available to Claim</p>
-                      <p className="mt-1 text-lg font-semibold">0.0312</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{assetSymbol} redeemable now</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{assetSymbol} for instant withdrawals</p>
                     </div>
                   </div>
                 </section>
@@ -484,22 +540,70 @@ const EarnYieldVault = () => {
                   ))}
                 </section>
 
-                {hasPendingWithdrawal && (
+                {(hasQueuedRequest || hasClaimable) && (
                   <section>
-                    <Card className="border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20">
+                    <Card className={hasClaimable
+                      ? "border border-green-500/30 bg-green-50/50 dark:bg-green-950/20"
+                      : "border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20"
+                    }>
                       <CardContent className="pt-4 pb-4 flex items-start gap-3">
-                        <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium">
-                            Pending Withdrawal: {formatTokenAmount(pendingWithdrawalWei, decimals)} {assetSymbol}
-                            {BigInt(pendingWithdrawalUsdWad) > 0n && (
-                              <span className="text-muted-foreground font-normal"> ({formatUsdAmount(pendingWithdrawalUsdWad)})</span>
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Your withdrawal is queued and will be processed when capital is returned to the vault.
-                          </p>
+                        {hasClaimable
+                          ? <CircleDollarSign className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                          : <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        }
+                        <div className="flex-1 space-y-1">
+                          {hasClaimable ? (
+                            <>
+                              <p className="text-sm font-medium">
+                                Claimable: {formatTokenAmount(claimableAssetsWei, decimals)} {assetSymbol}
+                                {BigInt(claimUsdWad) > 0n && (
+                                  <span className="text-muted-foreground font-normal">
+                                    {" "}
+                                    ({formatUsdAmount(claimUsdWad)})
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Your withdrawal has been processed. Claim your {assetSymbol} below.
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-sm font-medium">
+                                Withdrawal Queued: {formatTokenAmount(queuedSharesWei, decimals)} {shareSymbol}
+                                {BigInt(queuedUnderlyingUsdWad) > 0n && (
+                                  <span className="text-muted-foreground font-normal">
+                                    {" "}
+                                    (~{formatUsdAmount(queuedUnderlyingUsdWad)})
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Your shares are queued for withdrawal and will be processed when capital is returned.
+                              </p>
+                            </>
+                          )}
                         </div>
+                        {hasClaimable ? (
+                          <Button
+                            size="sm"
+                            className="shrink-0"
+                            onClick={handleClaim}
+                            disabled={isSubmitting}
+                          >
+                            {isSubmitting ? "..." : "Claim"}
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0 text-amber-700 dark:text-amber-400 border-amber-400/50 hover:bg-amber-100 dark:hover:bg-amber-950/40"
+                            onClick={handleCancelRequest}
+                            disabled={isSubmitting}
+                          >
+                            {isSubmitting ? "..." : "Cancel"}
+                          </Button>
+                        )}
                       </CardContent>
                     </Card>
                   </section>
@@ -590,9 +694,9 @@ const EarnYieldVault = () => {
                   ) : null}
                 </p>
                 <p className="text-muted-foreground">
-                  Available idle:{" "}
-                  {formatTokenAmount(idleAssetsWei, decimals, vaultDetailAmountDigits)} {assetSymbol}.
-                  Redemptions exceeding idle liquidity will be queued.
+                  {BigInt(freeIdleWei) <= 0n
+                    ? "No idle liquidity available — redemptions will be queued."
+                    : `Free idle: ${formatTokenAmount(freeIdleWei, decimals, vaultDetailAmountDigits)} ${assetSymbol}. Redemptions exceeding free idle will be queued.`}
                 </p>
               </div>
             )}

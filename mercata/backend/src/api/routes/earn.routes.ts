@@ -34,5 +34,7 @@ router.get("/yield-vault/:key/user", authHandler.authorizeRequest(), YieldVaultC
 router.post("/yield-vault/:key/deposit", authHandler.authorizeRequest(), YieldVaultController.deposit);
 router.post("/yield-vault/:key/redeem", authHandler.authorizeRequest(), YieldVaultController.redeem);
 router.post("/yield-vault/:key/redeem-all", authHandler.authorizeRequest(), YieldVaultController.redeemAll);
+router.post("/yield-vault/:key/claim", authHandler.authorizeRequest(), YieldVaultController.claim);
+router.post("/yield-vault/:key/cancel-request", authHandler.authorizeRequest(), YieldVaultController.cancelRequest);
 
 export default router;

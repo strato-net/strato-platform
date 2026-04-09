@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
+  cancelRequestYieldVault,
+  claimYieldVault,
   depositYieldVault,
   getYieldVaultInfo,
   getYieldVaultUserInfo,
@@ -97,6 +99,28 @@ class YieldVaultController {
       const key = requireVaultKey(req, res);
       if (!key) return;
       const result = await redeemAllYieldVault(req.accessToken, key, req.address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async claim(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const result = await claimYieldVault(req.accessToken, key, req.address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async cancelRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const result = await cancelRequestYieldVault(req.accessToken, key, req.address as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

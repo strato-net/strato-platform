@@ -22,13 +22,15 @@ export type YieldVaultInfo = {
   decimals: number;
   totalAssets: string;
   idleAssets: string;
+  activeAssets: string;
   totalShares: string;
   exchangeRate: string;
   assetPriceWad: string;
   tvlUsd: string;
   apy: string;
   paused: boolean;
-  totalPendingAssets: string;
+  totalQueuedShares: string;
+  totalClaimableAssets: string;
 };
 
 export type YieldVaultUserInfo = YieldVaultInfo & {
@@ -38,8 +40,11 @@ export type YieldVaultUserInfo = YieldVaultInfo & {
   positionUsd: string;
   maxDeposit: string;
   maxRedeem: string;
-  pendingWithdrawal: string;
-  pendingWithdrawalUsd: string;
+  claimableAssets: string;
+  claimableAssetsUsd: string;
+  activeRequestId: string;
+  queuedShares: string;
+  queuedSharesUsd: string;
 };
 
 type YieldVaultContextType = {
