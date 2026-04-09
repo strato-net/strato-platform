@@ -492,7 +492,7 @@ call' from to' fnCalltype functionName valList = do
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
-        Just CC.VariableDecl {..} -> do
+        Just CC.VariableDecl {..} | not (isExternal && _varVisibility /= Just CC.Public) -> do
           let args' = fromMaybe [] $ case (_varType, valList) of
                 ((SVMType.Array _ _), oa) -> for oa $ \case
                   SInteger n -> Just . MS.Index . BC.pack $ show n
@@ -504,9 +504,6 @@ call' from to' fnCalltype functionName valList = do
                 SVMType.Array t _ -> returnType t
                 SVMType.Mapping _ _ t -> returnType t
                 t -> t
-              isForbidden = case _varVisibility of
-                Just CC.Public -> False
-                _ -> True
               handleStruct s path = do
                 mFields <- case M.lookup s $ contract ^. CC.structs of
                   Just vals -> pure . Just $ (\(a, t, _) -> (a, CC.fieldTypeType t)) <$> vals
@@ -527,10 +524,6 @@ call' from to' fnCalltype functionName valList = do
               handleSimple path = do
                 v <- getVar $ Constant $ SReference path
                 pure $ Just v
-          when (isExternal && isForbidden) $
-            unknownFunction "logFunctionCall" (functionName, "asdf4" :: String) -- contract ^. CC.contractName)
-          -- TODO: this should only exist if the storage variable is declared "public",
-          -- right now I just ignore this and allow anything to be called as a getter
           case args' of
             [] -> do
               let path = MS.singleton $ BC.pack $ labelToString functionName
@@ -544,7 +537,7 @@ call' from to' fnCalltype functionName valList = do
                 SVMType.Struct _ s -> (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s -> (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> handleSimple path
-        Nothing -> case M.lookup "fallback" functionsIncludingConstructor of
+        _ -> case M.lookup "fallback" functionsIncludingConstructor of
           Just fallbackFunc -> do
             mCallInfo <- getCurrentCallInfoIfExists
             let ro = case mCallInfo of
