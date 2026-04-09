@@ -110,7 +110,7 @@ const buildYieldVaultEarningAsset = (
     balance,
     images: [],
     attributes: [],
-    price: info.exchangeRate || "0",
+    price: ((BigInt(info.exchangeRate || "0") * BigInt(info.assetPriceWad || "0")) / BigInt(1e18)).toString(),
     collateralBalance: "0",
     totalBalance,
     isPoolToken: false,
@@ -503,6 +503,19 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
         }
       };
     }
+    case 'claimableAssets': {
+      if (portfolioInfo.carryVaultAddrs?.has(newInfo.address)) {
+        const newValue = parseFloat(newInfo.value) || 0;
+        return { ...portfolioInfo,
+          tokens: { ...portfolioInfo.tokens,
+            [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
+              userClaimableAssets: newValue
+            }
+          }
+        };
+      }
+      return portfolioInfo;
+    }
   }
   return portfolioInfo;
 }
@@ -518,6 +531,11 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       const rateAccumulator = Number(BigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
       const loanAmt = (token?.scaledDebt || 0) * rateAccumulator;
       netLoan += loanAmt;
+    }
+    if (snapshot.data.carryVaultAddrs?.has(tokenAddr) && token?.userClaimableAssets) {
+      const ulAsset = token?.underlyingAsset || '';
+      const ulPrice = snapshot.data.tokens[ulAsset]?.price || 0;
+      netBalance += (token.userClaimableAssets / 1000000000) * (ulPrice / 1000000000);
     }
     if (tokenBalance === 0) continue;
     if (tokenPrice === 0) {
@@ -655,10 +673,12 @@ export const getNetBalanceHistory = async (
     'and(address.eq.937efa7e3a77e20bbdbd7c0d32b6514f368c1010,path.eq._balances[0000000000000000000000000000000000001004])',
     ...(vaultConfig?.botExecutor ? [`path.eq._balances[${vaultConfig.botExecutor}]`] : []),
     ...carryVaultAddrs.map(addr => `path.eq._balances[${addr}]`),
+    ...carryVaultAddrs.map(addr => `and(address.eq.${addr},path.eq.claimableAssets[${userAddress}])`),
   ]
 
   const mappingCollectionNames = [
     '_balances',
+    'claimableAssets',
     'collateralConfigs',
     'collateralGlobalStates',
     'prices',
