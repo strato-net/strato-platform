@@ -205,8 +205,29 @@ const Admin = () => {
             <BridgeTransactionsPage isAdmin={true} />
           </TabsContent>
           <TabsContent value="vault" className="space-y-6">
-            <VaultAdminTab />
-            <YieldVaultAdminTab />
+            <Card>
+              <CardHeader>
+                <CardTitle>Carry Vaults</CardTitle>
+                <CardDescription>
+                  Admin tools for the ETH and wBTC carry vaults.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <YieldVaultAdminTab />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Diversified Vault</CardTitle>
+                <CardDescription>
+                  Admin tools for the diversified multi-asset vault.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VaultAdminTab />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

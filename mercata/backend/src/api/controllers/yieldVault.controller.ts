@@ -8,6 +8,7 @@ import {
   getYieldVaultUserInfo,
   reportYieldVaultStrategyLoss,
   listVaultDefs,
+  processYieldVaultQueue,
   redeemAllYieldVault,
   redeemYieldVault,
   resolveVaultDef,
@@ -231,6 +232,28 @@ class YieldVaultController {
         req.address as string,
         strategy,
         loss
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async processQueue(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const key = requireVaultKey(req, res);
+      if (!key) return;
+      const { maxRequests, maxAssets } = req.body || {};
+      if (!isPositiveIntegerString(maxRequests) || !isPositiveIntegerString(maxAssets)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid process queue payload" });
+        return;
+      }
+      const result = await processYieldVaultQueue(
+        req.accessToken,
+        key,
+        req.address as string,
+        maxRequests,
+        maxAssets
       );
       res.status(RestStatus.OK).json(result);
     } catch (error) {

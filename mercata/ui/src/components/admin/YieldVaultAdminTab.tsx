@@ -4,9 +4,10 @@ import { Loader2 } from "lucide-react";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits, ensureHexPrefix } from "@/utils/numberUtils";
-import { YieldVaultInfo } from "@/context/YieldVaultContext";
+import type { YieldVaultInfo } from "@/context/YieldVaultContext.shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import CopyButton from "@/components/ui/copy";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,12 @@ const formatAddress = (value: string): string => {
   if (raw.length <= 10) return `0x${raw}`;
   return `0x${raw.slice(0, 6)}...${raw.slice(-4)}`;
 };
+
+const isFullHexAddress = (value: string | undefined): value is `0x${string}` =>
+  typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value);
+
+const normalizeAddress = (value: string | undefined | null): string =>
+  (value || "").toLowerCase().replace(/^0x/, "");
 
 const YieldVaultAdminTab = () => {
   const { toast } = useToast();
@@ -102,12 +109,26 @@ const YieldVaultAdminTab = () => {
   const normalizedStrategy = ensureHexPrefix(strategyAddress?.trim());
   const capitalAmountWei = capitalAmount ? safeParseUnits(capitalAmount, assetDecimals) : 0n;
   const lossAmountWei = lossAmount ? safeParseUnits(lossAmount, assetDecimals) : 0n;
-  const hasStrategy = Boolean(normalizedStrategy);
+  const hasStrategy = isFullHexAddress(normalizedStrategy);
   const hasCapitalAmount = capitalAmountWei > 0n;
   const hasLossAmount = lossAmountWei > 0n;
   const minIdleValue = minIdleBps.trim();
   const minIdleValid =
     /^\d+$/.test(minIdleValue) && Number(minIdleValue) >= 0 && Number(minIdleValue) <= 10000;
+  const selectedHolding =
+    vaultInfo?.strategyHoldings?.find(
+      (holding) => normalizeAddress(holding.strategyAddress) === normalizeAddress(normalizedStrategy)
+    ) || null;
+  const selectedStrategyDebtWei = BigInt(selectedHolding?.deployedAssets || "0");
+  const remainingDebtAfterLossWei =
+    lossAmountWei >= selectedStrategyDebtWei ? 0n : selectedStrategyDebtWei - lossAmountWei;
+  const lossExceedsDebt = hasLossAmount && lossAmountWei > selectedStrategyDebtWei;
+  const totalQueuedSharesWei = BigInt(vaultInfo?.totalQueuedShares || "0");
+  const idleAssetsWei = BigInt(vaultInfo?.idleAssets || "0");
+  const totalClaimableAssetsWei = BigInt(vaultInfo?.totalClaimableAssets || "0");
+  const queueProcessableAssetsWei =
+    idleAssetsWei > totalClaimableAssetsWei ? idleAssetsWei - totalClaimableAssetsWei : 0n;
+  const hasOpenQueue = totalQueuedSharesWei > 0n;
 
   const runAdminAction = useCallback(
     async (
@@ -183,14 +204,22 @@ const YieldVaultAdminTab = () => {
                 value={strategyAddress}
                 onChange={(event) => setStrategyAddress(event.target.value)}
               />
+              {strategyAddress.trim() && !hasStrategy && (
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  Enter the full strategy address. Shortened values like `0x1234...abcd` will be rejected.
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <Card className="border border-border/70">
               <CardContent className="pt-4 space-y-2">
                 <p className="text-xs text-muted-foreground">Vault Address</p>
-                <p className="text-lg font-semibold">{formatAddress(vaultInfo?.vaultAddress || selectedVault?.address || "")}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-lg font-semibold">{formatAddress(vaultInfo?.vaultAddress || selectedVault?.address || "")}</p>
+                  <CopyButton address={vaultInfo?.vaultAddress || selectedVault?.address || ""} />
+                </div>
                 <Badge variant={vaultInfo?.paused ? "destructive" : "default"}>
                   {vaultInfo?.paused ? "Paused" : "Active"}
                 </Badge>
@@ -203,6 +232,19 @@ const YieldVaultAdminTab = () => {
                   {formatTokenAmount(vaultInfo?.idleAssets || "0", assetDecimals)} {vaultInfo?.assetSymbol || selectedVault?.assetSymbol}
                 </p>
                 <p className="text-xs text-muted-foreground">Instantly held in the vault</p>
+              </CardContent>
+            </Card>
+            <Card className="border border-border/70">
+              <CardContent className="pt-4 space-y-2">
+                <p className="text-xs text-muted-foreground">Max Deployable</p>
+                <p className="text-lg font-semibold">
+                  {formatTokenAmount(vaultInfo?.maxDeploy || "0", assetDecimals)} {vaultInfo?.assetSymbol || selectedVault?.assetSymbol}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {vaultInfo?.deployBlockedReason
+                    ? `Deploy blocked: ${vaultInfo.deployBlockedReason}`
+                    : `Min idle reserve: ${formatTokenAmount(vaultInfo?.minIdleRequirement || "0", assetDecimals)} ${vaultInfo?.assetSymbol || selectedVault?.assetSymbol}`}
+                </p>
               </CardContent>
             </Card>
             <Card className="border border-border/70">
@@ -222,6 +264,32 @@ const YieldVaultAdminTab = () => {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Claimable: {formatTokenAmount(vaultInfo?.totalClaimableAssets || "0", assetDecimals)} {vaultInfo?.assetSymbol || selectedVault?.assetSymbol}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!hasOpenQueue || queueProcessableAssetsWei <= 0n || submittingAction !== null}
+                  onClick={() =>
+                    runAdminAction(
+                      "process-queue",
+                      () =>
+                        api.post(`/earn/yield-vault/${selectedKey}/admin/process-queue`, {
+                          maxRequests: "50",
+                          maxAssets: queueProcessableAssetsWei.toString(),
+                        }),
+                      "Queue processed",
+                      "Available idle assets were applied to queued withdrawals."
+                    )
+                  }
+                >
+                  {submittingAction === "process-queue" ? "Submitting..." : "Process Queue"}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  {hasOpenQueue
+                    ? queueProcessableAssetsWei > 0n
+                      ? `Can process up to ${formatTokenAmount(queueProcessableAssetsWei.toString(), assetDecimals)} ${vaultInfo?.assetSymbol || selectedVault?.assetSymbol} with current idle assets.`
+                      : "Queue is open, but there are no free idle assets available to process it yet."
+                    : "No queued withdrawals are currently waiting for processing."}
                 </p>
               </CardContent>
             </Card>
@@ -321,7 +389,7 @@ const YieldVaultAdminTab = () => {
               <CardHeader>
                 <CardTitle className="text-lg">Capital Movement</CardTitle>
                 <CardDescription>
-                  Deploy capital to a strategy or return principal/profit back to the vault. `returnCapital` only works if the strategy has assets and has approved the vault to pull them.
+                  Deploy capital from the vault into an approved strategy.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -336,45 +404,35 @@ const YieldVaultAdminTab = () => {
                     onChange={(event) => setCapitalAmount(event.target.value)}
                   />
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    disabled={!hasStrategy || !hasCapitalAmount || submittingAction !== null}
-                    onClick={() =>
-                      runAdminAction(
-                        "deploy",
-                        () =>
-                          api.post(`/earn/yield-vault/${selectedKey}/admin/deploy`, {
-                            strategy: normalizedStrategy,
-                            assets: capitalAmountWei.toString(),
-                          }),
-                        "Capital deployed",
-                        "Capital was deployed to the selected strategy."
-                      )
-                    }
-                  >
-                    {submittingAction === "deploy" ? "Submitting..." : "Deploy Capital"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    disabled={!hasStrategy || !hasCapitalAmount || submittingAction !== null}
-                    onClick={() =>
-                      runAdminAction(
-                        "return",
-                        () =>
-                          api.post(`/earn/yield-vault/${selectedKey}/admin/return`, {
-                            strategy: normalizedStrategy,
-                            assets: capitalAmountWei.toString(),
-                          }),
-                        "Capital return submitted",
-                        "The vault will pull the specified assets back from the strategy."
-                      )
-                    }
-                  >
-                    {submittingAction === "return" ? "Submitting..." : "Return Capital"}
-                  </Button>
+                <div className="rounded-lg border border-border/70 bg-muted/30 p-3 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span>Current strategy debt</span>
+                    <span className="font-medium text-foreground">
+                      {formatTokenAmount(selectedStrategyDebtWei.toString(), assetDecimals)} {vaultInfo?.assetSymbol || selectedVault?.assetSymbol}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Deploying capital increases strategy debt and moves assets out of the vault.
+                  </p>
                 </div>
+                <Button
+                  className="w-full"
+                  disabled={!hasStrategy || !hasCapitalAmount || submittingAction !== null}
+                  onClick={() =>
+                    runAdminAction(
+                      "deploy",
+                      () =>
+                        api.post(`/earn/yield-vault/${selectedKey}/admin/deploy`, {
+                          strategy: normalizedStrategy,
+                          assets: capitalAmountWei.toString(),
+                        }),
+                      "Capital deployed",
+                      "Capital was deployed to the selected strategy."
+                    )
+                  }
+                >
+                  {submittingAction === "deploy" ? "Submitting..." : "Deploy Capital"}
+                </Button>
               </CardContent>
             </Card>
 
@@ -397,10 +455,32 @@ const YieldVaultAdminTab = () => {
                     onChange={(event) => setLossAmount(event.target.value)}
                   />
                 </div>
+                <div className="rounded-lg border border-border/70 bg-muted/30 p-3 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span>Current strategy debt</span>
+                    <span className="font-medium text-foreground">
+                      {formatTokenAmount(selectedStrategyDebtWei.toString(), assetDecimals)} {vaultInfo?.assetSymbol || selectedVault?.assetSymbol}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Remaining debt after loss</span>
+                    <span className="font-medium text-foreground">
+                      {formatTokenAmount(remainingDebtAfterLossWei.toString(), assetDecimals)} {vaultInfo?.assetSymbol || selectedVault?.assetSymbol}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Reporting loss writes down vault assets directly and lowers the exchange rate.
+                  </p>
+                  {lossExceedsDebt && (
+                    <p className="text-red-600 dark:text-red-400">
+                      Loss cannot exceed current strategy debt.
+                    </p>
+                  )}
+                </div>
                 <Button
                   className="w-full"
                   variant="destructive"
-                  disabled={!hasStrategy || !hasLossAmount || submittingAction !== null}
+                  disabled={!hasStrategy || !hasLossAmount || lossExceedsDebt || submittingAction !== null}
                   onClick={() =>
                     runAdminAction(
                       "loss",
@@ -436,7 +516,19 @@ const YieldVaultAdminTab = () => {
                   >
                     <div>
                       <p className="text-xs text-muted-foreground">Strategy</p>
-                      <p className="font-medium">{formatAddress(holding.strategyAddress)}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="font-medium break-all">{holding.strategyAddress}</p>
+                        <CopyButton address={holding.strategyAddress} />
+                      </div>
+                    </div>
+                    <div className="sm:text-right space-y-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setStrategyAddress(holding.strategyAddress)}
+                      >
+                        Use Address
+                      </Button>
                     </div>
                     <div className="sm:text-right">
                       <p className="text-xs text-muted-foreground">Deployed</p>

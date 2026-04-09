@@ -9,6 +9,7 @@ import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import CopyButton from "@/components/ui/copy";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUser } from "@/context/UserContext";
-import { useYieldVaultContext } from "@/context/YieldVaultContext";
+import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits } from "@/utils/numberUtils";
@@ -208,13 +209,14 @@ const EarnYieldVault = () => {
   const instantWithdrawSharesWei = useMemo(() => {
     if (actionMode !== "redeem" || amountWei <= 0n) return 0n;
     const instantMaxShares = BigInt(maxRedeemShares || "0");
-    return amountWei < instantMaxShares ? amountWei : instantMaxShares;
+    return amountWei <= instantMaxShares ? amountWei : 0n;
   }, [actionMode, amountWei, maxRedeemShares]);
 
   const queuedWithdrawSharesWei = useMemo(() => {
-    if (actionMode !== "redeem" || amountWei <= instantWithdrawSharesWei) return 0n;
-    return amountWei - instantWithdrawSharesWei;
-  }, [actionMode, amountWei, instantWithdrawSharesWei]);
+    if (actionMode !== "redeem" || amountWei <= 0n) return 0n;
+    const instantMaxShares = BigInt(maxRedeemShares || "0");
+    return amountWei > instantMaxShares ? amountWei : 0n;
+  }, [actionMode, amountWei, maxRedeemShares]);
 
   const instantWithdrawAssetsWei = useMemo(
     () => previewAssetsForShares(instantWithdrawSharesWei, totalAssetsBig, totalSharesBig),
@@ -261,7 +263,7 @@ const EarnYieldVault = () => {
           title: "Withdraw submitted",
           description:
             queuedWithdrawSharesWei > 0n
-              ? `${formatTokenAmount(instantWithdrawAssetsWei.toString(), decimals)} ${assetSymbol} can exit now. The rest will be placed in the queue.`
+              ? `This withdrawal exceeds instant capacity, so the full request was placed in the queue.`
               : `Withdrawing ${actionAmount} ${shareSymbol} back to ${assetSymbol}.`,
           variant: "success",
         });
@@ -304,7 +306,7 @@ const EarnYieldVault = () => {
         title: "Withdraw submitted",
         description:
           BigInt(userShares || "0") > BigInt(maxRedeemShares || "0")
-            ? `The instantly withdrawable portion will exit now and the rest will be placed in the queue.`
+            ? `This withdrawal exceeds instant capacity, so the full request was placed in the queue.`
             : `Withdrawing your full ${shareSymbol} balance back to ${assetSymbol}.`,
         variant: "success",
       });
@@ -527,7 +529,10 @@ const EarnYieldVault = () => {
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
                         <p className="text-xs text-muted-foreground">Vault Address</p>
-                        <p className="text-lg font-semibold break-all">{formatAddress(effectiveInfo?.vaultAddress || "")}</p>
+                        <div className="flex items-center gap-1">
+                          <p className="text-lg font-semibold break-all">{formatAddress(effectiveInfo?.vaultAddress || "")}</p>
+                          <CopyButton address={effectiveInfo?.vaultAddress || ""} />
+                        </div>
                         <p className="text-xs text-muted-foreground">Configured carryETH vault on this network</p>
                       </CardContent>
                     </Card>
@@ -570,7 +575,10 @@ const EarnYieldVault = () => {
                           <CardContent className="pt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-1">
                               <p className="text-xs text-muted-foreground">Strategy Address</p>
-                              <p className="text-sm font-medium break-all">{formatAddress(holding.strategyAddress)}</p>
+                              <div className="flex items-center gap-1">
+                                <p className="text-sm font-medium break-all">{formatAddress(holding.strategyAddress)}</p>
+                                <CopyButton address={holding.strategyAddress} />
+                              </div>
                             </div>
                             <div className="space-y-1 sm:text-right">
                               <p className="text-xs text-muted-foreground">Deployed Capital</p>
@@ -612,7 +620,7 @@ const EarnYieldVault = () => {
                     </Card>
                     <Card className="border border-border/70">
                       <CardContent className="pt-4 space-y-2">
-                        <p className="text-xs text-muted-foreground">Pending In Queue</p>
+                        <p className="text-xs text-muted-foreground">Estimated Pending Claim</p>
                         <p className="text-2xl font-semibold">
                           {pendingWithdrawal
                             ? `${formatTokenAmount(pendingWithdrawal.estimatedAssets, decimals)} ${assetSymbol}`
@@ -620,7 +628,7 @@ const EarnYieldVault = () => {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {pendingWithdrawal
-                            ? `Request #${pendingWithdrawal.requestId} for ${formatTokenAmount(pendingWithdrawal.shares, decimals)} ${shareSymbol}`
+                            ? `${formatTokenAmount(pendingWithdrawal.shares, decimals)} ${shareSymbol} currently queued. Estimated at the current exchange rate.`
                             : "No queued withdrawal"}
                         </p>
                       </CardContent>

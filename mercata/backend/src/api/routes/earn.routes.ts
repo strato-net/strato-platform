@@ -38,6 +38,7 @@ router.post("/yield-vault/:key/claim", authHandler.authorizeRequest(), YieldVaul
 router.post("/yield-vault/:key/admin/strategy-approval", authHandler.authorizeRequest(), YieldVaultController.setStrategyApproval);
 router.post("/yield-vault/:key/admin/min-idle-bps", authHandler.authorizeRequest(), YieldVaultController.setMinIdleBps);
 router.post("/yield-vault/:key/admin/deploy", authHandler.authorizeRequest(), YieldVaultController.deployCapital);
+router.post("/yield-vault/:key/admin/process-queue", authHandler.authorizeRequest(), YieldVaultController.processQueue);
 router.post("/yield-vault/:key/admin/return", authHandler.authorizeRequest(), YieldVaultController.returnCapital);
 router.post("/yield-vault/:key/admin/report-loss", authHandler.authorizeRequest(), YieldVaultController.reportLoss);
 

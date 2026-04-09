@@ -45,6 +45,9 @@ export interface YieldVaultInfo {
   totalQueuedShares: string;
   totalClaimableAssets: string;
   strategyHoldings: YieldVaultStrategyHolding[];
+  maxDeploy: string;
+  minIdleRequirement: string;
+  deployBlockedReason: string | null;
 }
 
 export interface YieldVaultPendingWithdrawal {
@@ -168,6 +171,9 @@ function emptyInfo(def: YieldVaultDef | null, key: string): YieldVaultInfo {
     totalQueuedShares: "0",
     totalClaimableAssets: "0",
     strategyHoldings: [],
+    maxDeploy: "0",
+    minIdleRequirement: "0",
+    deployBlockedReason: null,
   };
 }
 
@@ -441,6 +447,20 @@ export const getYieldVaultInfo = async (
   const totalShares = parseBigIntLike(vaultState._totalSupply);
   const decimals = Number(vaultState._underlyingDecimals ?? 18);
   const exchangeRate = getExchangeRate(totalAssets, totalShares);
+  const minIdleBps = parseBigIntLike(vaultState.minIdleBps);
+  const totalQueuedShares = parseBigIntLike(vaultState.totalQueuedShares);
+  const minIdleRequirement =
+    minIdleBps > 0n ? (totalAssets * minIdleBps + 9999n) / 10000n : 0n;
+  const maxDeploy =
+    totalQueuedShares > 0n || idleAssets <= minIdleRequirement
+      ? 0n
+      : idleAssets - minIdleRequirement;
+  const deployBlockedReason =
+    totalQueuedShares > 0n
+      ? "Withdrawal queue is open"
+      : idleAssets <= minIdleRequirement
+        ? "Idle reserve requirement reached"
+        : null;
 
   let assetPrice = parseBigIntLike(
     filteredPrices.get(assetAddress) || filteredPrices.get(assetAddress.toLowerCase()) || "0"
@@ -482,6 +502,9 @@ export const getYieldVaultInfo = async (
     totalQueuedShares: String(vaultState.totalQueuedShares || "0"),
     totalClaimableAssets: String(vaultState.totalClaimableAssets || "0"),
     strategyHoldings,
+    maxDeploy: maxDeploy.toString(),
+    minIdleRequirement: minIdleRequirement.toString(),
+    deployBlockedReason,
   };
 };
 
@@ -504,6 +527,7 @@ export const getYieldVaultUserInfo = async (
   const totalAssets = parseBigIntLike(info.totalAssets);
   const idleAssets = parseBigIntLike(info.idleAssets);
   const totalShares = parseBigIntLike(info.totalShares);
+  const totalQueuedShares = parseBigIntLike(info.totalQueuedShares);
 
   const [claimableAssetsRaw, activeRequestIdRaw] = await Promise.all([
     getYieldVaultMappingValue(accessToken, info.vaultAddress, "claimableAssets", userAddress).catch(() => "0"),
@@ -511,7 +535,7 @@ export const getYieldVaultUserInfo = async (
   ]);
 
   const redeemableAssets = previewRedeemAssets(userShares, totalAssets, totalShares);
-  const idleShares = previewRedeemShares(idleAssets, totalAssets, totalShares);
+  const idleShares = totalQueuedShares > 0n ? 0n : previewRedeemShares(idleAssets, totalAssets, totalShares);
   const maxRedeem = userShares < idleShares ? userShares : idleShares;
   const maxWithdraw = previewRedeemAssets(maxRedeem, totalAssets, totalShares);
   const claimableAssets = parseBigIntLike(claimableAssetsRaw);
@@ -732,5 +756,18 @@ export const reportYieldVaultStrategyLoss = async (
   return executeYieldVaultAdminCall(accessToken, userAddress, key, "reportStrategyLoss", {
     strategy,
     loss,
+  });
+};
+
+export const processYieldVaultQueue = async (
+  accessToken: string,
+  key: string,
+  userAddress: string,
+  maxRequests: string,
+  maxAssets: string
+): Promise<{ status: string; hash: string }> => {
+  return executeYieldVaultAdminCall(accessToken, userAddress, key, "processQueue", {
+    maxRequests,
+    maxAssets,
   });
 };
