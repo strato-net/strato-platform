@@ -264,15 +264,14 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     function cancelRequest() external nonReentrant {
         uint64 requestId = activeRequestId[_msgSender()];
         require(requestId != 0, "YieldVault: no active request");
+        require(requestId == queueHead, "YieldVault: only head cancelable in v1");
 
         WithdrawalRequest storage r = requests[requestId];
         require(r.exists, "YieldVault: bad request");
-        require(requestId == queueHead, "YieldVault: only head cancelable in v1");
-        require(claimableAssets[_msgSender()] == 0, "YieldVault: request already processed");
+        require(r.shares > 0, "YieldVault: already processed");
 
         uint256 shares = r.shares;
         uint64 next = r.next;
-        require(shares > 0, "YieldVault: already processed");
 
         totalQueuedShares -= shares;
         activeRequestId[_msgSender()] = 0;
@@ -281,7 +280,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         delete requestOwner[requestId];
         if (next == 0) {
             delete queueHead;
-            delete queueTail;
+            queueTail = 0;
         } else {
             queueHead = next;
         }
@@ -519,6 +518,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
 
     function maxDeploy() public view returns (uint256) {
         if (!vaultInitialized || paused()) return 0;
+        if (queueHead != 0) return 0;
 
         uint256 freeIdle = _freeIdleForQueueProcessing();
         uint256 minIdleRequirement = _minIdleRequirement();
@@ -539,13 +539,16 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
     }
 
     function _freeIdleForInstantWithdrawals() internal view returns (uint256) {
+        if (queueHead != 0) return 0;
         uint256 idle = _idleBalance();
         if (idle <= totalClaimableAssets) return 0;
         return idle - totalClaimableAssets;
     }
 
     function _freeIdleForQueueProcessing() internal view returns (uint256) {
-        return _freeIdleForInstantWithdrawals();
+        uint256 idle = _idleBalance();
+        if (idle <= totalClaimableAssets) return 0;
+        return idle - totalClaimableAssets;
     }
 
     function _minIdleRequirement() internal view returns (uint256) {
