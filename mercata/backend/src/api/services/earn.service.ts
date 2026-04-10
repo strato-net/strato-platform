@@ -151,15 +151,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     vaultShareTokenAddress: shareTokenAddress || null,
     saveUsdstVaultAddress: appConfig.saveUsdstVault || null,
   });
-  const [{ data: poolFactoryRows }, stablePools] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.PoolFactory}`, {
-      params: {
-        address: `eq.${constants.poolFactory}`,
-        select: "swapFeeRate,lpSharePercent",
-      },
-    }).catch(() => ({ data: [] as any[] })),
-    fetchMultiTokenStablePools(accessToken).catch(() => []),
-  ]);
+  const stablePools = await fetchMultiTokenStablePools(accessToken).catch(() => []);
 
   // Phase 2: vault APY needs current balances + historical NAV context
   let vaultAPY: string | null = null;
@@ -289,9 +281,9 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     : null;
 
   const volumeMap = buildVolumeMap(swapEvents, prices);
-  const poolFactoryData = poolFactoryRows?.[0] || null;
-  const factorySwapFeeRate = Number(poolFactoryData?.swapFeeRate || 30);
-  const factoryLpSharePercent = Number(poolFactoryData?.lpSharePercent || 7000);
+  const firstPool = (pools || [])[0];
+  const factorySwapFeeRate = Number(firstPool?.swapFeeRate || 30);
+  const factoryLpSharePercent = Number(firstPool?.lpSharePercent || 7000);
   const stablePoolAddresses = new Set(
     (stablePools || []).map((pool: any) => normalizeAddress(pool?.address)).filter(Boolean)
   );
