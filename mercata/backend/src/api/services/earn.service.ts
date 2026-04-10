@@ -15,7 +15,7 @@ import {
 import { getSaveUsdstInfo } from "./saveUsdst.service";
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
-const { Pool, DECIMALS, Vault, Token } = constants;
+const { Pool, DECIMALS, Token } = constants;
 const ZERO_APY = "0.00";
 const CATA_PRICE_USD = 0.25;
 const STAKE_SEMANTICS = stakeSemanticsConfig as any;
@@ -54,13 +54,12 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     { data: mappingRows },
     { data: eventRows },
     { data: pools },
-    { data: vaultRows },
     saveUsdstInfo,
     { data: exchangeRateRows },
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
       address: `in.(${constants.lendingPool},${constants.safetyModule},${constants.sToken}${vaultAddr ? `,${vaultAddr}` : ""})`,
-      select: "address,data->>borrowableAsset,data->>mToken,data->>totalScaledDebt,data->>borrowIndex,data->>reservesAccrued,data->>_managedAssets,data->>_totalSupply,data->>botExecutor,data->>priceOracle",
+      select: "address,data->>borrowableAsset,data->>mToken,data->>totalScaledDebt,data->>borrowIndex,data->>reservesAccrued,data->>_managedAssets,data->>_totalSupply,data->>botExecutor,data->>priceOracle,data->>shareToken",
     }}),
     cirrus.get(accessToken, "/mapping", { params: { select: "address,collection_name,key->>key,value::text", or: mappingOr } }),
     cirrus.get(accessToken, `/${constants.Event}`, { params: { select: "address,event_name,attributes,block_timestamp", or: eventOr } }),
@@ -68,12 +67,6 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       poolFactory: `eq.${constants.poolFactory}`,
       select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol,_totalSupply::text),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
     }}),
-    vaultAddr
-      ? cirrus.get(accessToken, `/${Vault}`, { params: {
-        address: `eq.${vaultAddr}`,
-        select: "shareToken",
-      }})
-      : Promise.resolve({ data: [] as any[] }),
     getSaveUsdstInfo(accessToken).catch(() => null),
     exchangeRateAddrs.length
       ? cirrus.get(accessToken, "/history@mapping", { params: {
@@ -94,7 +87,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const stRow = storageByAddr.get(constants.sToken);
   const vaultStorage: any = vaultAddr ? storageByAddr.get(vaultAddr) : null;
   const botExecutor = vaultStorage?.botExecutor;
-  const shareTokenAddress = vaultRows?.[0]?.shareToken || "";
+  const shareTokenAddress = vaultStorage?.shareToken || "";
 
   // Parse mapping
   const prices = new Map<string, string>();
