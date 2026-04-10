@@ -616,14 +616,7 @@ function computeRewardStakeUsd(
 
 function getPriceForAddress(priceMap: Map<string, string>, address?: string | null): string | null {
   if (!address) return null;
-  const normalized = normalizeAddress(address);
-  const raw = String(address);
-  return (
-    priceMap.get(raw) ||
-    priceMap.get(normalized) ||
-    priceMap.get(raw.toLowerCase()) ||
-    null
-  );
+  return priceMap.get(address) || priceMap.get(normalizeAddress(address)) || null;
 }
 
 function toUsdValue(amountWei: string, priceWei: string): string {

@@ -115,10 +115,15 @@ const getHistoricalAssetPrices = async (
   }
 };
 
+const firstDepositCache = new Map<string, { date: string; timestamp: Date } | null>();
+
 const getFirstDepositDate = async (
   accessToken: string,
   vaultAddress: string
 ): Promise<{ date: string; timestamp: Date } | null> => {
+  const cached = firstDepositCache.get(vaultAddress);
+  if (cached !== undefined) return cached;
+
   try {
     const { data: depositEvents } = await cirrus.get(accessToken, `/${Vault}-Deposited`, {
       params: {
@@ -130,12 +135,15 @@ const getFirstDepositDate = async (
     });
 
     if (!depositEvents?.length || !depositEvents[0]?.block_timestamp) {
+      firstDepositCache.set(vaultAddress, null);
       return null;
     }
 
     const timestamp = new Date(depositEvents[0].block_timestamp);
     const date = timestamp.toISOString().split("T")[0];
-    return { date, timestamp };
+    const result = { date, timestamp };
+    firstDepositCache.set(vaultAddress, result);
+    return result;
   } catch {
     return null;
   }
