@@ -12,11 +12,10 @@ const stats = new Map<string, RouteStats>();
 export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
   const start = performance.now();
   res.on("finish", () => {
+    if (!req.route) return;
+
     const ms = performance.now() - start;
-    const route = req.route?.path;
-    const key = route
-      ? `${req.method} ${req.baseUrl}${route} ${res.statusCode}`
-      : `${req.method} ${req.originalUrl} ${res.statusCode}`;
+    const key = `${req.method} ${req.baseUrl}${req.route.path} ${res.statusCode}`;
 
     const entry = stats.get(key) ?? { count: 0, totalMs: 0, min: Infinity, max: 0 };
     entry.count++;
