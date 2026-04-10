@@ -209,8 +209,8 @@ NIX=true make
 ✓ vm-runner
 ✓ cirrus
 ✓ mercata-contracts
-✓ mercata-backend
-✓ mercata-ui
+✓ app-backend
+✓ app-ui
 ✓ docker-compose files generated
 ```
 
@@ -221,13 +221,13 @@ If you're only working on a specific part:
 **Backend only:**
 
 ```bash
-make mercata-backend
+make app-backend
 ```
 
 **Frontend only:**
 
 ```bash
-make mercata-ui
+make app-ui
 ```
 
 **Contracts only:**
@@ -349,13 +349,13 @@ tail -f my_node_name/logs/strato-core.log
 **Backend API:**
 
 ```bash
-tail -f my_node_name/logs/mercata-backend.log
+tail -f my_node_name/logs/app-backend.log
 ```
 
 **UI:**
 
 ```bash
-tail -f my_node_name/logs/mercata-ui.log
+tail -f my_node_name/logs/app-ui.log
 ```
 
 ### 5. Stop STRATO

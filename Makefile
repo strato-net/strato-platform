@@ -61,12 +61,12 @@ HASH_STRATO := $(call dir_hash,strato)
 HASH_POSTGREST := $(call dir_hash,postgrest-packager)
 HASH_NGINX := $(call dir_hash,nginx-packager)
 HASH_APEX := $(call dir_hash,apex)
-HASH_MERCATA_BACKEND := $(call dir_hash,mercata/backend)
-HASH_MERCATA_UI := $(call dir_hash,mercata/ui)
+HASH_APP_BACKEND := $(call dir_hash,app/backend)
+HASH_APP_UI := $(call dir_hash,app/ui)
 HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
-HASH_BRIDGE := $(call dir_hash,mercata/services/bridge)
-HASH_BRIDGE_NGINX := $(call dir_hash,mercata/services/bridge/nginx)
+HASH_BRIDGE := $(call dir_hash,app/services/bridge)
+HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
 # Generate BUILD_METADATA file with version and all hashes for Haskell to read
@@ -75,8 +75,8 @@ HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 generate-version-file:
 	@echo "VERSION=$(VERSION)" > BUILD_METADATA
 	@echo "HASH_STRATO=$(HASH_STRATO)" >> BUILD_METADATA
-	@echo "HASH_MERCATA_BACKEND=$(HASH_MERCATA_BACKEND)" >> BUILD_METADATA
-	@echo "HASH_MERCATA_UI=$(HASH_MERCATA_UI)" >> BUILD_METADATA
+	@echo "HASH_APP_BACKEND=$(HASH_APP_BACKEND)" >> BUILD_METADATA
+	@echo "HASH_APP_UI=$(HASH_APP_UI)" >> BUILD_METADATA
 	@echo "HASH_SMD=$(HASH_SMD)" >> BUILD_METADATA
 	@echo "HASH_APEX=$(HASH_APEX)" >> BUILD_METADATA
 	@echo "HASH_POSTGREST=$(HASH_POSTGREST)" >> BUILD_METADATA
@@ -90,8 +90,8 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_POSTGREST>|$(HASH_POSTGREST)|g' \
             -e 's|<HASH_NGINX>|$(HASH_NGINX)|g' \
             -e 's|<HASH_APEX>|$(HASH_APEX)|g' \
-            -e 's|<HASH_MERCATA_BACKEND>|$(HASH_MERCATA_BACKEND)|g' \
-            -e 's|<HASH_MERCATA_UI>|$(HASH_MERCATA_UI)|g' \
+            -e 's|<HASH_APP_BACKEND>|$(HASH_APP_BACKEND)|g' \
+            -e 's|<HASH_APP_UI>|$(HASH_APP_UI)|g' \
             -e 's|<HASH_PROMETHEUS>|$(HASH_PROMETHEUS)|g' \
             -e 's|<HASH_SMD>|$(HASH_SMD)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
@@ -107,7 +107,7 @@ needs_rebuild = [ ! -f $@ ] || [ "$$(cat $@ 2>/dev/null)" != "$(2)" ] || [ -n "$
 
 # These targets always run the recipe, which then checks if rebuild is actually needed
 .PHONY: $(DOCKER_SENTINELS)/postgrest $(DOCKER_SENTINELS)/nginx $(DOCKER_SENTINELS)/apex
-.PHONY: $(DOCKER_SENTINELS)/mercata-backend $(DOCKER_SENTINELS)/mercata-ui $(DOCKER_SENTINELS)/prometheus
+.PHONY: $(DOCKER_SENTINELS)/app-backend $(DOCKER_SENTINELS)/app-ui $(DOCKER_SENTINELS)/prometheus
 .PHONY: $(DOCKER_SENTINELS)/smd $(DOCKER_SENTINELS)/bridge $(DOCKER_SENTINELS)/bridge-nginx
 .PHONY: $(DOCKER_SENTINELS)/local-auth
 
@@ -138,27 +138,27 @@ $(DOCKER_SENTINELS)/apex: | $(DOCKER_SENTINELS)
 		echo "apex up to date"; \
 	fi
 
-$(DOCKER_SENTINELS)/mercata-backend: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/backend,$(VERSION)-$(HASH_MERCATA_BACKEND)); then \
-		echo "Building mercata-backend ($(VERSION)-$(HASH_MERCATA_BACKEND))..."; \
-		docker build -t $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) -f ./mercata/backend/Dockerfile ./mercata && \
-		docker tag $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_AWS_ECR_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) && \
-		echo "$(VERSION)-$(HASH_MERCATA_BACKEND)" > $@; \
+$(DOCKER_SENTINELS)/app-backend: | $(DOCKER_SENTINELS)
+	@if $(call needs_rebuild,app/backend,$(VERSION)-$(HASH_APP_BACKEND)); then \
+		echo "Building app-backend ($(VERSION)-$(HASH_APP_BACKEND))..."; \
+		docker build -t $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) -f ./app/backend/Dockerfile ./app && \
+		docker tag $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) $(REPO_AWS_ECR_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) && \
+		echo "$(VERSION)-$(HASH_APP_BACKEND)" > $@; \
 	else \
-		echo "mercata-backend up to date"; \
+		echo "app-backend up to date"; \
 	fi
-	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) <mercata-ui-tag>"
+	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) <app-ui-tag>"
 
-$(DOCKER_SENTINELS)/mercata-ui: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/ui,$(VERSION)-$(HASH_MERCATA_UI)); then \
-		echo "Building mercata-ui ($(VERSION)-$(HASH_MERCATA_UI))..."; \
-		docker build -t $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) -f ./mercata/ui/Dockerfile ./mercata && \
-		docker tag $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) $(REPO_AWS_ECR_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI) && \
-		echo "$(VERSION)-$(HASH_MERCATA_UI)" > $@; \
+$(DOCKER_SENTINELS)/app-ui: | $(DOCKER_SENTINELS)
+	@if $(call needs_rebuild,app/ui,$(VERSION)-$(HASH_APP_UI)); then \
+		echo "Building app-ui ($(VERSION)-$(HASH_APP_UI))..."; \
+		docker build -t $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI) -f ./app/ui/Dockerfile ./app && \
+		docker tag $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI) $(REPO_AWS_ECR_URL)app-ui:$(VERSION)-$(HASH_APP_UI) && \
+		echo "$(VERSION)-$(HASH_APP_UI)" > $@; \
 	else \
-		echo "mercata-ui up to date"; \
+		echo "app-ui up to date"; \
 	fi
-	@echo "  Update running node: strato-up <node-dir> --update-app <mercata-backend-tag> $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
+	@echo "  Update running node: strato-up <node-dir> --update-app <app-backend-tag> $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI)"
 
 $(DOCKER_SENTINELS)/prometheus: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,prometheus-packager,$(VERSION)-$(HASH_PROMETHEUS)); then \
@@ -179,9 +179,9 @@ $(DOCKER_SENTINELS)/smd: | $(DOCKER_SENTINELS)
 	fi
 
 $(DOCKER_SENTINELS)/bridge: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/services/bridge,$(VERSION)-$(HASH_BRIDGE)); then \
+	@if $(call needs_rebuild,app/services/bridge,$(VERSION)-$(HASH_BRIDGE)); then \
 		echo "Building bridge ($(VERSION)-$(HASH_BRIDGE))..."; \
-		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./mercata/services/bridge && \
+		docker build -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./app/services/bridge && \
 		docker tag $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE) && \
 		echo "$(VERSION)-$(HASH_BRIDGE)" > $@; \
 	else \
@@ -189,9 +189,9 @@ $(DOCKER_SENTINELS)/bridge: | $(DOCKER_SENTINELS)
 	fi
 
 $(DOCKER_SENTINELS)/bridge-nginx: | $(DOCKER_SENTINELS)
-	@if $(call needs_rebuild,mercata/services/bridge/nginx,$(VERSION)-$(HASH_BRIDGE_NGINX)); then \
+	@if $(call needs_rebuild,app/services/bridge/nginx,$(VERSION)-$(HASH_BRIDGE_NGINX)); then \
 		echo "Building bridge-nginx ($(VERSION)-$(HASH_BRIDGE_NGINX))..."; \
-		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) ./mercata/services/bridge/nginx && \
+		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) ./app/services/bridge/nginx && \
 		docker tag $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) && \
 		echo "$(VERSION)-$(HASH_BRIDGE_NGINX)" > $@; \
 	else \
@@ -204,27 +204,27 @@ clean-docker-sentinels:
 
 all: local
 
-local: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui bridge bridge-nginx oracle local-auth
+local: build_common apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
 
-docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle docker-compose
+docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui bridge bridge-nginx oracle docker-compose
 
 all_develop: build_develop docker-compose
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels update-app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force clean-docker-sentinels update-app
 
 apex: $(DOCKER_SENTINELS)/apex
 nginx: $(DOCKER_SENTINELS)/nginx
 postgrest: $(DOCKER_SENTINELS)/postgrest
 prometheus: $(DOCKER_SENTINELS)/prometheus
 smd: $(DOCKER_SENTINELS)/smd
-mercata-backend: $(DOCKER_SENTINELS)/mercata-backend
-mercata-ui: $(DOCKER_SENTINELS)/mercata-ui
-app: mercata-backend mercata-ui
+app-backend: $(DOCKER_SENTINELS)/app-backend
+app-ui: $(DOCKER_SENTINELS)/app-ui
+app: app-backend app-ui
 	@echo ""
 	@echo "Both app images built. To update a running node:"
-	@echo "  strato-up <node-dir> --update-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
+	@echo "  strato-up <node-dir> --update-app $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI)"
 
 bridge: $(DOCKER_SENTINELS)/bridge
 bridge-nginx: $(DOCKER_SENTINELS)/bridge-nginx
@@ -255,29 +255,29 @@ smd-force:
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION}-${HASH_SMD} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}smd:${VERSION}-${HASH_SMD} STRATO_VERSION=${VERSION}-${HASH_SMD} make --directory=smd-ui/
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/smd
 
-mercata-backend-force:
-	@echo Now building mercata-backend...
-	docker build -t ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} -f ./mercata/backend/Dockerfile ./mercata
-	docker tag ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND}
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-backend
-	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND)"
+app-backend-force:
+	@echo Now building app-backend...
+	docker build -t ${REPO_URL}app-backend:${VERSION}-${HASH_APP_BACKEND} -f ./app/backend/Dockerfile ./app
+	docker tag ${REPO_URL}app-backend:${VERSION}-${HASH_APP_BACKEND} ${REPO_AWS_ECR_URL}app-backend:${VERSION}-${HASH_APP_BACKEND}
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/app-backend
+	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND)"
 
-mercata-ui-force:
-	@echo Now building mercata-ui...
-	docker build -t ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} -f ./mercata/ui/Dockerfile ./mercata
-	docker tag ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI}
-	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-ui
-	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
+app-ui-force:
+	@echo Now building app-ui...
+	docker build -t ${REPO_URL}app-ui:${VERSION}-${HASH_APP_UI} -f ./app/ui/Dockerfile ./app
+	docker tag ${REPO_URL}app-ui:${VERSION}-${HASH_APP_UI} ${REPO_AWS_ECR_URL}app-ui:${VERSION}-${HASH_APP_UI}
+	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/app-ui
+	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI)"
 
 bridge-force:
 	@echo Now building bridge...
-	docker build -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./mercata/services/bridge
+	docker build -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./app/services/bridge
 	docker tag ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ${REPO_AWS_ECR_URL}bridge:${VERSION}-${HASH_BRIDGE}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/bridge
 
 bridge-nginx-force:
 	@echo Now building bridge-nginx...
-	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./mercata/services/bridge/nginx
+	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./app/services/bridge/nginx
 	docker tag ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/bridge-nginx
 
@@ -296,7 +296,7 @@ oracle:
 	@echo Now building oracle... 
 	# TODO: Dockerize
 	@echo TODO: NO DOCKERFILE TO BUILD YET...
-	#docker build -t ${REPO_URL}oracle:${VERSION} ./mercata/services/oracle
+	#docker build -t ${REPO_URL}oracle:${VERSION} ./app/services/oracle
 	#docker tag ${REPO_URL}oracle:${VERSION} ${REPO_AWS_ECR_URL}oracle:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
 	#echo "${REPO_URL}oracle:${VERSION}" > oracle_image_tag

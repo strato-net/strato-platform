@@ -395,8 +395,8 @@ sudo ./strato-run.sh
 **Responsibilities:**
 
 - Route `/strato-api/*` → strato-api (Layer 1)
-- Route `/api/*` → mercata-backend (Layer 2)
-- Route `/` → mercata-ui (frontend)
+- Route `/api/*` → app-backend (Layer 2)
+- Route `/` → app-ui (frontend)
 - Serve Swagger UI at `/docs` and `/api/docs`
 
 **Configuration:**
@@ -418,8 +418,8 @@ sudo ./strato-run.sh
 make                     # Build everything
 make strato-core         # Build blockchain core
 make mercata-contracts   # Build smart contracts
-make mercata-backend     # Build backend API
-make mercata-ui          # Build frontend UI
+make app-backend     # Build backend API
+make app-ui          # Build frontend UI
 make docker-compose      # Generate docker-compose files
 make test                # Run all tests
 ```

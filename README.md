@@ -84,7 +84,7 @@ Start the node:
 
 ### 4. Update App on a Running Node
 
-To rebuild and redeploy only the app services (mercata-backend and mercata-ui) without resyncing the blockchain data:
+To rebuild and redeploy only the app services (app-backend and app-ui) without resyncing the blockchain data:
 
 ```
 make app
@@ -94,10 +94,10 @@ This builds both app images and prints the command to deploy them. Then stop and
 
 ```
 strato-down
-strato-up mynode --update-app mercata-backend:<tag> mercata-ui:<tag>
+strato-up mynode --update-app app-backend:<tag> app-ui:<tag>
 ```
 
-Use the exact image tags printed by `make app`. You can also rebuild and deploy the images individually with `make mercata-backend` or `make mercata-ui`.
+Use the exact image tags printed by `make app`. You can also rebuild and deploy the images individually with `make app-backend` or `make app-ui`.
 
 ### 5. Stop and Wipe
 

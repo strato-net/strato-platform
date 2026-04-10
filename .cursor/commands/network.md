@@ -39,7 +39,7 @@ if [ "$COMMAND" = "stop" ]; then
         
         # Remove STRATO-related images
         docker images --format "{{.Repository}}:{{.Tag}}" | \
-            grep -E "(mercata-backend|mercata-ui|smd|apex|strato|postgrest|nginx|mercata-bridge|mercata-nginx|prometheus|swaggerapi|postgres|zookeeper|kafka|redis)" | \
+            grep -E "(app-backend|app-ui|smd|apex|strato|postgrest|nginx|app-bridge|app-nginx|prometheus|swaggerapi|postgres|zookeeper|kafka|redis)" | \
             xargs -r docker rmi -f || true
         
         # Remove dangling images
@@ -68,9 +68,9 @@ if [ "$COMMAND" = "stop" ]; then
         echo "✅ Network stopped and cleaned up (hard mode)."
     else
         echo "Performing light cleanup..."
-        # Stop only mercata/strato containers
-        docker ps -a --format "{{.Names}}" | grep -E "(mercata|strato)" | xargs -r docker stop || true
-        docker ps -a --format "{{.Names}}" | grep -E "(mercata|strato)" | xargs -r docker rm || true
+        # Stop only app/strato containers
+        docker ps -a --format "{{.Names}}" | grep -E "(app-backend|app-ui|strato)" | xargs -r docker stop || true
+        docker ps -a --format "{{.Names}}" | grep -E "(app-backend|app-ui|strato)" | xargs -r docker rm || true
         echo "✅ Mercata containers stopped."
     fi
     
@@ -170,7 +170,7 @@ This command manages the STRATO network with multiple modes:
 - `/network start fresh`: Apply Generator.hs changes, wipe data, and start fresh
 
 **Stop Modes**:
-- `/network stop`: Light cleanup - only stop mercata/strato containers
+- `/network stop`: Light cleanup - only stop app/strato containers
 - `/network stop hard`: Complete nuclear cleanup including images, volumes, build cache
 
 **Start Features**:
@@ -182,7 +182,7 @@ This command manages the STRATO network with multiple modes:
 - Fresh mode temporarily applies Generator.hs changes
 
 **Stop Features**:
-- **Light mode**: Only stops mercata/strato containers
+- **Light mode**: Only stops app/strato containers
 - **Hard mode**: Complete cleanup of containers, images, volumes, build cache, and files
 
 **Usage**:

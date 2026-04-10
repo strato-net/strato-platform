@@ -180,7 +180,7 @@ pipeline {
               script {
                 def WORKDIR = pwd()
                 sh """#!/bin/bash -lex
-                  find mercata/contracts/tests -name '*.test.sol' -print0 | xargs -0 -I {} sh -c 'echo "Running test: {}" && cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
+                  find app/contracts/tests -name '*.test.sol' -print0 | xargs -0 -I {} sh -c 'echo "Running test: {}" && cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
                 """
               }
             }
