@@ -12,7 +12,7 @@ import {
   computeVaultPerformanceMetrics,
   safeBigInt,
 } from "../helpers/vaultPerformance.helper";
-import { getSaveUsdstInfo } from "./saveUsdst.service";
+
 import { ApySource, TokenApyEntry } from "@mercata/shared-types";
 
 const { Pool, DECIMALS, Token } = constants;
@@ -40,7 +40,8 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const vaultAddr = constants.vault;
   const rewardsAddr = appConfig.rewards;
 
-  const mappingOr = `(and(address.eq.${constants.lendingPool},collection_name.eq.assetConfigs,key->>key.eq.${constants.USDST}),and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${constants.liquidityPool}),and(address.eq.${constants.priceOracle},collection_name.eq.prices)${vaultAddr ? `,and(address.eq.${vaultAddr},collection_name.eq.supportedAssets)` : ""}${rewardsAddr ? `,and(address.eq.${rewardsAddr},collection_name.in.(activities,activityStates))` : ""})`;
+  const saveUsdstVault = appConfig.saveUsdstVault;
+  const mappingOr = `(and(address.eq.${constants.lendingPool},collection_name.eq.assetConfigs,key->>key.eq.${constants.USDST}),and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${constants.liquidityPool}),and(address.eq.${constants.priceOracle},collection_name.eq.prices)${vaultAddr ? `,and(address.eq.${vaultAddr},collection_name.eq.supportedAssets)` : ""}${rewardsAddr ? `,and(address.eq.${rewardsAddr},collection_name.in.(activities,activityStates))` : ""}${saveUsdstVault ? `,and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${saveUsdstVault})` : ""})`;
   const eventOr = `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))`;
 
   // Phase 1: parallel calls
@@ -54,12 +55,11 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     { data: mappingRows },
     { data: eventRows },
     { data: pools },
-    saveUsdstInfo,
     { data: exchangeRateRows },
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
-      address: `in.(${constants.lendingPool},${constants.safetyModule},${constants.sToken}${vaultAddr ? `,${vaultAddr}` : ""})`,
-      select: "address,data->>borrowableAsset,data->>mToken,data->>totalScaledDebt,data->>borrowIndex,data->>reservesAccrued,data->>_managedAssets,data->>_totalSupply,data->>botExecutor,data->>priceOracle,data->>shareToken",
+      address: `in.(${constants.lendingPool},${constants.safetyModule},${constants.sToken}${vaultAddr ? `,${vaultAddr}` : ""}${saveUsdstVault ? `,${saveUsdstVault}` : ""})`,
+      select: "address,data->>borrowableAsset,data->>mToken,data->>totalScaledDebt,data->>borrowIndex,data->>reservesAccrued,data->>_managedAssets,data->>_totalSupply,data->>botExecutor,data->>priceOracle,data->>shareToken,data->>assetToken",
     }}),
     cirrus.get(accessToken, "/mapping", { params: { select: "address,collection_name,key->>key,value::text", or: mappingOr } }),
     cirrus.get(accessToken, `/${constants.Event}`, { params: { select: "address,event_name,attributes,block_timestamp", or: eventOr } }),
@@ -67,7 +67,6 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       poolFactory: `eq.${constants.poolFactory}`,
       select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol,_totalSupply::text),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
     }}),
-    getSaveUsdstInfo(accessToken).catch(() => null),
     exchangeRateAddrs.length
       ? cirrus.get(accessToken, "/history@mapping", { params: {
         address: `eq.${constants.priceOracle}`,
@@ -89,17 +88,22 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const botExecutor = vaultStorage?.botExecutor;
   const shareTokenAddress = vaultStorage?.shareToken || "";
 
+  // Parse saveUSDST storage
+  const saveUsdstStorage: any = saveUsdstVault ? storageByAddr.get(saveUsdstVault) : null;
+
   // Parse mapping
   const prices = new Map<string, string>();
   let lendingCfg: any = null;
   let liqBalance: string | null = null;
+  let saveUsdstBalance: string | null = null;
   const vaultAssets: string[] = [];
   const rewardActivityCfgById = new Map<string, any>();
   const rewardActivityStateById = new Map<string, any>();
   for (const r of mappingRows || []) {
     if (r.collection_name === "prices") prices.set(r.key, r.value);
     else if (r.collection_name === "assetConfigs") lendingCfg = JSON.parse(r.value);
-    else if (r.collection_name === "_balances") liqBalance = r.value;
+    else if (r.collection_name === "_balances" && r.key === constants.liquidityPool) liqBalance = r.value;
+    else if (r.collection_name === "_balances" && saveUsdstVault && r.key === saveUsdstVault) saveUsdstBalance = r.value;
     else if (r.collection_name === "supportedAssets" && r.value) {
       const addr = r.value.replace(/"/g, "");
       if (addr) vaultAssets.push(addr);
@@ -115,7 +119,11 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const filteredVaultAssets = vaultAssets.filter(a => a !== "0000000000000000000000000000000000000000");
 
   // Phase 1b: dependent reads that can run in parallel once Phase 1 context is known.
-  const [stablePools, shareTokenTotalSupply, vaultBalanceRows] = await Promise.all([
+  const saveUsdstAsset = saveUsdstStorage?.assetToken || constants.USDST;
+  const saveUsdstManagedAssets = safeBigInt(saveUsdstStorage?._managedAssets);
+  const saveUsdstTotalShares = safeBigInt(saveUsdstStorage?._totalSupply);
+
+  const [stablePools, shareTokenTotalSupply, vaultBalanceRows, saveUsdstApyResult] = await Promise.all([
     fetchMultiTokenStablePools(accessToken).catch(() => []),
     shareTokenAddress
       ? (async () => {
@@ -135,6 +143,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
           select: "address,value::text",
         }}).then((res) => res.data || []).catch(() => [])
       : Promise.resolve([] as any[]),
+    computeSaveUsdstApy(accessToken, saveUsdstVault, saveUsdstAsset, safeBigInt(saveUsdstBalance), saveUsdstManagedAssets, saveUsdstTotalShares),
   ]);
 
   // Parse events (single pass)
@@ -241,16 +250,16 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     add(constants.USDST, { source: "rewards", apy: directMintRewardsApy, meta: "direct_mint" });
   }
 
-  const saveUsdstAddress = normalizeAddress(saveUsdstInfo?.vaultAddress);
+  const saveUsdstAddress = normalizeAddress(saveUsdstVault);
   const saveUsdstNativeApy =
-    saveUsdstInfo?.apy && saveUsdstInfo.apy !== "-" && parseFloat(saveUsdstInfo.apy) > 0
-      ? saveUsdstInfo.apy
+    saveUsdstApyResult && saveUsdstApyResult !== "-" && parseFloat(saveUsdstApyResult) > 0
+      ? saveUsdstApyResult
       : null;
-  const saveUsdstStakeUsd =
-    saveUsdstInfo?.tvlUsd ||
-    saveUsdstInfo?.pricingAssets ||
-    saveUsdstInfo?.totalAssets ||
-    null;
+  const saveUsdstLiveBalance = safeBigInt(saveUsdstBalance);
+  const saveUsdstPricingAssets = saveUsdstLiveBalance < saveUsdstManagedAssets ? saveUsdstLiveBalance : saveUsdstManagedAssets;
+  const saveUsdstAssetPrice = safeBigInt(prices.get(saveUsdstAsset) || prices.get(constants.USDST));
+  const saveUsdstTvlUsd = saveUsdstAssetPrice > 0n ? (saveUsdstPricingAssets * saveUsdstAssetPrice) / DECIMALS : 0n;
+  const saveUsdstStakeUsd = saveUsdstTvlUsd > 0n ? saveUsdstTvlUsd.toString() : saveUsdstPricingAssets > 0n ? saveUsdstPricingAssets.toString() : null;
   const saveUsdstRewardsActivity = saveUsdstAddress
     ? findRewardActivity(rewardActivities, {
         sourceContract: saveUsdstAddress,
@@ -263,7 +272,6 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     saveUsdstRewardsActivity?.totalStakeUsd ?? saveUsdstStakeUsd
   );
   if (saveUsdstAddress) {
-    // Reuse the native-yield source bucket so generic lookup surfaces still label it as Native APY.
     if (saveUsdstNativeApy) {
       add(saveUsdstAddress, { source: "lending", apy: saveUsdstNativeApy, meta: "save_usdst" });
     }
@@ -725,4 +733,77 @@ function findPoolRewardActivity(
 
   const withUsdStake = matches.find((activity) => safeBigInt(activity?.totalStakeUsd || "0") > 0n);
   return withUsdStake || matches[0];
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const firstSaveUsdstDepositCache = new Map<string, { timestamp: Date } | null>();
+
+async function computeSaveUsdstApy(
+  accessToken: string,
+  vaultAddress: string | undefined,
+  assetAddress: string,
+  liveBalance: bigint,
+  managedAssets: bigint,
+  totalShares: bigint,
+): Promise<string> {
+  if (!vaultAddress || totalShares <= 0n) return "0.00";
+  const pricingAssets = liveBalance < managedAssets ? liveBalance : managedAssets;
+  if (pricingAssets <= 0n) return "0.00";
+
+  try {
+    let firstDeposit = firstSaveUsdstDepositCache.get(vaultAddress);
+    if (firstDeposit === undefined) {
+      const { data } = await cirrus.get(accessToken, "/event", { params: {
+        address: `eq.${vaultAddress}`,
+        event_name: "eq.Deposit",
+        select: "block_timestamp",
+        order: "block_timestamp.asc",
+        limit: "1",
+      }}).catch(() => ({ data: [] as any[] }));
+      firstDeposit = data?.[0]?.block_timestamp ? { timestamp: new Date(data[0].block_timestamp) } : null;
+      firstSaveUsdstDepositCache.set(vaultAddress, firstDeposit);
+    }
+    if (!firstDeposit?.timestamp) return "0.00";
+
+    const nowMs = Date.now();
+    const startMs = Math.max(nowMs - 30 * DAY_MS, firstDeposit.timestamp.getTime());
+    const lookbackDays = Math.max(1, (nowMs - startMs) / DAY_MS);
+    const startTimestamp = new Date(startMs + 1).toISOString();
+
+    const [{ data: histStorageRows }, { data: histBalanceRows }] = await Promise.all([
+      cirrus.get(accessToken, "/history@storage", { params: {
+        address: `eq.${vaultAddress}`,
+        valid_from: `lte.${startTimestamp}`,
+        valid_to: `gte.${startTimestamp}`,
+        select: "data",
+      }}).catch(() => ({ data: [] as any[] })),
+      cirrus.get(accessToken, "/history@mapping", { params: {
+        select: "value::text",
+        address: `eq.${assetAddress}`,
+        collection_name: "eq._balances",
+        "key->>key": `eq.${vaultAddress}`,
+        valid_from: `lte.${startTimestamp}`,
+        valid_to: `gte.${startTimestamp}`,
+      }}).catch(() => ({ data: [] as any[] })),
+    ]);
+
+    const histManagedAssets = safeBigInt(histStorageRows?.[0]?.data?._managedAssets);
+    const histTotalShares = safeBigInt(histStorageRows?.[0]?.data?._totalSupply);
+    const histBalance = safeBigInt(histBalanceRows?.[0]?.value);
+    if (histTotalShares <= 0n) return "-";
+
+    const histPricingAssets = histBalance < histManagedAssets ? histBalance : histManagedAssets;
+    const rateNow = totalShares > 0n ? (pricingAssets * DECIMALS) / totalShares : DECIMALS;
+    const rateStart = histTotalShares > 0n && histPricingAssets > 0n ? (histPricingAssets * DECIMALS) / histTotalShares : 0n;
+    if (rateStart <= 0n) return "0.00";
+
+    const periodReturn = Number(((rateNow - rateStart) * DECIMALS) / rateStart) / 1e18;
+    if (!isFinite(periodReturn) || periodReturn <= -1) return "-";
+
+    const annualizationDays = Math.max(30, lookbackDays);
+    const apy = (Math.pow(1 + periodReturn, 365 / annualizationDays) - 1) * 100;
+    return isFinite(apy) ? apy.toFixed(2) : "-";
+  } catch {
+    return "-";
+  }
 }
