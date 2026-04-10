@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -50,8 +50,6 @@ const Transfer = () => {
   const [showInactiveTokens, setShowInactiveTokens] = useState(false);
   const [nonceWarning, setNonceWarning] = useState(false);
   const [nonceOverride, setNonceOverride] = useState(false);
-  const [checkingNonce, setCheckingNonce] = useState(false);
-  const nonceAbortRef = useRef<AbortController | null>(null);
 
   const maxAmount = useMemo(() => {
     if (!fromAsset) return "0";
@@ -99,29 +97,18 @@ const Transfer = () => {
   useEffect(() => {
     setNonceWarning(false);
     setNonceOverride(false);
-
     if (!recipient || recipientError || !isLoggedIn) return;
 
-    nonceAbortRef.current?.abort();
     const controller = new AbortController();
-    nonceAbortRef.current = controller;
-
-    setCheckingNonce(true);
     api
       .get<{ nonce: number }>("/tokens/check-recipient", {
         params: { address: recipient },
         signal: controller.signal,
       })
       .then(({ data }) => {
-        if (!controller.signal.aborted && data.nonce === 0) {
-          setNonceWarning(true);
-        }
+        if (data.nonce === 0) setNonceWarning(true);
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!controller.signal.aborted) setCheckingNonce(false);
-      });
-
+      .catch(() => {});
     return () => controller.abort();
   }, [recipient, recipientError, isLoggedIn]);
 
@@ -429,11 +416,10 @@ const Transfer = () => {
                 !!recipientError ||
                 !!feeError ||
                 swapLoading ||
-                checkingNonce ||
-                (!!nonceWarning && !nonceOverride)
+                (nonceWarning && !nonceOverride)
               }
             >
-              {swapLoading ? <span>Processing…</span> : checkingNonce ? "Checking recipient…" : "Transfer"}
+              {swapLoading ? <span>Processing…</span> : "Transfer"}
             </Button>
           </div>
 
