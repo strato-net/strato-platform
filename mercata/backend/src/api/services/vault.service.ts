@@ -200,57 +200,6 @@ const getVaultData = async (
 };
 
 /**
- * Get token info including symbol, name, and images
- */
-const getTokenInfo = async (
-  accessToken: string,
-  tokenAddress: string
-): Promise<{ symbol: string; name: string; images?: { value: string }[] }> => {
-  try {
-    const { data } = await cirrus.get(accessToken, `/${Token}`, {
-      params: {
-        address: `eq.${tokenAddress}`,
-        select: `_symbol,_name,images:${Token}-images(value)`,
-      },
-    });
-
-    const token = data?.[0];
-    return {
-      symbol: token?._symbol || "UNKNOWN",
-      name: token?._name || "Unknown Token",
-      images: token?.images,
-    };
-  } catch (error) {
-    console.error(`Error fetching token info for ${tokenAddress}:`, error);
-    return { symbol: "UNKNOWN", name: "Unknown Token" };
-  }
-};
-
-/**
- * Get price for an asset from PriceOracle
- */
-const getAssetPrice = async (
-  accessToken: string,
-  oracleAddress: string,
-  assetAddress: string
-): Promise<string> => {
-  try {
-    const { data } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, {
-      params: {
-        select: "value::text",
-        address: `eq.${oracleAddress}`,
-        key: `eq.${assetAddress}`,
-      },
-    });
-
-    return data?.[0]?.value || "0";
-  } catch (error) {
-    console.error(`Error fetching price for ${assetAddress}:`, error);
-    return "0";
-  }
-};
-
-/**
  * Get token balance for an address
  */
 const getTokenBalance = async (
@@ -447,56 +396,6 @@ const getHistoricalAssetPrice = async (
   } catch (error) {
     console.error(`Error fetching historical price for ${assetAddress}:`, error);
     return "0";
-  }
-};
-
-/**
- * Get deposits and withdrawals for the vault within a date range
- */
-const getDepositsWithdrawalsInPeriod = async (
-  accessToken: string,
-  vaultAddress: string,
-  startDate: string // Format: YYYY-MM-DD
-): Promise<{ totalDepositsUsd: bigint; totalWithdrawalsUsd: bigint }> => {
-  try {
-    // Fetch Deposited events since startDate
-    const { data: depositEvents } = await cirrus.get(accessToken, `/${Vault}-Deposited`, {
-      params: {
-        select: "depositValueUSD::text",
-        address: `eq.${vaultAddress}`,
-        block_timestamp: `gte.${startDate}`,
-      },
-    });
-
-    // Fetch Withdrawn events since startDate
-    const { data: withdrawEvents } = await cirrus.get(accessToken, `/${Vault}-Withdrawn`, {
-      params: {
-        select: "withdrawValueUSD::text",
-        address: `eq.${vaultAddress}`,
-        block_timestamp: `gte.${startDate}`,
-      },
-    });
-
-    // Sum up deposits
-    let totalDepositsUsd = 0n;
-    for (const event of depositEvents || []) {
-      if (event.depositValueUSD) {
-        totalDepositsUsd += BigInt(event.depositValueUSD);
-      }
-    }
-
-    // Sum up withdrawals
-    let totalWithdrawalsUsd = 0n;
-    for (const event of withdrawEvents || []) {
-      if (event.withdrawValueUSD) {
-        totalWithdrawalsUsd += BigInt(event.withdrawValueUSD);
-      }
-    }
-
-    return { totalDepositsUsd, totalWithdrawalsUsd };
-  } catch (error) {
-    console.error("Error fetching deposits/withdrawals in period:", error);
-    return { totalDepositsUsd: 0n, totalWithdrawalsUsd: 0n };
   }
 };
 
@@ -756,25 +655,25 @@ export const getUserBalances = async (
   const supportedAssetAddresses: string[] = (vaultData.supportedAssets || [])
     .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000");
 
+  const [balanceMap, tokenInfoMap, priceMap] = await Promise.all([
+    getBatchBalances(accessToken, supportedAssetAddresses, userAddress),
+    getBatchTokenInfo(accessToken, supportedAssetAddresses),
+    getBatchPrices(accessToken, priceOracleAddress, supportedAssetAddresses),
+  ]);
+
   const balances: UserTokenBalance[] = [];
 
   for (const assetAddress of supportedAssetAddresses) {
-    // Get user's balance for this asset
-    const balance = await getTokenBalance(accessToken, assetAddress, userAddress);
-    const balanceBN = safeBigInt(balance);
-
-    // Only include tokens where user has a positive balance
-    if (balanceBN > 0n) {
-      const tokenInfo = await getTokenInfo(accessToken, assetAddress);
-      const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
-
+    const balance = balanceMap.get(assetAddress) || "0";
+    if (safeBigInt(balance) > 0n) {
+      const info = tokenInfoMap.get(assetAddress) || { symbol: "UNKNOWN", name: "Unknown Token" };
       balances.push({
         address: assetAddress,
-        symbol: tokenInfo.symbol,
-        name: tokenInfo.name,
+        symbol: info.symbol,
+        name: info.name,
         balance,
-        priceUsd,
-        images: tokenInfo.images,
+        priceUsd: priceMap.get(assetAddress) || "0",
+        images: info.images,
       });
     }
   }
@@ -1044,7 +943,12 @@ export const getWithdrawPreview = async (
   const { minReserveMap } = vaultData;
   const amountUsdBN = safeBigInt(amountUsd);
 
-  // Calculate withdrawable equity (same as contract)
+  const [tokenInfoMap, balanceMap, priceMap] = await Promise.all([
+    getBatchTokenInfo(accessToken, supportedAssetAddresses),
+    getBatchBalances(accessToken, supportedAssetAddresses, botExecutor),
+    getBatchPrices(accessToken, priceOracleAddress, supportedAssetAddresses),
+  ]);
+
   let withdrawableEquity = 0n;
   const assetData: Array<{
     address: string;
@@ -1059,13 +963,11 @@ export const getWithdrawPreview = async (
   }> = [];
 
   for (const assetAddress of supportedAssetAddresses) {
-    const tokenInfo = await getTokenInfo(accessToken, assetAddress);
-    const balance = await getTokenBalance(accessToken, assetAddress, botExecutor);
-    const balanceBN = safeBigInt(balance);
+    const info = tokenInfoMap.get(assetAddress) || { symbol: "UNKNOWN", name: "Unknown Token" };
+    const balanceBN = safeBigInt(balanceMap.get(assetAddress));
     const minReserve = minReserveMap.get(assetAddress.toLowerCase()) || "0";
     const minReserveBN = safeBigInt(minReserve);
-    const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
-    const priceBN = safeBigInt(priceUsd);
+    const priceBN = safeBigInt(priceMap.get(assetAddress));
 
     const withdrawable = balanceBN > minReserveBN ? balanceBN - minReserveBN : 0n;
     const withdrawableUsd = priceBN > 0n ? (withdrawable * priceBN) / WAD : 0n;
@@ -1074,14 +976,14 @@ export const getWithdrawPreview = async (
 
     assetData.push({
       address: assetAddress,
-      symbol: tokenInfo.symbol,
-      name: tokenInfo.name,
+      symbol: info.symbol,
+      name: info.name,
       balance: balanceBN,
       minReserve: minReserveBN,
       withdrawable,
       price: priceBN,
       withdrawableUsd,
-      images: tokenInfo.images,
+      images: info.images,
     });
   }
 
@@ -1366,19 +1268,24 @@ export const getTransactions = async (
       }),
     ]);
 
-    // Process swap events
+    // Collect all unique token addresses across both event types
+    const tokenAddresses = new Set<string>();
     for (const event of swapEvents || []) {
       const attrs = event.attributes || {};
-      
-      let tokenInInfo = { symbol: "UNKNOWN", name: "Unknown Token" };
-      let tokenOutInfo = { symbol: "UNKNOWN", name: "Unknown Token" };
-      
-      if (attrs.tokenIn) {
-        tokenInInfo = await getTokenInfo(accessToken, attrs.tokenIn);
-      }
-      if (attrs.tokenOut) {
-        tokenOutInfo = await getTokenInfo(accessToken, attrs.tokenOut);
-      }
+      if (attrs.tokenIn) tokenAddresses.add(attrs.tokenIn);
+      if (attrs.tokenOut) tokenAddresses.add(attrs.tokenOut);
+    }
+    for (const event of liquidationEvents || []) {
+      const attrs = event.attributes || {};
+      if (attrs.asset) tokenAddresses.add(attrs.asset);
+    }
+
+    const tokenInfoMap = await getBatchTokenInfo(accessToken, Array.from(tokenAddresses));
+
+    for (const event of swapEvents || []) {
+      const attrs = event.attributes || {};
+      const tokenInInfo = tokenInfoMap.get(attrs.tokenIn) || { symbol: "UNKNOWN", name: "Unknown Token" };
+      const tokenOutInfo = tokenInfoMap.get(attrs.tokenOut) || { symbol: "UNKNOWN", name: "Unknown Token" };
 
       transactions.push({
         id: event.id || `swap-${event.block_timestamp}-${event.address}`,
@@ -1397,15 +1304,9 @@ export const getTransactions = async (
       });
     }
 
-    // Process liquidation events
     for (const event of liquidationEvents || []) {
       const attrs = event.attributes || {};
-
-      let assetSymbol = "UNKNOWN";
-      if (attrs.asset) {
-        const info = await getTokenInfo(accessToken, attrs.asset);
-        assetSymbol = info.symbol;
-      }
+      const assetInfo = tokenInfoMap.get(attrs.asset) || { symbol: "UNKNOWN", name: "Unknown Token" };
 
       transactions.push({
         id: event.id || `liq-${event.block_timestamp}-${event.address}`,
@@ -1414,7 +1315,7 @@ export const getTransactions = async (
         liquidation: {
           borrower: attrs.borrower || "",
           asset: attrs.asset || "",
-          assetSymbol,
+          assetSymbol: assetInfo.symbol,
           collateralSeized: attrs.collateralOut || "0",
           debtBurnedUSD: attrs.debtBurnedUSD || "0",
         },
