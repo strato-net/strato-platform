@@ -18,8 +18,7 @@ type PortfolioDataPoint = {
   balance: number;
 };
 
-type TabType = 'netBalance' | 'rewards' | 'borrowed';
-
+type TabType = 'netBalance' | 'rewards' | 'borrowed' | 'earnings';
 interface PortfolioValueChartProps {
   data: PortfolioDataPoint[];
   onTimeRangeChange?: (duration: string) => void;
@@ -29,7 +28,20 @@ interface PortfolioValueChartProps {
   title?: string;
   subtitle?: string;
   currentValue?: number;
+  /** When true, time range UI is rendered outside (e.g. Performance toolbar). */
+  hideTimeRangeSelector?: boolean;
 }
+
+/** Shared with Performance toolbar — keep labels in sync with chart fetch ranges. */
+export const PORTFOLIO_CHART_TIME_RANGE_OPTIONS = [
+  { label: "1 Day", value: "1d" },
+  { label: "1 Week", value: "7d" },
+  { label: "1 Month", value: "1m" },
+  { label: "3 Months", value: "3m" },
+  { label: "6 Months", value: "6m" },
+  { label: "1 Year", value: "1y" },
+  { label: "All Time", value: "all" },
+] as const;
 
 // Convert timestamp to date or time string for display based on range
 const formatDate = (timestamp: number, isTimeRange: boolean): string => {
@@ -79,6 +91,7 @@ const getChangeText = (hasData: boolean, tabType: TabType, change: { percentage:
       txt = `${amt} Reward Points`; break;
     case 'borrowed':
       txt = `${amt} USDST`; break;
+    case 'earnings':
     case 'netBalance':
       txt = `$${amt}`; break;
     default:
@@ -96,7 +109,8 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
   tabType = 'netBalance',
   title = 'Portfolio Value',
   subtitle = 'Net balance over time',
-  currentValue: propCurrentValue
+  currentValue: propCurrentValue,
+  hideTimeRangeSelector = false,
 }) => {
   // Determine color scheme based on tab type
   const getColorScheme = (tab: TabType): { line: string; positive: string; negative: string } => {
@@ -105,6 +119,8 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
         return { line: '#a855f7', positive: '#a855f7', negative: '#ef4444' }; // purple-500
       case 'borrowed':
         return { line: '#f97316', positive: '#f97316', negative: '#f97316' }; // orange-500
+      case 'earnings':
+        return { line: '#10b981', positive: '#10b981', negative: '#ef4444' }; // emerald-500
       default:
         return { line: '#3b82f6', positive: '#22c55e', negative: '#ef4444' }; // blue-500
     }
@@ -196,6 +212,11 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
                 })} Claimed Reward Points`
+              ) : tabType === 'earnings' ? (
+                `$${currentValue.toLocaleString('en-US', { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })} in earning positions`
               ) : tabType === 'borrowed' ? (
                 `${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
@@ -208,7 +229,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 })}`
               )}
             </div>
-            <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+            <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : tabType === 'earnings' ? 'text-emerald-600' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
               {change.isPositive ? <TrendingUp size={16} color={getColorScheme(tabType).positive} /> : <TrendingDown size={16} color={getColorScheme(tabType).negative}/>}
               <span>{getChangeText(hasData, tabType, change)}</span>
             </div>
@@ -287,6 +308,11 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                                   minimumFractionDigits: 2, 
                                   maximumFractionDigits: 2 
                                 })} USDST`
+                              ) : tabType === 'earnings' ? (
+                                `$${dataPoint.value.toLocaleString('en-US', { 
+                                  minimumFractionDigits: 2, 
+                                  maximumFractionDigits: 2 
+                                })} (est.)`
                               ) : (
                                 `$${dataPoint.value.toLocaleString('en-US', { 
                                   minimumFractionDigits: 2, 
@@ -340,25 +366,17 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
           )}
         </div>
         
-        {/* Time Range Selector */}
-        {onTimeRangeChange && (
+        {onTimeRangeChange && !hideTimeRangeSelector && (
           <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-4 border-t border-border">
-            {[
-              { label: '1 Day', value: '1d' },
-              { label: '1 Week', value: '7d' },
-              { label: '1 Month', value: '1m' },
-              { label: '3 Months', value: '3m' },
-              { label: '6 Months', value: '6m' },
-              { label: '1 Year', value: '1y' },
-              { label: 'All Time', value: 'all' }
-            ].map(({ label, value }) => (
+            {PORTFOLIO_CHART_TIME_RANGE_OPTIONS.map(({ label, value }) => (
               <button
                 key={value}
+                type="button"
                 onClick={() => onTimeRangeChange(value)}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   selectedTimeRange === value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                 }`}
               >
                 {label}

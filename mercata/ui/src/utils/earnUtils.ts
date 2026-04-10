@@ -14,6 +14,81 @@ export interface EarnApyInfo {
   breakdown: EarnApyBreakdownItem[];
 }
 
+function normalizeBreakdownLabel(label: string | undefined): string {
+  return (label || "")
+    .replace(/\u00a0/g, " ")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function parseBreakdownApyPercent(raw: string | number | undefined): number {
+  if (raw === undefined || raw === null) return NaN;
+  if (typeof raw === "number") return Number.isFinite(raw) && raw >= 0 ? raw : NaN;
+  const s = String(raw).trim().replace(/%/g, "").replace(/,/g, "");
+  const v = Number(s);
+  return Number.isFinite(v) && v >= 0 ? v : NaN;
+}
+
+/**
+ * Sum APY % from `EarnApyInfo.breakdown` lines — matches earnUtils labels (`Native APY`, `Base APY`, `Rewards APY`)
+ * with tolerant label/number parsing so portfolio rollups stay aligned with table tooltips.
+ */
+export function parseEarnApyBreakdownBuckets(info: EarnApyInfo | null): {
+  native: number;
+  base: number;
+  rewards: number;
+} {
+  if (!info?.breakdown?.length) return { native: 0, base: 0, rewards: 0 };
+  let native = 0;
+  let base = 0;
+  let rewards = 0;
+  let unmatched = 0;
+
+  for (const b of info.breakdown) {
+    const v = parseBreakdownApyPercent(b.apy);
+    if (!Number.isFinite(v)) continue;
+
+    const key = normalizeBreakdownLabel(b.label);
+    if (key === "native apy" || key.endsWith(" native apy")) native += v;
+    else if (key === "base apy" || key.endsWith(" base apy")) base += v;
+    else if (key === "rewards apy" || key.endsWith(" rewards apy") || (key.includes("reward") && key.includes("apy")))
+      rewards += v;
+    else unmatched += v;
+  }
+
+  if (unmatched > 0) {
+    if (native + base + rewards === 0) {
+      base = unmatched;
+    } else {
+      base += unmatched;
+    }
+  }
+
+  return { native, base, rewards };
+}
+
+/**
+ * Per-position Native/Base/Rewards % from the Earn breakdown (API-shaped). If breakdown lines sum
+ * differs slightly from `apyTotal`, scales all three proportionally so totals stay consistent.
+ * No breakdown but `apyTotal` > 0 → attribute all to Base (e.g. vault alpha string only).
+ */
+export function earnApyRowBuckets(
+  info: EarnApyInfo | null,
+  apyTotal: number | null
+): { native: number; base: number; rewards: number } {
+  const apy = apyTotal != null && Number.isFinite(apyTotal) && apyTotal > 0 ? apyTotal : 0;
+  if (apy <= 0) return { native: 0, base: 0, rewards: 0 };
+
+  let { native, base, rewards } = parseEarnApyBreakdownBuckets(info);
+  const sum = native + base + rewards;
+  if (sum <= 0) return { native: 0, base: apy, rewards: 0 };
+  const tol = Math.max(0.05, apy * 0.002);
+  if (Math.abs(sum - apy) <= tol) return { native, base, rewards };
+  const scale = apy / sum;
+  return { native: native * scale, base: base * scale, rewards: rewards * scale };
+}
+
 export interface EarnApyLookupOptions {
   includeVaultSources?: boolean;
 }
@@ -202,6 +277,7 @@ const buildTokenCompositeInfo = (
     ? apys
     : apys.filter((item) => item.source !== "vault" && item.source !== "vault_weighted" && !(item.source === "rewards" && item.meta === "vault"));
 
+  /** Mirrors `/earn/token-apys` grouping: swap fee / vault NAV / lending supply → “Native APY”; pool base / vault_weighted → “Base APY”; rewards → “Rewards APY”. */
   const native = pickBestEntry(
     usableApys.filter(
       (item) =>
@@ -210,13 +286,14 @@ const buildTokenCompositeInfo = (
     )
   );
 
-  const bestPoolBase = pickBestEntry(
-    usableApys.filter((item) => !!item.poolAddress && (item.source === "weighted_swap" || item.source === "base"))
+  const basePoolEntries = usableApys.filter(
+    (item) => !!item.poolAddress && (item.source === "weighted_swap" || item.source === "base")
   );
-  const bestFallbackBase = pickBestEntry(
-    usableApys.filter((item) => !item.poolAddress && (item.source === "base" || item.source === "vault_weighted"))
+  const baseProtocolEntries = usableApys.filter(
+    (item) => !item.poolAddress && (item.source === "base" || item.source === "vault_weighted")
   );
-  const base = bestPoolBase || bestFallbackBase;
+  /** One “Base APY” line: best among pool-linked and token-level base sources (avoid `a || b` hiding the larger). */
+  const base = pickBestEntry([...basePoolEntries, ...baseProtocolEntries]);
 
   const rewards = pickBestEntry(
     usableApys.filter((item) => item.source === "rewards"),

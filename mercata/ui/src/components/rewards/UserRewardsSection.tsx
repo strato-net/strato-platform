@@ -2,9 +2,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserRewardsData, claimAllRewards, claimRewards, safeBigInt } from "@/services/rewardsService";
 import {
-  calculateRealTimePendingRewards,
+  UserRewardsData,
+  claimAllRewards,
+  claimRewards,
+  safeBigInt,
+  computeTotalClaimableRewards,
+  formatTotalClaimablePointsDisplay,
   formatEmissionRatePerDay,
   roundByMagnitude,
   formatRoundedWithCommas,
@@ -217,8 +221,6 @@ export const UserRewardsSection = ({
     );
   }
 
-  const unclaimedRewardsStr = userRewards.unclaimedRewards || "0";
-  const unclaimedFormatted = formatBalance(unclaimedRewardsStr, "points", 18, 2, 6);
   const activitiesWithStake = userRewards.activities.filter(
     (a) =>
       safeBigInt(a.userInfo?.stake || "0") > 0n &&
@@ -233,56 +235,9 @@ export const UserRewardsSection = ({
       )) + " points"
     : null;
 
-  // Calculate what user would receive if they claim:
-  // - claimAllRewards: settles all activities, then claims total unclaimedRewards[user]
-  // - claimRewards(activityId): settles that activity, then claims total unclaimedRewards[user]
-  // So both claim the total, but after settling different activities
-  
-  // Calculate new pending rewards that haven't been settled yet for each activity
-  const baseUnclaimed = safeBigInt(unclaimedRewardsStr);
-  let totalNewPending = 0n;
-  
-  // Pre-calculate pending for each activity using real-time calculation
-  const activityPendingMap = new Map<number, bigint>();
-  const currentTime = Math.floor(Date.now() / 1000); // Current Unix timestamp in seconds
-  activitiesWithStake.forEach(({ activity, userInfo }) => {
-    // Check for existence, not truthiness (0 is valid for userIndex)
-    if (
-      userInfo?.stake &&
-      activity?.accRewardPerStake !== undefined &&
-      userInfo?.userIndex !== undefined &&
-      activity?.emissionRate !== undefined &&
-      activity?.totalStake !== undefined &&
-      activity?.lastUpdateTime !== undefined
-    ) {
-      const pending = calculateRealTimePendingRewards(
-        userInfo.stake,
-        activity.accRewardPerStake,
-        userInfo.userIndex || "0",
-        activity.emissionRate,
-        activity.totalStake,
-        activity.lastUpdateTime,
-        currentTime
-      );
-      const pendingBig = safeBigInt(pending);
-      activityPendingMap.set(activity.activityId, pendingBig);
-      totalNewPending += pendingBig;
-    }
-  });
-  
-  // Total claimable = base unclaimed + new pending from all activities
-  const totalClaimable = baseUnclaimed + totalNewPending;
+  const totalClaimable = computeTotalClaimableRewards(userRewards);
   const hasClaimable = totalClaimable > 0n;
-  const totalClaimableDecimal = totalClaimable >= 0n
-    ? formatBalance(totalClaimable.toString(), "points", 18, 18, 18)
-    : null;
-  // Extract just the numeric part (remove "points" suffix and any spaces)
-  const numericPart = totalClaimableDecimal
-    ? totalClaimableDecimal.replace(/\s*points?\s*$/i, '').trim()
-    : null;
-  const totalClaimableFormatted = numericPart !== null
-    ? formatRoundedWithCommas(roundByMagnitude(numericPart)) + " points" 
-    : "?";
+  const totalClaimableFormatted = formatTotalClaimablePointsDisplay(totalClaimable);
 
   return (
     <div className="space-y-6">

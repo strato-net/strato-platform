@@ -17,7 +17,7 @@ export const WAD = 10n ** 18n;
  * Enable/disable rewards functionality in the UI
  * When false, all rewards-related UI elements will be hidden
  */
-export const rewardsEnabled = false;
+export const rewardsEnabled = true;
 
 // ============================================
 // Input Validation Patterns
