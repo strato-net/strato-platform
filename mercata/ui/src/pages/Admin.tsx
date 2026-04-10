@@ -16,6 +16,7 @@ import CollateralConfigManager from '@/components/admin/CollateralConfigManager'
 import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
 import VaultAdminTab from '@/components/admin/VaultAdminTab';
+import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -204,7 +205,29 @@ const Admin = () => {
             <BridgeTransactionsPage isAdmin={true} />
           </TabsContent>
           <TabsContent value="vault" className="space-y-6">
-            <VaultAdminTab />
+            <Card>
+              <CardHeader>
+                <CardTitle>Carry Vaults</CardTitle>
+                <CardDescription>
+                  Admin tools for the ETH and wBTC carry vaults.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <YieldVaultAdminTab />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Diversified Vault</CardTitle>
+                <CardDescription>
+                  Admin tools for the diversified multi-asset vault.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VaultAdminTab />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

@@ -21,7 +21,7 @@ import { useVaultContext } from "@/context/VaultContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
-import { useYieldVaultContext } from "@/context/YieldVaultContext";
+import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
