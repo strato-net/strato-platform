@@ -10,6 +10,8 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
+          strato-down || true
+          pkill convoke || true
           docker rm -f $(docker ps -aq) || true
           docker system prune -f || true
           docker volume prune -fa || true
