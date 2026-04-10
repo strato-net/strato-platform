@@ -1366,19 +1366,24 @@ export const getTransactions = async (
       }),
     ]);
 
-    // Process swap events
+    // Collect all unique token addresses across both event types
+    const tokenAddresses = new Set<string>();
     for (const event of swapEvents || []) {
       const attrs = event.attributes || {};
-      
-      let tokenInInfo = { symbol: "UNKNOWN", name: "Unknown Token" };
-      let tokenOutInfo = { symbol: "UNKNOWN", name: "Unknown Token" };
-      
-      if (attrs.tokenIn) {
-        tokenInInfo = await getTokenInfo(accessToken, attrs.tokenIn);
-      }
-      if (attrs.tokenOut) {
-        tokenOutInfo = await getTokenInfo(accessToken, attrs.tokenOut);
-      }
+      if (attrs.tokenIn) tokenAddresses.add(attrs.tokenIn);
+      if (attrs.tokenOut) tokenAddresses.add(attrs.tokenOut);
+    }
+    for (const event of liquidationEvents || []) {
+      const attrs = event.attributes || {};
+      if (attrs.asset) tokenAddresses.add(attrs.asset);
+    }
+
+    const tokenInfoMap = await getBatchTokenInfo(accessToken, Array.from(tokenAddresses));
+
+    for (const event of swapEvents || []) {
+      const attrs = event.attributes || {};
+      const tokenInInfo = tokenInfoMap.get(attrs.tokenIn) || { symbol: "UNKNOWN", name: "Unknown Token" };
+      const tokenOutInfo = tokenInfoMap.get(attrs.tokenOut) || { symbol: "UNKNOWN", name: "Unknown Token" };
 
       transactions.push({
         id: event.id || `swap-${event.block_timestamp}-${event.address}`,
@@ -1397,15 +1402,9 @@ export const getTransactions = async (
       });
     }
 
-    // Process liquidation events
     for (const event of liquidationEvents || []) {
       const attrs = event.attributes || {};
-
-      let assetSymbol = "UNKNOWN";
-      if (attrs.asset) {
-        const info = await getTokenInfo(accessToken, attrs.asset);
-        assetSymbol = info.symbol;
-      }
+      const assetInfo = tokenInfoMap.get(attrs.asset) || { symbol: "UNKNOWN", name: "Unknown Token" };
 
       transactions.push({
         id: event.id || `liq-${event.block_timestamp}-${event.address}`,
@@ -1414,7 +1413,7 @@ export const getTransactions = async (
         liquidation: {
           borrower: attrs.borrower || "",
           asset: attrs.asset || "",
-          assetSymbol,
+          assetSymbol: assetInfo.symbol,
           collateralSeized: attrs.collateralOut || "0",
           debtBurnedUSD: attrs.debtBurnedUSD || "0",
         },
