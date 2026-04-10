@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Token } from "@/interface";
 
 import { useUser } from "@/context/UserContext";
@@ -14,13 +16,14 @@ import TransferConfirmationModal from "../components/TransferConfirmationModal";
 import BulkTransferModal from "../components/BulkTransferModal";
 import { safeParseUnits, roundToDecimals, addCommasToInput, formatBalance, formatUnits } from "@/utils/numberUtils";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { api } from "@/lib/axios";
 
 import {
   Popover,
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { ChevronDown, Upload } from "lucide-react";
+import { ChevronDown, Upload, AlertTriangle } from "lucide-react";
 import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
@@ -45,6 +48,10 @@ const Transfer = () => {
   const [recipientError, setRecipientError] = useState("");
   const [feeError, setFeeError] = useState("");
   const [showInactiveTokens, setShowInactiveTokens] = useState(false);
+  const [nonceWarning, setNonceWarning] = useState(false);
+  const [nonceOverride, setNonceOverride] = useState(false);
+  const [checkingNonce, setCheckingNonce] = useState(false);
+  const nonceAbortRef = useRef<AbortController | null>(null);
 
   const maxAmount = useMemo(() => {
     if (!fromAsset) return "0";
@@ -87,6 +94,36 @@ const Transfer = () => {
       fetchUsdstBalance();
     }
   }, [isLoggedIn, fetchUserTokens, fetchUsdstBalance]);
+
+  // Check recipient nonce when a valid address is entered
+  useEffect(() => {
+    setNonceWarning(false);
+    setNonceOverride(false);
+
+    if (!recipient || recipientError || !isLoggedIn) return;
+
+    nonceAbortRef.current?.abort();
+    const controller = new AbortController();
+    nonceAbortRef.current = controller;
+
+    setCheckingNonce(true);
+    api
+      .get<{ nonce: number }>("/tokens/check-recipient", {
+        params: { address: recipient },
+        signal: controller.signal,
+      })
+      .then(({ data }) => {
+        if (!controller.signal.aborted && data.nonce === 0) {
+          setNonceWarning(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) setCheckingNonce(false);
+      });
+
+    return () => controller.abort();
+  }, [recipient, recipientError, isLoggedIn]);
 
   const handleConfirmTransfer = async () => {
     if (!fromAsset || !recipient || !fromAmount) return;
@@ -292,6 +329,31 @@ const Transfer = () => {
                 disabled={guestMode}
               />
               {recipientError && <span className="text-red-600 text-sm">{recipientError}</span>}
+              {nonceWarning && !recipientError && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-3">
+                  <div className="flex items-start gap-2 text-amber-800 dark:text-amber-300 text-sm">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>
+                      <p>
+                        This address has no transaction history on the STRATO network.
+                        If you are trying to withdraw to an external chain (e.g. Ethereum),
+                        please use the{" "}
+                        <Link to="/dashboard/withdrawals?tab=bridge-out" className="font-medium underline">
+                          Withdraw page
+                        </Link>{" "}
+                        instead.
+                      </p>
+                      <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                        <Checkbox
+                          checked={nonceOverride}
+                          onCheckedChange={(v) => setNonceOverride(v === true)}
+                        />
+                        <span>I understand — proceed with this transfer</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Amount */}
@@ -366,10 +428,12 @@ const Transfer = () => {
                 !!amountError ||
                 !!recipientError ||
                 !!feeError ||
-                swapLoading
+                swapLoading ||
+                checkingNonce ||
+                (!!nonceWarning && !nonceOverride)
               }
             >
-              {swapLoading ? <span>Processing…</span> : "Transfer"}
+              {swapLoading ? <span>Processing…</span> : checkingNonce ? "Checking recipient…" : "Transfer"}
             </Button>
           </div>
 
