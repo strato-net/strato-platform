@@ -82,7 +82,24 @@ Start the node:
 - Do not include OAUTH variables in env vars. You can include app-related variables if needed (e.g., RPC URLs, etc.).
 - Use `--network=helium` for testnet or `--network=upquark` for mainnet (default).
 
-### 4. Stop and Wipe
+### 4. Update App on a Running Node
+
+To rebuild and redeploy only the app services (mercata-backend and mercata-ui) without resyncing the blockchain data:
+
+```
+make app
+```
+
+This builds both app images and prints the command to deploy them. Then stop and restart the node with the new images:
+
+```
+strato-down
+strato-up mynode --update-app mercata-backend:<tag> mercata-ui:<tag>
+```
+
+Use the exact image tags printed by `make app`. You can also rebuild and deploy the images individually with `make mercata-backend` or `make mercata-ui`.
+
+### 5. Stop and Wipe
 
 Stop the node:
 

@@ -147,6 +147,7 @@ $(DOCKER_SENTINELS)/mercata-backend: | $(DOCKER_SENTINELS)
 	else \
 		echo "mercata-backend up to date"; \
 	fi
+	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) <mercata-ui-tag>"
 
 $(DOCKER_SENTINELS)/mercata-ui: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,mercata/ui,$(VERSION)-$(HASH_MERCATA_UI)); then \
@@ -157,6 +158,7 @@ $(DOCKER_SENTINELS)/mercata-ui: | $(DOCKER_SENTINELS)
 	else \
 		echo "mercata-ui up to date"; \
 	fi
+	@echo "  Update running node: strato-up <node-dir> --update-app <mercata-backend-tag> $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
 
 $(DOCKER_SENTINELS)/prometheus: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,prometheus-packager,$(VERSION)-$(HASH_PROMETHEUS)); then \
@@ -210,7 +212,7 @@ all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels update-app
 
 apex: $(DOCKER_SENTINELS)/apex
 nginx: $(DOCKER_SENTINELS)/nginx
@@ -219,6 +221,11 @@ prometheus: $(DOCKER_SENTINELS)/prometheus
 smd: $(DOCKER_SENTINELS)/smd
 mercata-backend: $(DOCKER_SENTINELS)/mercata-backend
 mercata-ui: $(DOCKER_SENTINELS)/mercata-ui
+app: mercata-backend mercata-ui
+	@echo ""
+	@echo "Both app images built. To update a running node:"
+	@echo "  strato-up <node-dir> --update-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
+
 bridge: $(DOCKER_SENTINELS)/bridge
 bridge-nginx: $(DOCKER_SENTINELS)/bridge-nginx
 
@@ -253,12 +260,14 @@ mercata-backend-force:
 	docker build -t ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} -f ./mercata/backend/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-backend
+	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND)"
 
 mercata-ui-force:
 	@echo Now building mercata-ui...
 	docker build -t ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} -f ./mercata/ui/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-ui
+	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
 
 bridge-force:
 	@echo Now building bridge...

@@ -2,10 +2,80 @@
 
 set -e
 
-# Setup node (creates if needed, skips if exists with no flags, errors if exists with flags)
-strato-setup "$@"
+# Parse --update-app flag (handled here since strato-setup doesn't know about it)
+# Usage: strato-up <node-dir> --update-app <mercata-backend-image:tag> <mercata-ui-image:tag>
+UPDATE_APP=false
+SETUP_ARGS=()
+BACKEND_IMAGE=""
+UI_IMAGE=""
 
-cd "$1"
+i=1
+while [[ $i -le $# ]]; do
+    arg="${!i}"
+    if [[ "$arg" == "--update-app" ]]; then
+        UPDATE_APP=true
+        # Consume exactly 2 arguments
+        i=$((i + 1))
+        if [[ $i -gt $# ]]; then
+            echo "Error: --update-app requires exactly 2 arguments: <mercata-backend-image:tag> <mercata-ui-image:tag>"
+            exit 1
+        fi
+        BACKEND_IMAGE="${!i}"
+        i=$((i + 1))
+        if [[ $i -gt $# ]]; then
+            echo "Error: --update-app requires exactly 2 arguments: <mercata-backend-image:tag> <mercata-ui-image:tag>"
+            exit 1
+        fi
+        UI_IMAGE="${!i}"
+    else
+        SETUP_ARGS+=("$arg")
+    fi
+    i=$((i + 1))
+done
+
+if [[ "$UPDATE_APP" == "true" ]]; then
+    # --update-app: replace app images in existing node's docker-compose.yml
+    NODE_DIR="${SETUP_ARGS[0]}"
+
+    if [[ -z "$NODE_DIR" ]]; then
+        echo "Error: node directory required"
+        echo "Usage: strato-up <node-directory> --update-app <mercata-backend-image:tag> <mercata-ui-image:tag>"
+        exit 1
+    fi
+    if [[ ! -d "$NODE_DIR" ]]; then
+        echo "Error: node directory '$NODE_DIR' does not exist"
+        exit 1
+    fi
+
+    COMPOSE_FILE="$NODE_DIR/docker-compose.yml"
+    if [[ ! -f "$COMPOSE_FILE" ]]; then
+        echo "Error: docker-compose.yml not found in '$NODE_DIR'"
+        exit 1
+    fi
+
+    if [[ "$BACKEND_IMAGE" != *"mercata-backend:"* ]]; then
+        echo "Error: first --update-app argument must be a mercata-backend image (got '$BACKEND_IMAGE')"
+        exit 1
+    fi
+    if [[ "$UI_IMAGE" != *"mercata-ui:"* ]]; then
+        echo "Error: second --update-app argument must be a mercata-ui image (got '$UI_IMAGE')"
+        exit 1
+    fi
+
+    echo "Updating mercata-backend image to: $BACKEND_IMAGE"
+    sed "s|image:.*mercata-backend:.*|image: ${BACKEND_IMAGE}|" "$COMPOSE_FILE" > "$COMPOSE_FILE.tmp" \
+        && mv "$COMPOSE_FILE.tmp" "$COMPOSE_FILE"
+
+    echo "Updating mercata-ui image to: $UI_IMAGE"
+    sed "s|image:.*mercata-ui:.*|image: ${UI_IMAGE}|" "$COMPOSE_FILE" > "$COMPOSE_FILE.tmp" \
+        && mv "$COMPOSE_FILE.tmp" "$COMPOSE_FILE"
+else
+    # Normal flow: setup node (creates if needed, warns if exists with flags)
+    strato-setup "${SETUP_ARGS[@]}"
+    NODE_DIR="${SETUP_ARGS[0]}"
+fi
+
+cd "$NODE_DIR"
 
 echo "Starting convoke..."
 # stdout goes to log, stderr goes to both log and terminal
