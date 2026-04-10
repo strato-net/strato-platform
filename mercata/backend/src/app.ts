@@ -20,11 +20,11 @@ app.use(
   requestLogger
 );
 
-app.get("/api/metrics", (req, res) => {
+app.get("/api/diagnostics", (req, res) => {
   const sortBy = (req.query.sortBy as string) || "avg";
   res.json(getRequestStats(sortBy as "avg" | "max" | "count"));
 });
-app.delete("/api/metrics", (_req, res) => { resetRequestStats(); res.json({ reset: true }); });
+app.delete("/api/diagnostics", (_req, res) => { resetRequestStats(); res.json({ reset: true }); });
 
 app.use("/api", routes);
 
