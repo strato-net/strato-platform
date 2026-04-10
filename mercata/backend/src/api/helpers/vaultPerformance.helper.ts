@@ -1,7 +1,7 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 
-const { Vault, Token } = constants;
+const { Vault } = constants;
 const WAD = BigInt(10) ** BigInt(18);
 
 export interface VaultPerformanceMetrics {
@@ -51,35 +51,20 @@ export const computeEquityFromMaps = (
   0n
 );
 
-const getTokenTotalSupply = async (
+const getHistoricalTokenBalances = async (
   accessToken: string,
-  tokenAddress: string
-): Promise<string> => {
-  try {
-    const { data } = await cirrus.get(accessToken, `/${Token}`, {
-      params: {
-        select: "_totalSupply::text",
-        address: `eq.${tokenAddress}`,
-      },
-    });
-
-    return data?.[0]?._totalSupply || "0";
-  } catch {
-    return "0";
-  }
-};
-
-const getHistoricalTokenBalance = async (
-  accessToken: string,
-  tokenAddress: string,
+  tokenAddresses: string[],
   holderAddress: string,
   date: string
-): Promise<string> => {
+): Promise<Map<string, string>> => {
+  const balances = new Map<string, string>();
+  if (tokenAddresses.length === 0) return balances;
+
   try {
     const { data } = await cirrus.get(accessToken, "/history@mapping", {
       params: {
-        select: "value::text",
-        address: `eq.${tokenAddress}`,
+        select: "address,value::text",
+        address: `in.(${tokenAddresses.join(",")})`,
         collection_name: "eq._balances",
         "key->>key": `eq.${holderAddress}`,
         valid_from: `lte.${date}`,
@@ -87,37 +72,46 @@ const getHistoricalTokenBalance = async (
       },
     });
 
-    const value = data?.[0]?.value;
-    if (!value || value === "") return "0";
-    return value;
+    for (const row of data || []) {
+      const address = String(row?.address || "").toLowerCase();
+      if (!address || balances.has(address)) continue;
+      balances.set(address, row?.value || "0");
+    }
+    return balances;
   } catch {
-    return "0";
+    return balances;
   }
 };
 
-const getHistoricalAssetPrice = async (
+const getHistoricalAssetPrices = async (
   accessToken: string,
   oracleAddress: string,
-  assetAddress: string,
+  assetAddresses: string[],
   date: string
-): Promise<string> => {
+): Promise<Map<string, string>> => {
+  const prices = new Map<string, string>();
+  if (assetAddresses.length === 0) return prices;
+
   try {
     const { data } = await cirrus.get(accessToken, "/history@mapping", {
       params: {
-        select: "value::text",
+        select: "key->>key,value::text",
         address: `eq.${oracleAddress}`,
         collection_name: "eq.prices",
-        "key->>key": `eq.${assetAddress}`,
+        "key->>key": `in.(${assetAddresses.join(",")})`,
         valid_from: `lte.${date}`,
         valid_to: `gte.${date}`,
       },
     });
 
-    const value = data?.[0]?.value;
-    if (!value || value === "") return "0";
-    return value;
+    for (const row of data || []) {
+      const asset = String(row?.key || "").toLowerCase();
+      if (!asset || prices.has(asset)) continue;
+      prices.set(asset, row?.value || "0");
+    }
+    return prices;
   } catch {
-    return "0";
+    return prices;
   }
 };
 
@@ -191,11 +185,19 @@ export const computeVaultPerformanceMetrics = async (
     const histTotalSupply = safeBigInt(histStorage?.[0]?.data?._totalSupply);
     if (histTotalSupply <= 0n) return noData;
 
+    const [histBalances, histPrices] = await Promise.all([
+      getHistoricalTokenBalances(accessToken, supportedAssets, botExecutor, startDate),
+      getHistoricalAssetPrices(accessToken, priceOracleAddress, supportedAssets, startDate),
+    ]);
+
     let histEquity = 0n;
     let hodlEquity = 0n;
     for (const assetAddress of supportedAssets) {
-      const histBalanceBN = safeBigInt(await getHistoricalTokenBalance(accessToken, assetAddress, botExecutor, startDate));
-      const histPriceBN = safeBigInt(await getHistoricalAssetPrice(accessToken, priceOracleAddress, assetAddress, startDate));
+      const assetKey = assetAddress.toLowerCase();
+      const histBalanceRaw = histBalances.get(assetKey) || "0";
+      const histPriceRaw = histPrices.get(assetKey) || "0";
+      const histBalanceBN = safeBigInt(histBalanceRaw);
+      const histPriceBN = safeBigInt(histPriceRaw);
 
       if (histPriceBN > 0n) {
         histEquity += (histBalanceBN * histPriceBN) / WAD;

@@ -119,6 +119,30 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       else if (r.collection_name === "activityStates") rewardActivityStateById.set(activityId, parsed);
     }
   }
+  const filteredVaultAssets = vaultAssets.filter(a => a !== "0000000000000000000000000000000000000000");
+
+  // Phase 1b: dependent reads that can run in parallel once Phase 1 context is known.
+  const [stablePools, shareTokenTotalSupply, vaultBalanceRows] = await Promise.all([
+    fetchMultiTokenStablePools(accessToken).catch(() => []),
+    shareTokenAddress
+      ? (async () => {
+          const { data: shareTokenStorageRows } = await cirrus.get(accessToken, "/storage", { params: {
+            address: `eq.${shareTokenAddress}`,
+            select: "data->>_totalSupply",
+          }}).catch(() => ({ data: [] as any[] }));
+          const fromStorage = shareTokenStorageRows?.[0]?._totalSupply || "";
+          return fromStorage || await getTokenTotalSupply(accessToken, shareTokenAddress);
+        })()
+      : Promise.resolve("0"),
+    (vaultAddr && shareTokenAddress && botExecutor && filteredVaultAssets.length)
+      ? cirrus.get(accessToken, "/mapping", { params: {
+          address: `in.(${filteredVaultAssets.join(",")})`,
+          collection_name: "eq._balances",
+          "key->>key": `eq.${botExecutor}`,
+          select: "address,value::text",
+        }}).then((res) => res.data || []).catch(() => [])
+      : Promise.resolve([] as any[]),
+  ]);
 
   // Parse events (single pass)
   const swapEvents: any[] = [], smEvents: any[] = [];
@@ -151,20 +175,18 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     vaultShareTokenAddress: shareTokenAddress || null,
     saveUsdstVaultAddress: appConfig.saveUsdstVault || null,
   });
-  const stablePools = await fetchMultiTokenStablePools(accessToken).catch(() => []);
 
   // Phase 2: vault APY needs current balances + historical NAV context
   let vaultAPY: string | null = null;
   let vaultRewardApy: string | null = null;
-  const filteredVaultAssets = vaultAssets.filter(a => a !== "0000000000000000000000000000000000000000");
   const vaultOracle = vaultStorage?.priceOracle || constants.priceOracle;
   const currentVaultBalances = new Map<string, string>();
+  for (const row of vaultBalanceRows || []) {
+    currentVaultBalances.set(row.address, row.value || "0");
+  }
   if (vaultAddr && shareTokenAddress && botExecutor && filteredVaultAssets.length) {
-    const balances = await getCurrentVaultBalances(accessToken, filteredVaultAssets, botExecutor);
-    balances.forEach((value, key) => currentVaultBalances.set(key, value));
-
     const vaultEquity = computeEquityFromMaps(filteredVaultAssets, currentVaultBalances, prices);
-    const vaultTotalShares = safeBigInt(await getTokenTotalSupply(accessToken, shareTokenAddress));
+    const vaultTotalShares = safeBigInt(shareTokenTotalSupply || "0");
 
     const vaultMetrics = await computeVaultPerformanceMetrics(
       accessToken,
@@ -490,21 +512,6 @@ function weightedBaseYield(addrs: string[], bals: string[], prices: Map<string, 
     ws += usd * (baseYields.get(addrs[i]) || 0);
   }
   return total > 0 && ws > 0 ? (ws / total).toFixed(2) : null;
-}
-
-async function getCurrentVaultBalances(
-  accessToken: string,
-  assets: string[],
-  botExecutor: string,
-): Promise<Map<string, string>> {
-  if (assets.length === 0) return new Map();
-  const { data } = await cirrus.get(accessToken, "/mapping", { params: {
-    address: `in.(${assets.join(",")})`,
-    collection_name: "eq._balances",
-    "key->>key": `eq.${botExecutor}`,
-    select: "address,value::text",
-  }});
-  return new Map((data || []).map((row: any) => [row.address, row.value || "0"]));
 }
 
 async function getTokenTotalSupply(accessToken: string, tokenAddress: string): Promise<string> {
