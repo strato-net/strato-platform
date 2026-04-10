@@ -756,25 +756,25 @@ export const getUserBalances = async (
   const supportedAssetAddresses: string[] = (vaultData.supportedAssets || [])
     .filter((addr: string) => addr && addr !== "0000000000000000000000000000000000000000");
 
+  const [balanceMap, tokenInfoMap, priceMap] = await Promise.all([
+    getBatchBalances(accessToken, supportedAssetAddresses, userAddress),
+    getBatchTokenInfo(accessToken, supportedAssetAddresses),
+    getBatchPrices(accessToken, priceOracleAddress, supportedAssetAddresses),
+  ]);
+
   const balances: UserTokenBalance[] = [];
 
   for (const assetAddress of supportedAssetAddresses) {
-    // Get user's balance for this asset
-    const balance = await getTokenBalance(accessToken, assetAddress, userAddress);
-    const balanceBN = safeBigInt(balance);
-
-    // Only include tokens where user has a positive balance
-    if (balanceBN > 0n) {
-      const tokenInfo = await getTokenInfo(accessToken, assetAddress);
-      const priceUsd = await getAssetPrice(accessToken, priceOracleAddress, assetAddress);
-
+    const balance = balanceMap.get(assetAddress) || "0";
+    if (safeBigInt(balance) > 0n) {
+      const info = tokenInfoMap.get(assetAddress) || { symbol: "UNKNOWN", name: "Unknown Token" };
       balances.push({
         address: assetAddress,
-        symbol: tokenInfo.symbol,
-        name: tokenInfo.name,
+        symbol: info.symbol,
+        name: info.name,
         balance,
-        priceUsd,
-        images: tokenInfo.images,
+        priceUsd: priceMap.get(assetAddress) || "0",
+        images: info.images,
       });
     }
   }
