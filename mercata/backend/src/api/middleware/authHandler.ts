@@ -66,10 +66,11 @@ class AuthHandler {
           }
 
           if (!isServiceUser) {
-            // fetch or create user key in Strato
-            let address = await createOrGetKey(token);
             let userName: string = payload["preferred_username"];
-            req.address = address;
+            const walletOverride = req.headers["x-wallet-address"] as string | undefined;
+            req.address = walletOverride
+              ? walletOverride.replace(/^0x/i, "").toLowerCase()
+              : await createOrGetKey(token);
             req.userName = userName;
           }
           req.accessToken = token;

@@ -10,9 +10,17 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor to add CSRF token to state-changing requests
+let _walletAddress: string | null = null;
+export function setConnectedWalletAddress(addr: string | null) {
+  _walletAddress = addr;
+}
+
 api.interceptors.request.use(
   (config) => {
+    if (_walletAddress) {
+      config.headers["X-Wallet-Address"] = _walletAddress;
+    }
+
     const method = (config.method || "get").toLowerCase();
     const needsCsrf = ["post", "put", "delete", "patch"].includes(method);
 

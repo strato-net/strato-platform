@@ -2,7 +2,8 @@
 
 // context/UserContext.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/axios";
+import { useAccount } from "wagmi";
+import { api, setConnectedWalletAddress } from "@/lib/axios";
 import { isAuthenticated, logout } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 
@@ -37,7 +38,8 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
-  const [userAddress, setUserAddress] = useState<string | null>(null);
+  const account = useAccount();
+  const [stratoAddress, setStratoAddress] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [userName, setUserName] = useState<string | null>(null)
@@ -63,16 +65,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       // If authenticated and we don't have user data, try to get it
       if (authenticated) {
         const storedUser = localStorage.getItem("user");
-        if (!storedUser || !userAddress) {
+        if (!storedUser || !stratoAddress) {
           try {
             const response = await api.get('/user/me');
             const newUserAddress = response.data.userAddress;
             const serverIsAdmin = response.data.isAdmin;
             const userName = response.data.userName
             setUserName(userName)
-            if (newUserAddress !== userAddress) {
+            if (newUserAddress !== stratoAddress) {
               localStorage.setItem("user", JSON.stringify(response.data));
-              setUserAddress(newUserAddress);
+              setStratoAddress(newUserAddress);
             }
             if (serverIsAdmin !== isAdmin) {
               setIsAdmin(serverIsAdmin);
@@ -84,17 +86,17 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           // Use stored user data if available
           const userData = JSON.parse(storedUser);
-          if (userData.userAddress !== userAddress) {
-            setUserAddress(userData.userAddress);
+          if (userData.userAddress !== stratoAddress) {
+            setStratoAddress(userData.userAddress);
           }
           if (userData.isAdmin !== undefined && userData.isAdmin !== isAdmin) {
             setIsAdmin(userData.isAdmin);
           }
         }
       } else {
-        if (userAddress) {
+        if (stratoAddress) {
           localStorage.removeItem("user");
-          setUserAddress(null);
+          setStratoAddress(null);
           setIsAdmin(false);
         }
       }
@@ -200,6 +202,14 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     await api.post('/user/admin/dismiss', { issueId });
     await getOpenIssues();
   };
+
+  const userAddress = account.isConnected && account.address ? account.address : stratoAddress;
+
+  useEffect(() => {
+    setConnectedWalletAddress(account.isConnected && account.address ? account.address : null);
+  }, [account.isConnected, account.address]);
+
+  const setUserAddress = (addr: string | null) => setStratoAddress(addr);
 
   const refreshAuth = () => {
     checkAuthenticationStatus();
