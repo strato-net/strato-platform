@@ -61,6 +61,8 @@ class AuthHandler {
           try {
             payload = await verifyAccessTokenSignature(token) as CustomJwtPayload;
           } catch (err) {
+            const path = (req as any).path ?? req.url ?? req.originalUrl ?? '-';
+            console.warn('[Auth] 401 invalid/expired token', { path, method: req.method });
             res.status(RestStatus.UNAUTHORIZED).json({ error: "Invalid or expired access token" });
             return next(err);
           }
@@ -75,6 +77,8 @@ class AuthHandler {
           req.accessToken = token;
           return next();
         } else {
+          const path = (req as any).path ?? req.url ?? req.originalUrl ?? '-';
+          console.warn('[Auth] 401 missing token', { path, method: req.method });
           res.set('WWW-Authenticate', 'Bearer');
           res.status(401).json({
             error: 'unauthorized',
