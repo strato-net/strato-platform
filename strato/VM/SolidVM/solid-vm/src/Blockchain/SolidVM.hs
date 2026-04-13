@@ -449,11 +449,36 @@ call' from to' fnCalltype functionName valList = do
                 Right (funcTocall, _) -> funcTocall
                 _ -> functionName
             )
-      nullifyRefs = \case
-        Just (SReference r) | shouldPushSender -> getStorageValue storageAddress r >>= \case
-          SReference _ -> pure $ Just SNULL
-          v            -> pure $ Just v
-        v -> pure v
+      nullifyRefs (ts, v) = case v of
+        Just (SReference r) | isExternal -> do
+          resolved <- getStorageValue storageAddress r
+          case resolved of
+            SReference _ -> do
+              let retType = case ts of
+                    [(_, CC.IndexedType _ t _)] -> Just t
+                    _ -> Nothing
+              case retType of
+                Just (SVMType.Array _ _) -> do
+                  lenVal <- getStorageValue storageAddress (r `MS.snoc` MS.Field "length")
+                  case lenVal of
+                    SInteger l' -> do
+                      elems <- for [0 .. l' - 1] $ \i ->
+                        getStorageValue storageAddress (r `MS.snoc` MS.Index (BC.pack $ show i))
+                      vars <- traverse createVar elems
+                      pure . Just . SArray $ V.fromList vars
+                    _ -> pure . Just $ SArray V.empty
+                Just (SVMType.Struct _ s) ->
+                  case (M.lookup s $ contract ^. CC.structs) <|> (M.lookup s $ cc ^. CC.flStructs) of
+                    Just vals -> do
+                      fieldPairs <- for vals $ \(field, _, _) -> do
+                        fv <- getStorageValue storageAddress (r `MS.snoc` MS.Field (BC.pack $ labelToString field))
+                        var <- createVar fv
+                        pure (field, var)
+                      pure . Just . SStruct s $ M.fromList fieldPairs
+                    Nothing -> pure $ Just SNULL
+                _ -> pure $ Just SNULL
+            v' -> pure $ Just v'
+        _ -> pure v
 
   f <- (nullifyRefs =<<) <$> case (M.lookup functionName' functionsIncludingConstructor, fnCalltype) of
       -- Standard contract call
@@ -524,16 +549,17 @@ call' from to' fnCalltype functionName valList = do
               handleSimple path = do
                 v <- getVar $ Constant $ SReference path
                 pure $ Just v
+              typeTuple = [(Nothing, CC.IndexedType 0 _varType Nothing)]
           case args' of
             [] -> do
               let path = MS.singleton $ BC.pack $ labelToString functionName
-              pure . withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
+              pure . fmap (typeTuple,) . withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
                 SVMType.Struct _ s -> (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s -> (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> handleSimple path
             _ -> do
               let path = MS.snocList (MS.singleton $ BC.pack $ labelToString functionName) args'
-              pure . withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
+              pure . fmap (typeTuple,) . withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
                 SVMType.Struct _ s -> (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s -> (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> handleSimple path
@@ -2630,8 +2656,8 @@ runTheCall ::
   ValList ->
   Bool ->
   Bool ->
-  m (Maybe Value)
-runTheCall addr cAddr cont fName h coll func vals r f = 
+  m ([(Maybe SolidString, CC.IndexedType)], Maybe Value)
+runTheCall addr cAddr cont fName h coll func vals r f = (func ^. CC.funcVals,) <$>
   runTheCallWithVars addr cAddr cont fName h coll func vals [] r f
 
 -- | Like runTheCall but accepts optional Variables for pass-by-reference semantics.
