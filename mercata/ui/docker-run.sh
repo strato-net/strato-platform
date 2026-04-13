@@ -8,4 +8,4 @@ window.ENV = {
 };
 EOF
 
-exec serve -s dist -l 8080
+exec node serve.js
