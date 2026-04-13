@@ -114,86 +114,51 @@ data Value
 --This only allows for comparison within the same type of values
 --(the move to static typing will probably automatically clean this up)
 
+toNull :: Value -> Value
+toNull SNULL = SNULL
+toNull SReference{} = SNULL
+toNull (SBool False) = SNULL
+toNull (SInteger 0) = SNULL
+toNull (SDecimal 0.0) = SNULL
+toNull (SString "") = SNULL
+toNull (SAddress 0 _) = SNULL
+toNull (SContract _ 0) = SNULL
+toNull (SEnumVal _ _ 0) = SNULL
+toNull (SBytes bs) | B.null bs = SNULL
+toNull (SArray vs) | V.null vs = SNULL
+toNull v = v
+
 instance Eq Value where
-  SNULL == SNULL = True
-  SReference{} == SReference{} = True
-  (SInteger i1) == (SInteger i2) = i1 == i2
-  SNULL == (SInteger i2) = 0 == i2
-  (SInteger i1) == SNULL = i1 == 0
-  SReference{} == (SInteger i2) = 0 == i2
-  (SInteger i1) == SReference{} = i1 == 0
-  (SString s1) == (SString s2) = s1 == s2
-  SNULL == (SString s2) = "" == s2
-  (SString s1) == SNULL = s1 == ""
-  SReference{} == (SString s2) = "" == s2
-  (SString s1) == SReference{} = s1 == ""
-  (SDecimal v1) == (SDecimal v2) = v1 == v2
-  SNULL == (SDecimal v2) = 0.0 == v2
-  (SDecimal v1) == SNULL = v1 == 0.0
-  SReference{} == (SDecimal v2) = 0.0 == v2
-  (SDecimal v1) == SReference{} = v1 == 0.0
-  (SBool b1) == (SBool b2) = b1 == b2
-  SNULL == (SBool b2) = False == b2
-  (SBool b1) == SNULL = b1 == False
-  SReference{} == (SBool b2) = False == b2
-  (SBool b1) == SReference{} = b1 == False
-  (SAddress a1 b1) == (SAddress a2 b2) = (a1 == a2 && b1 == b2)
-  SNULL == (SAddress a2 b2) = (0x0 == a2 && False == b2)
-  (SAddress a1 b1) == SNULL = (a1 == 0x0 && b1 == False)
-  SReference{} == (SAddress a2 b2) = (0x0 == a2 && False == b2)
-  (SAddress a1 b1) == SReference{} = (a1 == 0x0 && b1 == False)
-  (SContract c1 a1) == (SContract c2 a2) = c1 == c2 && a1 == a2
-  SNULL == (SContract c2 a2) = "" == c2 && 0x0 == a2
-  (SContract c1 a1) == SNULL = c1 == "" && a1 == 0x0
-  SReference{} == (SContract c2 a2) = "" == c2 && 0x0 == a2
-  (SContract c1 a1) == SReference{} = c1 == "" && a1 == 0x0
-  (SEnumVal t1 _ n1) == (SEnumVal t2 _ n2) = t1 == t2 && n1 == n2
-  SNULL == (SEnumVal _ _ n2) = 0 == n2
-  (SEnumVal _ _ n1) == SNULL = n1 == 0
-  SReference{} == (SEnumVal _ _ n2) = 0 == n2
-  (SEnumVal _ _ n1) == SReference{} = n1 == 0
-  (SBytes b1) == (SBytes b2) = b1 == b2
-  SNULL == (SBytes b2) = B.null b2
-  (SBytes b1) == SNULL = B.null b1
-  SReference{} == (SBytes b2) = B.null b2
-  (SBytes b1) == SReference{} = B.null b1
-  (SString b1) == (SBytes b2) = encodeUtf8 (T.pack b1) == b2
-  (SBytes b1) == (SString b2) = b1 == encodeUtf8 (T.pack b2)
-  x == y = todo "Value/Eq" (x, y)
+  x == y = case (toNull x, toNull y) of
+    (SNULL, SNULL) -> True
+    (SInteger i1, SInteger i2) -> i1 == i2
+    (SString s1, SString s2) -> s1 == s2
+    (SDecimal v1, SDecimal v2) -> v1 == v2
+    (SBool b1, SBool b2) -> b1 == b2
+    (SAddress a1 b1, SAddress a2 b2) -> (a1 == a2 && b1 == b2)
+    (SContract c1 a1, SContract c2 a2) -> c1 == c2 && a1 == a2
+    (SEnumVal t1 _ n1, SEnumVal t2 _ n2) -> t1 == t2 && n1 == n2
+    (SBytes b1, SBytes b2) -> b1 == b2
+    (SString b1, SBytes b2) -> encodeUtf8 (T.pack b1) == b2
+    (SBytes b1, SString b2) -> b1 == encodeUtf8 (T.pack b2)
+    (SNULL, _) -> False
+    (_, SNULL) -> False
+    _ -> todo "Value/Eq" (x, y)
 
 instance Ord Value where
-  compare SNULL SNULL = EQ
-  compare (SInteger i1) (SInteger i2) = compare i1 i2
-  compare SNULL (SInteger i2) = compare 0 i2
-  compare (SInteger i1) SNULL = compare i1 0
-  compare SReference{} (SInteger i2) = compare 0 i2
-  compare (SInteger i1) SReference{} = compare i1 0
-  compare (SString s1) (SString s2) = compare s1 s2
-  compare SNULL (SString s2) = compare "" s2
-  compare (SString s1) SNULL = compare s1 ""
-  compare SReference{} (SString s2) = compare "" s2
-  compare (SString s1) SReference{} = compare s1 ""
-  compare (SDecimal v1) (SDecimal v2) = compare v1 v2
-  compare SNULL (SDecimal v2) = compare 0.0 v2
-  compare (SDecimal v1) SNULL = compare v1 0.0
-  compare SReference{} (SDecimal v2) = compare 0.0 v2
-  compare (SDecimal v1) SReference{} = compare v1 0.0
-  compare (SBool b1) (SBool b2) = compare b1 b2
-  compare SNULL (SBool b2) = compare False b2
-  compare (SBool b1) SNULL = compare b1 False
-  compare SReference{} (SBool b2) = compare False b2
-  compare (SBool b1) SReference{} = compare b1 False
-  compare (SAddress a1 _) (SAddress a2 _) = compare a1 a2
-  compare SNULL (SAddress a2 _) = compare 0x0 a2
-  compare (SAddress a1 _) SNULL = compare a1 0x0
-  compare SReference{} (SAddress a2 _) = compare 0x0 a2
-  compare (SAddress a1 _) SReference{} = compare a1 0x0
-  compare (SBytes b1) (SBytes b2) = compare b1 b2
-  compare SNULL (SBytes b2) = compare B.empty b2
-  compare (SBytes b1) SNULL = compare b1 B.empty
-  compare SReference{} (SBytes b2) = compare B.empty b2
-  compare (SBytes b1) SReference{} = compare b1 B.empty
-  compare x y = todo "Value/Ord" (x, y)
+  compare x y = case (toNull x, toNull y) of
+    (SNULL, SNULL) -> EQ
+    (SInteger i1, SInteger i2) -> compare i1 i2
+    (SString s1, SString s2) -> compare s1 s2
+    (SDecimal v1, SDecimal v2) -> compare v1 v2
+    (SBool b1, SBool b2) -> compare b1 b2
+    (SAddress a1 _, SAddress a2 _) -> compare a1 a2
+    (SBytes b1, SBytes b2) -> compare b1 b2
+    (SString b1, SBytes b2) -> compare (encodeUtf8 (T.pack b1)) b2
+    (SBytes b1, SString b2) -> compare b1 (encodeUtf8 (T.pack b2))
+    (SNULL, _) -> LT
+    (_, SNULL) -> GT
+    _ -> todo "Value/Ord" (x, y)
 
 instance RLPSerializable Value where
   rlpEncode = rlpEncodeValue

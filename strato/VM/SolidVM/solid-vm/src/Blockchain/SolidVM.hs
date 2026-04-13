@@ -276,8 +276,13 @@ create' creator newAddress ch cc contractName' valList = do
 
   void . withCallInfo newAddress newAddress contract' "constructor" ch cc M.empty False False $ pure ()
 
+  -- Materialize any storage references passed in by the creator — the new contract
+  -- can't read the creator's storage, so we snapshot arrays/structs here.
+  let constructorArgs = fromMaybe [] . fmap CC._funcArgs $ contract' ^. CC.constructor
+  resolvedValList <- resolveArgRefs creator contract' cc constructorArgs valList
+
   -- Run the constructor
-  runTheConstructors creator newAddress ch cc contractName' valList
+  runTheConstructors creator newAddress ch cc contractName' resolvedValList
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
@@ -480,6 +485,10 @@ call' from to' fnCalltype functionName valList = do
             v' -> pure $ Just v'
         _ -> pure v
 
+      resolveArgs shouldResolve theFunction args
+        | shouldResolve = resolveArgRefs from contract cc (CC._funcArgs theFunction) args
+        | otherwise     = pure args
+
   f <- (nullifyRefs =<<) <$> case (M.lookup functionName' functionsIncludingConstructor, fnCalltype) of
       -- Standard contract call
       -- (Just theFunction, _)
@@ -491,8 +500,9 @@ call' from to' fnCalltype functionName valList = do
         let ro = case mCallInfo of
               Nothing -> False
               Just ci -> readOnly ci
+        resolvedValList <- resolveArgs shouldPushSender theFunction valList
         pure . bool id (pushSender from) shouldPushSender $
-          runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction valList ro False
+          runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction resolvedValList ro False
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
@@ -504,16 +514,18 @@ call' from to' fnCalltype functionName valList = do
             let ro = case mCallInfo of
                   Nothing -> False
                   Just ci -> readOnly ci
+            resolvedValList <- resolveArgs shouldPushSender theFunction' valList'
             pure . bool id (pushSender from) shouldPushSender $
-              runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction' valList' ro False
+              runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction' resolvedValList ro False
           _ -> case M.lookup "fallback" functionsIncludingConstructor of
             Just fallbackFunc -> do
               mCallInfo <- getCurrentCallInfoIfExists
               let ro = case mCallInfo of
                     Nothing -> False
                     Just ci -> readOnly ci
+              resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
               pure . bool id (pushSender from) shouldPushSender $
-                runTheCall storageAddress codeAddress contract functionName' hsh cc fallbackFunc valList ro False
+                runTheCall storageAddress codeAddress contract functionName' hsh cc fallbackFunc resolvedValList ro False
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
@@ -569,8 +581,9 @@ call' from to' fnCalltype functionName valList = do
             let ro = case mCallInfo of
                   Nothing -> False
                   Just ci -> readOnly ci
+            resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
             pure . bool id (pushSender from) shouldPushSender $
-              runTheCall storageAddress codeAddress contract functionName hsh cc fallbackFunc valList ro False
+              runTheCall storageAddress codeAddress contract functionName hsh cc fallbackFunc resolvedValList ro False
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
   when (fnCalltype == CC.DelegateCall) $ do
@@ -2625,6 +2638,59 @@ runTheConstructors from to hsh cc contractName' argVals' = do
     addDelegatecall to to (Just userName) $ T.pack contractName'
 
   return ()
+
+-- | Materialize an incoming `SReference` argument by loading its array/struct contents
+-- from the *source* address's storage. This is needed when an external call or a contract
+-- creation passes a storage reference from the caller — the callee can't read the caller's
+-- storage, so we snapshot the value into a concrete `SArray`/`SStruct` here.
+resolveArgRef ::
+  MonadSM m =>
+  Address ->
+  CC.Contract ->
+  CC.CodeCollection ->
+  SVMType.Type ->
+  Value ->
+  m Value
+resolveArgRef src contract cc argType arg = case arg of
+  SReference r -> do
+    stored <- getStorageValue src r
+    case stored of
+      SReference _ -> case argType of
+        SVMType.Array _ _ -> do
+          lenVal <- getStorageValue src (r `MS.snoc` MS.Field "length")
+          case lenVal of
+            SInteger l' -> do
+              elems <- for [0 .. l' - 1] $ \i ->
+                getStorageValue src (r `MS.snoc` MS.Index (BC.pack $ show i))
+              vars <- traverse createVar elems
+              pure . SArray $ V.fromList vars
+            _ -> pure $ SArray V.empty
+        SVMType.Struct _ s ->
+          case (M.lookup s $ contract ^. CC.structs) <|> (M.lookup s $ cc ^. CC.flStructs) of
+            Just defs -> do
+              fieldPairs <- for defs $ \(field, _, _) -> do
+                fv <- getStorageValue src (r `MS.snoc` MS.Field (BC.pack $ labelToString field))
+                var <- createVar fv
+                pure (field, var)
+              pure . SStruct s $ M.fromList fieldPairs
+            Nothing -> pure arg
+        _ -> pure arg
+      v' -> pure v'
+  _ -> pure arg
+
+resolveArgRefs ::
+  MonadSM m =>
+  Address ->
+  CC.Contract ->
+  CC.CodeCollection ->
+  [(Maybe SolidString, CC.IndexedType)] ->
+  ValList ->
+  m ValList
+resolveArgRefs src contract cc argDefs args =
+  let argTypes = CC.indexedTypeType . snd <$> argDefs
+      go (t : ts') (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
+      go _ vs' = pure vs'
+  in go argTypes args
 
 -- Note: this is intentionally nonstrict in `theType`
 addLocalVariable :: MonadSM m => SolidString -> Value -> m ()
