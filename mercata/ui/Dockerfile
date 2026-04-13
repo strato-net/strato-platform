@@ -24,10 +24,11 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+RUN npm install -g serve
+
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 COPY ui/docker-run.sh ./
-COPY ui/serve.js ./
 
 EXPOSE 8080
 
