@@ -8,7 +8,7 @@ import {
   ZERO_APY, DEFAULT_SWAP_FEE_BPS, DEFAULT_LP_SHARE_BPS,
   computeLendingAPY, computeSafetyAPY, computePoolAPY, weightedBaseYield, buildVolumeMap,
 } from "../helpers/earnYield.helper";
-import { calculateLPTokenPrice, fetchMultiTokenStablePools } from "../helpers/swapping.helper";
+import { calculateLPTokenPrice, fetchMultiTokenStablePools, fetchStablePoolFees } from "../helpers/swapping.helper";
 import {
   normalizeAddress, isPositiveApy, parseMappingValue, toUsdValue, APY_UNAVAILABLE,
   buildRewardActivitiesFromMappings, computeRewardsApy,
@@ -77,7 +77,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       )
     : null;
 
-  addPoolApys(add, phase1.pools, phase1b.stablePools, ctx, rewardActivities, baseYieldByAddr);
+  await addPoolApys(accessToken, add, phase1.pools, phase1b.stablePools, ctx, rewardActivities, baseYieldByAddr);
 
   if (ctx.shareTokenAddress) {
     if (isPositiveApy(vaultAPY)) add(ctx.shareTokenAddress, { source: "vault", apy: vaultAPY });
@@ -132,7 +132,7 @@ async function fetchPhase1(
     cirrus.get(accessToken, `/${constants.Event}`, { params: { select: "address,event_name,attributes,block_timestamp", or: `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))` } }),
     cirrus.get(accessToken, `/${Pool}`, { params: {
       poolFactory: `eq.${constants.poolFactory}`,
-      select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol,_totalSupply::text),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
+      select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol,_totalSupply::text),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled,isStable",
     }}),
     getYieldExchangeRateRowsCached(accessToken, {
       priceOracle: constants.priceOracle,
@@ -345,17 +345,26 @@ function addBaseYieldApys(add: AddFn, exchangeRateHistory: any, anchorsMs: numbe
   return baseYieldByAddr;
 }
 
-function addPoolApys(
+/** StablePool.fee raw (1e10 scale) → bps (10000 scale) */
+const STABLE_FEE_TO_BPS = 1_000_000n;
+
+async function addPoolApys(
+  accessToken: string,
   add: AddFn, pools: any[], stablePools: any[],
   ctx: Phase1Ctx, rewardActivities: any[], baseYieldByAddr: Map<string, number>,
 ) {
   const volumeMap = buildVolumeMap(ctx.swapEvents, ctx.prices);
   const firstPool = (pools ?? [])[0];
-  const factorySwapFeeRate = Number(firstPool?.swapFeeRate || DEFAULT_SWAP_FEE_BPS);
   const factoryLpSharePercent = Number(firstPool?.lpSharePercent || DEFAULT_LP_SHARE_BPS);
   const stablePoolAddresses = new Set(
     (stablePools ?? []).map((pool: any) => normalizeAddress(pool?.address)).filter(Boolean),
   );
+
+  // Fetch real on-chain fees for 2-token stable pools
+  const twoTokenStableAddrs = (pools ?? []).filter((p: any) => p?.isStable && p?.address).map((p: any) => p.address as string);
+  const stableFeeBps = twoTokenStableAddrs.length
+    ? await fetchStablePoolFees(accessToken, twoTokenStableAddrs).catch(() => new Map<string, number>())
+    : new Map<string, number>();
 
   const tokenSymbolMap = new Map<string, string>();
   for (const p of pools ?? []) {
@@ -377,7 +386,9 @@ function addPoolApys(
     const poolAddress = normalizeAddress(address);
     const lpTokenAddress = lpToken.address;
     const tokenAddrs = [tokenA.address, tokenB.address];
-    const swapApy = computePoolAPY(p, ctx.prices, volumeMap);
+    const realFee = stableFeeBps.get(address);
+    const poolForApy = realFee !== undefined ? { ...p, swapFeeRate: realFee } : p;
+    const swapApy = computePoolAPY(poolForApy, ctx.prices, volumeMap);
     const rewardActivity = findPoolRewardActivity(rewardActivities, { poolAddress, lpTokenAddress });
     const poolRewardApy = computeRewardsApy(rewardActivity?.emissionRate, rewardActivity?.totalStakeUsd);
     const wApy = baseYieldByAddr.size > 0
@@ -405,9 +416,11 @@ function addPoolApys(
       totalTvlUsd += Number((BigInt(bal) * BigInt(priceRaw)) / DECIMALS) / 1e18;
     }
 
+    const feeRaw = BigInt(String(stablePool.fee || "0"));
+    const swapFeeBps = feeRaw > 0n ? Number(feeRaw / STABLE_FEE_TO_BPS) : DEFAULT_SWAP_FEE_BPS;
     const volume24h = volumeMap.get(stablePool.address) ?? volumeMap.get(poolAddress) ?? 0;
     const swapApyValue = totalTvlUsd > 0
-      ? (volume24h * (factorySwapFeeRate / BPS_DIVISOR) * (factoryLpSharePercent / BPS_DIVISOR) / totalTvlUsd) * 365 * 100
+      ? (volume24h * (swapFeeBps / BPS_DIVISOR) * (factoryLpSharePercent / BPS_DIVISOR) / totalTvlUsd) * 365 * 100
       : 0;
     const swapApy = swapApyValue > 0 ? swapApyValue.toFixed(2) : ZERO_APY;
     const rewardActivity = findPoolRewardActivity(rewardActivities, { poolAddress, lpTokenAddress });
