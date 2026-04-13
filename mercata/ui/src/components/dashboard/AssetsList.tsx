@@ -128,7 +128,7 @@ const AssetsList = ({
                 <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
                   Asset
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   <span className="inline-flex items-center gap-1 justify-end w-full">
                     Best Available APY
                     <BestApyInfoTooltip />

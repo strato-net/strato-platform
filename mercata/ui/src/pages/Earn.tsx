@@ -1117,7 +1117,7 @@ const Earn = () => {
                     <thead className="bg-muted/40">
                       <tr className="border-b border-border/50">
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Opportunity</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                           <span className="inline-flex items-center gap-1">
                             Best Available APY
                             <BestApyInfoTooltip />
