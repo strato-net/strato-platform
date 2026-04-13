@@ -455,33 +455,15 @@ call' from to' fnCalltype functionName valList = do
                 _ -> functionName
             )
       nullifyRefs (ts, v) = case v of
-        Just (SReference r) | isExternal -> do
-          resolved <- getStorageValue storageAddress r
+        Just ref@(SReference _) | isExternal -> do
+          let retType = case ts of
+                [(_, CC.IndexedType _ t _)] -> t
+                _ -> SVMType.UnknownLabel ""
+          resolved <- resolveArgRef storageAddress contract cc retType ref
           case resolved of
-            SReference _ -> do
-              let retType = case ts of
-                    [(_, CC.IndexedType _ t _)] -> Just t
-                    _ -> Nothing
-              case retType of
-                Just (SVMType.Array _ _) -> do
-                  lenVal <- getStorageValue storageAddress (r `MS.snoc` MS.Field "length")
-                  case lenVal of
-                    SInteger l' -> do
-                      elems <- for [0 .. l' - 1] $ \i ->
-                        getStorageValue storageAddress (r `MS.snoc` MS.Index (BC.pack $ show i))
-                      vars <- traverse createVar elems
-                      pure . Just . SArray $ V.fromList vars
-                    _ -> pure . Just $ SArray V.empty
-                Just (SVMType.Struct _ s) ->
-                  case (M.lookup s $ contract ^. CC.structs) <|> (M.lookup s $ cc ^. CC.flStructs) of
-                    Just vals -> do
-                      fieldPairs <- for vals $ \(field, _, _) -> do
-                        fv <- getStorageValue storageAddress (r `MS.snoc` MS.Field (BC.pack $ labelToString field))
-                        var <- createVar fv
-                        pure (field, var)
-                      pure . Just . SStruct s $ M.fromList fieldPairs
-                    Nothing -> pure $ Just SNULL
-                _ -> pure $ Just SNULL
+            -- Still an unresolved reference after loading — the slot is empty
+            -- and the return type isn't an array/struct we could materialize.
+            SReference _ -> pure $ Just SNULL
             v' -> pure $ Just v'
         _ -> pure v
 
@@ -1323,6 +1305,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SNULL, "length") -> return . Constant $ SInteger 0
     (SReference p, itemName) -> return . Constant . SReference $ MS.snoc p $ MS.Field $ BC.pack $ labelToString itemName
     ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
+    (SNULL, _) -> return $ Constant SNULL
     m -> typeError ("illegal member access: " ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
 expToVar' x@(CC.IndexAccess _ _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
@@ -2674,8 +2657,28 @@ resolveArgRef src contract cc argType arg = case arg of
                 pure (field, var)
               pure . SStruct s $ M.fromList fieldPairs
             Nothing -> pure arg
+        SVMType.UnknownLabel s ->
+          case (M.lookup s $ contract ^. CC.structs) <|> (M.lookup s $ cc ^. CC.flStructs) of
+            Just defs -> do
+              fieldPairs <- for defs $ \(field, _, _) -> do
+                fv <- getStorageValue src (r `MS.snoc` MS.Field (BC.pack $ labelToString field))
+                var <- createVar fv
+                pure (field, var)
+              pure . SStruct s $ M.fromList fieldPairs
+            Nothing -> pure arg
         _ -> pure arg
       v' -> pure v'
+  SArray vs ->
+    let t' = case argType of
+               SVMType.Array t'' _ -> t''
+               _ -> argType
+     in SArray <$> traverse (fmap Constant . resolveArgRef src contract cc t' <=< weakGetVar) vs
+  SMap m ->
+    let t' = case argType of
+               SVMType.Mapping _ _ t'' -> t''
+               _ -> argType
+     in SMap <$> traverse (fmap Constant . resolveArgRef src contract cc t' <=< weakGetVar) m
+  SStruct n vs -> SStruct n <$> traverse (fmap Constant . resolveArgRef src contract cc argType <=< weakGetVar) vs
   _ -> pure arg
 
 resolveArgRefs ::
@@ -2688,6 +2691,7 @@ resolveArgRefs ::
   m ValList
 resolveArgRefs src contract cc argDefs args =
   let argTypes = CC.indexedTypeType . snd <$> argDefs
+      go ts'@[t@SVMType.Variadic] (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
       go (t : ts') (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
       go _ vs' = pure vs'
   in go argTypes args
