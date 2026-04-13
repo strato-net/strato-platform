@@ -188,8 +188,7 @@ contract Describe_DirectMintPSM {
         user.doSuccessfully(address(psm), "cancelBurn", psm.burnReqCounter());
 
         // User now tries and fails to complete the burn
-        //                                                    Happens to be the first error, and thus is hit when the request is already cancelled
-        user.doExpectingFailure(address(psm), "completeBurn", "Redeem token is not eligible", psm.burnReqCounter());
+        user.doExpectingFailure(address(psm), "completeBurn", "Invalid burn request ID", psm.burnReqCounter());
         require(USDST.balanceOf(address(user)) == 100e18, "User should have 100 USDST");
         require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC");
         require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");

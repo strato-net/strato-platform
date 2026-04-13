@@ -60,7 +60,7 @@ contract DirectMintPSM is Ownable {
     }
 
     function mint(uint amount, address againstToken) external isEligible(againstToken) {
-        require(amount > 0);
+        require(amount > 0, "Amount must be nonzero");
 
         // Pull funds from the user into the PSM
         require(IERC20(againstToken).transferFrom(msg.sender, address(this), amount), "Transfer failed");
@@ -79,6 +79,7 @@ contract DirectMintPSM is Ownable {
     }
 
     function requestBurn(uint amount, address redeemToken) external isEligible(redeemToken) returns (uint) {
+        require(amount > 0, "Amount must be nonzero");
         burnRequests[++burnReqCounter] = BurnRequest(amount, redeemToken, msg.sender, block.timestamp);
         emit BurnRequested(burnReqCounter, amount, redeemToken, msg.sender, block.timestamp);
         return burnReqCounter;
@@ -92,9 +93,10 @@ contract DirectMintPSM is Ownable {
         uint requestTime = burnRequests[id].requestTime;
 
         // Ensure eligibility
+        require(amount > 0, "Invalid burn request ID");
         require(eligibleTokens[redeemToken], "Redeem token is not eligible");
-        require(burnDelay == 0 || requestTime + burnDelay <= block.timestamp, "Burn delay not passed");
         require(requester == msg.sender, "Unauthorized");
+        require(burnDelay == 0 || requestTime + burnDelay <= block.timestamp, "Burn delay not passed");
 
         // Remove burn request
         _deleteBurnRequest(id);
