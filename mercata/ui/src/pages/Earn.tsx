@@ -1116,17 +1116,17 @@ const Earn = () => {
                   <table className="w-full min-w-[1140px]">
                     <thead className="bg-muted/40">
                       <tr className="border-b border-border/50">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Opportunity</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Opportunity</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                           <span className="inline-flex items-center gap-1">
                             Best Available APY
                             <BestApyInfoTooltip />
                           </span>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">TVL</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Position</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide">Action</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">TVL</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Your Position</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Type</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground tracking-wide">Action</th>
                       </tr>
                     </thead>
                     <tbody>
