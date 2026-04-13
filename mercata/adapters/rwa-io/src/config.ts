@@ -12,7 +12,7 @@ function requireEnv(key: string): string {
 export const config = {
   rwaIo: {
     apiKey: requireEnv("RWA_IO_API_KEY"),
-    slug: requireEnv("RWA_IO_SLUG"),
+    slug: "strato",
     baseUrl:
       process.env.RWA_IO_BASE_URL || "https://api.rwa.io",
   },
