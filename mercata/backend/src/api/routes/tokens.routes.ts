@@ -93,6 +93,31 @@ router.get("/stats", authHandler.authorizeRequest(true), TokensController.getSta
 
 /**
  * @openapi
+ * /tokens/check-recipient:
+ *   get:
+ *     summary: Check whether a recipient address has activity on STRATO
+ *     tags: [Tokens]
+ *     parameters:
+ *       - name: address
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Recipient account nonce (0 = no activity)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 nonce:
+ *                   type: integer
+ */
+router.get("/check-recipient", authHandler.authorizeRequest(), TokensController.checkRecipient);
+
+/**
+ * @openapi
  * /tokens/{address}:
  *   get:
  *     summary: Fetch token metadata by address

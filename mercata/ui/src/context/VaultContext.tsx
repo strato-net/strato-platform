@@ -235,7 +235,7 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const res = await api.get("/vault/transactions", {
-        params: { limit: 20 },
+        params: { limit: 10 },
       });
 
       if (res.data?.transactions) {
