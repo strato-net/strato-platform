@@ -15,6 +15,7 @@ import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { EarnApyInfo } from "@/utils/earnUtils";
 
 const SafetyModuleSection = () => {
@@ -587,7 +588,10 @@ const SafetyModuleSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-muted-foreground text-sm sm:text-base">Best Available APY</span>
+                  <span className="text-muted-foreground text-sm sm:text-base inline-flex items-center gap-1">
+                    Best Available APY
+                    <BestApyInfoTooltip />
+                  </span>
                   {loading || !tokenApysLoaded ? (
                     <span className="text-muted-foreground animate-pulse text-sm sm:text-base">Loading...</span>
                   ) : (
