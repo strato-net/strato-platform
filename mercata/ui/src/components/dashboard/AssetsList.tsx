@@ -329,10 +329,10 @@ const AssetsList = ({
               <table className="w-full">
                 <thead>
                   <tr className="bg-muted/50">
-                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
+                    <th className="text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                       Asset
                     </th>
-                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
+                    <th className="text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                       Balance
                     </th>
                   </tr>
