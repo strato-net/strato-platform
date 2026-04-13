@@ -1,5 +1,6 @@
 import backfillRows from "../../config/exchangeRateBackfill.json";
 import { constants } from "../../config/constants";
+import { cirrus } from "../../utils/mercataApiHelper";
 import { totalDebtFromScaled, calculateAPYs } from "./lending.helper";
 import { safeBigInt } from "./vaultPerformance.helper";
 
@@ -7,6 +8,7 @@ const { DECIMALS, DAY_MS, BPS_DIVISOR } = constants;
 const YIELD_ANCHOR_UTC_HOUR = 12;
 const DEFAULT_YIELD_WINDOW_DAYS = 30;
 const YIELD_ANCHOR_STEP_DAYS = 1;
+const MAX_YIELD_HISTORY_CACHE_KEYS = 8;
 
 export const ZERO_APY = "0.00";
 export const DEFAULT_SWAP_FEE_BPS = 30;
@@ -17,6 +19,29 @@ export interface YieldHistoryInterval {
   toMs: number;
   value: string;
 }
+
+type YieldHistoryCacheEntry = {
+  rows: YieldHistoryRow[];
+};
+
+const yieldHistoryCache = new Map<string, YieldHistoryCacheEntry>();
+// Dedupes concurrent refreshes for the same cache key.
+const pendingYieldHistoryFetches = new Map<string, Promise<YieldHistoryRow[]>>();
+
+type YieldHistoryRow = {
+  key?: string;
+  value?: string;
+  valid_from?: string;
+  valid_to?: string;
+};
+
+type YieldExchangeRateQuery = {
+  priceOracle: string;
+  exchangeRateAddrs: string[];
+  windowStart: string;
+  windowEndExclusive: string;
+  anchorsMs: number[];
+};
 
 function parseCirrusTimestamp(ts?: string): number {
   if (!ts) return Number.NaN;
@@ -77,13 +102,91 @@ function toCirrusUtcTime(d: Date): string {
   return d.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 }
 
-export function buildYieldAnchorOverlapFilter(anchorsMs: number[]): string {
+function buildYieldAnchorOverlapFilter(anchorsMs: number[]): string {
   return `(${anchorsMs
     .map((ms) => {
       const anchor = toCirrusUtcTime(new Date(ms));
       return `and(valid_from.lte.${anchor},valid_to.gte.${anchor})`;
     })
     .join(",")})`;
+}
+
+function normalizeAddresses(addresses: string[]): string[] {
+  const out = new Set<string>();
+  for (const address of addresses) if (address) out.add(address.toLowerCase());
+  return [...out].sort();
+}
+
+function buildYieldCacheKey(
+  query: YieldExchangeRateQuery,
+  addresses: string[],
+): string {
+  const { priceOracle, windowStart, windowEndExclusive } = query;
+  return `${priceOracle.toLowerCase()}|${windowStart}|${windowEndExclusive}|${addresses.join(",")}`;
+}
+
+function setYieldHistoryCacheEntry(cacheKey: string, entry: YieldHistoryCacheEntry): void {
+  if (yieldHistoryCache.has(cacheKey)) yieldHistoryCache.delete(cacheKey);
+  yieldHistoryCache.set(cacheKey, entry);
+
+  if (yieldHistoryCache.size > MAX_YIELD_HISTORY_CACHE_KEYS) {
+    const oldestKey = yieldHistoryCache.keys().next().value;
+    if (oldestKey) yieldHistoryCache.delete(oldestKey);
+  }
+}
+
+async function fetchYieldExchangeRateRows(
+  accessToken: string,
+  query: YieldExchangeRateQuery,
+  normalizedAddrs: string[],
+): Promise<YieldHistoryRow[]> {
+  const { priceOracle, windowStart, windowEndExclusive, anchorsMs } = query;
+  const { data } = await cirrus.get(accessToken, "/history@mapping", {
+    params: {
+      address: `eq.${priceOracle}`,
+      collection_name: "eq.exchangeRates",
+      "key->>key": `in.(${normalizedAddrs.join(",")})`,
+      select: "key->>key,value::text,valid_from,valid_to",
+      and: `(block_timestamp.gte.${windowStart},block_timestamp.lt.${windowEndExclusive})`,
+      or: buildYieldAnchorOverlapFilter(anchorsMs),
+    },
+  });
+  return data ?? [];
+}
+
+export async function getYieldExchangeRateRowsCached(
+  accessToken: string,
+  query: YieldExchangeRateQuery,
+): Promise<YieldHistoryRow[]> {
+  const { exchangeRateAddrs } = query;
+  const normalizedAddrs = normalizeAddresses(exchangeRateAddrs);
+  if (normalizedAddrs.length === 0) return [];
+
+  const cacheKey = buildYieldCacheKey(query, normalizedAddrs);
+  const cached = yieldHistoryCache.get(cacheKey);
+  const staleRows = cached?.rows ?? [];
+  if (cached) {
+    setYieldHistoryCacheEntry(cacheKey, cached);
+    return cached.rows;
+  }
+
+  const pending = pendingYieldHistoryFetches.get(cacheKey);
+  if (pending) return pending;
+
+  const fetchPromise = (async () => {
+    try {
+      const rows = await fetchYieldExchangeRateRows(accessToken, query, normalizedAddrs);
+      setYieldHistoryCacheEntry(cacheKey, { rows });
+      return rows;
+    } catch {
+      return staleRows;
+    } finally {
+      pendingYieldHistoryFetches.delete(cacheKey);
+    }
+  })();
+
+  pendingYieldHistoryFetches.set(cacheKey, fetchPromise);
+  return fetchPromise;
 }
 
 export function getYieldWindowBounds(

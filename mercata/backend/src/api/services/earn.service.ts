@@ -3,7 +3,7 @@ import { constants } from "../../config/constants";
 import { hiddenSwapPools, yieldBenchmarks, compositeYieldMap, rewards as rewardsAddr, saveUsdstVault as saveUsdstVaultAddr } from "../../config/config";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 import {
-  buildYieldAnchorOverlapFilter, computeExchangeRateAPY, getYieldWindowBounds,
+  computeExchangeRateAPY, getYieldWindowBounds, getYieldExchangeRateRowsCached,
   indexYieldHistoryRows, mergeBackfillRows,
   ZERO_APY, DEFAULT_SWAP_FEE_BPS, DEFAULT_LP_SHARE_BPS,
   computeLendingAPY, computeSafetyAPY, computePoolAPY, weightedBaseYield, buildVolumeMap,
@@ -112,17 +112,17 @@ async function fetchPhase1(
 
   const storageAddrs = [constants.lendingPool, constants.safetyModule, constants.sToken, vaultAddr, saveUsdstVault].filter(Boolean);
 
-  const exchangeRateAddrs = [...new Set([
+  const exchangeRateAddrs = [
     ...yieldBenchmarks.map(b => b.tokenAddress),
     ...Object.values(compositeYieldMap),
-  ])];
+  ];
 
   const [
     { data: storageRows },
     { data: mappingRows },
     { data: eventRows },
     { data: pools },
-    { data: exchangeRateRows },
+    exchangeRateRows,
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
       address: `in.(${storageAddrs.join(",")})`,
@@ -134,19 +134,13 @@ async function fetchPhase1(
       poolFactory: `eq.${constants.poolFactory}`,
       select: "address,tokenA:tokenA_fkey(address,_symbol),tokenB:tokenB_fkey(address,_symbol),lpToken:lpToken_fkey(address,_symbol,_totalSupply::text),tokenABalance::text,tokenBBalance::text,swapFeeRate,lpSharePercent,isPaused,isDisabled",
     }}),
-    // TODO: Cache the 30-day exchange rate window as a sliding cache — keep anchors in memory,
-    // pop the earliest anchor and append the new day's anchor on each calendar-day rollover
-    // instead of re-fetching the full 30-day history@mapping on every request.
-    exchangeRateAddrs.length
-      ? cirrus.get(accessToken, "/history@mapping", { params: {
-          address: `eq.${constants.priceOracle}`,
-          collection_name: "eq.exchangeRates",
-          "key->>key": `in.(${exchangeRateAddrs.join(",")})`,
-          select: "key->>key,value::text,valid_from,valid_to",
-          and: `(block_timestamp.gte.${windowStart},block_timestamp.lt.${windowEndExclusive})`,
-          or: buildYieldAnchorOverlapFilter(anchorsMs),
-        }}).catch(() => ({ data: [] as any[] }))
-      : Promise.resolve({ data: [] as any[] }),
+    getYieldExchangeRateRowsCached(accessToken, {
+      priceOracle: constants.priceOracle,
+      exchangeRateAddrs,
+      windowStart,
+      windowEndExclusive,
+      anchorsMs,
+    }),
   ]);
 
   return { storageRows, mappingRows, eventRows, pools, exchangeRateRows };
