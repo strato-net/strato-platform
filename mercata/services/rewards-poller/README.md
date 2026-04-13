@@ -51,24 +51,27 @@ cp .env.example .env
 - `REWARDS_CONTRACT_ADDRESS` - Rewards contract address
 - `PRICE_ORACLE_ADDRESS` - Price Oracle contract address (required for Swap event USD conversion)
 
-#### Service
-- `PORT` - Service port (default: 3004)
-- `POLLING_INTERVAL` - Polling interval in milliseconds (default: 600000)
-
 ### Optional Environment Variables
+
+#### Service
+- `PORT` - Service port (default: `3004`)
 
 #### Contract Addresses
 - `USDST_ADDRESS` - USDST token contract address (default: `937efa7e3a77e20bbdbd7c0d32b6514f368c1010`)
 - `VOUCHER_ADDRESS` - Voucher contract address (default: `000000000000000000000000000000000000100e`)
 
 #### Polling Configuration
+- `POLLING_INTERVAL` - Polling interval in milliseconds (default: `600000`)
 - `MAX_BATCH_SIZE` - Maximum number of actions per batch (default: `50`)
+
+#### Bonus Configuration
+- `BONUS_CRON_SCHEDULE` - Cron schedule for bonus processing (default: `0 3,9,15,21 * * *`)
 
 #### Balance Configuration
 - `GAS_FEE_USDST` - Gas fee in USDST, multiplied by 1e16 (default: `1` = 0.01 USDST)
 - `GAS_FEE_VOUCHER` - Gas fee in Voucher, multiplied by 1e16 (default: `100` = 1 Voucher)
 - `MIN_TRANSACTIONS_THRESHOLD` - Minimum transactions that can be processed with current balance (default: `1`)
-- `WARNING_TRANSACTIONS_THRESHOLD` - Threshold for low balance warning (default: `50`)
+- `WARNING_TRANSACTIONS_THRESHOLD` - Threshold for low balance warning (default: `100`)
 
 #### Retry Configuration
 - `RETRY_MAX_ATTEMPTS` - Maximum retry attempts (default: `2`)
@@ -98,11 +101,14 @@ NODE_URL=https://your-strato-node-url
 POLLING_INTERVAL=600000
 MAX_BATCH_SIZE=50
 
+# Bonus Configuration
+BONUS_CRON_SCHEDULE="0 3,9,15,21 * * *"
+
 # Balance Configuration
 GAS_FEE_USDST=1
 GAS_FEE_VOUCHER=100
 MIN_TRANSACTIONS_THRESHOLD=1
-WARNING_TRANSACTIONS_THRESHOLD=50
+WARNING_TRANSACTIONS_THRESHOLD=100
 
 # Retry Configuration
 RETRY_MAX_ATTEMPTS=2
@@ -152,13 +158,9 @@ Returns service health status. Returns 500 if error file exists, 200 otherwise.
 ### Service Structure
 
 - `src/index.ts` - Express server entry point
-- `src/config/index.ts` - Configuration management
-- `src/types/index.ts` - TypeScript type definitions
-- `src/services/rewardsService.ts` - Rewards contract interaction
-- `src/services/cirrusService.ts` - Cirrus DB event queries
-- `src/polling/rewardsPolling.ts` - Main polling logic
-- `src/utils/` - Utility functions (API client, logger, strato helper)
-- `src/auth/` - OAuth authentication
+- `src/infra/` - Infrastructure concerns (config, auth, observability, state helpers)
+- `src/features/` - Feature modules (polling, events-read, rewards-cycle, bonus-cycle)
+- `src/shared/` - Shared core helpers and shared types
 
 ### Polling Flow
 
@@ -183,3 +185,9 @@ The service uses structured logging with:
 - Sensitive data redaction (API keys, tokens)
 - Error file tracking for health monitoring
 
+## Future Shared Extraction Candidates
+
+- `src/infra/observability` (logger + error file sink)
+- `src/infra/auth` (OAuth bootstrap/token flow)
+- `src/infra/http` (API clients + retry + STRATO helper)
+- `src/infra/state/atomicJson.store.ts`

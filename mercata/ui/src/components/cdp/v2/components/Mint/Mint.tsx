@@ -5,6 +5,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useOracleContext } from '@/context/OracleContext';
+import { useEarnContext } from '@/context/EarnContext';
+import { useVaultContext } from '@/context/VaultContext';
+import { useRewardsActivities } from '@/hooks/useRewardsActivities';
 import { cdpService } from '@/services/cdpService';
 import { getOptimalAllocations, getMaxAllocations, getAbsoluteMaxAllocations } from '@/components/cdp/v2/MintService';
 import { computeTotalHeadroom } from '@/components/cdp/v2/cdpUtils';
@@ -14,6 +17,7 @@ import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { redirectToLogin } from '@/lib/auth';
+import EarnApyTooltip from '@/components/earn/EarnApyTooltip';
 import MintProgressModal, { type ProgressStep } from '../../../MintProgressModal';
 import LoanForm from './LoanForm';
 import VaultBreakdown from './VaultBreakdown';
@@ -34,6 +38,7 @@ import {
   findMaxAchievableHF,
   type OptimalAllocationResult,
 } from '@/components/cdp/v2/cdpUtils';
+import { buildNativeRewardsApyInfo, findVaultEarnApyInfo } from '@/utils/earnUtils';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 import { DECIMAL, ADDRESS, UNITS, USD } from '@/components/cdp/v2/cdpTypes';
 
@@ -52,6 +57,9 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
 
   const navigate = useNavigate();
   const { fetchAllPrices } = useOracleContext();
+  const { tokenApys } = useEarnContext();
+  const { vaultState } = useVaultContext();
+  const { activities: rewardsActivities } = useRewardsActivities();
   const { userRewards } = useRewardsUserInfo();
 
 
@@ -228,6 +236,32 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   const displayedStabilityFee = useMemo(
     () => calculateWeightedAverageAPR(mergedVaultCandidates),
     [mergedVaultCandidates]
+  );
+  const vaultEarnApyInfo = useMemo(() => findVaultEarnApyInfo(tokenApys), [tokenApys]);
+  const vaultRewardActivity = useMemo(
+    () => rewardsActivities.find((activity) => {
+      const source = activity.sourceContract?.toLowerCase?.() || "";
+      const shareTokenAddress = vaultState.shareTokenAddress?.toLowerCase?.() || "";
+      return Boolean(shareTokenAddress) && source === shareTokenAddress;
+    }) || null,
+    [rewardsActivities, vaultState.shareTokenAddress]
+  );
+  const resolvedVaultApyInfo = useMemo(
+    () =>
+      vaultEarnApyInfo ||
+      buildNativeRewardsApyInfo(
+        vaultState.alpha,
+        vaultRewardActivity?.emissionRate ? vaultRewardActivity.emissionRate.toString() : null,
+        vaultRewardActivity?.totalStakeUsd ?? vaultState.totalEquity ?? null,
+        "vault"
+      ),
+    [
+      vaultEarnApyInfo,
+      vaultRewardActivity?.emissionRate,
+      vaultRewardActivity?.totalStakeUsd,
+      vaultState.alpha,
+      vaultState.totalEquity,
+    ]
   );
 
   // Only show stability fee when there are allocations with mint amounts
@@ -858,12 +892,26 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
             />
           )}
 
-          {/* Transaction Fee - only for logged-in users */}
-          {!guestMode && (
-            <div className="text-sm text-muted-foreground">
-              Transaction Fee: {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
-            </div>
-          )}
+          <div className="space-y-1 text-sm text-muted-foreground">
+            {resolvedVaultApyInfo && (
+              <div className="flex items-center justify-between gap-3">
+                <span>Best Available APY</span>
+                <EarnApyTooltip info={resolvedVaultApyInfo} side="top" align="end">
+                  <span className="font-medium text-foreground cursor-default">
+                    {resolvedVaultApyInfo.total.toFixed(2)}%
+                  </span>
+                </EarnApyTooltip>
+              </div>
+            )}
+            {!guestMode && (
+              <div className="flex items-center justify-between gap-3">
+                <span>Transaction Fee</span>
+                <span className="font-medium text-foreground">
+                  {formatUSD(totalFees, 2)} USDST ({Math.round(totalFees * 100)} vouchers)
+                </span>
+              </div>
+            )}
+          </div>
 
           {/* Rewards Display */}
           {userRewards && cdpActivity && (

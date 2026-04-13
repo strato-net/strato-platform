@@ -5,6 +5,9 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Token as TokenType, EarningAsset } from "@mercata/shared-types";
 import { formatBalance } from "@/utils/numberUtils";
+import { useEarnContext } from "@/context/EarnContext";
+import { buildEarnApyMap } from "@/utils/earnUtils";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -12,9 +15,24 @@ const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | u
   return symbol === "saveusdst" || name.includes("save usdst") || name.includes("saveusdst");
 };
 
+const CARRY_VAULT_SHARE_MAP: Record<string, string> = {
+  carryeth: "eth-carry",
+  carrywbtc: "wbtc-carry",
+};
+
+const getCarryVaultKey = (asset: { _symbol?: string; _name?: string } | null | undefined): string | null => {
+  const symbol = asset?._symbol?.toLowerCase?.() || "";
+  return CARRY_VAULT_SHARE_MAP[symbol] ?? null;
+};
+
 const getAssetDetailHref = (asset: { address?: string; _symbol?: string; _name?: string } | null | undefined): string => {
   if (isSaveUsdstAsset(asset)) {
     return "/dashboard/earn-save";
+  }
+
+  const carryKey = getCarryVaultKey(asset);
+  if (carryKey) {
+    return `/dashboard/earn-yield-vault?vault=${carryKey}`;
   }
 
   return `/dashboard/deposits/${asset?.address || ""}`;
@@ -28,6 +46,8 @@ interface AssetsProps {
   guestMode?: boolean;
 }
 
+const normAddr = (a: string) => (a || "").toLowerCase().replace(/^0x/, "");
+
 const AssetsList = ({
   loading,
   tokens,
@@ -37,6 +57,11 @@ const AssetsList = ({
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
+
+  const earnByAddr = useMemo(() => {
+    return buildEarnApyMap(tokenApys, { includeVaultSources: false });
+  }, [tokenApys]);
 
   const hasEarningAssets = tokens.length > 0;
   const hasInactiveTokens = inActiveTokens.length > 0;
@@ -81,12 +106,12 @@ const AssetsList = ({
       <div>
         {!isDashboard && (
           <div className="p-4 text-right border-b border-border flex justify-between">
-            <span className="font-bold">Earning Assets</span>
+            <span className="font-bold">Earning Assets / Best Available APY</span>
           </div>
         )}
         {isDashboard && (
           <div className="p-3 md:p-4 text-right flex justify-between">
-            <span className="font-bold text-sm md:text-base">Earning Assets</span>
+            <span className="font-bold text-sm md:text-base">Earning Assets / Best Available APY</span>
           </div>
         )}
         <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
@@ -95,6 +120,9 @@ const AssetsList = ({
               <tr className="bg-muted/50">
                 <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
                   Asset
+                </th>
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                  Best Available APY
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Price
@@ -117,7 +145,7 @@ const AssetsList = ({
               {shouldShowLoading ? (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
@@ -167,12 +195,37 @@ const AssetsList = ({
                             <p className="hidden md:block text-muted-foreground text-xs truncate">
                               {asset?._name || ""}
                             </p>
+                            <div className="mt-1 flex items-center gap-1.5 text-[11px] leading-tight text-muted-foreground md:hidden">
+                              <span className="shrink-0">APY</span>
+                              {(() => {
+                                const info = tokenApysLoaded ? earnByAddr.get(normAddr(asset?.address || "")) : undefined;
+                                if (!info) return <span className="min-w-0">-</span>;
+                                return (
+                                  <EarnApyTooltip info={info} side="bottom" align="start">
+                                    <span className="min-w-0 font-medium text-foreground cursor-default">
+                                      {info.total.toFixed(2)}%
+                                    </span>
+                                  </EarnApyTooltip>
+                                );
+                              })()}
+                            </div>
                           </div>
                         </div>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
+                        {(() => {
+                          const info = tokenApysLoaded ? earnByAddr.get(normAddr(asset?.address || "")) : undefined;
+                          if (!info) return <p className="text-sm text-muted-foreground">-</p>;
+                          return (
+                            <EarnApyTooltip info={info} side="left" align="end">
+                              <span className="text-sm font-medium text-foreground cursor-default">{info.total.toFixed(2)}%</span>
+                            </EarnApyTooltip>
+                          );
+                        })()}
+                      </td>
+                      <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
-                          {!asset?.price
+                          {!asset?.price || asset.price === "0"
                             ? "-"
                             : formatBalance(asset.price, undefined, 18, 2, 2, true)}
                         </p>
@@ -223,7 +276,7 @@ const AssetsList = ({
               ) : (
                 <tr className="hover:bg-muted/50 transition-colors">
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="py-4 px-4 whitespace-nowrap w-full"
                   >
                     <div className="w-full flex justify-center items-center h-16">
