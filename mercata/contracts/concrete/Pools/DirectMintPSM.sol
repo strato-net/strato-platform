@@ -170,6 +170,9 @@ contract DirectMintPSM is Ownable {
         // Remove burn request
         _deleteBurnRequest(id);
 
+        // Check liquidity
+        require(IERC20(mintableToken).balanceOf(address(this)) >= amount, "Insufficient liquidity");
+
         // Return escrowed mintable token to the requester
         _transfer(mintableToken, requester, amount);
 
