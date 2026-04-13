@@ -1,4 +1,4 @@
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { cirrus, strato, eth } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { usc } from "../../utils/importer";
@@ -402,6 +402,23 @@ export const getVoucherBalance = async (
   const rawValue = response.data?.[0]?.balance ?? "0";
   const voucherAsUsdstWei = (BigInt(rawValue) * 100n).toString();
   return voucherAsUsdstWei;
+};
+
+/**
+ * Check whether a recipient address exists on the STRATO network.
+ * Returns the account nonce (0 = no activity).
+ */
+export const getAccountNonce = async (
+  accessToken: string,
+  recipientAddress: string
+): Promise<number> => {
+  const normalizedAddr = recipientAddress.toLowerCase().replace(/^0x/, "");
+  const result = await eth.get(accessToken, "/account", {
+    params: { address: normalizedAddr },
+  }).catch(() => ({ data: [] }));
+
+  const accounts = Array.isArray(result.data) ? result.data : [];
+  return accounts[0]?.nonce ?? 0;
 };
 
 /**
