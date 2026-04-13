@@ -38,6 +38,7 @@ import { CircleArrowDown, PiggyBank, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import stratoVaultLogo from "@/assets/strato-vault-logo.png";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { EarnApyInfo, buildNativeRewardsApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
 import {
   mUsdstAddress,
@@ -911,8 +912,9 @@ const Earn = () => {
                         </div>
                       </div>
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
-                        <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                        <p className="text-[11px] font-medium text-muted-foreground md:text-xs inline-flex items-center gap-1">
                           {featuredOpportunityMeta.rateLabel}
+                          {featuredOpportunityMeta.rateLabel === "Best Available APY" && <BestApyInfoTooltip />}
                         </p>
                         <EarnApyTooltip info={featuredOpportunityApyInfo}>
                           <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${featuredOpportunityApy.className} cursor-default`}>
@@ -1012,8 +1014,9 @@ const Earn = () => {
                       </div>
                     </div>
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
-                      <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                      <p className="text-[11px] font-medium text-muted-foreground md:text-xs inline-flex items-center gap-1">
                         {topOpportunityMeta.rateLabel}
+                        {topOpportunityMeta.rateLabel === "Best Available APY" && <BestApyInfoTooltip />}
                       </p>
                       <EarnApyTooltip info={topOpportunityApyInfo}>
                         <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${topOpportunityApy.className} cursor-default`}>
@@ -1113,12 +1116,17 @@ const Earn = () => {
                   <table className="w-full min-w-[1140px]">
                     <thead className="bg-muted/40">
                       <tr className="border-b border-border/50">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Opportunity</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Best Available APY</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">TVL</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Position</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide">Action</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Opportunity</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
+                          <span className="inline-flex items-center gap-1">
+                            Best Available APY
+                            <BestApyInfoTooltip />
+                          </span>
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">TVL</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Your Position</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Type</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground tracking-wide">Action</th>
                       </tr>
                     </thead>
                     <tbody>

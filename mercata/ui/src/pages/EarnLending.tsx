@@ -22,6 +22,7 @@ import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
 
 const EarnLending = () => {
@@ -185,7 +186,10 @@ const EarnLending = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
                     <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-                      <p className="text-[11px] text-muted-foreground">Best Available APY</p>
+                      <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                        Best Available APY
+                        <BestApyInfoTooltip />
+                      </p>
                       <EarnApyTooltip info={lendingEarnApyInfo}>
                         <p className="text-sm font-semibold cursor-default">
                           {lendingDisplayApy ? `${lendingDisplayApy}%` : "N/A"}
@@ -381,7 +385,7 @@ const EarnLending = () => {
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Total Collateral Value</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.totalCollateralValue || 0n, undefined, 18, 2, 2, true)}</p></div>
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Borrow Index</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : liquidityInfo?.borrowIndex ? (() => { const s = formatUnits(liquidityInfo.borrowIndex || 0, 27); const [w, f = ""] = s.split("."); return f ? `${w}.${f.slice(0, 5)}` : w; })() : "0"}</p></div>
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Reserves Accrued</p><p className="text-sm font-semibold">{loadingLiquidity ? "Loading..." : formatBalance(liquidityInfo?.reservesAccrued || 0n, undefined, 18, 2, 2, true)}</p></div>
-                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Best Available APY</p><EarnApyTooltip info={lendingEarnApyInfo}><p className="text-sm font-semibold cursor-default">{lendingDisplayApy ? `${lendingDisplayApy}%` : "N/A"}</p></EarnApyTooltip></div>
+                      <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground inline-flex items-center gap-1">Best Available APY<BestApyInfoTooltip /></p><EarnApyTooltip info={lendingEarnApyInfo}><p className="text-sm font-semibold cursor-default">{lendingDisplayApy ? `${lendingDisplayApy}%` : "N/A"}</p></EarnApyTooltip></div>
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Max Supply APY</p><p className="text-sm font-semibold">{liquidityInfo?.maxSupplyAPY ? `${liquidityInfo.maxSupplyAPY}%` : "N/A"}</p></div>
                       <div className="rounded-lg border border-border/60 p-3"><p className="text-xs text-muted-foreground">Borrow APY</p><p className="text-sm font-semibold">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</p></div>
                       {isLoggedIn && (
