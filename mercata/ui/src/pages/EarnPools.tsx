@@ -11,6 +11,7 @@ import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidityDepositModal from "@/components/dashboard/LiquidityDepositModal";
 import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModal";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { useSwapContext } from "@/context/SwapContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
@@ -205,7 +206,10 @@ const EarnPools = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
                   <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-                    <p className="text-[11px] text-muted-foreground">Best Available APY</p>
+                    <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                      Best Available APY
+                      <BestApyInfoTooltip />
+                    </p>
                     <EarnApyTooltip info={highlightedPoolApyInfo}>
                       <p className="text-sm font-semibold cursor-default">
                         {pageLoading ? "Loading..." : displayedHighlightedPoolApy ? formatPct(displayedHighlightedPoolApy) : "N/A"}
@@ -336,7 +340,10 @@ const EarnPools = () => {
                         </p>
                       </div>
                       <div className="rounded-lg border border-border/60 p-3">
-                        <p className="text-xs text-muted-foreground">Best Available APY</p>
+                        <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                          Best Available APY
+                          <BestApyInfoTooltip />
+                        </p>
                         <EarnApyTooltip info={highlightedPoolApyInfo}>
                           <p className="text-sm font-semibold cursor-default">
                             {pageLoading ? "Loading..." : formatPct(displayedHighlightedPoolApy)}

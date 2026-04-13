@@ -8,6 +8,7 @@ import { formatBalance } from "@/utils/numberUtils";
 import { useEarnContext } from "@/context/EarnContext";
 import { buildEarnApyMap } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -106,12 +107,18 @@ const AssetsList = ({
       <div>
         {!isDashboard && (
           <div className="p-4 text-right border-b border-border flex justify-between">
-            <span className="font-bold">Earning Assets / Best Available APY</span>
+            <span className="font-bold inline-flex items-center gap-1">
+              Earning Assets / Best Available APY
+              <BestApyInfoTooltip />
+            </span>
           </div>
         )}
         {isDashboard && (
           <div className="p-3 md:p-4 text-right flex justify-between">
-            <span className="font-bold text-sm md:text-base">Earning Assets / Best Available APY</span>
+            <span className="font-bold text-sm md:text-base inline-flex items-center gap-1">
+              Earning Assets / Best Available APY
+              <BestApyInfoTooltip />
+            </span>
           </div>
         )}
         <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
@@ -122,7 +129,10 @@ const AssetsList = ({
                   Asset
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
-                  Best Available APY
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Best Available APY
+                    <BestApyInfoTooltip />
+                  </span>
                 </th>
                 <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
                   Price

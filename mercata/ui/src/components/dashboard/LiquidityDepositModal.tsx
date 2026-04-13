@@ -21,6 +21,7 @@ import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { isMultiTokenPool } from '@/helpers/swapCalculations';
 import EarnApyTooltip from '@/components/earn/EarnApyTooltip';
+import { BestApyInfoTooltip } from '@/components/earn/BestApyInfoTooltip';
 import { findPoolEarnApyInfo } from '@/utils/earnUtils';
 
 const formatNumber = (value: string | number): string => {
@@ -538,7 +539,10 @@ const LiquidityDepositModal = ({
               {/* Pool info */}
               <div className="rounded-lg bg-muted/50 p-2 md:p-3">
                 <div className="flex justify-between items-center text-xs md:text-sm text-muted-foreground">
-                  <span>Best Available APY</span>
+                  <span className="inline-flex items-center gap-1">
+                    Best Available APY
+                    <BestApyInfoTooltip />
+                  </span>
                   <EarnApyTooltip info={selectedPoolApyInfo}>
                     <span className="font-medium cursor-default">{selectedPoolApyLabel}</span>
                   </EarnApyTooltip>
@@ -827,7 +831,10 @@ const LiquidityDepositModal = ({
 
           <div className="rounded-lg bg-muted/50 p-2 md:p-3">
             <div className="flex justify-between items-center text-xs md:text-sm text-muted-foreground">
-              <span>Best Available APY</span>
+              <span className="inline-flex items-center gap-1">
+                Best Available APY
+                <BestApyInfoTooltip />
+              </span>
               <EarnApyTooltip info={selectedPoolApyInfo}>
                 <span className="font-medium cursor-default">{selectedPoolApyLabel}</span>
               </EarnApyTooltip>
