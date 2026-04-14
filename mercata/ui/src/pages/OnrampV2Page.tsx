@@ -20,8 +20,7 @@ import {
 } from "lucide-react";
 
 const CRYPTO_OPTIONS = [
-  { code: "USDC", label: "USDST" },
-  { code: "ETH", label: "ETH" },
+  { code: "USDC", label: "USDST" }
 ];
 
 interface Quote {
