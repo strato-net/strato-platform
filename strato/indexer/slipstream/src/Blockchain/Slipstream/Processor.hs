@@ -220,7 +220,7 @@ processTheMessages messages = do
           pure []
         Right inheritedContracts -> pure $ map (T.pack . _contractName) inheritedContracts
       indexFkeys <- createIndexTable c cc nameParts inherited
-      collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
+      collectionFkeys <- concat <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
       eventFkeys <- createExpandEventTables c cc nameParts inherited
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 

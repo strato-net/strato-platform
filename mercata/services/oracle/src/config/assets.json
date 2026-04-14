@@ -11,13 +11,40 @@
       "targetAssetAddress": "491cdfe98470bfe69b662ab368826dca0fc2f24d"
     },
     "RETH": {
-      "targetAssetAddress": "2e4789eb7db143576da25990a3c0298917a8a87d"
+      "targetAssetAddress": "2e4789eb7db143576da25990a3c0298917a8a87d",
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xae78736Cd615f374D3085123A210448E74Fc6393\",\"data\":\"0xe6aa216c\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "Rocket Pool rETH: getExchangeRate() returns rETH/ETH rate in WAD"
+      }
     },
     "SUSDS": {
-      "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64"
+      "targetAssetAddress": "6e2d93d323edf1b3cc4672a909681b6a430cae64",
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD\",\"data\":\"0x07a2d13a0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "Sky sUSDS: convertToAssets(1e18) returns sUSDS/USDS rate in WAD"
+      }
     },
     "SYRUPUSDC": {
-      "targetAssetAddress": "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca"
+      "targetAssetAddress": "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca",
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x80ac24aA929eaF5013f6436cdA2a7ba190f5Cc0b\",\"data\":\"0x07a2d13a00000000000000000000000000000000000000000000000000000000000f4240\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "Maple syrupUSDC: convertToAssets(1e6) returns syrupUSDC/USDC rate in 6-decimal"
+      }
     },
     "USDC": {
       "targetAssetAddress": "6aeacaa19c68e53035bf495d15e0a328fc600ba8"
@@ -33,7 +60,16 @@
       "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
     },
     "WSTETH":{
-      "targetAssetAddress": "f2aa370405030a434ae07e7826178325c675e925"
+      "targetAssetAddress": "f2aa370405030a434ae07e7826178325c675e925",
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\",\"data\":\"0x035faf82\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "Lido wstETH: stEthPerToken() returns wstETH/stETH rate in WAD"
+      }
     },
     "XAG": {
       "targetAssetAddress": "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94",
@@ -60,7 +96,142 @@
     "WEETH": {
       "targetAssetAddress": "00000000000000000000000000000000deadbeef",
       "submit": false,
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee\",\"data\":\"0x679aefce\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "EtherFi weETH: getRate() returns weETH/eETH rate in WAD"
+      },
       "comment": "weETH price feed for AWEETH rebase. submit=false: only used as underlying, not pushed directly."
+    },
+    "AWETH": {
+      "targetAssetAddress": "6d40952f0895d21d2bf20cd088f0eb9a1574583f",
+      "rebase": {
+        "underlyingAsset": "ETH",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      },
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "AAVE V3 aWETH: getReserveNormalizedIncome(WETH) in RAY"
+      }
+    },
+    "AWBTC": {
+      "targetAssetAddress": "5f46258f73c405a58331c1a19e54add394637b06",
+      "rebase": {
+        "underlyingAsset": "WBTC",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      },
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000002260FAC5E5542a773Aa44fBCfeDf7C193bc2C599\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "AAVE V3 aWBTC: getReserveNormalizedIncome(WBTC) in RAY"
+      }
+    },
+    "AWEETH": {
+      "targetAssetAddress": "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1",
+      "rebase": {
+        "underlyingAsset": "WEETH",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      },
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000Cd5fE23C85820F7B72D0926FC9b05b43E359b7ee\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "AAVE V3 aweETH: getReserveNormalizedIncome(weETH) in RAY"
+      }
+    },
+    "AWSTETH": {
+      "targetAssetAddress": "2c33aa5f8bbfe3c15e356a5e87464310db12376e",
+      "rebase": {
+        "underlyingAsset": "WSTETH",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      },
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e00530000000000000000000000007f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "AAVE V3 awstETH: getReserveNormalizedIncome(wstETH) in RAY"
+      }
+    },
+    "AUSDC": {
+      "targetAssetAddress": "465c7e3061bc239df88c37d315be52f5487959ec",
+      "rebase": {
+        "underlyingAsset": "USDC",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      },
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "AAVE V3 aUSDC: getReserveNormalizedIncome(USDC) in RAY"
+      }
+    },
+    "AUSDT": {
+      "targetAssetAddress": "7d2a2b963e1fa273b60f9b7891392903de5e66b8",
+      "rebase": {
+        "underlyingAsset": "USDT",
+        "factorUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "factorMethod": "POST",
+        "factorBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
+        "factorParse": "result",
+        "factorPrecision": "1000000000000000000000000000",
+        "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
+      },
+      "exchangeRate": {
+        "rateUrl": "https://eth-mainnet.g.alchemy.com/v2/${API_KEY}",
+        "rateMethod": "POST",
+        "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2\",\"data\":\"0xd15e0053000000000000000000000000dAC17F958D2ee523a2206206994597C13D831ec7\"},\"latest\"]}",
+        "rateParse": "result",
+        "ratePrecision": "1000000000000000000000000000",
+        "rateApiKeyEnvVar": "ALCHEMY_API_KEY",
+        "comment": "AAVE V3 aUSDT: getReserveNormalizedIncome(USDT) in RAY"
+      }
     },
     "WSPYX": {
       "targetAssetAddress": "1ac696799624c75050b10b7ee3e6fcf6f1f39aa1",

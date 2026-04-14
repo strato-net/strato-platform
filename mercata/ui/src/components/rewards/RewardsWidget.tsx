@@ -4,6 +4,7 @@ import {
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
+import { calculateSingleTokenLiquidityMint } from "@/helpers/swapCalculations";
 import { formatBalance, safeParseUnits, calculateTokenValue } from "@/utils/numberUtils";
 import { TrendingUp, TrendingDown, Sparkles, Star, Coins } from "lucide-react";
 import { Pool } from "@/interface";
@@ -103,6 +104,14 @@ const calculateStakeChange = (
 
   // LP Deposit: calculate expected LP tokens from token amounts
   if (isLPActivity && poolData && !isWithdrawal) {
+    const hasTokenA = !!tokenAAmount && parseFloat(tokenAAmount) > 0;
+    const hasTokenB = !!tokenBAmount && parseFloat(tokenBAmount) > 0;
+
+    if (!poolData.isStable && hasTokenA !== hasTokenB) {
+      const singleTokenAmount = hasTokenA ? tokenAAmount! : tokenBAmount!;
+      return BigInt(calculateSingleTokenLiquidityMint(singleTokenAmount, poolData, hasTokenA));
+    }
+
     const tokenA = tokenAAmount || inputAmount || "0";
     const tokenB = tokenBAmount || "0";
     return calculateExpectedLPTokens(tokenA, tokenB, poolData);

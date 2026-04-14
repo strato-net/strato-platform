@@ -20,6 +20,8 @@ import {
   Plus,
   Banknote,
   Gem,
+  Clock,
+  CheckCircle,
   LucideIcon
 } from "lucide-react";
 import { usdstAddress } from "@/lib/constants";
@@ -1208,6 +1210,225 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           line2: {
             fieldLabels: ["Buyer"],
             renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "YieldVaultDeposit": {
+    contract_name: "YieldVault",
+    event_name: "Deposit",
+    displayName: "Yield Vault Deposit",
+    filterConfig: { type: "single", attribute: "owner" },
+    iconConfig: { icon: Download, color: "bg-cyan-500" },
+    getTokenAddress: (event: Event) => {
+      const asset = (event as any).asset_address;
+      return asset ? [asset] : [];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const owner = event.attributes.owner || event.attributes.Owner || "";
+      const assets = event.attributes.assets || event.attributes.Assets || "0";
+      const shares = event.attributes.shares || event.attributes.Shares || "0";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Deposited",
+          value: formatValue(assets),
+          type: "amount",
+          badge: "assets",
+          rawAmount: getFullAmount(assets),
+        },
+        {
+          label: "Shares Minted",
+          value: formatValue(shares),
+          type: "text",
+          badge: "shares",
+        },
+        {
+          label: "Depositor",
+          value: owner,
+          type: "address",
+          isUserAddress: isUserAddress(owner, userAddress),
+        },
+      ];
+
+      return {
+        title: "Yield Vault Deposit",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Deposited"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Depositor", "Shares Minted"],
+          },
+        },
+      };
+    },
+  },
+  "YieldVaultWithdraw": {
+    contract_name: "YieldVault",
+    event_name: "Withdraw",
+    displayName: "Yield Vault Withdraw",
+    filterConfig: { type: "or", attributes: ["owner", "receiver"] },
+    iconConfig: { icon: Upload, color: "bg-cyan-600" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const owner = event.attributes.owner || event.attributes.Owner || "";
+      const receiver = event.attributes.receiver || event.attributes.Receiver || "";
+      const assets = event.attributes.assets || event.attributes.Assets || "0";
+      const shares = event.attributes.shares || event.attributes.Shares || "0";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Withdrawn",
+          value: formatValue(assets),
+          type: "amount",
+          badge: "assets",
+          rawAmount: getFullAmount(assets),
+        },
+        {
+          label: "Owner",
+          value: owner,
+          type: "address",
+          isUserAddress: isUserAddress(owner, userAddress),
+        },
+        {
+          label: "Receiver",
+          value: receiver,
+          type: "address",
+          isUserAddress: isUserAddress(receiver, userAddress),
+        },
+      ];
+
+      return {
+        title: "Yield Vault Withdraw",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Withdrawn"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Owner", "Receiver"],
+            renderer: "addresses-with-arrow",
+          },
+        },
+      };
+    },
+  },
+  "YieldVaultWithdrawalRequested": {
+    contract_name: "YieldVault",
+    event_name: "WithdrawalRequested",
+    displayName: "Yield Vault Withdrawal Requested",
+    filterConfig: { type: "single", attribute: "owner" },
+    iconConfig: { icon: Clock, color: "bg-cyan-400" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const owner = event.attributes.owner || event.attributes.Owner || "";
+      const receiver = event.attributes.receiver || event.attributes.Receiver || "";
+      const shares = event.attributes.shares || event.attributes.Shares || "0";
+      const requestId = event.attributes.requestId || event.attributes.request_id || "";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Shares Queued",
+          value: formatValue(shares),
+          type: "amount",
+          badge: "shares",
+          rawAmount: getFullAmount(shares),
+        },
+        {
+          label: "Owner",
+          value: owner,
+          type: "address",
+          isUserAddress: isUserAddress(owner, userAddress),
+        },
+        {
+          label: "Receiver",
+          value: receiver,
+          type: "address",
+          isUserAddress: isUserAddress(receiver, userAddress),
+        },
+        requestId ? {
+          label: "Request",
+          value: `#${requestId}`,
+          type: "text",
+          size: "xs",
+        } : null,
+      ].filter(Boolean) as ActivityField[];
+
+      return {
+        title: "Yield Vault Withdrawal Requested",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Shares Queued"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: requestId ? ["Owner", "Request"] : ["Owner"],
+            renderer: "addresses-with-bullet",
+          },
+        },
+      };
+    },
+  },
+  "YieldVaultClaimed": {
+    contract_name: "YieldVault",
+    event_name: "WithdrawalClaimed",
+    displayName: "Yield Vault Claimed",
+    filterConfig: { type: "single", attribute: "owner" },
+    iconConfig: { icon: CheckCircle, color: "bg-cyan-700" },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+      const owner = event.attributes.owner || event.attributes.Owner || "";
+      const receiver = event.attributes.receiver || event.attributes.Receiver || "";
+      const assets = event.attributes.assets || event.attributes.Assets || "0";
+
+      const fields: ActivityField[] = [
+        {
+          label: "Claimed",
+          value: formatValue(assets),
+          type: "amount",
+          badge: "assets",
+          rawAmount: getFullAmount(assets),
+        },
+        {
+          label: "Owner",
+          value: owner,
+          type: "address",
+          isUserAddress: isUserAddress(owner, userAddress),
+        },
+        {
+          label: "Receiver",
+          value: receiver,
+          type: "address",
+          isUserAddress: isUserAddress(receiver, userAddress),
+        },
+      ];
+
+      return {
+        title: "Yield Vault Claimed",
+        fields,
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["Claimed"],
+            renderer: "amount-with-token",
+          },
+          line2: {
+            fieldLabels: ["Owner", "Receiver"],
+            renderer: "addresses-with-arrow",
           },
         },
       };

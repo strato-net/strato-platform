@@ -105,6 +105,8 @@ const GUEST_SAFE_URLS = [
   '/rewards/overview',
   '/rewards/activities',
   '/earn/save-usdst/info',
+  '/earn/yield-vault/eth-carry/info',
+  '/earn/yield-vault/wbtc-carry/info',
   // ActivityFeed page
   '/events',
   // Transfer page
