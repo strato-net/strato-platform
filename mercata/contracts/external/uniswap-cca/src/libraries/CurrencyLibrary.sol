@@ -3,10 +3,6 @@ pragma solidity ^0.8.4;
 
 import {IERC20Minimal} from '../interfaces/external/IERC20Minimal.sol';
 
-type Currency is address;
-
-using CurrencyLibrary for Currency global;
-
 /// @title CurrencyLibrary
 /// @dev This library allows for transferring and holding native tokens and ERC20 tokens
 /// @dev Forked from https://github.com/Uniswap/v4-core/blob/main/src/types/Currency.sol but modified to not bubble up reverts
@@ -18,9 +14,9 @@ library CurrencyLibrary {
     error ERC20TransferFailed();
 
     /// @notice A constant to represent the native currency
-    Currency public constant ADDRESS_ZERO = Currency.wrap(address(0));
+    address public constant ADDRESS_ZERO = address(0);
 
-    function transfer(Currency currency, address to, uint256 amount) internal {
+    function transfer(address currency, address to, uint256 amount) internal {
         // altered from https://github.com/transmissions11/solmate/blob/44a9963d4c78111f77caa0e65d677b8b46d6f2e6/src/utils/SafeTransferLib.sol
         // modified custom error selectors
 
@@ -67,15 +63,15 @@ library CurrencyLibrary {
         }
     }
 
-    function balanceOf(Currency currency, address owner) internal view returns (uint256) {
+    function balanceOf(address currency, address owner) internal view returns (uint256) {
         if (currency.isAddressZero()) {
             return owner.balance;
         } else {
-            return IERC20Minimal(Currency.unwrap(currency)).balanceOf(owner);
+            return IERC20Minimal(currency).balanceOf(owner);
         }
     }
 
-    function isAddressZero(Currency currency) internal pure returns (bool) {
-        return Currency.unwrap(currency) == Currency.unwrap(ADDRESS_ZERO);
+    function isAddressZero(address currency) internal pure returns (bool) {
+        return currency == ADDRESS_ZERO;
     }
 }

@@ -4,7 +4,6 @@ pragma solidity 0.8.26;
 import {Bid, BidLib} from '../libraries/BidLib.sol';
 import {Checkpoint} from '../libraries/CheckpointLib.sol';
 import {FixedPoint96} from '../libraries/FixedPoint96.sol';
-import {ValueX7} from '../libraries/ValueX7Lib.sol';
 import {FixedPointMathLib} from 'solady/utils/FixedPointMathLib.sol';
 
 /// @title CheckpointAccountingLib
@@ -42,7 +41,7 @@ library CheckpointAccountingLib {
     function accountPartiallyFilledCheckpoints(
         Bid memory bid,
         uint256 tickDemandQ96,
-        ValueX7 currencyRaisedAtClearingPriceQ96_X7
+        uint256 currencyRaisedAtClearingPriceQ96_X7
     ) internal pure returns (uint256 tokensFilled, uint256 currencySpentQ96) {
         if (tickDemandQ96 == 0) return (0, 0);
 
@@ -50,12 +49,11 @@ library CheckpointAccountingLib {
         // If currency spent is calculated to have a remainder, we round up.
         // In the case where the result would have been 0, we will return 1 wei.
         uint256 denominator = tickDemandQ96 * bid.mpsRemainingInAuctionAfterSubmission();
-        currencySpentQ96 = bid.amountQ96.fullMulDivUp(ValueX7.unwrap(currencyRaisedAtClearingPriceQ96_X7), denominator);
+        currencySpentQ96 = bid.amountQ96.fullMulDivUp(currencyRaisedAtClearingPriceQ96_X7, denominator);
 
         // We derive tokens filled from the currency spent by dividing it by the max price.
         // If the currency spent is 0, tokens filled will be 0 as well.
-        tokensFilled =
-            bid.amountQ96.fullMulDiv(ValueX7.unwrap(currencyRaisedAtClearingPriceQ96_X7), denominator) / bid.maxPrice;
+        tokensFilled = bid.amountQ96.fullMulDiv(currencyRaisedAtClearingPriceQ96_X7, denominator) / bid.maxPrice;
     }
 
     /// @notice Calculate the tokens filled and currency spent for a bid

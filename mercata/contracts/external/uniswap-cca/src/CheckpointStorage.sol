@@ -5,7 +5,6 @@ import {ICheckpointStorage} from './interfaces/ICheckpointStorage.sol';
 import {Bid} from './libraries/BidLib.sol';
 import {CheckpointAccountingLib} from './libraries/CheckpointAccountingLib.sol';
 import {Checkpoint} from './libraries/CheckpointLib.sol';
-import {ValueX7} from './libraries/ValueX7Lib.sol';
 
 /// @title CheckpointStorage
 /// @notice Abstract contract for managing auction checkpoints and bid fill calculations
@@ -70,7 +69,7 @@ abstract contract CheckpointStorage is ICheckpointStorage {
     function _accountPartiallyFilledCheckpoints(
         Bid memory bid,
         uint256 tickDemandQ96,
-        ValueX7 currencyRaisedAtClearingPriceQ96_X7
+        uint256 currencyRaisedAtClearingPriceQ96_X7
     ) internal pure returns (uint256 tokensFilled, uint256 currencySpentQ96) {
         return CheckpointAccountingLib.accountPartiallyFilledCheckpoints(
             bid, tickDemandQ96, currencyRaisedAtClearingPriceQ96_X7

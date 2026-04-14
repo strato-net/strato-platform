@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {Checkpoint} from '../libraries/CheckpointLib.sol';
-import {ValueX7} from '../libraries/ValueX7Lib.sol';
 import {IBidStorage} from './IBidStorage.sol';
 import {ICheckpointStorage} from './ICheckpointStorage.sol';
 import {IStepStorage} from './IStepStorage.sol';
@@ -241,14 +240,14 @@ interface IContinuousClearingAuction is
 
     /// @notice The currency raised as of the last checkpoint in Q96 representation, scaled up by X7
     /// @dev Most use cases will want to use `currencyRaised()` instead
-    function currencyRaisedQ96_X7() external view returns (ValueX7);
+    function currencyRaisedQ96_X7() external view returns (uint256);
 
     /// @notice The sum of demand in ticks above the clearing price
     function sumCurrencyDemandAboveClearingQ96() external view returns (uint256);
 
     /// @notice The total currency raised as of the last checkpoint in Q96 representation, scaled up by X7
     /// @dev Most use cases will want to use `totalCleared()` instead
-    function totalClearedQ96_X7() external view returns (ValueX7);
+    function totalClearedQ96_X7() external view returns (uint256);
 
     /// @notice The total tokens cleared as of the last checkpoint in uint256 representation
     function totalCleared() external view returns (uint256);
