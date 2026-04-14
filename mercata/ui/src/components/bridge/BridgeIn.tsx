@@ -32,6 +32,8 @@ import {
   validateRouterContract,
 } from "@/lib/bridge/contractService";
 import { normalizeError } from "@/lib/bridge/utils";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { buildEarnApyMap } from "@/utils/earnUtils";
 import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateDecimals } from "@/utils/numberUtils";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
@@ -70,6 +72,7 @@ const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: strin
     case "vault":
       return "/dashboard/earn-vault";
     case "swap":
+    case "weighted_swap":
       return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
     case "safety":
       return "/dashboard/advanced?tab=safety";
@@ -176,8 +179,8 @@ const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBad
   </button>
 );
 
-/** Responsive visible-card count based on container width: 5 desktop / 4 tablet / 3 mobile */
-const colsForWidth = (w: number) => (w >= 700 ? 5 : w >= 480 ? 4 : 3);
+/** Responsive visible-card count based on container width: 5 desktop / 4 tablet / 3 mobile / 2 narrow mobile */
+const colsForWidth = (w: number) => (w >= 700 ? 5 : w >= 480 ? 4 : w >= 380 ? 3 : 2);
 
 const ScrollRow = ({ children }: { children: React.ReactNode }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -210,9 +213,10 @@ const ScrollRow = ({ children }: { children: React.ReactNode }) => {
     el.scrollBy({ left: dir * Math.floor(el.clientWidth / cols), behavior: "smooth" });
   };
 
+  const visibleCols = Math.min(cols, Math.max(count, 1));
   const needsScroll = count > cols;
-  const gapPx = (cols - 1) * 8;
-  const colWidth = `calc((100% - ${gapPx}px) / ${cols})`;
+  const gapPx = (visibleCols - 1) * 8;
+  const colWidth = `calc((100% - ${gapPx}px) / ${visibleCols})`;
   const gridStyle: React.CSSProperties = {
     gridTemplateColumns: `repeat(${count || 1}, ${colWidth})`,
     ...(needsScroll ? { overflowX: "auto", scrollbarWidth: "none" } as const : {}),
@@ -331,16 +335,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [bridgeableTokens, selectedToken, depositActions]);
 
   const getApyInfo = useMemo(() => {
-    const m = new Map<string, { apy: string; source: ApySource["source"]; poolAddress?: string }>();
-    for (const entry of tokenApys) {
-      let best: ApySource | null = null;
-      for (const a of entry.apys) {
-        if (!best || parseFloat(a.apy) > parseFloat(best.apy)) best = a;
-      }
-      if (best && parseFloat(best.apy) > 0) {
-        m.set(normAddr(entry.token), { apy: best.apy, source: best.source, poolAddress: best.poolAddress });
-      }
-    }
+    const m = buildEarnApyMap(tokenApys);
     return (addr: string) => m.get(normAddr(addr));
   }, [tokenApys]);
 
@@ -356,23 +351,25 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         {!tokenApysLoaded ? (
           <p className="text-[10px] font-medium text-green-500/40 animate-pulse blur-[2px] leading-none">{"\u2026"}</p>
         ) : info ? (
-          <span
-            role="link"
-            tabIndex={0}
-            className="inline-flex items-center gap-0.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-500 cursor-pointer hover:bg-green-500/20 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              go();
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              e.stopPropagation();
-              go();
-            }}
-          >
-            {`Earn up to ${info.apy}%`} {"\u2192"}
-          </span>
+          <EarnApyTooltip info={info} side="top" align="start">
+            <span
+              role="link"
+              tabIndex={0}
+              className="inline-flex items-center gap-0.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-500 cursor-pointer hover:bg-green-500/20 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                go();
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                e.stopPropagation();
+                go();
+              }}
+            >
+              {`Earn up to ${info.total.toFixed(2)}%`} {"\u2192"}
+            </span>
+          </EarnApyTooltip>
         ) : null}
       </div>
     );

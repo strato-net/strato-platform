@@ -32,6 +32,8 @@ pipeline {
           }
         }
         sh '''#!/bin/bash -le
+          strato-down || true
+          pkill convoke || true
           docker rm -f $(docker ps -aq) || true
           docker system prune -f || true
           docker volume prune -fa || true
@@ -97,10 +99,13 @@ pipeline {
             --nodeHost=\$(</host) \\
             --vaultUrl=https://\$(</host):8093/strato/v2.3 \\
             --fileServerUrl=https://\$(</host):44300/highway \\
-            --sslDir='/home/ubuntu/letsencrypt-ssl'
+            --sslDir='/home/ubuntu/letsencrypt-ssl' \\
+            --jsonrpc
         """
         sh 'chmod +x run.sh'
-        sh './run.sh'
+        withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+          sh './run.sh'
+        }
 
         sh 'docker ps'
         script {

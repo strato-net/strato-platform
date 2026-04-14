@@ -99,12 +99,6 @@ router.get("/info", authHandler.authorizeRequest(true), VaultController.getInfo)
  *                 userValueUsd:
  *                   type: string
  *                   description: User's position value in USD (18 decimals)
- *                 allTimeDeposits:
- *                   type: string
- *                   description: User's all-time total deposits in USD (18 decimals)
- *                 allTimeEarnings:
- *                   type: string
- *                   description: User's all-time earnings/losses in USD (18 decimals, can be negative)
  */
 router.get("/user", authHandler.authorizeRequest(), VaultController.getUserPosition);
 

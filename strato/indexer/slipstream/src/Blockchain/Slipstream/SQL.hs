@@ -25,10 +25,10 @@ insertDelegatecallPostgres conn (Delegatecall storageAddr codeAddress Nothing co
   performSQLQueries conn
     [ E.insertSelect $ do
         src <- E.from $ \c -> do
-          E.where_ (c E.^. ContractAddress E.==. E.val (StorageKey codeAddress))
+          E.where_ (c E.^. ContractAddress E.==. E.val codeAddress)
           return c
         pure $ Contract
-          E.<#  (E.val $ StorageKey storageAddr)
+          E.<#  (E.val storageAddr)
           E.<&> (src E.^. ContractCreator)
           E.<&> (E.val contractName)
     ]
@@ -39,24 +39,24 @@ insertDelegatecallPostgres conn (Delegatecall storageAddr codeAddress Nothing co
   performSQLQueries conn
     [ E.insertSelect $ do
         src <- E.from $ \c -> do
-          E.where_ (c E.^. ContractAddress E.==. E.val (StorageKey codeAddress))
+          E.where_ (c E.^. ContractAddress E.==. E.val codeAddress)
           -- ensure we don't duplicate an existing (address, creator, contract_name)
           E.where_ $ E.notExists $ do
             E.from $ \d -> do
               E.where_
-                (   d E.^. ContractAddress       E.==. E.val (StorageKey storageAddr)
+                (   d E.^. ContractAddress       E.==. E.val storageAddr
                 E.&&. d E.^. ContractCreator       E.==. c E.^. ContractCreator
                 E.&&. d E.^. ContractContract_name E.==. c E.^. ContractContract_name
                 )
               return ()
           return c
         pure $ Contract
-          E.<#  (E.val $ StorageKey storageAddr)
+          E.<#  (E.val storageAddr)
           E.<&> (src E.^. ContractCreator)
           E.<&> (src E.^. ContractContract_name)
     ]
 insertDelegatecallPostgres conn (Delegatecall s _ (Just c) n) =
-  performSQLQueries conn [insert_ $ Contract (StorageKey s) c n]
+  performSQLQueries conn [insert_ $ Contract s c n]
 
 performSQLQueries :: (MonadLogger m, MonadUnliftIO m) =>
                      PGConnection -> [E.SqlPersistT m ()] -> m ()

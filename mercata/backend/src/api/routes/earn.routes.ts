@@ -34,5 +34,12 @@ router.get("/yield-vault/:key/user", authHandler.authorizeRequest(), YieldVaultC
 router.post("/yield-vault/:key/deposit", authHandler.authorizeRequest(), YieldVaultController.deposit);
 router.post("/yield-vault/:key/redeem", authHandler.authorizeRequest(), YieldVaultController.redeem);
 router.post("/yield-vault/:key/redeem-all", authHandler.authorizeRequest(), YieldVaultController.redeemAll);
+router.post("/yield-vault/:key/claim", authHandler.authorizeRequest(), YieldVaultController.claim);
+router.post("/yield-vault/:key/admin/strategy-approval", authHandler.authorizeRequest(), YieldVaultController.setStrategyApproval);
+router.post("/yield-vault/:key/admin/min-idle-bps", authHandler.authorizeRequest(), YieldVaultController.setMinIdleBps);
+router.post("/yield-vault/:key/admin/deploy", authHandler.authorizeRequest(), YieldVaultController.deployCapital);
+router.post("/yield-vault/:key/admin/process-queue", authHandler.authorizeRequest(), YieldVaultController.processQueue);
+router.post("/yield-vault/:key/admin/return", authHandler.authorizeRequest(), YieldVaultController.returnCapital);
+router.post("/yield-vault/:key/admin/report-loss", authHandler.authorizeRequest(), YieldVaultController.reportLoss);
 
 export default router;
