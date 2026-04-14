@@ -210,7 +210,7 @@ all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels update-app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force clean-docker-sentinels app
 
 apex: $(DOCKER_SENTINELS)/apex
 nginx: $(DOCKER_SENTINELS)/nginx
