@@ -7,6 +7,7 @@ import { useSwapContext } from "@/context/SwapContext";
 import { useVaultContext } from "@/context/VaultContext";
 import { useEarnContext } from "@/context/EarnContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { findBestEarnApyInfo, findBestNonVaultEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
@@ -142,8 +143,9 @@ export default function MyPoolParticipationSection({
   return (
     <Card className="rounded-xl shadow-sm w-full mb-6">
       <CardHeader className="pb-2 md:pb-4">
-        <CardTitle className="text-base md:text-lg font-semibold text-foreground">
+        <CardTitle className="text-base md:text-lg font-semibold text-foreground inline-flex items-center gap-1">
           My Pool Participation / Best Available APY
+          <BestApyInfoTooltip />
         </CardTitle>
       </CardHeader>
 
@@ -152,7 +154,10 @@ export default function MyPoolParticipationSection({
         <div className="grid grid-cols-3 md:grid-cols-4 px-3 md:px-4 text-xs md:text-sm text-muted-foreground font-medium">
           <div>Token</div>
           <div className="text-right md:text-center">Balance</div>
-          <div className="hidden md:block text-center">Best Available APY</div>
+          <div className="hidden md:flex items-center justify-center gap-1">
+            Best Available APY
+            <BestApyInfoTooltip />
+          </div>
           <div className="text-right">Value</div>
         </div>
 

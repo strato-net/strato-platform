@@ -8,6 +8,7 @@ import { formatBalance } from "@/utils/numberUtils";
 import { useEarnContext } from "@/context/EarnContext";
 import { buildEarnApyMap } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -106,37 +107,46 @@ const AssetsList = ({
       <div>
         {!isDashboard && (
           <div className="p-4 text-right border-b border-border flex justify-between">
-            <span className="font-bold">Earning Assets / Best Available APY</span>
+            <span className="font-bold inline-flex items-center gap-1">
+              Earning Assets / Best Available APY
+              <BestApyInfoTooltip />
+            </span>
           </div>
         )}
         {isDashboard && (
           <div className="p-3 md:p-4 text-right flex justify-between">
-            <span className="font-bold text-sm md:text-base">Earning Assets / Best Available APY</span>
+            <span className="font-bold text-sm md:text-base inline-flex items-center gap-1">
+              Earning Assets / Best Available APY
+              <BestApyInfoTooltip />
+            </span>
           </div>
         )}
         <div className={`w-full ${isDashboard ? 'overflow-x-auto md:overflow-visible px-3 md:px-0' : 'overflow-x-auto'}`}>
           <table className="w-full">
             <thead>
               <tr className="bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
+                <th className="text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Asset
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
-                  Best Available APY
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
+                  <span className="inline-flex items-center gap-1 justify-end w-full">
+                    Best Available APY
+                    <BestApyInfoTooltip />
+                  </span>
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Price
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Available
                 </th>
-                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4">
+                <th className="hidden md:table-cell text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-4">
                   Collateral
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
+                <th className="text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Value
                 </th>
-                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
+                <th className="text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                   Balance
                 </th>
               </tr>
@@ -225,7 +235,7 @@ const AssetsList = ({
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
                         <p className="font-medium text-foreground">
-                          {!asset?.price
+                          {!asset?.price || asset.price === "0"
                             ? "-"
                             : formatBalance(asset.price, undefined, 18, 2, 2, true)}
                         </p>
@@ -319,10 +329,10 @@ const AssetsList = ({
               <table className="w-full">
                 <thead>
                   <tr className="bg-muted/50">
-                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
+                    <th className="text-left text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                       Asset
                     </th>
-                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-1 md:px-4">
+                    <th className="text-right text-xs font-medium text-muted-foreground tracking-wider py-3 px-1 md:px-4">
                       Balance
                     </th>
                   </tr>
