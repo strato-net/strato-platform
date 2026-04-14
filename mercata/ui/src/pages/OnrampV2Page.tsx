@@ -84,12 +84,9 @@ const OnrampV2Page = () => {
         sourceAmount: amount,
         destinationCurrencyCode: crypto,
       });
-      const sortedQuotes = (data.data?.quotes || []).sort(
-        (a: Quote, b: Quote) =>
-          (b.rampIntelligence?.rampScore || 0) - (a.rampIntelligence?.rampScore || 0)
-      );
-      setQuotes(sortedQuotes);
-      if (sortedQuotes.length === 0) setQuoteError("No providers available for this configuration.");
+      const quotes = (data.data?.quotes || []).filter((q: Quote) => q.serviceProvider.toUpperCase() === "TRANSAK");
+      setQuotes(quotes);
+      if (quotes.length === 0) setQuoteError("No providers available for this configuration.");
     } catch (err: any) {
       setQuoteError(err?.response?.data?.error?.message || "Failed to get quotes.");
     } finally {
