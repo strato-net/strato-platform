@@ -9,7 +9,7 @@ Storage
     deriving Eq Ord Read Show
 
 Contract
-    address StorageId
+    address Address
     creator Text
     contract_name Text
     Primary address creator contract_name

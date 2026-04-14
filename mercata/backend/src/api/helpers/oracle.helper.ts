@@ -8,7 +8,7 @@ import { getVaultShareTokenPrice } from "../services/vault.service";
 import * as config from "../../config/config";
 import { OraclePriceMap } from "@mercata/shared-types";
 
-const { Token, DECIMALS, Pool, LendingPool, SaveUSDSTVault, lendingRegistry } = constants;
+const { Token, DECIMALS, Pool, LendingPool, SaveUSDSTVault, lendingRegistry, YieldVault } = constants;
 
 const addMTokenPrice = async (
   accessToken: string,
@@ -139,6 +139,43 @@ const addSaveUsdstTokenPrice = async (
   priceMap.set(vault.address, pricePerShare.toString());
 };
 
+/** NAV per carry-vault share (underlying base units per share, WAD) for portfolio price × balance math. */
+const addYieldVaultTokenPrices = async (
+  accessToken: string,
+  priceMap: OraclePriceMap
+): Promise<void> => {
+  const vaultAddrs = [config.ethCarryVault, config.wbtcCarryVault].filter(
+    (a): a is string => typeof a === "string" && a.replace(/^0x/i, "").length > 0
+  );
+  if (!vaultAddrs.length) return;
+
+  for (const vaultAddress of vaultAddrs) {
+    const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
+      params: {
+        address: `eq.${vaultAddress}`,
+        select: "address,_asset,deployedAssets::text,_totalSupply::text",
+      },
+    });
+    const v = rows?.[0];
+    if (!v?._asset || !v.address) continue;
+
+    const { data: balRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
+      params: {
+        address: `eq.${v._asset}`,
+        key: `eq.${vaultAddress}`,
+        select: "value::text",
+      },
+    });
+
+    const idle = BigInt(balRows?.[0]?.value || "0");
+    const deployed = BigInt(v.deployedAssets || "0");
+    const totalAssets = idle + deployed;
+    const totalShares = BigInt(v._totalSupply || "0");
+    const pricePerShare = totalShares === 0n ? DECIMALS : (totalAssets * DECIMALS) / totalShares;
+    priceMap.set(v.address, pricePerShare.toString());
+  }
+};
+
 export const getCompletePriceMap = async (
   accessToken: string
 ): Promise<Map<string, string>> => {
@@ -148,7 +185,8 @@ export const getCompletePriceMap = async (
     addSTokenPrice(accessToken, priceMap),
     addLPTokenPrices(accessToken, priceMap),
     addVaultTokenPrice(accessToken, priceMap),
-    addSaveUsdstTokenPrice(accessToken, priceMap)
+    addSaveUsdstTokenPrice(accessToken, priceMap),
+    addYieldVaultTokenPrices(accessToken, priceMap),
   ]);
   return priceMap;
 };

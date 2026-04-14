@@ -56,6 +56,10 @@ import "Proxy/Proxy.sol";
 //Vault
 import "Vault/Vault.sol";
 import "Vault/VaultFactory.sol";
+
+//YieldVault
+import "YieldVault/YieldVault.sol";
+
 //TODO
 
 //Direct Mint PSM

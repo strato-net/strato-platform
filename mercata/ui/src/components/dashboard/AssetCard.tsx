@@ -21,7 +21,7 @@ interface AssetCardProps {
 const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image, customDecimals }: AssetCardProps) => {
   // Helper function to safely format Wei values
   const formatWeiValue = (value: string, decimals: number, isPrice = false): string => {
-    if (!value || value === "0") return isPrice ? "$0.00" : "0.00";
+    if (!value || value === "0") return isPrice ? "-" : "0.00";
     
     try {
       if (isPrice) {
@@ -31,14 +31,14 @@ const AssetCard = ({ id, name, symbol, price, deposit, collateralBalance, image,
         const priceInWei = BigInt(priceString);
         const priceInEther = formatUnits(priceInWei, 18);
         const finalPrice = parseFloat(priceInEther);
-        return finalPrice > 0 ? `$${finalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00";
+        return finalPrice > 0 ? `$${finalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-";
       } else {
         // Handle regular Wei values
         const formatted = formatUnits(BigInt(value), decimals);
         return formatNumberForMobile(formatted);
       }
     } catch (error) {
-      return isPrice ? "$0.00" : "0.00";
+      return isPrice ? "-" : "0.00";
     }
   };
 

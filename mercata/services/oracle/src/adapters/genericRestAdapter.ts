@@ -1,5 +1,5 @@
 import { apiRequest } from '../utils/apiClient';
-import { SourceConfig, BatchPriceResult, Asset, RebaseConfig } from '../types';
+import { SourceConfig, BatchPriceResult, Asset, RebaseConfig, ExchangeRateConfig } from '../types';
 import { logError, logInfo } from '../utils/logger';
 
 function extractNestedProperty(obj: any, path: string): any {
@@ -300,70 +300,80 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
 }
 
 /**
- * Fetch a rebase factor from an external source (e.g., Ethereum eth_call via Alchemy).
- * Returns the raw factor as bigint to preserve full uint256 precision.
- * Caller is responsible for normalizing to WAD (1e18) before pushing on-chain.
+ * Shared: fetch a uint256 value from an external RPC/REST endpoint (e.g. Alchemy eth_call).
+ * Handles URL substitution, API key injection, ABI hex truncation, and bigint parsing.
  */
-export async function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig): Promise<bigint> {
-    let url = rebase.factorUrl;
-    const stratoUrl = process.env.STRATO_NODE_URL || '';
-    url = url.replace(/\$\{STRATO_NODE_URL\}/g, stratoUrl);
+async function fetchOnChainValue(
+    assetKey: string,
+    label: string,
+    opts: { url: string; method?: string; body?: string; parse: string; apiKeyEnvVar?: string; headers?: string },
+): Promise<bigint> {
+    let url = opts.url;
+    url = url.replace(/\$\{STRATO_NODE_URL\}/g, process.env.STRATO_NODE_URL || '');
 
-    const apiKey = rebase.factorApiKeyEnvVar ? process.env[rebase.factorApiKeyEnvVar] || '' : '';
-    if (apiKey) {
-        url = url.replace(/\$\{API_KEY\}/g, apiKey);
-    }
+    const apiKey = opts.apiKeyEnvVar ? process.env[opts.apiKeyEnvVar] || '' : '';
+    if (apiKey) url = url.replace(/\$\{API_KEY\}/g, apiKey);
 
-    const method = (rebase.factorMethod || 'GET').toUpperCase();
+    const method = (opts.method || 'GET').toUpperCase();
     const headers: Record<string, string> = {
         'Accept': 'application/json',
         ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {})
     };
-    if (rebase.factorHeaders && apiKey) {
-        rebase.factorHeaders.split(',').forEach(h => {
+    if (opts.headers && apiKey) {
+        opts.headers.split(',').forEach(h => {
             const name = h.trim();
             headers[name] = name === 'Authorization' ? `Bearer ${apiKey}` : apiKey;
         });
     }
 
     const requestConfig: any = { method, url, headers };
-    if (method === 'POST' && rebase.factorBody) {
-        requestConfig.data = JSON.parse(rebase.factorBody);
-    }
+    if (method === 'POST' && opts.body) requestConfig.data = JSON.parse(opts.body);
 
-    const response = await apiRequest(requestConfig, {
-        logPrefix: 'RebaseFactor',
-        apiUrl: url,
-        method
-    });
+    const response = await apiRequest(requestConfig, { logPrefix: label, apiUrl: url, method });
 
-    const raw = extractNestedProperty(response.data, rebase.factorParse);
+    const raw = extractNestedProperty(response.data, opts.parse);
     if (raw === undefined || raw === null) {
-        logError('RebaseFactor', new Error(`${assetKey}: no value at path "${rebase.factorParse}"`));
+        logError(label, new Error(`${assetKey}: no value at path "${opts.parse}"`));
         return 0n;
     }
 
+    // ABI-encoded eth_call responses pack each uint256 as 32 bytes (64 hex chars).
+    // Extract only the first word when result is longer.
     let rawStr = String(raw).trim();
+    if (rawStr.startsWith('0x') && rawStr.length > 66) rawStr = rawStr.slice(0, 66);
 
-    // ABI-encoded eth_call responses with multiple return values pack each uint256
-    // as 32 bytes (64 hex chars). Extract only the first word when result is longer.
-    if (rawStr.startsWith('0x') && rawStr.length > 66) {
-        rawStr = rawStr.slice(0, 66);
+    let value: bigint;
+    try { value = BigInt(rawStr); } catch {
+        logError(label, new Error(`${assetKey}: invalid value "${rawStr}"`));
+        return 0n;
     }
-
-    let factor: bigint;
-    try {
-        factor = rawStr.startsWith('0x') ? BigInt(rawStr) : BigInt(rawStr);
-    } catch {
-        logError('RebaseFactor', new Error(`${assetKey}: invalid factor value "${rawStr}"`));
+    if (value <= 0n) {
+        logError(label, new Error(`${assetKey}: invalid value "${rawStr}"`));
         return 0n;
     }
 
-    if (factor <= 0n) {
-        logError('RebaseFactor', new Error(`${assetKey}: invalid factor value "${rawStr}"`));
-        return 0n;
-    }
+    logInfo(label, `${assetKey}: ${value} (parse="${opts.parse}")`);
+    return value;
+}
 
-    logInfo('RebaseFactor', `${assetKey}: factor=${factor} (parse="${rebase.factorParse}")`);
-    return factor;
+export function fetchRebaseFactor(assetKey: string, rebase: RebaseConfig): Promise<bigint> {
+    return fetchOnChainValue(assetKey, 'RebaseFactor', {
+        url: rebase.factorUrl,
+        method: rebase.factorMethod,
+        body: rebase.factorBody,
+        parse: rebase.factorParse,
+        apiKeyEnvVar: rebase.factorApiKeyEnvVar,
+        headers: rebase.factorHeaders,
+    });
+}
+
+export function fetchExchangeRate(assetKey: string, config: ExchangeRateConfig): Promise<bigint> {
+    return fetchOnChainValue(assetKey, 'ExchangeRate', {
+        url: config.rateUrl,
+        method: config.rateMethod,
+        body: config.rateBody,
+        parse: config.rateParse,
+        apiKeyEnvVar: config.rateApiKeyEnvVar,
+        headers: config.rateHeaders,
+    });
 }

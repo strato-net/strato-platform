@@ -81,8 +81,10 @@ instance Functor (First b) where
   fmap f (First (a, b)) = First (f a, b)
 
 data ForeignKeyInfo = ForeignKeyInfo
-  { fkiSourceTableName :: TableName
+  { fkiFunctionName    :: Text
+  , fkiSourceTableName :: TableName
   , fkiDestTableName   :: TableName
+  , fkiOneToMany       :: Bool
   , fkiColumnName      :: Text
   , fkiColumnType      :: SqlType
   }
@@ -449,12 +451,14 @@ slipstreamQueryText _ InsertTable{..} = T.concat $
 slipstreamQueryText _ InsertDelegatecall{} = ""
 slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
   [ "CREATE OR REPLACE FUNCTION \""
-  , fkiColumnName
-  , "_fkey\"(\n  lp "
+  , fkiFunctionName
+  , "\"(\n  lp "
   , tableNameToDoubleQuoteText fkiSourceTableName
   , "\n) RETURNS SETOF "
   , tableNameToDoubleQuoteText fkiDestTableName
-  , "\nROWS 1\nLANGUAGE sql STABLE AS $$\n"
+  , "\n"
+  , if fkiOneToMany then "" else "ROWS 1\n"
+  , "LANGUAGE sql STABLE AS $$\n"
   , "  SELECT v.*\n  FROM "
   , tableNameToDoubleQuoteText fkiDestTableName
   , " AS v\n"
@@ -483,11 +487,12 @@ slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
         , "\"\n"
         , "  )\n"
         ]
-  , "  LIMIT 1;\n"
+  , if fkiOneToMany then "" else "  LIMIT 1"
+  , ";\n"
   , "$$;\n\n"
   , "GRANT EXECUTE ON FUNCTION \""
-  , fkiColumnName
-  , "_fkey\"(\n  "
+  , fkiFunctionName
+  , "\"(\n  "
   , tableNameToDoubleQuoteText fkiSourceTableName
   , "\n) TO postgres;\n\n"
   , "GRANT SELECT ON "
@@ -608,7 +613,7 @@ createIndexTable contract cc (creator, n) inherited = do
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       contractCols = ["creator", "contract_name"]
       cols' = [(x, t) | (x, t, _) <- cols, t /= SqlJsonbArray]
-      fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo tableName (indexTableName creator f) x t) <$> mf) cols
+      fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo (x <> "_fkey") tableName (indexTableName creator f) False x t) <$> mf) cols
   yield $ CreateView
     tableName
     inherited
@@ -628,7 +633,7 @@ createCollectionTable ::
   CodeCollectionF () ->
   [Text] ->
   (Text, [SVMType.Type], SVMType.Type) ->
-  ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
+  ConduitM () SlipstreamQuery m [ForeignKeyInfo]
 createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, valueType) = do
   let tableName = collectionTableName creator n collectionName
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
@@ -661,9 +666,11 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
     , ([Right "value", Left "::text"], Just "NOT IN", "('\"\"', '0', 'false')")
     , ([Left "jsonb_typeof(", Right "value", Left ")"], Just "IS", "NOT NULL")
     ]
-  pure $ case getTableColumnAndType False cc [("value", valueType)] of
-    [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator f) x SqlJsonb
-    _ -> Nothing
+  let addressFK = ForeignKeyInfo (tableNameToText $ indexTableName creator n) tableName (indexTableName creator n) False "address" SqlText
+  let o2mFK = ForeignKeyInfo (tableNameToText tableName) (indexTableName creator n) tableName True "address" SqlText
+  pure $ addressFK : o2mFK : case getTableColumnAndType False cc [("value", valueType)] of
+    [(x, _, Just f)] -> [ForeignKeyInfo (x <> "_fkey") tableName (indexTableName creator f) False x SqlJsonb]
+    _ -> []
 
 createEventArrayTable ::
   OutputM m =>
@@ -698,7 +705,7 @@ createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
     , ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
     ]
   pure $ case getTableColumnAndType False cc [("value", arrType)] of
-    [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator f) x SqlJsonb
+    [(x, _, Just f)] -> Just $ ForeignKeyInfo (x <> "_fkey") tableName (indexTableName creator f) False x SqlJsonb
     _ -> Nothing
 
 insertIndexTable ::
@@ -935,11 +942,12 @@ createEventTable ::
 createEventTable (creator, n) evName ev cc inherited = do
   $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, cname) = constructTableNameParameters creator n
-      eventTable = EventTableName crtr cname (escapeQuotes $ labelToText evName)
+      evNameText = escapeQuotes $ labelToText evName
+      eventTable = EventTableName crtr cname evNameText
       isEvent = True
       evLogToPair (EventLog n' _ t') = (n', t')
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
-      fcols = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo eventTable (indexTableName creator f) x t) <$> mf) cols
+      fcols = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo (x <> "_fkey") eventTable (indexTableName creator f) False x t) <$> mf) cols
       arrayNamesAndTypes = [(key, entry) | (key, IndexedType _ (SVMType.Array entry _) _) <- map evLogToPair $ ev ^. eventLogs]
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
   yieldMany $
@@ -959,7 +967,9 @@ createEventTable (creator, n) evName ev cc inherited = do
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
     createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc inherited
-  pure $ fcols ++ catMaybes arrayFkeys
+  let addressFK = ForeignKeyInfo (tableNameToText $ indexTableName creator n) eventTable (indexTableName creator n) False "address" SqlText
+  let o2mFK = ForeignKeyInfo (tableNameToText eventTable) (indexTableName creator n) eventTable True "address" SqlText
+  pure . ([addressFK, o2mFK] ++) $ fcols ++ catMaybes arrayFkeys
 
 -- Function to convert AggregateEvent to ProcessedCollectionRow
 aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]
@@ -1200,7 +1210,7 @@ initialSlipstreamQueries =
       , ("value", SqlJsonb)
       ]
       ["address", "path"]
-      (Just $ Foreign "contract_mapping" ["address"] storageTableName ["address"])
+      Nothing -- (Just $ Foreign "contract_mapping" ["address"] storageTableName ["address"])
       [("mapping_idx", ["address","path"])]
   , CreateTable
       mappingHistoryTableName
@@ -1232,7 +1242,7 @@ initialSlipstreamQueries =
       , ("attributes", SqlJsonb)
       ]
       ["address", "block_hash", "event_index"]
-      (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
+      Nothing -- (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
       []
   , CreateTable
       eventArrayTableName
@@ -1249,10 +1259,16 @@ initialSlipstreamQueries =
       , ("value", SqlJsonb)
       ]
       ["address", "block_hash", "event_index", "collection_name", "key"]
-      (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
+      Nothing -- (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
+  , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
+  , CreateFkeyFunction $ ForeignKeyInfo "event" (indexTableName "" "storage") (indexTableName "" "event") True "address" SqlText
+  , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "mapping") (indexTableName "" "storage") False "address" SqlText
+  , CreateFkeyFunction $ ForeignKeyInfo "mapping" (indexTableName "" "storage") (indexTableName "" "mapping") True "address" SqlText
+  , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "contract") (indexTableName "" "storage") True "address" SqlText
+  , CreateFkeyFunction $ ForeignKeyInfo "contract" (indexTableName "" "storage") (indexTableName "" "contract") True "address" SqlText
   ]
 
 jsonbMergeDeepSQL :: Text

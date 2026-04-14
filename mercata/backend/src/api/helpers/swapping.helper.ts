@@ -770,6 +770,51 @@ export interface MultiTokenStablePool {
   tokenBalances: Map<string, string>;
 }
 
+const STABLE_FEE_TO_BPS = 1e6; // StablePool.fee (1e10 scale) / 1e6 = bps (10000 scale)
+
+/**
+ * Fetch the on-chain fee for specific StablePool addresses.
+ * Returns a map of pool address → swapFeeRate in bps.
+ */
+export const fetchStablePoolFees = async (
+  accessToken: string,
+  addresses: string[]
+): Promise<Map<string, number>> => {
+  const map = new Map<string, number>();
+  if (addresses.length === 0) return map;
+
+  const { data } = await cirrus.get(accessToken, "/BlockApps-StablePool", {
+    params: {
+      address: `in.(${addresses.join(",")})`,
+      select: "address,fee::text",
+    }
+  });
+
+  for (const row of data as { address: string; fee: string }[]) {
+    const fee = BigInt(row.fee || "0");
+    if (fee > 0n) map.set(row.address, Number(fee / BigInt(STABLE_FEE_TO_BPS)));
+  }
+
+  return map;
+};
+
+/**
+ * Return a new pool list with swapFeeRate corrected for stable pools.
+ */
+export const applyStablePoolFees = async (
+  accessToken: string,
+  poolList: any[]
+): Promise<any[]> => {
+  const stableAddresses = poolList.filter(p => p.isStable).map(p => p.address);
+  if (stableAddresses.length === 0) return poolList;
+
+  const feeMap = await fetchStablePoolFees(accessToken, stableAddresses);
+  return poolList.map(pool => {
+    const realFee = feeMap.get(pool.address);
+    return realFee !== undefined ? { ...pool, swapFeeRate: realFee } : pool;
+  });
+};
+
 /**
  * Dynamically discovers multi-token stable pools by querying StablePool
  * contracts with initialA > 0 and joining coins + tokenBalances.
@@ -840,7 +885,8 @@ export const buildMultiTokenPoolEntry = async (
   const totalLiquidityUSD = calculateMultiTokenLiquidity(coins);
   const volume24h = volumeMap.get(stablePool.address) || "0";
 
-  const swapFeeRate = factoryData.swapFeeRate;
+  const stableFee = BigInt(stablePool.fee || "0");
+  const swapFeeRate = stableFee > 0n ? Number(stableFee / BigInt(STABLE_FEE_TO_BPS)) : factoryData.swapFeeRate;
   const lpSharePercent = factoryData.lpSharePercent;
   const fees24h = calculateLPFees24h(volume24h, swapFeeRate, lpSharePercent);
   const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
