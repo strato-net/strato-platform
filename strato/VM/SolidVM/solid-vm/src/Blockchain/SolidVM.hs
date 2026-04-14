@@ -490,7 +490,7 @@ call' from to' fnCalltype functionName valList = do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when (isExternal && isForbidden) $
           unknownFunction "logFunctionCall" (functionName, "asdf" :: String) -- contract ^. CC.contractName)
-        validateFunctionArguments theFunction valList >>= \case
+        validateFunctionArguments cc contract theFunction valList >>= \case
           Just (theFunction', valList') -> do
             mCallInfo <- getCurrentCallInfoIfExists
             let ro = case mCallInfo of
@@ -543,7 +543,7 @@ call' from to' fnCalltype functionName valList = do
               handleSimple path = do
                 v <- getVar $ Constant $ SReference path
                 pure $ Just v
-              typeTuple = [(Nothing, CC.IndexedType 0 _varType Nothing)]
+              typeTuple = [(Nothing, CC.IndexedType 0 (returnType _varType) Nothing)]
           case args' of
             [] -> do
               let path = MS.singleton $ BC.pack $ labelToString functionName
@@ -1649,15 +1649,15 @@ expToVar' (CC.FunctionCall _ e args) = do
               res <- case M.lookup funcName $ contract' ^. CC.functions of
                 Just func -> if (CC._funcIsFree func)
                   then do
-                    validateFunctionArguments func argVals >>= \case
+                    validateFunctionArguments cc contract' func argVals >>= \case
                       Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars ro True
                       Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars ro True
                   else do
-                    validateFunctionArguments func argVals >>= \case
+                    validateFunctionArguments cc contract' func argVals >>= \case
                       Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars ro False
                       Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                         Just ff -> do
-                          validateFunctionArguments ff argVals >>= \case
+                          validateFunctionArguments cc contract' ff argVals >>= \case
                             Just (mo, argVals') -> runTheCallWithVars address codeAddr contract' funcName hsh cc mo argVals' argVars ro True
                             Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars ro False
                         Nothing -> runTheCallWithVars address codeAddr contract' funcName hsh cc func argVals argVars ro False
@@ -2548,7 +2548,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
 
   argVals <- case contract' ^. CC.constructor of
     Nothing -> pure argVals'
-    Just theConstructor -> validateFunctionArguments theConstructor argVals' >>= \case
+    Just theConstructor -> validateFunctionArguments cc contract' theConstructor argVals' >>= \case
       Just (_, vals) -> pure vals
       Nothing -> invalidArguments "constructor arguments don't match" (contractName', argVals')
 
@@ -2639,34 +2639,34 @@ resolveArgRef src contract cc argType arg = case arg of
     stored <- getStorageValue src r
     case stored of
       SReference _ -> case argType of
-        SVMType.Array _ _ -> do
-          lenVal <- getStorageValue src (r `MS.snoc` MS.Field "length")
+        SVMType.Array t' _ -> do
+          lenVal <- resolveArgRef src contract cc (SVMType.Int Nothing Nothing) (SReference $ r `MS.snoc` MS.Field "length")
           case lenVal of
             SInteger l' -> do
               elems <- for [0 .. l' - 1] $ \i ->
-                getStorageValue src (r `MS.snoc` MS.Index (BC.pack $ show i))
+                resolveArgRef src contract cc t' (SReference $ r `MS.snoc` MS.Index (BC.pack $ show i))
               vars <- traverse createVar elems
               pure . SArray $ V.fromList vars
             _ -> pure $ SArray V.empty
-        SVMType.Struct _ s ->
+        SVMType.Struct _ s -> do
           case (M.lookup s $ contract ^. CC.structs) <|> (M.lookup s $ cc ^. CC.flStructs) of
             Just defs -> do
-              fieldPairs <- for defs $ \(field, _, _) -> do
-                fv <- getStorageValue src (r `MS.snoc` MS.Field (BC.pack $ labelToString field))
+              fieldPairs <- for defs $ \(field, t', _) -> do
+                fv <- resolveArgRef src contract cc (CC.fieldTypeType t') (SReference $ r `MS.snoc` MS.Field (BC.pack $ labelToString field))
                 var <- createVar fv
                 pure (field, var)
               pure . SStruct s $ M.fromList fieldPairs
             Nothing -> pure arg
-        SVMType.UnknownLabel s ->
+        SVMType.UnknownLabel s -> do
           case (M.lookup s $ contract ^. CC.structs) <|> (M.lookup s $ cc ^. CC.flStructs) of
             Just defs -> do
-              fieldPairs <- for defs $ \(field, _, _) -> do
-                fv <- getStorageValue src (r `MS.snoc` MS.Field (BC.pack $ labelToString field))
+              fieldPairs <- for defs $ \(field, t', _) -> do
+                fv <- resolveArgRef src contract cc (CC.fieldTypeType t') (SReference $ r `MS.snoc` MS.Field (BC.pack $ labelToString field))
                 var <- createVar fv
                 pure (field, var)
               pure . SStruct s $ M.fromList fieldPairs
             Nothing -> pure arg
-        _ -> pure arg
+        _ -> createDefaultValue cc contract argType
       v' -> pure v'
   SArray vs ->
     let t' = case argType of
@@ -2694,7 +2694,7 @@ resolveArgRefs src contract cc argDefs args =
       go ts'@[t@SVMType.Variadic] (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
       go (t : ts') (v : vs') = (:) <$> resolveArgRef src contract cc t v <*> go ts' vs'
       go _ vs' = pure vs'
-  in go argTypes args
+   in go argTypes args
 
 -- Note: this is intentionally nonstrict in `theType`
 addLocalVariable :: MonadSM m => SolidString -> Value -> m ()
@@ -2759,7 +2759,7 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
   let !theModifiers = catMaybes theModifiers'
 
-  argVals <- validateFunctionArguments theFunction argVals' >>= \case
+  argVals <- validateFunctionArguments cc contract' theFunction argVals' >>= \case
     Just (_, av) -> pure av
     Nothing ->
       let mismatchInfo = formatArgMismatch $ zip argVals' (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction))
@@ -3375,8 +3375,8 @@ solidVMExceptionHandler catchBlockMap ex =
           return res
 
 -- checks if an argument list is valid for a given function signature
-validateFunctionArguments:: MonadSM m => CC.Func -> ValList -> m (Maybe (CC.Func, ValList))
-validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload func
+validateFunctionArguments:: MonadSM m => CC.CodeCollection -> CC.Contract -> CC.Func -> ValList -> m (Maybe (CC.Func, ValList))
+validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._funcOverload func
   where
     checkFunc [] = pure Nothing
     checkFunc (x:xs) = testMatch x >>= \case
@@ -3431,6 +3431,7 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
             then fmap (SArray . V.fromList . map Constant) . sequence <$> traverse (marshalValue . (y,)) vs
             else pure Nothing
         (r@(SReference _), _) -> pure $ Just r
+        (SNULL, t') -> Just <$> createDefaultValue cc contract' t'
         _ -> pure Nothing
     mapArgs :: MonadSM m => CC.FuncF a -> m (Maybe [(String, (SVMType.Type, Value))])
     mapArgs theFunc =

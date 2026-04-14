@@ -5,6 +5,7 @@ module SolidVM.Model.Value
   ( Variable (..),
     Value (..),
     ValList,
+    toNull,
     rlpEncodeVariable,
     rlpEncodeValue,
     rlpEncodeValues,
@@ -315,7 +316,7 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
             Nothing -> return $ SContract name 0x0
             Just c -> createDefaultValue cc c (SVMType.UnknownLabel . T.unpack $ T.intercalate "." ns)
           _ -> return $ SContract name 0x0
-createDefaultValue _ _ x = todo "createDefaultValue" x
+createDefaultValue _ _ _ = pure SNULL
 
 {-
 byteStringToValue :: B.ByteString -> Maybe Value
