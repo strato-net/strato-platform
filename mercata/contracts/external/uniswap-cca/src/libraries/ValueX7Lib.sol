@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {ConstantsLib} from './ConstantsLib.sol';
-import {FixedPointMathLib} from 'solady/utils/FixedPointMathLib.sol';
 
 /// @title ValueX7Lib
 library ValueX7Lib {
@@ -11,7 +10,8 @@ library ValueX7Lib {
 
     /// @notice Subtract two X7-scaled values, returning zero on underflow.
     function saturatingSub(uint256 a, uint256 b) internal pure returns (uint256) {
-        return FixedPointMathLib.saturatingSub(a, b);
+        if (a > b) return a - b;
+        return 0;
     }
 
     /// @notice Divide an X7-scaled value by a uint256.

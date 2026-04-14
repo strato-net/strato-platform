@@ -10,15 +10,15 @@ import {Checkpoint} from './libraries/CheckpointLib.sol';
 /// @notice Abstract contract for managing auction checkpoints and bid fill calculations
 abstract contract CheckpointStorage is ICheckpointStorage {
     /// @notice Maximum block number value used as sentinel for last checkpoint
-    uint64 public constant MAX_BLOCK_NUMBER = type(uint64).max;
+    uint64 public constant MAX_BLOCK_NUMBER = uint64((2 ** 64) - 1);
 
     /// @notice Storage of checkpoints
-    mapping(uint64 blockNumber => Checkpoint) private _checkpoints;
+    mapping(uint64 => Checkpoint) private _checkpoints;
     /// @notice The block number of the last checkpointed block
     uint64 internal _lastCheckpointedBlock;
 
     /// @inheritdoc ICheckpointStorage
-    function latestCheckpoint() public view returns (Checkpoint memory) {
+    function latestCheckpoint() public view override returns (Checkpoint memory) {
         return _getCheckpoint(_lastCheckpointedBlock);
     }
 
@@ -32,7 +32,7 @@ abstract contract CheckpointStorage is ICheckpointStorage {
     function _insertCheckpoint(Checkpoint memory checkpoint, uint64 blockNumber) internal {
         uint64 lastCheckpointedBlock_ = _lastCheckpointedBlock;
         // Enforce strictly increasing checkpoint block numbers
-        if (blockNumber <= lastCheckpointedBlock_) revert CheckpointBlockNotIncreasing();
+        require(blockNumber > lastCheckpointedBlock_, "CheckpointStorage: block not increasing");
         // Link new checkpoint to the previous checkpoint
         checkpoint.prev = lastCheckpointedBlock_;
         checkpoint.next = MAX_BLOCK_NUMBER;
@@ -77,12 +77,12 @@ abstract contract CheckpointStorage is ICheckpointStorage {
     }
 
     /// @inheritdoc ICheckpointStorage
-    function lastCheckpointedBlock() external view returns (uint64) {
+    function lastCheckpointedBlock() external view override returns (uint64) {
         return _lastCheckpointedBlock;
     }
 
     /// @inheritdoc ICheckpointStorage
-    function checkpoints(uint64 blockNumber) external view returns (Checkpoint memory) {
+    function checkpoints(uint64 blockNumber) external view override returns (Checkpoint memory) {
         return _checkpoints[blockNumber];
     }
 }

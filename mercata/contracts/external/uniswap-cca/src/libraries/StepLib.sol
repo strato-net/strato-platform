@@ -9,8 +9,6 @@ struct AuctionStep {
 
 /// @notice Library for auction step calculations and parsing
 library StepLib {
-    using StepLib for *;
-
     /// @notice The size of a uint64 in bytes
     uint256 public constant UINT64_SIZE = 8;
 
@@ -31,12 +29,14 @@ library StepLib {
         if (offset >= data.length) revert StepLib__InvalidOffsetTooLarge();
         // Offset must be a multiple of a step (uint64 -  uint24|uint40)
         if (offset % UINT64_SIZE != 0) revert StepLib__InvalidOffsetNotAtStepBoundary();
+        if (offset + UINT64_SIZE > data.length) revert StepLib__InvalidOffsetTooLarge();
 
-        assembly {
-            let packedValue := mload(add(add(data, 0x20), offset))
-            packedValue := shr(192, packedValue)
-            mps := shr(40, packedValue)
-            blockDelta := and(packedValue, 0xFFFFFFFFFF)
-        }
+        uint64 packedValue = (uint64(uint8(data[offset])) << 56) | (uint64(uint8(data[offset + 1])) << 48)
+            | (uint64(uint8(data[offset + 2])) << 40) | (uint64(uint8(data[offset + 3])) << 32)
+            | (uint64(uint8(data[offset + 4])) << 24) | (uint64(uint8(data[offset + 5])) << 16)
+            | (uint64(uint8(data[offset + 6])) << 8) | uint64(uint8(data[offset + 7]));
+
+        mps = uint24(packedValue >> 40);
+        blockDelta = uint40(packedValue);
     }
 }

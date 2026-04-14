@@ -9,13 +9,13 @@ abstract contract BidStorage is IBidStorage {
     /// @notice The id of the next bid to be created
     uint256 private _nextBidId;
     /// @notice The mapping of bid ids to bids
-    mapping(uint256 bidId => Bid bid) private _bids;
+    mapping(uint256 => Bid) private _bids;
 
     /// @notice Get a bid from storage
     /// @param bidId The id of the bid to get
     /// @return bid The bid
     function _getBid(uint256 bidId) internal view returns (Bid storage) {
-        if (bidId >= _nextBidId) revert BidIdDoesNotExist(bidId);
+        require(bidId < _nextBidId, "BidStorage: bid id does not exist");
         return _bids[bidId];
     }
 
@@ -34,15 +34,13 @@ abstract contract BidStorage is IBidStorage {
         uint256 _maxPrice,
         uint24 _startCumulativeMps
     ) internal returns (Bid memory bid, uint256 bidId) {
-        bid = Bid({
-            startBlock: uint64(_blockNumberIsh),
-            startCumulativeMps: _startCumulativeMps,
-            exitedBlock: 0,
-            maxPrice: _maxPrice,
-            amountQ96: _amount,
-            owner: _owner,
-            tokensFilled: 0
-        });
+        bid.startBlock = uint64(_blockNumberIsh);
+        bid.startCumulativeMps = _startCumulativeMps;
+        bid.exitedBlock = 0;
+        bid.maxPrice = _maxPrice;
+        bid.owner = _owner;
+        bid.amountQ96 = _amount;
+        bid.tokensFilled = 0;
 
         bidId = _nextBidId;
         _bids[bidId] = bid;
@@ -51,12 +49,12 @@ abstract contract BidStorage is IBidStorage {
 
     /// Getters
     /// @inheritdoc IBidStorage
-    function nextBidId() external view returns (uint256) {
+    function nextBidId() external view override returns (uint256) {
         return _nextBidId;
     }
 
     /// @inheritdoc IBidStorage
-    function bids(uint256 bidId) external view returns (Bid memory) {
+    function bids(uint256 bidId) external view override returns (Bid memory) {
         return _getBid(bidId);
     }
 }

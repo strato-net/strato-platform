@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {FixedPointMathLib} from 'solady/utils/FixedPointMathLib.sol';
-
 /// @title MaxBidPriceLib
 /// @notice Library for calculating the maximum bid price for a given total supply
 /// @dev The two are generally inversely correlated with certain constraints.
@@ -71,7 +69,7 @@ library MaxBidPriceLib {
      */
     /// @notice The maximum allowable price for a bid is type(uint160).max
     /// @dev This is the maximum price that can be shifted left by 96 bits without overflowing a uint256
-    uint256 constant MAX_V4_PRICE = type(uint160).max;
+    uint256 constant MAX_V4_PRICE = (2 ** 160) - 1;
 
     /// @notice The total supply value below which the maximum bid price is capped at MAX_V4_PRICE
     /// @dev Since the two are inversely correlated, generally lower total supply = higher max bid price
@@ -118,6 +116,9 @@ library MaxBidPriceLib {
         uint256 maxPriceKeepingCurrencyRaisedUnderInt128Max = uint256(1 << 222) / _totalSupply;
 
         // Take the minimum of the two to ensure that the (max bid price, total supply) pair is within the valid range.
-        return FixedPointMathLib.min(maxPriceKeepingLiquidityUnderMax, maxPriceKeepingCurrencyRaisedUnderInt128Max);
+        if (maxPriceKeepingLiquidityUnderMax < maxPriceKeepingCurrencyRaisedUnderInt128Max) {
+            return maxPriceKeepingLiquidityUnderMax;
+        }
+        return maxPriceKeepingCurrencyRaisedUnderInt128Max;
     }
 }

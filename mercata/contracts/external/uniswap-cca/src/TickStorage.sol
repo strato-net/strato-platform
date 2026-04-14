@@ -8,7 +8,7 @@ import {ConstantsLib} from './libraries/ConstantsLib.sol';
 /// @notice Abstract contract for handling tick storage
 abstract contract TickStorage is ITickStorage {
     /// @notice Mapping of price levels to tick data
-    mapping(uint256 price => Tick) private _ticks;
+    mapping(uint256 => Tick) private _ticks;
 
     /// @notice The price of the next initialized tick above the clearing price
     /// @dev This will be equal to the clearingPrice if no ticks have been initialized yet
@@ -19,13 +19,13 @@ abstract contract TickStorage is ITickStorage {
     uint256 internal immutable TICK_SPACING;
 
     /// @notice Sentinel value for the next pointer of the highest tick in the book
-    uint256 public constant MAX_TICK_PTR = type(uint256).max;
+    uint256 public constant MAX_TICK_PTR = (2 ** 256) - 1;
 
     constructor(uint256 _tickSpacing, uint256 _floorPrice) {
-        if (_tickSpacing < ConstantsLib.MIN_TICK_SPACING) revert TickSpacingTooSmall();
+        require(_tickSpacing >= ConstantsLib.MIN_TICK_SPACING, "TickStorage: tick spacing too small");
         TICK_SPACING = _tickSpacing;
-        if (_floorPrice == 0) revert FloorPriceIsZero();
-        if (_floorPrice < ConstantsLib.MIN_FLOOR_PRICE) revert FloorPriceTooLow();
+        require(_floorPrice != 0, "TickStorage: floor price is zero");
+        require(_floorPrice >= ConstantsLib.MIN_FLOOR_PRICE, "TickStorage: floor price too low");
         FLOOR_PRICE = _floorPrice;
         // Initialize the floor price as the first tick
         // _getTick will validate that it is also at a tick boundary
@@ -39,7 +39,7 @@ abstract contract TickStorage is ITickStorage {
     /// @dev The returned tick is not guaranteed to be initialized
     function _getTick(uint256 price) internal view returns (Tick storage) {
         // Validate `price` is at a boundary designated by the tick spacing
-        if (price % TICK_SPACING != 0) revert TickPriceNotAtBoundary();
+        require(price % TICK_SPACING == 0, "TickStorage: tick price not at boundary");
         return _ticks[price];
     }
 
@@ -51,17 +51,17 @@ abstract contract TickStorage is ITickStorage {
     /// @param prevPrice The price of the previous tick
     /// @param price The price of the tick
     function _initializeTickIfNeeded(uint256 prevPrice, uint256 price) internal {
-        if (price == MAX_TICK_PTR) revert InvalidTickPrice();
+        require(price != MAX_TICK_PTR, "TickStorage: invalid tick price");
         // _getTick will validate that `price` is at a boundary designated by the tick spacing
         Tick storage newTick = _getTick(price);
         // Early return if the tick is already initialized
         if (newTick.next != 0) return;
         // Otherwise, we need to iterate through the linked list to find the correct position for the new tick
         // Require that `prevPrice` is less than `price` since we can only iterate forward
-        if (prevPrice >= price) revert TickPreviousPriceInvalid();
+        require(prevPrice < price, "TickStorage: previous tick price invalid");
         uint256 nextPrice = _getTick(prevPrice).next;
         // Revert if the next price is 0 as that means the `prevPrice` hint was not an initialized tick
-        if (nextPrice == 0) revert TickPreviousPriceInvalid();
+        require(nextPrice != 0, "TickStorage: previous tick price invalid");
         // Move the `prevPrice` pointer up until its next pointer is a tick greater than or equal to `price`
         // If `price` would be the highest tick in the list, this will iterate until `nextPrice` == MAX_TICK_PTR,
         // which will end the loop since we don't allow for ticks to be initialized at MAX_TICK_PTR.
@@ -88,28 +88,28 @@ abstract contract TickStorage is ITickStorage {
     /// @param currencyDemandQ96 The demand to add
     function _updateTickDemand(uint256 price, uint256 currencyDemandQ96) internal {
         Tick storage tick_ = _getTick(price);
-        if (tick_.next == 0) revert CannotUpdateUninitializedTick();
+        require(tick_.next != 0, "TickStorage: cannot update uninitialized tick");
         tick_.currencyDemandQ96 += currencyDemandQ96;
     }
 
     // Getters
     /// @inheritdoc ITickStorage
-    function floorPrice() external view returns (uint256) {
+    function floorPrice() external view override returns (uint256) {
         return FLOOR_PRICE;
     }
 
     /// @inheritdoc ITickStorage
-    function tickSpacing() external view returns (uint256) {
+    function tickSpacing() external view override returns (uint256) {
         return TICK_SPACING;
     }
 
     /// @inheritdoc ITickStorage
-    function nextActiveTickPrice() external view returns (uint256) {
+    function nextActiveTickPrice() external view override returns (uint256) {
         return _nextActiveTickPrice;
     }
 
     /// @inheritdoc ITickStorage
-    function ticks(uint256 price) external view returns (Tick memory) {
+    function ticks(uint256 price) external view override returns (Tick memory) {
         return _getTick(price);
     }
 }

@@ -2,16 +2,17 @@
 pragma solidity 0.8.26;
 
 import {BidStorage} from './BidStorage.sol';
-import {Checkpoint, CheckpointStorage} from './CheckpointStorage.sol';
+import {CheckpointStorage} from './CheckpointStorage.sol';
 import {StepStorage} from './StepStorage.sol';
-import {Tick, TickStorage} from './TickStorage.sol';
+import {TickStorage} from './TickStorage.sol';
 import {TokenCurrencyStorage} from './TokenCurrencyStorage.sol';
 import {AuctionParameters, IContinuousClearingAuction} from './interfaces/IContinuousClearingAuction.sol';
+import {Tick} from './interfaces/ITickStorage.sol';
 import {IValidationHook} from './interfaces/IValidationHook.sol';
 import {IDistributionContract} from './interfaces/external/IDistributionContract.sol';
 import {IERC20Minimal} from './interfaces/external/IERC20Minimal.sol';
 import {Bid, BidLib} from './libraries/BidLib.sol';
-import {CheckpointLib} from './libraries/CheckpointLib.sol';
+import {Checkpoint, CheckpointLib} from './libraries/CheckpointLib.sol';
 import {ConstantsLib} from './libraries/ConstantsLib.sol';
 import {CurrencyLibrary} from './libraries/CurrencyLibrary.sol';
 import {FixedPoint96} from './libraries/FixedPoint96.sol';
@@ -19,10 +20,6 @@ import {MaxBidPriceLib} from './libraries/MaxBidPriceLib.sol';
 import {AuctionStep, StepLib} from './libraries/StepLib.sol';
 import {ValidationHookLib} from './libraries/ValidationHookLib.sol';
 import {ValueX7Lib} from './libraries/ValueX7Lib.sol';
-import {BlockNumberish} from 'blocknumberish/src/BlockNumberish.sol';
-import {FixedPointMathLib} from 'solady/utils/FixedPointMathLib.sol';
-import {ReentrancyGuardTransient} from 'solady/utils/ReentrancyGuardTransient.sol';
-import {SafeTransferLib} from 'solady/utils/SafeTransferLib.sol';
 
 /// @title ContinuousClearingAuction
 /// @custom:security-contact security@uniswap.org
@@ -35,11 +32,8 @@ contract ContinuousClearingAuction is
     StepStorage,
     TickStorage,
     TokenCurrencyStorage,
-    BlockNumberish,
-    ReentrancyGuardTransient,
     IContinuousClearingAuction
 {
-    using FixedPointMathLib for *;
     using CurrencyLibrary for address;
     using BidLib for *;
     using StepLib for *;
@@ -68,6 +62,8 @@ contract ContinuousClearingAuction is
 
     /// @notice Whether the TOTAL_SUPPLY of tokens has been received
     bool private _tokensReceived;
+    /// @notice Simple reentrancy lock for STRATO compatibility
+    bool private _entered;
 
     constructor(address _token, uint128 _totalSupply, AuctionParameters memory _parameters)
         StepStorage(_parameters.auctionStepsData, _parameters.startBlock, _parameters.endBlock)
@@ -116,6 +112,13 @@ contract ContinuousClearingAuction is
     modifier onlyActiveAuction() {
         _onlyActiveAuction();
         _;
+    }
+
+    modifier nonReentrant() {
+        require(!_entered, "ReentrancyGuard: reentrant call");
+        _entered = true;
+        _;
+        _entered = false;
     }
 
     /// @notice Internal function to check if the auction is active
@@ -472,7 +475,7 @@ contract ContinuousClearingAuction is
         bid_.exitedBlock = uint64(_getBlockNumberish());
 
         if (refund > 0) {
-            CURRENCY.transfer(owner, refund);
+            _transferCurrency(owner, refund);
         }
 
         emit BidExited(_bidId, owner, _tokensFilled, refund);

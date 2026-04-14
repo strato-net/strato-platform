@@ -13,6 +13,8 @@ abstract contract TokenCurrencyStorage is ITokenCurrencyStorage {
     using ValueX7Lib for uint256;
     using CurrencyLibrary for address;
 
+    error NativeCurrencyTransferFailed();
+
     /// @notice The currency being raised in the auction
     address internal immutable CURRENCY;
     /// @notice The token being sold in the auction
@@ -40,25 +42,26 @@ abstract contract TokenCurrencyStorage is ITokenCurrencyStorage {
         address _fundsRecipient,
         uint128 _requiredCurrencyRaised
     ) {
-        if (_token == address(0)) revert TokenIsAddressZero();
-        if (_token == _currency) revert TokenAndCurrencyCannotBeTheSame();
-        if (_totalSupply == 0) revert TotalSupplyIsZero();
-        if (_totalSupply > ConstantsLib.MAX_TOTAL_SUPPLY) revert TotalSupplyIsTooLarge();
-        if (_tokensRecipient == address(0)) revert TokensRecipientIsZero();
-        if (_fundsRecipient == address(0)) revert FundsRecipientIsZero();
+        require(_token != address(0), "TokenCurrency: token=0");
+        require(_token != _currency, "TokenCurrency: token==currency");
+        require(_totalSupply != 0, "TokenCurrency: supply=0");
+        require(_totalSupply <= ConstantsLib.MAX_TOTAL_SUPPLY, "TokenCurrency: supply too large");
+        require(_tokensRecipient != address(0), "TokenCurrency: tokensRecipient=0");
+        require(_fundsRecipient != address(0), "TokenCurrency: fundsRecipient=0");
 
         TOKEN = IERC20Minimal(_token);
         CURRENCY = _currency;
         TOTAL_SUPPLY = _totalSupply;
         TOKENS_RECIPIENT = _tokensRecipient;
         FUNDS_RECIPIENT = _fundsRecipient;
-        REQUIRED_CURRENCY_RAISED_Q96_X7 = (uint256(_requiredCurrencyRaised) << FixedPoint96.RESOLUTION).scaleUpToX7();
+        uint256 requiredCurrencyRaisedQ96 = uint256(_requiredCurrencyRaised) << uint256(FixedPoint96.RESOLUTION);
+        REQUIRED_CURRENCY_RAISED_Q96_X7 = ValueX7Lib.scaleUpToX7(requiredCurrencyRaisedQ96);
     }
 
     function _sweepCurrency(uint256 _blockNumberIsh, uint256 _amount) internal {
         sweepCurrencyBlock = _blockNumberIsh;
         if (_amount > 0) {
-            CURRENCY.transfer(FUNDS_RECIPIENT, _amount);
+            _transferCurrency(FUNDS_RECIPIENT, _amount);
         }
         emit CurrencySwept(FUNDS_RECIPIENT, _amount);
     }
@@ -69,5 +72,15 @@ abstract contract TokenCurrencyStorage is ITokenCurrencyStorage {
             address(TOKEN).transfer(TOKENS_RECIPIENT, _amount);
         }
         emit TokensSwept(TOKENS_RECIPIENT, _amount);
+    }
+
+    function _transferCurrency(address _recipient, uint256 _amount) internal {
+        if (CURRENCY.isAddressZero()) {
+            _recipient;
+            _amount;
+            revert NativeCurrencyTransferFailed();
+        }
+
+        CURRENCY.transfer(_recipient, _amount);
     }
 }

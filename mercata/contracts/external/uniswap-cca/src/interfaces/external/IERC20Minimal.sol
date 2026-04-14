@@ -14,6 +14,13 @@ interface IERC20Minimal {
     /// @return Returns true for a successful transfer, false for an unsuccessful transfer
     function transfer(address recipient, uint256 amount) external returns (bool);
 
+    /// @notice Transfers tokens from the sender to the recipient using allowance
+    /// @param sender The account to transfer tokens from
+    /// @param recipient The account that will receive the amount transferred
+    /// @param amount The number of tokens to send from the sender to the recipient
+    /// @return Returns true for a successful transfer, false for an unsuccessful transfer
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+
     /// @notice Approves the spender to spend the amount of tokens from the `msg.sender`
     /// @param spender The account that will be allowed to spend the amount
     /// @param amount The number of tokens to allow the spender to spend

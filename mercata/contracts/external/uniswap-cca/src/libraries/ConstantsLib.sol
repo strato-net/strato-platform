@@ -7,7 +7,7 @@ library ConstantsLib {
     /// @notice we use milli-bips, or one thousandth of a basis point
     uint24 constant MPS = 1e7;
     /// @notice The upper bound of a ValueX7 value
-    uint256 constant X7_UPPER_BOUND = type(uint256).max / 1e7;
+    uint256 constant X7_UPPER_BOUND = ((2 ** 256) - 1) / 1e7;
 
     /// @notice The maximum total supply of tokens that can be sold in the Auction
     /// @dev    This is set to 2^100 tokens, which is just above 1e30, or one trillion units of a token with 18 decimals.
@@ -17,7 +17,7 @@ library ConstantsLib {
 
     /// @notice The minimum allowable floor price is type(uint32).max + 1
     /// @dev This is the minimum price that fits in a uint160 after being inversed
-    uint256 constant MIN_FLOOR_PRICE = uint256(type(uint32).max) + 1;
+    uint256 constant MIN_FLOOR_PRICE = ((2 ** 32) - 1) + 1;
 
     /// @notice The minimum allowable tick spacing
     /// @dev We don't support tick spacings of 1 to avoid edge cases where the rounding of the clearing price
