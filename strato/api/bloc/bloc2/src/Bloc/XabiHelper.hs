@@ -137,7 +137,7 @@ tFormTypeToType = \case
   (SolidType.Enum maybeInt typeD nams) -> (XabiType.Enum maybeInt (T.pack typeD) ((map T.pack) <$> nams))
   (SolidType.Array typ len) -> (XabiType.Array (tFormTypeToType typ) len)
   (SolidType.Contract s) -> (XabiType.Contract $ T.pack s)
-  (SolidType.Mapping maybeBoo k v) -> (XabiType.Mapping maybeBoo (tFormTypeToType k) (tFormTypeToType v))
+  (SolidType.Mapping maybeBoo k v _ _) -> (XabiType.Mapping maybeBoo (tFormTypeToType k) (tFormTypeToType v))
   (SolidType.UserDefined _ t) -> tFormTypeToType t
   (SolidType.Bool) -> (XabiType.Bool)
   (SolidType.Address _) -> (XabiType.Address)

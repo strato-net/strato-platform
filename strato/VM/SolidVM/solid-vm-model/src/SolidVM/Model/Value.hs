@@ -249,7 +249,7 @@ createVar val = createVar' =<< case val of
 --TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
 defaultValue :: CC.Contract -> SVMType.Type -> Value
 defaultValue _ (SVMType.Array _ _) = SArray V.empty
-defaultValue _ (SVMType.Mapping _ _ _) = SMap M.empty
+defaultValue _ (SVMType.Mapping _ _ _ _ _) = SMap M.empty
 defaultValue _ (SVMType.Int _ _) = SInteger 0
 defaultValue _ SVMType.Bool = SBool False
 defaultValue _ (SVMType.Address _) = (SAddress 0) False
@@ -281,7 +281,7 @@ createDefaultValue ::
   SVMType.Type ->
   m Value
 createDefaultValue _ _ (SVMType.Array _ _) = return $ SArray V.empty
-createDefaultValue _ _ (SVMType.Mapping _ _ _) = return $ SMap M.empty
+createDefaultValue _ _ (SVMType.Mapping _ _ _ _ _) = return $ SMap M.empty
 createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ _ SVMType.Bool = return $ SBool False
 createDefaultValue _ _ (SVMType.Address _) = return $ (SAddress 0) False

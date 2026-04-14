@@ -140,7 +140,7 @@ unparseVarType (SVMType.UnknownLabel str) = labelToString str
 unparseVarType (SVMType.Enum _ name _) = labelToString name
 unparseVarType (SVMType.Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
 unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
-unparseVarType (SVMType.Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
+unparseVarType (SVMType.Mapping _ key val kn vn) = "mapping (" <> (unparseVarType key) <> (maybe "" (" " <>) kn) <> " => " <> (unparseVarType val) <> (maybe "" (" " <>) vn) <> ")"
 unparseVarType (SVMType.Contract contractName') = labelToString contractName'
 unparseVarType (SVMType.Struct _ n) = "struct " ++ labelToString n
 unparseVarType (SVMType.Decimal) = "decimal"

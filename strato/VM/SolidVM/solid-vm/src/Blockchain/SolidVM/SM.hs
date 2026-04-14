@@ -969,7 +969,7 @@ getMapNamesFromContract :: CC.Contract -> [T.Text]
 getMapNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
-      listOfMappings = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Mapping _ _ _ -> True; _ -> False) storageDefsList
+      listOfMappings = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Mapping _ _ _ _ _ -> True; _ -> False) storageDefsList
    in T.pack . fst <$> listOfMappings
 
 --also needs to be changed for testnet3 to be only record

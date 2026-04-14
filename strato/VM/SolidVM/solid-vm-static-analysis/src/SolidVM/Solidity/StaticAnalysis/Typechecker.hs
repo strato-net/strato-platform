@@ -125,7 +125,9 @@ showType (SVMType.Array t l) =
       "]"
     ]
 showType (SVMType.Contract n) = "contract " <> labelToText n
-showType (SVMType.Mapping _ k v) = "mapping (" <> showType k <> " => " <> showType v <> ")"
+showType (SVMType.Mapping _ k v kn vn) =
+  let p = maybe "" ((" " <>) . T.pack)
+   in "mapping (" <> showType k <> (p kn) <> " => " <> (showType v) <> (p vn) <> ")"
 showType SVMType.Variadic = "variadic"
 
 showType' :: Type' -> Text
@@ -364,7 +366,7 @@ lookupContractFunction x cName fName = do
               _ -> bottom $ "Failed to construct type for contract array getter. This is probably a SolidVM typechecker bug" <$ y
          in pure $ Function args' rets ctx w j f
       _ -> pure . bottom $ "Failed to construct type for contract array getter. This is probably a SolidVM typechecker bug" <$ y
-    constructGetterType y (SVMType.Mapping _ k v) = constructGetterType y v >>= \case
+    constructGetterType y (SVMType.Mapping _ k v _ _) = constructGetterType y v >>= \case
       Function args rets ctx w j f ->
         let baseType = Static k y
             args' = case args of
@@ -489,7 +491,7 @@ contractType' :: SourceAnnotation Text -> Type'
 contractType' = Static (SVMType.Contract "")
 
 certType' :: SourceAnnotation Text -> Type'
-certType' x = Static (SVMType.Mapping Nothing (SVMType.String Nothing) (SVMType.String Nothing)) x
+certType' x = Static (SVMType.Mapping Nothing (SVMType.String Nothing) (SVMType.String Nothing) Nothing Nothing) x
 
 topType' :: SourceAnnotation Text -> Type'
 topType' = Top S.empty
@@ -762,12 +764,12 @@ typecheckStatic (SVMType.Contract a) (SVMType.Contract b) =
           <> " and "
           <> labelToText b
           <> " do not match."
-typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
+typecheckStatic (SVMType.Mapping d1 k1 v1 kn vn) (SVMType.Mapping d2 k2 v2 _ _) = do
   k <- typecheckStatic k1 k2
   v <- typecheckStatic v1 v2
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between mapping values"
-    _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
+    _ -> Right $ SVMType.Mapping (d1 <|> d2) k v kn vn
 typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
   if alias1 == alias2
     then typecheckStatic a b
@@ -803,7 +805,7 @@ typecheckIndex _ (Bottom es) = pure $ Bottom es
 typecheckIndex (Static (SVMType.Array t _) x) i = i ~> (pure $ intType' x) !> pure (Static t x)
 typecheckIndex (Static SVMType.Variadic x) i = i ~> (pure $ intType' x) !> pure (topType' x)
 typecheckIndex (Static (SVMType.Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (intType' x)
-typecheckIndex (Static (SVMType.Mapping _ k v) x) i = do
+typecheckIndex (Static (SVMType.Mapping _ k v _ _) x) i = do
   t <- typecheck (Static k x) i
   pure $ case t of
     Bottom es -> Bottom es

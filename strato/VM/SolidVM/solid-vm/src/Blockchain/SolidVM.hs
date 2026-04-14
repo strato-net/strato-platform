@@ -516,12 +516,12 @@ call' from to' fnCalltype functionName valList = do
                 ((SVMType.Array _ _), oa) -> for oa $ \case
                   SInteger n -> Just . MS.Index . BC.pack $ show n
                   _ -> Nothing
-                ((SVMType.Mapping _ _ _), oa) ->
+                ((SVMType.Mapping _ _ _ _ _), oa) ->
                   traverse convertValueToStoragePathPiece oa
                 _ -> Nothing
               returnType = \case
                 SVMType.Array t _ -> returnType t
-                SVMType.Mapping _ _ t -> returnType t
+                SVMType.Mapping _ _ t _ _ -> returnType t
                 t -> t
               handleStruct s path = do
                 mFields <- case M.lookup s $ contract ^. CC.structs of
@@ -2575,7 +2575,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
 
     forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
       case theType of
-        SVMType.Mapping _ _ _ -> return ()
+        SVMType.Mapping _ _ _ _ _ -> return ()
         SVMType.Array _ _ -> return ()
         t -> do
           defVal <- createDefaultValue cc contract' t
@@ -2675,7 +2675,7 @@ resolveArgRef src contract cc argType arg = case arg of
      in SArray <$> traverse (fmap Constant . resolveArgRef src contract cc t' <=< weakGetVar) vs
   SMap m ->
     let t' = case argType of
-               SVMType.Mapping _ _ t'' -> t''
+               SVMType.Mapping _ _ t'' _ _ -> t''
                _ -> argType
      in SMap <$> traverse (fmap Constant . resolveArgRef src contract cc t' <=< weakGetVar) m
   SStruct n vs -> SStruct n <$> traverse (fmap Constant . resolveArgRef src contract cc argType <=< weakGetVar) vs
