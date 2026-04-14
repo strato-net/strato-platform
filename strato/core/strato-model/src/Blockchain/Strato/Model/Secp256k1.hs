@@ -255,11 +255,11 @@ instance ToSchema Signature where
 -- we can keep the sigVs normal here.
 
 recoverPub :: Signature -> B.ByteString -> Maybe PublicKey
-recoverPub (Signature (S.CompactRecSig r s v)) msgHash =
+recoverPub (Signature (S.CompactRecSig r s v)) msgHash = do
   let sig' = S.CompactRecSig s r v -- the swapped sig
-      sig = fromMaybe (error "could not import recsig") (S.importCompactRecSig sig')
-      mesg = fromMaybe (error "could not import msgHash") (S.msg msgHash)
-   in PublicKey <$> (S.recover sig mesg)
+  sig  <- S.importCompactRecSig sig'
+  mesg <- S.msg msgHash
+  PublicKey <$> S.recover sig mesg
 
 signMsg :: PrivateKey -> B.ByteString -> Signature
 signMsg pk msgHash =

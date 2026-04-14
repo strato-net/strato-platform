@@ -270,7 +270,12 @@ blockstanbulSend' msg = do
     let getSequencedBlock =
           ingestBlockToSequencedBlock
             . blockToIngestBlock TO.Blockstanbul
-    let rBlocks = catMaybes (map getSequencedBlock blocks)
+    let allSequenced = map getSequencedBlock blocks
+        rBlocks = catMaybes allSequenced
+        droppedCount = length blocks - length rBlocks
+    when (droppedCount > 0) $
+      $logWarnS "seq/pbft/send" . T.pack $
+        "Rejected " ++ show droppedCount ++ " committed block(s) with unrecoverable transaction signatures"
     committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
     let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
 
@@ -397,8 +402,12 @@ transformBlocks ibs = do
   forM_ ibs $ \ib ->
     case (ingestBlockToSequencedBlock ib) of
       Nothing -> do
+        let theHash = blockHeaderHash $ ibBlockData ib
+            failedTxHashes = [format (BDB.txHash t) | t <- ibReceiptTransactions ib
+                             , isNothing (wrapIngestBlockTransaction theHash t)]
         $logWarnS "transformEvents/emitBlocks" . T.pack $
-          "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
+          "Rejecting " ++ prettyIBlock ib
+          ++ " - could not recover signer for tx(s): " ++ unwords failedTxHashes
         lift $ P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
       Just sb -> do
         runConsensus sb
