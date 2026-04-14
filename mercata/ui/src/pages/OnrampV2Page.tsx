@@ -55,6 +55,7 @@ const OnrampV2Page = () => {
   const [purchaseRefreshKey, setPurchaseRefreshKey] = useState(0);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const popupRef = useRef<Window | null>(null);
 
   // Config
   const [meldEnabled, setMeldEnabled] = useState<boolean | null>(null);
@@ -108,7 +109,7 @@ const OnrampV2Page = () => {
         });
 
         const { widgetUrl, sessionId } = data.data;
-        window.open(widgetUrl, "meld-onramp", "width=500,height=750,scrollbars=yes,resizable=yes");
+        popupRef.current = window.open(widgetUrl, "meld-onramp", "width=500,height=750,scrollbars=yes,resizable=yes");
         setWaitingForPayment(true);
 
         stopPolling();
@@ -121,6 +122,8 @@ const OnrampV2Page = () => {
               stopPolling();
               setWaitingForPayment(false);
               setActiveSessionId(sessionId);
+              try { popupRef.current?.close(); } catch { /* cross-origin */ }
+              popupRef.current = null;
             }
           } catch { /* keep polling */ }
         };
