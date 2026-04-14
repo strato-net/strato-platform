@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { formatUnits } from "ethers";
 import { Repeat2, TrendingUp, ShieldAlert, ChevronDown, ChevronUp } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -29,13 +30,14 @@ import { useUser } from "@/context/UserContext";
 import { loopService } from "@/services/loopService";
 import type {
   LoopBootstrapResponse,
+  LoopPositionEntry,
   LoopHistoryItem,
   LoopRouteType,
-  LoopStepPreview,
   LoopUnwindMode,
 } from "@/interface/loop";
+import { parseUnitsWithTruncation } from "@/utils/numberUtils";
 
-const LOOP_ASSETS = ["wstETH", "rETH", "sUSDS", "syrupUSDC"];
+const DEFAULT_ASSET_SYMBOL = "wstETH";
 
 const asNumber = (value: number | string | undefined): number => {
   if (value === undefined || value === null || value === "") return 0;
@@ -43,11 +45,18 @@ const asNumber = (value: number | string | undefined): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const formatPercent = (value: number | string | undefined): string =>
-  `${asNumber(value).toFixed(2)}%`;
+const formatPercent = (value: number | string | undefined): string => `${asNumber(value).toFixed(2)}%`;
 
-const formatUsd = (value: number | string | undefined): string =>
-  `$${asNumber(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+const formatUsd = (value: number | string | undefined): string => `$${asNumber(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+
+const formatUsdFromWei = (value: string | undefined): string => {
+  if (!value) return "—";
+  try {
+    return `$${Number(formatUnits(value, 18)).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  } catch {
+    return "—";
+  }
+};
 
 const formatTimestamp = (value?: string): string => {
   if (!value) return "—";
@@ -72,44 +81,31 @@ const getHealthClass = (healthFactor: number): string => {
 
 const getStatusBadgeClass = (status?: string): string => {
   const value = (status || "").toLowerCase();
-  if (value.includes("complete") || value.includes("success")) {
+  if (value.includes("success")) {
     return "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300";
   }
-  if (value.includes("pending") || value.includes("running")) {
+  if (value.includes("partial")) {
     return "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
   }
-  if (value.includes("fail") || value.includes("abort")) {
+  if (value.includes("fail")) {
     return "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300";
   }
   return "bg-muted text-muted-foreground";
 };
 
-const defaultSteps = (routeType: LoopRouteType): LoopStepPreview[] =>
-  routeType === "cdp"
-    ? [
-        { key: "deposit", label: "Deposit collateral", description: "Lock asset into CDP vault" },
-        { key: "mint", label: "Mint debt token", description: "Mint USDST against collateral" },
-        { key: "swap", label: "Swap and re-enter", description: "Swap USDST back into collateral and repeat" },
-      ]
-    : [
-        { key: "supply", label: "Supply collateral", description: "Deposit into lending market" },
-        { key: "borrow", label: "Borrow debt token", description: "Borrow USDST from lending pool" },
-        { key: "swap", label: "Swap and re-supply", description: "Swap USDST into collateral and repeat" },
-      ];
-
 const Loop = () => {
   const { isLoggedIn } = useUser();
 
-  const [routeType, setRouteType] = useState<LoopRouteType>("cdp");
-  const [asset, setAsset] = useState("wstETH");
+  const [routeType, setRouteType] = useState<LoopRouteType>("cdp_loop");
+  const [assetSymbol, setAssetSymbol] = useState(DEFAULT_ASSET_SYMBOL);
   const [collateralAmount, setCollateralAmount] = useState("1");
-  const [leverage, setLeverage] = useState(2);
+  const [leverage, setLeverage] = useState(2.0);
   const [iterations, setIterations] = useState(2);
   const [unwindMode, setUnwindMode] = useState<LoopUnwindMode>("partial");
   const [unwindPercent, setUnwindPercent] = useState(50);
 
   const [preview, setPreview] = useState<LoopBootstrapResponse | null>(null);
-  const [position, setPosition] = useState<LoopBootstrapResponse | null>(null);
+  const [position, setPosition] = useState<LoopPositionEntry | null>(null);
   const [history, setHistory] = useState<LoopHistoryItem[]>([]);
   const [expandedHistoryKey, setExpandedHistoryKey] = useState<string | null>(null);
   const [lastActionStatus, setLastActionStatus] = useState<string>("");
@@ -123,34 +119,83 @@ const Loop = () => {
     document.title = "Loop | STRATO";
   }, []);
 
+  const routeOpportunities = useMemo(() => {
+    if (!preview?.opportunities) return [];
+    return preview.opportunities.filter((item) =>
+      routeType === "cdp_loop" ? Boolean(item.cdpCarry) : Boolean(item.lendingCarry)
+    );
+  }, [preview?.opportunities, routeType]);
+
+  useEffect(() => {
+    if (routeOpportunities.length === 0) return;
+    const hasSelected = routeOpportunities.some((item) => item.symbol === assetSymbol);
+    if (!hasSelected) {
+      setAssetSymbol(routeOpportunities[0].symbol);
+    }
+  }, [assetSymbol, routeOpportunities]);
+
+  const selectedOpportunity = useMemo(
+    () => routeOpportunities.find((item) => item.symbol === assetSymbol) || null,
+    [assetSymbol, routeOpportunities]
+  );
+  const selectedAssetAddress = selectedOpportunity?.asset;
+  const selectedCarry = routeType === "cdp_loop" ? selectedOpportunity?.cdpCarry : selectedOpportunity?.lendingCarry;
+  const txPerLoop = 3;
+  const estimatedTxCount = iterations * txPerLoop;
+  const gasFeePerStep = preview?.gasFeePerStep;
+  const estimatedFeeUsdst = useMemo(() => {
+    if (!gasFeePerStep) return "—";
+    try {
+      return `${Number(formatUnits(BigInt(gasFeePerStep) * BigInt(estimatedTxCount), 18)).toFixed(4)} USDST`;
+    } catch {
+      return "—";
+    }
+  }, [estimatedTxCount, gasFeePerStep]);
+
   const loadPositionAndHistory = useCallback(async () => {
     if (!isLoggedIn) return;
     setSidePanelLoading(true);
     try {
       const [positionResponse, historyResponse] = await Promise.all([
-        loopService.position(routeType, asset),
-        loopService.history(routeType, asset),
+        loopService.position(),
+        loopService.history(),
       ]);
-      setPosition(positionResponse);
-      setHistory(historyResponse);
+      const routePositions = routeType === "cdp_loop" ? positionResponse.cdp : positionResponse.lending;
+      const selectedPosition = selectedAssetAddress
+        ? routePositions.find((item) => item.asset.toLowerCase() === selectedAssetAddress.toLowerCase()) || null
+        : routePositions[0] || null;
+      setPosition(selectedPosition);
+      setHistory(
+        historyResponse.filter(
+          (item) =>
+            item.routeType === routeType &&
+            (!selectedAssetAddress || item.asset.toLowerCase() === selectedAssetAddress.toLowerCase())
+        )
+      );
     } finally {
       setSidePanelLoading(false);
     }
-  }, [asset, isLoggedIn, routeType]);
+  }, [isLoggedIn, routeType, selectedAssetAddress]);
+
+  const ensureBootstrap = useCallback(async (): Promise<LoopBootstrapResponse | null> => {
+    if (preview) return preview;
+    try {
+      const response = await loopService.bootstrap();
+      setPreview(response);
+      return response;
+    } catch {
+      return null;
+    }
+  }, [preview]);
 
   const handlePreview = async () => {
     if (!isLoggedIn) return;
     setPreviewLoading(true);
     try {
-      const response = await loopService.bootstrap({
-        routeType,
-        asset,
-        collateralAmount,
-        leverage,
-        iterations,
-      });
+      const response = await loopService.bootstrap();
       setPreview(response);
       setLastActionStatus("Preview ready");
+      await loadPositionAndHistory();
     } finally {
       setPreviewLoading(false);
     }
@@ -160,14 +205,25 @@ const Loop = () => {
     if (!isLoggedIn) return;
     setExecuteLoading(true);
     try {
+      const bootstrapData = await ensureBootstrap();
+      if (!bootstrapData || !selectedAssetAddress) {
+        setLastActionStatus("Select a valid loopable asset first");
+        return;
+      }
+      const routeAssets =
+        routeType === "cdp_loop" ? bootstrapData.routes.cdp.assets : bootstrapData.routes.lending.assets;
+      const assetDecimals =
+        routeAssets.find((item) => item.address.toLowerCase() === selectedAssetAddress.toLowerCase())?.decimals || 18;
+      const amountWei = parseUnitsWithTruncation(collateralAmount, assetDecimals).toString();
       const response = await loopService.execute({
         routeType,
-        asset,
-        collateralAmount,
-        leverage,
-        iterations,
+        asset: selectedAssetAddress,
+        amount: amountWei,
+        loops: iterations,
+        minHealthFactor: leverage >= 2.5 ? 1.3 : 1.15,
       });
-      setLastActionStatus(response.status || response.message || "Execution submitted");
+      const failedStep = response.executedSteps.find((step) => step.status === "failed");
+      setLastActionStatus(failedStep ? `Execution failed: ${failedStep.action}` : "Execution submitted");
       await loadPositionAndHistory();
     } finally {
       setExecuteLoading(false);
@@ -178,26 +234,30 @@ const Loop = () => {
     if (!isLoggedIn) return;
     setUnwindLoading(true);
     try {
+      if (!selectedAssetAddress) {
+        setLastActionStatus("Select a valid loopable asset first");
+        return;
+      }
+      const steps =
+        unwindMode === "full"
+          ? "all"
+          : Math.max(1, Math.min(iterations, Math.round((iterations * unwindPercent) / 100)));
       const response = await loopService.unwind({
         routeType,
-        asset,
-        mode: unwindMode,
-        unwindPercent: unwindMode === "partial" ? unwindPercent : undefined,
+        asset: selectedAssetAddress,
+        steps,
       });
-      setLastActionStatus(response.status || response.message || "Unwind submitted");
+      const failedStep = response.executedSteps.find((step) => step.status === "failed");
+      setLastActionStatus(failedStep ? `Unwind failed: ${failedStep.action}` : "Unwind submitted");
       await loadPositionAndHistory();
     } finally {
       setUnwindLoading(false);
     }
   };
 
-  const effectiveSummary = preview || position || null;
-  const healthFactor = asNumber(effectiveSummary?.healthFactor);
+  const healthFactor = asNumber(position?.healthFactor || selectedCarry?.healthFactor);
   const riskLevel = getRiskLevel(healthFactor);
-  const stepPreview = useMemo(
-    () => (preview?.steps && preview.steps.length > 0 ? preview.steps : defaultSteps(routeType)),
-    [preview?.steps, routeType]
-  );
+  const actionLabel = routeType === "cdp_loop" ? "CDP route" : "Lending route";
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
@@ -220,7 +280,7 @@ const Loop = () => {
                     <CardDescription>Kamino-style flow: configure, preview, execute</CardDescription>
                   </div>
                   <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-                    {routeType === "cdp" ? "CDP loop" : "Lending loop"}
+                    {routeType === "cdp_loop" ? "CDP loop" : "Lending loop"}
                   </Badge>
                 </div>
               </CardHeader>
@@ -228,16 +288,16 @@ const Loop = () => {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
-                    variant={routeType === "cdp" ? "default" : "outline"}
-                    onClick={() => setRouteType("cdp")}
+                    variant={routeType === "cdp_loop" ? "default" : "outline"}
+                    onClick={() => setRouteType("cdp_loop")}
                     className="min-w-[120px]"
                   >
                     CDP route
                   </Button>
                   <Button
                     type="button"
-                    variant={routeType === "lending" ? "default" : "outline"}
-                    onClick={() => setRouteType("lending")}
+                    variant={routeType === "lending_loop" ? "default" : "outline"}
+                    onClick={() => setRouteType("lending_loop")}
                     className="min-w-[120px]"
                   >
                     Lending route
@@ -247,16 +307,18 @@ const Loop = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="loop-asset">Asset</Label>
-                    <Select value={asset} onValueChange={setAsset}>
+                    <Select value={assetSymbol} onValueChange={setAssetSymbol}>
                       <SelectTrigger id="loop-asset">
                         <SelectValue placeholder="Select asset" />
                       </SelectTrigger>
                       <SelectContent>
-                        {LOOP_ASSETS.map((item) => (
-                          <SelectItem key={item} value={item}>
-                            {item}
+                        {routeOpportunities.length > 0 ? routeOpportunities.map((item) => (
+                          <SelectItem key={item.asset} value={item.symbol}>
+                            {item.symbol}
                           </SelectItem>
-                        ))}
+                        )) : (
+                          <SelectItem value={DEFAULT_ASSET_SYMBOL}>{DEFAULT_ASSET_SYMBOL}</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -330,15 +392,19 @@ const Loop = () => {
 
                 <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Step preview</p>
+                    <p className="text-sm font-medium">{actionLabel} step preview</p>
                     <p className="text-xs text-muted-foreground">
-                      {effectiveSummary?.totalTxCount ?? stepPreview.length} steps
+                      {estimatedTxCount} actions
                     </p>
                   </div>
                   <div className="space-y-2">
-                    {stepPreview.map((step, index) => (
+                    {[
+                      routeType === "cdp_loop" ? "Deposit collateral" : "Supply collateral",
+                      routeType === "cdp_loop" ? "Mint/borrow USDST" : "Borrow USDST",
+                      "Swap and repeat",
+                    ].map((label, index) => (
                       <div
-                        key={step.key || `${step.label}-${index}`}
+                        key={`${label}-${index}`}
                         className="flex items-start justify-between gap-4 rounded-md border bg-background p-3"
                       >
                         <div className="flex items-start gap-3">
@@ -346,17 +412,10 @@ const Loop = () => {
                             {index + 1}
                           </span>
                           <div>
-                            <p className="text-sm font-medium">{step.label}</p>
-                            {step.description && (
-                              <p className="text-xs text-muted-foreground">{step.description}</p>
-                            )}
+                            <p className="text-sm font-medium">{label}</p>
                           </div>
                         </div>
-                        {step.txCount ? (
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {step.txCount} tx
-                          </span>
-                        ) : null}
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">per loop</span>
                       </div>
                     ))}
                   </div>
@@ -422,25 +481,29 @@ const Loop = () => {
                   <div className="rounded-md border bg-muted/30 p-3">
                     <p className="text-xs text-muted-foreground">Adjusted carry</p>
                     <p className="text-lg font-semibold">
-                      {effectiveSummary ? formatPercent(effectiveSummary.adjustedCarryApr) : "—"}
+                      {selectedCarry ? formatPercent(selectedCarry.netCarryWithImpactAPR) : "—"}
                     </p>
                   </div>
                   <div className="rounded-md border bg-muted/30 p-3">
                     <p className="text-xs text-muted-foreground">Leverage</p>
                     <p className="text-lg font-semibold">
-                      {effectiveSummary?.leverage ? `${asNumber(effectiveSummary.leverage).toFixed(2)}x` : "—"}
+                      {position?.leverage !== undefined
+                        ? `${asNumber(position.leverage).toFixed(2)}x`
+                        : selectedCarry
+                          ? `${asNumber(selectedCarry.exposureMultiple).toFixed(2)}x`
+                          : "—"}
                     </p>
                   </div>
                   <div className="rounded-md border bg-muted/30 p-3">
                     <p className="text-xs text-muted-foreground">Collateral</p>
                     <p className="text-lg font-semibold">
-                      {effectiveSummary ? formatUsd(effectiveSummary.collateralValueUsd) : "—"}
+                      {formatUsdFromWei(position?.collateralUSD)}
                     </p>
                   </div>
                   <div className="rounded-md border bg-muted/30 p-3">
                     <p className="text-xs text-muted-foreground">Debt</p>
                     <p className="text-lg font-semibold">
-                      {effectiveSummary ? formatUsd(effectiveSummary.debtValueUsd) : "—"}
+                      {formatUsdFromWei(position?.debt)}
                     </p>
                   </div>
                 </div>
@@ -479,28 +542,23 @@ const Loop = () => {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Estimated tx count</span>
-                    <span>{effectiveSummary?.totalTxCount ?? "—"}</span>
+                    <span>{estimatedTxCount}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Estimated fee</span>
-                    <span>
-                      {effectiveSummary?.estimatedTxCostUsdst
-                        ? `${asNumber(effectiveSummary.estimatedTxCostUsdst).toFixed(2)} USDST`
-                        : "—"}
-                    </span>
+                    <span>{estimatedFeeUsdst}</span>
                   </div>
                 </div>
 
-                {preview?.warnings && preview.warnings.length > 0 && (
+                {selectedCarry && selectedCarry.netCarryWithImpactAPR < 0 && (
                   <div className="rounded-md border border-amber-300/60 bg-amber-50/70 dark:bg-amber-500/10 p-3 space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-300">
                       <ShieldAlert size={16} />
                       <span>Risk warnings</span>
                     </div>
                     <ul className="space-y-1 text-sm text-amber-700 dark:text-amber-300">
-                      {preview.warnings.map((warning, index) => (
-                        <li key={`${warning}-${index}`}>- {warning}</li>
-                      ))}
+                      <li>- Adjusted carry is negative for this route/asset at current assumptions.</li>
+                      <li>- Continue only if this is intentional for strategy testing.</li>
                     </ul>
                   </div>
                 )}
@@ -543,19 +601,19 @@ const Loop = () => {
                     </TableRow>
                   ) : (
                     history.map((item, index) => {
-                      const rowKey = item.id || `${item.timestamp || "t"}-${index}`;
+                      const rowKey = item.requestId || `${item.timestamp || "t"}-${index}`;
                       const expanded = expandedHistoryKey === rowKey;
                       return (
                         <TableRow key={rowKey}>
                           <TableCell>{formatTimestamp(item.timestamp)}</TableCell>
-                          <TableCell>{item.action || "Execute"}</TableCell>
+                          <TableCell>{item.amount === "unwind" ? "Unwind" : "Execute"}</TableCell>
                           <TableCell>
                             <Badge className={getStatusBadgeClass(item.status)}>{item.status || "Unknown"}</Badge>
                           </TableCell>
                           <TableCell>
-                            {item.leverage !== undefined ? `${asNumber(item.leverage).toFixed(2)}x` : "—"}
+                            {position?.leverage !== undefined ? `${asNumber(position.leverage).toFixed(2)}x` : "—"}
                           </TableCell>
-                          <TableCell>{item.iterations ?? "—"}</TableCell>
+                          <TableCell>{item.loops ?? "—"}</TableCell>
                           <TableCell className="text-right">
                             <Button
                               type="button"
@@ -573,8 +631,12 @@ const Loop = () => {
                                 </>
                               )}
                             </Button>
-                            {expanded && item.summary ? (
-                              <p className="mt-2 text-xs text-muted-foreground text-left">{item.summary}</p>
+                            {expanded ? (
+                              <div className="mt-2 text-xs text-muted-foreground text-left space-y-1">
+                                <p>Request: {item.requestId}</p>
+                                <p>Asset: {item.asset}</p>
+                                {item.txHashes?.length ? <p>Txs: {item.txHashes.join(", ")}</p> : null}
+                              </div>
                             ) : null}
                           </TableCell>
                         </TableRow>

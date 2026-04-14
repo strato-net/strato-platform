@@ -1,75 +1,124 @@
-export type LoopRouteType = "cdp" | "lending";
+export type LoopRouteType = "lending_loop" | "cdp_loop";
 export type LoopUnwindMode = "partial" | "full";
 
-export interface LoopBootstrapRequest {
-  routeType: LoopRouteType;
+export interface LoopRouteOpportunity {
   asset: string;
-  collateralAmount: string;
-  leverage: number;
-  iterations: number;
-}
-
-export interface LoopStepPreview {
-  key?: string;
-  label: string;
-  description?: string;
-  txCount?: number;
-  estimatedFeeUsdst?: string;
+  symbol: string;
+  baseYieldAPR: number;
+  swapPoolAddress: string;
+  swapPoolUSDSTLiquidity: string;
+  swapFeeRate: number;
+  maxSwapPerLeg: string;
+  lendingCarry: {
+    exposureMultiple: number;
+    effectiveLTV: number;
+    grossCarryAPR: number;
+    feeDrag: number;
+    netCarryAPR: number;
+    swapImpactPct: number;
+    netCarryWithImpactAPR: number;
+    healthFactor: number;
+  } | null;
+  cdpCarry: {
+    exposureMultiple: number;
+    effectiveLTV: number;
+    grossCarryAPR: number;
+    feeDrag: number;
+    netCarryAPR: number;
+    swapImpactPct: number;
+    netCarryWithImpactAPR: number;
+    healthFactor: number;
+  } | null;
 }
 
 export interface LoopBootstrapResponse {
-  routeType?: LoopRouteType;
-  asset?: string;
-  leverage?: number;
-  iterations?: number;
-  estimatedCarryApr?: number | string;
-  adjustedCarryApr?: number | string;
-  healthFactor?: number | string;
-  liquidationBufferPct?: number | string;
-  collateralValueUsd?: number | string;
-  debtValueUsd?: number | string;
-  totalTxCount?: number;
-  estimatedTxCostUsdst?: number | string;
-  warnings?: string[];
-  steps?: LoopStepPreview[];
+  version: string;
+  timestamp: string;
+  networkId: string;
+  gasFeePerStep: string;
+  maxLoops: number;
+  swapFeeBps: number;
+  routes: {
+    lending: {
+      borrowableAsset: string;
+      borrowableSymbol: string;
+      borrowAPR: number;
+      ltvBps: number;
+      liquidationThresholdBps: number;
+      assets: Array<{ address: string; symbol: string; decimals: number; isPaused: boolean }>;
+    };
+    cdp: {
+      usdstAddress: string;
+      stabilityAPR: number;
+      minCR: number;
+      liquidationRatio: number;
+      assets: Array<{ address: string; symbol: string; decimals: number; isPaused: boolean }>;
+    };
+  };
+  opportunities: LoopRouteOpportunity[];
+}
+
+export interface LoopExecuteRequest {
+  routeType: LoopRouteType;
+  asset: string;
+  amount: string;
+  loops: number;
+  minHealthFactor?: number;
+  clientQuoteHash?: string;
+  dryRun?: boolean;
 }
 
 export interface LoopExecuteResponse {
-  status?: string;
-  message?: string;
-  jobId?: string;
-  txHashes?: string[];
+  requestId: string;
+  routeType: LoopRouteType;
+  bootstrapVersion: string;
+  plannedSteps: number;
+  executedSteps: Array<{
+    step: number;
+    action: string;
+    status: "success" | "failed" | "skipped";
+    txHash?: string;
+    error?: string;
+  }>;
+  terminalState: {
+    totalCollateral: string;
+    totalDebt: string;
+    effectiveLeverage: string;
+    healthFactor: string;
+  };
+}
+
+export interface LoopPositionEntry {
+  asset: string;
+  symbol: string;
+  collateral: string;
+  collateralUSD: string;
+  debt: string;
+  healthFactor: number;
+  effectiveLTV: number;
+  leverage: number;
+  estimatedCarryAPR: number;
 }
 
 export interface LoopPositionResponse {
-  routeType?: LoopRouteType;
-  asset?: string;
-  isOpen?: boolean;
-  leverage?: number | string;
-  healthFactor?: number | string;
-  liquidationBufferPct?: number | string;
-  collateralValueUsd?: number | string;
-  debtValueUsd?: number | string;
-  netCarryApr?: number | string;
-  updatedAt?: string;
+  lending: LoopPositionEntry[];
+  cdp: Array<LoopPositionEntry & { collateralizationRatio: number }>;
 }
 
 export interface LoopUnwindRequest {
   routeType: LoopRouteType;
   asset: string;
-  mode: LoopUnwindMode;
-  unwindPercent?: number;
+  steps: number | "all";
+  minHealthFactor?: number;
 }
 
 export interface LoopHistoryItem {
-  id?: string;
-  status?: string;
-  routeType?: LoopRouteType;
-  asset?: string;
-  action?: string;
-  leverage?: number | string;
-  iterations?: number;
-  txCount?: number;
-  timestamp?: string;
-  summary?: string;
+  requestId: string;
+  routeType: LoopRouteType;
+  asset: string;
+  amount: string;
+  loops: number;
+  status: "success" | "partial" | "failed";
+  txHashes: string[];
+  timestamp: string;
 }

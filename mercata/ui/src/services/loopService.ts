@@ -1,34 +1,28 @@
 import { api } from "@/lib/axios";
 import type {
-  LoopBootstrapRequest,
   LoopBootstrapResponse,
+  LoopExecuteRequest,
   LoopExecuteResponse,
   LoopHistoryItem,
   LoopPositionResponse,
-  LoopRouteType,
   LoopUnwindRequest,
 } from "@/interface/loop";
 
 const LOOP_BASE_PATH = "/loop";
 
 export const loopService = {
-  async bootstrap(payload: LoopBootstrapRequest): Promise<LoopBootstrapResponse> {
-    const response = await api.post(`${LOOP_BASE_PATH}/bootstrap`, payload);
+  async bootstrap(): Promise<LoopBootstrapResponse> {
+    const response = await api.get(`${LOOP_BASE_PATH}/bootstrap`);
     return response.data;
   },
 
-  async execute(payload: LoopBootstrapRequest): Promise<LoopExecuteResponse> {
+  async execute(payload: LoopExecuteRequest): Promise<LoopExecuteResponse> {
     const response = await api.post(`${LOOP_BASE_PATH}/execute`, payload);
     return response.data;
   },
 
-  async position(routeType: LoopRouteType, asset: string): Promise<LoopPositionResponse> {
-    const response = await api.get(`${LOOP_BASE_PATH}/position`, {
-      params: {
-        routeType,
-        asset,
-      },
-    });
+  async position(): Promise<LoopPositionResponse> {
+    const response = await api.get(`${LOOP_BASE_PATH}/position`);
     return response.data;
   },
 
@@ -37,13 +31,8 @@ export const loopService = {
     return response.data;
   },
 
-  async history(routeType: LoopRouteType, asset: string): Promise<LoopHistoryItem[]> {
-    const response = await api.get(`${LOOP_BASE_PATH}/history`, {
-      params: {
-        routeType,
-        asset,
-      },
-    });
+  async history(): Promise<LoopHistoryItem[]> {
+    const response = await api.get(`${LOOP_BASE_PATH}/history`);
     return Array.isArray(response.data) ? response.data : [];
   },
 };
