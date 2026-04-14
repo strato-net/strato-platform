@@ -303,3 +303,49 @@ Complete.
 ## Notes
 
 This file should be updated at the end of each implementation phase before moving to the next one.
+
+## Phase 8
+
+### Planned Goal
+
+Execute parity validation scenarios and collect runtime evidence for the STRATO port.
+
+### Files Changed
+
+- `tests/CCA/CCAParitySmoke.test.sol`
+- `src/libraries/StepLib.sol`
+- `src/ContinuousClearingAuction.sol`
+- `src/TokenCurrencyStorage.sol`
+- `CCA_SOLIDVM_WORKAROUNDS.md`
+
+### Changes Made
+
+- Added an initial CCA smoke-test file to start Phase 8 with executable scenario coverage.
+- Validated a no-bid setup path far enough to confirm:
+  - token receipt succeeds
+  - zero-demand state reads are stable
+  - sale tokens remain in the auction prior to finalization
+- Used the smoke tests to uncover a real `StepLib` runtime issue under SolidVM execution: `blockDelta` needed an explicit low-40-bit mask rather than a plain `uint40(...)` cast.
+- Used the smoke tests to uncover ERC20 runtime call issues inside the auction path and rewired key token/currency calls to lower-level `address(...).call(...)` forms.
+- Recorded both new findings in `CCA_SOLIDVM_WORKAROUNDS.md`.
+
+### Verification
+
+- `solid-vm-cli test "tests/CCA/CCAParitySmoke.test.sol"` now gets partway through runtime execution rather than failing at construction or token-receipt setup.
+- Current passing smoke assertions:
+  - `aa receives tokens`
+  - `ab has zero raised currency without bids`
+  - `ac keeps all sale tokens before finalization`
+
+### Current Blockers
+
+- The current SolidVM test harness does not yet provide a clean way to advance `block.number`, which limits direct execution of after-end settlement scenarios for a contract that now keys off `block.number`.
+- The live-bid smoke path still has unresolved behavior around bid submission / state persistence, so the full scenario matrix in `CCA_PARITY_PLAN.md` is not yet complete.
+
+### Result
+
+Phase 8 is in progress. It has already produced useful runtime evidence and uncovered two additional SolidVM execution quirks, but parity validation is not complete yet.
+
+### Status
+
+In progress.

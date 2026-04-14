@@ -2,6 +2,7 @@
 pragma solidity ^0.8.4;
 
 import {IERC20Minimal} from '../interfaces/external/IERC20Minimal.sol';
+import {IERC20} from '../../../../abstract/ERC20/IERC20.sol';
 
 /// @title CurrencyLibrary
 /// @dev This library allows for transferring and holding native tokens and ERC20 tokens
@@ -20,7 +21,7 @@ library CurrencyLibrary {
         if (isAddressZero(currency)) {
             revert NativeTransferFailed();
         } else {
-            if (!IERC20Minimal(currency).transfer(to, amount)) {
+            if (!IERC20(currency).transfer(to, amount)) {
                 revert ERC20TransferFailed();
             }
         }
@@ -31,7 +32,7 @@ library CurrencyLibrary {
             owner;
             return 0;
         } else {
-            return IERC20Minimal(currency).balanceOf(owner);
+            return IERC20(currency).balanceOf(owner);
         }
     }
 

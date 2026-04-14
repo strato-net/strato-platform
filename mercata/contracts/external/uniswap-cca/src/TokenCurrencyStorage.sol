@@ -69,7 +69,7 @@ abstract contract TokenCurrencyStorage is ITokenCurrencyStorage {
     function _sweepUnsoldTokens(uint256 _blockNumberIsh, uint256 _amount) internal {
         sweepUnsoldTokensBlock = _blockNumberIsh;
         if (_amount > 0) {
-            address(TOKEN).transfer(TOKENS_RECIPIENT, _amount);
+            require(bool(address(TOKEN).call("transfer", TOKENS_RECIPIENT, _amount)), "TokenCurrency: token transfer failed");
         }
         emit TokensSwept(TOKENS_RECIPIENT, _amount);
     }
@@ -80,7 +80,6 @@ abstract contract TokenCurrencyStorage is ITokenCurrencyStorage {
             _amount;
             revert NativeCurrencyTransferFailed();
         }
-
-        CURRENCY.transfer(_recipient, _amount);
+        require(bool(address(CURRENCY).call("transfer", _recipient, _amount)), "TokenCurrency: currency transfer failed");
     }
 }

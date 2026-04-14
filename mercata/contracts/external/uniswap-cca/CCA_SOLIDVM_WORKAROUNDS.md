@@ -356,7 +356,67 @@ Primary files:
 - `src/libraries/MaxBidPriceLib.sol`
 - `src/ContinuousClearingAuction.sol`
 
-### 18. Permit2 / `SafeTransferLib` flow was removed
+### 18. `StepLib` needed an explicit low-40-bit mask at runtime
+
+Observed behavior:
+
+- during Phase 8 smoke testing, `StepLib.get(...)` decoded `blockDelta` incorrectly under SolidVM test execution
+- `uint40(packedValue)` behaved as if the upper bits were not truncated, and the decoded `blockDelta` came back as the full packed 64-bit word instead of the low 40 bits
+
+Evidence:
+
+- a smoke test decoded the packed schedule bytes and reported:
+  - `decoded block delta mismatch: 5497558138880000002`
+- that value corresponds to the full packed step word rather than the intended `blockDelta`
+
+Workaround:
+
+- changed `StepLib.get(...)` from:
+  - `blockDelta = uint40(packedValue);`
+- to:
+  - `blockDelta = uint40(packedValue & ((uint64(1) << 40) - 1));`
+
+Primary files:
+
+- `src/libraries/StepLib.sol`
+- `tests/CCA/CCAParitySmoke.test.sol`
+
+Behavior note:
+
+- this is runtime-relevant because it affects step decoding and therefore auction timing
+
+### 19. ERC20 interface-method dispatch was unreliable in CCA runtime execution
+
+Observed behavior:
+
+- during Phase 8 smoke testing, interface-typed ERC20 calls inside the CCA runtime failed under the SolidVM test runner
+- both `IERC20Minimal(...).balanceOf(...)` and `IERC20(...).balanceOf(...)` forms still produced type/runtime errors when executed through the auction
+
+Evidence:
+
+- `onTokensReceived()` failed with errors of the form:
+  - `argument type mismatch in 'balanceOf': Argument 1: got Contract("IERC20Minimal"), expected address`
+  - and later:
+  - `argument type mismatch in 'balanceOf': Argument 1: got Contract("IERC20"), expected address`
+
+Workaround:
+
+- replaced key token/currency runtime calls in the auction path with low-level `address(...).call(...)` forms for:
+  - token `balanceOf`
+  - token `transfer`
+  - currency `transferFrom`
+  - currency `transfer`
+
+Primary files:
+
+- `src/ContinuousClearingAuction.sol`
+- `src/TokenCurrencyStorage.sol`
+
+Behavior note:
+
+- this looks like a SolidVM runtime or execution-environment quirk rather than ordinary Solidity behavior
+
+### 20. Permit2 / `SafeTransferLib` flow was removed
 
 Observed behavior:
 
@@ -373,7 +433,7 @@ Primary files:
 - `src/interfaces/external/IERC20Minimal.sol`
 - `src/ContinuousClearingAuction.sol`
 
-### 19. Block-number helper indirection was unnecessary and not worth preserving
+### 21. Block-number helper indirection was unnecessary and not worth preserving
 
 Observed behavior:
 
@@ -389,7 +449,7 @@ Primary files:
 - `lib/blocknumberish/src/BlockNumberish.sol`
 - `src/ContinuousClearingAuction.sol`
 
-### 20. Full compile success required a flatter, more explicit source style overall
+### 22. Full compile success required a flatter, more explicit source style overall
 
 Observed behavior:
 

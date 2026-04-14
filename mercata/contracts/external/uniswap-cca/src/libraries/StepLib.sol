@@ -37,6 +37,6 @@ library StepLib {
             | (uint64(uint8(data[offset + 6])) << 8) | uint64(uint8(data[offset + 7]));
 
         mps = uint24(packedValue >> 40);
-        blockDelta = uint40(packedValue);
+        blockDelta = uint40(packedValue & ((uint64(1) << 40) - 1));
     }
 }

@@ -166,6 +166,18 @@ contract ContinuousClearingAuction is
         return CheckpointLib.remainingMpsInAuction(checkpoint_);
     }
 
+    function _tokenBalanceOf(address owner) internal view returns (uint256) {
+        return uint(address(TOKEN).call("balanceOf", owner));
+    }
+
+    function _tokenTransfer(address to, uint256 amount) internal {
+        require(bool(address(TOKEN).call("transfer", to, amount)), "CCA: token transfer failed");
+    }
+
+    function _currencyTransferFrom(address from, address to, uint256 amount) internal {
+        require(bool(address(CURRENCY).call("transferFrom", from, to, amount)), "CCA: transferFrom failed");
+    }
+
     /// @notice Modifier for functions which require the latest checkpoint to be up to date
     modifier ensureEndBlockIsCheckpointed() {
         if (_lastCheckpointedBlock != END_BLOCK) {
@@ -179,7 +191,7 @@ contract ContinuousClearingAuction is
         // Don't check balance or emit the TokensReceived event if the tokens have already been received
         if (_tokensReceived) return;
         // Use the normal totalSupply value instead of the Q96 value
-        if (TOKEN.balanceOf(address(this)) < TOTAL_SUPPLY) {
+        if (_tokenBalanceOf(address(this)) < TOTAL_SUPPLY) {
             revert("CCA: invalid token amount received");
         }
         _tokensReceived = true;
@@ -565,10 +577,10 @@ contract ContinuousClearingAuction is
         require(_getBlockNumberish() < END_BLOCK, "CCA: auction is over");
         require(_amount != 0, "CCA: bid amount too small");
         require(_owner != address(0), "CCA: bid owner is zero");
-        if (CURRENCY.isAddressZero()) {
+        if (CURRENCY == address(0)) {
             revert("CCA: native currency bids unsupported on STRATO");
         } else {
-            require(IERC20Minimal(CURRENCY).transferFrom(msg.sender, address(this), _amount), "CCA: transferFrom failed");
+            _currencyTransferFrom(msg.sender, address(this), _amount);
         }
         return _submitBid(_maxPrice, _amount, _owner, _prevTickPrice, _hookData);
     }
@@ -701,7 +713,7 @@ contract ContinuousClearingAuction is
         (address owner, uint256 tokensFilled) = _internalClaimTokens(_bidId);
 
         if (tokensFilled > 0) {
-            address(TOKEN).transfer(owner, tokensFilled);
+            _tokenTransfer(owner, tokensFilled);
             emit TokensClaimed(_bidId, owner, tokensFilled);
         }
     }
@@ -732,7 +744,7 @@ contract ContinuousClearingAuction is
         }
 
         if (tokensFilled > 0) {
-            address(TOKEN).transfer(_owner, tokensFilled);
+            _tokenTransfer(_owner, tokensFilled);
         }
     }
 
