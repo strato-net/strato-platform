@@ -29,7 +29,13 @@ module Blockchain.Data.Transaction
     toEthV,
     getSigVals,
     codePtrName,
-    codePtrHash
+    codePtrHash,
+    eip712SignHash,
+    eip712StructHash,
+    eip712DomainSeparator,
+    eip712EncodeStringArray,
+    eip712DomainTypeHash,
+    eip712TxTypeHash
   )
 where
 
@@ -54,6 +60,8 @@ import qualified Crypto.Secp256k1 as SEC
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as BSS
 import Data.Maybe
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock
 import Data.Word
 import qualified Database.Persist.Postgresql as SQL
@@ -99,12 +107,12 @@ instance TransactionLike Transaction where
   morphTx t = case txType t of
     Message
       | Just fn <- txFuncName t ->
-          MessageTX n gl (fromJust $ txDestination t) fn args network cid r s v
+          MessageTX n gl (fromJust $ txDestination t) fn args network cid r s v 0
       | otherwise ->
           EthereumTX n 0 gl (txDestination t) 0 B.empty cid r s v
     ContractCreation
       | Just cn <- txContractName t ->
-          ContractCreationTX n gl cn args network (fromJust $ txCode t) cid r s v
+          ContractCreationTX n gl cn args network (fromJust $ txCode t) cid r s v 0
       | otherwise ->
           EthereumTX n 0 gl Nothing 0 B.empty cid r s v
     where
@@ -125,9 +133,9 @@ codePtrName _ = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just fn) Nothing ags net Nothing cid r' s' v' _ _ _ _ _ _) =
-  MessageTX nonce' gl to' fn ags net cid r' s' v'
+  MessageTX nonce' gl to' fn ags net cid r' s' v' 0
 rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just cn) ags net (Just cd) cid r' s' v' _ _ _ _ _ _) =
-  ContractCreationTX nonce' gl cn ags net cd cid r' s' v'
+  ContractCreationTX nonce' gl cn ags net cd cid r' s' v' 0
 rawTX2TX (RawTransaction _ _ nonce' gl mTo Nothing Nothing [] _ Nothing cid r' s' v' _ _ _ mgp mval mdata) =
   EthereumTX nonce' (fromMaybe 0 mgp) gl mTo (fromMaybe 0 mval) (fromMaybe B.empty mdata) cid r' s' v'
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
@@ -205,7 +213,9 @@ whoSignedThisTransaction tx = fromPublicKey <$> EC.recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
       sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r tx) (intToBSS $ s tx) ((v tx) - 0x1b))
-      mesg = keccak256ToByteString $ partialTransactionHash tx
+      mesg = case tx of
+        MessageTX{txVersion = tv} | tv > 0 -> eip712SignHash tx
+        _ -> keccak256ToByteString $ partialTransactionHash tx
 
 whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer -> Integer -> Maybe Address
 whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub sig mesg
@@ -231,3 +241,41 @@ transactionHash = hash . rlpSerialize . rlpEncode
 
 partialTransactionHash :: Transaction -> Keccak256
 partialTransactionHash = hash . rlpSerialize . partialRLPEncode
+
+-- EIP-712 support for external wallet signing (MetaMask, etc.)
+
+eip712DomainTypeHash :: B.ByteString
+eip712DomainTypeHash = keccak256ToByteString $ hash ("EIP712Domain(string name,string version)" :: B.ByteString)
+
+eip712TxTypeHash :: B.ByteString
+eip712TxTypeHash = keccak256ToByteString $ hash ("Transaction(address to,string funcName,string[] args,uint256 nonce,uint256 gasLimit,string network)" :: B.ByteString)
+
+eip712DomainSeparator :: B.ByteString
+eip712DomainSeparator = keccak256ToByteString $ hash $ B.concat
+  [ eip712DomainTypeHash
+  , keccak256ToByteString $ hash ("STRATO" :: B.ByteString)
+  , keccak256ToByteString $ hash ("1" :: B.ByteString)
+  ]
+
+eip712EncodeStringArray :: [T.Text] -> B.ByteString
+eip712EncodeStringArray texts = keccak256ToByteString $ hash $ B.concat
+  [keccak256ToByteString $ hash $ encodeUtf8 t | t <- texts]
+
+eip712StructHash :: Transaction -> B.ByteString
+eip712StructHash MessageTX{..} = keccak256ToByteString $ hash $ B.concat
+  [ eip712TxTypeHash
+  , word256ToBytes (fromIntegral to)
+  , keccak256ToByteString $ hash $ encodeUtf8 funcName
+  , eip712EncodeStringArray args
+  , word256ToBytes (fromInteger nonce)
+  , word256ToBytes (fromInteger gasLimit)
+  , keccak256ToByteString $ hash $ encodeUtf8 network
+  ]
+eip712StructHash _ = error "eip712StructHash: only MessageTX supported"
+
+eip712SignHash :: Transaction -> B.ByteString
+eip712SignHash tx = keccak256ToByteString $ hash $ B.concat
+  [ "\x19\x01"
+  , eip712DomainSeparator
+  , eip712StructHash tx
+  ]

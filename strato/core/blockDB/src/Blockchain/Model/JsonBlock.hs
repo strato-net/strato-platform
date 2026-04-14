@@ -167,7 +167,8 @@ instance ToJSON UnsignedRawTransaction' where
         "functionName" .= rawTransactionFuncName,
         "args" .= rawTransactionArgs,
         "network" .= rawTransactionNetwork,
-        "code" .= rawTransactionCode
+        "code" .= rawTransactionCode,
+        "chainId" .= rawTransactionChainId
       ]
 
 instance FromJSON UnsignedRawTransaction' where
@@ -233,7 +234,7 @@ rtPrimeToRt (RawTransaction' x) = x
 newtype Transaction' = Transaction' Transaction deriving (Eq, Show)
 
 instance ToJSON Transaction' where
-  toJSON (Transaction' tx@(MessageTX nonce gasLimit (Address toAddr) funcName args network cid tr ts tv)) =
+  toJSON (Transaction' tx@(MessageTX nonce gasLimit (Address toAddr) funcName args network cid tr ts tv txVer)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -248,9 +249,10 @@ instance ToJSON Transaction' where
         "s" .= showHex ts "",
         "v" .= showHex tv "",
         "hash" .= transactionHash tx,
-        "transactionType" .= show (transactionSemantics tx)
+        "transactionType" .= show (transactionSemantics tx),
+        "txVersion" .= txVer
       ]
-  toJSON (Transaction' tx@(ContractCreationTX nonce gasLimit contractName args network code cid tr ts tv)) =
+  toJSON (Transaction' tx@(ContractCreationTX nonce gasLimit contractName args network code cid tr ts tv txVer)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -265,7 +267,8 @@ instance ToJSON Transaction' where
         "s" .= showHex ts "",
         "v" .= showHex tv "",
         "hash" .= transactionHash tx,
-        "transactionType" .= show (transactionSemantics tx)
+        "transactionType" .= show (transactionSemantics tx),
+        "txVersion" .= txVer
       ]
   toJSON (Transaction' tx@(EthereumTX n gp gl eto val _ cid tr ts tv)) =
     object $
@@ -297,8 +300,9 @@ instance FromJSON Transaction' where
         tr <- parseHexStr (t .: "r")
         ts <- parseHexStr (t .: "s")
         tv <- parseHexStr (t .:? "v" .!= "0")
+        txVer <- t .:? "txVersion" .!= 0
         return . Transaction' $ ContractCreationTX
-          nonce gasLimit contractName args network code cid tr ts tv
+          nonce gasLimit contractName args network code cid tr ts tv txVer
       Nothing -> do
         mFuncName <- t .:? "funcName"
         case mFuncName of
@@ -313,7 +317,8 @@ instance FromJSON Transaction' where
             tr <- parseHexStr (t .: "r")
             ts <- parseHexStr (t .: "s")
             tv <- parseHexStr (t .:? "v" .!= "0")
-            return . Transaction' $ MessageTX nonce gasLimit toAddr funcName args network cid tr ts tv
+            txVer <- t .:? "txVersion" .!= 0
+            return . Transaction' $ MessageTX nonce gasLimit toAddr funcName args network cid tr ts tv txVer
           Nothing -> do
             n <- t .:? "nonce" .!= 0
             gp <- t .:? "gasPrice" .!= 0

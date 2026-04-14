@@ -1020,7 +1020,8 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
         TX.chainId = Just cid,
         TX.r = 0,
         TX.s = 0,
-        TX.v = 0
+        TX.v = 0,
+        TX.txVersion = 0
       }
     Just _ ->
       TX.MessageTX
@@ -1033,7 +1034,8 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
         TX.chainId = Just cid,
         TX.r = 0,
         TX.s = 0,
-        TX.v = 0
+        TX.v = 0,
+        TX.txVersion = 0
       }
   where
     cid = EthConf.chainId $ EthConf.networkConfig ethConf
