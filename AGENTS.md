@@ -26,3 +26,30 @@
 - Default priceOracle is system contract `0000…1002` (same for vaults and system default — no separate query)
 - Sidebar nav uses category groupings (TRADE, SPEND, EARN, PRO) defined in `DashboardSidebar.tsx`, `MobileSidebar.tsx`, and `MobileBottomNav.tsx`; all three must stay in sync; Card is under SPEND. SolidVM contract tests: `solid-vm-cli test <file>` from test dir; pattern is `Describe_*` contract with `beforeAll`/`beforeEach`/`it_*` functions; `fetchMinDepositAmount` depends on both `selectedToken` AND `currentNetwork`/`chainId`
 - CDP collateral on prod is listed via CDPRegistry (`…1012`) and CDPEngine (`…1011`) in Cirrus; many assets are configured with USDST often paused as collateral; the depositable set follows `getVaultCandidates` (excludes USDST and paused assets — typically on the order of a dozen depositable)
+
+## Cursor Cloud specific instructions
+
+### Services overview
+
+The primary dev loop involves three services — see `mercata/README.md` for canonical commands:
+
+| Service | Dir | Command | Port |
+|---|---|---|---|
+| Backend | `mercata/backend/` | `npm run dev` | 3001 |
+| UI | `mercata/ui/` | `npm run dev` | 8080 |
+| Nginx | `mercata/nginx/` | `docker compose -f docker-compose.nginx-standalone.yml up -d --build` | 80 |
+
+**Shared types** (`mercata/packages/shared-types/`) are built automatically via `postinstall` hooks in both backend and UI.
+
+### Required environment variables
+
+Backend requires four OAuth and node env vars (see `mercata/README.md` DEV MODE section for names). These are injected as secrets in the Cloud Agent environment.
+
+### Key caveats
+
+- **Access the app on port 80** (through nginx) — not port 8080. The OAuth/login flow only works through the nginx proxy; the Vite dev server on 8080 does not handle authentication.
+- **Docker is required** for nginx. In the Cloud Agent VM (nested container), Docker needs `fuse-overlayfs` storage driver and `iptables-legacy`. The daemon must be started manually: `sudo dockerd &>/tmp/dockerd.log &` then `sudo chmod 666 /var/run/docker.sock`.
+- **Nginx uses `host.docker.internal`** to reach backend (3001) and UI (8080) on the host. The `extra_hosts: host.docker.internal:host-gateway` directive in the compose file handles this.
+- Backend emits non-fatal YAML warnings from Swagger JSDoc annotations at startup — these can be ignored.
+- **Lint**: `cd mercata/ui && npx eslint .` — the existing codebase has pre-existing lint errors; this is normal.
+- **Type-check backend**: `cd mercata/backend && npx tsc --noEmit`
