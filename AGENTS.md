@@ -41,9 +41,18 @@ The primary dev workload is the **Mercata** app under `mercata/`. It has three c
 
 ### Environment variables
 
-- **Backend** requires a `.env` file at `mercata/backend/.env` with `OAUTH_DISCOVERY_URL`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, and `NODE_URL`. See `mercata/README.md` for full list. The backend uses `dotenv` to auto-load `.env` in non-production mode.
-- **UI** has no required env vars for dev; the only optional one is `VITE_LUCKY_ORANGE_SITE_ID` (analytics).
-- If `OAUTH_CLIENT_SECRET` is available as a VM environment variable, create `mercata/backend/.env` from it before starting the backend.
+- **Backend** requires a `.env` file at `mercata/backend/.env`. The backend uses `dotenv` to auto-load it in non-production mode. The four required vars (`OAUTH_DISCOVERY_URL`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `NODE_URL`) are injected as VM environment variables via Cursor Secrets. Before starting the backend, create the `.env` from them:
+  ```
+  cat > mercata/backend/.env <<EOF
+  OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+  OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+  OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+  NODE_URL=${NODE_URL}
+  BASE_URL=http://127.0.0.1
+  EOF
+  ```
+- **UI** has no required env vars for dev.
+- **Keycloak test login** credentials are available as `KEYCLOAK_TEST_USER_NAME` and `KEYCLOAK_TEST_USER_PASSWORD` VM environment variables for browser-based login testing.
 
 ### Running services
 
