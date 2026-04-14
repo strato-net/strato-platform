@@ -53,7 +53,7 @@ import {
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
 import { redirectToLogin } from "@/lib/auth";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail } from "lucide-react";
+import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail, CreditCard } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
@@ -157,9 +157,8 @@ const TokenCard = ({ active, image, symbol, estimated, onClick, disabled, apyBad
   spotLabel?: string;
 }) => (
   <button type="button" onClick={onClick} disabled={disabled}
-    className={`relative text-left rounded-md border-2 p-3 transition-colors snap-start ${
-      active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
-    }`}>
+    className={`relative text-left rounded-md border-2 p-3 transition-colors snap-start ${active ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10" : "border-border hover:bg-muted/30"
+      }`}>
     {active && <div className="absolute top-2 right-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /></div>}
     <div className="flex items-center gap-2 mb-1">
       {image
@@ -245,6 +244,7 @@ interface BridgeInProps {
 
 const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: externalFundingMode, onFundingModeChange, onMetalPurchase }) => {
   // Hooks & Context
+  const navigate = useNavigate();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
@@ -267,7 +267,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   } = useBridgeContext();
   const { tokenApys, tokenApysLoaded } = useEarnContext();
   const { contactEnabled } = useNetwork();
-  const navigate = useNavigate();
 
   // State -- fundingMode can be controlled externally or managed internally
   const [internalMode, setInternalMode] = useState<"bridge" | "metals">("bridge");
@@ -277,12 +276,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const [isLoading, setIsLoading] = useState(false);
   const [amountError, setAmountError] = useState("");
   const [networkError, setNetworkError] = useState("");
-  const [minDepositInfo, setMinDepositInfo] = useState<{ 
-    amount: string; 
-    amountWei: bigint; 
+  const [minDepositInfo, setMinDepositInfo] = useState<{
+    amount: string;
+    amountWei: bigint;
     loading: boolean;
-  }>({ 
-    amount: "", 
+  }>({
+    amount: "",
     amountWei: 0n,
     loading: false
   });
@@ -310,7 +309,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const enabledMetals = cfg.metals.filter(m => m.isEnabled);
       if (cfg.payTokens.length) setSelectedPayToken(cfg.payTokens[0]);
       if (enabledMetals.length) setSelectedMetal(enabledMetals[0]);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [fundingMode]);
 
   // Computed values
@@ -530,9 +529,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
     if (!tokenAddress || !currentNetwork) return;
-    
+
     setMinDepositInfo(prev => ({ ...prev, loading: true }));
-    
+
     try {
       const tokenConfig = await getTokenConfig({
         tokenAddress,
@@ -541,18 +540,18 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       });
 
       const minAmountWei = tokenConfig.minAmount ? BigInt(tokenConfig.minAmount) : 0n;
-      const formattedMinAmount = minAmountWei > 0n ? 
+      const formattedMinAmount = minAmountWei > 0n ?
         formatBalance(minAmountWei, undefined, decimals) : "0";
-      
-      setMinDepositInfo({ 
-        amount: formattedMinAmount, 
+
+      setMinDepositInfo({
+        amount: formattedMinAmount,
         amountWei: minAmountWei,
         loading: false
       });
       setIsTokenPermitted(tokenConfig.isPermitted);
     } catch {
-      setMinDepositInfo({ 
-        amount: "0", 
+      setMinDepositInfo({
+        amount: "0",
         amountWei: 0n,
         loading: false
       });
@@ -566,7 +565,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const decimals = isBridge ? parseInt(selectedToken?.externalDecimals || "18") : 18;
       const max = isBridge ? maxAmount : metalsMaxAmount;
       handleAmountInputChange(value, setAmount, setAmountError, max, decimals);
-      
+
       if (isBridge && value && minDepositInfo.amountWei > 0n) {
         const inputAmountWei = safeParseUnits(value, decimals);
         if (inputAmountWei < minDepositInfo.amountWei) {
@@ -648,17 +647,17 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
     setIsLoading(true);
     setProgressError(undefined);
-    
+
     const isNative = BigInt(selectedToken.externalToken || "0") === 0n;
     setProgressIsNative(isNative);
-    
+
     setProgressModalOpen(true);
 
     try {
       const activeChainId = currentNetwork.chainId;
       const depositRouter = currentNetwork.depositRouter;
       const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
-      
+
       // Set initial step based on token type
       if (!isNative) {
         // ERC20 tokens need approval
@@ -691,7 +690,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       if (!isNative) {
         // Step: Approve Token
         setCurrentStep("approve");
-        
+
         const approval = await checkPermit2Approval({
           token: selectedToken.externalToken,
           owner: address,
@@ -715,16 +714,16 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           });
 
           await waitForTransaction(approveTx, activeChainId);
-          
+
           toast({
             title: "Approval Successful",
             description: "Approval confirmed. Processing transaction...",
           });
         }
-        
+
         // Move to sign_permit step after approval completes (or if already approved)
         setCurrentStep("sign_permit");
-        
+
         // Build permit (this involves message signing, not a transaction)
         permitData = await buildPermit({
           tokenAddress: selectedToken.externalToken,
@@ -733,7 +732,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           chainId: activeChainId,
           owner: address,
         });
-        
+
         // Move to confirm_tx step after permit is signed
         setCurrentStep("confirm_tx");
       }
@@ -790,7 +789,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       }
 
       setProgressTxHash(txHash);
-      
+
       // Step: Waiting for Transaction
       setCurrentStep("waiting_tx");
       const success = await waitForTransaction(txHash, activeChainId);
@@ -865,366 +864,368 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     if (!token) return "Select asset";
     return token.externalSymbol || token.externalName || "Select asset";
   };
-  
+
   return (
-      <div className="space-y-7">
-        {/* STEP 1 */}
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">1</span>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How Are You Funding?</h3>
-          </div>
+    <div className="space-y-7">
+      {/* STEP 1 */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">1</span>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How Are You Funding?</h3>
+        </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => { if (guestMode) redirectToLogin(); else setFundingMode("bridge"); }}
-              className={`relative rounded-md border-2 p-3 text-left transition-colors ${
-                fundingMode === "bridge"
-                  ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
-                  : "border-border hover:bg-muted/30"
+        <div className="grid grid-cols-3 gap-3">
+          <button
+            type="button"
+            onClick={() => { if (guestMode) redirectToLogin(); else setFundingMode("bridge"); }}
+            className={`relative rounded-md border-2 p-3 text-left transition-colors ${fundingMode === "bridge"
+                ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                : "border-border hover:bg-muted/30"
               }`}
-            >
-              {fundingMode === "bridge" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
-              <ArrowDownToLine className={`w-5 h-5 mb-2 ${fundingMode === "bridge" ? "text-blue-500" : "text-muted-foreground"}`} />
-              <p className="text-sm font-semibold">{guestMode ? "Connect" : "Bridge In"}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">From {networkNames}</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => { if (guestMode) redirectToLogin(); else { setFundingMode("metals"); fetchTokens(); } }}
-              className={`relative rounded-md border-2 p-3 text-left transition-colors ${
-                fundingMode === "metals"
-                  ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
-                  : "border-border hover:bg-muted/30"
+          >
+            {fundingMode === "bridge" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
+            <ArrowDownToLine className={`w-5 h-5 mb-2 ${fundingMode === "bridge" ? "text-blue-500" : "text-muted-foreground"}`} />
+            <p className="text-sm font-semibold">{guestMode ? "Connect" : "Bridge In"}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">From {networkNames}</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => { if (guestMode) redirectToLogin(); else { setFundingMode("metals"); fetchTokens(); } }}
+            className={`relative rounded-md border-2 p-3 text-left transition-colors ${fundingMode === "metals"
+                ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+                : "border-border hover:bg-muted/30"
               }`}
-            >
-              {fundingMode === "metals" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
-              <Gem className={`w-5 h-5 mb-2 ${fundingMode === "metals" ? "text-blue-500" : "text-muted-foreground"}`} />
-              <p className="text-sm font-semibold">Buy Metals</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Gold, Silver & more</p>
-            </button>
-          </div>
+          >
+            {fundingMode === "metals" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
+            <Gem className={`w-5 h-5 mb-2 ${fundingMode === "metals" ? "text-blue-500" : "text-muted-foreground"}`} />
+            <p className="text-sm font-semibold">Buy Metals</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Gold, Silver & more</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => { if (guestMode) redirectToLogin(); else navigate("/dashboard/onramp-v2"); }}
+            className="relative rounded-md border-2 border-border hover:bg-muted/30 p-3 text-left transition-colors"
+          >
+            <CreditCard className="w-5 h-5 mb-2 text-muted-foreground" />
+            <p className="text-sm font-semibold">Buy with Fiat</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Card or bank transfer</p>
+          </button>
+        </div>
 
-          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            fundingMode === "bridge" ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0"
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${fundingMode === "bridge" ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0"
           }`}>
-            <p className="text-xs font-medium text-muted-foreground mb-2">Choose Network</p>
-            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${availableNetworks.length || 1}, 1fr)` }}>
-              {availableNetworks.map((network) => {
-                const active = selectedNetwork === network.chainName;
-                return (
-                  <button
-                    key={network.chainId}
-                    type="button"
-                    onClick={() => setSelectedNetwork(network.chainName)}
-                    disabled={guestMode || isLoading}
-                    className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${
-                      active
-                        ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-300"
-                        : "border-border text-foreground hover:bg-muted/50"
+          <p className="text-xs font-medium text-muted-foreground mb-2">Choose Network</p>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${availableNetworks.length || 1}, 1fr)` }}>
+            {availableNetworks.map((network) => {
+              const active = selectedNetwork === network.chainName;
+              return (
+                <button
+                  key={network.chainId}
+                  type="button"
+                  onClick={() => setSelectedNetwork(network.chainName)}
+                  disabled={guestMode || isLoading}
+                  className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${active
+                      ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                      : "border-border text-foreground hover:bg-muted/50"
                     }`}
-                  >
-                    {active && (
-                      <div className="absolute top-1 right-1">
-                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
-                      </div>
-                    )}
-                    {network.chainName}
-                  </button>
-                );
-              })}
-            </div>
+                >
+                  {active && (
+                    <div className="absolute top-1 right-1">
+                      <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    </div>
+                  )}
+                  {network.chainName}
+                </button>
+              );
+            })}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* STEP 2 */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">2</span>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Send</h3>
-            </div>
-            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              fundingMode === "bridge" ? "max-w-[300px] opacity-100" : "max-w-0 opacity-0"
-            }`}>
-              <div className="flex items-center gap-2">
-                <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
-                  <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
-                  <BridgeWalletStatus guestMode={guestMode} />
-                </div>
-                {isConnected && address && (
-                  <button
-                    type="button"
-                    className="text-[11px] text-muted-foreground font-mono hover:text-foreground transition-colors"
-                    onClick={() => {
-                      navigator.clipboard.writeText(address);
-                      toast({ title: "Copied", description: "Address copied to clipboard", duration: 1500 });
-                    }}
-                  >
-                    {address.slice(0, 6)}...{address.slice(-4)}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="relative">
-            <CrossfadePanel active={fundingMode === "metals"}>
-              <div className="rounded-md border-2 border-border p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Select value={selectedPayToken?.address || ""}
-                    onValueChange={(val) => setSelectedPayToken(metalsConfig?.payTokens.find(t => t.address === val) || null)}
-                    disabled={fundingMode !== "metals" || !metalsConfig?.payTokens.length || guestMode || isLoading}>
-                    <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
-                      <SelectValue placeholder="Token" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(metalsConfig?.payTokens || []).map((t) => (
-                        <SelectItem key={t.address} value={t.address}>{t.symbol}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
-                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
-                    value={amount} onChange={(e) => handleAmountChange(e.target.value)}
-                    disabled={fundingMode !== "metals" || guestMode || isLoading} />
-                </div>
-                {amountError && fundingMode === "metals" && <p className="text-xs text-red-500">{amountError}</p>}
-                {metalsFeeError && fundingMode === "metals" && <p className="text-xs text-yellow-600">{metalsFeeError}</p>}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs text-muted-foreground">
-                    Balance: <span className="text-foreground font-medium">{metalsPayBalance || "0.00"} {selectedPayToken?.symbol || ""}</span>
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <PercentageButtons value={amount} maxValue={metalsMaxAmount} onChange={handleAmountChange}
-                      decimals={18} disabled={fundingMode !== "metals" || guestMode || isLoading}
-                      className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
-                  </div>
-                </div>
-              </div>
-            </CrossfadePanel>
-            <CrossfadePanel active={fundingMode === "bridge"}>
-              <div className="rounded-md border-2 border-border p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Select value={(selectedToken?.externalToken || "").toLowerCase()}
-                    onValueChange={(val) => {
-                      const match = bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
-                        || bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
-                      setSelectedToken(match);
-                    }}
-                    disabled={!uniqueExternalTokens.length || guestMode || isLoading}>
-                    <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
-                      <SelectValue placeholder="Token" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {uniqueExternalTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
-                        <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
-                          {fundTokenLabel(t)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
-                    className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
-                    value={amount} onChange={(e) => handleAmountChange(e.target.value)}
-                    disabled={guestMode || !isConnected || isLoading} />
-                </div>
-                {amountError && <p className="text-xs text-red-500">{amountError}</p>}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs text-muted-foreground">
-                    Balance: <span className="text-foreground font-medium">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <PercentageButtons value={amount} maxValue={maxAmount} onChange={handleAmountChange}
-                      decimals={parseInt(selectedToken?.externalDecimals || "18")}
-                      disabled={guestMode || !isConnected || isLoading}
-                      className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
-                  </div>
-                </div>
-              </div>
-            </CrossfadePanel>
-          </div>
-        </section>
-
-        {/* STEP 3 */}
-        <section className="space-y-3">
+      {/* STEP 2 */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+            <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Send</h3>
           </div>
-
-          <div className="relative">
-            <CrossfadePanel active={fundingMode === "metals"}>
-              <ScrollRow>
-                {!metalsConfig
-                  ? Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={`ms-${i}`} id={`ms-${i}`} />)
-                  : metalsConfig.metals.filter(m => m.isEnabled).map((metal) => {
-                      const metalWei = amount && selectedPayToken ? calcMetalAmount(amount, metal, selectedPayToken) : 0n;
-                      const prices = metalPriceRowLabels(metal.price, metal.feeBps);
-                      return (
-                        <TokenCard key={metal.address}
-                          active={selectedMetal?.address === metal.address}
-                          image={metal.imageUrl} symbol={metal.symbol}
-                          estimated={metalWei > 0n ? truncateDecimals(formatUnits(metalWei, 18), 6) : "0"}
-                          onClick={() => setSelectedMetal(metal)}
-                          disabled={guestMode || isLoading}
-                          effectivePrice={prices.effective}
-                          spotLabel={`Spot ${prices.spot} \u00B7 ${Number(metal.feeBps) / 100}% fee`}
-                          apyBadge={<ApyLine addr={metal.address} />}
-                        />
-                      );
-                    })
-                }
-              </ScrollRow>
-            </CrossfadePanel>
-            <CrossfadePanel active={fundingMode === "bridge"}>
-              <ScrollRow>
-                {sourceTokenRoutes.length > 0 ? [
-                  ...sourceTokenRoutes.map((rt) => {
-                    let est = amount || "0";
-                    const routePrice = rt.rebaseFactor
-                      ? fmtSpotDollarWei(rt.rebaseFactor)
-                      : "$1.00";
-                    if (rt.rebaseFactor && amount) {
-                      try {
-                        const factor = BigInt(rt.rebaseFactor);
-                        if (factor > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / factor, 18), 6);
-                      } catch { /* keep original */ }
-                    }
-                    return (
-                      <TokenCard key={rt.id}
-                        active={rt.id === selectedToken?.id && !selectedAction}
-                        image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
-                        estimated={est}
-                        onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
-                        disabled={guestMode || isLoading}
-                        effectivePrice={routePrice}
-                        apyBadge={<ApyLine addr={rt.stratoToken} />}
-                      />
-                    );
-                  }),
-                  ...matchingActions.map((action) => {
-                    let est = amount || "0";
-                    if (action.action === 2 && action.oraclePrice && amount) {
-                      try {
-                        const price = BigInt(action.oraclePrice);
-                        if (price > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / price, 18), 6);
-                      } catch { /* keep */ }
-                    }
-                    const isForge = action.action === 2;
-                    const forgePrices = isForge
-                      ? metalPriceRowLabels(action.oraclePrice, action.feeBps)
-                      : undefined;
-                    const earnPrice = !isForge && action.oraclePrice
-                      ? fmtSpotDollarWei(action.oraclePrice)
-                      : undefined;
-                    const forgeSpotLabel = forgePrices && action.feeBps
-                      ? `Spot ${forgePrices.spot} \u00B7 ${Number(action.feeBps) / 100}% fee`
-                      : undefined;
-                    return (
-                      <TokenCard key={action.id}
-                        active={selectedAction?.id === action.id}
-                        image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
-                        estimated={est}
-                        onClick={() => {
-                          const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
-                          if (mintRoute) setSelectedToken(mintRoute);
-                          setSelectedAction(action);
-                        }}
-                        disabled={guestMode || isLoading}
-                        effectivePrice={forgePrices?.effective ?? earnPrice}
-                        spotLabel={forgeSpotLabel}
-                        apyBadge={<ApyLine addr={action.stratoToken} />}
-                      />
-                    );
-                  }),
-                ] : (
-                  Array.from({ length: prevRouteCountRef.current }).map((_, i) => <CardSkeleton key={`bs-${i}`} id={`bs-${i}`} />)
-                )}
-              </ScrollRow>
-            </CrossfadePanel>
-          </div>
-        </section>
-
-        {fundingMode === "bridge" && selectedToken?.rebaseFactor && (
-          <div className="flex items-start gap-3 p-3 bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 rounded-lg">
-            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-amber-800 dark:text-amber-200">
-              <div className="font-medium mb-1">Rebasing Token</div>
-              <div>
-              This token&apos;s quantity may change due to rebasing events on Ethereum.<br/>
-              The received amount on STRATO reflects your underlying share value at the current multiplier.
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${fundingMode === "bridge" ? "max-w-[300px] opacity-100" : "max-w-0 opacity-0"
+            }`}>
+            <div className="flex items-center gap-2">
+              <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
+                <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
+                <BridgeWalletStatus guestMode={guestMode} />
               </div>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Button
-            onClick={fundingMode === "metals" ? handleBuyMetals : handleBridge}
-            disabled={fundingMode === "metals" ? (isLoading || !selectedPayToken || !selectedMetal || !amount || guestMode) : isButtonDisabled}
-            className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
-          >
-            {isLoading ? "Processing..." : fundingMode === "metals" ? `Buy ${selectedMetal?.symbol || "Metal"}` : "Deposit"}
-          </Button>
-          <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${
-            fundingMode === "bridge" ? "max-h-[30px] opacity-100" : "max-h-0 opacity-0"
-          }`}>
-            <Link to="/dashboard/withdrawals" className="text-xs text-blue-500 hover:text-blue-400">
-              Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
-            </Link>
-          </div>
-          <div
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              fundingMode === "metals" && contactEnabled ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-500/10 p-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="bg-blue-500 rounded-full p-1 shrink-0">
-                  <Gem className="w-3 h-3 text-white" />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setContactModalOpen(true)}
-                className="inline-flex items-center gap-1 shrink-0 font-semibold text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 underline underline-offset-2"
-              >
-                <Mail className="w-3 h-3" />
-                Contact us {"\u2192"}
-              </button>
+              {isConnected && address && (
+                <button
+                  type="button"
+                  className="text-[11px] text-muted-foreground font-mono hover:text-foreground transition-colors"
+                  onClick={() => {
+                    navigator.clipboard.writeText(address);
+                    toast({ title: "Copied", description: "Address copied to clipboard", duration: 1500 });
+                  }}
+                >
+                  {address.slice(0, 6)}...{address.slice(-4)}
+                </button>
+              )}
             </div>
           </div>
         </div>
 
-        {networkError && (
-          <p className="text-sm text-red-500">{networkError}</p>
-        )}
+        <div className="relative">
+          <CrossfadePanel active={fundingMode === "metals"}>
+            <div className="rounded-md border-2 border-border p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Select value={selectedPayToken?.address || ""}
+                  onValueChange={(val) => setSelectedPayToken(metalsConfig?.payTokens.find(t => t.address === val) || null)}
+                  disabled={fundingMode !== "metals" || !metalsConfig?.payTokens.length || guestMode || isLoading}>
+                  <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
+                    <SelectValue placeholder="Token" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(metalsConfig?.payTokens || []).map((t) => (
+                      <SelectItem key={t.address} value={t.address}>{t.symbol}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
+                  className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
+                  value={amount} onChange={(e) => handleAmountChange(e.target.value)}
+                  disabled={fundingMode !== "metals" || guestMode || isLoading} />
+              </div>
+              {amountError && fundingMode === "metals" && <p className="text-xs text-red-500">{amountError}</p>}
+              {metalsFeeError && fundingMode === "metals" && <p className="text-xs text-yellow-600">{metalsFeeError}</p>}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-muted-foreground">
+                  Balance: <span className="text-foreground font-medium">{metalsPayBalance || "0.00"} {selectedPayToken?.symbol || ""}</span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <PercentageButtons value={amount} maxValue={metalsMaxAmount} onChange={handleAmountChange}
+                    decimals={18} disabled={fundingMode !== "metals" || guestMode || isLoading}
+                    className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
+                </div>
+              </div>
+            </div>
+          </CrossfadePanel>
+          <CrossfadePanel active={fundingMode === "bridge"}>
+            <div className="rounded-md border-2 border-border p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Select value={(selectedToken?.externalToken || "").toLowerCase()}
+                  onValueChange={(val) => {
+                    const match = bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
+                      || bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
+                    setSelectedToken(match);
+                  }}
+                  disabled={!uniqueExternalTokens.length || guestMode || isLoading}>
+                  <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
+                    <SelectValue placeholder="Token" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {uniqueExternalTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
+                      <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
+                        {fundTokenLabel(t)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
+                  className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
+                  value={amount} onChange={(e) => handleAmountChange(e.target.value)}
+                  disabled={guestMode || !isConnected || isLoading} />
+              </div>
+              {amountError && <p className="text-xs text-red-500">{amountError}</p>}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-muted-foreground">
+                  Balance: <span className="text-foreground font-medium">{formatBalanceDisplay(maxAmount)} {selectedToken?.externalSymbol || ""}</span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <PercentageButtons value={amount} maxValue={maxAmount} onChange={handleAmountChange}
+                    decimals={parseInt(selectedToken?.externalDecimals || "18")}
+                    disabled={guestMode || !isConnected || isLoading}
+                    className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
+                </div>
+              </div>
+            </div>
+          </CrossfadePanel>
+        </div>
+      </section>
 
-        <DepositProgressModal
-          open={progressModalOpen}
-          currentStep={currentStep}
-          txHash={progressTxHash}
-          chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
-          isEasySavings={(selectedAction?.action || 0) > 0}
-          isNative={progressIsNative}
-          error={progressError}
-          onClose={() => {
-            setProgressModalOpen(false);
-            setCurrentStep("confirm_tx");
-            setProgressTxHash(undefined);
-            setProgressError(undefined);
-          }}
-        />
-        {contactEnabled && (
-          <ContactInquiryModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
-        )}
+      {/* STEP 3 */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+        </div>
+
+        <div className="relative">
+          <CrossfadePanel active={fundingMode === "metals"}>
+            <ScrollRow>
+              {!metalsConfig
+                ? Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={`ms-${i}`} id={`ms-${i}`} />)
+                : metalsConfig.metals.filter(m => m.isEnabled).map((metal) => {
+                  const metalWei = amount && selectedPayToken ? calcMetalAmount(amount, metal, selectedPayToken) : 0n;
+                  const prices = metalPriceRowLabels(metal.price, metal.feeBps);
+                  return (
+                    <TokenCard key={metal.address}
+                      active={selectedMetal?.address === metal.address}
+                      image={metal.imageUrl} symbol={metal.symbol}
+                      estimated={metalWei > 0n ? truncateDecimals(formatUnits(metalWei, 18), 6) : "0"}
+                      onClick={() => setSelectedMetal(metal)}
+                      disabled={guestMode || isLoading}
+                      effectivePrice={prices.effective}
+                      spotLabel={`Spot ${prices.spot} \u00B7 ${Number(metal.feeBps) / 100}% fee`}
+                      apyBadge={<ApyLine addr={metal.address} />}
+                    />
+                  );
+                })
+              }
+            </ScrollRow>
+          </CrossfadePanel>
+          <CrossfadePanel active={fundingMode === "bridge"}>
+            <ScrollRow>
+              {sourceTokenRoutes.length > 0 ? [
+                ...sourceTokenRoutes.map((rt) => {
+                  let est = amount || "0";
+                  const routePrice = rt.rebaseFactor
+                    ? fmtSpotDollarWei(rt.rebaseFactor)
+                    : "$1.00";
+                  if (rt.rebaseFactor && amount) {
+                    try {
+                      const factor = BigInt(rt.rebaseFactor);
+                      if (factor > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / factor, 18), 6);
+                    } catch { /* keep original */ }
+                  }
+                  return (
+                    <TokenCard key={rt.id}
+                      active={rt.id === selectedToken?.id && !selectedAction}
+                      image={rt.stratoTokenImage} symbol={rt.stratoTokenSymbol}
+                      estimated={est}
+                      onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
+                      disabled={guestMode || isLoading}
+                      effectivePrice={routePrice}
+                      apyBadge={<ApyLine addr={rt.stratoToken} />}
+                    />
+                  );
+                }),
+                ...matchingActions.map((action) => {
+                  let est = amount || "0";
+                  if (action.action === 2 && action.oraclePrice && amount) {
+                    try {
+                      const price = BigInt(action.oraclePrice);
+                      if (price > 0n) est = truncateDecimals(formatUnits((safeParseUnits(amount, 18) * WAD) / price, 18), 6);
+                    } catch { /* keep */ }
+                  }
+                  const isForge = action.action === 2;
+                  const forgePrices = isForge
+                    ? metalPriceRowLabels(action.oraclePrice, action.feeBps)
+                    : undefined;
+                  const earnPrice = !isForge && action.oraclePrice
+                    ? fmtSpotDollarWei(action.oraclePrice)
+                    : undefined;
+                  const forgeSpotLabel = forgePrices && action.feeBps
+                    ? `Spot ${forgePrices.spot} \u00B7 ${Number(action.feeBps) / 100}% fee`
+                    : undefined;
+                  return (
+                    <TokenCard key={action.id}
+                      active={selectedAction?.id === action.id}
+                      image={action.stratoTokenImage} symbol={action.stratoTokenSymbol}
+                      estimated={est}
+                      onClick={() => {
+                        const mintRoute = sourceTokenRoutes.find(r => !r.isDefaultRoute);
+                        if (mintRoute) setSelectedToken(mintRoute);
+                        setSelectedAction(action);
+                      }}
+                      disabled={guestMode || isLoading}
+                      effectivePrice={forgePrices?.effective ?? earnPrice}
+                      spotLabel={forgeSpotLabel}
+                      apyBadge={<ApyLine addr={action.stratoToken} />}
+                    />
+                  );
+                }),
+              ] : (
+                Array.from({ length: prevRouteCountRef.current }).map((_, i) => <CardSkeleton key={`bs-${i}`} id={`bs-${i}`} />)
+              )}
+            </ScrollRow>
+          </CrossfadePanel>
+        </div>
+      </section>
+
+      {fundingMode === "bridge" && selectedToken?.rebaseFactor && (
+        <div className="flex items-start gap-3 p-3 bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 rounded-lg">
+          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-amber-800 dark:text-amber-200">
+            <div className="font-medium mb-1">Rebasing Token</div>
+            <div>
+              This token&apos;s quantity may change due to rebasing events on Ethereum.<br />
+              The received amount on STRATO reflects your underlying share value at the current multiplier.
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Button
+          onClick={fundingMode === "metals" ? handleBuyMetals : handleBridge}
+          disabled={fundingMode === "metals" ? (isLoading || !selectedPayToken || !selectedMetal || !amount || guestMode) : isButtonDisabled}
+          className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
+        >
+          {isLoading ? "Processing..." : fundingMode === "metals" ? `Buy ${selectedMetal?.symbol || "Metal"}` : "Deposit"}
+        </Button>
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${fundingMode === "bridge" ? "max-h-[30px] opacity-100" : "max-h-0 opacity-0"
+          }`}>
+          <Link to="/dashboard/withdrawals" className="text-xs text-blue-500 hover:text-blue-400">
+            Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
+          </Link>
+        </div>
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${fundingMode === "metals" && contactEnabled ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0"
+            }`}
+        >
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-500/10 p-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="bg-blue-500 rounded-full p-1 shrink-0">
+                <Gem className="w-3 h-3 text-white" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setContactModalOpen(true)}
+              className="inline-flex items-center gap-1 shrink-0 font-semibold text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 underline underline-offset-2"
+            >
+              <Mail className="w-3 h-3" />
+              Contact us {"\u2192"}
+            </button>
+          </div>
+        </div>
       </div>
-    );
+
+      {networkError && (
+        <p className="text-sm text-red-500">{networkError}</p>
+      )}
+
+      <DepositProgressModal
+        open={progressModalOpen}
+        currentStep={currentStep}
+        txHash={progressTxHash}
+        chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
+        isEasySavings={(selectedAction?.action || 0) > 0}
+        isNative={progressIsNative}
+        error={progressError}
+        onClose={() => {
+          setProgressModalOpen(false);
+          setCurrentStep("confirm_tx");
+          setProgressTxHash(undefined);
+          setProgressError(undefined);
+        }}
+      />
+      {contactEnabled && (
+        <ContactInquiryModal open={contactModalOpen} onOpenChange={setContactModalOpen} />
+      )}
+    </div>
+  );
 };
 
 export default BridgeIn;
