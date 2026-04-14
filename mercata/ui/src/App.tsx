@@ -66,6 +66,7 @@ import { NetworkProvider } from "@/context/NetworkContext";
 import { VaultProvider } from "@/context/VaultContext";
 import { SaveUsdstProvider } from "@/context/SaveUsdstContext";
 import Borrow from "./pages/Borrow";
+import Loop from "./pages/Loop";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -240,6 +241,14 @@ const App = () => {
                                             element={
                                               <GuestAccessibleRoute>
                                                 <Borrow />
+                                              </GuestAccessibleRoute>
+                                            }
+                                          />
+                                          <Route
+                                            path="/dashboard/loop"
+                                            element={
+                                              <GuestAccessibleRoute>
+                                                <Loop />
                                               </GuestAccessibleRoute>
                                             }
                                           />

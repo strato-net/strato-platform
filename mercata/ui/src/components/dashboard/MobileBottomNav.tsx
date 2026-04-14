@@ -17,6 +17,7 @@ import {
   UserPlus,
   HandCoins,
   Vault,
+  Repeat2,
 
   ArrowDownToLine,
   X
@@ -48,6 +49,7 @@ const MORE_CATEGORIES: MoreNavCategory[] = [
   {
     label: 'TRADE',
     items: [
+      { icon: Repeat2, label: 'Loop', path: '/dashboard/loop' },
       { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
       { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
     ],
