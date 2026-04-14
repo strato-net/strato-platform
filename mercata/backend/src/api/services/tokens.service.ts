@@ -7,7 +7,7 @@ import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getTokenDetails } from "../helpers/cirrusHelpers";
+import { getTokenDetails, getFactoryTokenAddresses } from "../helpers/cirrusHelpers";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher, CollateralVault } = constants;
 
@@ -27,12 +27,12 @@ export const getTokens = async (
       params.select = tokenSelectFields.join(",");
     }
 
-    // Fetch tokens and lending data in parallel
-    const [response, lendingResponse] = await Promise.all([
+    const [response, lendingResponse, factoryAddresses] = await Promise.all([
       cirrus.get(accessToken, "/" + Token, { params }),
       getLendingRegistry(accessToken, {
         select: `collateralVault:collateralVault_fkey(userCollaterals:${constants.CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`
-      })
+      }),
+      getFactoryTokenAddresses(accessToken),
     ]);
 
     if (response.status !== 200) {
@@ -55,7 +55,9 @@ export const getTokens = async (
     // Process price data
     const priceMap = await getCompletePriceMap(accessToken);
 
-    return (response.data as any[]).map((token) => ({
+    return (response.data as any[])
+      .filter((token) => factoryAddresses.has(token.address))
+      .map((token) => ({
       ...token,
       price: priceMap.get(token.address) || "0",
       balances: (token.balances || []).map((balance: any) => {
@@ -110,7 +112,7 @@ export const getBalance = async (
     select: rawParams.select || tokenBalanceSelectFields.join(","),
   };
 
-  const [balances, collaterals, cdps, rawPrices] = await Promise.all([
+  const [balances, collaterals, cdps, rawPrices, factoryAddresses] = await Promise.all([
     cirrus.get(accessToken, "/" + Token + "-_balances", { params }),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
@@ -126,7 +128,8 @@ export const getBalance = async (
         "value->>collateral": `gt.0`
       }
     }),
-    getCompletePriceMap(accessToken)
+    getCompletePriceMap(accessToken),
+    getFactoryTokenAddresses(accessToken),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -138,9 +141,11 @@ export const getBalance = async (
       (collateralMap.get(v.asset) || 0n) + BigInt(v.amount || "0")
     );
 
-  const balanceData = balances.data || [];
+  const balanceData = (balances.data || []).filter((b: any) => factoryAddresses.has(b.address));
   const balanceAddresses = new Set(balanceData.map((b: any) => b.address));
-  const tokensWithCollateralOnly = [...collateralMap.keys()].filter(a => !balanceAddresses.has(a));
+  const tokensWithCollateralOnly = [...collateralMap.keys()]
+    .filter(a => !balanceAddresses.has(a))
+    .filter(a => factoryAddresses.has(a));
 
   const tokenDetails =
     tokensWithCollateralOnly.length > 0
@@ -430,7 +435,7 @@ export const getTokenStats = async (
   accessToken: string
 ): Promise<{ tokens: any[], totalMarketCap: string }> => {
   try {
-    const [tokensResponse, priceData] = await Promise.all([
+    const [tokensResponse, priceData, factoryAddresses] = await Promise.all([
       cirrus.get(accessToken, `/${Token}`, {
         params: {
           select: "address,_name,_symbol,_totalSupply::text",
@@ -438,7 +443,8 @@ export const getTokenStats = async (
           _totalSupply: `gt.0`
         }
       }),
-      getOraclePrices(accessToken)
+      getOraclePrices(accessToken),
+      getFactoryTokenAddresses(accessToken),
     ]);
 
     if (tokensResponse.status !== 200) {
@@ -449,7 +455,7 @@ export const getTokenStats = async (
       throw new Error(`Error fetching price data, no price data found`);
     }
 
-    const tokens = tokensResponse.data || [];
+    const tokens = (tokensResponse.data || []).filter((t: any) => factoryAddresses.has(t.address));
 
     const filteredTokens = tokens.filter((token: any) => priceData.has(token.address));
 

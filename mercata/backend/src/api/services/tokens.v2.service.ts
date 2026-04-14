@@ -11,6 +11,7 @@ import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
+import { getFactoryTokenAddresses } from "../helpers/cirrusHelpers";
 
 const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, YieldVault } = constants;
 
@@ -132,29 +133,32 @@ export const getTokens = async (
     Object.entries(rawParams).filter(([key, v]) => v !== undefined)
   ) as Record<string, string>;
 
-  const { limit, offset, select, ...countParams } = params;
-  const countQuery = {
-    ...countParams,
-    select: select ? `count(),${select}` : "count()",
-  };
+  const { limit: limitStr, offset: offsetStr, ...queryParams } = params;
 
-  const [response, countResponse, rawPrices] = await Promise.all([
-    cirrus.get(accessToken, "/" + Token, { params }),
-    cirrus.get(accessToken, "/" + Token, { params: countQuery }),
+  const [response, rawPrices, factoryAddresses] = await Promise.all([
+    cirrus.get(accessToken, "/" + Token, { params: queryParams }),
     getCompletePriceMap(accessToken),
+    getFactoryTokenAddresses(accessToken),
   ]);
 
   if (response.status !== 200 || !response.data) {
     throw new Error(`Error fetching tokens: ${response.statusText}`);
   }
 
-  return {
-    tokens: (response.data as any[]).map((token) => ({
+  const allTokens = (response.data as any[])
+    .filter((token) => factoryAddresses.has(token.address))
+    .map((token) => ({
       ...token,
       balance: token.balances?.[0]?.balance || "0",
       price: rawPrices.get(token.address) || "0",
-    })) as Token[],
-    totalCount: countResponse.data?.[0]?.count || 0,
+    })) as Token[];
+
+  const limit = parseInt(limitStr) || allTokens.length;
+  const offset = parseInt(offsetStr) || 0;
+
+  return {
+    tokens: allTokens.slice(offset, offset + limit),
+    totalCount: allTokens.length,
   };
 };
 
@@ -162,7 +166,7 @@ export const getEarningAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices, vaultShareToken, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap] = await Promise.all([
+  const [tokens, collaterals, cdps, rawPrices, vaultShareToken, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, factoryAddresses] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -193,6 +197,7 @@ export const getEarningAssets = async (
     getSaveUsdstInfo(accessToken).catch(() => null),
     getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
     getRebaseFactors(accessToken),
+    getFactoryTokenAddresses(accessToken),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -203,14 +208,16 @@ export const getEarningAssets = async (
     )
   );
 
-  const rebasingAddresses = (tokens.data || [])
+  const factoryTokens = (tokens.data || []).filter((t: any) => factoryAddresses.has(t.address));
+
+  const rebasingAddresses = factoryTokens
     .map((t: any) => t.address as string)
     .filter((addr: string) => rebaseFactorMap.has(addr));
 
   const rebasingExternalSymbolMap = await getRebasingExternalSymbols(accessToken, rebasingAddresses)
     .catch(() => new Map<string, string>());
 
-  const earningAssets = (tokens.data || []).map((t: any) => {
+  const earningAssets = factoryTokens.map((t: any) => {
     const balance = t.balances?.[0]?.balance || "0";
     const price = rawPrices.get(t.address) || "0";
     const collateralBalance = (collateralMap.get(t.address) || 0n).toString();
@@ -284,25 +291,26 @@ export const getEarningAssets = async (
 export const getPublicEarningAssets = async (
   accessToken: string
 ): Promise<EarningAsset[]> => {
-  // Build token query params - no user balance filter for public data
   const tokenParams: Record<string, string> = {
         select: buildTokenSelectFields({
           images: true,
           attributes: true,
-          balance: false, // No balance for guests
+          balance: false,
         }).join(","),
         status: "eq.2",
   };
 
-  // Fetch only tokens and prices (skip user-specific collateral data)
-  const [tokens, rawPrices, vaultShareToken, saveUsdstInfo] = await Promise.all([
+  const [tokens, rawPrices, vaultShareToken, saveUsdstInfo, factoryAddresses] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
     getCompletePriceMap(accessToken),
     getVaultShareTokenAddress(accessToken),
     getSaveUsdstInfo(accessToken).catch(() => null),
+    getFactoryTokenAddresses(accessToken),
   ]);
 
-  const earningAssets = (tokens.data || []).map((t: any) => {
+  const earningAssets = (tokens.data || [])
+    .filter((t: any) => factoryAddresses.has(t.address))
+    .map((t: any) => {
     const balance = "0";
     const price = rawPrices.get(t.address) || "0";
     const collateralBalance = "0";

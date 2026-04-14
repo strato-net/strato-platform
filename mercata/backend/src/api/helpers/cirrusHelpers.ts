@@ -1,7 +1,29 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 
-const { Token } = constants;
+const { Token, TokenFactory, tokenFactory } = constants;
+
+let _factoryTokensCache: { addresses: Set<string>; fetchedAt: number } | null = null;
+const FACTORY_CACHE_TTL_MS = 60_000;
+
+export const getFactoryTokenAddresses = async (accessToken: string): Promise<Set<string>> => {
+  const now = Date.now();
+  if (_factoryTokensCache && (now - _factoryTokensCache.fetchedAt) < FACTORY_CACHE_TTL_MS) {
+    return _factoryTokensCache.addresses;
+  }
+
+  const { data } = await cirrus.get(accessToken, `/${TokenFactory}-isFactoryToken`, {
+    params: {
+      address: `eq.${tokenFactory}`,
+      value: `eq.true`,
+      select: "key",
+    },
+  });
+
+  const addresses = new Set<string>((data || []).map((row: any) => row.key));
+  _factoryTokensCache = { addresses, fetchedAt: now };
+  return addresses;
+};
 
 export const toUTCTime = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
 
