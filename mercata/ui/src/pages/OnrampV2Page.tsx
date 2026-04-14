@@ -49,6 +49,7 @@ const OnrampV2Page = () => {
   // Session state
   const [sessionLoading, setSessionLoading] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [waitingForPayment, setWaitingForPayment] = useState(false);
   const [sessionError, setSessionError] = useState("");
 
   const [purchaseRefreshKey, setPurchaseRefreshKey] = useState(0);
@@ -108,6 +109,7 @@ const OnrampV2Page = () => {
 
         const { widgetUrl, sessionId } = data.data;
         window.open(widgetUrl, "meld-onramp", "width=500,height=750,scrollbars=yes,resizable=yes");
+        setWaitingForPayment(true);
 
         stopPolling();
         const poll = async () => {
@@ -117,6 +119,7 @@ const OnrampV2Page = () => {
             });
             if (statusData.data?.step !== "purchasing") {
               stopPolling();
+              setWaitingForPayment(false);
               setActiveSessionId(sessionId);
             }
           } catch { /* keep polling */ }
@@ -133,6 +136,11 @@ const OnrampV2Page = () => {
     },
     [amount, crypto, stopPolling]
   );
+
+  const dismissWaiting = useCallback(() => {
+    setWaitingForPayment(false);
+    stopPolling();
+  }, [stopPolling]);
 
   const dismissTracker = useCallback(() => {
     setActiveSessionId(null);
@@ -174,6 +182,22 @@ const OnrampV2Page = () => {
                 </div>
               ) : (
                 <>
+                  {/* Waiting for payment banner */}
+                  {waitingForPayment && !activeSessionId && (
+                    <div className="flex items-center justify-between text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-3 py-2.5 rounded-lg text-sm">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                        <span>Complete your purchase in the popup window.</span>
+                      </div>
+                      <button
+                        onClick={dismissWaiting}
+                        className="text-xs underline shrink-0 ml-2 hover:text-blue-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
                   {/* Progress Tracker */}
                   {activeSessionId && (
                     <OnrampProgressTracker
