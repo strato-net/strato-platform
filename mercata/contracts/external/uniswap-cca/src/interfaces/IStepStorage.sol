@@ -22,8 +22,9 @@ interface IStepStorage {
     /// @param expectedEndBlock The expected end block from the constructor
     error InvalidEndBlockGivenStepData(uint64 actualEndBlock, uint64 expectedEndBlock);
 
-    /// @notice The address pointer to the contract deployed by SSTORE2
-    /// @return The address pointer
+    /// @notice Compatibility getter preserved from the upstream pointer-based design
+    /// @dev The STRATO port no longer uses SSTORE2-backed step storage and returns address(0).
+    /// @return The compatibility pointer value
     function pointer() external view returns (address);
 
     /// @notice Get the current active auction step

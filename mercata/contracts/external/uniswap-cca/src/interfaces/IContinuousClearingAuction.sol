@@ -12,7 +12,9 @@ import {IValidationHook} from './IValidationHook.sol';
 /// @notice Parameters for the auction
 /// @dev token and totalSupply are passed as constructor arguments
 struct AuctionParameters {
-    address currency; // token to raise funds in. Use address(0) for ETH
+    // Upstream used address(0) for native ETH. The current STRATO port compiles with address(0)
+    // as a configuration value but rejects native bid submission at runtime.
+    address currency; // token to raise funds in
     address tokensRecipient; // address to receive leftover tokens
     address fundsRecipient; // address to receive all raised funds
     uint64 startBlock; // Block which the first step starts
@@ -48,7 +50,7 @@ interface IContinuousClearingAuction is
     error InvalidBidPriceTooHigh(uint256 maxPrice, uint256 maxBidPrice);
     /// @notice Error thrown when the bid amount is too small
     error BidAmountTooSmall();
-    /// @notice Error thrown when msg.value is non zero when currency is not ETH
+    /// @notice Legacy upstream error for native-value mismatch handling
     error CurrencyIsNotNative();
     /// @notice Error thrown when the auction is not started
     error AuctionNotStarted();
@@ -127,6 +129,7 @@ interface IContinuousClearingAuction is
     event TokensClaimed(uint256 indexed bidId, address indexed owner, uint256 tokensFilled);
 
     /// @notice Submit a new bid
+    /// @dev The current STRATO port supports ERC20 bid flow. Native-currency bids are rejected.
     /// @param maxPrice The maximum price the bidder is willing to pay
     /// @param amount The amount of the bid
     /// @param owner The owner of the bid
