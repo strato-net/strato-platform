@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -53,12 +53,20 @@ const OnrampV2Page = () => {
 
   const [purchaseRefreshKey, setPurchaseRefreshKey] = useState(0);
 
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Config
   const [meldEnabled, setMeldEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
     getConfig().then((cfg) => setMeldEnabled(cfg.meldEnabled ?? false));
   }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  }, []);
+
+  useEffect(() => stopPolling, [stopPolling]);
 
   const fetchQuotes = useCallback(async () => {
     const numAmount = parseFloat(amount);
@@ -100,7 +108,21 @@ const OnrampV2Page = () => {
 
         const { widgetUrl, sessionId } = data.data;
         window.open(widgetUrl, "meld-onramp", "width=500,height=750,scrollbars=yes,resizable=yes");
-        setActiveSessionId(sessionId);
+
+        stopPolling();
+        const poll = async () => {
+          try {
+            const { data: statusData } = await api.get("/onramp/v2/purchase-status", {
+              params: { sessionId },
+            });
+            if (statusData.data?.step !== "purchasing") {
+              stopPolling();
+              setActiveSessionId(sessionId);
+            }
+          } catch { /* keep polling */ }
+        };
+        poll();
+        pollRef.current = setInterval(poll, 5000);
       } catch (err: any) {
         setSessionError(
           err?.response?.data?.error?.message || "Failed to create onramp session."
@@ -109,13 +131,14 @@ const OnrampV2Page = () => {
         setSessionLoading(null);
       }
     },
-    [amount, crypto]
+    [amount, crypto, stopPolling]
   );
 
   const dismissTracker = useCallback(() => {
     setActiveSessionId(null);
+    stopPolling();
     setPurchaseRefreshKey((k) => k + 1);
-  }, []);
+  }, [stopPolling]);
 
   const formatProvider = (name: string) =>
     name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();

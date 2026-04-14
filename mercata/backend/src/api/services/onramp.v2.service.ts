@@ -462,6 +462,10 @@ export async function getPurchaseStatus(
     return { step: "failed", meldStatus, bridgeStatus: null, destinationAmount, destinationCurrency, serviceProvider };
   }
 
+  if (meldStatus === "SETTLING") {
+    return { step: "routing", meldStatus, bridgeStatus: null, destinationAmount, destinationCurrency, serviceProvider };
+  }
+
   if (meldStatus !== "SETTLED") {
     return { step: "purchasing", meldStatus, bridgeStatus: null, destinationAmount, destinationCurrency, serviceProvider };
   }
