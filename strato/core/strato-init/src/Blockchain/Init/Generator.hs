@@ -117,7 +117,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
   nodeExists <- doesFileExist (".ethereumH" </> "ethconf.yaml")
   when nodeExists $ do
     when hasFlags $ liftIO $
-      putStrLn $ "\ESC[1;33mWarning: Node already exists at " ++ nodeDir ++ ". Flags are ignored. To recreate, remove the directory first.\ESC[0m"
+      putStrLn $ "\ESC[1;33mWarning: Node already exists at " ++ nodeDir ++ ". Flags are ignored. To recreate, stop the node and remove the directory first.\ESC[0m"
     liftIO $ putStrLn $ "Node already exists at " ++ nodeDir ++ ", skipping setup."
   
   unless nodeExists $ do

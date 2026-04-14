@@ -94,7 +94,7 @@ This builds both app images and prints the command to deploy them. Then stop and
 
 ```
 strato-down
-strato-up mynode --update-app mercata-backend:<tag> mercata-ui:<tag>
+strato-up mynode --patch-app mercata-backend:<tag> mercata-ui:<tag>
 ```
 
 Use the exact image tags printed by `make app`. You can also rebuild and deploy the images individually with `make mercata-backend` or `make mercata-ui`.

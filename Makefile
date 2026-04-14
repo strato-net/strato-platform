@@ -147,7 +147,6 @@ $(DOCKER_SENTINELS)/mercata-backend: | $(DOCKER_SENTINELS)
 	else \
 		echo "mercata-backend up to date"; \
 	fi
-	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) <mercata-ui-tag>"
 
 $(DOCKER_SENTINELS)/mercata-ui: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,mercata/ui,$(VERSION)-$(HASH_MERCATA_UI)); then \
@@ -158,7 +157,6 @@ $(DOCKER_SENTINELS)/mercata-ui: | $(DOCKER_SENTINELS)
 	else \
 		echo "mercata-ui up to date"; \
 	fi
-	@echo "  Update running node: strato-up <node-dir> --update-app <mercata-backend-tag> $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
 
 $(DOCKER_SENTINELS)/prometheus: | $(DOCKER_SENTINELS)
 	@if $(call needs_rebuild,prometheus-packager,$(VERSION)-$(HASH_PROMETHEUS)); then \
@@ -223,8 +221,8 @@ mercata-backend: $(DOCKER_SENTINELS)/mercata-backend
 mercata-ui: $(DOCKER_SENTINELS)/mercata-ui
 app: mercata-backend mercata-ui
 	@echo ""
-	@echo "Both app images built. To update a running node:"
-	@echo "  strato-up <node-dir> --update-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
+	@echo "Both app images built. To patch a running node:"
+	@echo "  strato-up <node-dir> --patch-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
 
 bridge: $(DOCKER_SENTINELS)/bridge
 bridge-nginx: $(DOCKER_SENTINELS)/bridge-nginx
@@ -260,14 +258,12 @@ mercata-backend-force:
 	docker build -t ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} -f ./mercata/backend/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}-${HASH_MERCATA_BACKEND}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-backend
-	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND)"
 
 mercata-ui-force:
 	@echo Now building mercata-ui...
 	docker build -t ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} -f ./mercata/ui/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}-${HASH_MERCATA_UI}
 	@mkdir -p $(DOCKER_SENTINELS) && touch $(DOCKER_SENTINELS)/mercata-ui
-	@echo "  Update running node: strato-up <node-dir> --update-app $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
 
 bridge-force:
 	@echo Now building bridge...
