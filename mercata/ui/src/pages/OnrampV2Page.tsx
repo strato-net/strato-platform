@@ -5,6 +5,7 @@ import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import PurchaseHistoryV2 from "../components/onramp/PurchaseHistoryV2";
 import OnrampProgressTracker from "../components/onramp/OnrampProgressTracker";
 import { useUser } from "@/context/UserContext";
+import { useTokenContext } from "@/context/TokenContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
 import { getConfig } from "@/lib/config";
@@ -36,6 +37,7 @@ interface Quote {
 
 const OnrampV2Page = () => {
   const { isLoggedIn } = useUser();
+  const { fetchUsdstBalance, refreshNetBalance } = useTokenContext();
 
   // Form state
   const [amount, setAmount] = useState("100");
@@ -202,7 +204,7 @@ const OnrampV2Page = () => {
                   {activeSessionId && (
                     <OnrampProgressTracker
                       sessionId={activeSessionId}
-                      onComplete={() => setTimeout(() => setPurchaseRefreshKey((k) => k + 1), 2000)}
+                      onComplete={() => { fetchUsdstBalance(); refreshNetBalance(); setTimeout(() => setPurchaseRefreshKey((k) => k + 1), 2000); }}
                       onDismiss={dismissTracker}
                     />
                   )}
