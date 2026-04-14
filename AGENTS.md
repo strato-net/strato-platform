@@ -26,3 +26,49 @@
 - Default priceOracle is system contract `0000…1002` (same for vaults and system default — no separate query)
 - Sidebar nav uses category groupings (TRADE, SPEND, EARN, PRO) defined in `DashboardSidebar.tsx`, `MobileSidebar.tsx`, and `MobileBottomNav.tsx`; all three must stay in sync; Card is under SPEND. SolidVM contract tests: `solid-vm-cli test <file>` from test dir; pattern is `Describe_*` contract with `beforeAll`/`beforeEach`/`it_*` functions; `fetchMinDepositAmount` depends on both `selectedToken` AND `currentNetwork`/`chainId`
 - CDP collateral on prod is listed via CDPRegistry (`…1012`) and CDPEngine (`…1011`) in Cirrus; many assets are configured with USDST often paused as collateral; the depositable set follows `getVaultCandidates` (excludes USDST and paused assets — typically on the order of a dozen depositable)
+
+## Cursor Cloud specific instructions
+
+### Services overview
+
+The primary dev workload is the **Mercata** app under `mercata/`. It has three core components:
+
+| Service | Path | Dev command | Port |
+|---|---|---|---|
+| shared-types | `mercata/packages/shared-types` | `npm run build` (auto via postinstall) | N/A |
+| backend | `mercata/backend` | `npm run dev` | 3001 |
+| ui | `mercata/ui` | `npm run dev` | 8080 |
+
+### Environment variables
+
+- **Backend** requires a `.env` file at `mercata/backend/.env`. The backend uses `dotenv` to auto-load it in non-production mode. The four required vars (`OAUTH_DISCOVERY_URL`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `NODE_URL`) are injected as VM environment variables via Cursor Secrets. Before starting the backend, create the `.env` from them:
+  ```
+  cat > mercata/backend/.env <<EOF
+  OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+  OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+  OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+  NODE_URL=${NODE_URL}
+  BASE_URL=http://127.0.0.1
+  EOF
+  ```
+- **UI** has no required env vars for dev.
+- **Keycloak test login** credentials are available as `KEYCLOAK_TEST_USER_NAME` and `KEYCLOAK_TEST_USER_PASSWORD` VM environment variables for browser-based login testing.
+
+### Running services
+
+- `cd mercata/backend && npm run dev` — starts Express API with `ts-node-dev` (hot reload). Requires valid OAuth credentials to boot (fetches a service token from Keycloak at startup via `initNetworkConfig`).
+- `cd mercata/ui && npm run dev` — starts Vite dev server on port 8080.
+- **Nginx reverse proxy** (required for OAuth login flow): see `mercata/README.md` "Run Nginx Standalone" section. Pass the three OAuth env vars from `mercata/backend/.env` and run `docker compose -f docker-compose.nginx-standalone.yml up -d --build` from `mercata/nginx/`. Serves the app on port 80, proxying UI (8080) and backend (3001) via `host.docker.internal`. Without nginx, `/login` returns 404. Docker must be installed and running first.
+
+### Lint / build / test
+
+- **UI lint**: `cd mercata/ui && npm run lint` (ESLint). Pre-existing warnings/errors in codebase are expected.
+- **Backend build**: `cd mercata/backend && npm run build` (TypeScript compilation).
+- **UI build**: `cd mercata/ui && npm run build`.
+- No automated test suites exist for `mercata/ui` or `mercata/backend`.
+
+### Gotchas
+
+- The backend prints YAML parse warnings from swagger annotations in `creditCard.routes.ts` — these are cosmetic and do not affect startup.
+- `shared-types` must be built before backend or UI can resolve `@mercata/shared-types`. Both services run `postinstall` scripts that build it automatically during `npm install`.
+- Node.js must be `>=22.12 <23.0` (enforced in `engines` field).
