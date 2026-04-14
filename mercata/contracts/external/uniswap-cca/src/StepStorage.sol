@@ -20,11 +20,11 @@ abstract contract StepStorage is IStepStorage {
     uint256 internal immutable _LENGTH;
 
     /// @notice The address pointer to the contract deployed by SSTORE2
-    address private immutable $_pointer;
+    address private immutable _stepPointer;
     /// @notice The word offset of the last read step in `auctionStepsData` bytes
-    uint256 private $_offset;
+    uint256 private _offset;
     /// @notice The current active auction step
-    AuctionStep internal $step;
+    AuctionStep internal _step;
 
     constructor(bytes memory _auctionStepsData, uint64 _startBlock, uint64 _endBlock) {
         if (_startBlock >= _endBlock) revert InvalidEndBlock();
@@ -32,9 +32,9 @@ abstract contract StepStorage is IStepStorage {
         END_BLOCK = _endBlock;
         _LENGTH = _auctionStepsData.length;
 
-        address _pointer = _auctionStepsData.write();
-        _validate(_pointer);
-        $_pointer = _pointer;
+        address stepPointer_ = _auctionStepsData.write();
+        _validate(stepPointer_);
+        _stepPointer = stepPointer_;
 
         _advanceStep();
     }
@@ -66,31 +66,31 @@ abstract contract StepStorage is IStepStorage {
     /// @notice Advance the current auction step
     /// @dev This function is called on every new bid if the current step is complete
     function _advanceStep() internal returns (AuctionStep memory) {
-        if ($_offset >= _LENGTH) revert AuctionIsOver();
+        if (_offset >= _LENGTH) revert AuctionIsOver();
 
-        bytes8 _auctionStep = bytes8($_pointer.read($_offset, $_offset + StepLib.UINT64_SIZE));
+        bytes8 _auctionStep = bytes8(_stepPointer.read(_offset, _offset + StepLib.UINT64_SIZE));
         (uint24 mps, uint40 blockDelta) = _auctionStep.parse();
 
-        uint64 _startBlock = $step.endBlock;
+        uint64 _startBlock = _step.endBlock;
         if (_startBlock == 0) _startBlock = START_BLOCK;
         uint64 _endBlock = _startBlock + uint64(blockDelta);
 
-        $step = AuctionStep({startBlock: _startBlock, endBlock: _endBlock, mps: mps});
+        _step = AuctionStep({startBlock: _startBlock, endBlock: _endBlock, mps: mps});
 
-        $_offset += StepLib.UINT64_SIZE;
+        _offset += StepLib.UINT64_SIZE;
 
         emit AuctionStepRecorded(_startBlock, _endBlock, mps);
-        return $step;
+        return _step;
     }
 
     /// @inheritdoc IStepStorage
     function step() external view returns (AuctionStep memory) {
-        return $step;
+        return _step;
     }
 
     // Getters
     /// @inheritdoc IStepStorage
     function pointer() external view returns (address) {
-        return $_pointer;
+        return _stepPointer;
     }
 }

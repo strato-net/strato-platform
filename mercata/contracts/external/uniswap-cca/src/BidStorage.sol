@@ -7,16 +7,16 @@ import {Bid} from './libraries/BidLib.sol';
 /// @notice Abstract contract for managing bid storage
 abstract contract BidStorage is IBidStorage {
     /// @notice The id of the next bid to be created
-    uint256 private $_nextBidId;
+    uint256 private _nextBidId;
     /// @notice The mapping of bid ids to bids
-    mapping(uint256 bidId => Bid bid) private $_bids;
+    mapping(uint256 bidId => Bid bid) private _bids;
 
     /// @notice Get a bid from storage
     /// @param bidId The id of the bid to get
     /// @return bid The bid
     function _getBid(uint256 bidId) internal view returns (Bid storage) {
-        if (bidId >= $_nextBidId) revert BidIdDoesNotExist(bidId);
-        return $_bids[bidId];
+        if (bidId >= _nextBidId) revert BidIdDoesNotExist(bidId);
+        return _bids[bidId];
     }
 
     /// @notice Create a new bid
@@ -44,15 +44,15 @@ abstract contract BidStorage is IBidStorage {
             tokensFilled: 0
         });
 
-        bidId = $_nextBidId;
-        $_bids[bidId] = bid;
-        $_nextBidId++;
+        bidId = _nextBidId;
+        _bids[bidId] = bid;
+        _nextBidId++;
     }
 
     /// Getters
     /// @inheritdoc IBidStorage
     function nextBidId() external view returns (uint256) {
-        return $_nextBidId;
+        return _nextBidId;
     }
 
     /// @inheritdoc IBidStorage

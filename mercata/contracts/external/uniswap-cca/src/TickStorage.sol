@@ -8,11 +8,11 @@ import {ConstantsLib} from './libraries/ConstantsLib.sol';
 /// @notice Abstract contract for handling tick storage
 abstract contract TickStorage is ITickStorage {
     /// @notice Mapping of price levels to tick data
-    mapping(uint256 price => Tick) private $_ticks;
+    mapping(uint256 price => Tick) private _ticks;
 
     /// @notice The price of the next initialized tick above the clearing price
     /// @dev This will be equal to the clearingPrice if no ticks have been initialized yet
-    uint256 internal $nextActiveTickPrice;
+    uint256 internal _nextActiveTickPrice;
     /// @notice The floor price of the auction
     uint256 internal immutable FLOOR_PRICE;
     /// @notice The tick spacing of the auction - bids must be placed at discrete tick intervals
@@ -30,7 +30,7 @@ abstract contract TickStorage is ITickStorage {
         // Initialize the floor price as the first tick
         // _getTick will validate that it is also at a tick boundary
         _getTick(FLOOR_PRICE).next = MAX_TICK_PTR;
-        $nextActiveTickPrice = MAX_TICK_PTR;
+        _nextActiveTickPrice = MAX_TICK_PTR;
         emit NextActiveTickUpdated(MAX_TICK_PTR);
         emit TickInitialized(FLOOR_PRICE);
     }
@@ -40,7 +40,7 @@ abstract contract TickStorage is ITickStorage {
     function _getTick(uint256 price) internal view returns (Tick storage) {
         // Validate `price` is at a boundary designated by the tick spacing
         if (price % TICK_SPACING != 0) revert TickPriceNotAtBoundary();
-        return $_ticks[price];
+        return _ticks[price];
     }
 
     /// @notice Initialize a tick at `price` if it does not exist already
@@ -53,9 +53,9 @@ abstract contract TickStorage is ITickStorage {
     function _initializeTickIfNeeded(uint256 prevPrice, uint256 price) internal {
         if (price == MAX_TICK_PTR) revert InvalidTickPrice();
         // _getTick will validate that `price` is at a boundary designated by the tick spacing
-        Tick storage $newTick = _getTick(price);
+        Tick storage newTick = _getTick(price);
         // Early return if the tick is already initialized
-        if ($newTick.next != 0) return;
+        if (newTick.next != 0) return;
         // Otherwise, we need to iterate through the linked list to find the correct position for the new tick
         // Require that `prevPrice` is less than `price` since we can only iterate forward
         if (prevPrice >= price) revert TickPreviousPriceInvalid();
@@ -71,12 +71,12 @@ abstract contract TickStorage is ITickStorage {
             nextPrice = _getTick(nextPrice).next;
         }
         // Update linked list pointers
-        $newTick.next = nextPrice;
+        newTick.next = nextPrice;
         _getTick(prevPrice).next = price;
         // If the next tick is the nextActiveTick, update nextActiveTick to the new tick
         // In the base case, where next == 0 and nextActiveTickPrice == 0, this will set nextActiveTickPrice to price
-        if (nextPrice == $nextActiveTickPrice) {
-            $nextActiveTickPrice = price;
+        if (nextPrice == _nextActiveTickPrice) {
+            _nextActiveTickPrice = price;
             emit NextActiveTickUpdated(price);
         }
 
@@ -87,9 +87,9 @@ abstract contract TickStorage is ITickStorage {
     /// @param price The price of the tick
     /// @param currencyDemandQ96 The demand to add
     function _updateTickDemand(uint256 price, uint256 currencyDemandQ96) internal {
-        Tick storage $tick = _getTick(price);
-        if ($tick.next == 0) revert CannotUpdateUninitializedTick();
-        $tick.currencyDemandQ96 += currencyDemandQ96;
+        Tick storage tick_ = _getTick(price);
+        if (tick_.next == 0) revert CannotUpdateUninitializedTick();
+        tick_.currencyDemandQ96 += currencyDemandQ96;
     }
 
     // Getters
@@ -105,7 +105,7 @@ abstract contract TickStorage is ITickStorage {
 
     /// @inheritdoc ITickStorage
     function nextActiveTickPrice() external view returns (uint256) {
-        return $nextActiveTickPrice;
+        return _nextActiveTickPrice;
     }
 
     /// @inheritdoc ITickStorage
