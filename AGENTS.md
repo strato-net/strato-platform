@@ -49,7 +49,7 @@ The primary dev workload is the **Mercata** app under `mercata/`. It has three c
 
 - `cd mercata/backend && npm run dev` — starts Express API with `ts-node-dev` (hot reload). Requires valid OAuth credentials to boot (fetches a service token from Keycloak at startup via `initNetworkConfig`).
 - `cd mercata/ui && npm run dev` — starts Vite dev server on port 8080.
-- Login/auth flow requires nginx reverse proxy (`mercata/nginx/docker-compose.nginx-standalone.yml`) — without it, `/login` returns 404.
+- **Nginx reverse proxy** (required for OAuth login flow): see `mercata/README.md` "Run Nginx Standalone" section. Pass the three OAuth env vars from `mercata/backend/.env` and run `docker compose -f docker-compose.nginx-standalone.yml up -d --build` from `mercata/nginx/`. Serves the app on port 80, proxying UI (8080) and backend (3001) via `host.docker.internal`. Without nginx, `/login` returns 404. Docker must be installed and running first.
 
 ### Lint / build / test
 
