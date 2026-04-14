@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { formatUnits } from "ethers";
 import { ArrowDownUp, Clock, X, Flame, BarChart3 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
+import { useTokenContext } from "@/context/TokenContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,6 +47,8 @@ const formatTimeRemaining = (seconds: number): string => {
 
 const DirectMintPSMSection = () => {
   const { isLoggedIn } = useUser();
+  const { fetchUsdstBalance } = useTokenContext();
+  const { fetchTokens } = useUserTokens();
   const { toast } = useToast();
 
   const [psmInfo, setPsmInfo] = useState<PsmInfo | null>(null);
@@ -145,7 +149,7 @@ const DirectMintPSMSection = () => {
         variant: "success",
       });
       setMintAmount("");
-      await refreshData();
+      await Promise.all([refreshData(), fetchUsdstBalance(), fetchTokens()]);
     } catch {
       // Errors handled by axios interceptor
     } finally {
@@ -164,7 +168,7 @@ const DirectMintPSMSection = () => {
         variant: "success",
       });
       setRedeemAmount("");
-      await refreshData();
+      await Promise.all([refreshData(), fetchUsdstBalance(), fetchTokens()]);
     } catch {
       // Errors handled by axios interceptor
     } finally {
@@ -179,10 +183,10 @@ const DirectMintPSMSection = () => {
       await psmService.completeBurn(request.id);
       toast({
         title: "Redemption Complete",
-        description: `Burned ${formatUnits(request.amount, 18)} ${psmInfo?.mintableTokenSymbol} and received ${request.redeemTokenSymbol}`,
+        description: `Redeemed ${formatUnits(request.amount, 18)} ${psmInfo?.mintableTokenSymbol} for ${request.redeemTokenSymbol}`,
         variant: "success",
       });
-      await refreshData();
+      await Promise.all([refreshData(), fetchUsdstBalance(), fetchTokens()]);
     } catch {
       // Errors handled by axios interceptor
     } finally {
@@ -200,7 +204,7 @@ const DirectMintPSMSection = () => {
         description: "Your redeem request has been cancelled.",
         variant: "success",
       });
-      await refreshData();
+      await Promise.all([refreshData(), fetchUsdstBalance(), fetchTokens()]);
     } catch {
       // Errors handled by axios interceptor
     } finally {
@@ -400,7 +404,7 @@ const DirectMintPSMSection = () => {
                   <Button
                     onClick={handleRequestBurn}
                     variant="outline"
-                    className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full"
+                    className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 w-full"
                     disabled={!isLoggedIn || isProcessing || !isRedeemValid()}
                   >
                     {isProcessing ? "Processing..." : "Request Redeem"}
@@ -578,12 +582,13 @@ const DirectMintPSMSection = () => {
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  This will redeem your escrowed{" "}
+                  This will burn your escrowed{" "}
                   <span className="font-semibold text-foreground">
                     {completeDialogRequest &&
                       formatUnits(completeDialogRequest.amount, 18)}{" "}
                     {psmInfo?.mintableTokenSymbol || "USDST"}
-                  </span>{" "}
+                  </span>
+                  <br />
                   and transfer{" "}
                   <span className="font-semibold text-foreground">
                     {completeDialogRequest &&
