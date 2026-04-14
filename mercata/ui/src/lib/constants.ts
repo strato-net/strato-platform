@@ -50,7 +50,7 @@ export const SAFETY_STAKE_FEE = "0.02"; // USDST fee for SafetyModule stake tran
 export const SAFETY_REDEEM_FEE = "0.01"; // USDST fee for SafetyModule redeem transactions
 export const METAL_BUY_FEE = "0.02"; // USDST fee for metal buy (approve + mintMetal = 2 calls)
 export const PSM_MINT_FEE = "0.02"; // USDST fee for PSM mint (approve + mint = 2 calls)
-export const PSM_BURN_REQUEST_FEE = "0.01"; // USDST fee for PSM burn request
+export const PSM_BURN_REQUEST_FEE = "0.02"; // USDST fee for PSM burn request (approve + requestBurn = 2 calls)
 export const PSM_BURN_COMPLETE_FEE = "0.01"; // USDST fee for PSM burn complete
 export const PSM_BURN_CANCEL_FEE = "0.01"; // USDST fee for PSM burn cancel
 

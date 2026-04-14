@@ -578,13 +578,13 @@ const DirectMintPSMSection = () => {
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  This will burn{" "}
+                  This will redeem your escrowed{" "}
                   <span className="font-semibold text-foreground">
                     {completeDialogRequest &&
                       formatUnits(completeDialogRequest.amount, 18)}{" "}
                     {psmInfo?.mintableTokenSymbol || "USDST"}
                   </span>{" "}
-                  from your wallet and transfer{" "}
+                  and transfer{" "}
                   <span className="font-semibold text-foreground">
                     {completeDialogRequest &&
                       formatUnits(completeDialogRequest.amount, 18)}{" "}

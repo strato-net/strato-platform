@@ -240,14 +240,28 @@ export const psmRequestBurn = async (
 ): Promise<{ status: string; hash: string }> => {
   const psmAddress = getPsmAddress();
 
-  const tx: FunctionInput = {
-    contractName: extractContractName(DirectMintPSM),
-    contractAddress: psmAddress,
-    method: "requestBurn",
-    args: { amount, redeemToken },
-  };
+  const psmResponse = await cirrus.get(accessToken, `/${DirectMintPSM}`, {
+    params: { address: `eq.${psmAddress}`, select: "mintableToken" },
+  });
+  const mintableToken = normalizeAddress(psmResponse.data?.[0]?.mintableToken);
+  if (!mintableToken) throw new Error("Could not resolve PSM mintableToken");
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+  const txs: FunctionInput[] = [
+    {
+      contractName: extractContractName(Token),
+      contractAddress: mintableToken,
+      method: "approve",
+      args: { spender: psmAddress, value: amount },
+    },
+    {
+      contractName: extractContractName(DirectMintPSM),
+      contractAddress: psmAddress,
+      method: "requestBurn",
+      args: { amount, redeemToken },
+    },
+  ];
+
+  const builtTx = await buildFunctionTx(txs, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
