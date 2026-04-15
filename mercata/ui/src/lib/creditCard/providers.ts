@@ -51,8 +51,8 @@ const ETHERFI_CARD: CardProvider = {
     { chainId: "84532", chainName: "Base Sepolia", testnetOnly: true },
   ],
   tokensByNetwork: {
-    "8453": ["USDC", "USDT", "aBasUSDC"],
-    "84532": ["USDC", "USDT", "aBasUSDC"],
+    "8453": ["USDC", "USDT"],
+    "84532": ["USDC", "USDT"],
   },
 };
 
