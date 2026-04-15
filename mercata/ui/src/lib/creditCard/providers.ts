@@ -56,7 +56,7 @@ const ETHERFI_CARD: CardProvider = {
   },
 };
 
-export const CARD_PROVIDERS: CardProvider[] = [METAMASK_CARD]; //, ETHERFI_CARD];
+export const CARD_PROVIDERS: CardProvider[] = [METAMASK_CARD, ETHERFI_CARD];
 
 export function getProviderById(id: string): CardProvider | undefined {
   return CARD_PROVIDERS.find((p) => p.id === id);
