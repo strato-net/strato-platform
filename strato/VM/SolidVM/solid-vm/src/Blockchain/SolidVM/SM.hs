@@ -909,13 +909,49 @@ addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEve
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> Maybe T.Text -> T.Text -> m ()
 addDelegatecall s c o n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o n)
 
-getUsername :: MonadSM m => m Text
+-- Cirrus table namespace enforcement
+--
+-- Cirrus tables are namespaced by the deployer's username, which is stored in
+-- the User contract created by the UserRegistry. Only contracts deployed through
+-- a User contract should produce Cirrus tables, since the username determines
+-- which namespace the table belongs to.
+--
+-- Previously, any contract deployed without a User in the call stack would
+-- default to the "BlockApps" namespace, allowing arbitrary accounts to write
+-- into the system namespace. getUsername now returns Nothing when no User
+-- contract is found, and addNewCodeCollection skips the announcement — so no
+-- Cirrus table is created for contracts deployed outside the User contract flow.
+--
+-- The addresses below are the legacy BlockApps operational accounts that
+-- deployed system contracts before the UserRegistry was in place. They are
+-- grandfathered in so that existing system contract tables continue to be
+-- created under the "BlockApps" namespace.
+blockappsAddresses :: S.Set Address
+blockappsAddresses = S.fromList
+  [ Address 0x7630b673862a2807583834908f10192e00c58b00
+  , Address 0x101a31a25295a5dd95187ea2b0725c91443db7b7
+  , Address 0x3287f1ad89b0ac875b58a65ceaf40bc7a6cc8041
+  , Address 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce
+  , Address 0xac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7
+  , Address 0x304f41812ce9a1db4fa9c58aff7904ea3e77d51a
+  , Address 0x292dd9591f506845ef05a9f3b8116e641cbcb4bb
+  ]
+
+-- | Resolve the deployer's username for Cirrus table namespacing.
+-- Walks the call stack looking for a User contract (which has a "username"
+-- storage field). Returns Nothing if no User contract is found and the TX
+-- origin is not a grandfathered BlockApps account.
+getUsername :: MonadSM m => m (Maybe Text)
 getUsername = do
-  let go []     = pure "BlockApps"
+  let go []     = do
+        origin <- Env.origin <$> getEnv
+        if origin `S.member` blockappsAddresses
+          then pure $ Just "BlockApps"
+          else pure Nothing
       go (x:xs) = do
         userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
         case userNameValue of
-          MS.BString userNameString -> pure $ DT.decodeUtf8 userNameString
+          MS.BString userNameString -> pure $ Just $ DT.decodeUtf8 userNameString
           _ -> go xs
 
   cs <- Mod.get (Mod.Proxy @[CallInfo])
@@ -923,8 +959,11 @@ getUsername = do
 
 addNewCodeCollection :: MonadSM m => Keccak256 -> CodeCollection -> m ()
 addNewCodeCollection ch cc = do
-  username <- getUsername
-  Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((username, ch), cc))
+  mUsername <- getUsername
+  case mUsername of
+    Just username ->
+      Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((username, ch), cc))
+    Nothing -> pure ()
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do

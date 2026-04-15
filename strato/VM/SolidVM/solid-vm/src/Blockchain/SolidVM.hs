@@ -2617,8 +2617,8 @@ runTheConstructors from to hsh cc contractName' argVals' = do
         _ <- runModifiersAndStatements modContentsList commands
         pure ()
       Nothing -> return ()
-    userName <- getUsername
-    addDelegatecall to to (Just userName) $ T.pack contractName'
+    mUserName <- getUsername
+    addDelegatecall to to mUserName $ T.pack contractName'
 
   return ()
 

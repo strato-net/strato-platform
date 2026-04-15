@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import { getActivityLink } from "@/lib/rewards/activityLinks";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { useEarnContext } from "@/context/EarnContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { buildNativeRewardsApyInfo, EarnApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo } from "@/utils/earnUtils";
@@ -187,7 +188,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 <TableHead>
                   <div className="flex items-center gap-1">
                  Best Available APY
-                    <InfoTooltip content="Best Available APY shows the highest stacked yield available for this activity, combining Native APY, Base APY, and Rewards APY when applicable. Hover over the APY value to see the full breakdown." />
+                    <BestApyInfoTooltip />
                   </div>
                 </TableHead>
                 <TableHead>Type</TableHead>
