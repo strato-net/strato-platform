@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { redirectToLogin } from "@/lib/auth";
 import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewards } from "@/hooks/useRewards";
 import { findBestEarnApyInfo, buildEarnApyMap } from "@/utils/earnUtils";
 import { usdstAddress } from "@/lib/constants";
 
@@ -19,6 +21,17 @@ const BRIDGE_IN_TOKEN_ADDRESSES = [
   "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9", // WBTC
   "93fb7295859b2d70199e0a4883b7c320cf874e6c", // ETH
 ] as const;
+
+const formatDailyPoints = (value: number): string => {
+  if (value < 1e-12) return "tiny";
+  if (value >= 0.01) return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const str = value.toFixed(20);
+  const decimalIndex = str.indexOf(".");
+  let firstNonZero = decimalIndex + 1;
+  while (firstNonZero < str.length && str[firstNonZero] === "0") firstNonZero++;
+  const decimals = Math.min(firstNonZero - decimalIndex, 12);
+  return value.toFixed(decimals);
+};
 
 type PromoTokenRow = { address: string; imageUrl: string | null; symbol: string };
 
@@ -41,12 +54,15 @@ const resolvePromoRows = (
 };
 
 interface GuestPromoSectionProps {
-  variant: 1 | 2; // 1 = logged out, 2 = logged in with 0 portfolio
+  variant: 1 | 2 | 3; // 1 = logged out, 2 = logged in 0 portfolio, 3 = logged in with portfolio
 }
 
 const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
   const navigate = useNavigate();
+  const [rewardsButtonHovered, setRewardsButtonHovered] = useState(false);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
+  const { userRewards } = useRewardsUserInfo();
+  const { state: rewardsState } = useRewards();
   const { earningAssets, inactiveTokens, loadingEarningAssets } = useTokenContext();
   const tokensLoading = loadingEarningAssets || earningAssets.length === 0;
 
@@ -75,6 +91,26 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
     return info && info.total > 0 ? info.total.toFixed(1) : null;
   }, [tokenApys]);
 
+  const { dailyPointsStr, emissionFillPct } = useMemo(() => {
+    if (!userRewards?.activities?.length) return { dailyPointsStr: null, emissionFillPct: 0 };
+    let totalPerSec = 0n;
+    for (const { personalEmissionRate } of userRewards.activities) {
+      if (personalEmissionRate) totalPerSec += BigInt(personalEmissionRate);
+    }
+    if (totalPerSec === 0n) return { dailyPointsStr: null, emissionFillPct: 0 };
+    const perDay = Number((totalPerSec * 86400n) / BigInt(1e9)) / 1e9;
+    console.log("[GuestPromoSection] dailyPoints full precision:", perDay);
+
+    let fillPct = 0;
+    const totalEmission = rewardsState?.totalRewardsEmission;
+    if (totalEmission && BigInt(totalEmission) > 0n) {
+      const raw = Math.min(100, Number((totalPerSec * 10000n) / BigInt(totalEmission)) / 100);
+      fillPct = raw > 0 ? Math.max(raw, 2) : 0;
+    }
+
+    return { dailyPointsStr: formatDailyPoints(perDay), emissionFillPct: fillPct };
+  }, [userRewards, rewardsState]);
+
   const highestNativeApy = useMemo(() => {
     let best = 0;
     for (const info of buildEarnApyMap(tokenApys).values()) {
@@ -85,6 +121,68 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
     }
     return best > 0 ? best.toFixed(1) : null;
   }, [tokenApys]);
+
+  if (variant === 3) {
+    return (
+      <div className="mb-8">
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ background: "linear-gradient(135deg, #0A0F29 0%, #001B70 55%, #102a80 100%)" }}
+        >
+          <div className="flex flex-col lg:flex-row">
+            <div className="flex-1 px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-7">
+              <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 mb-5">
+                <span className="w-2 h-2 rounded-full bg-green-400" />
+                <span className="text-white text-xs font-medium">Live Now</span>
+              </div>
+              <h1 className="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-2 leading-tight">
+                {tokenApysLoaded && highestNativeApy
+                  ? `Earn Up to ${highestNativeApy}% APY`
+                  : !tokenApysLoaded
+                    ? <span className="inline-flex items-center gap-2">Earn Up to <Loader2 className="w-7 h-7 animate-spin opacity-60" /> APY</span>
+                    : "Start Earning Today"
+                }
+              </h1>
+              <p className="text-white/60 text-sm md:text-base mb-6">
+                Plus 11,111 reward points daily, just for holding
+              </p>
+              <button
+                onClick={() => navigate("/dashboard/earn")}
+                className="inline-flex items-center gap-2 border border-white/30 text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-white/10 transition-colors"
+              >
+                Start Earning
+                <ArrowRight size={16} />
+              </button>
+            </div>
+
+            <div className="lg:w-[360px] xl:w-[400px] px-4 py-5 md:px-6 md:py-6 bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col justify-center gap-2">
+              <h3 className="text-white font-bold text-xl mb-1">Your Daily Points</h3>
+              <p className="text-white/50 text-base mb-4">
+                {dailyPointsStr ? `${dailyPointsStr} pts/day` : "—"}
+              </p>
+              <div>
+                <div className="w-full h-2 bg-white/10 rounded-full mb-5">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-[width] duration-[400ms]"
+                    style={{ width: rewardsButtonHovered ? "100%" : `${emissionFillPct}%` }}
+                  />
+                </div>
+                <button
+                  onClick={() => navigate("/dashboard/rewards")}
+                  onMouseEnter={() => setRewardsButtonHovered(true)}
+                  onMouseLeave={() => setRewardsButtonHovered(false)}
+                  className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
+                >
+                  See Rewards
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 mb-8">
@@ -97,7 +195,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
         }}
       >
         <div className="flex flex-col lg:flex-row">
-          <div className="flex-1 p-6 md:p-8 lg:p-10">
+          <div className="flex-1 px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-7">
             <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 mb-5">
               <span className="w-2 h-2 rounded-full bg-green-400" />
               <span className="text-white text-xs font-medium">Live Now</span>
@@ -124,31 +222,43 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
             </button>
           </div>
 
-          <div className="lg:w-[280px] xl:w-[300px] p-6 md:p-8 bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col justify-center">
-            <div className="inline-flex items-center self-start border border-blue-400/50 rounded-full px-3 py-0.5 mb-4">
-              <span className="text-blue-400 text-xs font-medium">
-                Preview
-              </span>
+          <div className="lg:w-[360px] xl:w-[400px] px-4 py-5 md:px-6 md:py-6 bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col justify-center gap-2">
+            <div className="inline-flex items-center self-start border border-blue-400/50 rounded-full px-3 py-0.5 mb-2">
+              <span className="text-blue-400 text-xs font-medium">Preview</span>
             </div>
 
-            <h3 className="text-white font-semibold text-base mb-1">
-              Your Daily Points
-            </h3>
-            <p className="text-white/50 text-sm mb-4">11,111 pts/day</p>
+            <h3 className="text-white font-bold text-xl mb-1">Your Daily Points</h3>
+            <p className="text-white/50 text-base mb-4">11,111 pts/day</p>
 
-            <div className="w-full h-1.5 bg-white/10 rounded-full mb-5">
-              <div className="h-full w-3/5 bg-blue-500 rounded-full" />
+            <div>
+              <div className="w-full h-2 bg-white/10 rounded-full mb-5">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-[width] duration-[400ms]"
+                  style={{ width: rewardsButtonHovered ? "100%" : "80%" }}
+                />
+              </div>
+              {variant === 1 ? (
+                <button
+                  onClick={() => redirectToLogin()}
+                  onMouseEnter={() => setRewardsButtonHovered(true)}
+                  onMouseLeave={() => setRewardsButtonHovered(false)}
+                  className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
+                >
+                  Sign in to start earning
+                  <ArrowRight size={14} />
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate("/dashboard/rewards")}
+                  onMouseEnter={() => setRewardsButtonHovered(true)}
+                  onMouseLeave={() => setRewardsButtonHovered(false)}
+                  className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
+                >
+                  See Rewards
+                  <ArrowRight size={14} />
+                </button>
+              )}
             </div>
-
-            {variant === 1 && (
-              <button
-                onClick={() => redirectToLogin()}
-                className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
-              >
-                Sign in to start earning
-                <ArrowRight size={14} />
-              </button>
-            )}
           </div>
         </div>
       </div>

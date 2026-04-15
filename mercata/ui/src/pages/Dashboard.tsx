@@ -314,6 +314,7 @@ const Dashboard = () => {
           )}
           {!isLoggedIn && <GuestPromoSection variant={1} />}
           {isLoggedIn && !isLoadingNetBalance && totalBalance === 0 && <GuestPromoSection variant={2} />}
+          {isLoggedIn && (isLoadingNetBalance || totalBalance > 0) && <GuestPromoSection variant={3} />}
           {showFullDashboard && <LiquidationAlertBanner />}
           {showFullDashboard && (
             <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
