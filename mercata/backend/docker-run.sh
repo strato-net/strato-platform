@@ -11,6 +11,11 @@ else
   exit 1
 fi
 
+# Read Postgres password for direct DB queries
+if [ -f /run/secrets/postgres_password ]; then
+  export postgres_password=$(cat /run/secrets/postgres_password)
+fi
+
 STRATO_HOSTNAME=$(grep 'apiHost:' /config/ethconf.yaml | awk '{print $2}' | tr -d '"')
 STRATO_API_URL="http://${STRATO_HOSTNAME}:3000/eth/v1.2"
 

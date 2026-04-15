@@ -37,12 +37,13 @@ generateDockerCompose = do
 
   let mercataBackend = def
         { image = "mercata-backend:" ++ stratoVersionTag ++ "-" ++ hashMercataBackend
-        , depends_on = Just $ DependsOnList ["postgrest"]
+        , depends_on = Just $ DependsOnList ["postgres", "postgrest"]
         , init = Just True
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
+            , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
         , environment = Just $ Map.fromList
             [ ("NODE_URL", "http://nginx:" ++ portNum)
@@ -68,6 +69,9 @@ generateDockerCompose = do
             , ("BA_PASSWORD", "${BA_PASSWORD}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY}")
+            , ("postgres_host", "postgres")
+            , ("postgres_port", "5432")
+            , ("postgres_user", "postgres")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
