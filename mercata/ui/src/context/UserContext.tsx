@@ -2,8 +2,8 @@
 
 // context/UserContext.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { useAccount } from "wagmi";
-import { api, setConnectedWalletAddress } from "@/lib/axios";
+import { useAccount, useWalletClient } from "wagmi";
+import { api, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 
@@ -39,6 +39,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const account = useAccount();
+  const { data: walletClient } = useWalletClient();
   const [stratoAddress, setStratoAddress] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -206,8 +207,41 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const userAddress = account.isConnected && account.address ? account.address : stratoAddress;
 
   useEffect(() => {
-    setConnectedWalletAddress(account.isConnected && account.address ? account.address : null);
-  }, [account.isConnected, account.address]);
+    const connected = account.isConnected && account.address;
+    setConnectedWalletAddress(connected ? account.address : null);
+    if (connected && walletClient) {
+      setWalletSigner(async (unsignedTx: any) => {
+        const d = unsignedTx.data;
+        return walletClient.signTypedData({
+          domain: {
+            name: "STRATO",
+            version: "1",
+          },
+          types: {
+            Transaction: [
+              { name: "to", type: "address" },
+              { name: "funcName", type: "string" },
+              { name: "args", type: "string[]" },
+              { name: "nonce", type: "uint256" },
+              { name: "gasLimit", type: "uint256" },
+              { name: "network", type: "string" },
+            ],
+          },
+          primaryType: "Transaction",
+          message: {
+            to: `0x${d.to}` as `0x${string}`,
+            funcName: d.functionName,
+            args: d.args,
+            nonce: BigInt(d.nonce),
+            gasLimit: BigInt(d.gasLimit),
+            network: d.network,
+          },
+        });
+      });
+    } else {
+      setWalletSigner(null);
+    }
+  }, [account.isConnected, account.address, walletClient]);
 
   const setUserAddress = (addr: string | null) => setStratoAddress(addr);
 

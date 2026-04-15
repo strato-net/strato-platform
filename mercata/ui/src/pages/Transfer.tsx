@@ -80,13 +80,12 @@ const Transfer = () => {
     return { activeTokens: active, inactiveTokens: inactive };
   }, [tokens]);
 
-  // Fetch USDST balance on mount (only for logged-in users)
   useEffect(() => {
     if (isLoggedIn) {
       fetchUserTokens();
       fetchUsdstBalance();
     }
-  }, [isLoggedIn, fetchUserTokens, fetchUsdstBalance]);
+  }, [isLoggedIn, userAddress, fetchUserTokens, fetchUsdstBalance]);
 
   const handleConfirmTransfer = async () => {
     if (!fromAsset || !recipient || !fromAmount) return;

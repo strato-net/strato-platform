@@ -3,6 +3,7 @@ import RestStatus from "http-status-codes";
 import { JWTPayload } from "jose";
 import { verifyAccessTokenSignature } from "../../utils/authHelper";
 import { getServiceToken, createOrGetKey } from "../../utils/authHelper";
+import { requestContext } from "../../utils/requestContext";
 // ————————————————————————————————————————————————————————————————
 // Helper functions, with explicit return types
 // ————————————————————————————————————————————————————————————————
@@ -65,15 +66,22 @@ class AuthHandler {
             return next(err);
           }
 
+          const walletOverride = req.headers["x-wallet-address"] as string | undefined;
           if (!isServiceUser) {
             let userName: string = payload["preferred_username"];
-            const walletOverride = req.headers["x-wallet-address"] as string | undefined;
             req.address = walletOverride
               ? walletOverride.replace(/^0x/i, "").toLowerCase()
               : await createOrGetKey(token);
             req.userName = userName;
           }
           req.accessToken = token;
+
+          if (walletOverride) {
+            return requestContext.run(
+              { externalSigning: true, userAddress: walletOverride.replace(/^0x/i, "").toLowerCase() },
+              next
+            );
+          }
           return next();
         } else {
           res.set('WWW-Authenticate', 'Bearer');

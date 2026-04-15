@@ -15,6 +15,67 @@ export function setConnectedWalletAddress(addr: string | null) {
   _walletAddress = addr;
 }
 
+type WalletSignFn = (unsignedTx: any) => Promise<string>;
+let _walletSignFn: WalletSignFn | null = null;
+export function setWalletSigner(fn: WalletSignFn | null) {
+  _walletSignFn = fn;
+}
+
+function parseSignature(sig: string): { r: string; s: string; v: string } {
+  const raw = sig.replace(/^0x/, "");
+  return {
+    r: raw.slice(0, 64),
+    s: raw.slice(64, 128),
+    v: raw.slice(128, 130),
+  };
+}
+
+function buildSignedTx(unsignedData: any, sig: { r: string; s: string; v: string }): any {
+  return {
+    nonce: unsignedData.nonce,
+    gasLimit: unsignedData.gasLimit,
+    to: unsignedData.to,
+    funcName: unsignedData.functionName,
+    args: unsignedData.args,
+    network: unsignedData.network,
+    r: sig.r,
+    s: sig.s,
+    v: sig.v,
+    txVersion: 1,
+  };
+}
+
+async function pollTxResult(hashes: string[], timeout = 60000, interval = 3000): Promise<any[]> {
+  const start = Date.now();
+  while (true) {
+    const { data: results } = await api.post("/rpc/results", hashes);
+    const allDone = results.every((r: any) => r?.status !== "Pending");
+    if (allDone) return results;
+    if (Date.now() - start >= timeout) return results;
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+}
+
+async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{ status: string; hash: string }> {
+  if (!_walletSignFn) throw new Error("No wallet signer available");
+
+  const hashes: string[] = [];
+  for (const tx of unsignedTxs) {
+    const signature = await _walletSignFn(tx);
+    const sig = parseSignature(signature);
+    const signedTx = buildSignedTx(tx.data, sig);
+    const submittedHash = await api.post("/rpc/submit", signedTx);
+    hashes.push(typeof submittedHash.data === "string" ? submittedHash.data : tx.hash);
+  }
+
+  const results = await pollTxResult(hashes);
+  const failed = results.find((r: any) => r?.status === "Failure");
+  if (failed) {
+    throw new Error(failed.txResult?.message || failed.message || "Transaction failed");
+  }
+  return { status: results[0]?.status || "Success", hash: hashes[0] };
+}
+
 api.interceptors.request.use(
   (config) => {
     if (_walletAddress) {
@@ -128,7 +189,13 @@ function isGuestSafeUrl(url: string): boolean {
 
 // Response interceptor to catch 401, 403 (CSRF), and show global toast for all APIs
 api.interceptors.response.use(
-  (response) => response,
+  async (response) => {
+    if (response.data?._unsigned && response.data?._unsignedTxs) {
+      const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs);
+      response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
+    }
+    return response;
+  },
   (error) => {
     // Skip error handling for aborted/canceled requests
     if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {

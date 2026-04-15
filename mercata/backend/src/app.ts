@@ -1,8 +1,9 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
 import routes from "./api/routes";
 import { initOpenIdConfig, initNetworkConfig } from "./config/config";
 import { errorHandler, notFoundHandler } from "./api/middleware/errorHandler";
+import { requestContext } from "./utils/requestContext";
 
 const PORT = process.env.PORT || 3001;
 
@@ -17,6 +18,19 @@ app.use(
   }),
   express.urlencoded({ extended: true })
 );
+
+// Inject unsigned tx data from AsyncLocalStorage into JSON responses
+app.use((req: Request, res: Response, next) => {
+  const originalJson = res.json;
+  res.json = function (body: any) {
+    const store = requestContext.getStore();
+    if (store?.unsignedTxs) {
+      body = { ...(typeof body === "object" && body !== null ? body : {}), _unsigned: true, _unsignedTxs: store.unsignedTxs };
+    }
+    return originalJson.call(this, body);
+  };
+  next();
+});
 
 app.use("/api", routes);
 
