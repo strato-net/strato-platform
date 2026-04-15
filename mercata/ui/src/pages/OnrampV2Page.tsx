@@ -85,7 +85,7 @@ const OnrampV2Page = () => {
         sourceAmount: amount,
         destinationCurrencyCode: crypto,
       });
-      const quotes = (data.data?.quotes || []).filter((q: Quote) => q.serviceProvider.toUpperCase() === "TRANSAK");
+      const quotes = (data.data?.quotes || []).sort((a: Quote, b: Quote) => a.totalFee - b.totalFee);
       setQuotes(quotes);
       if (quotes.length === 0) setQuoteError("No providers available for this configuration.");
     } catch (err: any) {

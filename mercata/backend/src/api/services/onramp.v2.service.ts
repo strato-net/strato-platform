@@ -333,7 +333,7 @@ export async function handleMeldTransactionUpdate(event: any): Promise<void> {
     }
 
     const currency = normalizeMeldCurrency(rawCurrency);
-    const chainId = 11155111; // TODO: hardcoded to Sepolia for dev — Meld sandbox reports wrong chainId
+    const chainId = parseInt(chainIdStr, 10);
     const externalToken = EXTERNAL_TOKEN_BY_CHAIN[chainId]?.[currency];
     const targetStratoToken = TARGET_STRATO_TOKEN[currency];
     const decimals = EXTERNAL_DECIMALS[currency];
