@@ -1067,7 +1067,7 @@ preparePostUnsignedRawTx time tx contractName' args =
       (Just contractName')
       args
       (TX.network tx)
-      (Just $ TX.code tx)
+      (case tx of TX.ContractCreationTX {} -> Just (TX.code tx); _ -> Nothing)
       (Just $ EthConf.chainId $ EthConf.networkConfig ethConf)
       0
       0
