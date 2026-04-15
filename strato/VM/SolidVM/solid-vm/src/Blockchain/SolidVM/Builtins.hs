@@ -41,8 +41,11 @@ import SolidVM.Model.Value
 
 -- Pushes a new value to an array and returns the length of the new array
 push :: MonadSM m => Value -> Maybe Variable -> ValList -> m Variable
-push (SReference apt) _ [av] = do
-  let lenPath = apt `MS.snoc` MS.Field "length"
+push (SReference apt) _ vals = do
+  let av = case vals of
+             [] -> SNULL
+             (a:_) -> a
+      lenPath = apt `MS.snoc` MS.Field "length"
   len' <- getInt $ Constant $ SReference lenPath
   let len :: Int = fromIntegral len'
       newLen = SInteger $ fromIntegral $ len + 1
@@ -50,7 +53,10 @@ push (SReference apt) _ [av] = do
   setVar (Constant (SReference lenPath)) newLen
   setVar (Constant (SReference idxPath)) av
   return $ Constant newLen
-push (SArray vec) (Just (Variable ref)) [av] = do
+push (SArray vec) (Just (Variable ref)) vals = do
+  let av = case vals of
+             [] -> SNULL
+             (a:_) -> a
   newVar <- createVar av
   let newArr = V.snoc vec newVar
   setVar (Variable ref) (SArray newArr)

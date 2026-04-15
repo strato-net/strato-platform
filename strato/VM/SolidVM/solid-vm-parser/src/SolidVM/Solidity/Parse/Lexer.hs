@@ -194,7 +194,9 @@ solidityLanguage =
       P.caseSensitive = True,
       P.identStart = letter <|> oneOf "$_",
       P.identLetter = alphaNum <|> oneOf "$_",
-      P.nestedComments = False
+      P.nestedComments = False,
+      P.opStart  = oneOf ":!#%&*+./<=>?@\\^|-~",
+      P.opLetter = oneOf ":!#%&*+./<=>?@\\^|-~"
     }
 
 -------------------------

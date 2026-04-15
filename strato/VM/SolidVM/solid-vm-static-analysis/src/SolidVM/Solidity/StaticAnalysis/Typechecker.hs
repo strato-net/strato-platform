@@ -198,6 +198,14 @@ mutable m@(Sum (t :| ts)) =
         (j:js) -> Sum $ j :| js
 mutable t = bottom $ "Cannot mutate immutable value" <$ context' t
 
+fromMutable :: Type' -> Type'
+fromMutable (Mutable m)              = m
+fromMutable (Product (t1, t2, ts) x) = Product (fromMutable t1, fromMutable t2, fromMutable <$> ts) x
+fromMutable (MultiVariate t x)       = MultiVariate (fromMutable t) x
+fromMutable (Sum ts)                 = Sum $ fromMutable <$> ts
+fromMutable (Function a r x o ns g)  = Function (fromMutable a) (fromMutable r) x (fromMutable <$> o) ns g
+fromMutable t                        = t
+
 varDefsToType' :: SourceAnnotation Text -> Annotated VarDefEntryF -> SSS Type'
 varDefsToType' x BlankEntry = pure $ topType' x
 varDefsToType' _ VarDefEntry {..} = case vardefType of
@@ -838,7 +846,8 @@ typecheckMember (Mutable t) member = do
     Top{} -> Mutable t'
     _ -> t'
 typecheckMember (Static (SVMType.Array _ _) x) "length" = pure . Mutable $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Unit x) x [] [] False
+typecheckMember (Static (SVMType.Array t _) x) "push" = pure . Sum $ Function (Static t x) (Unit x) x [] [] False
+                                                                  :| [Function (Unit x) (Unit x) x [] [] False]
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
 typecheckMember (Static (SVMType.String _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
@@ -1619,7 +1628,8 @@ getVarType' s@('b' : 'y' : 't' : 'e' : 's' : n) ctx = case n of
     Just n' -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing (Just n')) ctx) ctx [] [] False
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' "byte" ctx = pure $ Function (byteArgs ctx) (intType' ctx) ctx [] [] False
-getVarType' "push" ctx = pure $ Function (topType' ctx) (Unit ctx) ctx [] [] False
+getVarType' "push" ctx = pure . Sum $ Function (Static t x) (Unit x) x [] [] False
+                                   :| [Function (Unit x) (Unit x) x [] [] False]
 getVarType' "identity" ctx = pure $ Function (topType' ctx) (topType' ctx) ctx [] [] False
 getVarType' "base64encode" ctx = pure $ base64encodeType ctx
 getVarType' "base64urlencode" ctx = pure $ base64urlencodeType ctx
@@ -2085,9 +2095,9 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) = do
           expressionResult <- tcExpr e
           let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           let check =
-                ( case expressionResult of
+                ( case fromMutable expressionResult of
                     Static (SVMType.UserDefined name actual) _ -> pure $ checkerUserDefinedGetType (SVMType.UserDefined name actual) nam x
-                    _ -> pure . bottom $ "Passing a non user defined type inside unwrap function of user defined type" <$ x
+                    _ -> pure . bottom $ ("Passing a non user defined type inside unwrap function of user defined type: " <> T.pack (show expressionResult)) <$ x
                 )
           check !> (pure $ (Static (actualTypeOfUserDefinedVar) x))
         _ -> pure . bottom $ "'unwrap' must take one argument" <$ x
