@@ -153,7 +153,8 @@ solidityLanguage =
           "receive",
           "fallback",
           "virtual",
-          "override"
+          "override",
+          "global"
         ],
       P.reservedOpNames =
         [ "!",

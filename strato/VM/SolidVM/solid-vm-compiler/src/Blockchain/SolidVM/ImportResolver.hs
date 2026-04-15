@@ -34,6 +34,7 @@ module Blockchain.SolidVM.ImportResolver
   )
 where
 
+import           Control.Arrow                        ((&&&))
 import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.Trans.Class            (lift)
 import           Control.Monad.Trans.Except
@@ -63,6 +64,7 @@ data FileUnitF a
   | FUStruct [(SolidString, FieldType, a)]
   | FUEnum ([SolidString], a)
   | FUFunction (FuncF a)
+  | FUUsing (UsingF a)
   | FUError [(SolidString, IndexedType, a)]
   deriving (Show)
 
@@ -204,7 +206,7 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
                       Right r -> Right . FileUnits (r ^. fuPragmas) $ M.singleton Nothing (l ^. ufuUnits) <> (r ^. fuUnits)
       _ -> throwE (extractExpression expr, T.pack $ "Unsupported expression in import: " ++ unparseExpression expr)
 
-codeCollectionToFileUnits :: Maybe Address -> CodeCollectionF a -> FileUnitsF a
+codeCollectionToFileUnits :: Show a => Maybe Address -> CodeCollectionF a -> FileUnitsF a
 codeCollectionToFileUnits from CodeCollection {..} =
   let units =
         (FUContract . (importedFrom %~ maybe from Just) <$> _contracts)
@@ -212,6 +214,7 @@ codeCollectionToFileUnits from CodeCollection {..} =
           <> (FUStruct <$> _flStructs)
           <> (FUEnum <$> _flEnums)
           <> (FUFunction <$> _flFuncs)
+          <> (M.fromList $ (show &&& FUUsing) <$> _flUsings)
           <> (FUError <$> _flErrors)
    in FileUnits (M.fromList _pragmas) $ M.singleton Nothing units
 
@@ -224,6 +227,7 @@ fileUnitsToCodeCollection (FileUnits ps us) =
     addUnit (n, (FUStruct s)) = flStructs . at n ?~ s
     addUnit (n, (FUEnum e)) = flEnums . at n ?~ e
     addUnit (n, (FUFunction f)) = flFuncs . at n ?~ f
+    addUnit (_, (FUUsing u)) = flUsings %~ (u:)
     addUnit (n, (FUError e)) = flErrors . at n ?~ e
 
 doResolve ::

@@ -151,6 +151,7 @@ compileSourceNoInheritance isRunningTests typeCheck initCodeMap = runExceptT $ d
         FLError name (Def.Error ps _ a) ->
           let fler = (\(n, t) -> (n, t, a)) <$> ps
            in pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUError fler
+        FLUsing u -> pure . Just $ def & ufuUnits . at (show u) ?~ FUUsing u
         Pragma _ n v ->
           pure . Just $ def & ufuPragmas . at n ?~ v
         Import _ i -> pure . Just $ def & ufuImports .~ [i]

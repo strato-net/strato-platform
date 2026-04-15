@@ -11,6 +11,7 @@
 module SolidVM.Solidity.Parse.UnParser where
 
 import Control.Lens hiding (op)
+import Data.Bool (bool)
 import qualified Data.List as List
 import Data.Map ()
 import qualified Data.Map as Map
@@ -45,6 +46,7 @@ unparseSourceUnit (FLError name args) = (("\n    " <>) . unparseTypes) (Text.unp
 unparseSourceUnit (Alias _ ident orignal) = "type \"" ++ ident ++ " " ++ orignal ++ "\";\n"
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (FLContract contract) = unparseContract contract
+unparseSourceUnit (FLUsing using) = unparseUsing using
 unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
 unparseVar :: (SolidString, VariableDecl) -> String
@@ -364,7 +366,7 @@ unparseEvent (name, Event {..}) =
       <> ";"
 
 unparseUsing :: UsingF a -> String
-unparseUsing (Using lib typ _) = mconcat ["using ", lib, " for ", maybe "*" unparseVarType typ, ";\n"]
+unparseUsing (Using lib typ g _) = mconcat ["using ", lib, " for ", maybe "*" unparseVarType typ, bool "" " global" g, ";\n"]
 
 unparseTypes :: (SolidString, SolidVM.DefF a) -> String
 unparseTypes (name, SolidVM.Enum {names = names'}) =

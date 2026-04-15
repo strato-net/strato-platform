@@ -47,7 +47,7 @@ transFormXabi Contract{..} =
       xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic T.pack _modifiers,
       xabiEvents = M.map tFormEv $ M.mapKeysMonotonic T.pack _events,
       xabiKind = case _contractType of ContractType -> EVMXabi.ContractKind; InterfaceType -> EVMXabi.InterfaceKind; AbstractType -> EVMXabi.AbstractKind; LibraryType -> EVMXabi.LibraryKind,
-      xabiUsing = M.fromList $ map (\u@(SVMXabi.Using c _ _) -> (T.pack c, tFormUs u)) _usings
+      xabiUsing = M.fromList $ map (\u@(SVMXabi.Using c _ _ _) -> (T.pack c, tFormUs u)) _usings
     }
 
 ----------------------------------
@@ -120,7 +120,7 @@ tFormEv SolidEv.Event {..} =
     }
 
 tFormUs :: SVMXabi.Using -> EVMXabi.Using
-tFormUs (SVMXabi.Using _ t _) = EVMXabi.Using $ "for " ++ show t -- weird legacy code
+tFormUs (SVMXabi.Using _ t _ _) = EVMXabi.Using $ "for " ++ show t -- weird legacy code
 
 tFormIndexedType :: CCVarfDef.IndexedType -> XabiType.IndexedType
 tFormIndexedType (CCVarfDef.IndexedType x y _) = XabiType.IndexedType x (tFormTypeToType y)

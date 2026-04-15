@@ -356,7 +356,7 @@ lookupContractFunction x cName fName = do
                       <$ x
           Just ConstantDecl {..} -> pure $ Static _constType x
         Just f -> pure . filterFuncs cc x fName f $
-          case filter (\(Using n _ _) -> n == cName) $ ctract ^. usings of
+          case filter (\(Using n _ _ _) -> n == cName) $ ctract ^. usings ++ cc ^. flUsings of
             [] -> case c ^. contractType of
               LibraryType -> [Private]  -- Library internal functions are callable directly
               _ | isInherited -> [Private]  -- Inherited internal functions are accessible
@@ -973,10 +973,11 @@ typecheckMember (Static (SVMType.UnknownLabel c) x) n = do
 typecheckMember t@(Static svmType x) n = do
   let unknownMember = pure . bottom $ ("Unknown member: " <> showType svmType <> "." <> labelToText n) <$ x
   c <- asks contract
-  case filter (\(Using _ t' _) -> maybe True (isRight . typecheckStatic svmType) t') $ c ^. usings of
+  cc <- asks codeCollection
+  case filter (\(Using _ t' _ _) -> maybe True (isRight . typecheckStatic svmType) t') $ c ^. usings ++ cc ^. flUsings of
     [] -> unknownMember
     us -> do
-      results <- forM us $ \(Using c' _ _) -> do
+      results <- forM us $ \(Using c' _ _ _) -> do
         ~CodeCollection {..} <- asks codeCollection
         case M.lookup c' _contracts of
           Nothing -> unknownMember

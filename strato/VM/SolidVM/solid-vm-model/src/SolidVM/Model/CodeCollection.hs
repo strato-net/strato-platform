@@ -22,6 +22,7 @@ module SolidVM.Model.CodeCollection (
   flStructs,
   flEnums,
   flErrors,
+  flUsings,
   pragmas,
   imports,
   getContractsBySolidString,
@@ -84,6 +85,7 @@ data CodeCollectionF a = CodeCollection
     _flEnums :: Map SolidString ([SolidString], a),
     _flStructs :: Map SolidString [(SolidString, FieldType, a)],
     _flErrors :: Map SolidString [(SolidString, IndexedType, a)],
+    _flUsings :: [UsingF a],
     _pragmas :: [(String, String)],
     _imports :: [FileImportF a]
   }
@@ -112,7 +114,7 @@ type CodeCollection = Positioned CodeCollectionF
 makeLenses ''CodeCollectionF
 
 emptyCodeCollection :: CodeCollectionF a
-emptyCodeCollection = CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty [] []
+emptyCodeCollection = CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty [] [] []
 
 instance Default (CodeCollectionF a) where
   def = emptyCodeCollection
@@ -126,6 +128,7 @@ mergeCodeCollections cc1 cc2 =
       _flEnums = cc1 ^. flEnums <> cc2 ^. flEnums,
       _flStructs = cc1 ^. flStructs <> cc2 ^. flStructs,
       _flErrors = cc1 ^. flErrors <> cc2 ^. flErrors,
+      _flUsings = cc1 ^. flUsings <> cc2 ^. flUsings,
       _pragmas = cc1 ^. pragmas <> cc2 ^. pragmas,
       _imports = cc1 ^. imports <> cc2 ^. imports
     }
@@ -164,7 +167,7 @@ getParentsAndUsings cc c = do
           )
           Right
   ps <- getParents cc c
-  us <- for (c ^. usings) $ \(Using p _ _) -> do
+  us <- for (c ^. usings ++ cc ^. flUsings) $ \(Using p _ _ _) -> do
         p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
         (p' :) <$> getParentsAndUsings cc p'
   pure . concat $ ps : us
@@ -200,6 +203,7 @@ instance Arbitrary CodeCollection where
               _flEnums = M.empty,
               _flStructs = M.empty,
               _flErrors = M.empty,
+              _flUsings = [],
               _pragmas = [],
               _imports = []
             }
