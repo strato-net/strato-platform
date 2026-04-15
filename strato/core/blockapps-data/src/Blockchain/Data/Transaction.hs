@@ -132,11 +132,11 @@ codePtrName (SolidVMCode n _) = Just n
 codePtrName _ = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just fn) Nothing ags net Nothing cid r' s' v' _ _ _ _ _ _) =
-  MessageTX nonce' gl to' fn ags net cid r' s' v' 0
-rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just cn) ags net (Just cd) cid r' s' v' _ _ _ _ _ _) =
-  ContractCreationTX nonce' gl cn ags net cd cid r' s' v' 0
-rawTX2TX (RawTransaction _ _ nonce' gl mTo Nothing Nothing [] _ Nothing cid r' s' v' _ _ _ mgp mval mdata) =
+rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just fn) Nothing ags net Nothing cid r' s' v' _ _ _ _ _ _ tv) =
+  MessageTX nonce' gl to' fn ags net cid r' s' v' tv
+rawTX2TX (RawTransaction _ _ nonce' gl Nothing Nothing (Just cn) ags net (Just cd) cid r' s' v' _ _ _ _ _ _ tv) =
+  ContractCreationTX nonce' gl cn ags net cd cid r' s' v' tv
+rawTX2TX (RawTransaction _ _ nonce' gl mTo Nothing Nothing [] _ Nothing cid r' s' v' _ _ _ mgp mval mdata _) =
   EthereumTX nonce' (fromMaybe 0 mgp) gl mTo (fromMaybe 0 mval) (fromMaybe B.empty mdata) cid r' s' v'
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
@@ -144,11 +144,11 @@ txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransacti
 txAndTime2RawTX origin tx blkNum time =
   case tx of
     MessageTX{..} ->
-      RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing
+      RawTransaction time signer nonce gasLimit (Just to) (Just funcName) Nothing args network Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion
     ContractCreationTX{..} ->
-      RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing
+      RawTransaction time signer nonce gasLimit Nothing Nothing (Just contractName) args network (Just code) chainId r s v (fromIntegral blkNum) (txHash tx) origin Nothing Nothing Nothing txVersion
     EthereumTX{..} ->
-      RawTransaction time signer nonce gasLimit ethTo Nothing Nothing [] "" Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin (Just gasPrice) (Just value) (Just txData)
+      RawTransaction time signer nonce gasLimit ethTo Nothing Nothing [] "" Nothing chainId r s v (fromIntegral blkNum) (txHash tx) origin (Just gasPrice) (Just value) (Just txData) 0
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 

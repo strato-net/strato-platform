@@ -86,7 +86,7 @@ instance ToJSON RawTransaction' where
         "gasPrice" .= rawTransactionGasPrice,
         "value" .= rawTransactionValue,
         "txData" .= fmap B.unpack rawTransactionTxData
-      ]
+      ] ++ ["txVersion" .= rawTransactionTxVersion | rawTransactionTxVersion > 0]
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
 parseHexStr = fmap readHexStr
@@ -124,6 +124,7 @@ instance FromJSON RawTransaction' where
     gp <- t .:? "gasPrice"
     val <- t .:? "value"
     td <- fmap (fmap B.pack) (t .:? "txData")
+    txVer <- t .:? "txVersion" .!= (0 :: Word8)
 
     return
       ( RawTransaction'
@@ -148,6 +149,7 @@ instance FromJSON RawTransaction' where
               gp
               val
               td
+              txVer
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
@@ -218,6 +220,7 @@ instance FromJSON UnsignedRawTransaction' where
               Nothing
               Nothing
               Nothing
+              0
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"

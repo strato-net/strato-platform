@@ -91,6 +91,7 @@ RawTransaction
     gasPrice Integer Maybe sqltype=numeric(1000,0)
     value Integer Maybe sqltype=numeric(1000,0)
     txData BS.ByteString Maybe
+    txVersion Word8
     UniqueTXHash txHash
     deriving Eq Generic Read Show
 

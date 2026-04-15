@@ -1078,6 +1078,7 @@ preparePostUnsignedRawTx time tx contractName' args =
       Nothing
       Nothing
       Nothing
+      (TX.txVersion tx)
 
 signAndPrepare ::
   (MonadIO m, MonadLogger m, HasBlocEnv m) =>
