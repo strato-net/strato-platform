@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useRef,
   useState,
@@ -9,48 +7,19 @@ import {
 } from "react";
 import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
+import {
+  VAULT_KEYS,
+  YieldVaultContext,
+  type YieldVaultInfo,
+  type YieldVaultUserInfo,
+} from "./YieldVaultContext.shared";
 
-export type YieldVaultInfo = {
-  key: string;
-  configured: boolean;
-  deployed: boolean;
-  vaultAddress: string;
-  assetAddress: string;
-  assetSymbol: string;
-  shareSymbol: string;
-  name: string;
-  decimals: number;
-  totalAssets: string;
-  idleAssets: string;
-  totalShares: string;
-  exchangeRate: string;
-  assetPriceWad: string;
-  tvlUsd: string;
-  apy: string;
-  paused: boolean;
-};
-
-export type YieldVaultUserInfo = YieldVaultInfo & {
-  walletAssets: string;
-  userShares: string;
-  redeemableAssets: string;
-  positionUsd: string;
-  maxDeposit: string;
-  maxRedeem: string;
-};
-
-type YieldVaultContextType = {
-  vaults: Record<string, YieldVaultInfo | null>;
-  userVaults: Record<string, YieldVaultUserInfo | null>;
-  loading: boolean;
-  refreshVaults: () => Promise<void>;
-  getVaultInfo: (key: string) => YieldVaultInfo | null;
-  getUserVaultInfo: (key: string) => YieldVaultUserInfo | null;
-};
-
-const VAULT_KEYS = ["eth-carry", "wbtc-carry"] as const;
-
-const YieldVaultContext = createContext<YieldVaultContextType | undefined>(undefined);
+export type {
+  YieldVaultContextType,
+  YieldVaultInfo,
+  YieldVaultPendingWithdrawal,
+  YieldVaultUserInfo,
+} from "./YieldVaultContext.shared";
 
 export const YieldVaultProvider = ({ children }: { children: ReactNode }) => {
   const { isLoggedIn } = useUser();
@@ -69,23 +38,6 @@ export const YieldVaultProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
 
     try {
-      const infoResults = await Promise.allSettled(
-        VAULT_KEYS.map((key) =>
-          api.get<YieldVaultInfo>(`/earn/yield-vault/${key}/info`, {
-            signal: controller.signal,
-          })
-        )
-      );
-
-      if (controller.signal.aborted) return;
-
-      const infoMap: Record<string, YieldVaultInfo | null> = {};
-      VAULT_KEYS.forEach((key, i) => {
-        infoMap[key] =
-          infoResults[i].status === "fulfilled" ? infoResults[i].value.data : null;
-      });
-      setVaults(infoMap);
-
       if (isLoggedIn) {
         const userResults = await Promise.allSettled(
           VAULT_KEYS.map((key) =>
@@ -103,21 +55,35 @@ export const YieldVaultProvider = ({ children }: { children: ReactNode }) => {
             userResults[i].status === "fulfilled" ? userResults[i].value.data : null;
         });
         setUserVaults(userMap);
-        // `/user` includes the same vault metrics as `/info` from a fresh getYieldVaultInfo(). The Earn
-        // table reads `vaults` only; the vault detail prefers `userInfo`. Merge so TVL/totals match.
-        const merged: Record<string, YieldVaultInfo | null> = {};
-        VAULT_KEYS.forEach((key) => {
-          merged[key] = userMap[key] ?? infoMap[key];
-        });
-        setVaults(merged);
+        // `/user` already includes the same vault-level metrics as `/info`, so use it directly
+        // for signed-in users instead of doing a second round trip per vault.
+        setVaults(userMap);
       } else {
+        const infoResults = await Promise.allSettled(
+          VAULT_KEYS.map((key) =>
+            api.get<YieldVaultInfo>(`/earn/yield-vault/${key}/info`, {
+              signal: controller.signal,
+            })
+          )
+        );
+
+        if (controller.signal.aborted) return;
+
+        const infoMap: Record<string, YieldVaultInfo | null> = {};
+        VAULT_KEYS.forEach((key, i) => {
+          infoMap[key] =
+            infoResults[i].status === "fulfilled" ? infoResults[i].value.data : null;
+        });
+        setVaults(infoMap);
         setUserVaults({});
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (
         controller.signal.aborted ||
-        error?.name === "AbortError" ||
-        error?.code === "ERR_CANCELED"
+        (error instanceof Error && (
+          error.name === "AbortError" ||
+          "code" in error && error.code === "ERR_CANCELED"
+        ))
       ) {
         return;
       }
@@ -152,12 +118,4 @@ export const YieldVaultProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </YieldVaultContext.Provider>
   );
-};
-
-export const useYieldVaultContext = (): YieldVaultContextType => {
-  const context = useContext(YieldVaultContext);
-  if (!context) {
-    throw new Error("useYieldVaultContext must be used within a YieldVaultProvider");
-  }
-  return context;
 };

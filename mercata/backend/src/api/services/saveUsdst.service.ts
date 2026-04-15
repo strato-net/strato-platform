@@ -109,10 +109,15 @@ const getExchangeRate = (pricingAssets: bigint, totalShares: bigint): bigint => 
   return (pricingAssets * WAD) / totalShares;
 };
 
+const firstSaveUsdstDepositCache = new Map<string, { timestamp: Date } | null>();
+
 const getFirstSaveUsdstDepositDate = async (
   accessToken: string,
   vaultAddress: string
 ): Promise<{ timestamp: Date } | null> => {
+  const cached = firstSaveUsdstDepositCache.get(vaultAddress);
+  if (cached !== undefined) return cached;
+
   try {
     const { data } = await cirrus.get(accessToken, "/event", {
       params: {
@@ -125,10 +130,13 @@ const getFirstSaveUsdstDepositDate = async (
     });
 
     if (!data?.length || !data[0]?.block_timestamp) {
+      firstSaveUsdstDepositCache.set(vaultAddress, null);
       return null;
     }
 
-    return { timestamp: new Date(data[0].block_timestamp) };
+    const result = { timestamp: new Date(data[0].block_timestamp) };
+    firstSaveUsdstDepositCache.set(vaultAddress, result);
+    return result;
   } catch (error) {
     console.warn("Failed to fetch first saveUSDST deposit timestamp:", error);
     return null;

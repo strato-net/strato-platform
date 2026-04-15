@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import {
   Dialog,
   DialogContent,
@@ -452,7 +453,10 @@ const EarnSave = () => {
                           </p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground">Best Available APY</p>
+                          <p className="text-muted-foreground inline-flex items-center gap-1">
+                            Best Available APY
+                            <BestApyInfoTooltip />
+                          </p>
                           {loadingInfo || rewardsActivitiesLoading ? (
                             <p className="mt-1 text-lg font-semibold">...</p>
                           ) : (
