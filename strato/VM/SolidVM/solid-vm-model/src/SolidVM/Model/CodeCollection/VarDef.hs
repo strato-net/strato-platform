@@ -59,7 +59,7 @@ instance ToSchema IndexedType where
     genericDeclareNamedSchema defaultSchemaOptions proxy
       & mapped . name ?~ "Solidity type"
       & mapped . schema . description ?~ "Represents a soldity type"
-      & mapped . schema . example ?~ toJSON (IndexedType 10 (Mapping (Just False) (Address False) (Bytes Nothing Nothing)) Nothing)
+      & mapped . schema . example ?~ toJSON (IndexedType 10 (Mapping (Just False) (Address False) (Bytes Nothing Nothing) Nothing Nothing) Nothing)
 
 data FieldType = FieldType {fieldTypeAtBytes :: Int32, fieldTypeType :: Type}
   deriving (Eq, Show, Generic, NFData)
