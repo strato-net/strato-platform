@@ -1603,7 +1603,7 @@ saltCreateArgs :: SourceAnnotation Text -> Type'
 saltCreateArgs x = Product (stringType' x, stringType' x, [stringType' x, Static SVMType.Variadic x]) x
 
 fastForwardArgs :: SourceAnnotation Text -> Type'
-fastForwardArgs x = intType' x
+fastForwardArgs x = Sum $ intType' x :| [Product (intType' x, intType' x, []) x]
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Address False) ctx

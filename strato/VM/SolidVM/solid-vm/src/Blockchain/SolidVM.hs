@@ -2485,8 +2485,11 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
-callBuiltin "fastForward" [secs] = do
+callBuiltin "fastForward" (secs : mBlocks) = do
   seconds <- int secs
+  blocks <- case mBlocks of
+    [] -> pure 1
+    (blks : _) -> int blks
   -- Only allow fastForward during testing
   env' <- getEnv
   if not (Env.runningTests env')
@@ -2494,8 +2497,10 @@ callBuiltin "fastForward" [secs] = do
     else do
       -- Get current timestamp and add seconds
       let currentTimestamp = BlockHeader.timestamp $ Env.blockHeader env'
-          newTimestamp = addUTCTime (fromIntegral seconds) currentTimestamp
-          updatedBlockHeader = (Env.blockHeader env') { BlockHeader.timestamp = newTimestamp }
+          newTimestamp = addUTCTime (max 1 $ fromIntegral seconds) currentTimestamp
+          currentBlockNumber = BlockHeader.number $ Env.blockHeader env'
+          newBlockNumber = currentBlockNumber + blocks
+          updatedBlockHeader = (Env.blockHeader env') { BlockHeader.timestamp = newTimestamp, BlockHeader.number = newBlockNumber }
       -- Update the environment with new block header
       Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
         pure $ env { Env.blockHeader = updatedBlockHeader }
