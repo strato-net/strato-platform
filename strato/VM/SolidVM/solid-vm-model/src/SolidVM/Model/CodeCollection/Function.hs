@@ -59,6 +59,7 @@ import SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import SolidVM.Model.CodeCollection.Visibility
 import SolidVM.Model.SolidString
+import qualified SolidVM.Model.Type as SVMType
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import qualified Text.Colors as CL
@@ -179,7 +180,7 @@ instance Arbitrary a => Arbitrary (ModifierF a) where
 
 data UsingF a = Using
   { _usingContract :: SolidString,
-    _usingType :: SolidString, -- TODO: Use Type here
+    _usingType :: Maybe SVMType.Type,
     _usingContext :: a
   }
   deriving (Eq, Show, Generic, Functor, NFData, Traversable, Foldable)
@@ -217,7 +218,7 @@ instance ToSchema Using where
       & mapped . schema . example ?~ toJSON sampleUsing
     where
       sampleUsing :: UsingF ()
-      sampleUsing = Using "SafeMath" "uint256" ()
+      sampleUsing = Using "SafeMath" (Just $ SVMType.Int (Just False) (Just 32)) ()
 
 instance Arbitrary a => Arbitrary (FuncF a) where
   arbitrary = GR.genericArbitrary GR.uniform

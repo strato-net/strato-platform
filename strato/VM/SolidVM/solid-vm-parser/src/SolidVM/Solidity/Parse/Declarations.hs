@@ -75,7 +75,7 @@ solidityContract = do
   let allFunctions = Map.fromListWith parseOverloads [(stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [c | (_, ConstructorDeclaration c) <- declarations]
   let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
-  let using = [(n, [u]) | (n, UsingDeclaration u) <- declarations]
+  let using = [u | (_, UsingDeclaration u) <- declarations]
   mCtor <-
     case ctorList of
       (_:_:_) -> fail "multiple constructors defined"
@@ -95,7 +95,7 @@ solidityContract = do
         SolidVM._events = Map.fromList events,
         SolidVM._functions = allFunctions,
         SolidVM._modifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations],
-        SolidVM._usings = Map.fromListWith (++) using,
+        SolidVM._usings = using,
         SolidVM._constructor = mCtor,
         SolidVM._contractType = kind,
         SolidVM._importedFrom = Nothing,
@@ -258,11 +258,11 @@ usingDeclaration = do
     reserved "using"
     usingContract' <- identifier
     reserved "for"
-    usingType' <- many1 $ noneOf ";"
+    usingType' <- (Nothing <$ char '*') <|> (Just <$> simpleTypeExpression)
     semi
     pure (usingContract', usingType')
   return
-    ( usingType',
+    ( "using",
       UsingDeclaration (Xabi.Using usingContract' usingType' a)
     )
 

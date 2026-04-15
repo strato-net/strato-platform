@@ -1609,7 +1609,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               contracts <- CC._contracts . snd <$> getCurrentCodeCollection
               let usingContracts = mapMaybe
                     (flip M.lookup contracts . CC._usingContract)
-                    (concat . M.elems $ ctrct ^. CC.usings)
+                    (ctrct ^. CC.usings)
               case mapMaybe (\y -> y <$ M.lookup name (y ^. CC.functions)) usingContracts of
                 [] -> regularFunctionCall e argVals argVars Nothing
                 c:_ -> regularFunctionCall

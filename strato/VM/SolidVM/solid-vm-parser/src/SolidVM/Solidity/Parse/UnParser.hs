@@ -364,7 +364,7 @@ unparseEvent (name, Event {..}) =
       <> ";"
 
 unparseUsing :: UsingF a -> String
-unparseUsing (Using lib typ _) = mconcat ["using ", lib, " for ", typ, ";\n"]
+unparseUsing (Using lib typ _) = mconcat ["using ", lib, " for ", maybe "*" unparseVarType typ, ";\n"]
 
 unparseTypes :: (SolidString, SolidVM.DefF a) -> String
 unparseTypes (name, SolidVM.Enum {names = names'}) =

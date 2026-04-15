@@ -164,7 +164,7 @@ getParentsAndUsings cc c = do
           )
           Right
   ps <- getParents cc c
-  us <- fmap concat . for (M.elems $ c ^. usings) . traverse $ \(Using p _ _) -> do
+  us <- for (c ^. usings) $ \(Using p _ _) -> do
         p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
         (p' :) <$> getParentsAndUsings cc p'
   pure . concat $ ps : us

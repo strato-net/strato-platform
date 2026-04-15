@@ -19,6 +19,7 @@ import Control.Monad (forM, msum)
 import Control.Monad.Reader
 import Control.Monad.Trans.State
 import Data.Bool (bool)
+import Data.Either (isRight)
 import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
@@ -355,7 +356,7 @@ lookupContractFunction x cName fName = do
                       <$ x
           Just ConstantDecl {..} -> pure $ Static _constType x
         Just f -> pure . filterFuncs cc x fName f $
-          case filter (\(Using n _ _) -> n == cName) . concat . M.elems $ ctract ^. usings of
+          case filter (\(Using n _ _) -> n == cName) $ ctract ^. usings of
             [] -> case c ^. contractType of
               LibraryType -> [Private]  -- Library internal functions are callable directly
               _ | isInherited -> [Private]  -- Inherited internal functions are accessible
@@ -972,10 +973,9 @@ typecheckMember (Static (SVMType.UnknownLabel c) x) n = do
 typecheckMember t@(Static svmType x) n = do
   let unknownMember = pure . bottom $ ("Unknown member: " <> showType svmType <> "." <> labelToText n) <$ x
   c <- asks contract
-  case c ^. usings . at (T.unpack $ showType svmType) of
-    Nothing -> unknownMember
-    Just [] -> unknownMember
-    Just us -> do
+  case filter (\(Using _ t' _) -> maybe True (isRight . typecheckStatic svmType) t') $ c ^. usings of
+    [] -> unknownMember
+    us -> do
       results <- forM us $ \(Using c' _ _) -> do
         ~CodeCollection {..} <- asks codeCollection
         case M.lookup c' _contracts of
@@ -1628,8 +1628,8 @@ getVarType' s@('b' : 'y' : 't' : 'e' : 's' : n) ctx = case n of
     Just n' -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing (Just n')) ctx) ctx [] [] False
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' "byte" ctx = pure $ Function (byteArgs ctx) (intType' ctx) ctx [] [] False
-getVarType' "push" ctx = pure . Sum $ Function (Static t x) (Unit x) x [] [] False
-                                   :| [Function (Unit x) (Unit x) x [] [] False]
+getVarType' "push" ctx = pure . Sum $ Function (topType' ctx) (Unit ctx) ctx [] [] False
+                                   :| [Function (Unit ctx) (Unit ctx) ctx [] [] False]
 getVarType' "identity" ctx = pure $ Function (topType' ctx) (topType' ctx) ctx [] [] False
 getVarType' "base64encode" ctx = pure $ base64encodeType ctx
 getVarType' "base64urlencode" ctx = pure $ base64urlencodeType ctx
