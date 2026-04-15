@@ -50,6 +50,7 @@ data MetadataResponse = MetadataResponse
     isSynced :: Bool,
     isVaultPasswordSet :: Bool,
     networkID :: String, -- cuz JSON can't rep integers > 2^53
+    evmChainId :: String,
     urls :: UrlMap
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
@@ -80,6 +81,7 @@ exMetadataRespone =
     True
     True
     "0"
+    "0"
     (fromList [("vault", "http://vault.com")])
 
 -- | The model's field modifiers will match the JSON instances
@@ -100,7 +102,8 @@ getMetaData =
     validators <- fromMaybe [] . fmap bestSequencedBlockValidators <$> runStratoRedisIO getBestSequencedBlockInfo
     isSynced <- checkIsSynced
     urlMap <- access (Proxy @UrlMap)
-    pure $ MetadataResponse validators isSynced True (show $ Conf.networkID (networkConfig ethConf)) urlMap
+    let nc = networkConfig ethConf
+    pure $ MetadataResponse validators isSynced True (show $ Conf.networkID nc) (show $ Conf.chainId nc) urlMap
 
 checkIsSynced :: MonadIO m => m Bool
 checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow
