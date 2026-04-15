@@ -291,15 +291,17 @@ export const getEarningAssets = async (
 export const getPublicEarningAssets = async (
   accessToken: string
 ): Promise<EarningAsset[]> => {
+  // Build token query params - no user balance filter for public data
   const tokenParams: Record<string, string> = {
         select: buildTokenSelectFields({
           images: true,
           attributes: true,
-          balance: false,
+          balance: false, // No balance for guests
         }).join(","),
         status: "eq.2",
   };
 
+  // Fetch only tokens and prices (skip user-specific collateral data)
   const [tokens, rawPrices, vaultShareToken, saveUsdstInfo, factoryAddresses] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, { params: tokenParams }),
     getCompletePriceMap(accessToken),
