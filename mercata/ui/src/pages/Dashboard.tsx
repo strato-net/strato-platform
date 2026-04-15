@@ -23,8 +23,8 @@ import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
 import { useRewards } from "@/hooks/useRewards";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
+import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import { useNetwork } from "@/context/NetworkContext";
 
@@ -130,6 +130,8 @@ const Dashboard = () => {
   const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isLoadingNetBalance } = useNetBalance({
     cataToken,
   });
+
+  const showFullDashboard = isLoggedIn && (isLoadingNetBalance || totalBalance > 0);
 
   const chartConfig = useMemo(() => ({
     netBalance: {
@@ -310,37 +312,35 @@ const Dashboard = () => {
               </div>
             </div>
           )}
-          {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to view your portfolio, track rewards, and manage your assets" />
-          )}
-          {isLoggedIn && <LiquidationAlertBanner />}
-          <div className={`grid grid-cols-1 ${rewardsEnabled && isLoggedIn ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
-            <AssetSummary
-              title="Net Balance"
-              value={isLoggedIn ? `$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : "-"}
-              icon={<Wallet className="text-white" size={18} />}
-              color="bg-blue-500"
-              onClick={isLoggedIn ? () => setActiveTab('netBalance') : undefined}
-              isActive={isLoggedIn && activeTab === 'netBalance'}
-              isLoading={isLoggedIn && isLoadingNetBalance}
-            />
+          {!isLoggedIn && <GuestPromoSection variant={1} />}
+          {isLoggedIn && !isLoadingNetBalance && totalBalance === 0 && <GuestPromoSection variant={2} />}
+          {showFullDashboard && <LiquidationAlertBanner />}
+          {showFullDashboard && (
+            <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
+              <AssetSummary
+                title="Net Balance"
+                value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
+                icon={<Wallet className="text-white" size={18} />}
+                color="bg-blue-500"
+                onClick={() => setActiveTab('netBalance')}
+                isActive={activeTab === 'netBalance'}
+                isLoading={isLoadingNetBalance}
+              />
 
-            <AssetSummary
-              title="Rewards"
-              value={(() => {
-                if (!isLoggedIn) return "-";
-                if (rankLoading) return "Loading...";
-                if (!totalEarned) return "0 Reward Points";
-                const totalEarnedNum = parseFloat(totalEarned) / 1e18;
-                return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`;
-              })()}
-              icon={<Coins className="text-white" size={18} />}
-              color="bg-purple-500"
-              onClick={isLoggedIn ? () => setActiveTab('rewards') : undefined}
-              isActive={isLoggedIn && activeTab === 'rewards'}
-              isLoading={isLoggedIn && rankLoading}
-              additionalContent={
-                isLoggedIn ? (
+              <AssetSummary
+                title="Rewards"
+                value={(() => {
+                  if (rankLoading) return "Loading...";
+                  if (!totalEarned) return "0 Reward Points";
+                  const totalEarnedNum = parseFloat(totalEarned) / 1e18;
+                  return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`;
+                })()}
+                icon={<Coins className="text-white" size={18} />}
+                color="bg-purple-500"
+                onClick={() => setActiveTab('rewards')}
+                isActive={activeTab === 'rewards'}
+                isLoading={rankLoading}
+                additionalContent={
                   <div className="mt-2">
                     <Button
                       variant="outline"
@@ -366,19 +366,19 @@ const Dashboard = () => {
                       )}
                     </Button>
                   </div>
-                ) : null
-              }
-            />
+                }
+              />
 
-            <AssetSummary
-              title="Total Borrowed"
-              value={isLoggedIn ? `${totalBorrowed.toFixed(2)} USDST` : "-"}
-              icon={<Shield className="text-white" size={18} />}
-              color="bg-orange-500"
-              onClick={isLoggedIn ? () => setActiveTab('borrowed') : undefined}
-              isActive={isLoggedIn && activeTab === 'borrowed'}
-            />
-          </div>
+              <AssetSummary
+                title="Total Borrowed"
+                value={`${totalBorrowed.toFixed(2)} USDST`}
+                icon={<Shield className="text-white" size={18} />}
+                color="bg-orange-500"
+                onClick={() => setActiveTab('borrowed')}
+                isActive={activeTab === 'borrowed'}
+              />
+            </div>
+          )}
 
           {/* Rewards Section */}
           {/* <div className="mb-4 md:mb-8">
@@ -411,7 +411,7 @@ const Dashboard = () => {
           </div> */}
 
           {/* Portfolio Value Chart - hidden on mobile and for guests */}
-          {isLoggedIn && (
+          {showFullDashboard && (
             <div className="mb-8 hidden md:block">
               <PortfolioValueChart
                 data={chartConfig[activeTab].data || []}
@@ -427,36 +427,38 @@ const Dashboard = () => {
           )}
 
           {/* Quick Action Buttons */}
-          <div className="mb-8 grid grid-cols-4 gap-2 md:gap-4">
-            <Button
-              onClick={() => navigate("/dashboard/deposits")}
-              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
-            >
-              <Wallet size={18} />
-              <span className="text-xs md:text-sm">Deposit</span>
-            </Button>
-            <Button
-              onClick={() => navigate("/dashboard/transfer")}
-              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
-            >
-              <Send size={18} />
-              <span className="text-xs md:text-sm">Transfer</span>
-            </Button>
-            <Button
-              onClick={() => navigate("/dashboard/borrow")}
-              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
-            >
-              <Book size={18} />
-              <span className="text-xs md:text-sm">Borrow</span>
-            </Button>
-            <Button
-              onClick={() => navigate("/dashboard/swap")}
-              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
-            >
-              <ArrowRightLeft size={18} />
-              <span className="text-xs md:text-sm">Swap</span>
-            </Button>
-          </div>
+          {showFullDashboard && (
+            <div className="mb-8 grid grid-cols-4 gap-2 md:gap-4">
+              <Button
+                onClick={() => navigate("/dashboard/deposits")}
+                className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+              >
+                <Wallet size={18} />
+                <span className="text-xs md:text-sm">Deposit</span>
+              </Button>
+              <Button
+                onClick={() => navigate("/dashboard/transfer")}
+                className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+              >
+                <Send size={18} />
+                <span className="text-xs md:text-sm">Transfer</span>
+              </Button>
+              <Button
+                onClick={() => navigate("/dashboard/borrow")}
+                className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+              >
+                <Book size={18} />
+                <span className="text-xs md:text-sm">Borrow</span>
+              </Button>
+              <Button
+                onClick={() => navigate("/dashboard/swap")}
+                className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+              >
+                <ArrowRightLeft size={18} />
+                <span className="text-xs md:text-sm">Swap</span>
+              </Button>
+            </div>
+          )}
 
           <div className="mb-8">
             <AssetsList
