@@ -69,7 +69,7 @@ Login before the very first run:
 strato-login
 ```
 
-> To obtain the credentials for your node server, submit a request for client credentials at https://support.blockapps.net
+> To get the credentials for your node server, submit a request for client credentials at https://support.blockapps.net
 
 
 Start the node:
@@ -82,24 +82,7 @@ Start the node:
 - Do not include OAUTH variables in env vars. You can include app-related variables if needed (e.g., RPC URLs, etc.).
 - Use `--network=helium` for testnet or `--network=upquark` for mainnet (default).
 
-### 4. Update App on a Running Node
-
-To rebuild and redeploy only the app services (mercata-backend and mercata-ui) without resyncing the blockchain data:
-
-```
-make app
-```
-
-This builds both app images and prints the command to deploy them. Then stop and restart the node with the new images:
-
-```
-strato-down
-strato-up mynode --patch-app mercata-backend:<tag> mercata-ui:<tag>
-```
-
-Use the exact image tags printed by `make app`. You can also rebuild and deploy the images individually with `make mercata-backend` or `make mercata-ui`.
-
-### 5. Stop and Wipe
+### 4. Stop and Wipe
 
 Stop the node:
 
@@ -111,5 +94,27 @@ Stop and wipe all data:
 
 ```
 strato-down
-rm -rf mynode
+rm -rf mynode/
 ```
+
+### 5. Patch App on a Running Node (for development and testing)
+
+Steps to rebuild and patch the app on a running STRATO node.
+
+#### Rebuild the App Images
+
+```
+make app
+```
+
+This builds both app images and prints the command to deploy them (similar to `make` but only builds the app)
+
+#### Patch the App on a Node
+
+Stop and restart the node with the new images:
+```
+strato-down
+strato-up mynode --patch-app mercata-backend:<tag> mercata-ui:<tag>
+```
+
+Use the exact image tags printed by `make app`.
