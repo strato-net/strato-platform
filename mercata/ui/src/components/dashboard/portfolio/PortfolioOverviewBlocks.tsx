@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Gift, Sparkles, TrendingUp } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ArrowRight, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,10 +22,24 @@ import type { CollateralData, NewLoanData } from "@/interface";
 import type { Token as WalletToken } from "@mercata/shared-types";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getPortfolioAssetHref } from "@/utils/portfolioAssetRoutes";
-import type { PortfolioEarningRow, PortfolioYieldRollup } from "@/hooks/usePortfolioEarningRows";
+import type { PortfolioYieldRollup } from "@/hooks/usePortfolioEarningRows";
+import type { IdleHoldingRow } from "@/hooks/usePortfolioIdleHoldings";
 import type { BalanceSnapshot } from "@mercata/shared-types";
+import { cn } from "@/lib/utils";
 
 const CATA_PRICE_USD = 0.25;
+
+/** KPI tile → Performance chart (same order as the strip). */
+export type PortfolioChartKpi = "portfolio" | "estAnnual" | "blendedApy" | "rewards";
+
+export type PerformanceChartSlice = {
+  data: BalanceSnapshot[];
+  title: string;
+  subtitle: string;
+  currentValue: number;
+  tabType: "netBalance" | "rewards" | "earnings" | "estAnnual";
+  showReferenceLine?: boolean;
+};
 
 const ACTIVITY_SNIPPET_KEYS = [
   "Deposit",
@@ -36,6 +50,42 @@ const ACTIVITY_SNIPPET_KEYS = [
   "Swap",
   "VaultDeposited",
 ] as const;
+
+function KpiTile({
+  selected,
+  selectable,
+  kpi,
+  onSelect,
+  children,
+}: {
+  selected: boolean;
+  selectable: boolean;
+  kpi: PortfolioChartKpi;
+  onSelect?: (k: PortfolioChartKpi) => void;
+  children: ReactNode;
+}) {
+  const base =
+    "rounded-xl border border-border bg-card p-4 shadow-sm flex flex-col gap-1 min-h-[100px] w-full";
+  const state = cn(
+    selected && selectable && "ring-2 ring-primary border-primary",
+    selectable && "cursor-pointer transition-colors hover:border-primary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+  );
+
+  if (selectable && onSelect) {
+    return (
+      <button
+        type="button"
+        className={cn(base, state, "text-left")}
+        onClick={() => onSelect(kpi)}
+        aria-pressed={selected}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return <div className={base}>{children}</div>;
+}
 
 export function PortfolioKpiStrip({
   isLoggedIn,
@@ -50,6 +100,8 @@ export function PortfolioKpiStrip({
   earningMetricsLoading,
   rewardsClaimableLoading,
   portfolioYieldRollup,
+  selectedChartKpi,
+  onSelectChartKpi,
 }: {
   isLoggedIn: boolean;
   portfolioValueUsd: number;
@@ -66,6 +118,9 @@ export function PortfolioKpiStrip({
   rewardsClaimableLoading: boolean;
   /** Value-weighted Native / Base / STRATO rewards APY (matches blended total). */
   portfolioYieldRollup: PortfolioYieldRollup | null;
+  /** When set with `onSelectChartKpi`, tiles drive the Performance chart. */
+  selectedChartKpi?: PortfolioChartKpi;
+  onSelectChartKpi?: (k: PortfolioChartKpi) => void;
 }) {
   const claimableUsdNum = useMemo(() => {
     try {
@@ -78,6 +133,8 @@ export function PortfolioKpiStrip({
 
   const colClass =
     "rounded-xl border border-border bg-card p-4 shadow-sm flex flex-col gap-1 min-h-[100px]";
+
+  const chartDrive = Boolean(onSelectChartKpi && selectedChartKpi != null);
 
   if (!isLoggedIn) {
     return (
@@ -94,7 +151,12 @@ export function PortfolioKpiStrip({
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-      <div className={colClass}>
+      <KpiTile
+        kpi="portfolio"
+        selectable={chartDrive}
+        selected={chartDrive && selectedChartKpi === "portfolio"}
+        onSelect={onSelectChartKpi}
+      >
         <p className="text-xs font-medium text-muted-foreground">Portfolio value</p>
         {portfolioLoading ? (
           <Skeleton className="h-7 w-36 mt-0.5" />
@@ -111,9 +173,14 @@ export function PortfolioKpiStrip({
             )}
           </>
         )}
-      </div>
+      </KpiTile>
 
-      <div className={colClass}>
+      <KpiTile
+        kpi="estAnnual"
+        selectable={chartDrive}
+        selected={chartDrive && selectedChartKpi === "estAnnual"}
+        onSelect={onSelectChartKpi}
+      >
         <p className="text-xs font-medium text-muted-foreground">Est. annual earnings</p>
         {earningMetricsLoading ? (
           <>
@@ -131,9 +198,14 @@ export function PortfolioKpiStrip({
             </p>
           </>
         )}
-      </div>
+      </KpiTile>
 
-      <div className={colClass}>
+      <KpiTile
+        kpi="blendedApy"
+        selectable={chartDrive}
+        selected={chartDrive && selectedChartKpi === "blendedApy"}
+        onSelect={onSelectChartKpi}
+      >
         <p className="text-xs font-medium text-muted-foreground">Blended est. APY</p>
         {earningMetricsLoading ? (
           <Skeleton className="h-7 w-20 mt-0.5" />
@@ -150,9 +222,14 @@ export function PortfolioKpiStrip({
         ) : !earningMetricsLoading ? (
           <p className="text-xs text-muted-foreground">By position value</p>
         ) : null}
-      </div>
+      </KpiTile>
 
-      <div className={colClass}>
+      <KpiTile
+        kpi="rewards"
+        selectable={chartDrive && rewardsEnabled}
+        selected={chartDrive && selectedChartKpi === "rewards"}
+        onSelect={rewardsEnabled ? onSelectChartKpi : undefined}
+      >
         <p className="text-xs font-medium text-muted-foreground">Claimable rewards</p>
         {!rewardsEnabled ? (
           <p className="text-sm text-muted-foreground">—</p>
@@ -169,94 +246,80 @@ export function PortfolioKpiStrip({
             <p className="text-xs text-muted-foreground">~${claimableUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}</p>
           </>
         )}
-      </div>
+      </KpiTile>
     </div>
   );
 }
 
 export function PortfolioPerformanceBlock({
-  activeTab,
-  setActiveTab,
-  chartConfig,
+  chart,
   selectedTimeRange,
   onTimeRangeChange,
   loadingBalanceHistory,
   isLoggedIn,
-  rewardsEnabled,
 }: {
-  activeTab: "netBalance" | "rewards" | "earnings";
-  setActiveTab: (t: "netBalance" | "rewards" | "earnings") => void;
-  chartConfig: {
-    netBalance: { data: BalanceSnapshot[]; title: string; subtitle: string; currentValue: number };
-    rewards: { data: BalanceSnapshot[]; title: string; subtitle: string; currentValue: number };
-    earnings: { data: BalanceSnapshot[]; title: string; subtitle: string; currentValue: number };
-  };
+  chart: PerformanceChartSlice;
   selectedTimeRange: string;
   onTimeRangeChange: (d: string) => void;
   loadingBalanceHistory: boolean;
   isLoggedIn: boolean;
-  rewardsEnabled: boolean;
 }) {
   if (!isLoggedIn) return null;
-
-  const effectiveTab = activeTab === "rewards" && !rewardsEnabled ? "netBalance" : activeTab;
 
   return (
     <div className="mb-8">
       <h2 className="text-lg font-bold mb-3">Performance</h2>
-      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 mb-3">
-        <Select
-          value={effectiveTab}
-          onValueChange={(v) => setActiveTab(v as "netBalance" | "rewards" | "earnings")}
-        >
-          <SelectTrigger className="w-full sm:w-[220px] h-9" aria-label="Chart metric">
-            <SelectValue placeholder="Metric" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="netBalance">Portfolio</SelectItem>
-            {rewardsEnabled && <SelectItem value="rewards">Rewards</SelectItem>}
-            <SelectItem value="earnings">Earnings</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
       <div className="w-full min-w-0">
         <PortfolioValueChart
-          data={chartConfig[effectiveTab].data || []}
+          data={chart.data || []}
           onTimeRangeChange={onTimeRangeChange}
           selectedTimeRange={selectedTimeRange}
           isLoading={loadingBalanceHistory}
-          tabType={effectiveTab === "earnings" ? "earnings" : effectiveTab}
-          title={chartConfig[effectiveTab].title}
-          subtitle={chartConfig[effectiveTab].subtitle}
-          currentValue={chartConfig[effectiveTab].currentValue}
+          tabType={chart.tabType}
+          title={chart.title}
+          subtitle={chart.subtitle}
+          currentValue={chart.currentValue}
+          showReferenceLine={chart.showReferenceLine !== false}
         />
       </div>
     </div>
   );
 }
 
+export type TopEarnDisplay = {
+  title: string;
+  apy: number | null;
+  path: string;
+};
+
 export function PortfolioInsightsRow({
   isLoggedIn,
   rewardsEnabled,
   claimableRewardsWei,
-  bestRow,
+  claimableRewardsDisplay,
   blendedApy,
-  estAnnualUsd,
   onNavigateClaim,
   earningMetricsLoading,
   rewardsClaimableLoading,
   portfolioYieldRollup,
+  idleTop,
+  easySavingsApyPct,
+  topEarnDisplay,
+  recommendedLoading,
 }: {
   isLoggedIn: boolean;
   rewardsEnabled: boolean;
   claimableRewardsWei: string;
-  bestRow: PortfolioEarningRow | null;
+  claimableRewardsDisplay: string;
   blendedApy: number | null;
-  estAnnualUsd: number;
   onNavigateClaim: () => void;
   earningMetricsLoading: boolean;
   rewardsClaimableLoading: boolean;
   portfolioYieldRollup: PortfolioYieldRollup | null;
+  idleTop: { usd: number; symbol: string } | null;
+  easySavingsApyPct: number | null;
+  topEarnDisplay: TopEarnDisplay | null;
+  recommendedLoading: boolean;
 }) {
   if (!isLoggedIn) return null;
 
@@ -271,116 +334,133 @@ export function PortfolioInsightsRow({
       }
     })();
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-      <Card className="border-border shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            Suggested next steps
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {hasClaimable && (
-            <button
-              type="button"
-              className="w-full text-left rounded-lg border border-border bg-muted/30 hover:bg-muted/50 p-3 flex items-start justify-between gap-2"
-              onClick={onNavigateClaim}
-            >
-              <span>
-                <span className="font-medium">Claim reward points</span>
-                <span className="block text-muted-foreground text-xs mt-0.5">You have claimable STRATO rewards</span>
-              </span>
-              <Gift className="w-4 h-4 shrink-0 text-purple-500" />
-            </button>
-          )}
-          {bestRow && bestRow.apyTotal != null && (
-            <div className="rounded-lg border border-border bg-muted/20 p-3">
-              <p className="font-medium">Highest estimated APY</p>
-              <p className="text-muted-foreground text-xs mt-1">
-                {bestRow.asset._symbol || bestRow.asset._name} at {bestRow.apyTotal.toFixed(2)}% (indicative)
-              </p>
-              <Button variant="link" className="h-auto p-0 mt-2" asChild>
-                <Link to={bestRow.href}>Open position</Link>
-              </Button>
-            </div>
-          )}
-          {!hasClaimable && !bestRow && (
-            <p className="text-muted-foreground text-sm">Deposit or add liquidity to see suggestions here.</p>
-          )}
-        </CardContent>
-      </Card>
+  const stratoRewardsPct = portfolioYieldRollup?.rewardsApy ?? null;
 
-      <Card className="border-border shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">Yield summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="flex justify-between gap-4 items-center">
-            <span className="text-muted-foreground">Native (est.)</span>
-            {earningMetricsLoading ? (
-              <Skeleton className="h-5 w-14 shrink-0" />
-            ) : (
-              <span className="font-semibold tabular-nums">
-                {portfolioYieldRollup != null ? `${portfolioYieldRollup.nativeApy.toFixed(2)}%` : "—"}
-              </span>
-            )}
+  const rowClass =
+    "grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 items-start md:items-center py-3 px-3 md:px-4 border-b border-border last:border-b-0 text-sm";
+
+  return (
+    <Card className="border-border shadow-sm mb-8">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-bold">Recommended actions</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="rounded-lg border border-border overflow-hidden bg-card">
+          <div className={rowClass}>
+            <div className="min-w-0">
+              <span className="font-semibold text-muted-foreground mr-1.5">1.</span>
+              {idleTop ? (
+                <span className="text-foreground">
+                  ${idleTop.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                  {idleTop.symbol} is idle.{" "}
+                  <Link
+                    to="/dashboard/earn-save"
+                    className="font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                  >
+                    Move to Easy Savings
+                  </Link>
+                </span>
+              ) : (
+                <span className="text-muted-foreground">
+                  No idle wallet balance over $10 with a price. Explore{" "}
+                  <Link to="/dashboard/earn-save" className="text-blue-600 hover:underline">
+                    Easy Savings
+                  </Link>
+                  .
+                </span>
+              )}
+            </div>
+            <div className="md:text-right tabular-nums shrink-0">
+              {recommendedLoading ? (
+                <Skeleton className="h-5 w-24 ml-auto" />
+              ) : (
+                <span className="font-semibold">
+                  Base Yield: {easySavingsApyPct != null ? `${easySavingsApyPct.toFixed(2)}%` : "—"}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex justify-between gap-4 items-center">
-            <span className="text-muted-foreground">Base (est.)</span>
-            {earningMetricsLoading ? (
-              <Skeleton className="h-5 w-14 shrink-0" />
-            ) : (
-              <span className="font-semibold tabular-nums">
-                {portfolioYieldRollup != null ? `${portfolioYieldRollup.baseApy.toFixed(2)}%` : "—"}
-              </span>
-            )}
+
+          <div className={rowClass}>
+            <div className="min-w-0">
+              <span className="font-semibold text-muted-foreground mr-1.5">2.</span>
+              {rewardsEnabled && hasClaimable ? (
+                <button
+                  type="button"
+                  className="text-left font-medium text-foreground hover:underline underline-offset-2"
+                  onClick={onNavigateClaim}
+                >
+                  Claim {claimableRewardsDisplay || "reward points"} rewards
+                </button>
+              ) : rewardsEnabled ? (
+                <span className="text-muted-foreground">No claimable rewards right now.</span>
+              ) : (
+                <span className="text-muted-foreground">Rewards are not enabled on this network.</span>
+              )}
+            </div>
+            <div className="md:text-right tabular-nums shrink-0">
+              {earningMetricsLoading ? (
+                <Skeleton className="h-5 w-24 ml-auto" />
+              ) : (
+                <span className="font-semibold">
+                  STRATO Rewards: {stratoRewardsPct != null ? `${stratoRewardsPct.toFixed(2)}%` : "—"}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex justify-between gap-4 items-center">
-            <span className="text-muted-foreground">STRATO rewards (est.)</span>
-            {earningMetricsLoading ? (
-              <Skeleton className="h-5 w-14 shrink-0" />
-            ) : (
-              <span className="font-semibold tabular-nums">
-                {portfolioYieldRollup != null ? `${portfolioYieldRollup.rewardsApy.toFixed(2)}%` : "—"}
-              </span>
-            )}
+
+          <div className={rowClass}>
+            <div className="min-w-0">
+              <span className="font-semibold text-muted-foreground mr-1.5">3.</span>
+              {recommendedLoading ? (
+                <Skeleton className="h-4 w-64 max-w-full" />
+              ) : topEarnDisplay && topEarnDisplay.apy != null && Number.isFinite(topEarnDisplay.apy) ? (
+                <span className="text-foreground">
+                  Highest yield:{" "}
+                  <Link
+                    to={topEarnDisplay.path}
+                    className="font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                  >
+                    {topEarnDisplay.title}
+                  </Link>{" "}
+                  at {topEarnDisplay.apy.toFixed(2)}% est. APY
+                </span>
+              ) : topEarnDisplay ? (
+                <span className="text-foreground">
+                  Top opportunity:{" "}
+                  <Link
+                    to={topEarnDisplay.path}
+                    className="font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                  >
+                    {topEarnDisplay.title}
+                  </Link>
+                </span>
+              ) : (
+                <span className="text-muted-foreground">
+                  <Link to="/dashboard/earn" className="text-blue-600 hover:underline">
+                    Browse Earn
+                  </Link>{" "}
+                  for pools and vaults.
+                </span>
+              )}
+            </div>
+            <div className="md:text-right tabular-nums shrink-0">
+              {earningMetricsLoading ? (
+                <Skeleton className="h-5 w-24 ml-auto" />
+              ) : (
+                <span className="font-semibold">
+                  Total Est. Yield: {blendedApy != null ? `${blendedApy.toFixed(2)}%` : "—"}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex justify-between gap-4 items-center">
-            <span className="text-muted-foreground">Total est. yield (blended)</span>
-            {earningMetricsLoading ? (
-              <Skeleton className="h-5 w-16 shrink-0" />
-            ) : (
-              <span className="font-semibold tabular-nums">{blendedApy != null ? `${blendedApy.toFixed(2)}%` : "—"}</span>
-            )}
-          </div>
-          <div className="flex justify-between gap-4 items-center">
-            <span className="text-muted-foreground">Est. annual earnings</span>
-            {earningMetricsLoading ? (
-              <Skeleton className="h-5 w-28 shrink-0" />
-            ) : (
-              <span className="font-semibold tabular-nums">
-                ${estAnnualUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / yr
-              </span>
-            )}
-          </div>
-          {!earningMetricsLoading && portfolioYieldRollup != null && estAnnualUsd > 0 && (
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              ~$
-              {portfolioYieldRollup.estNativeUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-              native · ~$
-              {portfolioYieldRollup.estBaseUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-              base · ~$
-              {portfolioYieldRollup.estRewardsUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-              rewards / yr
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground pt-1 border-t border-border">
-            Figures use live APY hints from Earn and your position values; they are indicative, not guarantees.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground leading-relaxed mt-3">
+          Row 1 uses Easy Savings APY; row 3 uses the same top-opportunity ranking as the Earn page. Portfolio
+          percentages are indicative.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -419,6 +499,12 @@ export function PortfolioBorrowingOverview({
     return labels.join(", ") + (active.length > 3 ? "…" : "");
   }, [collateralRows]);
 
+  const netCarryLabel = useMemo(() => {
+    if (borrowed <= 0 || loanData?.interestRate == null) return null;
+    const pct = loanData.interestRate / 100;
+    return `-${pct.toFixed(1)}% borrow cost`;
+  }, [borrowed, loanData?.interestRate]);
+
   if (guestMode) {
     return (
       <Card className="mb-8 border-border shadow-sm">
@@ -445,6 +531,7 @@ export function PortfolioBorrowingOverview({
               <th className="py-2 pr-4">Position</th>
               <th className="py-2 pr-4 text-right">Borrowed</th>
               <th className="py-2 pr-4">Collateral</th>
+              <th className="py-2 pr-4">Net carry</th>
               <th className="py-2 text-right">Action</th>
             </tr>
           </thead>
@@ -462,6 +549,15 @@ export function PortfolioBorrowingOverview({
               </td>
               <td className="py-3 pr-4 text-muted-foreground">
                 {loading ? <Skeleton className="h-5 w-40" /> : collateralSummary}
+              </td>
+              <td className="py-3 pr-4 text-muted-foreground tabular-nums">
+                {loading ? (
+                  <Skeleton className="h-5 w-36" />
+                ) : netCarryLabel ? (
+                  netCarryLabel
+                ) : (
+                  "—"
+                )}
               </td>
               <td className="py-3 text-right">
                 <Button variant="ghost" size="sm" asChild>
@@ -610,6 +706,105 @@ export function PortfolioNonEarningAssets({
                       {!asset?.balance || asset.balance === "0"
                         ? "—"
                         : formatBalance(asset.balance, undefined, 18, 1, 4)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const idleValueFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+export function PortfolioIdleHoldings({
+  rows,
+  loading,
+  guestMode,
+}: {
+  rows: IdleHoldingRow[];
+  loading: boolean;
+  guestMode: boolean;
+}) {
+  const [open, setOpen] = useState(true);
+
+  if (guestMode) return null;
+  if (!loading && rows.length === 0) return null;
+
+  const count = rows.length;
+  const countPending = loading && count === 0;
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-sm mb-8 overflow-hidden">
+      <button
+        type="button"
+        className="w-full p-4 flex items-center justify-between text-left hover:bg-muted/30 transition-colors gap-2"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="font-bold text-lg shrink-0">Idle Holdings</span>
+        <div className="flex items-center gap-2 min-w-0 justify-end">
+          <span className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+            {countPending ? (
+              "Loading…"
+            ) : open ? (
+              <>
+                Hide <span className="font-medium text-foreground">{count}</span>
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-foreground">{count}</span> idle
+              </>
+            )}
+          </span>
+          {open ? <ChevronUp size={20} className="shrink-0" /> : <ChevronDown size={20} className="shrink-0" />}
+        </div>
+      </button>
+      <div
+        className={`transition-all duration-300 ease-in-out overflow-hidden ${open ? "max-h-[560px] opacity-100" : "max-h-0 opacity-0"}`}
+      >
+        <div className="overflow-x-auto overflow-y-auto max-h-[520px] px-4 pb-4">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary" />
+            </div>
+          ) : (
+            <table className="w-full text-sm min-w-[520px]">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                  <th className="py-2 pr-4">Asset</th>
+                  <th className="py-2 pr-4 text-right">Value</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Opportunity</th>
+                  <th className="py-2 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((row) => (
+                  <tr key={row.address}>
+                    <td className="py-3 pr-4 font-medium">
+                      <Link
+                        to={getPortfolioAssetHref({ address: row.address, _symbol: row.symbol })}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {row.symbol}
+                      </Link>
+                    </td>
+                    <td className="py-3 pr-4 text-right tabular-nums">{idleValueFormatter.format(row.valueUsd)}</td>
+                    <td className="py-3 pr-4 text-muted-foreground">Idle</td>
+                    <td className="py-3 pr-4 text-muted-foreground">{row.opportunity}</td>
+                    <td className="py-3 text-right">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link to={row.to} className="gap-1">
+                          {row.actionLabel} <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </Button>
                     </td>
                   </tr>
                 ))}

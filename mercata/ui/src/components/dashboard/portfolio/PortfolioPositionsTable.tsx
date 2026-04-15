@@ -14,8 +14,26 @@ import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import LPTokenDropdown from "@/components/dashboard/LPTokenDropdown";
 import type { LPTokenDropdownProps } from "@/interface";
 import type { PortfolioEarningRow } from "@/hooks/usePortfolioEarningRows";
+import { Badge } from "@/components/ui/badge";
 
 type SortKey = "value" | "apy";
+
+function PositionTypeBadges({ labels }: { labels: string[] }) {
+  if (!labels.length) return null;
+  return (
+    <span className="flex flex-wrap items-center gap-1 shrink-0">
+      {labels.map((label, i) => (
+        <Badge
+          key={`${label}-${i}`}
+          variant="secondary"
+          className="px-2 py-0 text-[10px] font-medium border-border bg-muted/60 text-foreground"
+        >
+          {label}
+        </Badge>
+      ))}
+    </span>
+  );
+}
 
 export default function PortfolioPositionsTable({
   rows,
@@ -108,6 +126,7 @@ export default function PortfolioPositionsTable({
                   <tr className="hover:bg-muted/40">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2 flex-wrap">
+                        <PositionTypeBadges labels={row.badges} />
                         <Link
                           to={row.href}
                           className="font-medium text-blue-600 hover:text-blue-800 underline"
@@ -197,6 +216,7 @@ export default function PortfolioPositionsTable({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
+                    <PositionTypeBadges labels={row.badges} />
                     <Link to={row.href} className="font-semibold text-blue-600 underline">
                       {row.asset._symbol || row.asset._name}
                     </Link>

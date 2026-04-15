@@ -18,7 +18,7 @@ type PortfolioDataPoint = {
   balance: number;
 };
 
-type TabType = 'netBalance' | 'rewards' | 'borrowed' | 'earnings';
+type TabType = 'netBalance' | 'rewards' | 'borrowed' | 'earnings' | 'estAnnual';
 interface PortfolioValueChartProps {
   data: PortfolioDataPoint[];
   onTimeRangeChange?: (duration: string) => void;
@@ -30,6 +30,8 @@ interface PortfolioValueChartProps {
   currentValue?: number;
   /** When true, time range UI is rendered outside (e.g. Performance toolbar). */
   hideTimeRangeSelector?: boolean;
+  /** When false, omits horizontal reference line (e.g. header KPI unit ≠ series unit). */
+  showReferenceLine?: boolean;
 }
 
 /** Shared with Performance toolbar — keep labels in sync with chart fetch ranges. */
@@ -91,6 +93,7 @@ const getChangeText = (hasData: boolean, tabType: TabType, change: { percentage:
       txt = `${amt} Reward Points`; break;
     case 'borrowed':
       txt = `${amt} USDST`; break;
+    case 'estAnnual':
     case 'earnings':
     case 'netBalance':
       txt = `$${amt}`; break;
@@ -111,6 +114,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
   subtitle = 'Net balance over time',
   currentValue: propCurrentValue,
   hideTimeRangeSelector = false,
+  showReferenceLine = true,
 }) => {
   // Determine color scheme based on tab type
   const getColorScheme = (tab: TabType): { line: string; positive: string; negative: string } => {
@@ -120,6 +124,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
       case 'borrowed':
         return { line: '#f97316', positive: '#f97316', negative: '#f97316' }; // orange-500
       case 'earnings':
+      case 'estAnnual':
         return { line: '#10b981', positive: '#10b981', negative: '#ef4444' }; // emerald-500
       default:
         return { line: '#3b82f6', positive: '#22c55e', negative: '#ef4444' }; // blue-500
@@ -212,6 +217,11 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
                 })} Claimed Reward Points`
+              ) : tabType === 'estAnnual' ? (
+                `$${currentValue.toLocaleString('en-US', { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })} / yr`
               ) : tabType === 'earnings' ? (
                 `$${currentValue.toLocaleString('en-US', { 
                   minimumFractionDigits: 2, 
@@ -229,7 +239,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 })}`
               )}
             </div>
-            <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : tabType === 'earnings' ? 'text-emerald-600' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+            <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : tabType === 'earnings' || tabType === 'estAnnual' ? 'text-emerald-600' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
               {change.isPositive ? <TrendingUp size={16} color={getColorScheme(tabType).positive} /> : <TrendingDown size={16} color={getColorScheme(tabType).negative}/>}
               <span>{getChangeText(hasData, tabType, change)}</span>
             </div>
@@ -308,7 +318,7 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                                   minimumFractionDigits: 2, 
                                   maximumFractionDigits: 2 
                                 })} USDST`
-                              ) : tabType === 'earnings' ? (
+                              ) : tabType === 'earnings' || tabType === 'estAnnual' ? (
                                 `$${dataPoint.value.toLocaleString('en-US', { 
                                   minimumFractionDigits: 2, 
                                   maximumFractionDigits: 2 
@@ -334,12 +344,14 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                       animationDuration={350}
                       animationEasing="ease-out"
                     />
+                    {showReferenceLine && (
                     <ReferenceLine 
                       y={currentValue} 
                       stroke={lineColor}
                       strokeDasharray="2 2"
                       strokeOpacity={0.3}
                     />
+                    )}
                   </LineChart>
                 </ResponsiveContainer>
               </ChartContainer>

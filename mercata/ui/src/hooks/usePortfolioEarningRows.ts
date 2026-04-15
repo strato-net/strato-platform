@@ -16,6 +16,43 @@ import { getPortfolioAssetHref } from "@/utils/portfolioAssetRoutes";
 
 const normAddr = (value?: string | null) => (value || "").toLowerCase().replace(/^0x/, "");
 
+/** UI labels for earning-position row badges (KPI / wireframe taxonomy). */
+export function earningPositionBadges(
+  asset: EarningAsset,
+  ctx: {
+    liquidityWithdrawableAddress?: string | null;
+    vaultShareTokenAddress?: string | null;
+    isLPToken: boolean;
+    apyTotal: number | null;
+    apyInfo: EarnApyInfo | null;
+  }
+): string[] {
+  const a = normAddr(asset.address);
+
+  if (ctx.liquidityWithdrawableAddress && normAddr(ctx.liquidityWithdrawableAddress) === a) {
+    return ["Savings"];
+  }
+
+  if (ctx.vaultShareTokenAddress && normAddr(ctx.vaultShareTokenAddress) === a) {
+    return ["Vault"];
+  }
+
+  if (asset._symbol === "SUSDST" || asset._symbol === "safetyUSDST") {
+    return ["Staked"];
+  }
+
+  if (ctx.isLPToken) {
+    const buckets = earnApyRowBuckets(ctx.apyInfo, ctx.apyTotal);
+    return [buckets.rewards >= 0.01 ? "LP + Incentives" : "LP"];
+  }
+
+  if (asset.rebasingExternalSymbol || asset.rebaseFactor) {
+    return ["Yield Coin"];
+  }
+
+  return ["Earn"];
+}
+
 export type PortfolioEarningRow = {
   asset: EarningAsset;
   valueUsd: number;
@@ -26,6 +63,7 @@ export type PortfolioEarningRow = {
   href: string;
   pool: unknown;
   isLPToken: boolean;
+  badges: string[];
 };
 
 function breakdownToLabel(info: EarnApyInfo | null): string {
@@ -144,6 +182,12 @@ export function usePortfolioEarningRows(earningAssets: EarningAsset[]) {
       const apyTotal = apyStr != null ? parseFloat(apyStr) : null;
       const apyNum = apyTotal != null && Number.isFinite(apyTotal) ? apyTotal : null;
 
+      const isLPToken = !!(
+        asset.isPoolToken ||
+        asset._symbol?.endsWith("-LP") ||
+        asset.description === "Liquidity Provider Token"
+      );
+
       const estAnnualUsd = valueUsd > 0 && apyNum != null ? (valueUsd * apyNum) / 100 : null;
 
       if (valueUsd > 0) {
@@ -170,11 +214,14 @@ export function usePortfolioEarningRows(earningAssets: EarningAsset[]) {
         estAnnualUsd,
         href: getPortfolioAssetHref(asset),
         pool: pool || null,
-        isLPToken: !!(
-          asset.isPoolToken ||
-          asset._symbol?.endsWith("-LP") ||
-          asset.description === "Liquidity Provider Token"
-        ),
+        isLPToken,
+        badges: earningPositionBadges(asset, {
+          liquidityWithdrawableAddress: liquidityInfo?.withdrawable?.address,
+          vaultShareTokenAddress: vaultState.shareTokenAddress,
+          isLPToken,
+          apyTotal: apyNum,
+          apyInfo: info,
+        }),
       };
       rowsInner.push(row);
 
@@ -213,7 +260,7 @@ export function usePortfolioEarningRows(earningAssets: EarningAsset[]) {
       bestApyRow: best,
       portfolioYieldRollup: portfolioYieldRollupInner,
     };
-  }, [earningAssets, lpTokenPoolMap, pools, resolveTokenAPY]);
+  }, [earningAssets, lpTokenPoolMap, pools, resolveTokenAPY, liquidityInfo?.withdrawable?.address, vaultState.shareTokenAddress]);
 
   return { rows, blendedApy, totalEstAnnualUsd, totalEarningValueUsd, bestApyRow, portfolioYieldRollup };
 }

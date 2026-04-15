@@ -25,20 +25,23 @@ import {
   formatTotalClaimablePointsDisplay,
 } from "@/services/rewardsService";
 import { usePortfolioEarningRows } from "@/hooks/usePortfolioEarningRows";
+import { usePortfolioRecommendedActionsData } from "@/hooks/usePortfolioRecommendedActionsData";
+import { usePortfolioIdleHoldings } from "@/hooks/usePortfolioIdleHoldings";
 import PortfolioPositionsTable from "@/components/dashboard/portfolio/PortfolioPositionsTable";
 import {
   PortfolioBorrowingOverview,
   PortfolioInsightsRow,
   PortfolioKpiStrip,
   PortfolioNonEarningAssets,
+  PortfolioIdleHoldings,
   PortfolioPerformanceBlock,
   PortfolioRecentActivity,
+  type PortfolioChartKpi,
+  type PerformanceChartSlice,
 } from "@/components/dashboard/portfolio/PortfolioOverviewBlocks";
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = (typeof TIME_RANGES)[number];
-
-type ChartTab = "netBalance" | "rewards" | "earnings";
 
 function portfolioValuePct1m(snapshots: BalanceSnapshot[]): string | null {
   if (!snapshots?.length || snapshots.length < 2) return null;
@@ -73,10 +76,15 @@ const Dashboard = () => {
     setLoadingBalanceHistory,
   } = useTokenContext();
 
-  const [activeTab, setActiveTab] = useState<ChartTab>(() => {
-    const stored = localStorage.getItem("dashboard-activeTab");
-    if (stored === "rewards" || stored === "earnings") return stored;
-    return "netBalance";
+  const [chartKpi, setChartKpi] = useState<PortfolioChartKpi>(() => {
+    const k = localStorage.getItem("dashboard-chartKpi");
+    if (k === "portfolio" || k === "estAnnual" || k === "blendedApy" || k === "rewards") {
+      return k;
+    }
+    const legacy = localStorage.getItem("dashboard-activeTab");
+    if (legacy === "rewards") return "rewards";
+    if (legacy === "earnings") return "estAnnual";
+    return "portfolio";
   });
 
   const { loans, refreshLoans, collateralInfo, loadingLoans, loadingCollateral } = useLendingContext();
@@ -108,9 +116,17 @@ const Dashboard = () => {
     blendedApy,
     totalEstAnnualUsd,
     totalEarningValueUsd,
-    bestApyRow,
     portfolioYieldRollup,
   } = usePortfolioEarningRows(earningAssets);
+
+  const {
+    idleTop,
+    easySavingsApyPct,
+    topEarnDisplay,
+    loading: recommendedActionsLoading,
+  } = usePortfolioRecommendedActionsData(isLoggedIn);
+
+  const { rows: idleHoldingRows, loading: idleHoldingsLoading } = usePortfolioIdleHoldings(isLoggedIn);
 
   const earningMetricsLoading = loadingEarningAssets || (!!earningAssets.length && !tokenApysLoaded);
   const rewardsClaimableLoading = isLoggedIn && rewardsEnabled && rewardsUserLoading;
@@ -175,6 +191,59 @@ const Dashboard = () => {
     totalEarningValueUsd,
   ]);
 
+  const performanceChart = useMemo((): PerformanceChartSlice => {
+    const c = chartConfig;
+    switch (chartKpi) {
+      case "portfolio":
+        return {
+          data: c.netBalance.data,
+          title: c.netBalance.title,
+          subtitle: c.netBalance.subtitle,
+          currentValue: c.netBalance.currentValue,
+          tabType: "netBalance",
+        };
+      case "estAnnual":
+        return {
+          data: c.earnings.data,
+          title: "Est. annual earnings",
+          subtitle: "Estimated trend from portfolio · $/yr in header is current KPI",
+          currentValue: totalEstAnnualUsd,
+          tabType: "estAnnual",
+          showReferenceLine: false,
+        };
+      case "blendedApy":
+        return {
+          data: c.netBalance.data,
+          title: "Blended est. APY",
+          subtitle: "Portfolio value over time · blended APY is shown in the KPI tile",
+          currentValue: c.netBalance.currentValue,
+          tabType: "netBalance",
+        };
+      case "rewards":
+        return {
+          data: c.rewards.data,
+          title: c.rewards.title,
+          subtitle: c.rewards.subtitle,
+          currentValue: c.rewards.currentValue,
+          tabType: "rewards",
+        };
+      default:
+        return {
+          data: c.netBalance.data,
+          title: c.netBalance.title,
+          subtitle: c.netBalance.subtitle,
+          currentValue: c.netBalance.currentValue,
+          tabType: "netBalance",
+        };
+    }
+  }, [chartConfig, chartKpi, totalEstAnnualUsd]);
+
+  useEffect(() => {
+    if (chartKpi === "rewards" && !rewardsEnabled) {
+      setChartKpi("portfolio");
+    }
+  }, [chartKpi, rewardsEnabled]);
+
   useEffect(() => {
     document.title = "Dashboard | STRATO";
 
@@ -198,9 +267,9 @@ const Dashboard = () => {
   }, [location.pathname, userAddress, getEarningAssets, getInactiveTokens, refreshLoans, refreshVaults, isLoggedIn, navigate]);
 
   useEffect(() => {
-    localStorage.setItem("dashboard-activeTab", activeTab);
+    localStorage.setItem("dashboard-chartKpi", chartKpi);
     localStorage.setItem("dashboard-timeRange", selectedTimeRange);
-  }, [activeTab, selectedTimeRange]);
+  }, [chartKpi, selectedTimeRange]);
 
   const netBalanceCacheRef = useRef(netBalanceHistoryCache);
   const rewardsCacheRef = useRef(rewardsHistoryCache);
@@ -232,7 +301,7 @@ const Dashboard = () => {
     }
 
     const historyFetchTab: "netBalance" | "rewards" =
-      activeTab === "rewards" && rewardsEnabled ? "rewards" : "netBalance";
+      chartKpi === "rewards" && rewardsEnabled ? "rewards" : "netBalance";
     let isMounted = true;
 
     const loadRange = async () => {
@@ -269,7 +338,7 @@ const Dashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, [selectedTimeRange, activeTab, tabConfig, setLoadingBalanceHistory, isLoggedIn, rewardsEnabled]);
+  }, [selectedTimeRange, chartKpi, tabConfig, setLoadingBalanceHistory, isLoggedIn, rewardsEnabled]);
 
   const onTimeRangeChange = useCallback((duration: string) => {
     setSelectedTimeRange(duration as TimeRange);
@@ -335,21 +404,6 @@ const Dashboard = () => {
           )}
           {isLoggedIn && <LiquidationAlertBanner />}
 
-          <p className="text-sm text-muted-foreground mb-4 max-w-3xl leading-relaxed">
-            Track what you hold, what is earning, and suggested next steps.
-          </p>
-
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <Button size="sm" className="h-9" onClick={() => navigate("/dashboard/deposits")}>
-              Deposit
-            </Button>
-            {isLoggedIn && rewardsEnabled && (
-              <Button size="sm" variant="outline" className="h-9" onClick={() => navigate("/dashboard/rewards")}>
-                Claim
-              </Button>
-            )}
-          </div>
-
           <PortfolioKpiStrip
             isLoggedIn={isLoggedIn}
             portfolioValueUsd={totalBalance}
@@ -363,30 +417,32 @@ const Dashboard = () => {
             earningMetricsLoading={earningMetricsLoading}
             rewardsClaimableLoading={rewardsClaimableLoading}
             portfolioYieldRollup={portfolioYieldRollup}
+            selectedChartKpi={isLoggedIn ? chartKpi : undefined}
+            onSelectChartKpi={isLoggedIn ? setChartKpi : undefined}
           />
 
           <PortfolioPerformanceBlock
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            chartConfig={chartConfig}
+            chart={performanceChart}
             selectedTimeRange={selectedTimeRange}
             onTimeRangeChange={onTimeRangeChange}
             loadingBalanceHistory={loadingBalanceHistory}
             isLoggedIn={isLoggedIn}
-            rewardsEnabled={rewardsEnabled}
           />
 
           <PortfolioInsightsRow
             isLoggedIn={isLoggedIn}
             rewardsEnabled={rewardsEnabled}
             claimableRewardsWei={claimableRewardsWei}
-            bestRow={bestApyRow}
+            claimableRewardsDisplay={claimableRewardsDisplay}
             blendedApy={blendedApy}
-            estAnnualUsd={totalEstAnnualUsd}
             onNavigateClaim={() => navigate("/dashboard/rewards")}
             earningMetricsLoading={earningMetricsLoading}
             rewardsClaimableLoading={rewardsClaimableLoading}
             portfolioYieldRollup={portfolioYieldRollup}
+            idleTop={idleTop}
+            easySavingsApyPct={easySavingsApyPct}
+            topEarnDisplay={topEarnDisplay}
+            recommendedLoading={recommendedActionsLoading}
           />
 
           <div className="mb-4 flex flex-wrap gap-2">
@@ -419,6 +475,12 @@ const Dashboard = () => {
           </div>
 
           <PortfolioNonEarningAssets tokens={isLoggedIn ? inactiveTokens : []} loading={loadingInactiveTokens} />
+
+          <PortfolioIdleHoldings
+            rows={idleHoldingRows}
+            loading={idleHoldingsLoading || (isLoggedIn && loadingInactiveTokens)}
+            guestMode={!isLoggedIn}
+          />
 
           <PortfolioBorrowingOverview
             guestMode={!isLoggedIn}
