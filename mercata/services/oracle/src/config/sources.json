@@ -5,7 +5,7 @@
     "parse": "data[].prices[0].value",
     "timestamp": "data[0].prices[0].lastUpdatedAt",
     "apiKeyEnvVar": "ALCHEMY_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "TSLAX","WEETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "TSLAX","WEETH", "USDAI"]
   },
   "CoinMarketCap": {
     "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
@@ -14,7 +14,7 @@
     "parse": "data.{symbol}[0].quote.USD.price",
     "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
     "apiKeyEnvVar": "COINMARKETCAP_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "WEETH"]
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "WEETH", "USDAI"]
   },
   "Metals.dev": {
     "url": "https://api.metals.dev/v1/latest",
@@ -42,7 +42,7 @@
     "parse": "{id}.usd",
     "timestamp": "{id}.last_updated_at",
     "apiKeyEnvVar": "COINGECKO_API_KEY",
-    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "TSLAX", "SPYX", "WEETH"],
+    "assets": ["ETH", "WBTC", "PAXG", "XAUT", "SUSDS", "WSTETH", "SYRUPUSDC", "RETH", "USDC", "USDT", "TSLAX", "SPYX", "WEETH", "USDAI"],
     "symbolMapping": {
       "ETH": "ethereum",
       "WBTC": "wrapped-bitcoin",
@@ -56,7 +56,8 @@
       "USDT": "tether",
       "TSLAX": "tesla-xstock",
       "SPYX": "sp500-xstock",
-      "WEETH": "wrapped-eeth"
+      "WEETH": "wrapped-eeth",
+      "USDAI": "usdai"
     }
   },
   "CoinAPI": {

@@ -56,6 +56,9 @@
       "targetAssetAddress": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
       "constantPrice": 1000000000000000000
     },
+    "USDAI": {
+      "targetAssetAddress": "b8fa2db41236b1421eb8aea8a52826ba32096fbf"
+    },
     "WBTC": {
       "targetAssetAddress": "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9"
     },
