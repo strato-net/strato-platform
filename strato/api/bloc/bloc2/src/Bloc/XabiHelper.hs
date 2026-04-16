@@ -11,7 +11,6 @@ import BlockApps.Solidity.Parse.Parser
 import qualified BlockApps.Solidity.Parse.ParserTypes as EVMParseT (SolcVersion (..))
 import qualified BlockApps.Solidity.Xabi as EVMXabi
 import qualified BlockApps.Solidity.Xabi.Type as XabiType
-import Control.Arrow ((***))
 import Data.Int (Int32)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
@@ -48,7 +47,7 @@ transFormXabi Contract{..} =
       xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic T.pack _modifiers,
       xabiEvents = M.map tFormEv $ M.mapKeysMonotonic T.pack _events,
       xabiKind = case _contractType of ContractType -> EVMXabi.ContractKind; InterfaceType -> EVMXabi.InterfaceKind; AbstractType -> EVMXabi.AbstractKind; LibraryType -> EVMXabi.LibraryKind,
-      xabiUsing = M.fromList . map (T.pack *** tFormUs) $ M.toList _usings
+      xabiUsing = M.fromList $ map (\u@(SVMXabi.Using c _ _ _) -> (T.pack c, tFormUs u)) _usings
     }
 
 ----------------------------------
@@ -120,9 +119,8 @@ tFormEv SolidEv.Event {..} =
       eventLogs = [(a, tFormIndexedType b) | SolidEv.EventLog a _ b <- _eventLogs]
     }
 
-tFormUs :: [SVMXabi.Using] -> EVMXabi.Using
-tFormUs [] = EVMXabi.Using $ "for nothing, apparently"
-tFormUs (SVMXabi.Using _ t _ : _) = EVMXabi.Using $ "for " ++ t -- weird legacy code
+tFormUs :: SVMXabi.Using -> EVMXabi.Using
+tFormUs (SVMXabi.Using _ t _ _) = EVMXabi.Using $ "for " ++ show t -- weird legacy code
 
 tFormIndexedType :: CCVarfDef.IndexedType -> XabiType.IndexedType
 tFormIndexedType (CCVarfDef.IndexedType x y _) = XabiType.IndexedType x (tFormTypeToType y)
@@ -137,7 +135,7 @@ tFormTypeToType = \case
   (SolidType.Enum maybeInt typeD nams) -> (XabiType.Enum maybeInt (T.pack typeD) ((map T.pack) <$> nams))
   (SolidType.Array typ len) -> (XabiType.Array (tFormTypeToType typ) len)
   (SolidType.Contract s) -> (XabiType.Contract $ T.pack s)
-  (SolidType.Mapping maybeBoo k v) -> (XabiType.Mapping maybeBoo (tFormTypeToType k) (tFormTypeToType v))
+  (SolidType.Mapping maybeBoo k v _ _) -> (XabiType.Mapping maybeBoo (tFormTypeToType k) (tFormTypeToType v))
   (SolidType.UserDefined _ t) -> tFormTypeToType t
   (SolidType.Bool) -> (XabiType.Bool)
   (SolidType.Address _) -> (XabiType.Address)
