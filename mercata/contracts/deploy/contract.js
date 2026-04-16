@@ -115,6 +115,7 @@ async function uploadDappContract(token, options) {
       config,
       history: [contractName],
       cacheNonce: true,
+      query: { username: 'BlockApps' }
     };
 
     // Deploy the contract
