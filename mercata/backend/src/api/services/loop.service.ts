@@ -82,6 +82,7 @@ async function findSwapPool(
     params: {
       poolFactory: `eq.${constants.poolFactory}`,
       isDisabled: "eq.false",
+      swapFeeRate: "eq.0", // constant-product pools only
       select: "address,tokenA,tokenB",
       or: `(and(tokenA.eq.${tokenA},tokenB.eq.${tokenB}),and(tokenA.eq.${tokenB},tokenB.eq.${tokenA}))`,
     },
@@ -105,6 +106,7 @@ async function fetchSwapPools(accessToken: string) {
     params: {
       poolFactory: `eq.${constants.poolFactory}`,
       isDisabled: "eq.false",
+      swapFeeRate: "eq.0", // constant-product pools only (StablePool stores fee on pool)
       select: "address,tokenA,tokenB,tokenABalance::text,tokenBBalance::text",
     },
   });
@@ -155,7 +157,9 @@ function buildOpportunities(
 export async function getBootstrap(accessToken: string): Promise<LoopBootstrapResponse> {
   const [cdpAssets, cdpRegistry, baseYieldMap] = await Promise.all([
     getSupportedAssets(accessToken),
-    getCDPRegistry(accessToken, undefined, {}, "bootstrap"),
+    getCDPRegistry(accessToken, undefined, {
+      select: `address,usdst,priceOracle:priceOracle_fkey(address,prices:${constants.PriceOracle}-prices(asset:key,value::text))`,
+    }, "bootstrap"),
     fetchBaseYields(accessToken),
   ]);
   const cdpPriceMap = new Map<string, string>();
