@@ -58,7 +58,6 @@ contract record CDPEngine is Ownable {
     mapping(address => bool) public record isSupportedAsset;
 
     uint256 public feeToReserveBps; // portion of feeUSD sent to CDPReserve (0..10000)
-    // uint public priceMaxAge = 1200;
 
     event FeeToReserveBpsSet(uint256 oldBps, uint256 newBps);
     event FeesRouted(address indexed asset, uint256 toReserve, uint256 toCollector);
@@ -432,6 +431,44 @@ contract record CDPEngine is Ownable {
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
     }
 
+    // ───────────────────── Router On-Behalf-Of Actions ─────────────────────
+
+    function depositFor(address from, address user, address asset, uint amount) external onlyOwner onlyActiveAsset(asset) {
+        require(amount > 0, "CDPEngine: Invalid amount");
+        _cdpVault().depositFrom(from, user, asset, amount);
+        vaults[user][asset].collateral += amount;
+        emit Deposited(user, asset, amount);
+        emit VaultUpdated(user, asset, vaults[user][asset].collateral, vaults[user][asset].scaledDebt);
+    }
+
+    function mintFor(address recipient, address user, address asset, uint amountUSD) external onlyOwner whenNotPaused(asset) onlyActiveAsset(asset) {
+        _accrue(asset);
+        require(amountUSD > 0, "CDPEngine: zero amount");
+        CollateralConfig memory assetConfig = collateralConfigs[asset];
+        CollateralGlobalState storage assetState = collateralGlobalStates[asset];
+        Vault storage userVault = vaults[user][asset];
+        uint currentDebt = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        (uint price, ) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
+        require(price > 0, "invalid price");
+        uint collateralValueUSD_calc = (userVault.collateral * price) / assetConfig.unitScale;
+        uint maxBorrowableUSD = (collateralValueUSD_calc * WAD) / assetConfig.minCR;
+        require(currentDebt + amountUSD < maxBorrowableUSD, "CDPEngine: insufficient collateral");
+        if (assetConfig.debtCeiling > 0) {
+            uint assetDebtUSD = (assetState.totalScaledDebt * assetState.rateAccumulator) / RAY;
+            require(assetDebtUSD + amountUSD <= assetConfig.debtCeiling, "CDPEngine: debt ceiling exceeded");
+        }
+        uint scaledAdd = (amountUSD * RAY + assetState.rateAccumulator - 1) / assetState.rateAccumulator;
+        userVault.scaledDebt += scaledAdd;
+        assetState.totalScaledDebt += scaledAdd;
+        uint totalDebtAfter = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        if (assetConfig.debtFloor > 0) {
+            require(totalDebtAfter >= assetConfig.debtFloor, "CDPEngine: below debt floor");
+        }
+        Token(_usdst()).mint(recipient, amountUSD);
+        emit USDSTMinted(user, asset, amountUSD, assetState.totalScaledDebt, assetState.rateAccumulator);
+        emit VaultUpdated(user, asset, userVault.collateral, userVault.scaledDebt);
+    }
+
     /**
     * @notice Liquidate an undercollateralized vault for a given collateral asset
     * @dev Steps:
@@ -548,6 +585,10 @@ contract record CDPEngine is Ownable {
      * @dev Uses discrete compounding: newRate = oldRate * rpow(stabilityFeeRate, dt, RAY) / RAY
      * @dev Routes fees from exact index growth
      */
+    function accrue(address asset) external {
+        _accrue(asset);
+    }
+
     function _accrue(address asset) internal {
         // Load config/state for the collateral asset
         CollateralConfig memory assetConfig = collateralConfigs[asset];

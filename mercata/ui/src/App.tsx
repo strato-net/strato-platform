@@ -256,6 +256,14 @@ const App = () => {
                                                   }
                                                 />
                                                 <Route
+                                                  path="/dashboard/loop/:routeType/:asset"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Loop />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
                                                   path="/dashboard/advanced"
                                                   element={
                                                     <GuestAccessibleRoute>

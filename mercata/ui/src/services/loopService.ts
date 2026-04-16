@@ -3,9 +3,7 @@ import type {
   LoopBootstrapResponse,
   LoopExecuteRequest,
   LoopExecuteResponse,
-  LoopHistoryItem,
   LoopPositionResponse,
-  LoopUnwindRequest,
 } from "@/interface/loop";
 
 const LOOP_BASE_PATH = "/loop";
@@ -24,15 +22,5 @@ export const loopService = {
   async position(): Promise<LoopPositionResponse> {
     const response = await api.get(`${LOOP_BASE_PATH}/position`);
     return response.data;
-  },
-
-  async unwind(payload: LoopUnwindRequest): Promise<LoopExecuteResponse> {
-    const response = await api.post(`${LOOP_BASE_PATH}/unwind`, payload);
-    return response.data;
-  },
-
-  async history(): Promise<LoopHistoryItem[]> {
-    const response = await api.get(`${LOOP_BASE_PATH}/history`);
-    return Array.isArray(response.data) ? response.data : [];
   },
 };

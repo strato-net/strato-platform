@@ -98,6 +98,22 @@ contract record CDPVault is Ownable {
     }
 
     /**
+     * @notice Pull tokens from `from` but credit custody to `owner` (for router on-behalf-of pattern)
+     */
+    function depositFrom(
+        address from,
+        address owner,
+        address asset,
+        uint amount
+    ) public onlyEngine {
+        require(from != address(0) && owner != address(0), "CDPVault: zero addr");
+        require(amount > 0, "Invalid amount");
+        require(IERC20(asset).transferFrom(from, address(this), amount), "Transfer failed");
+        userCollaterals[owner][asset] += amount;
+        emit CollateralDeposited(owner, asset, amount);
+    }
+
+    /**
      * @notice View helper
      */
     function getCollateral(address user, address asset) public view returns (uint) {

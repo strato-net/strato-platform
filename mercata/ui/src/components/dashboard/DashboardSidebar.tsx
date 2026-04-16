@@ -19,7 +19,6 @@ import {
   Vault,
   CreditCard,
   ArrowDownToLine,
-  Repeat2,
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -49,7 +48,6 @@ const NAV_CATEGORIES: NavCategory[] = [
       { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
       { icon: ArrowLeftRight, label: 'Swap', path: '/dashboard/swap' },
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
-      { icon: Repeat2, label: 'Loop', path: '/dashboard/loop' },
       { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
       { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
     ],
