@@ -36,13 +36,6 @@ const formatCompactNumber = (value: number): string =>
     ? value.toLocaleString(undefined, { maximumFractionDigits: 2, notation: "compact" })
     : "0";
 
-const formatRatioPercent = (value: number | string | undefined): string => {
-  if (value === undefined || value === null || value === "") return "—";
-  const numeric = asNumber(value);
-  const percent = numeric <= 1 ? numeric * 100 : numeric;
-  return `${percent.toFixed(1)}%`;
-};
-
 const formatUsdFromWei = (value: string | undefined): string => {
   if (!value) return "—";
   try {
@@ -350,12 +343,20 @@ const Loop = ({ embedded = false }: LoopProps) => {
   const projectedExposureUsd = useMemo(() => projectedExposure * selectedAssetPrice, [projectedExposure, selectedAssetPrice]);
   const projectedDebt = useMemo(() => Math.max(0, projectedExposure - collateralAmountNumber), [collateralAmountNumber, projectedExposure]);
 
-  const liquidationLtvRatio = useMemo(() => {
-    if (!preview) return 0;
-    const rawRatio = asNumber(preview.routes.cdp.liquidationRatio);
+  const ltvFromCR = (rawRatio: number): number => {
     if (rawRatio <= 0) return 0;
     return rawRatio > 1 ? 1 / (rawRatio / 100) : rawRatio;
-  }, [preview]);
+  };
+
+  const maxLtvRatio = useMemo(
+    () => (preview ? ltvFromCR(asNumber(preview.routes.cdp.minCR)) : 0),
+    [preview]
+  );
+
+  const liquidationLtvRatio = useMemo(
+    () => (preview ? ltvFromCR(asNumber(preview.routes.cdp.liquidationRatio)) : 0),
+    [preview]
+  );
 
   const projectedLiquidationPrice = useMemo(() => {
     if (liquidationLtvRatio <= 0 || selectedAssetPrice <= 0 || effectiveLtvRatio <= 0) return 0;
@@ -562,9 +563,9 @@ const Loop = ({ embedded = false }: LoopProps) => {
                     <Label htmlFor="loop-leverage">Leverage</Label>
                     <span className="inline-block w-12 text-right text-sm font-medium tabular-nums">{leverage.toFixed(1)}x</span>
                   </div>
-                  <Slider id="loop-leverage" min={1} max={leverageSliderMax} step={0.1} value={[leverage]} onValueChange={(value) => setLeverage(value[0] ?? leverage)} disabled={!isLoggedIn} />
+                  <Slider id="loop-leverage" min={1.1} max={leverageSliderMax} step={0.1} value={[leverage]} onValueChange={(value) => setLeverage(value[0] ?? leverage)} disabled={!isLoggedIn} />
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>1.0x</span>
+                    <span>1.1x</span>
                     <span className="inline-block w-12 text-right tabular-nums">{leverageSliderMax.toFixed(1)}x</span>
                   </div>
                 </div>
@@ -628,9 +629,9 @@ const Loop = ({ embedded = false }: LoopProps) => {
                 </div>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">Collateral Asset</span><span className="font-medium">{assetSymbol}</span></div>
-                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Max LTV</span><span className="font-medium tabular-nums">{formatRatioPercent(preview?.routes.cdp.liquidationRatio)}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Max LTV</span><span className="font-medium tabular-nums">{formatPercent(maxLtvRatio * 100)}</span></div>
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">Debt Asset</span><span className="font-medium">{borrowSymbol}</span></div>
-                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Liquidation LTV</span><span className="font-medium tabular-nums">{formatRatioPercent(preview?.routes.cdp.minCR)}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-muted-foreground">Liquidation LTV</span><span className="font-medium tabular-nums">{formatPercent(liquidationLtvRatio * 100)}</span></div>
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">Average Leverage Taken</span><span className="font-medium tabular-nums">{maxLeverageDisplay}</span></div>
                 </div>
               </div>
@@ -666,7 +667,7 @@ const Loop = ({ embedded = false }: LoopProps) => {
                     <div className="flex items-center justify-between"><span className="text-muted-foreground">{assetSymbol} Supplied</span><span className="font-medium tabular-nums">{formatBalance(filteredPosition.collateral, undefined, selectedAssetDecimals, 4, 4)} <span className="text-muted-foreground">({formatUsdFromWei(filteredPosition.collateralUSD)})</span></span></div>
                     <div className="flex items-center justify-between"><span className="text-muted-foreground">{borrowSymbol} Borrowed</span><span className="font-medium tabular-nums">{formatBalance(filteredPosition.debt, undefined, 18, 4, 4)} <span className="text-muted-foreground">({formatUsdFromWei(filteredPosition.debt)})</span></span></div>
                     <div className="flex items-center justify-between"><span className="text-muted-foreground">Position LTV</span><span className="font-medium tabular-nums text-emerald-500">{formatPercent(filteredPosition.effectiveLTV * 100)}</span></div>
-                    <div className="flex items-center justify-between"><span className="text-muted-foreground">Liquidation LTV</span><span className="font-medium tabular-nums text-amber-500">{formatRatioPercent(preview?.routes.cdp.minCR)}</span></div>
+                    <div className="flex items-center justify-between"><span className="text-muted-foreground">Liquidation LTV</span><span className="font-medium tabular-nums text-amber-500">{formatPercent(liquidationLtvRatio * 100)}</span></div>
                     <div className="flex items-center justify-between"><span className="text-muted-foreground">Max Leverage</span><span className="font-medium tabular-nums">{maxLeverageDisplay}</span></div>
                     <div className="flex items-center justify-between"><span className="text-muted-foreground">Max Leverage APY</span><span className="font-medium tabular-nums text-emerald-500">{formatPercent(selectedCarry?.netCarryWithImpactAPR)}</span></div>
                     {filteredPosition.collateralizationRatio !== undefined && (

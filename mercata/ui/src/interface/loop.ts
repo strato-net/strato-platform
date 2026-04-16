@@ -27,7 +27,6 @@ export interface LoopBootstrapResponse {
   timestamp: string;
   networkId: string;
   gasFeePerStep: string;
-  maxLoops: number;
   swapFeeBps: number;
   routes: {
     cdp: {

@@ -53,6 +53,11 @@ contract record LoopRouter is Ownable {
         registry = CDPRegistry(_registry);
     }
 
+    function setMaxLoops(uint _maxLoops) external onlyOwner {
+        require(_maxLoops >= 1 && _maxLoops <= 100, "invalid maxLoops");
+        MAX_LOOPS = _maxLoops;
+    }
+
     // ─────────────────── Pool fee helpers ───────────────────
     // Mirrors Pool._swapFeeRate() / Pool._lpSharePercent() fallback logic.
 
@@ -119,15 +124,16 @@ contract record LoopRouter is Ownable {
             totalDebt += mintAmt;
             remainingDebt -= mintAmt;
 
-            if (remainingDebt == 0) break;
-
+            // Always swap minted USDST back to collateral — this is the core
+            // of leverage. Without the swap, we just have debt with no extra exposure.
             (uint swapOut, uint nRin, uint nRout) = _simulateSwap(mintAmt, vRin, vRout, feeRate, lpShare);
             vRin = nRin;
             vRout = nRout;
             available = swapOut;
         }
 
-        if (available > 0 && remainingDebt == 0) {
+        // Deposit any remaining collateral from the final swap
+        if (available >= DUST) {
             totalCollateral += available;
         }
     }
@@ -331,9 +337,8 @@ contract record LoopRouter is Ownable {
 
             loopsCompleted++;
 
-            if (remainingDebt == 0) break;
-
-            // Slippage-protected swap
+            // Always swap minted USDST back to collateral — this is the core
+            // of leverage. Without the swap, we just have debt with no extra exposure.
             uint inputReserve = swapIsAToB ? pool.tokenABalance() : pool.tokenBBalance();
             uint outputReserve = swapIsAToB ? pool.tokenBBalance() : pool.tokenABalance();
             uint swapFee = mintAmt * feeRate / 10000;
@@ -347,7 +352,8 @@ contract record LoopRouter is Ownable {
             available = received;
         }
 
-        if (available > 0 && remainingDebt == 0) {
+        // Deposit any remaining collateral from the final swap
+        if (available >= DUST) {
             IERC20(asset).approve(vaultAddr, available);
             engine.depositFor(address(this), msg.sender, asset, available);
         }

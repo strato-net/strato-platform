@@ -22,7 +22,6 @@ import { getTokenApys } from "./earn.service";
 const { Token } = constants;
 const LOOP_ROUTER_ADDR = config.loopRouter;
 const SWAP_FEE_BPS = 30;
-const MAX_LOOPS = 20;
 const DEFAULT_SLIPPAGE_BPS = 100; // 1%
 const DEADLINE_BUFFER_SECS = 600; // 10 minutes
 
@@ -81,7 +80,7 @@ async function findSwapPool(
   const { data: pools } = await cirrus.get(accessToken, `/${constants.Pool}`, {
     params: {
       poolFactory: `eq.${constants.poolFactory}`,
-      isDisabled: "eq.false",
+      locked: "eq.false",
       swapFeeRate: "eq.0", // constant-product pools only
       select: "address,tokenA,tokenB",
       or: `(and(tokenA.eq.${tokenA},tokenB.eq.${tokenB}),and(tokenA.eq.${tokenB},tokenB.eq.${tokenA}))`,
@@ -105,7 +104,7 @@ async function fetchSwapPools(accessToken: string) {
   const { data } = await cirrus.get(accessToken, `/${constants.Pool}`, {
     params: {
       poolFactory: `eq.${constants.poolFactory}`,
-      isDisabled: "eq.false",
+      locked: "eq.false",
       swapFeeRate: "eq.0", // constant-product pools only (StablePool stores fee on pool)
       select: "address,tokenA,tokenB,tokenABalance::text,tokenBBalance::text",
     },
@@ -183,7 +182,6 @@ export async function getBootstrap(accessToken: string): Promise<LoopBootstrapRe
     timestamp: new Date().toISOString(),
     networkId: config.networkId || "",
     gasFeePerStep: constants.GAS_FEE_WEI.toString(),
-    maxLoops: MAX_LOOPS,
     swapFeeBps: SWAP_FEE_BPS,
     routes: { cdp: cdpData },
     opportunities,
