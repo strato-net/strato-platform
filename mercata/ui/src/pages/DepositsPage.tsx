@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
@@ -11,7 +12,15 @@ import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 const DepositsPage = () => {
   const { isLoggedIn } = useUser();
   const { loadNetworksAndTokens } = useBridgeContext();
-  const [fundingMode, setFundingMode] = useState<"bridge" | "metals">("bridge");
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get('tab');
+  const [fundingMode, setFundingMode] = useState<"bridge" | "metals">(() =>
+    tab === 'metals' ? 'metals' : 'bridge'
+  );
+
+  useEffect(() => {
+    if (tab === 'metals') setFundingMode('metals');
+  }, [tab]);
   const [metalRefreshKey, setMetalRefreshKey] = useState(0);
   const handleMetalPurchase = useCallback(() => setMetalRefreshKey(k => k + 1), []);
 

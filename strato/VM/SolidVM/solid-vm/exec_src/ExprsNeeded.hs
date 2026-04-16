@@ -123,7 +123,7 @@ main = do
   contents <- readFile filename
   File parsedFile <- either (die . show) return $ runParser solidityFile initialParserState "" contents
   let namedContracts = [(_contractName contr, contr) | FLContract contr <- parsedFile]
-      cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty) [] []
+      cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty) [] [] []
       typecheck = TC.detector cc
       nodes = codeCollectionCrawler cc
   putStrLn (show typecheck) --when (not null typecheck)
