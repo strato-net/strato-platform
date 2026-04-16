@@ -52,6 +52,7 @@ import Blockchain.Event
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
+import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -279,6 +280,8 @@ addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock ->
 addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   trrs <- addTransactions bd transactions proposer
+
+  lift $ runPatches bd
 
   flushMemStorageTxDBToBlockDB
 
@@ -835,3 +838,14 @@ completeDiff src' dst hsh num = withCurrentBlockHash hsh $ do
     SD.stateDiff Nothing num hsh src' dst
       .| mapM_C (yield . OutStateDiff)
 
+runPatches :: (MonadLogger m, HasRawStorageDB m) => BlockHeader -> m ()
+runPatches bh = case Conf.networkID (networkConfig ethConf) of
+  114784819836269 -> case blockHeaderBlockNumber bh of
+    49820 -> do
+      putRawStorageKeyVal' (0x1005, MS.StoragePath [MS.Field "userLoan", MS.Index "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7", MS.Field "lastUpdated"]) (MS.BInteger 1775496883)
+      putRawStorageKeyVal' (0x1005, MS.StoragePath [MS.Field "userLoan", MS.Index "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7", MS.Field "scaledDebt"]) (MS.BInteger 1000000000000000000000000000000)
+    49824 -> do
+      putRawStorageKeyVal' (0x1005, MS.StoragePath [MS.Field "userLoan", MS.Index "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7", MS.Field "lastUpdated"]) (MS.BInteger 1775497158)
+      putRawStorageKeyVal' (0x1005, MS.StoragePath [MS.Field "userLoan", MS.Index "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7", MS.Field "scaledDebt"]) MS.BDefault
+    _ -> pure ()
+  _ -> pure ()

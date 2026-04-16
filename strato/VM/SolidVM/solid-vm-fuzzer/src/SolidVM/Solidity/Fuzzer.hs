@@ -183,7 +183,7 @@ generateArgs = traverse generateArg
       ts <- traverse (const $ generateArg t) [0 .. n]
       pure $ "[" <> T.intercalate "," ts <> "]"
     generateArg (SVMType.Contract _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
-    generateArg (SVMType.Mapping _ _ _) = pure "<mapping>" --haha lol
+    generateArg (SVMType.Mapping _ _ _ _ _) = pure "<mapping>" --haha lol
     generateArg (SVMType.Error _ _) = pure "<error>" -- haha xd
     generateArg (SVMType.Variadic) = pure "<variadic>"
 
