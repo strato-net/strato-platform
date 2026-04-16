@@ -1,4 +1,5 @@
 import { config } from "./config";
+import { fetchWithRetry } from "./fetchWithRetry";
 import { logInfo, logError } from "./logger";
 
 interface TimeSeriesInfo {
@@ -25,7 +26,7 @@ interface AddDataPayload {
 export async function getTvlTimeSeriesId(): Promise<string> {
   const url = `${config.rwaIo.baseUrl}/project-time-series/info?slug=${config.rwaIo.slug}`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: { "x-api-key": config.rwaIo.apiKey },
   });
 
@@ -70,7 +71,7 @@ export async function pushTokenizedAssetRecords(
 ): Promise<void> {
   const url = `${config.rwaIo.baseUrl}/tokenized-asset-time-series/data/add?assetId=${rwaIoAssetId}`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -98,7 +99,7 @@ export async function pushTokenizedAssetRecords(
 export async function pushRecords(payload: AddDataPayload): Promise<void> {
   const url = `${config.rwaIo.baseUrl}/project-time-series/data/add?slug=${config.rwaIo.slug}`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

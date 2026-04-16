@@ -1,11 +1,23 @@
 import { config } from "./config";
+import { fetchWithRetry } from "./fetchWithRetry";
 import { logInfo } from "./logger";
+import { floorToHour } from "./time";
 import {
   pushTokenizedAssetRecords,
   TokenizedAssetTimeSeriesIds,
 } from "./rwaIoClient";
 
 const WAD = BigInt("1000000000000000000"); // 10^18
+const WAD_NUMBER = 1e18;
+
+/**
+ * Convert a WAD-scaled BigInt string to a decimal string with up to `decimals`
+ * fractional digits (trailing zeros stripped).
+ */
+function wadToDecimal(raw: string, decimals = 6): string {
+  const n = Number(BigInt(raw)) / WAD_NUMBER;
+  return parseFloat(n.toFixed(decimals)).toString();
+}
 
 export interface TokenConfig {
   address: string;
@@ -40,7 +52,7 @@ async function fetchOraclePrices(): Promise<OraclePrice[]> {
   if (oraclePricesCache) return oraclePricesCache;
 
   const url = `${config.strato.baseUrl}/api/oracle/price`;
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
 
   oraclePricesCache = (await res.json()) as OraclePrice[];
@@ -65,7 +77,7 @@ async function fetchTokenStats(): Promise<TokenStatsResponse> {
   if (tokenStatsCache) return tokenStatsCache;
 
   const url = `${config.strato.baseUrl}/api/tokens/stats`;
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
 
   tokenStatsCache = (await res.json()) as TokenStatsResponse;
@@ -90,7 +102,7 @@ async function fetchTvl(): Promise<TvlResponse> {
   if (tvlCache) return tvlCache;
 
   const url = config.strato.tvlEndpoint;
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
 
   tvlCache = (await res.json()) as TvlResponse;
@@ -115,7 +127,7 @@ async function fetchSwapPools(): Promise<SwapPool[]> {
   if (swapPoolsCache) return swapPoolsCache;
 
   const url = `${config.strato.baseUrl}/api/swap-pools`;
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
 
   swapPoolsCache = (await res.json()) as SwapPool[];
@@ -137,12 +149,6 @@ export function clearCaches(): void {
 // Per-token metric extraction
 // ---------------------------------------------------------------------------
 
-function floorToHour(date: Date): number {
-  const d = new Date(date);
-  d.setUTCMinutes(0, 0, 0);
-  return d.getTime();
-}
-
 async function fetchMetricsForToken(token: TokenConfig): Promise<TokenMetrics> {
   const [oraclePrices, stats, tvl, pools] = await Promise.all([
     fetchOraclePrices(),
@@ -160,7 +166,7 @@ async function fetchMetricsForToken(token: TokenConfig): Promise<TokenMetrics> {
   if (!priceEntry) {
     throw new Error(`${token.symbol} not found in oracle price response`);
   }
-  const price = (BigInt(priceEntry.price) / WAD).toString();
+  const price = wadToDecimal(priceEntry.price, 6);
 
   // Circulating Supply & Market Cap
   const statsToken = stats.tokens.find(
@@ -171,18 +177,21 @@ async function fetchMetricsForToken(token: TokenConfig): Promise<TokenMetrics> {
       `${token.symbol} not found in /tokens/stats. Available: ${stats.tokens.map((t) => t.symbol).join(", ")}`
     );
   }
-  const circulatingSupply = (BigInt(statsToken.totalSupply) / WAD).toString();
-  const marketCap = Math.floor(Number(statsToken.marketCap)).toString();
+  const circulatingSupply = wadToDecimal(statsToken.totalSupply, 6);
+  const marketCap = parseFloat(Number(statsToken.marketCap).toFixed(2)).toString();
 
   // AUM from TVL
   const tvlAsset = (tvl.assets ?? []).find(
     (a) => a.symbol === token.symbol || a.address?.toLowerCase() === addr
   );
-  const aum = tvlAsset ? (BigInt(tvlAsset.totalUsd) / WAD).toString() : "0";
+  const aum = tvlAsset ? wadToDecimal(tvlAsset.totalUsd, 2) : "0";
 
-  // NAV = AUM / Circulating Supply
-  const supplyBig = BigInt(circulatingSupply);
-  const nav = supplyBig > 0n ? (BigInt(aum) / supplyBig).toString() : "0";
+  // NAV = AUM / Circulating Supply (computed from raw WAD values to preserve precision)
+  const rawAum = tvlAsset ? BigInt(tvlAsset.totalUsd) : 0n;
+  const rawSupply = BigInt(statsToken.totalSupply);
+  const nav = rawSupply > 0n
+    ? parseFloat((Number(rawAum) / Number(rawSupply)).toFixed(6)).toString()
+    : "0";
 
   // Volume — sum 24h volume across all pools containing this token
   let totalVolume = BigInt(0);
@@ -197,7 +206,7 @@ async function fetchMetricsForToken(token: TokenConfig): Promise<TokenMetrics> {
       totalVolume += BigInt(pool.tradingVolume24h);
     }
   }
-  const volume = (totalVolume / WAD).toString();
+  const volume = wadToDecimal(totalVolume.toString(), 2);
 
   const timestamp = floorToHour(new Date(tvl.timestamp));
 

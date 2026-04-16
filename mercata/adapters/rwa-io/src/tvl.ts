@@ -1,8 +1,8 @@
 import { config } from "./config";
+import { fetchWithRetry } from "./fetchWithRetry";
 import { logInfo, logError } from "./logger";
+import { floorToHour } from "./time";
 import { getTvlTimeSeriesId, pushRecords } from "./rwaIoClient";
-
-const WAD = BigInt("1000000000000000000"); // 10^18
 
 interface TvlMetricsResponse {
   timestamp: string;
@@ -16,7 +16,7 @@ let cachedTsId: string | undefined;
  * Returns the total USD value as a human-readable string (no decimals).
  */
 async function fetchTvl(): Promise<{ totalUsd: string; timestamp: string }> {
-  const res = await fetch(config.strato.tvlEndpoint);
+  const res = await fetchWithRetry(config.strato.tvlEndpoint);
 
   if (!res.ok) {
     throw new Error(
@@ -27,21 +27,11 @@ async function fetchTvl(): Promise<{ totalUsd: string; timestamp: string }> {
   const data = (await res.json()) as TvlMetricsResponse;
 
   // totalUsd from the STRATO endpoint is a BigInt string in WAD (10^18) units.
-  // Convert to whole-dollar value for RWA.io.
-  const totalUsdWad = BigInt(data.totalUsd);
-  const totalUsdWhole = (totalUsdWad / WAD).toString();
+  const totalUsdWhole = parseFloat(
+    (Number(BigInt(data.totalUsd)) / 1e18).toFixed(2)
+  ).toString();
 
   return { totalUsd: totalUsdWhole, timestamp: data.timestamp };
-}
-
-/**
- * Round a Date down to the start of the current UTC hour (RWA.io requirement
- * for hourly series).
- */
-function floorToHour(date: Date): number {
-  const d = new Date(date);
-  d.setUTCMinutes(0, 0, 0);
-  return d.getTime();
 }
 
 /**

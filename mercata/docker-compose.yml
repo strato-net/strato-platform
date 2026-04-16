@@ -45,8 +45,6 @@ services:
     image: mercata-rwa-io-adapter:latest
     environment:
       - RWA_IO_API_KEY=${RWA_IO_API_KEY}
-      - RWA_IO_SLUG=${RWA_IO_SLUG}
-      - STRATO_TVL_ENDPOINT=${STRATO_TVL_ENDPOINT:-https://app.strato.nexus/api/metrics/tvl}
     restart: unless-stopped
     logging:
       driver: "json-file"

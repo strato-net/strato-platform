@@ -1,18 +1,30 @@
+import { writeFileSync } from "fs";
 import cron from "node-cron";
 import { config } from "./config";
 import { logInfo, logError } from "./logger";
 import { pushTokenMetrics, clearCaches } from "./tokenMetrics";
+import { pushTvl } from "./tvl";
+
+const HEALTH_FILE = "/tmp/rwa-io-healthy";
 
 async function tick(): Promise<void> {
   clearCaches();
 
-  const tokenPushes = config.tokens.map((t) => pushTokenMetrics(t));
-  const results = await Promise.allSettled(tokenPushes);
+  const results = await Promise.allSettled([
+    pushTvl(),
+    ...config.tokens.map((t) => pushTokenMetrics(t)),
+  ]);
 
+  let anyFailed = false;
   for (const r of results) {
     if (r.status === "rejected") {
       logError("Push failed", r.reason);
+      anyFailed = true;
     }
+  }
+
+  if (!anyFailed) {
+    writeFileSync(HEALTH_FILE, new Date().toISOString());
   }
 }
 

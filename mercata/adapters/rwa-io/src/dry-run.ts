@@ -7,7 +7,11 @@
 
 import { config } from "./config";
 
-const WAD = BigInt("1000000000000000000");
+const WAD_NUMBER = 1e18;
+
+function wadToDecimal(raw: string, decimals = 6): string {
+  return parseFloat((Number(BigInt(raw)) / WAD_NUMBER).toFixed(decimals)).toString();
+}
 
 async function main() {
   // Fetch shared data once
@@ -39,7 +43,7 @@ async function main() {
     // Price
     const priceEntry = prices.find((d) => d.asset.toLowerCase() === addr);
     const price = priceEntry
-      ? (BigInt(priceEntry.price) / WAD).toString()
+      ? wadToDecimal(priceEntry.price, 6)
       : "NOT FOUND";
     console.log(`  price:              $${price}`);
 
@@ -48,10 +52,10 @@ async function main() {
       (t) => t.symbol === token.symbol || t.address.toLowerCase() === addr
     );
     const supply = statsToken
-      ? (BigInt(statsToken.totalSupply) / WAD).toString()
+      ? wadToDecimal(statsToken.totalSupply, 6)
       : "NOT FOUND";
     const mcap = statsToken
-      ? Math.floor(Number(statsToken.marketCap)).toString()
+      ? parseFloat(Number(statsToken.marketCap).toFixed(2)).toString()
       : "NOT FOUND";
     console.log(`  circulatingSupply:  ${supply}`);
     console.log(`  marketCap:          $${mcap}`);
@@ -61,13 +65,17 @@ async function main() {
       (a) => a.symbol === token.symbol || a.address?.toLowerCase() === addr
     );
     const aum = tvlAsset
-      ? (BigInt(tvlAsset.totalUsd) / WAD).toString()
+      ? wadToDecimal(tvlAsset.totalUsd, 2)
       : "0";
     console.log(`  aum:                $${aum}`);
 
     // NAV
-    const supplyBig = BigInt(supply === "NOT FOUND" ? "0" : supply);
-    const nav = supplyBig > 0n ? (BigInt(aum) / supplyBig).toString() : "0";
+    // NAV from raw WAD values to preserve precision
+    const rawAum = tvlAsset ? BigInt(tvlAsset.totalUsd) : 0n;
+    const rawSupply = statsToken ? BigInt(statsToken.totalSupply) : 0n;
+    const nav = rawSupply > 0n
+      ? parseFloat((Number(rawAum) / Number(rawSupply)).toFixed(6)).toString()
+      : "0";
     console.log(`  nav:                $${nav}`);
 
     // Volume
@@ -82,7 +90,7 @@ async function main() {
         totalVolume += BigInt(pool.tradingVolume24h);
       }
     }
-    const volume = (totalVolume / WAD).toString();
+    const volume = wadToDecimal(totalVolume.toString(), 2);
     console.log(`  volume (24h):       $${volume}`);
   }
 
