@@ -77,6 +77,10 @@ const CHAIN_NAME_TO_ID = {
   "linea-mainnet": 59144,
   linea_sepolia: 59141,
   "linea-sepolia": 59141,
+  bsc: 56,
+  bnb: 56,
+  bnb_chain: 56,
+  "bnb-chain": 56,
 };
 
 function parseChains(args) {

@@ -35,10 +35,13 @@ Modular Hardhat setup for deploying Mercata contracts to Ethereum networks with 
 | `npm run compile`                 | Compile all contracts                          |
 | `npm run deployWithProxy:sepolia` | Deploy contract with proxy to Sepolia testnet  |
 | `npm run deployWithProxy:mainnet` | Deploy contract with proxy to Ethereum mainnet |
+| `npm run deployWithProxy:bsc`     | Deploy contract with proxy to BSC mainnet      |
+| `npm run deployImpl:bsc`          | Deploy implementation only to BSC mainnet      |
 | `npm run verify:sepolia`          | Verify contract on Sepolia Etherscan           |
 | `npm run verify:mainnet`          | Verify contract on Mainnet Etherscan           |
 | `npm run scan:sepolia`            | Scan token configurations on Sepolia testnet   |
 | `npm run scan:mainnet`            | Scan token configurations on Ethereum mainnet  |
+| `npm run scan:bsc`                | Scan token configurations on BSC mainnet       |
 
 ## Utility Scripts
 

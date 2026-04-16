@@ -44,6 +44,11 @@ module.exports = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: "auto",
     },
+    bsc: {
+      url: process.env.BSC_RPC_URL || "https://bsc-rpc.publicnode.com",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: "auto",
+    },
     localhost: {
       url: "http://127.0.0.1:8545",
     },
