@@ -7,11 +7,18 @@ import {
   useRef,
   ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/axios';
 import { Token, CreateTokenPayload } from '@/interface';
 import { Token as TokenType, EarningAsset, BalanceSnapshot } from '@mercata/shared-types';
 import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
+import {
+  USER_TOKEN_BALANCES_QUERY_KEY,
+  fetchUserTokenBalances,
+  findBalanceInTokenList,
+  invalidateUserTokenBalances,
+} from '@/queries/tokenBalancesQuery';
 
 export interface BulkTransferItem {
   to: string;
@@ -85,6 +92,7 @@ const TokenContext = createContext<TokenContextType | undefined>(undefined);
 
 export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const { isLoggedIn } = useUser();
+  const queryClient = useQueryClient();
   const [tokens, setTokens] = useState<Token[]>([]);
   const [activeTokens, setActiveTokens] = useState<Token[]>([]);
   const [inactiveTokens, setInactiveTokens] = useState<TokenType[]>([]);
@@ -189,6 +197,21 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const getUserTokensWithBalance = useCallback(async (): Promise<Token[]> => {
+    const list = queryClient.getQueryData<Token[]>(USER_TOKEN_BALANCES_QUERY_KEY);
+    if (list?.length) {
+      try {
+        const filtered = list.filter((t) => {
+          try {
+            return BigInt(t.balance || "0") > 0n;
+          } catch {
+            return false;
+          }
+        });
+        return filtered;
+      } catch {
+        /* fall through to API */
+      }
+    }
     setLoading(true);
     try {
       const res = await api.get<Token[]>(`/tokens/balance?value=gt.0`);
@@ -198,7 +221,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   const getTransferableTokens = useCallback(async (): Promise<Token[]> => {
     setLoading(true);
@@ -216,19 +239,35 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const fetchUsdstBalance = useCallback(async (signal?: AbortSignal) => {
     setLoadingUsdstBalance(true);
     try {
-      const [usdstResponse, voucherResponse] = await Promise.all([
-        api.get(`/tokens/balance`, {
-          signal,
-          params: { address: `eq.${usdstAddress}` },
-        }),
-        api.get(`/vouchers/balance`, {
-          signal,
-        }),
-      ]);
+      let list = queryClient.getQueryData<Token[]>(USER_TOKEN_BALANCES_QUERY_KEY);
+      if (!list?.length) {
+        try {
+          list = await queryClient.fetchQuery({
+            queryKey: USER_TOKEN_BALANCES_QUERY_KEY,
+            queryFn: ({ signal: qSignal }) => fetchUserTokenBalances(qSignal),
+          });
+        } catch {
+          list = [];
+        }
+      }
+      const cachedUsdst = list?.length ? findBalanceInTokenList(list, usdstAddress) : null;
+
+      const voucherPromise = api.get(`/vouchers/balance`, { signal });
+      const usdstPromise =
+        cachedUsdst !== null
+          ? Promise.resolve(cachedUsdst)
+          : api
+              .get(`/tokens/balance`, {
+                signal,
+                params: { address: `eq.${usdstAddress}` },
+              })
+              .then((r) => String(r.data?.[0]?.balance ?? "0"));
+
+      const [voucherResponse, usdstBal] = await Promise.all([voucherPromise, usdstPromise]);
 
       if (signal?.aborted) return;
 
-      setUsdstBalance(usdstResponse?.data?.[0]?.balance || "0");
+      setUsdstBalance(usdstBal);
       setVoucherBalance(voucherResponse?.data?.balance || "0");
     } catch (err) {
       if (signal?.aborted) return;
@@ -239,7 +278,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         setLoadingUsdstBalance(false);
       }
     }
-  }, []);
+  }, [queryClient]);
 
   const getEarningAssets = useCallback(async (showLoading: boolean = false) => {
     if (earningAssetsAbortControllerRef.current) {
@@ -394,18 +433,20 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await api.post('/tokens/transfer', payload);
+      invalidateUserTokenBalances(queryClient);
       fetchNetBalance();
     } catch (err) {
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [fetchNetBalance]);
+  }, [fetchNetBalance, queryClient]);
 
   const bulkTransferToken = useCallback(async (payload: { address: string; transfers: BulkTransferItem[] }): Promise<BulkTransferResponse> => {
     setLoading(true);
     try {
       const response = await api.post<BulkTransferResponse>('/tokens/bulk-transfer', payload);
+      invalidateUserTokenBalances(queryClient);
       fetchNetBalance();
       return response.data;
     } catch (err) {
@@ -413,7 +454,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, [fetchNetBalance]);
+  }, [fetchNetBalance, queryClient]);
 
   const approveToken = useCallback(async (payload: { address: string; spender: string; value: string }) => {
     setLoading(true);
@@ -430,13 +471,14 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await api.post('/tokens/transferFrom', payload);
+      invalidateUserTokenBalances(queryClient);
       fetchNetBalance();
     } catch (err) {
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [fetchNetBalance]);
+  }, [fetchNetBalance, queryClient]);
 
   const setTokenStatus = useCallback(async (payload: { address: string; status: number }) => {
     setLoading(true);

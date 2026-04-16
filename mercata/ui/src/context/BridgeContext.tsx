@@ -7,7 +7,14 @@ import {
   useEffect,
   useRef,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
+import type { Token } from "@/interface";
+import {
+  USER_TOKEN_BALANCES_QUERY_KEY,
+  fetchUserTokenBalances,
+  findBalanceInTokenList,
+} from "@/queries/tokenBalancesQuery";
 import { formatBalance } from "@/utils/numberUtils";
 import {
   BalanceResponse,
@@ -20,6 +27,7 @@ import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactio
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
 export const BridgeProvider = ({ children }: { children: ReactNode }) => {
+  const queryClient = useQueryClient();
   // ========== STATE ==========
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,6 +148,30 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       const addr = tokenAddress.startsWith("0x")
         ? tokenAddress.slice(2)
         : tokenAddress;
+
+      const cached = queryClient.getQueryData<Token[]>(USER_TOKEN_BALANCES_QUERY_KEY);
+      let fromList =
+        findBalanceInTokenList(cached, addr) ?? findBalanceInTokenList(cached, tokenAddress);
+      if (fromList !== null) {
+        return { balance: fromList };
+      }
+
+      let list: Token[] | undefined;
+      try {
+        list = await queryClient.fetchQuery({
+          queryKey: USER_TOKEN_BALANCES_QUERY_KEY,
+          queryFn: ({ signal: qSignal }) => fetchUserTokenBalances(qSignal),
+        });
+      } catch {
+        list = undefined;
+      }
+
+      fromList =
+        findBalanceInTokenList(list, addr) ?? findBalanceInTokenList(list, tokenAddress);
+      if (fromList !== null) {
+        return { balance: fromList };
+      }
+
       const { data } = await api.get(`/tokens/balance?address=eq.${addr}`, {
         signal,
       });
@@ -153,7 +185,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
       return { balance: "0" };
     },
-    []
+    [queryClient]
   );
 
   const useBalance = useCallback((tokenAddress: string | null) => {
