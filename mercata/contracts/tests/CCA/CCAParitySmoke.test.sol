@@ -92,6 +92,17 @@ contract Describe_CCA_NoBids_Smoke {
         require(saleToken.getBalance(address(auction)) == TOTAL_SUPPLY, "sale tokens should remain in auction");
         require(saleToken.getBalance(tokensRecipient) == 0, "tokens recipient should not receive funds early");
     }
+
+    function it_ad_sweeps_unsold_tokens_after_block_advance() public {
+        uint256 beforeBlock = block.number;
+
+        fastForward(1, 2);
+
+        require(block.number == beforeBlock + 2, "block number did not advance");
+        auction.sweepUnsoldTokens();
+        require(saleToken.getBalance(tokensRecipient) == TOTAL_SUPPLY, "unsold tokens should sweep after end block");
+        require(saleToken.getBalance(address(auction)) == 0, "auction should have no sale tokens after sweep");
+    }
 }
 
 contract Describe_CCA_SingleWinningBid_Smoke {
