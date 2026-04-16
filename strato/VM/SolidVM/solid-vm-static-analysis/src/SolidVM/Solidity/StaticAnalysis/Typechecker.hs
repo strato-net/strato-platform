@@ -19,6 +19,7 @@ import Control.Monad (forM, msum)
 import Control.Monad.Reader
 import Control.Monad.Trans.State
 import Data.Bool (bool)
+import Data.Either (isRight)
 import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
@@ -125,7 +126,9 @@ showType (SVMType.Array t l) =
       "]"
     ]
 showType (SVMType.Contract n) = "contract " <> labelToText n
-showType (SVMType.Mapping _ k v) = "mapping (" <> showType k <> " => " <> showType v <> ")"
+showType (SVMType.Mapping _ k v kn vn) =
+  let p = maybe "" ((" " <>) . T.pack)
+   in "mapping (" <> showType k <> (p kn) <> " => " <> (showType v) <> (p vn) <> ")"
 showType SVMType.Variadic = "variadic"
 
 showType' :: Type' -> Text
@@ -196,11 +199,29 @@ mutable m@(Sum (t :| ts)) =
         (j:js) -> Sum $ j :| js
 mutable t = bottom $ "Cannot mutate immutable value" <$ context' t
 
-varDefsToType' :: SourceAnnotation Text -> Annotated VarDefEntryF -> Type'
-varDefsToType' x BlankEntry = topType' x
+fromMutable :: Type' -> Type'
+fromMutable (Mutable m)              = m
+fromMutable (Product (t1, t2, ts) x) = Product (fromMutable t1, fromMutable t2, fromMutable <$> ts) x
+fromMutable (MultiVariate t x)       = MultiVariate (fromMutable t) x
+fromMutable (Sum ts)                 = Sum $ fromMutable <$> ts
+fromMutable (Function a r x o ns g)  = Function (fromMutable a) (fromMutable r) x (fromMutable <$> o) ns g
+fromMutable t                        = t
+
+varDefsToType' :: SourceAnnotation Text -> Annotated VarDefEntryF -> SSS Type'
+varDefsToType' x BlankEntry = pure $ topType' x
 varDefsToType' _ VarDefEntry {..} = case vardefType of
-  Nothing -> topType' vardefContext
-  Just t  -> Mutable $ Static t vardefContext
+  Nothing -> pure $ topType' vardefContext
+  Just t -> case t of
+    SVMType.UnknownLabel l -> do
+      let ls = T.splitOn "." $ labelToText l
+          embedMember f [] = f ""
+          embedMember f [z] = f z
+          embedMember f (z:zs) = embedMember (MemberAccess vardefContext (f z) . textToLabel) zs
+      tcExpr (embedMember (Variable vardefContext . textToLabel) ls) >>= \case
+        Bottom{} -> pure . bottom $ "Unknown type: " <> labelToText l <$ vardefContext
+        Function _ r _ _ _ _ -> pure r
+        t' -> pure t'
+    _ -> pure . Mutable $ Static t vardefContext
 
 lookupEnum :: SolidString -> SSS [SolidString]
 lookupEnum name = do
@@ -335,7 +356,7 @@ lookupContractFunction x cName fName = do
                       <$ x
           Just ConstantDecl {..} -> pure $ Static _constType x
         Just f -> pure . filterFuncs cc x fName f $
-          case filter (\(Using n _ _) -> n == cName) . concat . M.elems $ ctract ^. usings of
+          case filter (\(Using n _ _ _) -> n == cName) $ ctract ^. usings ++ cc ^. flUsings of
             [] -> case c ^. contractType of
               LibraryType -> [Private]  -- Library internal functions are callable directly
               _ | isInherited -> [Private]  -- Inherited internal functions are accessible
@@ -354,7 +375,7 @@ lookupContractFunction x cName fName = do
               _ -> bottom $ "Failed to construct type for contract array getter. This is probably a SolidVM typechecker bug" <$ y
          in pure $ Function args' rets ctx w j f
       _ -> pure . bottom $ "Failed to construct type for contract array getter. This is probably a SolidVM typechecker bug" <$ y
-    constructGetterType y (SVMType.Mapping _ k v) = constructGetterType y v >>= \case
+    constructGetterType y (SVMType.Mapping _ k v _ _) = constructGetterType y v >>= \case
       Function args rets ctx w j f ->
         let baseType = Static k y
             args' = case args of
@@ -479,7 +500,7 @@ contractType' :: SourceAnnotation Text -> Type'
 contractType' = Static (SVMType.Contract "")
 
 certType' :: SourceAnnotation Text -> Type'
-certType' x = Static (SVMType.Mapping Nothing (SVMType.String Nothing) (SVMType.String Nothing)) x
+certType' x = Static (SVMType.Mapping Nothing (SVMType.String Nothing) (SVMType.String Nothing) Nothing Nothing) x
 
 topType' :: SourceAnnotation Text -> Type'
 topType' = Top S.empty
@@ -752,12 +773,12 @@ typecheckStatic (SVMType.Contract a) (SVMType.Contract b) =
           <> " and "
           <> labelToText b
           <> " do not match."
-typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
+typecheckStatic (SVMType.Mapping d1 k1 v1 kn vn) (SVMType.Mapping d2 k2 v2 _ _) = do
   k <- typecheckStatic k1 k2
   v <- typecheckStatic v1 v2
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between mapping values"
-    _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
+    _ -> Right $ SVMType.Mapping (d1 <|> d2) k v kn vn
 typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
   if alias1 == alias2
     then typecheckStatic a b
@@ -793,7 +814,7 @@ typecheckIndex _ (Bottom es) = pure $ Bottom es
 typecheckIndex (Static (SVMType.Array t _) x) i = i ~> (pure $ intType' x) !> pure (Static t x)
 typecheckIndex (Static SVMType.Variadic x) i = i ~> (pure $ intType' x) !> pure (topType' x)
 typecheckIndex (Static (SVMType.Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (intType' x)
-typecheckIndex (Static (SVMType.Mapping _ k v) x) i = do
+typecheckIndex (Static (SVMType.Mapping _ k v _ _) x) i = do
   t <- typecheck (Static k x) i
   pure $ case t of
     Bottom es -> Bottom es
@@ -826,7 +847,8 @@ typecheckMember (Mutable t) member = do
     Top{} -> Mutable t'
     _ -> t'
 typecheckMember (Static (SVMType.Array _ _) x) "length" = pure . Mutable $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Unit x) x [] [] False
+typecheckMember (Static (SVMType.Array t _) x) "push" = pure . Sum $ Function (Static t x) (Unit x) x [] [] False
+                                                                  :| [Function (Unit x) (Unit x) x [] [] False]
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
 typecheckMember (Static (SVMType.String _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
@@ -951,11 +973,11 @@ typecheckMember (Static (SVMType.UnknownLabel c) x) n = do
 typecheckMember t@(Static svmType x) n = do
   let unknownMember = pure . bottom $ ("Unknown member: " <> showType svmType <> "." <> labelToText n) <$ x
   c <- asks contract
-  case c ^. usings . at (T.unpack $ showType svmType) of
-    Nothing -> unknownMember
-    Just [] -> unknownMember
-    Just us -> do
-      results <- forM us $ \(Using c' _ _) -> do
+  cc <- asks codeCollection
+  case filter (\(Using _ t' _ _) -> maybe True (isRight . typecheckStatic svmType) t') $ c ^. usings ++ cc ^. flUsings of
+    [] -> unknownMember
+    us -> do
+      results <- forM us $ \(Using c' _ _ _) -> do
         ~CodeCollection {..} <- asks codeCollection
         case M.lookup c' _contracts of
           Nothing -> unknownMember
@@ -1582,7 +1604,7 @@ saltCreateArgs :: SourceAnnotation Text -> Type'
 saltCreateArgs x = Product (stringType' x, stringType' x, [stringType' x, Static SVMType.Variadic x]) x
 
 fastForwardArgs :: SourceAnnotation Text -> Type'
-fastForwardArgs x = intType' x
+fastForwardArgs x = Sum $ intType' x :| [Product (intType' x, intType' x, []) x]
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Address False) ctx
@@ -1607,7 +1629,8 @@ getVarType' s@('b' : 'y' : 't' : 'e' : 's' : n) ctx = case n of
     Just n' -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing (Just n')) ctx) ctx [] [] False
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' "byte" ctx = pure $ Function (byteArgs ctx) (intType' ctx) ctx [] [] False
-getVarType' "push" ctx = pure $ Function (topType' ctx) (Unit ctx) ctx [] [] False
+getVarType' "push" ctx = pure . Sum $ Function (topType' ctx) (Unit ctx) ctx [] [] False
+                                   :| [Function (Unit ctx) (Unit ctx) ctx [] [] False]
 getVarType' "identity" ctx = pure $ Function (topType' ctx) (topType' ctx) ctx [] [] False
 getVarType' "base64encode" ctx = pure $ base64encodeType ctx
 getVarType' "base64urlencode" ctx = pure $ base64urlencodeType ctx
@@ -1912,9 +1935,18 @@ statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
 
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
-  pushLocalVariables vdefs
-  let ts' = toType' (varDefsToType' x) x vdefs
-  ts' ~> maybe (pure $ topType' x) tcExpr mExpr
+  vdefs' <- traverse (varDefsToType' x) vdefs
+  pushLocalVariables $ (\(vdef, t') -> case t' of
+      Static t _ -> case vdef of
+        BlankEntry -> BlankEntry
+        _ -> vdef{vardefType = Just t}
+      _ -> vdef
+    ) <$> zip vdefs vdefs'
+  case reduceType' x vdefs' of
+    b@Bottom{} -> pure b
+    _ -> do
+      let ts' = toType x vdefs'
+      ts' ~> maybe (pure $ topType' x) tcExpr mExpr
 simpleStatementHelper _ (ExpressionStatement expr) =
   tcExpr expr
 
@@ -2064,9 +2096,9 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) = do
           expressionResult <- tcExpr e
           let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           let check =
-                ( case expressionResult of
+                ( case fromMutable expressionResult of
                     Static (SVMType.UserDefined name actual) _ -> pure $ checkerUserDefinedGetType (SVMType.UserDefined name actual) nam x
-                    _ -> pure . bottom $ "Passing a non user defined type inside unwrap function of user defined type" <$ x
+                    _ -> pure . bottom $ ("Passing a non user defined type inside unwrap function of user defined type: " <> T.pack (show expressionResult)) <$ x
                 )
           check !> (pure $ (Static (actualTypeOfUserDefinedVar) x))
         _ -> pure . bottom $ "'unwrap' must take one argument" <$ x
