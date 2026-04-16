@@ -1,9 +1,9 @@
 import { config, ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE, WAD } from "../config";
-import { 
-  getTransactionReceiptsBatch, 
-  getInternalTransactionsBatch 
+import {
+  getTransactionReceiptsBatch,
+  getInternalTransactionsBatch
 } from "./rpcService";
-import { getRebaseFactors } from "./cirrusService";
+import { getRebaseFactors, getEnabledChains } from "./cirrusService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
 import { logInfo } from "../utils/logger";
 import { DepositInfo } from "../types";
@@ -122,13 +122,8 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
     depositsByChain.get(externalChainId)!.push(deposit);
   });
 
-  // Normalize once, reuse everywhere
-  const safe = normalizeAddress(config?.safe?.address ?? "");
-  if (!safe) {
-    const error = new Error("Gnosis Safe address not configured");
-    deposits.forEach(d => results.set(d.externalTxHash, error));
-    return results;
-  }
+  // Fetch chain info to get per-chain vault addresses
+  const enabledChains = await getEnabledChains();
 
   // Fetch rebase factors for all deposits' STRATO tokens
   const allStratoTokens = [...new Set(deposits.map(d => d.stratoToken).filter(Boolean))];
@@ -136,10 +131,21 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
 
   // Process each chain's deposits in batches
   for (const [chainId, chainDeposits] of depositsByChain) {
+    // Resolve custody address: prefer externalBridgeVault, fall back to custody (legacy Safe)
+    const chainInfo = enabledChains.get(chainId);
+    const custodyAddress = normalizeAddress(
+      chainInfo?.externalBridgeVault || chainInfo?.custody || ""
+    );
+    if (!custodyAddress) {
+      const error = new Error(`No custody/vault address configured for chain ${chainId}`);
+      chainDeposits.forEach(d => results.set(d.externalTxHash, error));
+      continue;
+    }
+
     // Dedupe txHashes
     const txHashes = [...new Set(chainDeposits.map(d => d.externalTxHash))];
     if (txHashes.length === 0) continue;
-    
+
     // Batch fetch receipts and internal transactions
     const [receipts, internalTxsMap] = await Promise.all([
       getTransactionReceiptsBatch(chainId, txHashes),
@@ -160,9 +166,9 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
           continue;
         }
 
-        // Early guard + context object
+        // Early guard + context object (uses per-chain custody/vault address)
         const rebaseFactor = rebaseFactorMap.get(deposit.stratoToken);
-        const ctx = validateDeposit(deposit, chainId, safe, rebaseFactor);
+        const ctx = validateDeposit(deposit, chainId, custodyAddress, rebaseFactor);
         if (ctx instanceof Error) {
           results.set(deposit.externalTxHash, ctx);
           continue;

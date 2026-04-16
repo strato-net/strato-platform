@@ -146,10 +146,13 @@ export interface ChainInfo {
   enabled: boolean;
   custody: string;
   chainName: string;
+  externalBridgeVault: string;
+  representationBridge: string;
 }
 
 export interface AssetInfo {
   enabled: boolean;
+  isNative: boolean;
   stratoToken: string;
   externalName: string;
   externalToken: string;

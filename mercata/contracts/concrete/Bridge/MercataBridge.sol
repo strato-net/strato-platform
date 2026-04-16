@@ -93,7 +93,7 @@ contract record MercataBridge is Ownable {
 
     // ───────────── Registry related events ─────────────
     /// @notice Emitted when chain configuration is updated
-    event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address hotWallet);
+    event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address externalBridgeVault, address representationBridge, address hotWallet);
 
     /// @notice Emitted when the last processed block is updated for a chain
     event LastProcessedBlockUpdated(uint256 externalChainId, uint256 lastProcessedBlock);
@@ -110,7 +110,8 @@ contract record MercataBridge is Ownable {
     /// @param externalToken The address of the external token contract
     /// @param maxPerWithdrawal Maximum amount per withdrawal (0 = unlimited)
     /// @param stratoToken The corresponding STRATO token address
-    event AssetUpdated(bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken);
+    /// @param isNative Whether the asset is a native STRATO asset
+    event AssetUpdated(bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken, bool isNative);
 
     /// @notice Emitted when the metal forge address is updated
     event MetalForgeUpdated(address newForge, address oldForge);
@@ -286,15 +287,15 @@ contract record MercataBridge is Ownable {
      * @param stratoToken The corresponding STRATO token address
      */
     function setAsset(
-        bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken
+        bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken, bool isNative
     ) external onlyOwner {
         require(chains[externalChainId].custody != address(0), "MB: chain missing");
         require(externalName.length > 0, "MB: invalid external name");
         require(externalSymbol.length > 0, "MB: invalid external symbol");
         require(stratoToken != address(0), "MB: invalid strato token");
         require(externalDecimals <= DECIMAL_PLACES, "MB: decimals exceed max");
-        assets[externalToken][externalChainId] = AssetInfo(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
-        emit AssetUpdated(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
+        assets[externalToken][externalChainId] = AssetInfo(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken, isNative);
+        emit AssetUpdated(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken, isNative);
     }
 
     /**
@@ -318,7 +319,7 @@ contract record MercataBridge is Ownable {
         require(assetInfo.externalToken == externalToken, "MB: asset not found");
         assetInfo.externalName = externalName;
         assetInfo.externalSymbol = externalSymbol;
-        emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, externalName, externalSymbol, externalToken, assetInfo.maxPerWithdrawal, assetInfo.stratoToken);
+        emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, externalName, externalSymbol, externalToken, assetInfo.maxPerWithdrawal, assetInfo.stratoToken, assetInfo.isNative);
     }
 
     /**
@@ -339,7 +340,7 @@ contract record MercataBridge is Ownable {
         AssetInfo assetInfo = assets[externalToken][externalChainId];
         require(assetInfo.externalToken == externalToken, "MB: asset not found");
         assetInfo.maxPerWithdrawal = maxPerWithdrawal;
-        emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, assetInfo.externalName, assetInfo.externalSymbol, externalToken, maxPerWithdrawal, assetInfo.stratoToken);
+        emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, assetInfo.externalName, assetInfo.externalSymbol, externalToken, maxPerWithdrawal, assetInfo.stratoToken, assetInfo.isNative);
     }
 
     /**
@@ -353,14 +354,22 @@ contract record MercataBridge is Ownable {
      * @param router The router contract address for deposits
      */
     function setChain(
-        string chainName, address custody, address hotWallet, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router
+        string chainName,
+        address custody,
+        address hotWallet,
+        bool enabled,
+        uint256 externalChainId,
+        uint256 lastProcessedBlock,
+        address depositRouter,
+        address externalBridgeVault,
+        address representationBridge
     ) external onlyOwner {
         require(chainName.length > 0, "MB: invalid chain name");
         require(custody != address(0), "MB: zero custody address");
         require(externalChainId > 0, "MB: invalid external chain id");
-        require(router != address(0), "MB: zero router address");
-        chains[externalChainId] = ChainInfo(chainName, custody, hotWallet, router, enabled, lastProcessedBlock);
-        emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, router, hotWallet);
+        require(depositRouter != address(0), "MB: zero router address");
+        chains[externalChainId] = ChainInfo(chainName, custody, hotWallet, depositRouter, externalBridgeVault, representationBridge, enabled, lastProcessedBlock);
+        emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, depositRouter, externalBridgeVault, representationBridge, hotWallet);
     }
 
     /**

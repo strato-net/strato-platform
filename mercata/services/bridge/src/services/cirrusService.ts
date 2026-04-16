@@ -33,6 +33,8 @@ export const getEnabledChains = async (): Promise<Map<number, ChainInfo>> => {
     enabled: !!v.enabled,
     custody: v.custody,
     chainName: v.chainName,
+    externalBridgeVault: v.externalBridgeVault || "",
+    representationBridge: v.representationBridge || "",
   });
 
   return new Map(
@@ -59,6 +61,7 @@ export const getAssetInfo = async (
 
   const normalize = (v: any): AssetInfo => ({
     enabled: !!v.enabled,
+    isNative: !!v.isNative,
     stratoToken: v.stratoToken,
     externalName: v.externalName,
     externalToken: v.externalToken,

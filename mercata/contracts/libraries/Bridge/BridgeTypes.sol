@@ -37,11 +37,13 @@ library BridgeTypes {
 
     struct ChainInfo {
         string  chainName;
-        address custody;            // custody on that chain
-        address hotWallet;          // wallet used for hot withdrawals
-        address depositRouter;      // contract users interact with on L1/L2
-        bool    enabled;            // quick toggle
-        uint256 lastProcessedBlock; // last processed block on the chain for polling
+        address custody;              // custody on that chain
+        address hotWallet;            // wallet used for hot withdrawals
+        address depositRouter;        // DepositRouter contract users interact with on L1/L2
+        address externalBridgeVault;  // ExternalBridgeVault contract users interact with on L1/L2
+        address representationBridge; // StratoRepresentationBridge contract users interact with on L1/L2
+        bool    enabled;              // quick toggle
+        uint256 lastProcessedBlock;   // last processed block on the chain for polling
     }
 
     struct AssetInfo {
@@ -53,6 +55,7 @@ library BridgeTypes {
         address externalToken;    // token address on external chain
         uint256 maxPerWithdrawal; // hard ceiling for withdrawals; 0 means "unlimited"
         address stratoToken;      // STRATO token to mint (ETHst, USDST, etc)
+        bool    isNative;         // is native STRATO token (e.g. USDST, GOLDST, SILVST)
     }
 
     /// @notice Post-deposit action types for confirmDeposit dispatch
