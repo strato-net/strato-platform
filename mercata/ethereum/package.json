@@ -19,6 +19,7 @@
 
     "verify:sepolia": "hardhat verify --network sepolia",
     "verify:mainnet": "hardhat verify --network mainnet",
+    "verify:bsc": "hardhat verify --network bsc",
 
     "scan:sepolia": "npx hardhat run scripts/scanTokenConfig.js --network sepolia",
     "scan:mainnet": "npx hardhat run scripts/scanTokenConfig.js --network mainnet",
