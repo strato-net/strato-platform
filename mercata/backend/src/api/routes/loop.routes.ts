@@ -23,12 +23,6 @@ router.get("/bootstrap", authHandler.authorizeRequest(true), LoopController.boot
  *   post:
  *     summary: Execute a CDP leverage loop via LoopRouter (atomic)
  *     tags: [Loop]
- *     parameters:
- *       - in: header
- *         name: Idempotency-Key
- *         schema:
- *           type: string
- *         description: Optional key to prevent duplicate execution
  *     requestBody:
  *       required: true
  *       content:
@@ -51,13 +45,9 @@ router.get("/bootstrap", authHandler.authorizeRequest(true), LoopController.boot
  *                 type: number
  *               maxSlippageBps:
  *                 type: integer
- *               minHealthFactor:
- *                 type: number
- *               clientQuoteHash:
- *                 type: string
  *     responses:
  *       200:
- *         description: Execution result with step status and tx hash
+ *         description: Execution result with tx hash
  */
 router.post("/execute", authHandler.authorizeRequest(), LoopController.execute);
 

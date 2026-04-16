@@ -26,13 +26,7 @@ class LoopController {
     try {
       validateExecuteArgs(req.body);
 
-      const idempotencyKey =
-        (req.headers["idempotency-key"] as string) || req.body.idempotencyKey;
-
-      const result = await executeLoop(req.accessToken!, req.address!, {
-        ...req.body,
-        idempotencyKey,
-      });
+      const result = await executeLoop(req.accessToken!, req.address!, req.body);
 
       res.status(RestStatus.OK).json(result);
       next();

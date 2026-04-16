@@ -17,9 +17,6 @@ export interface LoopExecuteRequest {
   amount: string;
   targetLeverage?: number;
   maxSlippageBps?: number;
-  minHealthFactor?: number;
-  clientQuoteHash?: string;
-  idempotencyKey?: string;
 }
 
 export interface LoopExecuteResponse {

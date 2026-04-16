@@ -8,9 +8,6 @@ export function validateExecuteArgs(args: any) {
     amount: numericStringField("amount"),
     targetLeverage: Joi.number().min(1.1).max(10).required(),
     maxSlippageBps: Joi.number().integer().min(0).max(1000).optional(),
-    minHealthFactor: Joi.number().min(1.15).optional(),
-    clientQuoteHash: Joi.string().optional(),
-    idempotencyKey: Joi.string().max(128).optional(),
   });
 
   const { error } = schema.validate(args);

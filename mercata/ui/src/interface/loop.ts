@@ -58,8 +58,6 @@ export interface LoopExecuteRequest {
   amount: string;
   targetLeverage: number;
   maxSlippageBps?: number;
-  minHealthFactor?: number;
-  clientQuoteHash?: string;
 }
 
 export interface LoopExecuteResponse {
