@@ -15,7 +15,7 @@ import { useMemo } from 'react';
 
 type PortfolioDataPoint = {
   timestamp: number;
-  balance: number;
+  balance: number | string;
 };
 
 type TabType = 'netBalance' | 'rewards' | 'borrowed' | 'earnings' | 'estAnnual';
@@ -70,9 +70,15 @@ const calculateTimeRangeHours = (data: PortfolioDataPoint[]): number => {
 // Calculate percentage change
 const calculateChange = (data: PortfolioDataPoint[]): { percentage: number | null; amount: number; isPositive: boolean } => {
   if (data.length < 2) return { percentage: null, amount: 0, isPositive: true };
-  
-  const first = data[0].balance;
-  const last = data[data.length - 1].balance;
+
+  const sorted = [...data].sort((a, b) => a.timestamp - b.timestamp);
+  const firstRaw = sorted[0].balance;
+  const lastRaw = sorted[sorted.length - 1].balance;
+  const first = typeof firstRaw === "string" ? parseFloat(firstRaw) : firstRaw;
+  const last = typeof lastRaw === "string" ? parseFloat(lastRaw) : lastRaw;
+  if (!Number.isFinite(first) || !Number.isFinite(last)) {
+    return { percentage: null, amount: 0, isPositive: true };
+  }
   const changeAmount = last - first;
   
   return {
@@ -180,13 +186,19 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
     const maxValue = Math.max(...values);
     const range = maxValue - minValue;
     const padding = range > 0 ? range * 0.1 : maxValue * 0.05;
-    
-    const yAxisDomain = [
-      Math.max(0, minValue - padding),
-      maxValue + padding
-    ];
 
-    const maxDomainValue = maxValue + padding;
+    let yMin = Math.max(0, minValue - padding);
+    let yMax = maxValue + padding;
+    // Recharts / linear scales divide by (max − min). All-zero or flat series ⇒ [0,0] ⇒ RangeError in prod builds.
+    if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMax <= yMin) {
+      const base = Number.isFinite(yMin) && yMin >= 0 ? yMin : 0;
+      yMin = base;
+      yMax = base + (base > 0 ? Math.max(base * 1e-6, 1e-9) : 1);
+    }
+
+    const yAxisDomain: [number, number] = [yMin, yMax];
+
+    const maxDomainValue = yMax;
     let scale;
     if (maxDomainValue >= 1000000) {
       scale = { divisor: 1000000, suffix: 'M' };
