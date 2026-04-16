@@ -4,7 +4,7 @@ import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Transport, WagmiProvider } from "wagmi";
-import { mainnet, polygon, sepolia, base, baseSepolia } from "wagmi/chains";
+import { mainnet, polygon, sepolia, base, baseSepolia, bsc } from "wagmi/chains";
 import {
   connectorsForWallets,
   RainbowKitProvider,
@@ -137,7 +137,7 @@ const App = () => {
               rpcUrls: { default: { http: [typeof window !== "undefined" ? `${window.location.origin}/api/rpc/${networkId}` : ""] } },
             })
           : null;
-      const baseChains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
+      const baseChains = [mainnet, polygon, sepolia, base, baseSepolia, bsc] as const;
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
         chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
