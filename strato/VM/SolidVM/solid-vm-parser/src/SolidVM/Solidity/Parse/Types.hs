@@ -106,12 +106,14 @@ arrayType = do
 mappingType :: SolidityParser SVMType.Type
 mappingType = do
   reserved "mapping"
-  (mapDomT, mapCodT) <- parens $ do
+  (mapDomT, keyName, mapCodT, valName) <- parens $ do
     d <- simpleTypeExpression
+    kn <- optionMaybe identifier
     reservedOp "=>"
     c <- simpleTypeExpression
-    return (d, c)
-  return $ SVMType.Mapping (Just True) mapDomT mapCodT
+    vn <- optionMaybe identifier
+    return (d, kn, c, vn)
+  return $ SVMType.Mapping (Just True) mapDomT mapCodT keyName valName
 
 userTypeHelper' :: Maybe String -> SVMType.Type
 userTypeHelper' (Just "bool") = SVMType.Bool

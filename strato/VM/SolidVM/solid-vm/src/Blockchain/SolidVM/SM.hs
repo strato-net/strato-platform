@@ -554,7 +554,7 @@ getVariableOfName name = do
                           CC._functions = M.empty,
                           CC._constructor = currentContract x ^. CC.constructor,
                           CC._modifiers = M.empty,
-                          CC._usings = M.empty,
+                          CC._usings = [],
                           CC._contractType = currentContract x ^. CC.contractType,
                           CC._importedFrom = Nothing,
                           CC._contractContext = currentContract x ^. CC.contractContext
@@ -662,15 +662,8 @@ getVariableOfName name = do
           t "contract" $ Constant $ SContractDef name
 
       maybeStorageItem :: Maybe Variable
-      maybeStorageItem =
-        -- TODO(tim): This might just be restricted to a field name
-        if name `elem` M.keys (currentContract currentCallInfo ^. CC.storageDefs)
-          then
-            Just . Constant . SReference $
-              AddressPath
-                (currentAddress currentCallInfo)
-                (MS.singleton $ BC.pack $ labelToString name)
-          else Nothing
+      maybeStorageItem = Constant (SReference . MS.singleton . BC.pack $ labelToString name)
+                      <$ M.lookup name (currentContract currentCallInfo ^. CC.storageDefs)
 
       maybeThis :: Maybe Variable
       maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAddress (currentAddress currentCallInfo) False
@@ -1015,7 +1008,7 @@ getMapNamesFromContract :: CC.Contract -> [T.Text]
 getMapNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
-      listOfMappings = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Mapping _ _ _ -> True; _ -> False) storageDefsList
+      listOfMappings = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Mapping _ _ _ _ _ -> True; _ -> False) storageDefsList
    in T.pack . fst <$> listOfMappings
 
 --also needs to be changed for testnet3 to be only record

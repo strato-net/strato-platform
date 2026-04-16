@@ -531,7 +531,7 @@ fillFirstEmptyEntries :: [(Text, a)] -> [(Text, a)]
 fillFirstEmptyEntries = map unFirst . fillEmptyEntries . map First
 
 getTableColumnAndType :: Bool -> CodeCollectionF () -> [(Text, SVMType.Type)] -> [(T.Text, SqlType, Maybe T.Text)]
-getTableColumnAndType isEvent cc@(CodeCollection ccs _ _ _ _ _ _ _) = mapMaybe go . fillFirstEmptyEntries
+getTableColumnAndType isEvent cc@(CodeCollection ccs _ _ _ _ _ _ _ _) = mapMaybe go . fillFirstEmptyEntries
   where
     go :: (Text, SVMType.Type) -> Maybe (T.Text, SqlType, Maybe T.Text)
     go (x, y) =
