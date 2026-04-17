@@ -1,5 +1,12 @@
-import { Pool, PoolConfig, QueryResultRow } from "pg";
+import { Pool, PoolConfig, QueryResultRow, types } from "pg";
 import { cirrusDbName } from "../config/config";
+
+// Override pg type parsers to return raw strings instead of JS objects.
+// This matches PostgREST behavior — the existing reducer code expects string timestamps
+// (e.g. "2025-01-15T12:00:00") not Date objects, and numeric values as strings not floats.
+types.setTypeParser(types.builtins.TIMESTAMP, (val) => val);    // 1114
+types.setTypeParser(types.builtins.TIMESTAMPTZ, (val) => val);  // 1184
+types.setTypeParser(types.builtins.NUMERIC, (val) => val);      // 1700
 
 let pool: Pool | null = null;
 

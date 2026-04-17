@@ -122,8 +122,8 @@ export async function fetchStorageHistory(
         data->>'lpToken' != ''
         OR data->>'_symbol' LIKE '%-LP'
         OR data->>'_symbol' IN ('MUSDST','SUSDST','safetyUSDST','lendUSDST','saveUSDST')
-        OR (data->>'sToken')::numeric > 0
-        OR ((data->>'mToken')::numeric > 0 AND (data->>'borrowIndex')::numeric > 0)
+        OR (data->>'sToken' IS NOT NULL AND data->>'sToken' > '0')
+        OR (data->>'mToken' IS NOT NULL AND data->>'mToken' > '0' AND data->>'borrowIndex' IS NOT NULL AND data->>'borrowIndex' > '0')
         OR address = ANY($3)
       )
     ORDER BY valid_from
@@ -234,7 +234,7 @@ export async function fetchVaultHistoryConfig(
       [vaultAddress],
     ),
     query<{ value: string }>(
-      `SELECT value FROM "BlockApps-Vault-supportedAssets" WHERE address = $1`,
+      `SELECT value::text FROM "BlockApps-Vault-supportedAssets" WHERE address = $1`,
       [vaultAddress],
     ),
   ]);
@@ -299,8 +299,8 @@ export async function getHistoryDirect(
   const endTime = new Date(params.endTimestamp).toISOString();
 
   const [storageHistory, mappingHistory] = await Promise.all([
-    fetchStorageHistory(endTime, startTime, storageFilterParams),
-    fetchMappingHistory(endTime, startTime, collectionNames, mappingFilterParams),
+    fetchStorageHistory(startTime, endTime, storageFilterParams),
+    fetchMappingHistory(startTime, endTime, collectionNames, mappingFilterParams),
   ]);
 
   return buildSnapshots(
