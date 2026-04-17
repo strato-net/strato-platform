@@ -55,9 +55,11 @@ const resolvePromoRows = (
 
 interface GuestPromoSectionProps {
   variant: 1 | 2 | 3; // 1 = logged out, 2 = logged in 0 portfolio, 3 = logged in with portfolio
+  /** Gold/USDST promo cards; guests only (default true). */
+  showFeatureCards?: boolean;
 }
 
-const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
+const GuestPromoSection = ({ variant, showFeatureCards = true }: GuestPromoSectionProps) => {
   const navigate = useNavigate();
   const [rewardsButtonHovered, setRewardsButtonHovered] = useState(false);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
@@ -99,7 +101,6 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
     }
     if (totalPerSec === 0n) return { dailyPointsStr: null, emissionFillPct: 0 };
     const perDay = Number((totalPerSec * 86400n) / BigInt(1e9)) / 1e9;
-    console.log("[GuestPromoSection] dailyPoints full precision:", perDay);
 
     let fillPct = 0;
     const totalEmission = rewardsState?.totalRewardsEmission;
@@ -263,7 +264,8 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
         </div>
       </div>
 
-      {/* Feature Cards */}
+      {/* Feature Cards — guests only when showFeatureCards */}
+      {showFeatureCards && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Buy Tokenized Gold and Silver */}
         <div className="bg-card border border-border rounded-2xl p-6 flex flex-col justify-between min-h-[240px]">
@@ -385,6 +387,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };
