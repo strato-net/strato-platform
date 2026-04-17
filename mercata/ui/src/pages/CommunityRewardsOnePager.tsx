@@ -14,7 +14,9 @@ const CommunityRewardsOnePager = () => {
     const host = hostRef.current;
     if (!host || host.shadowRoot) return;
     const root = host.attachShadow({ mode: "open" });
-    root.innerHTML = pageHtml;
+    // `:root` does not match inside a shadow tree (shadow root is a DocumentFragment),
+    // so rewrite to `:host` so the HTML's CSS custom properties cascade to descendants.
+    root.innerHTML = pageHtml.replace(/:root\b/g, ":host");
   }, []);
 
   return <div ref={hostRef} className="fixed inset-0 z-[100] overflow-auto bg-[#F4F5FB]" />;
