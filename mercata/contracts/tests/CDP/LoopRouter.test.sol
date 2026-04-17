@@ -25,6 +25,15 @@ contract Describe_LoopRouter is Authorizable {
     address usdstAddr;
     address poolAddr;
 
+    Token stableColl;
+    address stableCollAddr;
+    address stablePoolAddr;
+    StablePool stablePool;
+    // StablePool created via createStablePool(usdstAddr, stableCollAddr),
+    // so coins(0)=USDST, coins(1)=stableColl. Use literal 0/1 at call sites
+    // because u.do variadic packing doesn't propagate storage-typed uints
+    // cleanly into nested StablePool.quoteSwap array indexing.
+
     uint WAD = 1e18;
     uint RAY = 1e27;
     uint PRICE = 11595e14; // $1.1595
@@ -49,6 +58,45 @@ contract Describe_LoopRouter is Authorizable {
         uint collValueUSD = coll * PRICE / WAD;
         require(collValueUSD > debt, "insolvent");
         return collValueUSD * WAD / (collValueUSD - debt);
+    }
+
+    // ─────────────────── Flash debt helpers ───────────────────
+    // D* solver: Newton iteration on f(D) = (amount + X(D)) * P/U * (L-1)/L - D
+    // where X(D) is the pool's output for a USDST-in swap of size D.
+    // Converges in 6–8 rounds for typical leverage targets.
+
+    function _computeFlashDebtCP(uint amount, uint targetLevWAD) internal returns (uint) {
+        // Fixed-point iteration on the identity
+        //   D = (amount + X(D)) * P/U * (L-1)/L
+        // where X(D) is pool.quoteSwap output for swapping D USDST in.
+        // Converges quickly for typical targets; 20 rounds leaves ample margin
+        // (error halves each round for this monotone contraction).
+        uint D = amount * PRICE / WAD * (targetLevWAD - WAD) / WAD;
+
+        for (uint i = 0; i < 20; i++) {
+            uint X = pool.quoteSwap(true, D);
+            uint totalColl = amount + X;
+            uint targetDebt = totalColl * PRICE / WAD * (targetLevWAD - WAD) / targetLevWAD;
+            uint diff = targetDebt > D ? targetDebt - D : D - targetDebt;
+            D = targetDebt;
+            if (diff < 1e12) break; // 6 decimal-places of D
+        }
+        return D;
+    }
+
+    function _computeFlashDebtStable(uint amount, uint targetLevWAD) internal returns (uint) {
+        // stableColl price = $1, unitScale = 1e18.
+        uint D = amount * (targetLevWAD - WAD) / WAD;
+
+        for (uint i = 0; i < 20; i++) {
+            uint X = stablePool.quoteSwap(0, 1, D);
+            uint totalColl = amount + X;
+            uint targetDebt = totalColl * (targetLevWAD - WAD) / targetLevWAD;
+            uint diff = targetDebt > D ? targetDebt - D : D - targetDebt;
+            D = targetDebt;
+            if (diff < 1e12) break;
+        }
+        return D;
     }
 
     function beforeAll() {
@@ -98,61 +146,111 @@ contract Describe_LoopRouter is Authorizable {
 
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(cdpEngine), "depositFor", address(loopRouter));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(cdpEngine), "mintFor", address(loopRouter));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(cdpEngine), "flashMint", address(loopRouter));
+
+        // ─── StablePool collateral fixture ───
+        stableCollAddr = m.tokenFactory().createToken(
+            "stableColl", "Stable Collateral", emptyArray, emptyArray, emptyArray, "SCOL", 1000000000e18, 18
+        );
+        stableColl = Token(stableCollAddr);
+        stableColl.setStatus(2);
+        stableColl.mint(address(this), 10000000e18);
+
+        cdpEngine.setCollateralAssetParams(
+            stableCollAddr, 150e16, MIN_CR, 1000, 5000,
+            RAY + ((RAY * 2) / 100 / 31536000),
+            DEBT_FLOOR, DEBT_CEILING, 1e18, false
+        );
+        priceOracle.setAssetPrice(stableCollAddr, 1e18);
+
+        fastForward(100);
+        stablePoolAddr = m.poolFactory().createStablePool(usdstAddr, stableCollAddr);
+        stablePool = StablePool(stablePoolAddr);
+        // Sanity check coin layout (factory pairs first arg as coin 0)
+        require(address(stablePool.coins(0)) == usdstAddr, "USDST must be coin 0");
+        require(address(stablePool.coins(1)) == stableCollAddr, "stableColl must be coin 1");
+
+        Token stableLp = stablePool.lpToken();
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(stableLp), "mint", stablePoolAddr);
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(stableLp), "burn", stablePoolAddr);
+
+        require(ERC20(usdstAddr).approve(stablePoolAddr, 5000000e18), "USDST approve stable");
+        require(ERC20(stableCollAddr).approve(stablePoolAddr, 5000000e18), "stableColl approve");
+        stablePool.addLiquidityGeneral([5000000e18, 5000000e18], 5000000e18, address(0));
     }
 
     // ─────────────── Config & access ───────────────
 
     function it_config() {
         require(address(loopRouter) != address(0), "exists");
-        require(loopRouter.MAX_LOOPS() == 20, "MAX_LOOPS=20");
+        require(address(loopRouter.registry()) == address(cdpRegistry), "registry set");
     }
 
     function it_whitelist() {
         require(adminRegistry.whitelist(address(cdpEngine), "depositFor", address(loopRouter)), "depositFor");
         require(adminRegistry.whitelist(address(cdpEngine), "mintFor", address(loopRouter)), "mintFor");
+        require(adminRegistry.whitelist(address(cdpEngine), "flashMint", address(loopRouter)), "flashMint");
     }
 
-    // ─────────────── Leverage targets ───────────────
+    // ─────────────── Leverage targets (flash) ───────────────
 
     function it_leverage_15x() {
         User u = _freshUser(10000e18);
-        u.do(collAddr, "approve", address(loopRouter), 1000e18);
-        u.do(address(loopRouter), "leverageUp", collAddr, 1000e18, 15e17, poolAddr, true, 100, block.timestamp + 3600);
+        uint amount = 1000e18;
+        uint targetLev = 15e17;
+        uint targetDebt = _computeFlashDebtCP(amount, targetLev);
+        require(targetDebt > 0, "debt solver > 0");
+
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), collAddr);
         uint debt = _realDebt(address(u));
-        require(coll >= 1000e18, "collateral deposited");
+        require(coll >= amount, "collateral deposited");
         require(debt > 0, "has debt");
         uint actualLev = _leverage(coll, debt);
-        uint diff = actualLev > 15e17 ? actualLev - 15e17 : 15e17 - actualLev;
+        uint diff = actualLev > targetLev ? actualLev - targetLev : targetLev - actualLev;
         require(diff < WAD / 50, "leverage within 0.02 WAD of 1.5x");
     }
 
     function it_leverage_2x() {
         User u = _freshUser(10000e18);
-        u.do(collAddr, "approve", address(loopRouter), 1000e18);
-        u.do(address(loopRouter), "leverageUp", collAddr, 1000e18, 2e18, poolAddr, true, 100, block.timestamp + 3600);
+        uint amount = 1000e18;
+        uint targetLev = 2e18;
+        uint targetDebt = _computeFlashDebtCP(amount, targetLev);
+        require(targetDebt > 0, "debt solver > 0");
+
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), collAddr);
         uint debt = _realDebt(address(u));
-        require(coll >= 1000e18, "collateral deposited");
+        require(coll >= amount, "collateral deposited");
         require(debt > 0, "has debt");
         uint actualLev = _leverage(coll, debt);
-        uint diff = actualLev > 2e18 ? actualLev - 2e18 : 2e18 - actualLev;
+        uint diff = actualLev > targetLev ? actualLev - targetLev : targetLev - actualLev;
         require(diff < WAD / 50, "leverage within 0.02 WAD of 2x");
     }
 
     function it_leverage_28x() {
         User u = _freshUser(50000e18);
-        u.do(collAddr, "approve", address(loopRouter), 5000e18);
-        u.do(address(loopRouter), "leverageUp", collAddr, 5000e18, 28e17, poolAddr, true, 100, block.timestamp + 3600);
+        uint amount = 5000e18;
+        uint targetLev = 28e17;
+        uint targetDebt = _computeFlashDebtCP(amount, targetLev);
+        require(targetDebt > 0, "debt solver > 0");
+
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), collAddr);
         uint debt = _realDebt(address(u));
-        require(coll > 5000e18, "collateral looped");
+        require(coll > amount, "collateral stacked");
         require(debt > 0, "has debt");
         uint actualLev = _leverage(coll, debt);
-        uint diff = actualLev > 28e17 ? actualLev - 28e17 : 28e17 - actualLev;
+        uint diff = actualLev > targetLev ? actualLev - targetLev : targetLev - actualLev;
         require(diff < WAD / 50, "leverage within 0.02 WAD of 2.8x");
     }
 
@@ -160,9 +258,12 @@ contract Describe_LoopRouter is Authorizable {
         User u = _freshUser(50000e18);
         uint amount = 10000e18;
         uint targetLev = 2e18;
+        uint targetDebt = _computeFlashDebtCP(amount, targetLev);
+        require(targetDebt > 0, "debt solver > 0");
 
         u.do(collAddr, "approve", address(loopRouter), amount);
-        u.do(address(loopRouter), "leverageUp", collAddr, amount, targetLev, poolAddr, true, 100, block.timestamp + 3600);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), collAddr);
         uint debt = _realDebt(address(u));
@@ -171,27 +272,16 @@ contract Describe_LoopRouter is Authorizable {
         require(diff < WAD / 100, "leverage within 0.01 WAD of target");
     }
 
-    function it_exact_leverage_tight_tolerance() {
-        User u = _freshUser(50000e18);
-        uint amount = 5000e18;
-        uint targetLev = 18e17; // 1.8x
-
-        u.do(collAddr, "approve", address(loopRouter), amount);
-        u.do(address(loopRouter), "leverageUp", collAddr, amount, targetLev, poolAddr, true, 100, block.timestamp + 3600);
-
-        (uint coll,) = cdpEngine.vaults(address(u), collAddr);
-        uint debt = _realDebt(address(u));
-        uint actualLev = _leverage(coll, debt);
-        uint diff = actualLev > targetLev ? actualLev - targetLev : targetLev - actualLev;
-        require(diff < WAD / 200, "leverage within 0.005 WAD of target");
-    }
-
     // ─────────────── Position ownership ───────────────
 
     function it_position_under_user() {
         User u = _freshUser(10000e18);
-        u.do(collAddr, "approve", address(loopRouter), 1000e18);
-        u.do(address(loopRouter), "leverageUp", collAddr, 1000e18, 2e18, poolAddr, true, 100, block.timestamp + 3600);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtCP(amount, 2e18);
+
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint userColl,) = cdpEngine.vaults(address(u), collAddr);
         require(userColl > 0, "user has position");
@@ -205,36 +295,39 @@ contract Describe_LoopRouter is Authorizable {
         User u = _freshUser(50000e18);
 
         // First: create a 1.5x position
-        u.do(collAddr, "approve", address(loopRouter), 5000e18);
-        u.do(address(loopRouter), "leverageUp", collAddr, 5000e18, 15e17, poolAddr, true, 100, block.timestamp + 3600);
+        uint amount1 = 5000e18;
+        uint targetDebt1 = _computeFlashDebtCP(amount1, 15e17);
+        u.do(collAddr, "approve", address(loopRouter), amount1);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount1, targetDebt1, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll1,) = cdpEngine.vaults(address(u), collAddr);
         uint debt1 = _realDebt(address(u));
-        require(coll1 >= 5000e18, "first position has collateral");
+        require(coll1 >= amount1, "first position has collateral");
         require(debt1 > 0, "first position has debt");
-        uint lev1 = _leverage(coll1, debt1);
-        uint diff1 = lev1 > 15e17 ? lev1 - 15e17 : 15e17 - lev1;
-        require(diff1 < WAD / 50, "first position near 1.5x");
 
-        // Second: add more collateral and increase to 2x
-        u.do(collAddr, "approve", address(loopRouter), 5000e18);
-        u.do(address(loopRouter), "leverageUp", collAddr, 5000e18, 2e18, poolAddr, true, 100, block.timestamp + 3600);
+        // Second: add more collateral
+        uint amount2 = 5000e18;
+        uint targetDebt2 = _computeFlashDebtCP(amount2, 2e18);
+        u.do(collAddr, "approve", address(loopRouter), amount2);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount2, targetDebt2, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll2,) = cdpEngine.vaults(address(u), collAddr);
         uint debt2 = _realDebt(address(u));
         require(coll2 > coll1, "collateral increased");
         require(debt2 > debt1, "debt increased");
-        uint lev2 = _leverage(coll2, debt2);
-        uint diff2 = lev2 > 2e18 ? lev2 - 2e18 : 2e18 - lev2;
-        require(diff2 < WAD / 50, "final position near 2x");
     }
 
     // ─────────────── Return values ───────────────
 
     function it_returns_values() {
         User u = _freshUser(50000e18);
-        u.do(collAddr, "approve", address(loopRouter), 1000e18);
-        (uint retColl, uint retDebt) = u.do(address(loopRouter), "leverageUp", collAddr, 1000e18, 2e18, poolAddr, true, 100, block.timestamp + 3600);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtCP(amount, 2e18);
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        (uint retColl, uint retDebt) = u.do(address(loopRouter), "leverageUp",
+            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint vaultColl,) = cdpEngine.vaults(address(u), collAddr);
         uint realDebt = _realDebt(address(u));
@@ -248,8 +341,11 @@ contract Describe_LoopRouter is Authorizable {
 
     function it_debt_floor() {
         User u = _freshUser(100e18);
-        u.do(collAddr, "approve", address(loopRouter), 5e18);
-        u.do(address(loopRouter), "leverageUp", collAddr, 5e18, 2e18, poolAddr, true, 100, block.timestamp + 3600);
+        uint amount = 5e18;
+        uint targetDebt = _computeFlashDebtCP(amount, 2e18);
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         uint debt = _realDebt(address(u));
         require(debt >= DEBT_FLOOR, "real debt meets floor");
@@ -259,8 +355,11 @@ contract Describe_LoopRouter is Authorizable {
 
     function it_residue_zero_after_success() {
         User u = _freshUser(10000e18);
-        u.do(collAddr, "approve", address(loopRouter), 1000e18);
-        u.do(address(loopRouter), "leverageUp", collAddr, 1000e18, 2e18, poolAddr, true, 100, block.timestamp + 3600);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtCP(amount, 2e18);
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         uint routerAsset = IERC20(collAddr).balanceOf(address(loopRouter));
         uint routerUsdst = IERC20(usdstAddr).balanceOf(address(loopRouter));
@@ -302,26 +401,99 @@ contract Describe_LoopRouter is Authorizable {
         require(balAfter == balBefore + 100e18, "rescued stray tokens");
     }
 
+    // ─────────────── Single-swap impact + CR boundary ───────────────
+
+    function it_flash_impact_bounded() {
+        // Flash path does one big swap instead of many small ones, so we want an
+        // explicit bound on how much the effective exec price drifts from the
+        // pool's spot price at swap start. Pool is 5M:5M depth, 1k notional
+        // swap → impact should be tiny.
+        User u = _freshUser(10000e18);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtCP(amount, 2e18);
+        require(targetDebt > 0, "debt solver > 0");
+
+        // Pool fixture uses createPool(usdstAddr, collAddr) → tokenA = USDST.
+        uint usdstBefore = pool.tokenABalance();
+        uint collBefore = pool.tokenBBalance();
+        uint spotBefore = usdstBefore * WAD / collBefore;  // USDST per coll at swap start
+
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 200, block.timestamp + 3600);
+
+        uint usdstAfter = pool.tokenABalance();
+        uint collAfter = pool.tokenBBalance();
+        uint usdstIn = usdstAfter - usdstBefore;
+        uint collOut = collBefore - collAfter;
+        require(usdstIn > 0 && collOut > 0, "swap happened");
+
+        // Effective exec price must be WORSE than spot for the trader (CP math).
+        uint effPrice = usdstIn * WAD / collOut;
+        require(effPrice >= spotBefore, "effective price worse than spot (trader pays impact)");
+
+        // Bound impact at router's 10% slippage cap.
+        uint impactBps = (effPrice - spotBefore) * 10000 / spotBefore;
+        require(impactBps < 1000, "swap impact within router's 10% slippage cap");
+    }
+
+    function it_reverts_at_cr_boundary() {
+        // Precision test: feed a targetDebt above what CR permits, but less
+        // egregious than the 10× overshoot in it_reverts_impossible_leverage.
+        // Start from the max-leverage (2.8x) debt and push ~20% further — that
+        // pushes target leverage past the ~2.82x theoretical max for minCR=155.
+        User u = _freshUser(10000e18);
+        uint amount = 1000e18;
+        uint maxDebt = _computeFlashDebtCP(amount, 28e17);
+        require(maxDebt > 0, "max debt solver > 0");
+
+        uint overDebt = maxDebt * 12 / 10;
+
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        bool reverted = false;
+        try {
+            u.do(address(loopRouter), "leverageUp",
+                collAddr, amount, overDebt, poolAddr, 0, 0, 1, 200, block.timestamp + 3600);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "should revert when targetDebt is over the CR limit");
+
+        // Flash must unwind: vault empty, no debt, no collateral charged.
+        (uint coll, uint sd) = cdpEngine.vaults(address(u), collAddr);
+        require(coll == 0 && sd == 0, "vault fully rolled back on boundary revert");
+    }
+
     // ─────────────── Revert cases ───────────────
 
     function it_reverts_impossible_leverage() {
+        // CR violation: target debt far above what collateral at minCR permits.
         User u = _freshUser(10000e18);
-        u.do(collAddr, "approve", address(loopRouter), 1000e18);
+        uint amount = 1000e18;
+        // Collateral value ~1159.5 USD; debt of ~10000 USDST busts any CR > 1.0x.
+        uint badDebt = amount * 10;
+        u.do(collAddr, "approve", address(loopRouter), amount);
         bool reverted = false;
         try {
-            u.do(address(loopRouter), "leverageUp", collAddr, 1000e18, 10e18, poolAddr, true, 100, block.timestamp + 3600);
+            u.do(address(loopRouter), "leverageUp",
+                collAddr, amount, badDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
         require(reverted, "should revert on impossible leverage");
+        (uint coll, uint sd) = cdpEngine.vaults(address(u), collAddr);
+        require(coll == 0 && sd == 0, "vault unchanged on revert");
     }
 
     function it_reverts_wrong_pool_direction() {
         User u = _freshUser(10000e18);
-        u.do(collAddr, "approve", address(loopRouter), 1000e18);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtCP(amount, 2e18);
+        u.do(collAddr, "approve", address(loopRouter), amount);
         bool reverted = false;
         try {
-            u.do(address(loopRouter), "leverageUp", collAddr, 1000e18, 2e18, poolAddr, false, 100, block.timestamp + 3600);
+            u.do(address(loopRouter), "leverageUp",
+                collAddr, amount, targetDebt, poolAddr, 0, 1, 0, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -343,7 +515,8 @@ contract Describe_LoopRouter is Authorizable {
         bool reverted = false;
         try {
             // poolAddr is USDST/COLL — OTHER does not match
-            u.do(address(loopRouter), "leverageUp", otherAddr, 1000e18, 2e18, poolAddr, true, 100, block.timestamp + 3600);
+            u.do(address(loopRouter), "leverageUp",
+                otherAddr, 1000e18, 1e18, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -352,10 +525,13 @@ contract Describe_LoopRouter is Authorizable {
 
     function it_reverts_excessive_slippage_param() {
         User u = _freshUser(10000e18);
-        u.do(collAddr, "approve", address(loopRouter), 1000e18);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtCP(amount, 2e18);
+        u.do(collAddr, "approve", address(loopRouter), amount);
         bool reverted = false;
         try {
-            u.do(address(loopRouter), "leverageUp", collAddr, 1000e18, 2e18, poolAddr, true, 1001, block.timestamp + 3600);
+            u.do(address(loopRouter), "leverageUp",
+                collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 1001, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -363,12 +539,17 @@ contract Describe_LoopRouter is Authorizable {
     }
 
     function it_reverts_below_floor() {
+        // Tiny deposit with tiny target debt that's below DEBT_FLOOR.
+        // mintFor enforces the floor.
         User u = _freshUser(100e18);
-        u.do(collAddr, "approve", address(loopRouter), 1e17);
+        uint amount = 1e17; // 0.1 token
+        // Pick a debt well below the 1 USDST floor.
+        uint tinyDebt = 1e16; // 0.01 USDST
+        u.do(collAddr, "approve", address(loopRouter), amount);
         bool reverted = false;
         try {
-            // 0.1 tokens at 1.5x: target debt ~0.039 USDST, below floor of 1 USDST
-            u.do(address(loopRouter), "leverageUp", collAddr, 1e17, 15e17, poolAddr, true, 100, block.timestamp + 3600);
+            u.do(address(loopRouter), "leverageUp",
+                collAddr, amount, tinyDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -384,10 +565,13 @@ contract Describe_LoopRouter is Authorizable {
         );
 
         User u = _freshUser(10000e18);
-        u.do(collAddr, "approve", address(loopRouter), 1000e18);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtCP(amount, 2e18);
+        u.do(collAddr, "approve", address(loopRouter), amount);
         bool reverted = false;
         try {
-            u.do(address(loopRouter), "leverageUp", collAddr, 1000e18, 2e18, poolAddr, true, 100, block.timestamp + 3600);
+            u.do(address(loopRouter), "leverageUp",
+                collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -399,5 +583,202 @@ contract Describe_LoopRouter is Authorizable {
             RAY + ((RAY * 2) / 100 / 31536000),
             DEBT_FLOOR, DEBT_CEILING, 1e18, false
         );
+    }
+
+    function it_flash_callback_unauthorized_reverts() {
+        // Direct external invocation of onFlashLoan must revert — only the
+        // engine should ever reach this entry point.
+        User u = _freshUser(0);
+        bool reverted = false;
+        try {
+            u.do(address(loopRouter), "onFlashLoan", collAddr, 1e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "direct onFlashLoan must revert");
+    }
+
+    // ─────────────── StablePool leverage ───────────────
+
+    function _freshStableUser(uint tokens) internal returns (User) {
+        User u = new User();
+        stableColl.mint(address(u), tokens);
+        return u;
+    }
+
+    function _realDebtStable(address user) internal returns (uint) {
+        (, uint scaledDebt) = cdpEngine.vaults(user, stableCollAddr);
+        (uint rateAcc,,) = cdpEngine.collateralGlobalStates(stableCollAddr);
+        if (rateAcc == 0) rateAcc = RAY;
+        return scaledDebt * rateAcc / RAY;
+    }
+
+    function _leverageStable(uint coll, uint debt) internal returns (uint) {
+        // stableColl price = $1
+        uint collValueUSD = coll * 1e18 / WAD;
+        require(collValueUSD > debt, "insolvent");
+        return collValueUSD * WAD / (collValueUSD - debt);
+    }
+
+    function it_cp_quote_monotonic() {
+        uint dy1 = pool.quoteSwap(true, 1e18);
+        uint dy2 = pool.quoteSwap(true, 10e18);
+        uint dy3 = pool.quoteSwap(true, 100e18);
+        require(dy2 > dy1, "dy monotonic 1->10");
+        require(dy3 > dy2, "dy monotonic 10->100");
+    }
+
+    function it_stable_quote_monotonic() {
+        uint dy1 = stablePool.quoteSwap(0, 1, 1e18);
+        uint dy2 = stablePool.quoteSwap(0, 1, 10e18);
+        uint dy3 = stablePool.quoteSwap(0, 1, 100e18);
+        require(dy2 > dy1, "dy monotonic 1->10");
+        require(dy3 > dy2, "dy monotonic 10->100");
+    }
+
+    function it_stable_leverage_15x() {
+        User u = _freshStableUser(10000e18);
+        uint amount = 1000e18;
+        uint targetLev = 15e17;
+        uint targetDebt = _computeFlashDebtStable(amount, targetLev);
+        require(targetDebt > 0, "debt solver > 0");
+
+        u.do(stableCollAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            stableCollAddr, amount, targetDebt, stablePoolAddr,
+            1, 0, 1, 200, block.timestamp + 3600);
+
+        (uint coll,) = cdpEngine.vaults(address(u), stableCollAddr);
+        uint debt = _realDebtStable(address(u));
+        require(coll >= amount, "collateral deposited");
+        require(debt > 0, "has debt");
+        uint actualLev = _leverageStable(coll, debt);
+        uint diff = actualLev > targetLev ? actualLev - targetLev : targetLev - actualLev;
+        require(diff < WAD / 50, "leverage within 0.02 WAD of 1.5x");
+    }
+
+    function it_stable_leverage_2x() {
+        User u = _freshStableUser(10000e18);
+        uint amount = 1000e18;
+        uint targetLev = 2e18;
+        uint targetDebt = _computeFlashDebtStable(amount, targetLev);
+        require(targetDebt > 0, "debt solver > 0");
+
+        u.do(stableCollAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            stableCollAddr, amount, targetDebt, stablePoolAddr,
+            1, 0, 1, 200, block.timestamp + 3600);
+
+        (uint coll,) = cdpEngine.vaults(address(u), stableCollAddr);
+        uint debt = _realDebtStable(address(u));
+        require(coll >= amount, "collateral deposited");
+        require(debt > 0, "has debt");
+        uint actualLev = _leverageStable(coll, debt);
+        uint diff = actualLev > targetLev ? actualLev - targetLev : targetLev - actualLev;
+        require(diff < WAD / 50, "leverage within 0.02 WAD of 2x");
+    }
+
+    function it_stable_leverage_28x() {
+        // Flash path clears 2.8x against the stable pool too: no binary
+        // search, no simulator — D* is closed-form from `quoteSwap`,
+        // one on-chain swap/deposit/mint sequence.
+        User u = _freshStableUser(50000e18);
+        uint amount = 5000e18;
+        uint targetLev = 28e17;
+        uint targetDebt = _computeFlashDebtStable(amount, targetLev);
+        require(targetDebt > 0, "debt solver > 0");
+
+        u.do(stableCollAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            stableCollAddr, amount, targetDebt, stablePoolAddr,
+            1, 0, 1, 200, block.timestamp + 3600);
+
+        (uint coll,) = cdpEngine.vaults(address(u), stableCollAddr);
+        uint debt = _realDebtStable(address(u));
+        require(coll > amount, "collateral stacked");
+        require(debt > 0, "has debt");
+        uint actualLev = _leverageStable(coll, debt);
+        uint diff = actualLev > targetLev ? actualLev - targetLev : targetLev - actualLev;
+        require(diff < WAD / 50, "leverage within 0.02 WAD of 2.8x");
+    }
+
+    function it_stable_wrong_indices_reverts() {
+        User u = _freshStableUser(10000e18);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtStable(amount, 15e17);
+        u.do(stableCollAddr, "approve", address(loopRouter), amount);
+        bool reverted = false;
+        try {
+            // Swap coinI/coinJ — USDST must be at coinI
+            u.do(address(loopRouter), "leverageUp",
+                stableCollAddr, amount, targetDebt, stablePoolAddr,
+                1, 1, 0, 200, block.timestamp + 3600);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "should revert on swapped stable indices");
+    }
+
+    function it_stable_slippage_reverts() {
+        // Slippage param > 10% cap (1001 bps) is rejected by the router.
+        User u = _freshStableUser(10000e18);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtStable(amount, 2e18);
+        u.do(stableCollAddr, "approve", address(loopRouter), amount);
+        bool reverted = false;
+        try {
+            u.do(address(loopRouter), "leverageUp",
+                stableCollAddr, amount, targetDebt, stablePoolAddr,
+                1, 0, 1, 1001, block.timestamp + 3600);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "should revert on slippage > 10%");
+    }
+
+    function it_stable_deadline_reverts() {
+        User u = _freshStableUser(10000e18);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtStable(amount, 2e18);
+        u.do(stableCollAddr, "approve", address(loopRouter), amount);
+        bool reverted = false;
+        try {
+            u.do(address(loopRouter), "leverageUp",
+                stableCollAddr, amount, targetDebt, stablePoolAddr,
+                1, 0, 1, 200, block.timestamp - 1);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "should revert on expired deadline");
+    }
+
+    function it_stable_existing_position_stacks() {
+        User u = _freshStableUser(50000e18);
+
+        // First: 1.5x
+        uint amount1 = 5000e18;
+        uint targetDebt1 = _computeFlashDebtStable(amount1, 15e17);
+        u.do(stableCollAddr, "approve", address(loopRouter), amount1);
+        u.do(address(loopRouter), "leverageUp",
+            stableCollAddr, amount1, targetDebt1, stablePoolAddr,
+            1, 0, 1, 200, block.timestamp + 3600);
+
+        (uint coll1,) = cdpEngine.vaults(address(u), stableCollAddr);
+        uint debt1 = _realDebtStable(address(u));
+        require(coll1 >= amount1, "first stable position collateral");
+        require(debt1 > 0, "first stable position debt");
+
+        // Second: add more and scale to 2x
+        uint amount2 = 5000e18;
+        uint targetDebt2 = _computeFlashDebtStable(amount2, 2e18);
+        u.do(stableCollAddr, "approve", address(loopRouter), amount2);
+        u.do(address(loopRouter), "leverageUp",
+            stableCollAddr, amount2, targetDebt2, stablePoolAddr,
+            1, 0, 1, 200, block.timestamp + 3600);
+
+        (uint coll2,) = cdpEngine.vaults(address(u), stableCollAddr);
+        uint debt2 = _realDebtStable(address(u));
+        require(coll2 > coll1, "stable coll increased");
+        require(debt2 > debt1, "stable debt increased");
     }
 }

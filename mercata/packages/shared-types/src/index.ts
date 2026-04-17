@@ -21,3 +21,6 @@ export * from './rewards-types';
 
 // Export all earn-related types
 export * from './earn-types';
+
+// Export all loop-related types
+export * from './loop-types';

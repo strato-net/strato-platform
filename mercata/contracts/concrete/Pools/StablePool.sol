@@ -705,6 +705,25 @@ contract record StablePool is Ownable {
         _withdrawAdminFees();
     }
 
+    /// @notice Quote swap output for (i, j, dx). Returns the dy the caller would receive
+    /// (post-fee, pre-admin-share-accounting — which doesn't affect user-facing output).
+    /// View-only; does not model the admin-fee reserve shift on the output side.
+    function quoteSwap(uint i, uint j, uint dx) external view returns (uint dy) {
+        require(i != j && i < coins.length && j < coins.length, "invalid indices");
+        require(dx > 0, "dx=0");
+
+        uint[] rates = _storedRates();
+        uint[] xp = _xpMem(rates, _balances());
+        uint amp = _A();
+        uint d = getD(xp, amp);
+
+        uint x = xp[i] + dx * rates[i] / PRECISION;
+        uint y = getY(i, j, x, xp, amp, d);
+        uint rawDy = xp[j] - y - 1;
+        uint dyFee = (rawDy * _dynamicFee((xp[i] + x) / 2, (xp[j] + y) / 2, fee)) / FEE_DENOMINATOR;
+        dy = ((rawDy - dyFee) * PRECISION) / rates[j];
+    }
+
     function _dynamicFee(uint xpi, uint xpj, uint _fee) internal view returns (uint) {
         uint _offpegFeeMultiplier = offpegFeeMultiplier;
         if (_offpegFeeMultiplier <= FEE_DENOMINATOR) {

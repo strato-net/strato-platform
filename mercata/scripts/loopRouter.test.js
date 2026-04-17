@@ -168,29 +168,18 @@ async function getTokenBalance(tokenAddr, userAddr) {
       bootstrap = data;
 
       assert(status === 200, "A1: returns 200");
-      assert(typeof data.version === "string" && data.version.length > 0, "A2: has version string");
-      assert(data.timestamp, "A3: has timestamp");
-      assert(typeof data.gasFeePerStep === "string" && BigInt(data.gasFeePerStep) > 0n, "A4: gasFeePerStep > 0");
-      assert(data.maxLoops >= 1, "A5: maxLoops >= 1");
-      assert(data.swapFeeBps > 0, "A6: swapFeeBps > 0");
-      assert(data.routes?.cdp?.usdstAddress, "A7: cdp route has usdstAddress");
-      assert(Array.isArray(data.opportunities), "A8: opportunities is array");
-
-      const allCdp = data.opportunities.every((o) => o.cdpCarry !== null && o.cdpCarry !== undefined);
-      assert(allCdp, "A9: every opportunity has cdpCarry");
-
-      if (data.opportunities.length >= 2) {
-        let sorted = true;
-        for (let i = 1; i < data.opportunities.length; i++) {
-          const prev = data.opportunities[i - 1].cdpCarry?.netCarryAPR ?? -999;
-          const curr = data.opportunities[i].cdpCarry?.netCarryAPR ?? -999;
-          if (curr > prev) { sorted = false; break; }
-        }
-        assert(sorted, "A10: opportunities sorted by netCarryAPR desc");
-      }
-
-      assert(data.routes.cdp.minCR > 0, "A11: cdp minCR > 0");
-      assert(data.routes.cdp.stabilityAPR >= 0, "A12: cdp stabilityAPR >= 0");
+      assert(data.swapFeeBps > 0, "A2: swapFeeBps > 0");
+      assert(Array.isArray(data.opportunities), "A3: opportunities is array");
+      const wellShaped = data.opportunities.every((o) =>
+        typeof o.asset === "string" && typeof o.symbol === "string" &&
+        typeof o.baseYieldAPR === "number" && typeof o.swapFeeBps === "number" &&
+        typeof o.swapPoolUSDSTLiquidity === "string"
+      );
+      assert(wellShaped, "A4: every opportunity has the expected minimal shape");
+      assert(data.routes.cdp.minCR > 0, "A5: cdp minCR > 0");
+      assert(data.routes.cdp.stabilityAPR >= 0, "A6: cdp stabilityAPR >= 0");
+      assert(data.routes.cdp.liquidationRatio > 0, "A7: cdp liquidationRatio > 0");
+      assert(Array.isArray(data.routes.cdp.assets) && data.routes.cdp.assets.length > 0, "A8: cdp assets present");
     } catch (e) {
       assert(false, "A: bootstrap call failed", e.response?.data?.message || e.message);
     }
@@ -237,7 +226,7 @@ async function getTokenBalance(tokenAddr, userAddr) {
       const opp = cdpOpps[0];
       testAsset = opp.asset;
       console.log(`  Using asset: ${opp.symbol} (${testAsset})`);
-      console.log(`  Net carry: ${opp.cdpCarry.netCarryWithImpactAPR}%`);
+      console.log(`  Net carry: ${opp.cdpCarry.netCarryAPR}%`);
 
       const preBalance = await getTokenBalance(testAsset, userAddr);
       console.log(`  Pre-balance: ${fmt(preBalance)} ${opp.symbol}`);

@@ -4,7 +4,7 @@ import type {
   LoopExecuteRequest,
   LoopExecuteResponse,
   LoopPositionResponse,
-} from "@/interface/loop";
+} from "@mercata/shared-types";
 
 const LOOP_BASE_PATH = "/loop";
 

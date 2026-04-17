@@ -376,6 +376,18 @@ contract record Pool is Ownable {
         return numerator / denominator;
     }
 
+    /// @notice Quote swap output for (isAToB, amountIn). Returns the dy the caller would receive
+    /// after the effective swap fee. Pure view, no state mutation — mirrors the StablePool API.
+    function quoteSwap(bool isAToB, uint256 amountIn) external view returns (uint256 dy) {
+        require(amountIn > 0, "dx=0");
+        uint256 fee = (amountIn * _swapFeeRate()) / 10000;
+        uint256 netInput = amountIn - fee;
+        (uint256 inRes, uint256 outRes) = isAToB
+            ? (tokenABalance, tokenBBalance)
+            : (tokenBBalance, tokenABalance);
+        dy = getInputPrice(netInput, inRes, outRes);
+    }
+
     /// @notice Swap tokens using the automated market maker
     /// @param isAToB If true, swap tokenA for tokenB; if false, swap tokenB for tokenA
     /// @param amountIn The amount of input tokens to swap

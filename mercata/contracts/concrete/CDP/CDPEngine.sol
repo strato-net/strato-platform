@@ -470,6 +470,35 @@ contract record CDPEngine is Ownable {
     }
 
     /**
+     * @notice Flash-mint USDST to `borrower`, invoke its onFlashLoan callback,
+     *         then require full repayment and burn the flashed supply.
+     * @dev    Zero net USDST supply change across the call. Ceiling/floor checks
+     *         intentionally do NOT fire here — any permanent debt is created via
+     *         `mintFor` inside the callback, which enforces them.
+     * @dev    `borrower` is passed explicitly (Maker-pattern) because when the
+     *         engine is owned by AdminRegistry, `msg.sender` inside this body
+     *         is AdminRegistry rather than the router that initiated the flash.
+     * @param borrower The contract that receives the flashed USDST and must
+     *                 implement `onFlashLoan(address asset, uint amount)`.
+     * @param asset    Collateral asset context (gates active/pause like mintFor).
+     * @param amount   Flash-minted USDST amount in wei (1e18).
+     */
+    function flashMint(
+        address borrower,
+        address asset,
+        uint amount
+    ) external onlyOwner whenNotPaused(asset) onlyActiveAsset(asset) {
+        require(amount > 0, "flash amount zero");
+        require(borrower != address(0), "flash borrower zero");
+        Token usdstTok = Token(_usdst());
+        usdstTok.mint(borrower, amount);
+        // SolidVM dispatches by function name over address.call.
+        address(borrower).call("onFlashLoan", asset, amount);
+        require(usdstTok.balanceOf(borrower) >= amount, "flash not repaid");
+        usdstTok.burn(borrower, amount);
+    }
+
+    /**
     * @notice Liquidate an undercollateralized vault for a given collateral asset
     * @dev Steps:
     *      - Accrue, assert unhealthy (CR < LR)

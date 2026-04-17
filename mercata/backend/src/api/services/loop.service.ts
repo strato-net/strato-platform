@@ -1,14 +1,11 @@
-import { createHash } from "crypto";
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
-import * as config from "../../config/config";
+import { loopRouter } from "../../config/config";
 import { FunctionInput } from "../../types/types";
-import { getSupportedAssets, getCDPRegistry, getVaults as cdpGetVaults } from "./cdp.service";
-import {
-  CarryMetrics,
+import type {
   CDPAssetConfig,
   CDPBootstrapData,
   LoopBootstrapResponse,
@@ -16,200 +13,128 @@ import {
   LoopExecuteRequest,
   LoopExecuteResponse,
   LoopPositionResponse,
-} from "./loop.types";
-import { getTokenApys } from "./earn.service";
+} from "@mercata/shared-types";
+import {
+  SWAP_FEE_BPS,
+  WAD,
+  fetchSwapPools,
+  findPoolForAsset,
+  findSwapPool,
+  fetchCDPBootstrap,
+  fetchAssetSymbols,
+  fetchUserVaults,
+  fetchLoopBaseYields,
+  computeTargetNewDebt,
+  type NormalizedPool,
+  type SwapPoolHandle,
+  type CDPBootstrapRow,
+} from "../helpers/loop.helper";
 
 const { Token } = constants;
-const LOOP_ROUTER_ADDR = config.loopRouter;
-const SWAP_FEE_BPS = 30;
+const LOOP_ROUTER_ADDR = loopRouter;
 const DEFAULT_SLIPPAGE_BPS = 100; // 1%
 const DEADLINE_BUFFER_SECS = 600; // 10 minutes
+const DEFAULT_STABILITY_APR = 2;   // % APR fallback
+const DEFAULT_MIN_CR = 155;        // % fallback
+const DEFAULT_LIQUIDATION_RATIO = 150; // % fallback
 
 // ═══════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
-function computeSwapImpact(dxUSDST: number, poolReserveUSDST: number, swapFeeBps: number): number {
-  if (poolReserveUSDST <= 0 || dxUSDST <= 0) return 0;
-  const g = 1 - swapFeeBps / 10000;
-  return (g * dxUSDST) / (poolReserveUSDST + g * dxUSDST);
+const round = (n: number, dp = 3) => {
+  const k = 10 ** dp;
+  return Math.round(n * k) / k;
+};
+
+function netCarryAPR(M: number, baseYield: number, borrowRate: number): number {
+  return round(M * baseYield - (M - 1) * borrowRate);
 }
 
-function computeCarry(
-  baseYield: number,
-  borrowRate: number,
-  swapFeeBps: number,
-  effectiveLTV: number,
-  poolReserveUSDST: number,
-  initialAmountUSD: number,
-): CarryMetrics {
-  const M = 1 / (1 - effectiveLTV);
-  const grossCarryAPR = M * baseYield - (M - 1) * borrowRate;
-  const feeDrag = 2 * (M - 1) * (swapFeeBps / 10000) * 100;
-  const netCarryAPR = grossCarryAPR - feeDrag;
-  const refUSD = initialAmountUSD > 0 ? initialAmountUSD : 1000;
-  const avgLegUSDST = (M - 1) * refUSD / Math.max(Math.ceil(M - 1), 1);
-  const impactPerLeg = computeSwapImpact(avgLegUSDST, poolReserveUSDST, swapFeeBps);
-  const totalImpactDrag = 2 * (M - 1) * impactPerLeg * 100;
-  const netCarryWithImpactAPR = netCarryAPR - totalImpactDrag;
-  const r = (n: number) => Math.round(n * 1000) / 1000;
-  return {
-    exposureMultiple: r(M), effectiveLTV,
-    grossCarryAPR: r(grossCarryAPR), feeDrag: r(feeDrag),
-    netCarryAPR: r(netCarryAPR), swapImpactPct: r(impactPerLeg * 100),
-    netCarryWithImpactAPR: r(netCarryWithImpactAPR), healthFactor: 0,
-  };
-}
-
-async function fetchBaseYields(accessToken: string): Promise<Record<string, number>> {
-  const yields: Record<string, number> = {};
-  try {
-    const apyData = await getTokenApys(accessToken);
-    for (const item of apyData) {
-      const addr = (item.token || "").toLowerCase();
-      const yieldEntry = (item.apys || []).find((a: any) => a.source === "base" || a.source === "yield");
-      if (yieldEntry) yields[addr] = parseFloat(yieldEntry.apy) || 0;
-    }
-  } catch {}
-  return yields;
-}
-
-async function findSwapPool(
-  accessToken: string, tokenA: string, tokenB: string,
-): Promise<{ poolAddress: string; isAToB: boolean } | null> {
-  const { data: pools } = await cirrus.get(accessToken, `/${constants.Pool}`, {
-    params: {
-      poolFactory: `eq.${constants.poolFactory}`,
-      locked: "eq.false",
-      swapFeeRate: "eq.0", // constant-product pools only
-      select: "address,tokenA,tokenB",
-      or: `(and(tokenA.eq.${tokenA},tokenB.eq.${tokenB}),and(tokenA.eq.${tokenB},tokenB.eq.${tokenA}))`,
-    },
-  });
-  if (!pools || pools.length === 0) return null;
-  const pool = pools[0];
-  return { poolAddress: pool.address, isAToB: pool.tokenA.toLowerCase() === tokenA.toLowerCase() };
-}
-
-function buildCDPAssetList(cdpAssets: any[], priceMap: Map<string, string>): CDPAssetConfig[] {
-  return cdpAssets.map((a: any) => ({
-    address: a.asset, symbol: a.symbol, decimals: 18,
-    price: priceMap.get(a.asset) || "0",
-    minCR: a.minCR, liquidationRatio: a.liquidationRatio, stabilityFeeRate: a.stabilityFeeRate,
-    debtFloor: a.debtFloor, debtCeiling: a.debtCeiling, unitScale: a.unitScale, isPaused: a.isPaused,
+function buildCDPAssetList(assets: CDPBootstrapRow[], priceMap: Map<string, string>): CDPAssetConfig[] {
+  return assets.map((a) => ({
+    address: a.asset,
+    decimals: 18,
+    price: priceMap.get(a.asset.toLowerCase()) || "0",
+    minCR: a.minCR,
+    liquidationRatio: a.liquidationRatio,
+    stabilityFeeRate: a.stabilityFeeRate || DEFAULT_STABILITY_APR,
+    debtFloor: a.debtFloor,
+    debtCeiling: a.debtCeiling,
   }));
 }
 
-async function fetchSwapPools(accessToken: string) {
-  const { data } = await cirrus.get(accessToken, `/${constants.Pool}`, {
-    params: {
-      poolFactory: `eq.${constants.poolFactory}`,
-      locked: "eq.false",
-      swapFeeRate: "eq.0", // constant-product pools only (StablePool stores fee on pool)
-      select: "address,tokenA,tokenB,tokenABalance::text,tokenBBalance::text",
-    },
-  });
-  return data || [];
-}
-
 function buildOpportunities(
-  cdpAssets: CDPAssetConfig[], pools: any[], usdstAddress: string,
-  baseYieldMap: Record<string, number>, stabilityAPR: number, minCR: number, liquidationRatio: number,
+  cdpAssets: Array<{ asset: string; symbol: string }>,
+  pools: NormalizedPool[],
+  usdstAddress: string,
+  baseYieldMap: Record<string, number>,
 ): LoopRouteOpportunity[] {
+  const usdstLower = usdstAddress.toLowerCase();
   const opportunities: LoopRouteOpportunity[] = [];
   for (const asset of cdpAssets) {
-    const pool = pools.find((p: any) => {
-      const tA = (p.tokenA || "").toLowerCase();
-      const tB = (p.tokenB || "").toLowerCase();
-      return (tA === asset.address.toLowerCase() && tB === usdstAddress.toLowerCase()) ||
-             (tA === usdstAddress.toLowerCase() && tB === asset.address.toLowerCase());
-    });
-    if (!pool) continue;
-    const tA = (pool.tokenA || "").toLowerCase();
-    const usdstLiq = tA === usdstAddress.toLowerCase() ? (pool.tokenABalance || "0") : (pool.tokenBBalance || "0");
-    const reserveUSD = Number(BigInt(usdstLiq)) / 1e18;
-    const g = 1 - SWAP_FEE_BPS / 10000;
-    const maxSwapPerLeg = (0.01 * reserveUSD) / (g * 0.99);
-    const baseYield = baseYieldMap[asset.address.toLowerCase()] || 0;
-    const assetMinCR = asset.minCR || minCR;
-    const maxLTV = assetMinCR > 100 ? 100 / assetMinCR : 0.50;
-    const safeQ = maxLTV * 0.95;
-    const carry = computeCarry(baseYield, stabilityAPR, SWAP_FEE_BPS, safeQ, reserveUSD, 1000);
-    const assetLiqRatio = (asset.liquidationRatio || liquidationRatio) / 100;
-    const healthFactor = assetLiqRatio > 0 && safeQ > 0 ? Math.round(((1 / safeQ) / assetLiqRatio) * 100) / 100 : 0;
+    const assetLower = asset.asset.toLowerCase();
+    const match = findPoolForAsset(pools, assetLower, usdstLower);
+    if (!match) continue;
     opportunities.push({
-      asset: asset.address, symbol: asset.symbol, baseYieldAPR: baseYield,
-      swapPoolAddress: pool.address, swapPoolUSDSTLiquidity: usdstLiq,
-      swapFeeRate: SWAP_FEE_BPS / 10000,
-      maxSwapPerLeg: (Math.round(maxSwapPerLeg * 100) / 100).toString(),
-      cdpCarry: { ...carry, healthFactor },
+      asset: asset.asset,
+      symbol: asset.symbol,
+      baseYieldAPR: baseYieldMap[assetLower] || 0,
+      swapPoolUSDSTLiquidity: match.usdstLiquidity,
+      swapFeeBps: match.swapFeeBps,
     });
   }
-  opportunities.sort((a, b) => (b.cdpCarry?.netCarryAPR ?? -999) - (a.cdpCarry?.netCarryAPR ?? -999));
   return opportunities;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Bootstrap
+// Bootstrap — 2-phase fan-out
+//   Phase 1: single CDPRegistry kitchen-sink join (1 GET)
+//   Phase 2: pools + symbols + yields in parallel (~3 GETs)
 // ═══════════════════════════════════════════════════════════════
 
 export async function getBootstrap(accessToken: string): Promise<LoopBootstrapResponse> {
-  const [cdpAssets, cdpRegistry, baseYieldMap] = await Promise.all([
-    getSupportedAssets(accessToken),
-    getCDPRegistry(accessToken, undefined, {
-      select: `address,usdst,priceOracle:priceOracle_fkey(address,prices:${constants.PriceOracle}-prices(asset:key,value::text))`,
-    }, "bootstrap"),
-    fetchBaseYields(accessToken),
+  const cdp = await fetchCDPBootstrap(accessToken);
+  const assetAddrs = cdp.assets.map((a) => a.asset);
+
+  const [pools, symbolMap, baseYieldMap] = await Promise.all([
+    fetchSwapPools(accessToken, constants.USDST),
+    fetchAssetSymbols(accessToken, assetAddrs),
+    fetchLoopBaseYields(accessToken, assetAddrs),
   ]);
-  const cdpPriceMap = new Map<string, string>();
-  (cdpRegistry.priceOracle?.prices || []).forEach((p: any) => cdpPriceMap.set(p.asset, p.value));
-  const cdpAssetList = buildCDPAssetList(cdpAssets, cdpPriceMap);
-  const firstAsset = cdpAssets[0] as any;
+
+  const firstAsset = cdp.assets[0];
   const cdpData: CDPBootstrapData = {
-    usdstAddress: cdpRegistry.usdst || "",
-    stabilityAPR: firstAsset?.stabilityFeeRate || 2,
-    minCR: firstAsset?.minCR || 155,
-    liquidationRatio: firstAsset?.liquidationRatio || 150,
-    assets: cdpAssetList,
+    stabilityAPR: firstAsset?.stabilityFeeRate || DEFAULT_STABILITY_APR,
+    minCR: firstAsset?.minCR || DEFAULT_MIN_CR,
+    liquidationRatio: firstAsset?.liquidationRatio || DEFAULT_LIQUIDATION_RATIO,
+    assets: buildCDPAssetList(cdp.assets, cdp.priceMap),
   };
-  const pools = await fetchSwapPools(accessToken);
-  const opportunities = buildOpportunities(
-    cdpAssetList, pools, cdpData.usdstAddress, baseYieldMap,
-    cdpData.stabilityAPR, cdpData.minCR, cdpData.liquidationRatio,
-  );
-  const bootstrap: LoopBootstrapResponse = {
-    version: "",
-    timestamp: new Date().toISOString(),
-    networkId: config.networkId || "",
-    gasFeePerStep: constants.GAS_FEE_WEI.toString(),
+
+  const assetsWithSymbols = cdp.assets.map((a) => ({
+    asset: a.asset,
+    symbol: symbolMap.get(a.asset.toLowerCase()) || "UNKNOWN",
+  }));
+
+  return {
     swapFeeBps: SWAP_FEE_BPS,
     routes: { cdp: cdpData },
-    opportunities,
+    opportunities: buildOpportunities(assetsWithSymbols, pools, constants.USDST, baseYieldMap),
   };
-  bootstrap.version = createHash("sha256").update(JSON.stringify({ routes: bootstrap.routes, gasFeePerStep: bootstrap.gasFeePerStep })).digest("hex").slice(0, 16);
-  return bootstrap;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Execute
+// Execute — uses constants.USDST directly, no registry fetch
 // ═══════════════════════════════════════════════════════════════
 
-export async function executeLoop(
-  accessToken: string,
-  userAddress: string,
+function buildLeverageTxs(
   req: LoopExecuteRequest,
-): Promise<LoopExecuteResponse> {
-  const targetLeverageWAD = BigInt(Math.round((req.targetLeverage || 2.0) * 1e18)).toString();
-  const maxSlippageBps = req.maxSlippageBps ?? DEFAULT_SLIPPAGE_BPS;
-  const deadline = Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECS;
-
-  const registry = await getCDPRegistry(accessToken, userAddress, {}, "loop-execute");
-  if (!registry.usdst) throw new Error("CDP addresses not found");
-
-  const swapPool = await findSwapPool(accessToken, registry.usdst, req.asset);
-  if (!swapPool) throw new Error(`No swap pool for USDST <-> ${req.asset}`);
-
-  const txs: FunctionInput[] = [
+  swapPool: SwapPoolHandle,
+  targetNewDebt: string,
+  maxSlippageBps: number,
+  deadline: number,
+): FunctionInput[] {
+  return [
     {
       contractName: extractContractName(Token),
       contractAddress: req.asset,
@@ -223,51 +148,119 @@ export async function executeLoop(
       args: {
         asset: req.asset,
         amount: req.amount,
-        targetLeverageWAD,
+        targetNewDebt,
         poolAddress: swapPool.poolAddress,
-        swapIsAToB: swapPool.isAToB,
+        poolType: swapPool.poolType,
+        coinI: swapPool.coinI,
+        coinJ: swapPool.coinJ,
         maxSlippageBps,
         deadline,
       },
     },
   ];
+}
 
+export async function executeLoop(
+  accessToken: string,
+  userAddress: string,
+  req: LoopExecuteRequest,
+): Promise<LoopExecuteResponse> {
+  const [swapPool, cdp] = await Promise.all([
+    findSwapPool(accessToken, constants.USDST, req.asset),
+    fetchCDPBootstrap(accessToken),
+  ]);
+  if (!swapPool) throw new Error(`No swap pool for USDST <-> ${req.asset}`);
+
+  const assetLower = req.asset.toLowerCase();
+  const price = BigInt(cdp.priceMap.get(assetLower) || "0");
+  const cfg = cdp.assets.find((a) => a.asset.toLowerCase() === assetLower);
+  const unitScale = BigInt(cfg?.unitScale || WAD.toString());
+  if (price === 0n) throw new Error(`No oracle price for ${req.asset}`);
+
+  const targetNewDebt = computeTargetNewDebt({
+    amount: BigInt(req.amount),
+    targetLevWAD: BigInt(Math.round(req.targetLeverage * 1e18)),
+    priceWAD: price,
+    unitScale,
+    pool: swapPool,
+  });
+  if (targetNewDebt <= 0n) throw new Error("D* solver did not converge — target leverage may be unsupported");
+
+  const maxSlippageBps = req.maxSlippageBps ?? DEFAULT_SLIPPAGE_BPS;
+  const deadline = Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECS;
+  const txs = buildLeverageTxs(req, swapPool, targetNewDebt.toString(), maxSlippageBps, deadline);
   const built = await buildFunctionTx(txs, userAddress, accessToken);
   const result = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, built),
   );
-
   return { txHash: result.hash };
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Position
+// Position — 2-phase fan-out
+//   Phase 1: CDPEngine-vaults for user (1 GET)
+//   Phase 2: symbols + yields in parallel (~2 GETs, yields cached)
 // ═══════════════════════════════════════════════════════════════
 
 export async function getPosition(accessToken: string, userAddress: string): Promise<LoopPositionResponse> {
-  const [cdpVaults, bs] = await Promise.all([
-    cdpGetVaults(accessToken, userAddress),
-    getBootstrap(accessToken),
+  const rawVaults = await fetchUserVaults(accessToken, userAddress);
+  const withBalance = rawVaults.filter(
+    (v) => BigInt(v.collateral || "0") > 0n || BigInt(v.scaledDebt || "0") > 0n,
+  );
+
+  if (withBalance.length === 0) return { cdp: [] };
+
+  const assetAddrs = withBalance.map((v) => v.asset);
+  const [cdp, symbolMap, baseYieldMap] = await Promise.all([
+    fetchCDPBootstrap(accessToken),
+    fetchAssetSymbols(accessToken, assetAddrs),
+    fetchLoopBaseYields(accessToken, assetAddrs),
   ]);
-  const yMap = new Map(bs.opportunities.map((o) => [o.asset.toLowerCase(), o]));
 
-  const cdp = cdpVaults
-    .filter((v: any) => BigInt(v.collateralAmount || "0") > 0n || BigInt(v.debtAmount || "0") > 0n)
-    .map((v: any) => {
-      const cUSD = Number(BigInt(v.collateralValueUSD || "0")) / 1e18;
-      const d = Number(BigInt(v.debtAmount || "0")) / 1e18;
-      const q = cUSD > 0 ? d / cUSD : 0;
-      const lev = q < 1 ? 1 / (1 - q) : 1;
-      const y = yMap.get(v.asset?.toLowerCase())?.baseYieldAPR || 0;
-      const carry = lev * y - (lev - 1) * (v.stabilityFeeRate || bs.routes.cdp.stabilityAPR) - 2 * (lev - 1) * (bs.swapFeeBps / 10000) * 100;
-      return {
-        asset: v.asset, symbol: v.symbol || "UNKNOWN",
-        collateral: v.collateralAmount || "0", collateralUSD: v.collateralValueUSD || "0",
-        debt: v.debtAmount || "0", healthFactor: v.healthFactor || 0,
-        effectiveLTV: Math.round(q * 10000) / 10000, leverage: Math.round(lev * 1000) / 1000,
-        estimatedCarryAPR: Math.round(carry * 1000) / 1000, collateralizationRatio: v.collateralizationRatio || 0,
-      };
-    });
+  // Build lookup maps from the CDP bootstrap data.
+  const configMap = new Map(cdp.assets.map((a) => [a.asset.toLowerCase(), a]));
+  const priceMap = cdp.priceMap;
 
-  return { cdp };
+  const positions = withBalance.map((v) => {
+    const assetLower = v.asset.toLowerCase();
+    const cfg = configMap.get(assetLower);
+    const price = BigInt(priceMap.get(assetLower) || "0");
+    const unitScale = BigInt(cfg?.unitScale || WAD.toString());
+
+    const collateral = BigInt(v.collateral || "0");
+    const collateralValueUSD = unitScale > 0n ? (collateral * price) / unitScale : 0n;
+    const currentDebt = BigInt(v.scaledDebt || "0");
+
+    const cUSD = Number(collateralValueUSD) / 1e18;
+    const d = Number(currentDebt) / 1e18;
+    const q = cUSD > 0 ? d / cUSD : 0;
+    const lev = q < 1 ? 1 / (1 - q) : 1;
+
+    const liquidationRatio = cfg?.liquidationRatio || DEFAULT_LIQUIDATION_RATIO;
+    let cr = 0;
+    if (currentDebt > 0n) {
+      cr = Number((collateralValueUSD * WAD) / currentDebt) / Number(WAD) * 100;
+    } else if (collateral > 0n) {
+      cr = Number.MAX_SAFE_INTEGER;
+    }
+    const healthFactor = liquidationRatio > 0 ? round(cr / liquidationRatio, 2) : 0;
+
+    const y = baseYieldMap[assetLower] || 0;
+    const borrowRate = Number(cfg?.stabilityFeeRate) || DEFAULT_STABILITY_APR;
+
+    return {
+      asset: v.asset,
+      symbol: symbolMap.get(assetLower) || "UNKNOWN",
+      collateral: collateral.toString(),
+      collateralUSD: collateralValueUSD.toString(),
+      debt: currentDebt.toString(),
+      healthFactor,
+      effectiveLTV: round(q, 4),
+      leverage: round(lev),
+      estimatedCarryAPR: netCarryAPR(lev, y, borrowRate),
+      collateralizationRatio: round(cr, 2),
+    };
+  });
+
+  return { cdp: positions };
 }
