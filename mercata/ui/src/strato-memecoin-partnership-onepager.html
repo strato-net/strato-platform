@@ -61,6 +61,33 @@
   .btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(91,108,249,0.25)}
   .btn-primary{background:var(--accent);color:white} .btn-dark{background:var(--navy);color:white} .btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--navy)}
   .footer{padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;color:var(--text-light)} .footer a{color:var(--accent);text-decoration:none;font-weight:500}
+  @media (max-width: 640px){
+    .content{padding:28px 20px 32px}
+    .header{margin-bottom:32px;gap:12px}
+    .header-label{font-size:11px;padding:5px 10px;letter-spacing:1px}
+    .hero{margin-bottom:28px}
+    .hero h1{font-size:28px}
+    .hero p{font-size:15px}
+    .boost-banner{flex-direction:column;align-items:flex-start;gap:8px;padding:20px;margin-bottom:28px}
+    .boost-big{font-size:40px}
+    .benefits-grid{grid-template-columns:1fr;gap:12px;margin-bottom:32px}
+    .benefit-card{padding:20px}
+    .steps-section{margin-bottom:32px}
+    .steps-tabs{flex-direction:column;gap:0}
+    .step-tab{flex:none;width:100%}
+    .step-tab:first-child{border-radius:var(--radius) var(--radius) 0 0}
+    .step-tab:last-child{border-radius:0 0 var(--radius) var(--radius)}
+    .step-tab:not(:last-child){border-right:1px solid var(--border);border-bottom:none}
+    .case-study{padding:22px;margin-bottom:28px}
+    .cs-header{flex-direction:row;flex-wrap:wrap;gap:8px}
+    .cs-stats-row{grid-template-columns:1fr;gap:10px}
+    .glance-section{margin-bottom:28px}
+    .glance-grid{grid-template-columns:1fr 1fr;gap:10px}
+    .cta{padding:22px;margin-bottom:24px}
+    .cta-buttons{flex-direction:column;align-items:stretch}
+    .cta-buttons .btn{justify-content:center;width:100%}
+    .footer{flex-direction:column;gap:6px;text-align:center;align-items:center}
+  }
 </style>
 </head>
 <body><div class="page"><div class="content">
