@@ -6,6 +6,7 @@ const baseChainId = "8453";
 const baseSepoliaChainId = "84532";
 const lineaChainId = "59144";
 const lineaSepoliaChainId = "59141";
+const bscChainId = "56";
 
 const fallbackRpcUpstreams: RpcMapping = {
   [mainnetChainId]: process.env.RPC_URL_MAINNET_FALLBACK || "https://eth.merkle.io",
@@ -14,6 +15,7 @@ const fallbackRpcUpstreams: RpcMapping = {
   [baseSepoliaChainId]: process.env.RPC_URL_BASE_SEPOLIA_FALLBACK || "https://sepolia.base.org",
   [lineaChainId]: process.env.RPC_URL_LINEA_FALLBACK || "https://rpc.linea.build",
   [lineaSepoliaChainId]: process.env.RPC_URL_LINEA_SEPOLIA_FALLBACK || "https://rpc.sepolia.linea.build",
+  [bscChainId]: process.env.RPC_URL_BSC_FALLBACK || "https://bsc-rpc.publicnode.com",
 };
 
 const rpcUpstreams: RpcMapping = {
@@ -23,6 +25,7 @@ const rpcUpstreams: RpcMapping = {
   [baseSepoliaChainId]: process.env.RPC_URL_BASE_SEPOLIA || fallbackRpcUpstreams[baseSepoliaChainId],
   [lineaChainId]: process.env.RPC_URL_LINEA || fallbackRpcUpstreams[lineaChainId],
   [lineaSepoliaChainId]: process.env.RPC_URL_LINEA_SEPOLIA || fallbackRpcUpstreams[lineaChainId],
+  [bscChainId]: process.env.RPC_URL_BSC || fallbackRpcUpstreams[bscChainId],
 };
 
 export function getRpcUpstream(chainId: string): { upstream: string | undefined; fallback: string | undefined } {

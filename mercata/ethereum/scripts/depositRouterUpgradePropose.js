@@ -80,6 +80,10 @@ const CHAIN_NAME_TO_ID = {
   linea_sepolia: 59141,
   "linea-sepolia": 59141,
   lineasepolia: 59141,
+  bsc: 56,
+  bnb: 56,
+  bnb_chain: 56,
+  "bnb-chain": 56,
 };
 
 function parseChains(args) {
@@ -104,9 +108,11 @@ function getImplementationForChain(chainId) {
   const implEth = normalizeAddress(process.env.ROUTER_IMPL_ETH);
   const implBase = normalizeAddress(process.env.ROUTER_IMPL_BASE);
   const implLinea = normalizeAddress(process.env.ROUTER_IMPL_LINEA);
+  const implBsc = normalizeAddress(process.env.ROUTER_IMPL_BSC);
   if (chainId === 1 || chainId === 11155111) return implEth;
   if (chainId === 8453 || chainId === 84532) return implBase;
   if (chainId === 59144 || chainId === 59141) return implLinea;
+  if (chainId === 56) return implBsc;
   return "";
 }
 
@@ -127,6 +133,7 @@ function getHardhatNetwork(chainId) {
   if (chainId === 84532) return "baseSepolia";
   if (chainId === 59144) return "linea";
   if (chainId === 59141) return "lineaSepolia";
+  if (chainId === 56) return "bsc";
   return "";
 }
 
