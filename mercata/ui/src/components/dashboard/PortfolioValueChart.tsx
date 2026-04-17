@@ -1,4 +1,5 @@
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
   Line,
@@ -214,52 +215,78 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
   // Determine color based on trend and tab type
   const lineColor = change.isPositive ? colors.positive : colors.negative;
 
+  const fmt2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 } as const;
+  const primaryValueClass =
+    "text-lg font-bold tabular-nums leading-tight break-words md:text-2xl";
+
   return (
     <Card className="mb-6">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold">{title}</h3>
-            <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+      <CardHeader className="space-y-0 pb-3 pt-4 px-4 md:pb-6 md:pt-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6">
+          <div className="min-w-0 flex-1 space-y-1">
+            <h3 className="text-lg font-bold md:text-2xl">{title}</h3>
+            <p className="text-xs text-muted-foreground md:text-sm">{subtitle}</p>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold">
-              {tabType === 'rewards' ? (
-                `${currentValue.toLocaleString('en-US', { 
-                  minimumFractionDigits: 2, 
-                  maximumFractionDigits: 2 
-                })} Claimed Reward Points`
-              ) : tabType === 'estAnnual' ? (
-                `$${currentValue.toLocaleString('en-US', { 
-                  minimumFractionDigits: 2, 
-                  maximumFractionDigits: 2 
-                })} / yr`
-              ) : tabType === 'earnings' ? (
-                `$${currentValue.toLocaleString('en-US', { 
-                  minimumFractionDigits: 2, 
-                  maximumFractionDigits: 2 
-                })} in earning positions`
-              ) : tabType === 'borrowed' ? (
-                `${currentValue.toLocaleString('en-US', { 
-                  minimumFractionDigits: 2, 
-                  maximumFractionDigits: 2 
-                })} USDST`
-              ) : (
-                `$${currentValue.toLocaleString('en-US', { 
-                  minimumFractionDigits: 2, 
-                  maximumFractionDigits: 2 
-                })}`
+          <div className="min-w-0 w-full space-y-1 md:w-auto md:max-w-[min(100%,22rem)] md:text-right">
+            {tabType === "rewards" ? (
+              <>
+                <div className={cn(primaryValueClass, "md:text-right")}>
+                  {currentValue.toLocaleString("en-US", fmt2)}
+                </div>
+                <div className="text-xs text-muted-foreground md:text-sm md:text-right">Claimed reward points</div>
+              </>
+            ) : tabType === "estAnnual" ? (
+              <>
+                <div className={cn(primaryValueClass, "md:text-right")}>
+                  ${currentValue.toLocaleString("en-US", fmt2)}
+                  <span className="text-sm font-semibold text-muted-foreground md:text-base"> / yr</span>
+                </div>
+              </>
+            ) : tabType === "earnings" ? (
+              <>
+                <div className={cn(primaryValueClass, "md:text-right")}>
+                  ${currentValue.toLocaleString("en-US", fmt2)}
+                </div>
+                <div className="text-xs text-muted-foreground md:text-sm md:text-right">In earning positions</div>
+              </>
+            ) : tabType === "borrowed" ? (
+              <>
+                <div className={cn(primaryValueClass, "md:text-right")}>
+                  {currentValue.toLocaleString("en-US", fmt2)}
+                </div>
+                <div className="text-xs text-muted-foreground md:text-sm md:text-right">USDST</div>
+              </>
+            ) : (
+              <div className={cn(primaryValueClass, "md:text-right")}>
+                ${currentValue.toLocaleString("en-US", fmt2)}
+              </div>
+            )}
+            <div
+              className={cn(
+                "flex flex-wrap items-center gap-1 text-xs md:text-sm md:justify-end",
+                tabType === "rewards"
+                  ? "text-purple-500"
+                  : tabType === "borrowed"
+                    ? "text-orange-500"
+                    : tabType === "earnings" || tabType === "estAnnual"
+                      ? "text-emerald-600"
+                      : change.isPositive
+                        ? "text-green-500"
+                        : "text-red-500"
               )}
-            </div>
-            <div className={`flex items-center gap-1 text-sm ${tabType === 'rewards' ? 'text-purple-500' : tabType === 'borrowed' ? 'text-orange-500' : tabType === 'earnings' || tabType === 'estAnnual' ? 'text-emerald-600' : change.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-              {change.isPositive ? <TrendingUp size={16} color={getColorScheme(tabType).positive} /> : <TrendingDown size={16} color={getColorScheme(tabType).negative}/>}
-              <span>{getChangeText(hasData, tabType, change)}</span>
+            >
+              {change.isPositive ? (
+                <TrendingUp size={16} color={getColorScheme(tabType).positive} className="shrink-0" />
+              ) : (
+                <TrendingDown size={16} color={getColorScheme(tabType).negative} className="shrink-0" />
+              )}
+              <span className="min-w-0 text-left md:text-right">{getChangeText(hasData, tabType, change)}</span>
             </div>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="overflow-hidden">
-        <div className="relative w-full h-80">
+      <CardContent className="overflow-hidden px-3 pb-4 pt-0 sm:px-6 sm:pb-6">
+        <div className="relative w-full h-64 sm:h-72 md:h-80">
           {hasData ? (
             <>
               <ChartContainer
@@ -391,17 +418,25 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
         </div>
         
         {onTimeRangeChange && !hideTimeRangeSelector && (
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-4 border-t border-border">
+          <div
+            className={cn(
+              "mt-3 gap-2 border-t border-border pt-3 sm:mt-4 sm:pt-4",
+              "grid grid-cols-3",
+              "md:flex md:flex-wrap md:items-center md:justify-center md:gap-2"
+            )}
+          >
             {PORTFOLIO_CHART_TIME_RANGE_OPTIONS.map(({ label, value }) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => onTimeRangeChange(value)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={cn(
+                  "w-full rounded-md px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-2.5 sm:text-sm",
+                  value === "all" && "col-span-3 md:col-auto md:w-auto",
                   selectedTimeRange === value
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                }`}
+                )}
               >
                 {label}
               </button>

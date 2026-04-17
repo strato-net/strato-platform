@@ -65,7 +65,7 @@ function KpiTile({
   children: ReactNode;
 }) {
   const base =
-    "rounded-xl border border-border bg-card p-4 shadow-sm flex flex-col gap-1 min-h-[100px] w-full";
+    "rounded-xl border border-border bg-card p-3 md:p-4 shadow-sm flex flex-col gap-1 min-h-[88px] md:min-h-[100px] w-full min-w-0";
   const state = cn(
     selected && selectable && "ring-2 ring-primary border-primary",
     selectable && "cursor-pointer transition-colors hover:border-primary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -132,13 +132,13 @@ export function PortfolioKpiStrip({
   const claimableUsd = claimableUsdNum * CATA_PRICE_USD;
 
   const colClass =
-    "rounded-xl border border-border bg-card p-4 shadow-sm flex flex-col gap-1 min-h-[100px]";
+    "rounded-xl border border-border bg-card p-3 md:p-4 shadow-sm flex flex-col gap-1 min-h-[88px] md:min-h-[100px] min-w-0";
 
   const chartDrive = Boolean(onSelectChartKpi && selectedChartKpi != null);
 
   if (!isLoggedIn) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-6 min-w-0">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className={colClass}>
             <p className="text-xs text-muted-foreground">—</p>
@@ -150,7 +150,7 @@ export function PortfolioKpiStrip({
   }
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-6 min-w-0">
       <KpiTile
         kpi="portfolio"
         selectable={chartDrive}
@@ -162,7 +162,10 @@ export function PortfolioKpiStrip({
           <Skeleton className="h-7 w-36 mt-0.5" />
         ) : (
           <>
-            <p className="text-lg md:text-xl font-bold tabular-nums">
+            <p
+              className="text-sm sm:text-base md:text-lg lg:text-xl font-bold tabular-nums min-w-0 break-words leading-tight"
+              title={`$${portfolioValueUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            >
               ${portfolioValueUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
             {change1mLabel && (
@@ -189,11 +192,14 @@ export function PortfolioKpiStrip({
           </>
         ) : (
           <>
-            <p className="text-lg md:text-xl font-bold tabular-nums">
+            <p
+              className="text-sm sm:text-base md:text-lg lg:text-xl font-bold tabular-nums min-w-0 break-words leading-tight"
+              title={`$${estAnnualUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / yr`}
+            >
               ${estAnnualUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              <span className="text-xs font-normal text-muted-foreground"> / yr</span>
+              <span className="text-[10px] sm:text-xs font-normal text-muted-foreground"> / yr</span>
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] sm:text-xs text-muted-foreground min-w-0 break-words">
               ~${(estAnnualUsd / 365).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / day
             </p>
           </>
@@ -210,7 +216,7 @@ export function PortfolioKpiStrip({
         {earningMetricsLoading ? (
           <Skeleton className="h-7 w-20 mt-0.5" />
         ) : (
-          <p className="text-lg md:text-xl font-bold tabular-nums">
+          <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold tabular-nums min-w-0">
             {blendedApy != null ? `${blendedApy.toFixed(2)}%` : "—"}
           </p>
         )}
@@ -240,10 +246,12 @@ export function PortfolioKpiStrip({
           </>
         ) : (
           <>
-            <p className="text-lg md:text-xl font-bold tabular-nums leading-snug">
+            <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold tabular-nums leading-snug min-w-0 break-words">
               {claimableRewardsDisplay}
             </p>
-            <p className="text-xs text-muted-foreground">~${claimableUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground min-w-0 break-words">
+              ~${claimableUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+            </p>
           </>
         )}
       </KpiTile>
