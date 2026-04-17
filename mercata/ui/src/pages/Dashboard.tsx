@@ -296,34 +296,6 @@ const Dashboard = () => {
         <DashboardHeader title="Portfolio" />
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
-          {/* Physical Metals Deposit Banner (only when contact API is configured) */}
-          {contactEnabled && (
-            <div className="mb-8">
-              <div className="bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-200 dark:border-blue-800 rounded-xl p-4 md:p-5 hover:bg-blue-500/15 transition-colors">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-500 rounded-full p-1.5 shrink-0">
-                      <Gem className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm md:text-base font-semibold text-foreground">Deposit Physical Gold & Silver</h3>
-                      <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                        We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => setContactModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
-                  >
-                    <Mail size={16} />
-                    Contact Us
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
           {!isLoggedIn && <GuestPromoSection variant={1} />}
           {isLoggedIn && !isLoadingNetBalance && totalBalance === 0 && <GuestPromoSection variant={2} />}
           {isLoggedIn && (isLoadingNetBalance || totalBalance > 0) && <GuestPromoSection variant={3} />}
@@ -484,6 +456,35 @@ const Dashboard = () => {
                 <ArrowRightLeft size={18} />
                 <span className="text-xs md:text-sm">Swap</span>
               </Button>
+            </div>
+          )}
+
+          {/* Physical Metals Deposit Banner (only when contact API is configured) */}
+          {contactEnabled && (
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-200 dark:border-blue-800 rounded-xl p-4 md:p-5 hover:bg-blue-500/15 transition-colors">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-500 rounded-full p-1.5 shrink-0">
+                      <Gem className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-semibold text-foreground">Deposit Physical Gold & Silver</h3>
+                      <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                        We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => setContactModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+                  >
+                    <Mail size={16} />
+                    Contact Us
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
