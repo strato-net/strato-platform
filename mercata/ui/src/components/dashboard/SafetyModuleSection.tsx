@@ -669,3 +669,4 @@ const SafetyModuleSection = () => {
 };
 
 export default SafetyModuleSection;
+
