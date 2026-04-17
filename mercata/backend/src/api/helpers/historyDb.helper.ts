@@ -6,9 +6,17 @@ import {
   MappingHistoryElement,
 } from "./history.helper";
 
+export interface BuildSnapshotsResult {
+  snapshots: HistorySnapshot[];
+  applyStorageMs: number;
+  applyMappingMs: number;
+  snapshotFnMs: number;
+}
+
 /**
  * Reconstruct time-series snapshots from raw history rows.
  * Rows should be sorted by valid_from for optimal early-termination in the inner loops.
+ * Returns the snapshots along with phase timings (for profiling).
  */
 export function buildSnapshots(
   params: HistoryParams,
@@ -18,7 +26,7 @@ export function buildSnapshots(
   storageReducer: (data: any, element: StorageHistoryElement) => any,
   mappingReducer: (data: any, element: MappingHistoryElement) => any,
   snapshotFn: (snapshot: HistorySnapshot, index: number) => HistorySnapshot,
-): HistorySnapshot[] {
+): BuildSnapshotsResult {
   const { endTimestamp, interval, numTicks } = params;
   const startTimestamp = endTimestamp - interval * numTicks;
 
@@ -76,10 +84,20 @@ export function buildSnapshots(
     }
   };
 
+  const tStorageStart = performance.now();
   applyRows(storageHistory, storageReducer);
+  const tMappingStart = performance.now();
   applyRows(mappingHistory, mappingReducer);
+  const tSnapshotFnStart = performance.now();
+  const finalized = snapshots.map((snapshot, i) => snapshotFn(snapshot, i));
+  const tEnd = performance.now();
 
-  return snapshots.map((snapshot, i) => snapshotFn(snapshot, i));
+  return {
+    snapshots: finalized,
+    applyStorageMs: tMappingStart - tStorageStart,
+    applyMappingMs: tSnapshotFnStart - tMappingStart,
+    snapshotFnMs: tEnd - tSnapshotFnStart,
+  };
 }
 
 // ── SQL query builders for net-balance-history ──────────────────────────
@@ -279,9 +297,25 @@ export async function fetchActiveRequestIds(
   return result;
 }
 
+export interface HistoryDirectTimings {
+  sqlMs: number;
+  storageRows: number;
+  mappingRows: number;
+  applyStorageMs: number;
+  applyMappingMs: number;
+  snapshotFnMs: number;
+  numSnapshots: number;
+}
+
+export interface HistoryDirectResult {
+  snapshots: HistorySnapshot[];
+  timings: HistoryDirectTimings;
+}
+
 /**
  * Direct-SQL version of getHistory for the net-balance-history endpoint.
  * Fetches storage + mapping history in parallel, then reconstructs snapshots.
+ * Returns per-phase timings for profiling.
  */
 export async function getHistoryDirect(
   params: HistoryParams,
@@ -292,18 +326,20 @@ export async function getHistoryDirect(
   storageReducer: (data: any, element: StorageHistoryElement) => any,
   mappingReducer: (data: any, element: MappingHistoryElement) => any,
   snapshotFn: (snapshot: HistorySnapshot, index: number) => HistorySnapshot,
-): Promise<HistorySnapshot[]> {
+): Promise<HistoryDirectResult> {
   const startTimestamp =
     params.endTimestamp - params.interval * params.numTicks;
   const startTime = new Date(startTimestamp).toISOString();
   const endTime = new Date(params.endTimestamp).toISOString();
 
+  const tSqlStart = performance.now();
   const [storageHistory, mappingHistory] = await Promise.all([
     fetchStorageHistory(startTime, endTime, storageFilterParams),
     fetchMappingHistory(startTime, endTime, collectionNames, mappingFilterParams),
   ]);
+  const sqlMs = performance.now() - tSqlStart;
 
-  return buildSnapshots(
+  const { snapshots, applyStorageMs, applyMappingMs, snapshotFnMs } = buildSnapshots(
     params,
     storageHistory,
     mappingHistory,
@@ -312,4 +348,17 @@ export async function getHistoryDirect(
     mappingReducer,
     snapshotFn,
   );
+
+  return {
+    snapshots,
+    timings: {
+      sqlMs,
+      storageRows: storageHistory.length,
+      mappingRows: mappingHistory.length,
+      applyStorageMs,
+      applyMappingMs,
+      snapshotFnMs,
+      numSnapshots: snapshots.length,
+    },
+  };
 }

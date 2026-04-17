@@ -688,14 +688,17 @@ export const getNetBalanceHistory = async (
   userAddress: string,
   historyParams: HistoryParams,
 ): Promise<BalanceSnapshot[]> => {
+  const tTotalStart = performance.now();
 
   // Pre-fetch vault config and carry vault active request IDs in parallel (2 queries, not N+1)
   const carryVaultAddrs = listVaultDefs().filter(v => v.address).map(v => v.address);
 
+  const tPrefetchStart = performance.now();
   const [vaultConfig, activeReqMap] = await Promise.all([
     fetchVaultHistoryConfig(config.vault),
     fetchActiveRequestIds(carryVaultAddrs, userAddress).catch(() => new Map<string, string>()),
   ]);
+  const prefetchMs = performance.now() - tPrefetchStart;
 
   const requestFilters: { address: string; path: string }[] = [];
   for (const [addr, reqId] of activeReqMap) {
@@ -717,7 +720,7 @@ export const getNetBalanceHistory = async (
   const carryVaultAddrSet = new Set(carryVaultAddrs);
   const initialData = { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined, carryVaultAddrs: carryVaultAddrSet };
 
-  const balanceHistory = await getHistoryDirect(
+  const { snapshots: balanceHistory, timings } = await getHistoryDirect(
     historyParams,
     {
       vaultShareToken: vaultConfig?.shareToken,
@@ -734,6 +737,23 @@ export const getNetBalanceHistory = async (
     updatePortfolioInfoStorage,
     updatePortfolioInfoMapping,
     processBalanceSnapshot,
+  );
+
+  const totalMs = performance.now() - tTotalStart;
+
+  // Profile line — grep for this prefix to analyze performance
+  console.log(
+    `[net-balance-profile] ` +
+    `total=${totalMs.toFixed(1)}ms ` +
+    `prefetchSql=${prefetchMs.toFixed(1)}ms ` +
+    `historySql=${timings.sqlMs.toFixed(1)}ms ` +
+    `applyStorage=${timings.applyStorageMs.toFixed(1)}ms ` +
+    `applyMapping=${timings.applyMappingMs.toFixed(1)}ms ` +
+    `processSnapshots=${timings.snapshotFnMs.toFixed(1)}ms ` +
+    `storageRows=${timings.storageRows} ` +
+    `mappingRows=${timings.mappingRows} ` +
+    `snapshots=${timings.numSnapshots} ` +
+    `numTicks=${historyParams.numTicks}`
   );
 
   return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
