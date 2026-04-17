@@ -1,5 +1,3 @@
-export type LoopRouteType = "cdp_loop";
-
 export interface CDPAssetConfig {
   address: string;
   decimals: number;
@@ -27,7 +25,6 @@ export interface LoopRouteOpportunity {
 }
 
 export interface LoopBootstrapResponse {
-  swapFeeBps: number;
   routes: {
     cdp: CDPBootstrapData;
   };
@@ -35,7 +32,7 @@ export interface LoopBootstrapResponse {
 }
 
 export interface LoopExecuteRequest {
-  routeType: LoopRouteType;
+  routeType: "cdp_loop";
   asset: string;
   amount: string;
   targetLeverage: number;
@@ -48,7 +45,6 @@ export interface LoopExecuteResponse {
 
 export interface LoopPositionEntry {
   asset: string;
-  symbol: string;
   collateral: string;
   collateralUSD: string;
   debt: string;

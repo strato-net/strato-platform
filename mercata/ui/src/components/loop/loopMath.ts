@@ -12,7 +12,7 @@ export const ltvFromCR = (rawRatio: number): number => {
 
 // Hard max leverage achievable at the given minCR, rounded to 1 decimal.
 // Capped at 10x to match the backend validator limit.
-export const MAX_LEVERAGE = 10;
+const MAX_LEVERAGE = 10;
 
 export const maxLeverageFromMinCR = (minCR: number): number => {
   if (minCR <= 100) return MAX_LEVERAGE;
@@ -27,7 +27,7 @@ export const healthFactorAtLeverage = (leverage: number, liquidationLtv: number)
 };
 
 // Health factor below this threshold is styled as a warning (amber).
-export const HEALTH_FACTOR_WARNING = 1.5;
+const HEALTH_FACTOR_WARNING = 1.5;
 
 export const healthFactorColor = (hf: number): string =>
   hf > 0 && hf < HEALTH_FACTOR_WARNING ? "text-amber-500" : "text-emerald-500";

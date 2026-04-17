@@ -15,17 +15,16 @@ import type {
   LoopPositionResponse,
 } from "@mercata/shared-types";
 import {
-  SWAP_FEE_BPS,
   RAY,
   WAD,
   fetchSwapPools,
   findPoolForAsset,
   findSwapPool,
   fetchCDPBootstrap,
+  fetchCDPAssetConfig,
   fetchAssetSymbols,
-  fetchUserVaults,
   fetchLoopBaseYields,
-  fetchRateAccumulators,
+  fetchPositionBootstrap,
   computeTargetNewDebt,
   quoteSwap,
   type NormalizedPool,
@@ -94,17 +93,19 @@ function buildOpportunities(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Bootstrap — 2-phase fan-out
-//   Phase 1: single CDPRegistry kitchen-sink join (1 GET)
-//   Phase 2: pools + symbols + yields in parallel (~3 GETs)
+// Bootstrap — 2 rounds:
+//   Round 1: cdp + pools in parallel (neither needs the other)
+//   Round 2: symbols + yields in parallel (both need the asset list)
 // ═══════════════════════════════════════════════════════════════
 
 export async function getBootstrap(accessToken: string): Promise<LoopBootstrapResponse> {
-  const cdp = await fetchCDPBootstrap(accessToken);
+  const [cdp, pools] = await Promise.all([
+    fetchCDPBootstrap(accessToken),
+    fetchSwapPools(accessToken, constants.USDST),
+  ]);
   const assetAddrs = cdp.assets.map((a) => a.asset);
 
-  const [pools, symbolMap, baseYieldMap] = await Promise.all([
-    fetchSwapPools(accessToken, constants.USDST),
+  const [symbolMap, baseYieldMap] = await Promise.all([
     fetchAssetSymbols(accessToken, assetAddrs),
     fetchLoopBaseYields(accessToken, assetAddrs),
   ]);
@@ -123,7 +124,6 @@ export async function getBootstrap(accessToken: string): Promise<LoopBootstrapRe
   }));
 
   return {
-    swapFeeBps: SWAP_FEE_BPS,
     routes: { cdp: cdpData },
     opportunities: buildOpportunities(assetsWithSymbols, pools, constants.USDST, baseYieldMap),
   };
@@ -173,16 +173,14 @@ export async function executeLoop(
   userAddress: string,
   req: LoopExecuteRequest,
 ): Promise<LoopExecuteResponse> {
-  const [swapPool, cdp] = await Promise.all([
+  const [swapPool, cdpAsset] = await Promise.all([
     findSwapPool(accessToken, constants.USDST, req.asset),
-    fetchCDPBootstrap(accessToken),
+    fetchCDPAssetConfig(accessToken, req.asset),
   ]);
   if (!swapPool) throw new Error(`No swap pool for USDST <-> ${req.asset}`);
 
-  const assetLower = req.asset.toLowerCase();
-  const price = BigInt(cdp.priceMap.get(assetLower) || "0");
-  const cfg = cdp.assets.find((a) => a.asset.toLowerCase() === assetLower);
-  const unitScale = BigInt(cfg?.unitScale || WAD.toString());
+  const price = cdpAsset.price;
+  const unitScale = BigInt(cdpAsset.config?.unitScale || WAD.toString());
   if (price === 0n) throw new Error(`No oracle price for ${req.asset}`);
 
   const targetNewDebt = computeTargetNewDebt({
@@ -208,42 +206,34 @@ export async function executeLoop(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Position — 2-phase fan-out
-//   Phase 1: CDPEngine-vaults for user (1 GET)
-//   Phase 2: symbols + yields in parallel (~2 GETs, yields cached)
+// Position — one /mapping call (bootstrap + vaults + rateAccs) plus
+// one side call for cached base yields.
 // ═══════════════════════════════════════════════════════════════
 
 export async function getPosition(accessToken: string, userAddress: string): Promise<LoopPositionResponse> {
-  const rawVaults = await fetchUserVaults(accessToken, userAddress);
-  const withBalance = rawVaults.filter(
-    (v) => BigInt(v.collateral || "0") > 0n || BigInt(v.scaledDebt || "0") > 0n,
-  );
+  const ctx = await fetchPositionBootstrap(accessToken, userAddress);
+  const activeAssets: string[] = [];
+  for (const [assetLower, v] of ctx.vaults) {
+    if (v.collateral > 0n || v.scaledDebt > 0n) activeAssets.push(assetLower);
+  }
+  if (activeAssets.length === 0) return { cdp: [] };
 
-  if (withBalance.length === 0) return { cdp: [] };
+  const baseYieldMap = await fetchLoopBaseYields(accessToken, activeAssets);
 
-  const assetAddrs = withBalance.map((v) => v.asset);
-  const [cdp, symbolMap, baseYieldMap, rateAccMap] = await Promise.all([
-    fetchCDPBootstrap(accessToken),
-    fetchAssetSymbols(accessToken, assetAddrs),
-    fetchLoopBaseYields(accessToken, assetAddrs),
-    fetchRateAccumulators(accessToken, assetAddrs),
-  ]);
+  const configMap = new Map(ctx.assets.map((a) => [a.asset.toLowerCase(), a]));
+  const priceMap = ctx.priceMap;
 
-  // Build lookup maps from the CDP bootstrap data.
-  const configMap = new Map(cdp.assets.map((a) => [a.asset.toLowerCase(), a]));
-  const priceMap = cdp.priceMap;
-
-  const positions = withBalance.map((v) => {
-    const assetLower = v.asset.toLowerCase();
+  const positions = activeAssets.map((assetLower) => {
+    const v = ctx.vaults.get(assetLower)!;
     const cfg = configMap.get(assetLower);
     const price = BigInt(priceMap.get(assetLower) || "0");
     const unitScale = BigInt(cfg?.unitScale || WAD.toString());
 
-    const collateral = BigInt(v.collateral || "0");
+    const collateral = v.collateral;
     const collateralValueUSD = unitScale > 0n ? (collateral * price) / unitScale : 0n;
     // Apply live rateAccumulator so accrued stability fees are reflected; fall back to RAY (no accrual) if missing.
-    const rateAcc = rateAccMap.get(assetLower) ?? RAY;
-    const currentDebt = (BigInt(v.scaledDebt || "0") * rateAcc) / RAY;
+    const rateAcc = ctx.rateAccumulators.get(assetLower) ?? RAY;
+    const currentDebt = (v.scaledDebt * rateAcc) / RAY;
 
     const cUSD = Number(collateralValueUSD) / 1e18;
     const d = Number(currentDebt) / 1e18;
@@ -263,8 +253,7 @@ export async function getPosition(accessToken: string, userAddress: string): Pro
     const borrowRate = Number(cfg?.stabilityFeeRate) || DEFAULT_STABILITY_APR;
 
     return {
-      asset: v.asset,
-      symbol: symbolMap.get(assetLower) || "UNKNOWN",
+      asset: assetLower,
       collateral: collateral.toString(),
       collateralUSD: collateralValueUSD.toString(),
       debt: currentDebt.toString(),

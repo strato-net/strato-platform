@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { formatUnits, formatBalance, parseUnitsWithTruncation } from "@/utils/numberUtils";
+import { formatUnits, formatBalance, parseUnitsWithTruncation, safeParseUnits } from "@/utils/numberUtils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import type { LoopRouteOpportunity, LoopPositionEntry } from "@mercata/shared-types";
 import { handleAmountInputChange } from "@/utils/transferValidation";
+import { LOOP_FEE } from "@/lib/constants";
 import { Row, ExpandableRow, InfoTip } from "./LoopRow";
 import { formatPct, formatFeeBps, formatCompact } from "./loopFormat";
 import { healthFactorColor } from "./loopMath";
@@ -44,6 +45,7 @@ interface LoopWidgetProps {
   selectedAssetDecimals: number;
   selectedAssetPrice: number;
   selectedTokenBalanceWei: string;
+  usdstBalanceWei: string;
   leverageSliderMax: number;
   liquidationLtvRatio: number;
   assetStabilityAPR: number;
@@ -66,6 +68,7 @@ const LoopWidget = ({
   selectedAssetDecimals,
   selectedAssetPrice,
   selectedTokenBalanceWei,
+  usdstBalanceWei,
   leverageSliderMax,
   liquidationLtvRatio,
   assetStabilityAPR,
@@ -96,6 +99,8 @@ const LoopWidget = ({
     [assetSymbol, selectedAssetDecimals, selectedTokenBalanceWei]
   );
 
+  const loopFeeWei = safeParseUnits(LOOP_FEE);
+
   const computedAmountError = useMemo(() => {
     if (!collateralAmount) return "";
     if (amountError) return amountError;
@@ -103,11 +108,12 @@ const LoopWidget = ({
       const weiAmount = parseUnitsWithTruncation(collateralAmount, selectedAssetDecimals);
       if (weiAmount <= 0n) return "Amount must be greater than 0";
       if (maxBalanceWei <= 0n || weiAmount > maxBalanceWei) return "Maximum amount exceeded";
+      if (BigInt(usdstBalanceWei || "0") < loopFeeWei) return "Insufficient USDST for transaction fee";
       return "";
     } catch {
       return "Invalid input format";
     }
-  }, [amountError, collateralAmount, selectedAssetDecimals, maxBalanceWei]);
+  }, [amountError, collateralAmount, selectedAssetDecimals, maxBalanceWei, usdstBalanceWei, loopFeeWei]);
 
   const hasValidAmount = Boolean(collateralAmount) && !computedAmountError;
 
@@ -148,7 +154,7 @@ const LoopWidget = ({
     const cost = Math.round((M - 1) * (feePerLeg + impact) * 100 * 1000) / 1000;
     const days = net > 0 ? Math.ceil((cost / net) * 365) : 0;
     return { projectedNetSupplyApy: net, breakEvenDays: days, entryCostPct: cost };
-  }, [selectedOpportunity, leverage, effectiveLtvRatio, collateralAmountNumber, selectedAssetPrice, assetStabilityAPR, poolSwapFeeBps]);
+  }, [selectedOpportunity, leverage, collateralAmountNumber, selectedAssetPrice, assetStabilityAPR, poolSwapFeeBps]);
 
   const projectedLiquidationPrice =
     liquidationLtvRatio > 0 && selectedAssetPrice > 0 && effectiveLtvRatio > 0
@@ -172,6 +178,7 @@ const LoopWidget = ({
       const amountWei = parseUnitsWithTruncation(collateralAmount, selectedAssetDecimals).toString();
       await onExecute({ amount: amountWei, targetLeverage: leverage, maxSlippageBps: slippageBps });
       toast({ title: "Loop executed", variant: "success" });
+      onCollateralAmountChange("");
       await onExecuted();
     } catch (err: any) {
       toast({ title: "Loop failed", description: err?.message || "Unknown error", variant: "destructive" });
@@ -325,7 +332,7 @@ const LoopWidget = ({
         <div className="rounded-md border border-border bg-muted/20 p-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span className="flex items-center">Est. fee<InfoTip text="Network transaction fee for the approve + leverage call" /></span>
-            <span className="font-medium tabular-nums text-foreground">0.02 USDST</span>
+            <span className="font-medium tabular-nums text-foreground">{LOOP_FEE} USDST</span>
           </div>
         </div>
       </CardContent>

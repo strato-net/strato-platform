@@ -49,6 +49,7 @@ export const tokenFactory = process.env.TOKEN_FACTORY || "0000000000000000000000
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
+export const cdpEngine = process.env.CDP_ENGINE || "0000000000000000000000000000000000001011";
 export const loopRouter = process.env.LOOP_ROUTER || "6a02b77c84d6b83c4b57a6d03df3ff3671401df8";
 
 export const safetyModule = process.env.SAFETY_MODULE || "0000000000000000000000000000000000001015";

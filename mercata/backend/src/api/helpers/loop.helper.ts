@@ -3,14 +3,13 @@
 //
 // Entry points:
 //   Pool:   fetchSwapPools, findPoolForAsset, findSwapPool
-//   CDP:    fetchCDPBootstrap, fetchUserVaults, fetchAssetSymbols
+//   CDP:    fetchCDPBootstrap, fetchPositionBootstrap, fetchAssetSymbols
 //   Yield:  fetchLoopBaseYields
 //   Solver: computeTargetNewDebt (off-chain D* for flash-mint leverage)
 
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { yieldBenchmarks, priceOracle } from "../../config/config";
-import { fetchMultiTokenStablePools } from "./swapping.helper";
 import { RAY } from "./lending.helper";
 // Re-export for loop.service.ts consumers.
 export { RAY };
@@ -22,7 +21,7 @@ import {
   computeExchangeRateAPY,
 } from "./earnYield.helper";
 export const WAD = constants.DECIMALS; // 10n ** 18n
-export const SWAP_FEE_BPS = 30;
+const SWAP_FEE_BPS = 30;
 
 // Backend-internal types — not exposed via API, not shared with UI.
 type PoolType = 0 | 1;
@@ -256,51 +255,41 @@ interface CDPBootstrapResult {
 }
 
 export async function fetchCDPBootstrap(accessToken: string): Promise<CDPBootstrapResult> {
-  const { CDPEngine, PriceOracle: POTable, CDPRegistry } = constants;
-  const cdpRegistryAddr = constants.cdpRegistry || "0000000000000000000000000000000000001012";
-
-  // Phase 1: read the registry row to get priceOracle + cdpEngine addresses.
-  // priceOracle_fkey has been seen to drop out of the cirrus schema cache after
-  // CDPEngine upgrades, so fetch the address plainly and issue a separate query
-  // for prices.
-  const { data: [reg] } = await cirrus.get(accessToken, `/${CDPRegistry}`, {
-    params: { address: `eq.${cdpRegistryAddr}`, select: "address,priceOracle,cdpEngine" },
+  // Single /mapping call with `or=(...)` — same pattern as earn.service
+  // getTokenApys. Addresses are the well-known system-contract proxies so no
+  // CDPRegistry round-trip needed.
+  const priceOracleAddr = constants.priceOracle;
+  const engineAddr = constants.cdpEngine;
+  const mappingFilters = [
+    `and(address.eq.${priceOracleAddr},collection_name.eq.prices)`,
+    `and(address.eq.${engineAddr},collection_name.eq.collateralConfigs)`,
+    `and(address.eq.${engineAddr},collection_name.eq.isSupportedAsset,value.eq.true)`,
+  ];
+  const { data: rows } = await cirrus.get(accessToken, "/mapping", {
+    params: {
+      or: `(${mappingFilters.join(",")})`,
+      select: "address,collection_name,key->>key,value::text",
+    },
   });
-  const priceOracleAddr = reg?.priceOracle || "";
-  const engineAddr = reg?.cdpEngine || "";
-
-  // Phase 2: fan out 3 independent fetches.
-  const [pricesRes, configsRes, supportedRes] = await Promise.all([
-    priceOracleAddr
-      ? cirrus.get(accessToken, `/${POTable}-prices`, {
-          params: { address: `eq.${priceOracleAddr}`, select: "asset:key,value::text" },
-        })
-      : Promise.resolve({ data: [] }),
-    engineAddr
-      ? cirrus.get(accessToken, `/${CDPEngine}-collateralConfigs`, {
-          params: { address: `eq.${engineAddr}`, select: "asset:key,CollateralConfig:value" },
-        })
-      : Promise.resolve({ data: [] }),
-    engineAddr
-      ? cirrus.get(accessToken, `/${CDPEngine}-isSupportedAsset`, {
-          params: { address: `eq.${engineAddr}`, value: "eq.true", select: "asset:key,value" },
-        })
-      : Promise.resolve({ data: [] }),
-  ]);
 
   const priceMap = new Map<string, string>();
-  for (const p of pricesRes.data || []) priceMap.set((p.asset as string).toLowerCase(), p.value);
+  const configRows: Array<{ asset: string; cfg: any }> = [];
+  const supportedSet = new Set<string>();
+  for (const r of (rows || []) as any[]) {
+    if (r.collection_name === "prices") {
+      priceMap.set((r.key as string).toLowerCase(), r.value);
+    } else if (r.collection_name === "collateralConfigs") {
+      try { configRows.push({ asset: r.key, cfg: JSON.parse(r.value) }); } catch { /* skip malformed */ }
+    } else if (r.collection_name === "isSupportedAsset") {
+      supportedSet.add((r.key as string).toLowerCase());
+    }
+  }
 
-  const supportedSet = new Set(
-    (supportedRes.data || []).map((s: any) => s.asset?.toLowerCase()),
-  );
   const assets: CDPBootstrapRow[] = [];
-  for (const c of configsRes.data || []) {
-    if (!supportedSet.has(c.asset?.toLowerCase())) continue;
-    const cfg = c.CollateralConfig;
-    if (!cfg) continue;
+  for (const { asset, cfg } of configRows) {
+    if (!supportedSet.has(asset.toLowerCase()) || !cfg) continue;
     assets.push({
-      asset: c.asset,
+      asset,
       minCR: Number(cfg.minCR) / Number(WAD) * 100,
       liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
       stabilityFeeRate: stabilityFeeRateToAPR(cfg.stabilityFeeRate),
@@ -310,6 +299,52 @@ export async function fetchCDPBootstrap(accessToken: string): Promise<CDPBootstr
     });
   }
   return { priceMap, assets };
+}
+
+// Narrow single-asset variant for executeLoop — same /mapping or= pattern as
+// fetchCDPBootstrap but key-filtered to one asset so the response is ~3 rows
+// instead of ~30.
+export async function fetchCDPAssetConfig(
+  accessToken: string,
+  asset: string,
+): Promise<{ price: bigint; config: CDPBootstrapRow | null }> {
+  const priceOracleAddr = constants.priceOracle;
+  const engineAddr = constants.cdpEngine;
+  const assetLower = asset.toLowerCase();
+  const mappingFilters = [
+    `and(address.eq.${priceOracleAddr},collection_name.eq.prices,key->>key.eq.${assetLower})`,
+    `and(address.eq.${engineAddr},collection_name.eq.collateralConfigs,key->>key.eq.${assetLower})`,
+    `and(address.eq.${engineAddr},collection_name.eq.isSupportedAsset,key->>key.eq.${assetLower},value.eq.true)`,
+  ];
+  const { data: rows } = await cirrus.get(accessToken, "/mapping", {
+    params: {
+      or: `(${mappingFilters.join(",")})`,
+      select: "collection_name,value::text",
+    },
+  });
+
+  let price = 0n;
+  let cfg: any = null;
+  let supported = false;
+  for (const r of (rows || []) as any[]) {
+    if (r.collection_name === "prices") price = BigInt(r.value || "0");
+    else if (r.collection_name === "collateralConfigs") { try { cfg = JSON.parse(r.value); } catch { /* skip */ } }
+    else if (r.collection_name === "isSupportedAsset") supported = true;
+  }
+  if (!supported || !cfg) return { price, config: null };
+
+  return {
+    price,
+    config: {
+      asset,
+      minCR: Number(cfg.minCR) / Number(WAD) * 100,
+      liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+      stabilityFeeRate: stabilityFeeRateToAPR(cfg.stabilityFeeRate),
+      debtFloor: cfg.debtFloor || "0",
+      debtCeiling: cfg.debtCeiling || "0",
+      unitScale: cfg.unitScale || WAD.toString(),
+    },
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -328,60 +363,89 @@ export async function fetchAssetSymbols(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CDP: user vaults (1 GET replaces 2× registry + engine + N×token)
+// Position bootstrap — 1 /mapping call that folds CDP bootstrap +
+// user vaults + rate accumulators. Replaces 3 separate calls on the
+// /loop/position path.
 // ═══════════════════════════════════════════════════════════════
 
-interface RawVaultRow {
-  asset: string;
-  collateral: string;
-  scaledDebt: string;
+interface PositionBootstrapResult extends CDPBootstrapResult {
+  vaults: Map<string, { collateral: bigint; scaledDebt: bigint }>;
+  rateAccumulators: Map<string, bigint>;
 }
 
-export async function fetchUserVaults(
+export async function fetchPositionBootstrap(
   accessToken: string,
   userAddress: string,
-): Promise<RawVaultRow[]> {
-  const cdpEngineAddr = "0000000000000000000000000000000000001011";
-  const { data } = await cirrus.get(accessToken, `/${constants.CDPEngine}-vaults`, {
+): Promise<PositionBootstrapResult> {
+  const priceOracleAddr = constants.priceOracle;
+  const engineAddr = constants.cdpEngine;
+  const user = userAddress.toLowerCase();
+  const mappingFilters = [
+    `and(address.eq.${priceOracleAddr},collection_name.eq.prices)`,
+    `and(address.eq.${engineAddr},collection_name.eq.collateralConfigs)`,
+    `and(address.eq.${engineAddr},collection_name.eq.isSupportedAsset,value.eq.true)`,
+    `and(address.eq.${engineAddr},collection_name.eq.collateralGlobalStates)`,
+    `and(address.eq.${engineAddr},collection_name.eq.vaults,key->>key.eq.${user})`,
+  ];
+  const { data: rows } = await cirrus.get(accessToken, "/mapping", {
     params: {
-      select: "asset:key2,Vault:value",
-      key: `eq.${userAddress.toLowerCase()}`,
-      address: `eq.${cdpEngineAddr}`,
+      or: `(${mappingFilters.join(",")})`,
+      select: "address,collection_name,key->>key,key->>key2,value::text",
     },
   });
-  return (data || []).map((r: any) => ({
-    asset: r.asset,
-    collateral: r.Vault?.collateral || "0",
-    scaledDebt: r.Vault?.scaledDebt || "0",
-  }));
-}
 
-// Per-asset rateAccumulator (RAY-scaled). scaledDebt * rateAccumulator / RAY = currentDebt
-// in USDST wei. Needed to display the accrued stability-fee-inclusive debt.
-export async function fetchRateAccumulators(
-  accessToken: string,
-  assetAddresses: string[],
-): Promise<Map<string, bigint>> {
-  if (assetAddresses.length === 0) return new Map();
-  const cdpEngineAddr = "0000000000000000000000000000000000001011";
-  // PostgREST `in.(...)` on JSON-typed address columns rejects bare hex literals,
-  // so fetch all rows for this engine and filter client-side.
-  const { data } = await cirrus.get(accessToken, `/${constants.CDPEngine}-collateralGlobalStates`, {
-    params: {
-      address: `eq.${cdpEngineAddr}`,
-      select: "asset:key,value",
-    },
-  });
-  const wanted = new Set(assetAddresses.map((a) => a.toLowerCase()));
-  const map = new Map<string, bigint>();
-  for (const row of (data || []) as any[]) {
-    const asset = (row.asset as string).toLowerCase();
-    if (!wanted.has(asset)) continue;
-    const v = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
-    const ra = BigInt(v?.rateAccumulator || "0");
-    map.set(asset, ra > 0n ? ra : RAY);
+  const priceMap = new Map<string, string>();
+  const configRows: Array<{ asset: string; cfg: any }> = [];
+  const supportedSet = new Set<string>();
+  const rateAccumulators = new Map<string, bigint>();
+  const vaults = new Map<string, { collateral: bigint; scaledDebt: bigint }>();
+
+  for (const r of (rows || []) as any[]) {
+    switch (r.collection_name) {
+      case "prices":
+        priceMap.set((r.key as string).toLowerCase(), r.value);
+        break;
+      case "collateralConfigs":
+        try { configRows.push({ asset: r.key, cfg: JSON.parse(r.value) }); } catch { /* skip */ }
+        break;
+      case "isSupportedAsset":
+        supportedSet.add((r.key as string).toLowerCase());
+        break;
+      case "collateralGlobalStates": {
+        try {
+          const v = JSON.parse(r.value);
+          const ra = BigInt(v?.rateAccumulator || "0");
+          rateAccumulators.set((r.key as string).toLowerCase(), ra > 0n ? ra : RAY);
+        } catch { /* skip */ }
+        break;
+      }
+      case "vaults": {
+        try {
+          const v = JSON.parse(r.value);
+          vaults.set((r.key2 as string).toLowerCase(), {
+            collateral: BigInt(v?.collateral || "0"),
+            scaledDebt: BigInt(v?.scaledDebt || "0"),
+          });
+        } catch { /* skip */ }
+        break;
+      }
+    }
   }
-  return map;
+
+  const assets: CDPBootstrapRow[] = [];
+  for (const { asset, cfg } of configRows) {
+    if (!supportedSet.has(asset.toLowerCase()) || !cfg) continue;
+    assets.push({
+      asset,
+      minCR: Number(cfg.minCR) / Number(WAD) * 100,
+      liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
+      stabilityFeeRate: stabilityFeeRateToAPR(cfg.stabilityFeeRate),
+      debtFloor: cfg.debtFloor || "0",
+      debtCeiling: cfg.debtCeiling || "0",
+      unitScale: cfg.unitScale || WAD.toString(),
+    });
+  }
+  return { priceMap, assets, vaults, rateAccumulators };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -423,16 +487,20 @@ export async function fetchSwapPools(
   accessToken: string,
   usdstAddress: string,
 ): Promise<NormalizedPool[]> {
-  // Pool table surfaces CP pools + 2-coin StablePools (both expose tokenA/tokenB
-  // and tokenABalance/tokenBBalance). CP pools store swapFeeRate=0 and inherit
-  // the factory default (30 bps). StablePools store their own rate.
-  const { data: poolRows } = await cirrus.get(accessToken, `/${constants.Pool}`, {
-    params: {
-      poolFactory: `eq.${constants.poolFactory}`,
-      locked: "eq.false",
-      select: "address,tokenA,tokenB,tokenABalance::text,tokenBBalance::text,isStable,swapFeeRate",
-    },
-  });
+  // Two parallel fetches: the Pool table (CP + 2-coin stable) and a loop-local
+  // discovery of USDST-containing multi-coin StablePools (>2 coins).
+  const usdstLower = usdstAddress.toLowerCase();
+  const [{ data: poolRows }, multiTokenPools] = await Promise.all([
+    cirrus.get(accessToken, `/${constants.Pool}`, {
+      params: {
+        poolFactory: `eq.${constants.poolFactory}`,
+        locked: "eq.false",
+        select: "address,tokenA,tokenB,tokenABalance::text,tokenBBalance::text,isStable,swapFeeRate",
+      },
+    }),
+    fetchUsdstMultiStablePools(accessToken, usdstLower),
+  ]);
+
   const pools: NormalizedPool[] = (poolRows || []).map((p: any): NormalizedPool => ({
     kind: "pair",
     address: p.address,
@@ -444,26 +512,70 @@ export async function fetchSwapPools(
     swapFeeBps: poolFeeBps(p.swapFeeRate),
   }));
 
-  // Multi-coin StablePools (>2 coins) aren't represented in the Pool view;
-  // the shared helper filters `initialA > 0` so uninitialized pools are skipped.
   const seen = new Set(pools.map((p) => p.address.toLowerCase()));
-  const multiTokenPools = await fetchMultiTokenStablePools(accessToken);
-  const usdstLower = usdstAddress.toLowerCase();
   for (const mp of multiTokenPools) {
     if (seen.has(mp.address.toLowerCase())) continue;
-    const usdstCoin = mp.coins.find((c) => c.tokenAddress.toLowerCase() === usdstLower);
-    if (!usdstCoin) continue;
-    // tokenBalances is keyed by whatever casing cirrus stores — use the coin's raw tokenAddress.
     pools.push({
       kind: "multi",
       address: mp.address,
       poolType: 1,
-      usdstBalance: mp.tokenBalances.get(usdstCoin.tokenAddress) || "0",
-      coins: mp.coins.map((c) => ({ index: c.coinIndex, address: c.tokenAddress.toLowerCase() })),
-      swapFeeBps: poolFeeBps((mp as any).swapFeeRate),
+      usdstBalance: mp.usdstBalance,
+      coins: mp.coins,
+      swapFeeBps: SWAP_FEE_BPS,
     });
   }
   return pools;
+}
+
+// Loop-local discovery of USDST-containing multi-coin StablePools. Two small
+// /mapping calls: (1) find pools where USDST appears in coins, (2) hydrate
+// coins[] + USDST balance for those pools only. Scoped to the USDST subset —
+// skips pulling every StablePool in the network like swapping.helper does.
+async function fetchUsdstMultiStablePools(
+  accessToken: string,
+  usdstLower: string,
+): Promise<Array<{ address: string; coins: { index: number; address: string }[]; usdstBalance: string }>> {
+  // Step 1: which pools have USDST as a coin?
+  // Uses the table-view so the JSON-typed `value` column accepts the quoted
+  // literal — inside `and=(...)` the embedded parser rejects the same form
+  // with a 22P02 "invalid input syntax for type json".
+  const { data: usdstCoinRows } = await cirrus.get(accessToken, `/${constants.StablePoolCoins}`, {
+    params: {
+      value: `eq."${usdstLower}"`,
+      select: "address",
+    },
+  });
+  const poolAddrs: string[] = Array.from(new Set<string>((usdstCoinRows || []).map((r: any) => r.address as string)));
+  if (poolAddrs.length === 0) return [];
+
+  // Step 2: full coins[] + USDST balance for those pools.
+  const inList = poolAddrs.join(",");
+  const { data: rows } = await cirrus.get(accessToken, "/mapping", {
+    params: {
+      or: `(and(address.in.(${inList}),collection_name.eq.coins),and(address.in.(${inList}),collection_name.eq.tokenBalances,key->>key.eq.${usdstLower}))`,
+      select: "address,collection_name,key->>key,value::text",
+    },
+  });
+
+  const coinsByPool = new Map<string, { index: number; address: string }[]>();
+  const usdstBalByPool = new Map<string, string>();
+  for (const r of (rows || []) as any[]) {
+    if (r.collection_name === "coins") {
+      let list = coinsByPool.get(r.address);
+      if (!list) { list = []; coinsByPool.set(r.address, list); }
+      list.push({ index: Number(r.key), address: (r.value || "").toLowerCase() });
+    } else if (r.collection_name === "tokenBalances") {
+      usdstBalByPool.set(r.address, r.value);
+    }
+  }
+
+  const out: Array<{ address: string; coins: { index: number; address: string }[]; usdstBalance: string }> = [];
+  for (const addr of poolAddrs) {
+    const coins = (coinsByPool.get(addr) || []).sort((a, b) => a.index - b.index);
+    if (coins.length <= 2) continue; // 2-coin stable pools are covered by the Pool table
+    out.push({ address: addr, coins, usdstBalance: usdstBalByPool.get(addr) || "0" });
+  }
+  return out;
 }
 
 // Finds the USDST-paired pool for an asset and returns its USDST liquidity + fee.
@@ -528,48 +640,69 @@ async function findPairPool(
 }
 
 // Resolves coin indices + full stable-pool state for the off-chain solver.
+// Two parallel calls:
+//   1) /mapping `or=` over coins + tokenBalances + rateMultipliers + assetTypes
+//      (replaces three fkey-embedded joins on BlockApps-StablePool that share
+//      the same cirrus schema-cache staleness risk we patched out of
+//      fetchCDPBootstrap).
+//   2) Scalar fetch of fee / offpeg / A-ramp parameters.
 async function resolveStablePoolState(
   accessToken: string, poolAddress: string, usdst: string, collateral: string,
 ): Promise<{ coinI: number; coinJ: number; stableState: StablePoolState | null }> {
-  const [{ data: coins }, { data: [spRow] }] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.StablePoolCoins}`, {
-      params: { address: `eq.${poolAddress}`, select: "key,value", order: "key.asc" },
+  const mappingFilters = [
+    `and(address.eq.${poolAddress},collection_name.eq.coins)`,
+    `and(address.eq.${poolAddress},collection_name.eq.tokenBalances)`,
+    `and(address.eq.${poolAddress},collection_name.eq.rateMultipliers)`,
+    `and(address.eq.${poolAddress},collection_name.eq.assetTypes)`,
+  ];
+  const [{ data: rows }, { data: [spRow] }] = await Promise.all([
+    cirrus.get(accessToken, "/mapping", {
+      params: {
+        or: `(${mappingFilters.join(",")})`,
+        select: "collection_name,key->>key,value::text",
+      },
     }),
     cirrus.get(accessToken, "/BlockApps-StablePool", {
       params: {
         address: `eq.${poolAddress}`,
-        select: [
-          "fee::text,offpegFeeMultiplier::text,initialA::text,futureA::text,initialATime::text,futureATime::text",
-          `,BlockApps-StablePool-tokenBalances(key,value::text)`,
-          `,BlockApps-StablePool-rateMultipliers(key,value::text)`,
-          `,BlockApps-StablePool-assetTypes(key,value::text)`,
-        ].join(""),
+        select: "fee::text,offpegFeeMultiplier::text,initialA::text,futureA::text,initialATime::text,futureATime::text",
       },
     }),
   ]);
 
   const usdstLower = usdst.toLowerCase();
   const collLower = collateral.toLowerCase();
-  let coinI = -1, coinJ = -1;
   const coinAddrs: string[] = [];
-  for (const c of (coins || []) as any[]) {
-    const idx = Number(c.key);
-    const addr = (c.value || "").toLowerCase();
-    coinAddrs[idx] = addr;
-    if (addr === usdstLower) coinI = idx;
-    else if (addr === collLower) coinJ = idx;
+  const balMap = new Map<string, string>();
+  const rateMap = new Map<string, string>();
+  const atMap = new Map<string, string>();
+  let coinI = -1, coinJ = -1;
+
+  for (const r of (rows || []) as any[]) {
+    switch (r.collection_name) {
+      case "coins": {
+        const idx = Number(r.key);
+        const addr = (r.value || "").toLowerCase();
+        coinAddrs[idx] = addr;
+        if (addr === usdstLower) coinI = idx;
+        else if (addr === collLower) coinJ = idx;
+        break;
+      }
+      case "tokenBalances":
+        balMap.set((r.key as string).toLowerCase(), r.value);
+        break;
+      case "rateMultipliers":
+        rateMap.set((r.key as string).toLowerCase(), r.value);
+        break;
+      case "assetTypes":
+        atMap.set((r.key as string).toLowerCase(), r.value);
+        break;
+    }
   }
 
   if (!spRow) return { coinI, coinJ, stableState: null };
 
   const numCoins = coinAddrs.length;
-  const balMap = new Map<string, string>();
-  for (const b of spRow["BlockApps-StablePool-tokenBalances"] || []) balMap.set((b.key as string).toLowerCase(), b.value);
-  const rateMap = new Map<string, string>();
-  for (const r of spRow["BlockApps-StablePool-rateMultipliers"] || []) rateMap.set(r.key.toLowerCase(), r.value);
-  const atMap = new Map<string, string>();
-  for (const a of spRow["BlockApps-StablePool-assetTypes"] || []) atMap.set(a.key.toLowerCase(), a.value);
-
   const balances: bigint[] = [];
   const rates: bigint[] = [];
   for (let i = 0; i < numCoins; i++) {

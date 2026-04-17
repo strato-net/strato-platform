@@ -49,6 +49,7 @@ export const BRIDGE_OUT_FEE = "0.02"; // USDST fee for bridge out transactions
 export const SAFETY_STAKE_FEE = "0.02"; // USDST fee for SafetyModule stake transactions
 export const SAFETY_REDEEM_FEE = "0.01"; // USDST fee for SafetyModule redeem transactions
 export const METAL_BUY_FEE = "0.02"; // USDST fee for metal buy (approve + mintMetal = 2 calls)
+export const LOOP_FEE = "0.02"; // USDST fee for loop leverage (approve + leverageUp = 2 calls)
 
 // ============================================
 // Withdrawal limits

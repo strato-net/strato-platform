@@ -8,6 +8,7 @@ import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { loopService } from "@/services/loopService";
 import type { LoopBootstrapResponse, LoopPositionResponse } from "@mercata/shared-types";
 import { formatUsdFromWei } from "@/components/loop/loopFormat";
@@ -96,6 +97,7 @@ interface LoopProps {
 const Loop = ({ embedded = false }: LoopProps) => {
   const { isLoggedIn } = useUser();
   const { activeTokens, fetchTokens } = useUserTokens();
+  const { usdstBalance, fetchUsdstBalance } = useTokenContext();
   const navigate = useNavigate();
   const { asset: assetParam } = useParams();
 
@@ -210,7 +212,7 @@ const Loop = ({ embedded = false }: LoopProps) => {
   const assetMinCR = selectedCdpAsset?.minCR || preview?.routes.cdp.minCR || 0;
   const assetLiqRatio = selectedCdpAsset?.liquidationRatio || preview?.routes.cdp.liquidationRatio || 0;
   const assetStabilityAPR = selectedCdpAsset?.stabilityFeeRate || preview?.routes.cdp.stabilityAPR || 0;
-  const poolSwapFeeBps = selectedOpportunity?.swapFeeBps || preview?.swapFeeBps || 0;
+  const poolSwapFeeBps = selectedOpportunity?.swapFeeBps ?? 0;
 
   const leverageSliderMax = maxLeverageFromMinCR(assetMinCR);
   const maxLeverageDisplay = `${leverageSliderMax.toFixed(1)}x`;
@@ -256,8 +258,8 @@ const Loop = ({ embedded = false }: LoopProps) => {
   }, [selectedAssetAddress]);
 
   const refreshAfterExecute = useCallback(async () => {
-    await Promise.all([refetchPreview(), refetchPosition(), fetchTokens()]);
-  }, [fetchTokens, refetchPosition, refetchPreview]);
+    await Promise.all([refetchPreview(), refetchPosition(), fetchTokens(), fetchUsdstBalance()]);
+  }, [fetchTokens, fetchUsdstBalance, refetchPosition, refetchPreview]);
 
   const loopContent = (
     <>
@@ -296,6 +298,7 @@ const Loop = ({ embedded = false }: LoopProps) => {
             selectedAssetDecimals={selectedAssetDecimals}
             selectedAssetPrice={selectedAssetPrice}
             selectedTokenBalanceWei={selectedTokenBalanceWei}
+            usdstBalanceWei={usdstBalance}
             leverageSliderMax={leverageSliderMax}
             liquidationLtvRatio={liquidationLtvRatio}
             assetStabilityAPR={assetStabilityAPR}

@@ -168,18 +168,17 @@ async function getTokenBalance(tokenAddr, userAddr) {
       bootstrap = data;
 
       assert(status === 200, "A1: returns 200");
-      assert(data.swapFeeBps > 0, "A2: swapFeeBps > 0");
-      assert(Array.isArray(data.opportunities), "A3: opportunities is array");
+      assert(Array.isArray(data.opportunities), "A2: opportunities is array");
       const wellShaped = data.opportunities.every((o) =>
         typeof o.asset === "string" && typeof o.symbol === "string" &&
         typeof o.baseYieldAPR === "number" && typeof o.swapFeeBps === "number" &&
         typeof o.swapPoolUSDSTLiquidity === "string"
       );
-      assert(wellShaped, "A4: every opportunity has the expected minimal shape");
-      assert(data.routes.cdp.minCR > 0, "A5: cdp minCR > 0");
-      assert(data.routes.cdp.stabilityAPR >= 0, "A6: cdp stabilityAPR >= 0");
-      assert(data.routes.cdp.liquidationRatio > 0, "A7: cdp liquidationRatio > 0");
-      assert(Array.isArray(data.routes.cdp.assets) && data.routes.cdp.assets.length > 0, "A8: cdp assets present");
+      assert(wellShaped, "A3: every opportunity has the expected minimal shape");
+      assert(data.routes.cdp.minCR > 0, "A4: cdp minCR > 0");
+      assert(data.routes.cdp.stabilityAPR >= 0, "A5: cdp stabilityAPR >= 0");
+      assert(data.routes.cdp.liquidationRatio > 0, "A6: cdp liquidationRatio > 0");
+      assert(Array.isArray(data.routes.cdp.assets) && data.routes.cdp.assets.length > 0, "A7: cdp assets present");
     } catch (e) {
       assert(false, "A: bootstrap call failed", e.response?.data?.message || e.message);
     }
