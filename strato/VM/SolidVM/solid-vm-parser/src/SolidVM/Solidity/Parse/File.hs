@@ -43,6 +43,7 @@ solidityFile = do
           <|> solidityFLError
           <|> solidityAlias
           <|> solidityFreeFunction
+          <|> solidityFreeUsing
           <|> solidityContract
           <|> solidityFLConstant
           <|> solidityFLStruct
