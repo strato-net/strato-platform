@@ -2,14 +2,26 @@ import { formatBalance } from "@/utils/numberUtils";
 import { LPTokenDropdownProps } from "@/interface";
 
 export default function LPTokenDropdown({ lpToken, className = "", isExpanded }: LPTokenDropdownProps) {
-  const userShare = lpToken?.lpToken?._totalSupply && lpToken?.lpToken?.balance
-    ? Number((BigInt(lpToken.lpToken.balance) * 10000n) / BigInt(lpToken.lpToken._totalSupply)) / 100
+  const totalSupplyBI =
+    lpToken?.lpToken?._totalSupply != null && lpToken.lpToken._totalSupply !== ""
+      ? BigInt(lpToken.lpToken._totalSupply)
+      : 0n;
+  const balanceBI =
+    lpToken?.lpToken?.balance != null && lpToken.lpToken.balance !== ""
+      ? BigInt(lpToken.lpToken.balance)
+      : 0n;
+  const hasSupply = totalSupplyBI > 0n;
+
+  const userShare = hasSupply
+    ? Number((balanceBI * 10000n) / totalSupplyBI) / 100
     : 0;
 
-  const tokenQuantities = lpToken?.lpToken?.balance && lpToken?.lpToken?._totalSupply ? {
-    tokenA: ((BigInt(lpToken.lpToken.balance) * BigInt(lpToken.tokenA.poolBalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString(),
-    tokenB: ((BigInt(lpToken.lpToken.balance) * BigInt(lpToken.tokenB.poolBalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString()
-  } : { tokenA: "0", tokenB: "0" };
+  const tokenQuantities = hasSupply
+    ? {
+        tokenA: ((balanceBI * BigInt(lpToken.tokenA.poolBalance || "0")) / totalSupplyBI).toString(),
+        tokenB: ((balanceBI * BigInt(lpToken.tokenB.poolBalance || "0")) / totalSupplyBI).toString(),
+      }
+    : { tokenA: "0", tokenB: "0" };
 
   return (
     <div className={`${className}`}>
