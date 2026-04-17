@@ -614,10 +614,6 @@ contract record CDPEngine is Ownable {
      * @dev Uses discrete compounding: newRate = oldRate * rpow(stabilityFeeRate, dt, RAY) / RAY
      * @dev Routes fees from exact index growth
      */
-    function accrue(address asset) external {
-        _accrue(asset);
-    }
-
     function _accrue(address asset) internal {
         // Load config/state for the collateral asset
         CollateralConfig memory assetConfig = collateralConfigs[asset];

@@ -203,7 +203,7 @@ contract Describe_LoopRouter is Authorizable {
 
         u.do(collAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), collAddr);
         uint debt = _realDebt(address(u));
@@ -223,7 +223,7 @@ contract Describe_LoopRouter is Authorizable {
 
         u.do(collAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), collAddr);
         uint debt = _realDebt(address(u));
@@ -243,7 +243,7 @@ contract Describe_LoopRouter is Authorizable {
 
         u.do(collAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), collAddr);
         uint debt = _realDebt(address(u));
@@ -263,7 +263,7 @@ contract Describe_LoopRouter is Authorizable {
 
         u.do(collAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), collAddr);
         uint debt = _realDebt(address(u));
@@ -281,7 +281,7 @@ contract Describe_LoopRouter is Authorizable {
 
         u.do(collAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint userColl,) = cdpEngine.vaults(address(u), collAddr);
         require(userColl > 0, "user has position");
@@ -299,7 +299,7 @@ contract Describe_LoopRouter is Authorizable {
         uint targetDebt1 = _computeFlashDebtCP(amount1, 15e17);
         u.do(collAddr, "approve", address(loopRouter), amount1);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount1, targetDebt1, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount1, targetDebt1, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll1,) = cdpEngine.vaults(address(u), collAddr);
         uint debt1 = _realDebt(address(u));
@@ -311,7 +311,7 @@ contract Describe_LoopRouter is Authorizable {
         uint targetDebt2 = _computeFlashDebtCP(amount2, 2e18);
         u.do(collAddr, "approve", address(loopRouter), amount2);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount2, targetDebt2, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount2, targetDebt2, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint coll2,) = cdpEngine.vaults(address(u), collAddr);
         uint debt2 = _realDebt(address(u));
@@ -327,7 +327,7 @@ contract Describe_LoopRouter is Authorizable {
         uint targetDebt = _computeFlashDebtCP(amount, 2e18);
         u.do(collAddr, "approve", address(loopRouter), amount);
         (uint retColl, uint retDebt) = u.do(address(loopRouter), "leverageUp",
-            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         (uint vaultColl,) = cdpEngine.vaults(address(u), collAddr);
         uint realDebt = _realDebt(address(u));
@@ -345,7 +345,7 @@ contract Describe_LoopRouter is Authorizable {
         uint targetDebt = _computeFlashDebtCP(amount, 2e18);
         u.do(collAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         uint debt = _realDebt(address(u));
         require(debt >= DEBT_FLOOR, "real debt meets floor");
@@ -359,7 +359,7 @@ contract Describe_LoopRouter is Authorizable {
         uint targetDebt = _computeFlashDebtCP(amount, 2e18);
         u.do(collAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+            collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
 
         uint routerAsset = IERC20(collAddr).balanceOf(address(loopRouter));
         uint routerUsdst = IERC20(usdstAddr).balanceOf(address(loopRouter));
@@ -420,7 +420,7 @@ contract Describe_LoopRouter is Authorizable {
 
         u.do(collAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 200, block.timestamp + 3600);
+            collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 200, block.timestamp + 3600);
 
         uint usdstAfter = pool.tokenABalance();
         uint collAfter = pool.tokenBBalance();
@@ -453,7 +453,7 @@ contract Describe_LoopRouter is Authorizable {
         bool reverted = false;
         try {
             u.do(address(loopRouter), "leverageUp",
-                collAddr, amount, overDebt, poolAddr, 0, 0, 1, 200, block.timestamp + 3600);
+                collAddr, amount, overDebt, 0, poolAddr, 0, 0, 1, 200, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -476,7 +476,7 @@ contract Describe_LoopRouter is Authorizable {
         bool reverted = false;
         try {
             u.do(address(loopRouter), "leverageUp",
-                collAddr, amount, badDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+                collAddr, amount, badDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -493,7 +493,7 @@ contract Describe_LoopRouter is Authorizable {
         bool reverted = false;
         try {
             u.do(address(loopRouter), "leverageUp",
-                collAddr, amount, targetDebt, poolAddr, 0, 1, 0, 100, block.timestamp + 3600);
+                collAddr, amount, targetDebt, 0, poolAddr, 0, 1, 0, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -516,7 +516,7 @@ contract Describe_LoopRouter is Authorizable {
         try {
             // poolAddr is USDST/COLL — OTHER does not match
             u.do(address(loopRouter), "leverageUp",
-                otherAddr, 1000e18, 1e18, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+                otherAddr, 1000e18, 1e18, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -531,7 +531,7 @@ contract Describe_LoopRouter is Authorizable {
         bool reverted = false;
         try {
             u.do(address(loopRouter), "leverageUp",
-                collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 1001, block.timestamp + 3600);
+                collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 1001, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -549,7 +549,7 @@ contract Describe_LoopRouter is Authorizable {
         bool reverted = false;
         try {
             u.do(address(loopRouter), "leverageUp",
-                collAddr, amount, tinyDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+                collAddr, amount, tinyDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -571,7 +571,7 @@ contract Describe_LoopRouter is Authorizable {
         bool reverted = false;
         try {
             u.do(address(loopRouter), "leverageUp",
-                collAddr, amount, targetDebt, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
+                collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 100, block.timestamp + 3600);
         } catch {
             reverted = true;
         }
@@ -636,6 +636,52 @@ contract Describe_LoopRouter is Authorizable {
         require(dy3 > dy2, "dy monotonic 10->100");
     }
 
+    // ─────────────── quoteSwap parity ───────────────
+
+    function it_cp_quote_matches_swap() {
+        uint[] sizes = new uint[](3);
+        sizes[0] = 1e18;
+        sizes[1] = 100e18;
+        sizes[2] = 10000e18;
+
+        for (uint t = 0; t < sizes.length; t++) {
+            uint dx = sizes[t];
+            uint quoted = pool.quoteSwap(true, dx);
+
+            User u = new User();
+            usdst.mint(address(u), dx);
+            u.do(usdstAddr, "approve", poolAddr, dx);
+            uint before = collateral.balanceOf(address(u));
+            u.do(poolAddr, "swap", true, dx, 1, block.timestamp + 3600);
+            uint got = collateral.balanceOf(address(u)) - before;
+
+            uint diff = quoted > got ? quoted - got : got - quoted;
+            require(diff <= 1, "CP quote matches swap within 1 wei");
+        }
+    }
+
+    function it_stable_quote_matches_exchange() {
+        uint[] sizes = new uint[](3);
+        sizes[0] = 1e18;
+        sizes[1] = 100e18;
+        sizes[2] = 10000e18;
+
+        for (uint t = 0; t < sizes.length; t++) {
+            uint dx = sizes[t];
+            uint quoted = stablePool.quoteSwap(0, 1, dx);
+
+            User u = new User();
+            usdst.mint(address(u), dx);
+            u.do(usdstAddr, "approve", stablePoolAddr, dx);
+            uint before = stableColl.balanceOf(address(u));
+            u.do(stablePoolAddr, "exchange", 0, 1, dx, 1, address(u));
+            uint got = stableColl.balanceOf(address(u)) - before;
+
+            uint diff = quoted > got ? quoted - got : got - quoted;
+            require(diff <= 1, "Stable quote matches exchange within 1 wei");
+        }
+    }
+
     function it_stable_leverage_15x() {
         User u = _freshStableUser(10000e18);
         uint amount = 1000e18;
@@ -645,7 +691,7 @@ contract Describe_LoopRouter is Authorizable {
 
         u.do(stableCollAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            stableCollAddr, amount, targetDebt, stablePoolAddr,
+            stableCollAddr, amount, targetDebt, 0, stablePoolAddr,
             1, 0, 1, 200, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), stableCollAddr);
@@ -666,7 +712,7 @@ contract Describe_LoopRouter is Authorizable {
 
         u.do(stableCollAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            stableCollAddr, amount, targetDebt, stablePoolAddr,
+            stableCollAddr, amount, targetDebt, 0, stablePoolAddr,
             1, 0, 1, 200, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), stableCollAddr);
@@ -690,7 +736,7 @@ contract Describe_LoopRouter is Authorizable {
 
         u.do(stableCollAddr, "approve", address(loopRouter), amount);
         u.do(address(loopRouter), "leverageUp",
-            stableCollAddr, amount, targetDebt, stablePoolAddr,
+            stableCollAddr, amount, targetDebt, 0, stablePoolAddr,
             1, 0, 1, 200, block.timestamp + 3600);
 
         (uint coll,) = cdpEngine.vaults(address(u), stableCollAddr);
@@ -711,7 +757,7 @@ contract Describe_LoopRouter is Authorizable {
         try {
             // Swap coinI/coinJ — USDST must be at coinI
             u.do(address(loopRouter), "leverageUp",
-                stableCollAddr, amount, targetDebt, stablePoolAddr,
+                stableCollAddr, amount, targetDebt, 0, stablePoolAddr,
                 1, 1, 0, 200, block.timestamp + 3600);
         } catch {
             reverted = true;
@@ -728,7 +774,7 @@ contract Describe_LoopRouter is Authorizable {
         bool reverted = false;
         try {
             u.do(address(loopRouter), "leverageUp",
-                stableCollAddr, amount, targetDebt, stablePoolAddr,
+                stableCollAddr, amount, targetDebt, 0, stablePoolAddr,
                 1, 0, 1, 1001, block.timestamp + 3600);
         } catch {
             reverted = true;
@@ -744,7 +790,7 @@ contract Describe_LoopRouter is Authorizable {
         bool reverted = false;
         try {
             u.do(address(loopRouter), "leverageUp",
-                stableCollAddr, amount, targetDebt, stablePoolAddr,
+                stableCollAddr, amount, targetDebt, 0, stablePoolAddr,
                 1, 0, 1, 200, block.timestamp - 1);
         } catch {
             reverted = true;
@@ -760,7 +806,7 @@ contract Describe_LoopRouter is Authorizable {
         uint targetDebt1 = _computeFlashDebtStable(amount1, 15e17);
         u.do(stableCollAddr, "approve", address(loopRouter), amount1);
         u.do(address(loopRouter), "leverageUp",
-            stableCollAddr, amount1, targetDebt1, stablePoolAddr,
+            stableCollAddr, amount1, targetDebt1, 0, stablePoolAddr,
             1, 0, 1, 200, block.timestamp + 3600);
 
         (uint coll1,) = cdpEngine.vaults(address(u), stableCollAddr);
@@ -773,7 +819,7 @@ contract Describe_LoopRouter is Authorizable {
         uint targetDebt2 = _computeFlashDebtStable(amount2, 2e18);
         u.do(stableCollAddr, "approve", address(loopRouter), amount2);
         u.do(address(loopRouter), "leverageUp",
-            stableCollAddr, amount2, targetDebt2, stablePoolAddr,
+            stableCollAddr, amount2, targetDebt2, 0, stablePoolAddr,
             1, 0, 1, 200, block.timestamp + 3600);
 
         (uint coll2,) = cdpEngine.vaults(address(u), stableCollAddr);

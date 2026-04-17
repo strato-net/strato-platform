@@ -12,6 +12,8 @@ import { constants } from "../../config/constants";
 import { yieldBenchmarks, priceOracle } from "../../config/config";
 import { fetchMultiTokenStablePools } from "./swapping.helper";
 import { RAY } from "./lending.helper";
+// Re-export for loop.service.ts consumers.
+export { RAY };
 import {
   getYieldExchangeRateRowsCached,
   getYieldWindowBounds,
@@ -167,6 +169,21 @@ function computeQuoteStable(dx: bigint, i: number, j: number, st: StablePoolStat
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Pool-polymorphic quote — used by the D* solver and for computing
+// minFinalCollateral in the execute path.
+// ═══════════════════════════════════════════════════════════════
+
+export function quoteSwap(pool: SwapPoolHandle, dx: bigint): bigint {
+  if (pool.poolType === 0 && pool.cpState) {
+    return computeQuoteCP(dx, pool.cpState.rin, pool.cpState.rout, pool.cpState.feeBps);
+  }
+  if (pool.poolType === 1 && pool.stableState) {
+    return computeQuoteStable(dx, pool.coinI, pool.coinJ, pool.stableState);
+  }
+  throw new Error("pool state missing for quote");
+}
+
+// ═══════════════════════════════════════════════════════════════
 // D* solver — mirrors LoopRouter.test.sol _computeFlashDebt*
 // Fixed-point iteration: D = (amount + X(D)) * price/unitScale * (L-1)/L
 // ═══════════════════════════════════════════════════════════════
@@ -183,21 +200,11 @@ export function computeTargetNewDebt(p: DebtSolverParams): bigint {
   const { amount, targetLevWAD, priceWAD, unitScale, pool } = p;
   const levMinus1 = targetLevWAD - WAD;
 
-  const quote = (d: bigint): bigint => {
-    if (pool.poolType === 0 && pool.cpState) {
-      return computeQuoteCP(d, pool.cpState.rin, pool.cpState.rout, pool.cpState.feeBps);
-    }
-    if (pool.poolType === 1 && pool.stableState) {
-      return computeQuoteStable(d, pool.coinI, pool.coinJ, pool.stableState);
-    }
-    throw new Error("pool state missing for D* solver");
-  };
-
   let D = amount * priceWAD / unitScale * levMinus1 / WAD;
   if (D === 0n) D = 1n;
 
   for (let i = 0; i < 20; i++) {
-    const X = quote(D);
+    const X = quoteSwap(pool, D);
     const targetDebt = (amount + X) * priceWAD / unitScale * levMinus1 / targetLevWAD;
     const diff = targetDebt > D ? targetDebt - D : D - targetDebt;
     D = targetDebt;
@@ -251,31 +258,47 @@ interface CDPBootstrapResult {
 export async function fetchCDPBootstrap(accessToken: string): Promise<CDPBootstrapResult> {
   const { CDPEngine, PriceOracle: POTable, CDPRegistry } = constants;
   const cdpRegistryAddr = constants.cdpRegistry || "0000000000000000000000000000000000001012";
-  const { data: [row] } = await cirrus.get(accessToken, `/${CDPRegistry}`, {
-    params: {
-      select: [
-        "address",
-        `,priceOracle:priceOracle_fkey(address,prices:${POTable}-prices(asset:key,value::text))`,
-        `,cdpEngine:cdpEngine_fkey(`,
-        `collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),`,
-        `isSupportedAsset:${CDPEngine}-isSupportedAsset!inner(asset:key,value)`,
-        `)`,
-      ].join(""),
-      "cdpEngine.isSupportedAsset.value": "eq.true",
-      address: `eq.${cdpRegistryAddr}`,
-    },
+
+  // Phase 1: read the registry row to get priceOracle + cdpEngine addresses.
+  // priceOracle_fkey has been seen to drop out of the cirrus schema cache after
+  // CDPEngine upgrades, so fetch the address plainly and issue a separate query
+  // for prices.
+  const { data: [reg] } = await cirrus.get(accessToken, `/${CDPRegistry}`, {
+    params: { address: `eq.${cdpRegistryAddr}`, select: "address,priceOracle,cdpEngine" },
   });
+  const priceOracleAddr = reg?.priceOracle || "";
+  const engineAddr = reg?.cdpEngine || "";
+
+  // Phase 2: fan out 3 independent fetches.
+  const [pricesRes, configsRes, supportedRes] = await Promise.all([
+    priceOracleAddr
+      ? cirrus.get(accessToken, `/${POTable}-prices`, {
+          params: { address: `eq.${priceOracleAddr}`, select: "asset:key,value::text" },
+        })
+      : Promise.resolve({ data: [] }),
+    engineAddr
+      ? cirrus.get(accessToken, `/${CDPEngine}-collateralConfigs`, {
+          params: { address: `eq.${engineAddr}`, select: "asset:key,CollateralConfig:value" },
+        })
+      : Promise.resolve({ data: [] }),
+    engineAddr
+      ? cirrus.get(accessToken, `/${CDPEngine}-isSupportedAsset`, {
+          params: { address: `eq.${engineAddr}`, value: "eq.true", select: "asset:key,value" },
+        })
+      : Promise.resolve({ data: [] }),
+  ]);
 
   const priceMap = new Map<string, string>();
-  for (const p of row?.priceOracle?.prices || []) priceMap.set((p.asset as string).toLowerCase(), p.value);
+  for (const p of pricesRes.data || []) priceMap.set((p.asset as string).toLowerCase(), p.value);
 
   const supportedSet = new Set(
-    (row?.cdpEngine?.isSupportedAsset || []).map((s: any) => s.asset?.toLowerCase()),
+    (supportedRes.data || []).map((s: any) => s.asset?.toLowerCase()),
   );
   const assets: CDPBootstrapRow[] = [];
-  for (const c of row?.cdpEngine?.collateralConfigs || []) {
+  for (const c of configsRes.data || []) {
     if (!supportedSet.has(c.asset?.toLowerCase())) continue;
     const cfg = c.CollateralConfig;
+    if (!cfg) continue;
     assets.push({
       asset: c.asset,
       minCR: Number(cfg.minCR) / Number(WAD) * 100,
@@ -331,6 +354,34 @@ export async function fetchUserVaults(
     collateral: r.Vault?.collateral || "0",
     scaledDebt: r.Vault?.scaledDebt || "0",
   }));
+}
+
+// Per-asset rateAccumulator (RAY-scaled). scaledDebt * rateAccumulator / RAY = currentDebt
+// in USDST wei. Needed to display the accrued stability-fee-inclusive debt.
+export async function fetchRateAccumulators(
+  accessToken: string,
+  assetAddresses: string[],
+): Promise<Map<string, bigint>> {
+  if (assetAddresses.length === 0) return new Map();
+  const cdpEngineAddr = "0000000000000000000000000000000000001011";
+  // PostgREST `in.(...)` on JSON-typed address columns rejects bare hex literals,
+  // so fetch all rows for this engine and filter client-side.
+  const { data } = await cirrus.get(accessToken, `/${constants.CDPEngine}-collateralGlobalStates`, {
+    params: {
+      address: `eq.${cdpEngineAddr}`,
+      select: "asset:key,value",
+    },
+  });
+  const wanted = new Set(assetAddresses.map((a) => a.toLowerCase()));
+  const map = new Map<string, bigint>();
+  for (const row of (data || []) as any[]) {
+    const asset = (row.asset as string).toLowerCase();
+    if (!wanted.has(asset)) continue;
+    const v = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+    const ra = BigInt(v?.rateAccumulator || "0");
+    map.set(asset, ra > 0n ? ra : RAY);
+  }
+  return map;
 }
 
 // ═══════════════════════════════════════════════════════════════

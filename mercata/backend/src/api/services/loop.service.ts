@@ -16,6 +16,7 @@ import type {
 } from "@mercata/shared-types";
 import {
   SWAP_FEE_BPS,
+  RAY,
   WAD,
   fetchSwapPools,
   findPoolForAsset,
@@ -24,7 +25,9 @@ import {
   fetchAssetSymbols,
   fetchUserVaults,
   fetchLoopBaseYields,
+  fetchRateAccumulators,
   computeTargetNewDebt,
+  quoteSwap,
   type NormalizedPool,
   type SwapPoolHandle,
   type CDPBootstrapRow,
@@ -74,12 +77,15 @@ function buildOpportunities(
   const opportunities: LoopRouteOpportunity[] = [];
   for (const asset of cdpAssets) {
     const assetLower = asset.asset.toLowerCase();
+    const yieldAPR = baseYieldMap[assetLower] || 0;
+    if (yieldAPR <= 0) continue; // only surface yield-earning assets
     const match = findPoolForAsset(pools, assetLower, usdstLower);
     if (!match) continue;
+    if (BigInt(match.usdstLiquidity || "0") === 0n) continue; // pool must be swappable
     opportunities.push({
       asset: asset.asset,
       symbol: asset.symbol,
-      baseYieldAPR: baseYieldMap[assetLower] || 0,
+      baseYieldAPR: yieldAPR,
       swapPoolUSDSTLiquidity: match.usdstLiquidity,
       swapFeeBps: match.swapFeeBps,
     });
@@ -131,6 +137,7 @@ function buildLeverageTxs(
   req: LoopExecuteRequest,
   swapPool: SwapPoolHandle,
   targetNewDebt: string,
+  minFinalCollateral: string,
   maxSlippageBps: number,
   deadline: number,
 ): FunctionInput[] {
@@ -149,6 +156,7 @@ function buildLeverageTxs(
         asset: req.asset,
         amount: req.amount,
         targetNewDebt,
+        minFinalCollateral,
         poolAddress: swapPool.poolAddress,
         poolType: swapPool.poolType,
         coinI: swapPool.coinI,
@@ -187,8 +195,11 @@ export async function executeLoop(
   if (targetNewDebt <= 0n) throw new Error("D* solver did not converge — target leverage may be unsupported");
 
   const maxSlippageBps = req.maxSlippageBps ?? DEFAULT_SLIPPAGE_BPS;
+  const expectedSwapOut = quoteSwap(swapPool, targetNewDebt);
+  const minFinalCollateral = BigInt(req.amount) + (expectedSwapOut * (10000n - BigInt(maxSlippageBps))) / 10000n;
+
   const deadline = Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECS;
-  const txs = buildLeverageTxs(req, swapPool, targetNewDebt.toString(), maxSlippageBps, deadline);
+  const txs = buildLeverageTxs(req, swapPool, targetNewDebt.toString(), minFinalCollateral.toString(), maxSlippageBps, deadline);
   const built = await buildFunctionTx(txs, userAddress, accessToken);
   const result = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, built),
@@ -211,10 +222,11 @@ export async function getPosition(accessToken: string, userAddress: string): Pro
   if (withBalance.length === 0) return { cdp: [] };
 
   const assetAddrs = withBalance.map((v) => v.asset);
-  const [cdp, symbolMap, baseYieldMap] = await Promise.all([
+  const [cdp, symbolMap, baseYieldMap, rateAccMap] = await Promise.all([
     fetchCDPBootstrap(accessToken),
     fetchAssetSymbols(accessToken, assetAddrs),
     fetchLoopBaseYields(accessToken, assetAddrs),
+    fetchRateAccumulators(accessToken, assetAddrs),
   ]);
 
   // Build lookup maps from the CDP bootstrap data.
@@ -229,7 +241,9 @@ export async function getPosition(accessToken: string, userAddress: string): Pro
 
     const collateral = BigInt(v.collateral || "0");
     const collateralValueUSD = unitScale > 0n ? (collateral * price) / unitScale : 0n;
-    const currentDebt = BigInt(v.scaledDebt || "0");
+    // Apply live rateAccumulator so accrued stability fees are reflected; fall back to RAY (no accrual) if missing.
+    const rateAcc = rateAccMap.get(assetLower) ?? RAY;
+    const currentDebt = (BigInt(v.scaledDebt || "0") * rateAcc) / RAY;
 
     const cUSD = Number(collateralValueUSD) / 1e18;
     const d = Number(currentDebt) / 1e18;

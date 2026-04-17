@@ -38,7 +38,6 @@ contract record LoopRouter is Ownable {
         uint coinJ;
         uint maxSlippageBps;
         uint deadline;
-        bool active;
     }
     FlashContext private _flashCtx;
 
@@ -57,11 +56,6 @@ contract record LoopRouter is Ownable {
         registry = CDPRegistry(_registry);
     }
 
-    function setRegistry(address _registry) external onlyOwner {
-        require(_registry != address(0), "invalid registry");
-        registry = CDPRegistry(_registry);
-    }
-
     function _freshRate(CDPEngine engine, address asset) internal view returns (uint) {
         (uint ra,,) = engine.collateralGlobalStates(asset);
         return ra == 0 ? 1e27 : ra;
@@ -72,6 +66,7 @@ contract record LoopRouter is Ownable {
         address asset,
         uint amount,
         uint targetNewDebt,
+        uint minFinalCollateral,
         address poolAddress,
         uint poolType,
         uint coinI,
@@ -83,7 +78,6 @@ contract record LoopRouter is Ownable {
         require(targetNewDebt > 0, "target debt zero");
         require(maxSlippageBps <= 1000, "slippage > 10%");
         require(block.timestamp <= deadline, "expired");
-        require(!_flashCtx.active, "flash reentry");
 
         CDPEngine engine = registry.cdpEngine();
         address usdst = address(registry.usdst());
@@ -115,12 +109,11 @@ contract record LoopRouter is Ownable {
         _flashCtx.coinJ = coinJ;
         _flashCtx.maxSlippageBps = maxSlippageBps;
         _flashCtx.deadline = deadline;
-        _flashCtx.active = true;
 
         engine.flashMint(address(this), asset, targetNewDebt);
 
-        // Clear context — belt-and-suspenders even though the engine
-        // guarantees onFlashLoan ran exactly once before returning.
+        // Clear context — SolidVM's struct-level delete doesn't clear fields,
+        // so clear explicitly to avoid leaking user addresses / sizes to later callers.
         delete _flashCtx.user;
         delete _flashCtx.userCollateral;
         delete _flashCtx.poolAddress;
@@ -129,12 +122,15 @@ contract record LoopRouter is Ownable {
         delete _flashCtx.coinJ;
         delete _flashCtx.maxSlippageBps;
         delete _flashCtx.deadline;
-        delete _flashCtx.active;
 
         uint rateAcc = _freshRate(engine, asset);
         (uint finalColl, uint finalScaledDebt) = engine.vaults(msg.sender, asset);
         totalCollateral = finalColl;
         totalDebt = finalScaledDebt * rateAcc / 1e27;
+
+        require(totalCollateral >= minFinalCollateral, "final collateral below min");
+        require(IERC20(asset).balanceOf(address(this)) == 0, "asset residue");
+        require(IERC20(usdst).balanceOf(address(this)) == 0, "usdst residue");
 
         emit LeveragedUp(msg.sender, asset, amount, totalCollateral, totalDebt);
         return (totalCollateral, totalDebt);
@@ -149,7 +145,6 @@ contract record LoopRouter is Ownable {
     function onFlashLoan(address asset, uint amount) external {
         CDPEngine engine = registry.cdpEngine();
         require(msg.sender == address(engine), "not engine");
-        require(_flashCtx.active, "no flash context");
 
         address user = _flashCtx.user;
         uint userCollateral = _flashCtx.userCollateral;
