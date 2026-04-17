@@ -16,6 +16,7 @@ import { BalanceSnapshot } from "@mercata/shared-types";
 import { Button } from "@/components/ui/button";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
+import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import { useNetwork } from "@/context/NetworkContext";
 import { useEarnContext } from "@/context/EarnContext";
@@ -42,6 +43,8 @@ import {
 
 const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
 type TimeRange = (typeof TIME_RANGES)[number];
+
+type HistoryFetchTab = "netBalance" | "rewards";
 
 function portfolioValuePct1m(snapshots: BalanceSnapshot[]): string | null {
   if (!snapshots?.length || snapshots.length < 2) return null;
@@ -300,7 +303,7 @@ const Dashboard = () => {
       return;
     }
 
-    const historyFetchTab: "netBalance" | "rewards" =
+    const historyFetchTab: HistoryFetchTab =
       chartKpi === "rewards" && rewardsEnabled ? "rewards" : "netBalance";
     let isMounted = true;
 
@@ -398,6 +401,12 @@ const Dashboard = () => {
               </div>
             </div>
           )}
+
+          {!isLoggedIn && <GuestPromoSection variant={1} />}
+          {isLoggedIn && !isLoadingNetBalance && totalBalance === 0 && (
+            <GuestPromoSection variant={2} showFeatureCards={false} />
+          )}
+          {isLoggedIn && (isLoadingNetBalance || totalBalance > 0) && <GuestPromoSection variant={3} />}
 
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to view your portfolio, track rewards, and manage your assets" />
