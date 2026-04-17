@@ -705,18 +705,6 @@ export const getNetBalanceHistory = async (
     requestFilters.push({ address: addr, path: `requests[${reqId}]` });
   }
 
-  const mappingCollectionNames = [
-    '_balances',
-    'claimableAssets',
-    'collateralConfigs',
-    'collateralGlobalStates',
-    'prices',
-    ...(requestFilters.length ? ['requests'] : []),
-    'userCollaterals',
-    'userLoan',
-    'vaults'
-  ];
-
   const carryVaultAddrSet = new Set(carryVaultAddrs);
   const initialData = { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined, carryVaultAddrs: carryVaultAddrSet };
 
@@ -732,7 +720,7 @@ export const getNetBalanceHistory = async (
       carryVaultAddrs,
       requestFilters,
     },
-    mappingCollectionNames,
+    vaultConfig,
     initialData,
     updatePortfolioInfoStorage,
     updatePortfolioInfoMapping,
@@ -746,13 +734,16 @@ export const getNetBalanceHistory = async (
     `[net-balance-profile] ` +
     `total=${totalMs.toFixed(1)}ms ` +
     `prefetchSql=${prefetchMs.toFixed(1)}ms ` +
-    `historySql=${timings.sqlMs.toFixed(1)}ms ` +
+    `pass1Sql=${timings.pass1SqlMs.toFixed(1)}ms ` +
+    `pass2Sql=${timings.pass2SqlMs.toFixed(1)}ms ` +
+    `computeTokens=${timings.computeRelevantTokensMs.toFixed(1)}ms ` +
     `applyStorage=${timings.applyStorageMs.toFixed(1)}ms ` +
     `applyMapping=${timings.applyMappingMs.toFixed(1)}ms ` +
     `processSnapshots=${timings.snapshotFnMs.toFixed(1)}ms ` +
     `storageRows=${timings.storageRows} ` +
-    `mappingRows=${timings.mappingRows} ` +
-    `snapshots=${timings.numSnapshots} ` +
+    `userMappingRows=${timings.userMappingRows} ` +
+    `globalMappingRows=${timings.globalMappingRows} ` +
+    `relevantTokens=${timings.relevantTokenCount} ` +
     `numTicks=${historyParams.numTicks}`
   );
 
