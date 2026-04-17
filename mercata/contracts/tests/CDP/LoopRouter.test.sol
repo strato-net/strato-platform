@@ -116,7 +116,10 @@ contract Describe_LoopRouter is Authorizable {
         );
         usdst = Token(usdstAddr);
         usdst.setStatus(2);
-        usdst.mint(address(this), 10000000e18);
+        // 20M: 5M seeds the CP pool, 5M seeds the stable pool, 10M reserve
+        // for post-ownership-transfer test helpers (e.g. the quote/swap parity
+        // tests which need to fund a fresh User with USDST via .transfer).
+        usdst.mint(address(this), 20000000e18);
         Ownable(usdstAddr).transferOwnership(address(cdpEngine));
         cdpRegistry.setUSDST(usdstAddr);
         priceOracle.setAssetPrice(usdstAddr, 1e18);
@@ -649,7 +652,11 @@ contract Describe_LoopRouter is Authorizable {
             uint quoted = pool.quoteSwap(true, dx);
 
             User u = new User();
-            usdst.mint(address(u), dx);
+            // USDST ownership was transferred to cdpEngine in beforeAll, so
+            // `usdst.mint` from the test contract routes through a broken
+            // AdminRegistry cast. Use the 10M USDST reserve already minted
+            // to this test contract on line 119 instead.
+            require(usdst.transfer(address(u), dx), "usdst transfer");
             u.do(usdstAddr, "approve", poolAddr, dx);
             uint before = collateral.balanceOf(address(u));
             u.do(poolAddr, "swap", true, dx, 1, block.timestamp + 3600);
@@ -671,7 +678,7 @@ contract Describe_LoopRouter is Authorizable {
             uint quoted = stablePool.quoteSwap(0, 1, dx);
 
             User u = new User();
-            usdst.mint(address(u), dx);
+            require(usdst.transfer(address(u), dx), "usdst transfer");
             u.do(usdstAddr, "approve", stablePoolAddr, dx);
             uint before = stableColl.balanceOf(address(u));
             u.do(stablePoolAddr, "exchange", 0, 1, dx, 1, address(u));
