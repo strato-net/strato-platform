@@ -488,13 +488,17 @@ contract record CDPEngine is Ownable {
         address asset,
         uint amount
     ) external onlyOwner whenNotPaused(asset) onlyActiveAsset(asset) {
-        require(amount > 0, "flash amount zero");
-        require(borrower != address(0), "flash borrower zero");
+        require(amount > 0, "CDPEngine: flash amount zero");
+        require(borrower != address(0), "CDPEngine: flash borrower zero");
         Token usdstTok = Token(_usdst());
+        // Delta-based repayment: any pre-existing borrower USDST balance is
+        // excluded from the repayment accounting so it can't be "burned as repayment".
+        uint balanceBefore = usdstTok.balanceOf(borrower);
         usdstTok.mint(borrower, amount);
         // SolidVM dispatches by function name over address.call.
         address(borrower).call("onFlashLoan", asset, amount);
-        require(usdstTok.balanceOf(borrower) >= amount, "flash not repaid");
+        uint balanceAfter = usdstTok.balanceOf(borrower);
+        require(balanceAfter >= balanceBefore + amount, "CDPEngine: flash not repaid");
         usdstTok.burn(borrower, amount);
     }
 

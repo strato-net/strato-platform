@@ -21,15 +21,28 @@ import "../Pools/StablePool.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
+/// @notice Marker for the engine->borrower flash callback. Dispatch happens
+/// via `address(borrower).call("onFlashLoan", …)` in SolidVM so this interface
+/// is documentation — it identifies implementers by grep.
+interface IFlashLoanBorrower {
+    function onFlashLoan(address asset, uint amount) external;
+}
+
 contract record LoopRouter is Ownable {
     CDPRegistry public registry;
+
+    // Monotonic flash-call version. Bumped on every `leverageUp`; `onFlashLoan`
+    // requires `_flashCtx.version == _flashVersion` so a stale or unprimed
+    // context fails loudly instead of being silently consumed.
+    uint256 private _flashVersion;
 
     // ─────────────────── Flash-loan reentrancy context ───────────────────
     // SolidVM-friendly alternative to `abi.encode`/`abi.decode`: the caller
     // writes the full flash context into private storage right before
-    // `engine.flashMint` fires, and `onFlashLoan` reads it back. Cleared at
-    // the end of every flash to make residue impossible to consume later.
+    // `engine.flashMint` fires, and `onFlashLoan` reads it back. Invalidated
+    // at the end of every flash by setting `version = 0`.
     struct FlashContext {
+        uint256 version;
         address user;
         uint userCollateral;
         address poolAddress;
@@ -49,6 +62,8 @@ contract record LoopRouter is Ownable {
         uint totalDebt
     );
 
+    event TokensRescued(address indexed token, address indexed to, uint amount);
+
     constructor(address initialOwner) Ownable(initialOwner) {}
 
     function initialize(address _registry) external onlyOwner {
@@ -58,7 +73,8 @@ contract record LoopRouter is Ownable {
 
     function _freshRate(CDPEngine engine, address asset) internal view returns (uint) {
         (uint ra,,) = engine.collateralGlobalStates(asset);
-        return ra == 0 ? 1e27 : ra;
+        require(ra > 0, "LoopRouter: rate not initialized");
+        return ra;
     }
 
     // ─────────────────── Single-shot flash leverage ───────────────────
@@ -74,10 +90,10 @@ contract record LoopRouter is Ownable {
         uint maxSlippageBps,
         uint deadline
     ) external returns (uint totalCollateral, uint totalDebt) {
-        require(amount > 0, "invalid amount");
-        require(targetNewDebt > 0, "target debt zero");
-        require(maxSlippageBps <= 1000, "slippage > 10%");
-        require(block.timestamp <= deadline, "expired");
+        require(amount > 0, "LoopRouter: invalid amount");
+        require(targetNewDebt > 0, "LoopRouter: target debt zero");
+        require(maxSlippageBps <= 1000, "LoopRouter: slippage > 10%");
+        require(block.timestamp <= deadline, "LoopRouter: expired");
 
         CDPEngine engine = registry.cdpEngine();
         address usdst = address(registry.usdst());
@@ -87,20 +103,23 @@ contract record LoopRouter is Ownable {
             bool isAToB = (coinI == 0);
             address tokenIn  = isAToB ? address(p.tokenA()) : address(p.tokenB());
             address tokenOut = isAToB ? address(p.tokenB()) : address(p.tokenA());
-            require(tokenIn == usdst && tokenOut == asset, "pool token mismatch");
+            require(tokenIn == usdst && tokenOut == asset, "LoopRouter: pool token mismatch");
         } else if (poolType == 1) {
             StablePool sp = StablePool(poolAddress);
-            require(address(sp.coins(coinI)) == usdst, "coinI must be USDST");
-            require(address(sp.coins(coinJ)) == asset, "coinJ must be asset");
+            require(address(sp.coins(coinI)) == usdst, "LoopRouter: coinI must be USDST");
+            require(address(sp.coins(coinJ)) == asset, "LoopRouter: coinJ must be asset");
         } else {
-            revert("invalid poolType");
+            revert("LoopRouter: invalid poolType");
         }
 
         // Pull user collateral in before entering the callback so the
         // deposit inside onFlashLoan owns it.
-        require(IERC20(asset).transferFrom(msg.sender, address(this), amount), "transfer failed");
+        require(IERC20(asset).transferFrom(msg.sender, address(this), amount), "LoopRouter: transfer failed");
 
-        // Prime the flash context; onFlashLoan reads this back.
+        // Prime the flash context with a unique version token so stale or
+        // unprimed reads in `onFlashLoan` fail `version` equality.
+        ++_flashVersion;
+        _flashCtx.version = _flashVersion;
         _flashCtx.user = msg.sender;
         _flashCtx.userCollateral = amount;
         _flashCtx.poolAddress = poolAddress;
@@ -112,25 +131,17 @@ contract record LoopRouter is Ownable {
 
         engine.flashMint(address(this), asset, targetNewDebt);
 
-        // Clear context — SolidVM's struct-level delete doesn't clear fields,
-        // so clear explicitly to avoid leaking user addresses / sizes to later callers.
-        delete _flashCtx.user;
-        delete _flashCtx.userCollateral;
-        delete _flashCtx.poolAddress;
-        delete _flashCtx.poolType;
-        delete _flashCtx.coinI;
-        delete _flashCtx.coinJ;
-        delete _flashCtx.maxSlippageBps;
-        delete _flashCtx.deadline;
+        // Invalidate the ctx — any future stale read fails the version check.
+        _flashCtx.version = 0;
 
         uint rateAcc = _freshRate(engine, asset);
         (uint finalColl, uint finalScaledDebt) = engine.vaults(msg.sender, asset);
         totalCollateral = finalColl;
         totalDebt = finalScaledDebt * rateAcc / 1e27;
 
-        require(totalCollateral >= minFinalCollateral, "final collateral below min");
-        require(IERC20(asset).balanceOf(address(this)) == 0, "asset residue");
-        require(IERC20(usdst).balanceOf(address(this)) == 0, "usdst residue");
+        require(totalCollateral >= minFinalCollateral, "LoopRouter: final collateral below min");
+        require(IERC20(asset).balanceOf(address(this)) == 0, "LoopRouter: asset residue");
+        require(IERC20(usdst).balanceOf(address(this)) == 0, "LoopRouter: usdst residue");
 
         emit LeveragedUp(msg.sender, asset, amount, totalCollateral, totalDebt);
         return (totalCollateral, totalDebt);
@@ -140,11 +151,12 @@ contract record LoopRouter is Ownable {
     ///         collateral, deposits total collateral on the user's behalf,
     ///         then mints the permanent debt that will repay the flash.
     /// @dev Gated to the engine we resolve from the registry; any direct call
-    ///      reverts with "not engine". Context is the `_flashCtx` set by
-    ///      `leverageUp` just before the engine call.
+    ///      reverts with "not engine". The primed `_flashCtx.version` must
+    ///      equal `_flashVersion` so stale / unprimed contexts fail loudly.
     function onFlashLoan(address asset, uint amount) external {
         CDPEngine engine = registry.cdpEngine();
-        require(msg.sender == address(engine), "not engine");
+        require(msg.sender == address(engine), "LoopRouter: not engine");
+        require(_flashCtx.version != 0 && _flashCtx.version == _flashVersion, "LoopRouter: stale flash ctx");
 
         address user = _flashCtx.user;
         uint userCollateral = _flashCtx.userCollateral;
@@ -161,12 +173,12 @@ contract record LoopRouter is Ownable {
         address usdst = address(registry.usdst());
 
         // 1) Swap the full flash amount USDST → collateral.
-        require(IERC20(usdst).approve(poolAddress, amount), "usdst approve failed");
+        require(IERC20(usdst).approve(poolAddress, amount), "LoopRouter: usdst approve failed");
         uint expectedOut = poolType == 0
             ? Pool(poolAddress).quoteSwap(coinI == 0, amount)
             : StablePool(poolAddress).quoteSwap(coinI, coinJ, amount);
+        require(expectedOut > 0, "LoopRouter: zero quote");
         uint minOut = expectedOut * (10000 - maxSlippageBps) / 10000;
-        if (minOut == 0) minOut = 1;
         uint received = poolType == 0
             ? Pool(poolAddress).swap(coinI == 0, amount, minOut, deadline)
             : StablePool(poolAddress).exchange(coinI, coinJ, amount, minOut, address(this));
@@ -175,7 +187,7 @@ contract record LoopRouter is Ownable {
         //    user's behalf, then mint the permanent debt (CR check fires).
         uint totalColl = userCollateral + received;
         address vaultAddr = address(registry.cdpVault());
-        require(IERC20(asset).approve(vaultAddr, totalColl), "coll approve failed");
+        require(IERC20(asset).approve(vaultAddr, totalColl), "LoopRouter: coll approve failed");
         engine.depositFor(address(this), user, asset, totalColl);
         engine.mintFor(address(this), user, asset, amount);
         // The `amount` of USDST freshly minted by mintFor now sits in the
@@ -183,9 +195,10 @@ contract record LoopRouter is Ownable {
     }
 
     function rescueTokens(address token, address to, uint amount) external onlyOwner {
-        require(to != address(0), "invalid to");
-        require(token != address(registry.usdst()), "cannot rescue USDST");
-        require(!registry.cdpEngine().isSupportedAsset(token), "cannot rescue collateral asset");
-        require(IERC20(token).transfer(to, amount), "transfer failed");
+        require(to != address(0), "LoopRouter: invalid to");
+        require(token != address(registry.usdst()), "LoopRouter: cannot rescue USDST");
+        require(!registry.cdpEngine().isSupportedAsset(token), "LoopRouter: cannot rescue collateral asset");
+        require(IERC20(token).transfer(to, amount), "LoopRouter: rescue transfer failed");
+        emit TokensRescued(token, to, amount);
     }
 }

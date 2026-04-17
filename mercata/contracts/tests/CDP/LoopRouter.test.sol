@@ -827,4 +827,99 @@ contract Describe_LoopRouter is Authorizable {
         require(coll2 > coll1, "stable coll increased");
         require(debt2 > debt1, "stable debt increased");
     }
+
+    // ─────────────── Post-review hardening coverage ───────────────
+
+    function it_cp_deadline_expired_reverts() {
+        // CP parity of it_stable_deadline_reverts.
+        User u = _freshUser(10000e18);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtCP(amount, 2e18);
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        bool reverted = false;
+        try {
+            u.do(address(loopRouter), "leverageUp",
+                collAddr, amount, targetDebt, 0, poolAddr, 0, 0, 1, 200, block.timestamp - 1);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "CP leverageUp must revert on expired deadline");
+    }
+
+    function it_flash_onflashloan_unprimed_reverts() {
+        // Simulate the engine calling onFlashLoan without a priming leverageUp.
+        // The router's stale-ctx check (version != 0 && version == _flashVersion)
+        // must fire, which propagates a revert out through engine.flashMint.
+        // (Test contract acts as admin via bypassAuthorizations, so it can call
+        // cdpEngine.flashMint directly.)
+        bool reverted = false;
+        try {
+            cdpEngine.flashMint(address(loopRouter), collAddr, 1e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "unprimed onFlashLoan must revert via stale ctx check");
+    }
+
+    function it_flash_zero_quote_reverts() {
+        // Quote-floor guard: a 1-wei targetNewDebt on a 5M:5M pool produces
+        // quoteSwap(true, 1) == 0 (integer floor). onFlashLoan's
+        // require(expectedOut > 0) must fire before the swap executes.
+        User u = _freshUser(10000e18);
+        uint amount = 1000e18;
+        u.do(collAddr, "approve", address(loopRouter), amount);
+        bool reverted = false;
+        try {
+            u.do(address(loopRouter), "leverageUp",
+                collAddr, amount, 1, 0, poolAddr, 0, 0, 1, 200, block.timestamp + 3600);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "zero-quote swap must revert inside onFlashLoan");
+    }
+
+    function it_stable_offpeg_fee_active() {
+        // With offpegFeeMultiplier > FEE_DENOMINATOR and an imbalanced pool,
+        // _dynamicFee scales above the base fee. The D* solver uses live
+        // quoteSwap so it should still converge within tolerance.
+        // Enable offpeg (fee=4000000 = 4bps, multiplier=20e9 = 2x at full imbalance).
+        stablePool.setNewFee(4000000, 20000000000);
+
+        // Imbalance: swap 500k stableColl → USDST to tilt reserves.
+        require(ERC20(stableCollAddr).approve(stablePoolAddr, 500000e18), "approve imbalance");
+        stablePool.exchange(1, 0, 500000e18, 1, address(this));
+
+        User u = _freshStableUser(10000e18);
+        uint amount = 1000e18;
+        uint targetDebt = _computeFlashDebtStable(amount, 2e18);
+        u.do(stableCollAddr, "approve", address(loopRouter), amount);
+        u.do(address(loopRouter), "leverageUp",
+            stableCollAddr, amount, targetDebt, 0, stablePoolAddr,
+            1, 0, 1, 200, block.timestamp + 3600);
+
+        uint debt = _realDebtStable(address(u));
+        (uint coll,) = cdpEngine.vaults(address(u), stableCollAddr);
+        uint lev = _leverageStable(coll, debt);
+        // Convergence within 2% — offpeg fee allows slightly wider drift than peg.
+        require(lev >= 196e16 && lev <= 204e16, "offpeg 2x converges within 2%");
+    }
+
+    function it_flash_rescue_emits_event() {
+        // Smoke test: successful rescue of an unrelated token. The contract
+        // emits TokensRescued; we assert the balance transfer succeeded as
+        // a proxy for the event wiring being correct (SolidVM tests don't
+        // expose event inspection directly).
+        address strayAddr = m.tokenFactory().createToken(
+            "STRAY2", "Stray Token Two", emptyArray, emptyArray, emptyArray, "STRAY2", 1000000e18, 18
+        );
+        Token stray = Token(strayAddr);
+        stray.setStatus(2);
+        stray.mint(address(loopRouter), 42e18);
+
+        uint balBefore = IERC20(strayAddr).balanceOf(address(this));
+        loopRouter.rescueTokens(strayAddr, address(this), 42e18);
+        uint balAfter = IERC20(strayAddr).balanceOf(address(this));
+        require(balAfter == balBefore + 42e18, "rescue transfer succeeded");
+        require(IERC20(strayAddr).balanceOf(address(loopRouter)) == 0, "router drained");
+    }
 }
