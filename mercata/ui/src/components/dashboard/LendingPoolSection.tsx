@@ -40,13 +40,12 @@ const LendingPoolSection = () => {
   const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
   const lendingDisplayApy = lendingEarnApyInfo?.total.toFixed(2);
 
+  /** Pool + token balances after deposit/withdraw (mount uses pool-only to avoid duplicate GET /tokens/balance). */
   const refreshLendingData = (signal?: AbortSignal) => {
-    // Pool stats are public - always fetch
     refreshLiquidity(signal);
-    // User-specific data - only fetch when logged in
     if (isLoggedIn) {
-      fetchTokens(signal);
-      fetchUsdstBalance();
+      void fetchTokens(signal);
+      void fetchUsdstBalance(signal);
     }
   };
 
@@ -55,14 +54,13 @@ const LendingPoolSection = () => {
     return BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
   };
 
-  // 1. Fetch on mount, with abort controller
   useEffect(() => {
     const abortController = new AbortController();
-    refreshLendingData(abortController.signal);
+    refreshLiquidity(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, []);
+  }, [refreshLiquidity]);
 
 
   const isDepositAmountValid = () => {

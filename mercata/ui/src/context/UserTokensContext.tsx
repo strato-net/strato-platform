@@ -1,10 +1,14 @@
 // src/context/UserTokensContext.tsx
-import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, axios } from "@/lib/axios";
 import { Token } from "@/interface";
-import isEqual from "lodash.isequal";
 import { sUsdstAddress, mUsdstAddress, cataAddress } from "@/lib/constants";
 import { useUser } from "@/context/UserContext";
+import {
+  USER_TOKEN_BALANCES_QUERY_KEY,
+  fetchUserTokenBalances,
+} from "@/queries/tokenBalancesQuery";
 
 type UserTokensContextType = {
   activeTokens: Token[];
@@ -25,67 +29,87 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   children
 }) => {
   const { isLoggedIn } = useUser();
-  const [activeTokens, setActiveTokens] = useState<Token[]>([]);
-  const [inactiveTokens, setInactiveTokens] = useState<Token[]>([]);
+  const queryClient = useQueryClient();
   const [allActiveTokens, setAllActiveTokens] = useState<Token[]>([]);
-  const [loading, setLoading] = useState(false);
   const [allActiveLoading, setAllActiveLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [refetchError, setRefetchError] = useState<string | null>(null);
 
-  const fetchTokens = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await api.get(
-        `/tokens/balance`,
-        { signal }
-      );
-      // Only update state if not aborted and data has actually changed
-      if (signal?.aborted) return;
+  const {
+    data: balanceData,
+    isPending,
+    isFetching,
+    isError,
+    error: balanceQueryError,
+  } = useQuery({
+    queryKey: USER_TOKEN_BALANCES_QUERY_KEY,
+    queryFn: ({ signal }) => fetchUserTokenBalances(signal),
+    enabled: isLoggedIn,
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
 
-      const allTokens = response.data || [];
-
-      const active = allTokens.filter((token: Token) =>
-        // filtering musdst, sUSDST, and CATA tokens out
-        token.token.status === '2' &&
+  const activeTokens = useMemo(() => {
+    if (!isLoggedIn) return [] as Token[];
+    const allTokens = balanceData ?? [];
+    return allTokens.filter(
+      (token: Token) =>
+        token.token.status === "2" &&
         token.address !== mUsdstAddress &&
         token.address !== sUsdstAddress &&
         token.address !== cataAddress
-      );
-      const inactive = allTokens.filter((token: Token) =>
-        token.token.status !== '2' ||
+    );
+  }, [isLoggedIn, balanceData]);
+
+  const inactiveTokens = useMemo(() => {
+    if (!isLoggedIn) return [] as Token[];
+    const allTokens = balanceData ?? [];
+    return allTokens.filter(
+      (token: Token) =>
+        token.token.status !== "2" ||
         token.address === mUsdstAddress ||
         token.address === sUsdstAddress ||
         token.address === cataAddress
-      );
+    );
+  }, [isLoggedIn, balanceData]);
 
-      setActiveTokens(prev => (isEqual(prev, active) ? prev : active));
-      setInactiveTokens(prev => (isEqual(prev, inactive) ? prev : inactive));
-    } catch (err) {
-      if (
-        axios.isCancel?.(err) ||
-        err?.name === "CanceledError" ||
-        err?.code === "ERR_CANCELED" ||
-        err?.message === "canceled"
-      ) {
-        return;
-      }
-      setActiveTokens([]);
-      setInactiveTokens([]);
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-      }
-    }
-  }, []);
+  const loading = Boolean(isLoggedIn && (isPending || isFetching));
 
-  // Modified to work like fetchTokens - storing in state
+  const queryErrorMessage =
+    isError && balanceQueryError
+      ? balanceQueryError instanceof Error
+        ? balanceQueryError.message
+        : "Failed to load tokens"
+      : null;
+
+  const fetchTokens = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!isLoggedIn) return;
+      if (signal?.aborted) return;
+      setRefetchError(null);
+      try {
+        await queryClient.invalidateQueries({
+          queryKey: USER_TOKEN_BALANCES_QUERY_KEY,
+        });
+      } catch (err) {
+        if (
+          axios.isCancel?.(err) ||
+          (err as { name?: string })?.name === "AbortError" ||
+          (err as { code?: string })?.code === "ERR_CANCELED"
+        ) {
+          return;
+        }
+        setRefetchError(err instanceof Error ? err.message : "Failed to refresh tokens");
+      }
+    },
+    [isLoggedIn, queryClient]
+  );
+
   const fetchAllActiveTokens = useCallback(async (signal?: AbortSignal): Promise<void> => {
     setAllActiveLoading(true);
-    setError(null);
+    setRefetchError(null);
     try {
       const response = await api.get(`/tokens?status=eq.2`, { signal });
-      // Only update state if not aborted and data has actually changed
       if (signal?.aborted) return;
       const tokens = response.data || [];
       setAllActiveTokens(tokens);
@@ -106,14 +130,6 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  // Fetch tokens on mount, but only if logged in
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    const abortController = new AbortController();
-    fetchTokens(abortController.signal);
-    return () => abortController.abort();
-  }, [fetchTokens, isLoggedIn]);
-
   const contextValue = useMemo(
     () => ({
       activeTokens,
@@ -121,11 +137,21 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       allActiveTokens,
       loading,
       allActiveLoading,
-      error,
+      error: refetchError ?? queryErrorMessage,
       fetchTokens,
       fetchAllActiveTokens,
     }),
-    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens]
+    [
+      activeTokens,
+      inactiveTokens,
+      allActiveTokens,
+      loading,
+      allActiveLoading,
+      refetchError,
+      queryErrorMessage,
+      fetchTokens,
+      fetchAllActiveTokens,
+    ]
   );
 
   return (

@@ -147,16 +147,29 @@ export const getBalance = async (
       ? await getTokenDetails(accessToken, tokensWithCollateralOnly)
       : new Map();
 
+  const tokenAddressFilter = rawParams.address;
+  const isFullUserBalanceList = tokenAddressFilter === undefined || tokenAddressFilter === "";
+
+  let syntheticWalletBalances: string[] = [];
+  if (isFullUserBalanceList && tokensWithCollateralOnly.length > 0) {
+    syntheticWalletBalances = await Promise.all(
+      tokensWithCollateralOnly.map((a) => {
+        const tokenAddr = a.startsWith("0x") ? a.slice(2) : a;
+        return getTokenBalanceForUser(accessToken, tokenAddr, address);
+      })
+    );
+  }
+
   const allTokens = [
     ...balanceData.map((t: any) => ({
       ...t,
       price: (rawPrices.get(t.address) || 0n).toString(),
       collateralBalance: (collateralMap.get(t.address) || 0n).toString(),
     })),
-    ...tokensWithCollateralOnly.map((a) => ({
+    ...tokensWithCollateralOnly.map((a, i) => ({
       address: a,
       user: address,
-      balance: "0",
+      balance: isFullUserBalanceList ? syntheticWalletBalances[i] || "0" : "0",
       price: (rawPrices.get(a) || 0n).toString(),
       collateralBalance: (collateralMap.get(a) || 0n).toString(),
       token: tokenDetails.get(a),

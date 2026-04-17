@@ -7,7 +7,9 @@ import {
   useEffect,
   useRef,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
+import { getBalanceForAddressPreferSharedList } from "@/queries/tokenBalancesQuery";
 import { formatBalance } from "@/utils/numberUtils";
 import {
   BalanceResponse,
@@ -20,6 +22,7 @@ import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactio
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
 export const BridgeProvider = ({ children }: { children: ReactNode }) => {
+  const queryClient = useQueryClient();
   // ========== STATE ==========
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,23 +140,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       tokenAddress: string,
       signal?: AbortSignal
     ): Promise<BalanceResponse> => {
-      const addr = tokenAddress.startsWith("0x")
-        ? tokenAddress.slice(2)
-        : tokenAddress;
-      const { data } = await api.get(`/tokens/balance?address=eq.${addr}`, {
+      const balance = await getBalanceForAddressPreferSharedList(
+        queryClient,
+        tokenAddress,
         signal,
-      });
-
-      if (Array.isArray(data) && data[0]) {
-        const tokenData = data[0];
-        const balance = tokenData.balance ? String(tokenData.balance) : "0";
-
-        return { balance };
-      }
-
-      return { balance: "0" };
+      );
+      return { balance };
     },
-    []
+    [queryClient]
   );
 
   const useBalance = useCallback((tokenAddress: string | null) => {

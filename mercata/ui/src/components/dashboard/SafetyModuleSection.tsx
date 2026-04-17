@@ -60,21 +60,20 @@ const SafetyModuleSection = () => {
 
 
   const refreshData = (signal?: AbortSignal) => {
-    refreshSafetyInfo(signal); // Always fetch public safety info
+    refreshSafetyInfo(signal);
     if (isLoggedIn) {
-    fetchTokens(signal);
-    fetchUsdstBalance();
+      void fetchTokens(signal);
+      void fetchUsdstBalance(signal);
     }
   };
 
-  // Fetch on mount, with abort controller
   useEffect(() => {
     const abortController = new AbortController();
-    refreshData(abortController.signal);
+    refreshSafetyInfo(abortController.signal);
     return () => {
       abortController.abort();
     };
-  }, []);
+  }, [refreshSafetyInfo]);
 
   // usdstBalance is now coming directly from useUserTokens() context
 

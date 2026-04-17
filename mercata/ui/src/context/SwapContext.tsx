@@ -1,7 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
-import { Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType } from '@/interface';
+import {
+  Pool,
+  SwapHistoryEntry,
+  SetPoolRatesParams,
+  SwapToken,
+  SwapContextType,
+} from '@/interface';
 import {api} from '@/lib/axios';
 import { useUser } from '@/context/UserContext';
+import { getBalanceForAddressFiltered } from '@/queries/tokenBalancesQuery';
 
 // ============================================================================
 // TYPES
@@ -13,7 +20,7 @@ const SwapContext = createContext<SwapContextType | undefined>(undefined);
 
 export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const { isLoggedIn } = useUser();
-  
+
   // ============================================================================
   // STATE
   // ============================================================================
@@ -392,18 +399,18 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Utility functions
+  // Always use GET /tokens/balance?address=eq.{addr} (same as develop) so swap / liquidity data matches backend.
   const fetchTokenBalances = useCallback(async (pool: Pool, _userAddress: string, usdstAddress: string) => {
-    const [balanceA, balanceB, balanceUsdst] = await Promise.all([
-      api.get(`/tokens/balance?address=eq.${pool.tokenA.address}`),
-      api.get(`/tokens/balance?address=eq.${pool.tokenB.address}`),
-      api.get(`/tokens/balance?address=eq.${usdstAddress}`)
+    const [tokenABalance, tokenBBalance, usdstBalance] = await Promise.all([
+      getBalanceForAddressFiltered(pool.tokenA.address),
+      getBalanceForAddressFiltered(pool.tokenB.address),
+      getBalanceForAddressFiltered(usdstAddress),
     ]);
-    
+
     return {
-      tokenABalance: balanceA?.data[0]?.balance || "0",
-      tokenBBalance: balanceB?.data[0]?.balance || "0",
-      usdstBalance: balanceUsdst?.data[0]?.balance || "0"
+      tokenABalance,
+      tokenBBalance,
+      usdstBalance,
     };
   }, []);
 

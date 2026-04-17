@@ -37,13 +37,6 @@ const SwapPoolsSection = () => {
   }, [fetchPools]);
 
   useEffect(() => {
-    // Only fetch user balance when logged in
-    if (isLoggedIn) {
-      fetchUsdstBalance();
-    }
-  }, [fetchUsdstBalance, isLoggedIn]);
-
-  useEffect(() => {
     if (selectedPool && isDepositModalOpen) {
       const pollPool = async () => {
         try {
