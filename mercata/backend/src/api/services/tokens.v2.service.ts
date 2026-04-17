@@ -6,12 +6,13 @@ import { getVaultShareTokenAddress, getVaultHistoryConfig } from "./vault.servic
 import { getSaveUsdstInfo, getSaveUsdstUserInfo } from "./saveUsdst.service";
 import { getLoan } from "./lending.service";
 import { getVaults } from "./cdp.service";
+import { listVaultDefs, getYieldVaultInfo, getYieldVaultUserInfo } from "./yieldVault.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@mercata/shared-types";
 import { buildTokenSelectFields } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 
-const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS } = constants;
+const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, YieldVault } = constants;
 
 // Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
 // Returns a map of stratoToken -> externalSymbol.
@@ -73,6 +74,48 @@ const buildSaveUsdstEarningAsset = (
     images: [],
     attributes: [],
     price,
+    collateralBalance: "0",
+    totalBalance,
+    isPoolToken: false,
+    value,
+    apy: info.apy || "0",
+  };
+};
+
+const buildYieldVaultEarningAsset = (
+  info: Awaited<ReturnType<typeof getYieldVaultInfo>>,
+  userInfo?: Awaited<ReturnType<typeof getYieldVaultUserInfo>> | null
+): EarningAsset | null => {
+  if (!info.deployed || !info.vaultAddress) return null;
+
+  const balance = userInfo?.userShares ?? "0";
+  const totalBalance = balance;
+  let value = "0.00";
+  if (userInfo) {
+    const positionUsd = BigInt(userInfo.positionUsd || "0");
+    const assetPrice = BigInt(info.assetPriceWad || "0");
+    const unit = BigInt(10) ** BigInt(info.decimals || 18);
+    const claimableUsd = assetPrice > 0n ? (BigInt(userInfo.claimableAssets || "0") * assetPrice) / unit : 0n;
+    const queuedUsd = userInfo.pendingWithdrawal
+      ? (assetPrice > 0n ? (BigInt(userInfo.pendingWithdrawal.estimatedAssets || "0") * assetPrice) / unit : 0n)
+      : 0n;
+    value = (Number(positionUsd + claimableUsd + queuedUsd) / 1e18).toFixed(2);
+  }
+
+  return {
+    address: info.vaultAddress,
+    _name: info.name,
+    _symbol: info.shareSymbol,
+    _owner: "",
+    _totalSupply: info.totalShares || "0",
+    customDecimals: info.decimals,
+    description: "Carry vault",
+    status: "2",
+    _paused: info.paused,
+    balance,
+    images: [],
+    attributes: [],
+    price: ((BigInt(info.exchangeRate || "0") * BigInt(info.assetPriceWad || "0")) / BigInt(1e18)).toString(),
     collateralBalance: "0",
     totalBalance,
     isPoolToken: false,
@@ -215,6 +258,26 @@ export const getEarningAssets = async (
     }
   }
 
+  const yieldVaultPairs = await Promise.all(
+    listVaultDefs().map(async (def) => ({
+      info: await getYieldVaultInfo(accessToken, def.key).catch(() => null),
+      userInfo: await getYieldVaultUserInfo(accessToken, def.key, userAddress).catch(() => null),
+    }))
+  );
+  for (const { info, userInfo } of yieldVaultPairs) {
+    if (!info?.deployed) continue;
+    const yvAsset = buildYieldVaultEarningAsset(info, userInfo ?? undefined);
+    if (!yvAsset) continue;
+    const existingIdx = earningAssets.findIndex(
+      (asset: EarningAsset) => asset.address.toLowerCase() === yvAsset.address.toLowerCase()
+    );
+    if (existingIdx >= 0) {
+      earningAssets[existingIdx] = yvAsset;
+    } else {
+      earningAssets.push(yvAsset);
+    }
+  }
+
   return earningAssets;
 };
 
@@ -270,6 +333,20 @@ export const getPublicEarningAssets = async (
     earningAssets.push(saveUsdstAsset);
   }
 
+  const yieldVaultInfos = await Promise.all(
+    listVaultDefs().map((def) => getYieldVaultInfo(accessToken, def.key).catch(() => null))
+  );
+  for (const info of yieldVaultInfos) {
+    if (!info?.deployed) continue;
+    const yvAsset = buildYieldVaultEarningAsset(info, null);
+    if (
+      yvAsset &&
+      !earningAssets.some((asset: EarningAsset) => asset.address.toLowerCase() === yvAsset.address.toLowerCase())
+    ) {
+      earningAssets.push(yvAsset);
+    }
+  }
+
   return earningAssets;
 };
 
@@ -279,7 +356,13 @@ function updatePortfolioInfoStorage(portfolioInfo: any, newInfo: StorageHistoryE
     return { ...portfolioInfo,
       tokens: { ...portfolioInfo.tokens,
         [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
-          supply: totalSupply
+          supply: totalSupply,
+          ...(newInfo.data._managedAssets ? { managedAssets: BigInt(newInfo.data._managedAssets) } : {}),
+          ...(newInfo.data.deployedAssets != null ? {
+            deployedAssets: BigInt(newInfo.data.deployedAssets || 0),
+            totalClaimableAssets: BigInt(newInfo.data.totalClaimableAssets || 0),
+            underlyingAsset: newInfo.data._asset || '',
+          } : {})
         }
       }
     };
@@ -338,6 +421,22 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
             }
           }
         };
+      }
+      if (portfolioInfo.carryVaultAddrs) {
+        for (const cvAddr of portfolioInfo.carryVaultAddrs) {
+          if (newInfo.path === `_balances[${cvAddr}]`) {
+            if (portfolioInfo.tokens[cvAddr]?.underlyingAsset === newInfo.address) {
+              return { ...portfolioInfo, 
+                tokens: { ...portfolioInfo.tokens,
+                  [cvAddr]: { ...portfolioInfo.tokens[cvAddr],
+                    idleAssets: newValue
+                  }
+                }
+              };
+            }
+            return portfolioInfo;
+          }
+        }
       }
       return { ...portfolioInfo, 
         tokens: { ...portfolioInfo.tokens,
@@ -409,6 +508,32 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
         }
       };
     }
+    case 'claimableAssets': {
+      if (portfolioInfo.carryVaultAddrs?.has(newInfo.address)) {
+        const newValue = parseFloat(newInfo.value) || 0;
+        return { ...portfolioInfo,
+          tokens: { ...portfolioInfo.tokens,
+            [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
+              userClaimableAssets: newValue
+            }
+          }
+        };
+      }
+      return portfolioInfo;
+    }
+    case 'requests': {
+      if (portfolioInfo.carryVaultAddrs?.has(newInfo.address)) {
+        const shares = parseFloat(newInfo.value?.shares) || 0;
+        return { ...portfolioInfo,
+          tokens: { ...portfolioInfo.tokens,
+            [newInfo.address]: { ...portfolioInfo.tokens[newInfo.address],
+              userQueuedShares: shares
+            }
+          }
+        };
+      }
+      return portfolioInfo;
+    }
   }
   return portfolioInfo;
 }
@@ -424,6 +549,29 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
       const rateAccumulator = Number(BigInt(token?.rateAccumulator) / 1000000000000000000n) / 1000000000;
       const loanAmt = (token?.scaledDebt || 0) * rateAccumulator;
       netLoan += loanAmt;
+    }
+    if (snapshot.data.carryVaultAddrs?.has(tokenAddr)) {
+      if (token?.userClaimableAssets) {
+        const ulAsset = token?.underlyingAsset || '';
+        const ulPrice = snapshot.data.tokens[ulAsset]?.price || 0;
+        netBalance += (token.userClaimableAssets / 1000000000) * (ulPrice / 1000000000);
+      }
+      if (token?.userQueuedShares) {
+        const supply = token?.supply || '0';
+        if (supply !== '0') {
+          const deployed = BigInt(token?.deployedAssets || 0);
+          const claimable = BigInt(token?.totalClaimableAssets || 0);
+          const idle = BigInt(token?.idleAssets || 0);
+          const cvTotal = idle + deployed;
+          const cvActive = cvTotal > claimable ? cvTotal - claimable : 0n;
+          if (cvActive > 0n) {
+            const ulAsset = token?.underlyingAsset || '';
+            const ulPrice = snapshot.data.tokens[ulAsset]?.price || 0;
+            const queuedAssets = Number((BigInt(Math.round(token.userQueuedShares)) * cvActive) / BigInt(supply));
+            netBalance += (queuedAssets / 1000000000) * (ulPrice / 1000000000);
+          }
+        }
+      }
     }
     if (tokenBalance === 0) continue;
     if (tokenPrice === 0) {
@@ -453,6 +601,17 @@ function processBalanceSnapshot(snapshot: {timestamp: number, data: any}, index:
         }
         if (totalEquity > 0n) {
           tokenPrice = Number((totalEquity * BigInt(1e18)) / BigInt(totalSupply));
+        }
+      } else if (snapshot.data.carryVaultAddrs?.has(tokenAddr)) {
+        const deployed = BigInt(token?.deployedAssets || 0);
+        const claimable = BigInt(token?.totalClaimableAssets || 0);
+        const idle = BigInt(token?.idleAssets || 0);
+        const cvTotalAssets = idle + deployed;
+        const cvActiveAssets = cvTotalAssets > claimable ? cvTotalAssets - claimable : 0n;
+        const underlyingAsset = token?.underlyingAsset || '';
+        const assetPrice = BigInt(snapshot.data.tokens[underlyingAsset]?.price || 0) || 0n;
+        if (cvActiveAssets > 0n && assetPrice > 0n) {
+          tokenPrice = Number((cvActiveAssets * assetPrice) / BigInt(totalSupply));
         }
       } else { // mUSDST
         const borrowIndex = BigInt(token?.borrowIndex) || 0n;
@@ -528,16 +687,32 @@ export const getNetBalanceHistory = async (
   historyParams: HistoryParams,
 ): Promise<BalanceSnapshot[]> => {
 
-  // Pre-fetch vault config for vault share token history tracking
-  const vaultConfig = await getVaultHistoryConfig(accessToken);
+  // Pre-fetch vault config and carry vault active request IDs in parallel
+  const carryVaultAddrs = listVaultDefs().filter(v => v.address).map(v => v.address);
+  const [vaultConfig, ...activeReqIds] = await Promise.all([
+    getVaultHistoryConfig(accessToken),
+    ...carryVaultAddrs.map(addr =>
+      cirrus.get(accessToken, `/${YieldVault}-activeRequestId`, {
+        params: { address: `eq.${addr}`, key: `eq.${userAddress}`, select: 'value::text' },
+      }).then(r => r.data?.[0]?.value || "0").catch(() => "0")
+    ),
+  ]);
+
+  const requestFilters: string[] = [];
+  carryVaultAddrs.forEach((addr, i) => {
+    if (activeReqIds[i] && activeReqIds[i] !== "0") {
+      requestFilters.push(`and(address.eq.${addr},path.eq.requests[${activeReqIds[i]}])`);
+    }
+  });
 
   const storageFilters = [
     'data->>lpToken.neq.""',
     'data->>_symbol.like.*-LP',
-    'data->>_symbol.in.(MUSDST,SUSDST,safetyUSDST,lendUSDST)',
+    'data->>_symbol.in.(MUSDST,SUSDST,safetyUSDST,lendUSDST,saveUSDST)',
     'data->>sToken.gt.0',
     'and(data->>mToken.gt.0,data->>borrowIndex.gt.0)',
     ...(vaultConfig?.shareToken ? [`address.eq.${vaultConfig.shareToken}`] : []),
+    ...carryVaultAddrs.map(addr => `address.eq.${addr}`),
   ]
 
   const mappingFilters = [
@@ -547,25 +722,31 @@ export const getNetBalanceHistory = async (
     'path.like.collateralGlobalStates[*',
     'and(address.eq.937efa7e3a77e20bbdbd7c0d32b6514f368c1010,path.eq._balances[0000000000000000000000000000000000001004])',
     ...(vaultConfig?.botExecutor ? [`path.eq._balances[${vaultConfig.botExecutor}]`] : []),
+    ...carryVaultAddrs.map(addr => `path.eq._balances[${addr}]`),
+    ...carryVaultAddrs.map(addr => `and(address.eq.${addr},path.eq.claimableAssets[${userAddress}])`),
+    ...requestFilters,
   ]
 
   const mappingCollectionNames = [
     '_balances',
+    'claimableAssets',
     'collateralConfigs',
     'collateralGlobalStates',
     'prices',
+    ...(requestFilters.length ? ['requests'] : []),
     'userCollaterals',
     'userLoan',
     'vaults'
   ]
 
+  const carryVaultAddrSet = new Set(carryVaultAddrs);
   const balanceHistory = await getHistory(
     accessToken,
     historyParams,
     storageFilters,
     mappingFilters,
     mappingCollectionNames,
-    { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined },
+    { tokens: {}, userLoan: {}, vaultConfig: vaultConfig || undefined, carryVaultAddrs: carryVaultAddrSet },
     updatePortfolioInfoStorage,
     updatePortfolioInfoMapping,
     processBalanceSnapshot

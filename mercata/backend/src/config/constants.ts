@@ -38,6 +38,7 @@ export const constants = (() => {
   const Vault = `${CONTRACT_PREFIX}Vault`;
   const VaultFactory = `${CONTRACT_PREFIX}VaultFactory`;
   const SaveUSDSTVault = `${CONTRACT_PREFIX}SaveUSDSTVault`;
+  const YieldVault = `${CONTRACT_PREFIX}YieldVault`;
   const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
   const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
   const Event = "event";
@@ -149,6 +150,7 @@ export const constants = (() => {
     Vault,
     VaultFactory,
     SaveUSDSTVault,
+    YieldVault,
     MetalForge,
     SafetyModule,
     get metalForge() { return config.metalForge; },
@@ -181,6 +183,9 @@ export const constants = (() => {
     GAS_FEE: 0.01,
     GAS_FEE_WEI: 10n ** 16n, // 0.01 USDST in wei
     USDST: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+    ZERO_ADDRESS: "0000000000000000000000000000000000000000",
+    DAY_MS: 24 * 60 * 60 * 1000,
+    BPS_DIVISOR: 10000,
     voucher,
   };
 })();

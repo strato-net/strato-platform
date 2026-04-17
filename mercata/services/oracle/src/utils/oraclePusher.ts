@@ -126,6 +126,21 @@ export async function pushRebaseFactors(factors: Array<{ targetAddress: string; 
     return result;
 }
 
+export async function pushExchangeRates(rates: Array<{ targetAddress: string; rate: bigint }>): Promise<TransactionResult> {
+    const callListArgs: CallListArg[] = [{
+        contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
+        method: "setExchangeRates",
+        args: {
+            assets: rates.map(r => r.targetAddress),
+            rates: rates.map(r => r.rate.toString())
+        },
+    }];
+
+    const result = await callListAndWait(callListArgs);
+    logInfo('OraclePusher', `Exchange rates pushed for ${rates.length} asset(s)`);
+    return result;
+}
+
 async function waitForTransaction(txHash: string): Promise<TransactionResult> {
     const startTime = Date.now();
 

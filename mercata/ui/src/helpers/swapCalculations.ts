@@ -1,4 +1,20 @@
 import { Pool, PoolCoin } from "@/interface";
+import { safeParseUnits } from "@/utils/numberUtils";
+
+const BPS_DENOMINATOR = 10000n;
+
+const sqrtBigInt = (value: bigint): bigint => {
+  if (value <= 1n) return value;
+
+  let x = value;
+  let y = (x + 1n) / 2n;
+  while (y < x) {
+    x = y;
+    y = (x + value / x) / 2n;
+  }
+
+  return x;
+};
 
 /**
  * Check if a pool is a multi-token pool (more than 2 coins)
@@ -117,6 +133,70 @@ export const calculateSwapOutput = (
   const denominator = pool.isStable ? BigInt(1e18) : inputReserve + netInput;
 
   return (numerator / denominator).toString();
+};
+
+export const calculateSingleTokenLiquidityMint = (
+  inputAmount: string,
+  pool: Pool,
+  isAToB: boolean
+): string => {
+  if (!inputAmount || inputAmount === "0") return "0";
+
+  const amountIn = safeParseUnits(inputAmount, 18);
+  const totalLiquidity = BigInt(pool.lpToken._totalSupply || "0");
+  if (amountIn <= 0n || totalLiquidity <= 0n) return "0";
+
+  const reserveIn = isAToB
+    ? BigInt(pool.tokenA.poolBalance || "0")
+    : BigInt(pool.tokenB.poolBalance || "0");
+  const reserveOut = isAToB
+    ? BigInt(pool.tokenB.poolBalance || "0")
+    : BigInt(pool.tokenA.poolBalance || "0");
+  if (reserveIn <= 0n || reserveOut <= 0n) return "0";
+
+  const feeRate = BigInt(pool.swapFeeRate || 0);
+  const lpShareRate = BigInt(pool.lpSharePercent || 0);
+  const effectiveMultiplier = BPS_DENOMINATOR - feeRate;
+  if (effectiveMultiplier <= 0n) return "0";
+
+  const sqrtTerm = sqrtBigInt(
+    reserveIn *
+      (amountIn * 4n * effectiveMultiplier * BPS_DENOMINATOR +
+        reserveIn * (effectiveMultiplier + BPS_DENOMINATOR) * (effectiveMultiplier + BPS_DENOMINATOR))
+  );
+  const numerator = sqrtTerm - reserveIn * (effectiveMultiplier + BPS_DENOMINATOR);
+  if (numerator <= 0n) return "0";
+
+  const swapAmount = numerator / (2n * effectiveMultiplier);
+  const fee = (swapAmount * feeRate) / BPS_DENOMINATOR;
+  const lpFee = (fee * lpShareRate) / BPS_DENOMINATOR;
+  const protocolFee = fee - lpFee;
+  const netInput = swapAmount - fee;
+  if (netInput <= 0n) return "0";
+
+  const amountOut = (netInput * reserveOut) / (reserveIn + netInput);
+  if (amountOut <= 0n) return "0";
+
+  const postA = isAToB
+    ? reserveIn + swapAmount - protocolFee
+    : BigInt(pool.tokenA.poolBalance || "0") - amountOut;
+  const postB = isAToB
+    ? BigInt(pool.tokenB.poolBalance || "0") - amountOut
+    : reserveIn + swapAmount - protocolFee;
+  if (postA <= 0n || postB <= 0n) return "0";
+
+  const requiredA = isAToB ? (amountOut * postA) / postB : amountOut;
+  const requiredB = isAToB ? amountOut : (amountOut * postB) / postA;
+  const totalNeeded = isAToB ? swapAmount + requiredA : swapAmount + requiredB;
+  if (totalNeeded > amountIn) return "0";
+
+  const tokenAAmount = isAToB ? requiredA : amountOut;
+  const tokenBAmount = isAToB ? amountOut : requiredB;
+  const liquidityA = (tokenAAmount * totalLiquidity) / postA;
+  const liquidityB = (tokenBAmount * totalLiquidity) / postB;
+  const minted = liquidityA < liquidityB ? liquidityA : liquidityB;
+
+  return minted > 0n ? minted.toString() : "0";
 };
 
 /**

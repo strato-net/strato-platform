@@ -278,6 +278,7 @@ async function main() {
       logger: console,
       history: [contractName],
       cacheNonce: true,
+      query: { username: 'BlockApps' }
     };
 
     const implementation = await rest.createContract(tokenObj, contractArgs, deployOptions);

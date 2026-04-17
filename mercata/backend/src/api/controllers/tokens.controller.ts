@@ -12,6 +12,7 @@ import {
   getVoucherBalance,
   getTransferableTokens,
   getTokenStats,
+  getAccountNonce,
 } from "../services/tokens.service";
 import {
   validateAddressArgs,
@@ -211,6 +212,27 @@ class TokensController {
 
       const stats = await getTokenStats(accessToken);
       res.status(RestStatus.OK).json(stats);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async checkRecipient(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const address = req.query.address as string;
+
+      if (!address) {
+        res.status(400).json({ error: "address query parameter is required" });
+        return;
+      }
+
+      const nonce = await getAccountNonce(accessToken, address);
+      res.status(RestStatus.OK).json({ nonce });
     } catch (error) {
       next(error);
     }
