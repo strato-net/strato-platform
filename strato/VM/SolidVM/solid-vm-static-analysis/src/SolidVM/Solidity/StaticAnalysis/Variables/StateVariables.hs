@@ -8,6 +8,8 @@ module SolidVM.Solidity.StaticAnalysis.Variables.StateVariables
   )
 where
 
+import Blockchain.VM.SolidException (SolidException (InternalError))
+import Control.Exception (throw)
 import Control.Lens
 import Control.Monad (unless)
 import Control.Monad.State
@@ -79,7 +81,7 @@ isLocalVariable name = foldr lookupVar False <$> gets (\(_,s,_) -> s)
 
 pushLocalVariable :: SolidString -> SourceAnnotation () -> SSS ()
 pushLocalVariable name decl = modify $ \(a,b,c) -> case b of
-  [] -> error "This can't happen by the laws of physics"
+  [] -> throw $ InternalError "pushLocalVariable: empty scope stack" "StateVariables detector"
   (x : xs) -> (a, (M.insert name decl x) : xs, c)
 
 pushLocalVariables :: [VarDefEntry] -> SSS ()

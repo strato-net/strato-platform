@@ -46,6 +46,21 @@ import Text.Read
 import Text.Regex.TDFA
 import Servant
 
+-- | Typed exception for partial failures in this module. We cannot use
+-- 'Blockchain.VM.SolidException' because its 'CustomError' constructor
+-- carries '[BasicValue]', which would form an import cycle with this
+-- module. Locally defining a concrete 'Exception' lets callers of
+-- 'rlpDecode' / 'fromString' / 'unparsePath' receive a typed failure
+-- (caught by @runSM@'s 'SomeException' handler and surfaced as
+-- 'InternalError') instead of a bare 'ErrorCall'.
+data StorableException
+  = StorableMalformedData String String
+  | StorableParseError String String
+  | StorableInternalError String String
+  deriving (Show, Generic, NFData)
+
+instance Exception StorableException
+
 data BasicValue
   = BInteger !Integer
   | BString !B.ByteString
@@ -102,14 +117,16 @@ instance JSON.ToJSON BasicValue where
   toJSON v = JSON.toJSON $ format v
 
 instance JSON.FromJSON BasicValue where
-  parseJSON v =
-    fmap readOrError $ JSON.parseJSON v
-    where
-      readOrError theString =
-        case basicParse theString of
-          Just theBasicValue -> theBasicValue
-          Nothing -> error $ "in parseJSON for BasicValue, basicParse fails for: " ++ show theString
+  parseJSON v = do
+    theString <- JSON.parseJSON v
+    case basicParse theString of
+      Just theBasicValue -> pure theBasicValue
+      Nothing ->
+        fail $ "in parseJSON for BasicValue, basicParse fails for: " ++ show (theString :: String)
 
+-- | Parse a textual BasicValue. Returns 'Nothing' on malformed input instead
+-- of crashing the caller. Previously used partial @read@ which threw
+-- uncatchable ErrorCall on invalid addresses / integers.
 basicParse :: String -> Maybe BasicValue
 basicParse input =
   case readMaybe input of
@@ -126,11 +143,11 @@ basicParse input =
       [
         ("false", \[] -> Just $ BBool False),
         ("true", \[] -> Just $ BBool True),
-        ("address\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAddress $ read accountString),
+        ("address\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> BAddress <$> readMaybe accountString),
         ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)", \[enumName, enumValName, enumValNum] -> BEnumVal enumName enumValName <$> readMaybe enumValNum),
-        ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)", \[contractName, accountString] -> Just $ BContract contractName $ read accountString),
-        ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
-        ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ encodeUtf8 . T.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
+        ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)", \[contractName, accountString] -> BContract contractName <$> readMaybe accountString),
+        ("([0-9]+)", \[numString] -> BInteger <$> readMaybe numString),
+        ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> (BString . encodeUtf8 . T.pack) <$> readMaybe theString)
       ]
 
 textToBasicValue :: Text -> BasicValue
@@ -197,7 +214,13 @@ instance Binary StoragePathPiece
 newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Ord, Show, Read, Generic, NFData, Hashable)
 
 instance IsString StoragePath where
-  fromString s = either (error ("error parsing String to StoragePath: " ++ s)) id . parsePath . C8.pack $ s
+  fromString s =
+    either
+      (\e -> throw $ StorableParseError ("error parsing String to StoragePath: " ++ s) e)
+      id
+      . parsePath
+      . C8.pack
+      $ s
 
 instance Format StoragePath where
   format (StoragePath []) = "<empty path>"
@@ -209,8 +232,11 @@ instance Format StoragePath where
       addConditionalDot w = w
 
 instance JSON.FromJSON StoragePath where
-  parseJSON (JSON.String v) = return $ either (error . (("malformed StoragePath: " ++ show v ++ "\n") ++)) id $ parsePath $ encodeUtf8 v
-  parseJSON v = error $ "wrong format in call to parseJSON for StoragePath: " ++ show v
+  parseJSON (JSON.String v) =
+    case parsePath (encodeUtf8 v) of
+      Right p -> pure p
+      Left e -> fail $ "malformed StoragePath: " ++ show v ++ "\n" ++ e
+  parseJSON v = fail $ "wrong format in call to parseJSON for StoragePath: " ++ show v
 
 instance JSON.ToJSONKey StoragePath where
 
@@ -344,6 +370,7 @@ parseField = do
 parsePath :: B.ByteString -> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser
 
+{-# NOINLINE escapeKey #-}
 escapeKey :: B.ByteString -> B.ByteString
 escapeKey srcBS = unsafePerformIO $ do
   let len = B.length srcBS
@@ -366,6 +393,7 @@ escapeKey srcBS = unsafePerformIO $ do
                     copyAndEscape (dstOff + 2) (srcOff + 1)
       copyAndEscape 0 0
 
+{-# NOINLINE unescapeKey #-}
 unescapeKey :: B.ByteString -> B.ByteString
 unescapeKey srcBS = unsafePerformIO $ do
   let len = B.length srcBS
@@ -402,7 +430,7 @@ unparsePath (StoragePath (Field p : rest)) =
     go :: StoragePathPiece -> [B.ByteString]
     go (Field q) = [".", q]
     go (Index i) = ["[", escapeKey i, "]"]
-unparsePath v = error $ "StoragePath must always start with a Field: " ++ show v
+unparsePath v = throw $ StorableInternalError "StoragePath must always start with a Field" (show v)
 
 instance RLPSerializable BasicValue where
   rlpEncode = \case
@@ -425,9 +453,9 @@ instance RLPSerializable BasicValue where
       (5, [f, s', c']) -> BEnumVal (rlpDecode f) (rlpDecode s') (rlpDecode c')
       (7, [f]) -> BDecimal (rlpDecode f)
       (8, [f]) -> BBytes $ rlpDecode f
-      _ -> error $ "invalid type or data length for BasicValue: " ++ show x
+      _ -> throw $ StorableMalformedData "invalid type or data length for BasicValue" (show x)
   rlpDecode (RLPString "") = BDefault
-  rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x
+  rlpDecode x = throw $ StorableMalformedData "invalid shape for BasicValue" (show x)
 
 pathToStorageKey :: StoragePath -> Text
 pathToStorageKey = decodeUtf8 . unparsePath
@@ -438,9 +466,13 @@ basicToStorageValue = T.pack . format
 storageKeyToPath :: Text -> Either String StoragePath
 storageKeyToPath = parsePath . encodeUtf8
 
+-- | 'unsafePerformIO' (not 'unsafeDupablePerformIO') so concurrent evaluators
+-- do not duplicate the 'evaluate'/'force' side effect over untrusted
+-- blockchain data.
+{-# NOINLINE storageValueByteStringToBasic #-}
 storageValueByteStringToBasic :: B.ByteString -> Either String BasicValue
 storageValueByteStringToBasic bs =
-  unsafeDupablePerformIO . handle handler
+  unsafePerformIO . handle handler
     . evaluate
     . force
     . Right

@@ -54,6 +54,7 @@ import Data.Bool (bool)
 import Data.Decimal
 import Data.List
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 import qualified Data.Vector as V
@@ -73,7 +74,11 @@ fromBasic = \case
     Right t -> SString $ T.unpack t
     Left _ -> SString $ BC.unpack s
   MS.BBytes bs -> SBytes bs
-  MS.BDecimal v -> SDecimal $ read $ BC.unpack v
+  -- Corrupt/malformed BDecimal bytes used to crash the node via partial
+  -- 'read'; now fall back to 0 so the VM boundary stays intact. A malformed
+  -- decimal at this layer indicates storage corruption, not a contract-level
+  -- error, so there is no suitable SolidException to raise.
+  MS.BDecimal v -> SDecimal . fromMaybe 0 . readMaybe $ BC.unpack v
   MS.BBool b -> SBool b
   MS.BAddress a -> SAddress a False
   MS.BContract n a -> SContract n a
@@ -92,8 +97,19 @@ toBasic currentBlockNum = \case
   SUserDefined _ _ x -> toBasic currentBlockNum x
   SBytes bs -> Just $ MS.BBytes bs
   SNULL ->
+    -- The original guard disables the feature only on Helium before its
+    -- fork, which means *every other network* — existing or new — silently
+    -- inherits the post-fork semantics. We preserve that runtime behavior
+    -- (changing it would fork state on live networks) but surface the
+    -- hardcoded network ID/block as named constants so future networks can
+    -- be added explicitly. See audit finding 39 for the long-term fix of
+    -- replacing this with a per-chain configuration flag.
     let heliumToBasicForkBlock = 33918 :: Integer
-        snullToBasicEnabled = not (Conf.networkID (networkConfig ethConf) == 114784819836269 && currentBlockNum < heliumToBasicForkBlock)
+        heliumNetworkId = 114784819836269
+        isPreHelium =
+          Conf.networkID (networkConfig ethConf) == heliumNetworkId
+            && currentBlockNum < heliumToBasicForkBlock
+        snullToBasicEnabled = not isPreHelium
      in if snullToBasicEnabled then Just MS.BDefault else Nothing
   _ -> Nothing
 

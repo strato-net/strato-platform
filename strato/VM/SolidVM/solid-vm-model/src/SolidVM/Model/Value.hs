@@ -40,6 +40,7 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, listToMaybe)
+import Text.Read (readMaybe)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Vector (Vector)
@@ -129,6 +130,34 @@ toNull (SBytes bs) | B.null bs = SNULL
 toNull (SArray vs) | V.null vs = SNULL
 toNull v = v
 
+-- | Stable constructor tag used to give 'Value' a total 'Ord' without
+-- throwing on mismatched constructor pairs. Distinct constructors compare by
+-- tag; values of the same tag use the data-specific comparison below.
+valueConstructorTag :: Value -> Int
+valueConstructorTag SNULL = 0
+valueConstructorTag SInteger {} = 1
+valueConstructorTag SString {} = 2
+valueConstructorTag SDecimal {} = 3
+valueConstructorTag SBool {} = 4
+valueConstructorTag SAddress {} = 5
+valueConstructorTag SContract {} = 6
+valueConstructorTag SEnumVal {} = 7
+valueConstructorTag SBytes {} = 8
+valueConstructorTag SArray {} = 9
+valueConstructorTag SMap {} = 10
+valueConstructorTag STuple {} = 11
+valueConstructorTag SStruct {} = 12
+valueConstructorTag SReference {} = 13
+valueConstructorTag SVariadic {} = 14
+valueConstructorTag SPush {} = 15
+valueConstructorTag SBuiltinVariable {} = 16
+valueConstructorTag SContractItem {} = 17
+valueConstructorTag SFunction {} = 18
+valueConstructorTag _ = 99
+
+-- | Total Eq over 'Value'. Mismatched constructors now compare as not-equal
+-- instead of throwing, so a Solidity comparison between incompatible values
+-- cannot crash the VM thread.
 instance Eq Value where
   x == y = case (toNull x, toNull y) of
     (SNULL, SNULL) -> True
@@ -142,10 +171,10 @@ instance Eq Value where
     (SBytes b1, SBytes b2) -> b1 == b2
     (SString b1, SBytes b2) -> encodeUtf8 (T.pack b1) == b2
     (SBytes b1, SString b2) -> b1 == encodeUtf8 (T.pack b2)
-    (SNULL, _) -> False
-    (_, SNULL) -> False
-    _ -> todo "Value/Eq" (x, y)
+    _ -> False
 
+-- | Total Ord over 'Value'. Mismatched constructors fall back to comparing
+-- 'valueConstructorTag' so we never throw from 'compare'.
 instance Ord Value where
   compare x y = case (toNull x, toNull y) of
     (SNULL, SNULL) -> EQ
@@ -159,7 +188,7 @@ instance Ord Value where
     (SBytes b1, SString b2) -> compare b1 (encodeUtf8 (T.pack b2))
     (SNULL, _) -> LT
     (_, SNULL) -> GT
-    _ -> todo "Value/Ord" (x, y)
+    (a, b) -> compare (valueConstructorTag a) (valueConstructorTag b)
 
 instance RLPSerializable Value where
   rlpEncode = rlpEncodeValue
@@ -205,7 +234,10 @@ coerceFromInt ct cc (SEnumVal tipe _ _) n' =
     let n = fromIntegral n'
     -- Look up enum in contract first, then fall back to file-level enums
     enumDef <- fmap fst $ M.lookup tipe (CC._enums ct) <|> M.lookup tipe (cc ^. CC.flEnums)
-    when (n >= length enumDef) $ fail "enum val out of range"
+    -- Reject negative inputs as well as out-of-range; without the lower-bound
+    -- check, casting a negative Integer lands in a negative Int and crashes
+    -- the VM with an index-out-of-bounds from (!!).
+    when (n < 0 || n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
 coerceFromInt _ _ SNULL n = SInteger n
 coerceFromInt _ _ SReference{} n = SInteger n
@@ -219,7 +251,10 @@ coerceType ct cc xt = \case
   SString s -> case xt of
     SVMType.String {} -> SString s
     SVMType.Bytes {} -> SString s
-    SVMType.Decimal {} -> SDecimal (read s :: Decimal)
+    SVMType.Decimal {} ->
+      case readMaybe s :: Maybe Decimal of
+        Just d -> SDecimal d
+        Nothing -> typeError "string literal not a valid decimal" $ show (xt, s)
     _ -> typeError "string literal must be string or bytes" $ show (xt, s)
   v -> v
 

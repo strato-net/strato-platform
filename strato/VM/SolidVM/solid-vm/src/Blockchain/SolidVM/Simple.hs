@@ -58,6 +58,7 @@ import Blockchain.VM.SolidException
 import Control.Lens
 import Data.Default
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import GHC.Generics
@@ -81,6 +82,12 @@ defaultBlockData =
     emptyHash
     0
 
+-- | Default gas budget applied to SolidVM entry points when the caller
+-- does not override it. Keep it configurable so lightweight nodes and
+-- fuzzers can run with a smaller ceiling (audit finding 51).
+defaultSolidVMGas :: Gas
+defaultSolidVMGas = Gas 100000000
+
 data SolidVMTxArgs = SolidVMTxArgs
   { _argsBlockData :: BlockHeader,
     _argsSender :: Address,
@@ -89,7 +96,8 @@ data SolidVMTxArgs = SolidVMTxArgs
     _argsTxHash :: Keccak256,
     _argsArgs :: [T.Text],
     _argsChainId :: Maybe Word256,
-    _argsMetadata :: Maybe (M.Map T.Text T.Text)
+    _argsMetadata :: Maybe (M.Map T.Text T.Text),
+    _argsGasLimit :: Maybe Gas
   }
   deriving (Eq, Show, Generic)
 
@@ -104,6 +112,7 @@ instance Default SolidVMTxArgs where
       (Address 0)
       emptyHash
       []
+      Nothing
       Nothing
       Nothing
 
@@ -158,7 +167,7 @@ create s =
     (s ^. createArgs . argsSender)
     (s ^. createArgs . argsOrigin)
     (s ^. createArgs . argsProposer)
-    (Gas 100000000)
+    (fromMaybe defaultSolidVMGas (s ^. createArgs . argsGasLimit))
     (s ^. createNewAddress)
     (s ^. createCode)
     (s ^. createArgs . argsTxHash)
@@ -175,7 +184,7 @@ createReturnEnv s =
     (s ^. createArgs . argsSender)
     (s ^. createArgs . argsOrigin)
     (s ^. createArgs . argsProposer)
-    (Gas 100000000)
+    (fromMaybe defaultSolidVMGas (s ^. createArgs . argsGasLimit))
     (s ^. createNewAddress)
     (s ^. createCode)
     (s ^. createArgs . argsTxHash)
@@ -192,7 +201,7 @@ call s =
     (s ^. callCodeAddress)
     (s ^. callArgs . argsSender)
     (s ^. callArgs . argsProposer)
-    (Gas 100000000)
+    (fromMaybe defaultSolidVMGas (s ^. callArgs . argsGasLimit))
     (s ^. callArgs . argsOrigin)
     (s ^. callArgs . argsTxHash)
     (s ^. callFuncName)
@@ -209,7 +218,7 @@ callReturnEnv s =
     (s ^. callCodeAddress)
     (s ^. callArgs . argsSender)
     (s ^. callArgs . argsProposer)
-    (Gas 100000000)
+    (fromMaybe defaultSolidVMGas (s ^. callArgs . argsGasLimit))
     (s ^. callArgs . argsOrigin)
     (s ^. callArgs . argsTxHash)
     (s ^. callFuncName)

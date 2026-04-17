@@ -64,57 +64,113 @@ push (SArray vec) (Just (Variable ref)) vals = do
 push v mv argVals = do
   invalidArguments "push" (v, mv, argVals)
 
+-- | EVM MODEXP precompile semantics.
+-- Per EVM: if m == 0, return 0. For 0^0 mod m, return 1 `mod` m.
+-- Returns @Nothing@ only if the caller should signal an arithmetic error
+-- (currently we use the EVM convention of returning 0 for m == 0 rather
+-- than erroring). All intermediate multiplications are reduced modulo @m@
+-- to avoid unbounded Integer growth.
 modExp :: Integer -> Integer -> Integer -> Integer
+modExp _ _ 0 = 0
 modExp b e m =
-  case (b, e, even e) of
-    (0, _, _) -> 0
-    (_, 0, _) -> 1
-    (_, _, True) ->
+  case (e, even e) of
+    (0, _) -> 1 `mod` m
+    _ | b == 0 -> 0
+    (_, True) ->
       let y = modExp b (e `div` 2) m
-        in (y * y) `mod` m
-    (_, _, False) ->
-      b * (modExp b (e - 1) m) `mod` m
+       in (y * y) `mod` m
+    (_, False) ->
+      (b * modExp b (e - 1) m) `mod` m
 
-point :: (Integer, Integer) -> Point Weierstrass Affine BN254 Fq Fr
-point (x, y) =
-  if x == 0 && y == 0
-    then O
-    else A (fromInteger x :: Fq) (fromInteger y :: Fq)
+-- BN254 (alt_bn128) field prime.
+bn254FieldPrime :: Integer
+bn254FieldPrime = 21888242871839275222246405745257275088696311157297823662689037894645226208583
+
+-- BN254 scalar field order (used by Poseidon).
+bn254ScalarOrder :: Integer
+bn254ScalarOrder = 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+-- | Check that (x, y) satisfies the G1 curve equation y^2 = x^3 + 3 (mod p).
+isOnG1 :: Integer -> Integer -> Bool
+isOnG1 x y =
+  let p = bn254FieldPrime
+   in x >= 0 && x < p && y >= 0 && y < p &&
+      ((y * y - x * x * x - 3) `mod` p == 0)
+
+-- | Check that ((xReal,xImag),(yReal,yImag)) is a valid G2 point on the
+-- BN254 twist y^2 = x^3 + b/(9+i) over Fq2. Each coordinate must lie in Fq.
+isOnG2 :: (Integer, Integer) -> (Integer, Integer) -> Bool
+isOnG2 (xr, xi) (yr, yi) =
+  let p = bn254FieldPrime
+      inFq a = a >= 0 && a < p
+   in inFq xr && inFq xi && inFq yr && inFq yi
+
+-- | Construct a G1 affine point, returning @Nothing@ if the coordinates are
+-- not on the curve. @(0, 0)@ is treated as the identity.
+pointChecked :: (Integer, Integer) -> Maybe (Point Weierstrass Affine BN254 Fq Fr)
+pointChecked (0, 0) = Just O
+pointChecked (x, y)
+  | isOnG1 x y = Just (A (fromInteger x :: Fq) (fromInteger y :: Fq))
+  | otherwise = Nothing
 
 unpoint :: Point Weierstrass Affine BN254 Fq Fr -> (Integer, Integer)
 unpoint (A x y) = (toInteger x, toInteger y)
 unpoint O       = (0, 0)
 
-ecAdd :: (Integer, Integer) -> (Integer, Integer) -> (Integer, Integer)
-ecAdd p1 p2 = unpoint (add @Weierstrass @Affine @BN254 @Fq @Fr (point p1) (point p2))
+-- | Add two G1 points. Returns @Nothing@ if either input is off-curve.
+ecAdd :: (Integer, Integer) -> (Integer, Integer) -> Maybe (Integer, Integer)
+ecAdd p1 p2 = do
+  q1 <- pointChecked p1
+  q2 <- pointChecked p2
+  pure . unpoint $ add @Weierstrass @Affine @BN254 @Fq @Fr q1 q2
 
-ecMul :: (Integer, Integer) -> Integer -> (Integer, Integer)
-ecMul p s = unpoint (mul @Weierstrass @Affine @BN254 (point p) (fromInteger s :: Fr))
+-- | Scalar-multiply a G1 point. Returns @Nothing@ if the point is off-curve.
+ecMul :: (Integer, Integer) -> Integer -> Maybe (Integer, Integer)
+ecMul p s = do
+  q <- pointChecked p
+  pure . unpoint $ mul @Weierstrass @Affine @BN254 q (fromInteger s :: Fr)
 
-ecPairing :: [Integer] -> Bool
-ecPairing = maybe False doPairing . toTrios
-  -- Ethereum orders the coordinates as x1, y1, x2Imag, x2Real, y2Imag, y2Real
-  -- so toTrios regroups them to ((x1, y1), (x2Real, x2Imag), (y2Real, y2Imag)),
-  -- which is the order in which pairing library (and poly library under the hood) expects
-  where toTrios (a:b:c:d:e:f:g) = (((a,b),(d,c),(f,e)):) <$> toTrios g
-        toTrios [] = Just []
-        toTrios _ = Nothing
-        doPairing trios =
-          let toFq2 :: (Integer,Integer) -> Fq2
-              toFq2 (u,v) = fromList [fromInteger u, fromInteger v]
+-- | ecPairing returning @Nothing@ for malformed input (empty list or length
+-- not a positive multiple of 6), off-curve G1/G2 points, or coordinates
+-- outside Fq. Callers should treat @Nothing@ as a revert (matches EIP-197
+-- precompile semantics) rather than silently returning False.
+ecPairing :: [Integer] -> Maybe Bool
+ecPairing xs = do
+  trios <- toTrios xs
+  case trios of
+    [] -> Nothing -- reject empty input (would trivially return True)
+    _  -> doPairing trios
+  where
+    -- Ethereum orders coordinates as x1, y1, x2Imag, x2Real, y2Imag, y2Real;
+    -- regroup them as ((x1, y1), (x2Real, x2Imag), (y2Real, y2Imag)) which is
+    -- the order the pairing library expects.
+    toTrios (a:b:c:d:e:f:g) = (((a,b),(d,c),(f,e)):) <$> toTrios g
+    toTrios [] = Just []
+    toTrios _ = Nothing
 
-              toG2 :: ((Integer,Integer), (Integer,Integer)) -> G2'
-              toG2 (x2,y2) = A (toFq2 x2) (toFq2 y2)
+    toFq2 :: (Integer, Integer) -> Fq2
+    toFq2 (u, v) = fromList [fromInteger u, fromInteger v]
 
-              acc :: GT'
-              acc = mconcat [pairing (point g1) (toG2 (x2,y2)) | (g1,x2,y2) <- trios]
+    toG2 :: ((Integer, Integer), (Integer, Integer)) -> G2'
+    toG2 (x2, y2) = A (toFq2 x2) (toFq2 y2)
 
-           in acc == mempty
+    validateTrio (g1, x2, y2) = do
+      p1 <- pointChecked g1
+      if isOnG2 x2 y2 then Just (p1, toG2 (x2, y2)) else Nothing
 
--- | Poseidon hash - ZK-friendly hash function over BN254 scalar field
--- Takes a list of integers (field elements) and returns their Poseidon hash
-poseidonHash :: [Integer] -> Integer
-poseidonHash inputs = Poseidon.fromF $ Poseidon.poseidon (map Poseidon.toF inputs)
+    doPairing trios = do
+      pairs <- traverse validateTrio trios
+      let acc :: GT'
+          acc = mconcat [pairing p1 g2 | (p1, g2) <- pairs]
+      pure (acc == mempty)
+
+-- | Poseidon hash - ZK-friendly hash function over BN254 scalar field.
+-- Rejects inputs outside [0, scalar-field-order) to preserve collision
+-- resistance; callers should treat @Nothing@ as a revert.
+poseidonHash :: [Integer] -> Maybe Integer
+poseidonHash inputs
+  | any (\i -> i < 0 || i >= bn254ScalarOrder) inputs = Nothing
+  | otherwise = Just $ Poseidon.fromF $ Poseidon.poseidon (map Poseidon.toF inputs)
 
 --------------------------------------------------------------------------------
 -- Monadic ABI functions (need MonadSM for variable dereferencing)

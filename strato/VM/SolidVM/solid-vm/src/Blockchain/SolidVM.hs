@@ -281,8 +281,13 @@ create' creator newAddress ch cc contractName' valList = do
   let constructorArgs = fromMaybe [] . fmap CC._funcArgs $ contract' ^. CC.constructor
   resolvedValList <- resolveArgRefs creator contract' cc constructorArgs valList
 
-  -- Run the constructor
-  runTheConstructors creator newAddress ch cc contractName' resolvedValList
+  -- Run the constructor. If it throws (e.g. the caller wraps this in
+  -- try/catch), roll back the AddressState write performed above so a
+  -- phantom account is not left in the creator's frame (audit finding 21).
+  (runTheConstructors creator newAddress ch cc contractName' resolvedValList) `catch`
+    \(e :: SomeException) -> do
+      A.delete (A.Proxy @AddressState) newAddress
+      throwIO e
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
@@ -628,12 +633,18 @@ argsToValsFromVars vars = do
 
 -- | Zip struct field definitions with argument values, collecting trailing
 -- args into an SVariadic when the last field has Variadic type.
+-- Previously silently truncated on arity mismatch, hiding contract bugs
+-- (audit finding 23). Now raises TooManyCooks / ArityMismatch when the
+-- argument and field counts don't line up.
 zipStructFields :: [(SolidString, CC.FieldType, a)] -> [Value] -> [(SolidString, Value)]
-zipStructFields [] _ = []
+zipStructFields [] [] = []
+zipStructFields [] extra =
+  tooManyCooks 0 (length extra)
 zipStructFields [(name, ft, _)] args
   | CC.fieldTypeType ft == SVMType.Variadic = [(name, SVariadic args)]
 zipStructFields ((name, _, _) : rest) (v : vs) = (name, v) : zipStructFields rest vs
-zipStructFields _ [] = []
+zipStructFields missing [] =
+  arityMismatch "zipStructFields: not enough arguments for struct fields" 0 (length missing)
 
 runModifiersAndStatements :: MonadSM m => [[CC.Statement]] -> [CC.Statement] -> m (Maybe Value)
 runModifiersAndStatements []   stmts = runStatementBlock stmts
@@ -954,6 +965,10 @@ runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
 runStatement st@(CC.EmitStatement eventName exptups pos) = do
   -- emit MemberAdded(<address>, <enode>);
   solidVMBreakpoint pos
+  -- Event emission is observable state; block it inside a staticcall/view
+  -- context so the readOnly invariant is not violated.
+  roEmit <- readOnly <$> getCurrentCallInfo
+  when roEmit $ invalidWrite "emit is not allowed in a read-only (static/view) call" eventName
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM jsonSM expVals
@@ -1082,6 +1097,24 @@ expToVar x = do
   v <- expToVar' x
   decrementGas 1
   return v
+
+-- | Gas helpers for cryptographic builtins (audit finding 38). These are
+-- rough approximations of EVM precompile pricing — the exact EIP-2565 /
+-- EIP-1108 formulas belong in GasInfo.hs, but the key invariant is that
+-- every crypto call is now at least *proportional* to its work rather
+-- than a flat 1 gas, so a 100M-gas budget can't fund billions of them.
+
+chargeFlatGas :: MonadSM m => Int -> m ()
+chargeFlatGas n = decrementGas (Gas $ fromIntegral n)
+
+chargeHashGas :: MonadSM m => Int -> Int -> Int -> m ()
+chargeHashGas base perWord lenBytes = chargeFlatGas (base + perWord * ((lenBytes + 31) `div` 32))
+
+chargePairingGas :: MonadSM m => Int -> m ()
+chargePairingGas elemCount =
+  -- 6 integers per pair.
+  let pairs = max 0 (elemCount `div` 6)
+   in chargeFlatGas (45000 + 34000 * pairs)
 
 decrementGas :: MonadSM m => Gas -> m ()
 decrementGas !gas = do
@@ -1367,7 +1400,7 @@ expToVar' ex@(CC.Binary _ "%" expr1 expr2) = do
 expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger (max `on` byteWidth)
 expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger (max `on` byteWidth)
 expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger (max `on` byteWidth)
-expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger (\a b -> byteWidth a * b)
+expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 safePow expr2 SInteger (\a b -> byteWidth a * b + b)
 expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger (\a b -> byteWidth a + b)
 expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger (const . byteWidth)
 expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 (\x i -> fromInteger (toInteger ((fromInteger x) :: Word256)) `shiftR` fromInteger i) expr2 SInteger (const . byteWidth)
@@ -1691,6 +1724,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             -- TODO: When gas gets more implemented ensure that this function does not
             --       consume more than 2300 gas
             Constant (SContractItem address' "transfer") -> do
+              roTransfer <- readOnly <$> getCurrentCallInfo
+              when roTransfer $ invalidWrite "transfer is not allowed in a read-only (static/view) call" (show address')
               from <- getCurrentAddress
               case argVals of
                 [SInteger amount] -> do
@@ -1706,6 +1741,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             -- TODO: When gas gets more implemented ensure that this function does not
             --       consume more than 2300 gas
             Constant (SContractItem address' "send") -> do
+              roSend <- readOnly <$> getCurrentCallInfo
+              when roSend $ invalidWrite "send is not allowed in a read-only (static/view) call" (show address')
               from <- getCurrentAddress
               success <- case argVals of
                 [SInteger amount] -> do
@@ -2072,6 +2109,34 @@ byteWidth = go 0 . abs
   where go w 0 = w
         go w n = let !v = w + 32 in go v (n `shiftR` 256)
 
+-- | Exponentiation with a hard cap on both the exponent and the estimated
+-- result bit-length. Without a cap, a small base like @2 ** 10_000_000@
+-- produces a multi-million-digit 'Integer' for zero additional gas, since
+-- 'byteWidth' returns 0 for small bases. See audit finding 36.
+maxExpExponent :: Integer
+maxExpExponent = 10 ^ (6 :: Int)
+
+maxExpBits :: Integer
+maxExpBits = 1 `shiftL` 20 -- 1 Mbit ≈ 128 KiB result
+
+safePow :: Integer -> Integer -> Integer
+safePow b e
+  | e < 0 = throw $ ArithmeticException "negative exponent in **" (show e)
+  | e == 0 = 1
+  | b == 0 = 0
+  | abs b == 1 = if even e || b == 1 then 1 else -1
+  | e > maxExpExponent =
+      throw $ ArithmeticException "exponent too large in **" (show e)
+  | estimatedBits > maxExpBits =
+      throw $ ArithmeticException "exponent result would exceed size limit" (show (b, e))
+  | otherwise = b ^ e
+  where
+    -- bit-length of |b|^e ≈ e * log2(|b|)
+    bitsOfB = toInteger (integerLog2 (abs b)) + 1
+    estimatedBits = e * bitsOfB
+    integerLog2 :: Integer -> Int
+    integerLog2 n = if n <= 1 then 0 else 1 + integerLog2 (n `shiftR` 1)
+
 -- Deduct 1 gas for every 256 bits (32 bytes) used
 deductGasForOp :: MonadSM m => Integer -> m ()
 deductGasForOp numBytes = decrementGas . Gas $ 1 + (numBytes `shiftR` 5)
@@ -2195,15 +2260,31 @@ binopAssign oper lhs rhs gasFormula = do
 -- | Convert a value to an integer. Signedness and bit size are currently ignored;
 -- we discourage fixed-size integer types in SolidVM but support this function for
 -- backwards compatibility with existing Solidity contracts.
+-- | Apply Solidity integer-cast semantics: truncate to the declared bit
+-- width for uintN, and perform two's-complement sign-extension for intN.
+-- When 'mSize' is 'Nothing' (bare 'int' / 'uint') we default to 256 bits.
+-- Audit finding 37: previously 'mSize' and the signedness flag were
+-- ignored, so 'uint8(256)' returned 256 instead of 0 and 'int8(128)'
+-- returned 128 instead of -128.
+applyIntCast :: Bool -> Maybe Int -> Integer -> Integer
+applyIntCast signed mSize n =
+  let bits = fromMaybe 256 mSize
+      bitMask = (2 ^ (bits :: Int)) - 1
+      truncated = n .&. bitMask
+      signBit = 2 ^ (bits - 1)
+   in if signed && truncated >= signBit
+        then truncated - 2 ^ (bits :: Int)
+        else truncated
+
 intBuiltin :: Bool -> Maybe Int -> [Value] -> Value
-intBuiltin _ _ [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
-intBuiltin _ _ [SInteger n] = SInteger n
-intBuiltin _ _ [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
-intBuiltin _ _ [SString hex] = integerToValue $ parseBaseInt hex 16
-intBuiltin _ _ [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
-intBuiltin _ _ [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
-intBuiltin _ _ [SBytes bs] = SInteger $ byteString2Integer bs  -- bytes32 -> uint256 cast
-intBuiltin _ _ [SAddress a _] = SInteger $ fromIntegral $ unAddress a  -- address -> int cast
+intBuiltin signed mSize [SEnumVal _ _ enumNum] = SInteger . applyIntCast signed mSize $ fromIntegral enumNum
+intBuiltin signed mSize [SInteger n] = SInteger $ applyIntCast signed mSize n
+intBuiltin signed mSize [SDecimal v] = SInteger . applyIntCast signed mSize $ decimalMantissa $ roundTo 0 v
+intBuiltin signed mSize [SString hex] = integerToValue $ applyIntCast signed mSize <$> parseBaseInt hex 16
+intBuiltin signed mSize [SString hex, SInteger 16] = integerToValue $ applyIntCast signed mSize <$> parseBaseInt hex 16
+intBuiltin signed mSize [SString dec, SInteger 10] = integerToValue $ applyIntCast signed mSize <$> parseBaseInt dec 10
+intBuiltin signed mSize [SBytes bs] = SInteger . applyIntCast signed mSize $ byteString2Integer bs
+intBuiltin signed mSize [SAddress a _] = SInteger . applyIntCast signed mSize $ fromIntegral $ unAddress a
 intBuiltin _ _ [SNULL] = SInteger 0
 intBuiltin _ _ [SReference{}] = SInteger 0
 intBuiltin signed mSize [] = typeError (funcName ++ " called with no arguments") ""
@@ -2251,6 +2332,22 @@ callBuiltinFunction n args' = do
         _ -> args'
   callBuiltin n args
 
+-- | Invoke Builtins.ecPairing, throwing a SolidException if the input is
+-- malformed (empty, not a multiple of 6, or contains off-curve / out-of-field
+-- coordinates). This matches EIP-197's "revert on bad input" semantics rather
+-- than silently returning False.
+ecPairingCall :: MonadSM m => [Integer] -> m Value
+ecPairingCall xs = case Builtins.ecPairing xs of
+  Just b -> pure (SBool b)
+  Nothing -> invalidArguments "ecPairing: empty, malformed, or off-curve input" xs
+
+-- | Invoke Builtins.poseidonHash, throwing if any input is outside
+-- [0, BN254 scalar field order).
+poseidonCall :: MonadSM m => [Integer] -> m Value
+poseidonCall xs = case Builtins.poseidonHash xs of
+  Just h -> pure (SInteger h)
+  Nothing -> invalidArguments "poseidon: input exceeds BN254 scalar field" xs
+
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic vs
 callBuiltin "variadic" vs = pure $ SVariadic vs
@@ -2285,10 +2382,11 @@ callBuiltin "address" [SReference{}] = return $ SAddress 0 False
 callBuiltin "address" vs = typeError "address cast" $ show vs
 callBuiltin ("addmod") [a', b', c'] = do
   (a,b,c) <- (,,) <$> int a' <*> int b' <*> int c'
-  return . SInteger $ (a + b) `mod` c
+  -- EVM semantics: c == 0 returns 0 (do not crash the node).
+  return . SInteger $ if c == 0 then 0 else (a + b) `mod` c
 callBuiltin ("mulmod") [a', b', c'] = do
   (a,b,c) <- (,,) <$> int a' <*> int b' <*> int c'
-  return . SInteger $ (a * b) `mod` c
+  return . SInteger $ if c == 0 then 0 else (a * b) `mod` c
 callBuiltin ("blockhash") [bNum] = do
   blockNum <- int bNum
   when (blockNum < 0) $ invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
@@ -2297,6 +2395,8 @@ callBuiltin ("blockhash") [bNum] = do
   maybeTheHash <- getBlockHashWithNumber blockNum (BlockHeader.parentHash curBlock)
   maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
 callBuiltin ("selfdestruct") [a'] = do
+  roSd <- readOnly <$> getCurrentCallInfo
+  when roSd $ invalidWrite "selfdestruct is not allowed in a read-only (static/view) call" ("selfdestruct" :: String)
   a <- getAddressVal a'
   contract' <- getCurrentAddress
   contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract'
@@ -2304,6 +2404,13 @@ callBuiltin ("selfdestruct") [a'] = do
     pure newAddressState {addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
   sendRes <- pay "selfdestruct function" contract' a contractBalance
   _purgeRes <- purgeStorageMap contract'
+  -- TODO (audit finding 18): EVM 'SELFDESTRUCT' halts the current
+  -- execution context after performing the state changes. SolidVM
+  -- currently returns and lets subsequent statements run against the
+  -- zeroed contract, which can corrupt state. Implementing the halt
+  -- requires either a dedicated terminal SolidException that preserves
+  -- committed state (without triggering popCallInfo's rollback) or a
+  -- per-frame 'selfdestructed' flag that blocks further operations.
   return $ SBool sendRes
 callBuiltin "account" vs = typeError "account cast" $ show vs
 callBuiltin "bool" [SBool b] = return $ SBool b
@@ -2350,9 +2457,19 @@ callBuiltin name [arg]
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
-callBuiltin "keccak256" [SBytes bs] = pure . SBytes . keccak256ToByteString $ hash bs
-callBuiltin "keccak256" args = pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "keccak256" [SBytes bs] = do
+  chargeHashGas 30 6 (B.length bs)
+  pure . SBytes . keccak256ToByteString $ hash bs
+callBuiltin "keccak256" args = do
+  -- Audit finding 33: the non-bytes fallback previously used RLP encoding,
+  -- which produces hashes incompatible with Ethereum's abi.encodePacked.
+  -- Fall back to packed ABI encoding to match Solidity semantics and
+  -- return SBytes instead of a hex string for cross-chain compat.
+  packed <- Builtins.abiEncodePacked args
+  chargeHashGas 30 6 (B.length packed)
+  pure . SBytes . keccak256ToByteString $ hash packed
 callBuiltin "ecrecover" [h', v', r', s'] = do
+    chargeFlatGas 3000 -- per EIP-198
     bytestringHash <- getBytesVal h'
     v <- int v'
     rIntHash <- case r' of
@@ -2367,13 +2484,25 @@ callBuiltin "ecrecover" [h', v', r', s'] = do
         Right y -> return y
         _ -> invalidArguments "parseHex: error parsing s: " s
       _ -> invalidArguments "ecrecover: s must be a hex string or an integer" s'
-    let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
-    let theZero :: Integer
-        theZero = 0
-    case theSignerAddress of
-      Nothing -> return . ((flip SAddress) False) $ fromIntegral theZero
-      Just theAddress -> return . ((flip SAddress) False) $ theAddress
-callBuiltin "verifyP256" (h' : r' : s' : p') = getBytesVal h' >>= \h -> case digestFromByteString @SHA256 h of
+    -- EIP-2 / Ethereum Yellow Paper validity rules. Invalid inputs must
+    -- return the zero address rather than recover from an arbitrary ECDSA
+    -- value; without these checks the implementation was vulnerable to
+    -- signature malleability and accepted nonsense v values.
+    let secp256k1N :: Integer
+        secp256k1N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+        halfN = secp256k1N `div` 2
+        validV = v == 27 || v == 28
+        validR = rIntHash >= 1 && rIntHash < secp256k1N
+        validS = sIntHash >= 1 && sIntHash < secp256k1N && sIntHash <= halfN
+        validHashLen = B.length bytestringHash == 32
+    if not (validV && validR && validS && validHashLen)
+      then return $ SAddress (fromInteger 0) False
+      else do
+        let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
+        case theSignerAddress of
+          Nothing -> return $ SAddress (fromInteger 0) False
+          Just theAddress -> return $ SAddress theAddress False
+callBuiltin "verifyP256" (h' : r' : s' : p') = chargeFlatGas 3450 >> getBytesVal h' >>= \h -> case digestFromByteString @SHA256 h of
   Nothing -> invalidArguments "Could not decode hash from string" h
   Just digest -> do
     pub <- case p' of
@@ -2399,37 +2528,57 @@ callBuiltin "verifyP256" (h' : r' : s' : p') = getBytesVal h' >>= \h -> case dig
       CryptoFailed e -> invalidArguments "Invalid P256 signature" e
     let !isValidSig = verifyDigest (Mod.Proxy @Curve_P256R1) pub sig digest
     pure $ SBool isValidSig
-callBuiltin "sha256" [SBytes bs] = pure . SBytes $ SHA256.hash bs
-callBuiltin "sha256" args = pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args
-callBuiltin "ripemd160" [SBytes bs] = pure . SBytes $ RIPEMD160.hash bs
-callBuiltin "ripemd160" args = pure . SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "sha256" [SBytes bs] = do
+  chargeHashGas 60 12 (B.length bs)
+  pure . SBytes $ SHA256.hash bs
+callBuiltin "sha256" args = do
+  chargeHashGas 60 12 0
+  pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "ripemd160" [SBytes bs] = do
+  chargeHashGas 600 120 (B.length bs)
+  pure . SBytes $ RIPEMD160.hash bs
+callBuiltin "ripemd160" args = do
+  chargeHashGas 600 120 0
+  pure . SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "base64encode" [SBytes bs] = pure . SBytes $ B64.encode bs
 callBuiltin "base64encode" [SString s] = pure . SString . BC.unpack . B64.encode . DT.encodeUtf8 $ T.pack s
 callBuiltin "base64urlencode" [SBytes bs] = pure . SBytes . BC.takeWhile (/= '=') $ B64URL.encode bs
 callBuiltin "base64urlencode" [SString s] = pure . SString . BC.unpack . BC.takeWhile (/= '=') . B64URL.encode . DT.encodeUtf8 $ T.pack s
-callBuiltin "modExp" [b, e, m] = SInteger <$> (Builtins.modExp <$> int b <*> int e <*> int m)
+callBuiltin "modExp" [b, e, m] = do
+  (bi, ei, mi) <- (,,) <$> int b <*> int e <*> int m
+  -- Charge proportional to the complexity of the computation. Not EIP-2565
+  -- exact, but enough to prevent ~zero-cost 2^huge abuse (audit finding 38).
+  chargeFlatGas $ 200 + fromInteger (toInteger (byteWidth bi + byteWidth ei + byteWidth mi))
+  pure . SInteger $ Builtins.modExp bi ei mi
 callBuiltin "ecAdd" [a, b, c, d] = do
+  chargeFlatGas 150
   (x1, y1, x2, y2) <- (,,,) <$> int a <*> int b <*> int c <*> int d
-  let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
-  pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+  case Builtins.ecAdd (x1, y1) (x2, y2) of
+    Just (x, y) -> pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+    Nothing -> invalidArguments "ecAdd: input point is not on BN254 curve" (x1, y1, x2, y2)
 callBuiltin "ecMul" [a, b, c] = do
+  chargeFlatGas 6000
   (x1, y1, s) <- (,,) <$> int a <*> int b <*> int c
-  let (x, y) = Builtins.ecMul (x1, y1) s
-  pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
-callBuiltin "ecPairing" [SVariadic xs] =
-  SBool . Builtins.ecPairing <$> traverse int xs
-callBuiltin "ecPairing" [SArray xs] =
-  SBool . Builtins.ecPairing <$> traverse getInt (V.toList xs)
+  case Builtins.ecMul (x1, y1) s of
+    Just (x, y) -> pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+    Nothing -> invalidArguments "ecMul: input point is not on BN254 curve" (x1, y1, s)
+callBuiltin "ecPairing" [SVariadic xs] = do
+  chargePairingGas (length xs)
+  ecPairingCall =<< traverse int xs
+callBuiltin "ecPairing" [SArray xs] = do
+  chargePairingGas (V.length xs)
+  ecPairingCall =<< traverse getInt (V.toList xs)
 callBuiltin "ecPairing" xs = do
-  SBool . Builtins.ecPairing <$> traverse int xs
+  chargePairingGas (length xs)
+  ecPairingCall =<< traverse int xs
 callBuiltin "poseidon" [SVariadic xs] = case length xs of
-  n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
+  n | n > 0 && n <= 8 -> chargeFlatGas (200 * n) >> (poseidonCall =<< traverse int xs)
   _ -> typeError "invalid args passed to poseidon" $ show xs
 callBuiltin "poseidon" [SArray xs] = case V.length xs of
-  n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse getInt (V.toList xs)
+  n | n > 0 && n <= 8 -> chargeFlatGas (200 * n) >> (poseidonCall =<< traverse getInt (V.toList xs))
   _ -> typeError "invalid args passed to poseidon" $ show xs
 callBuiltin "poseidon" xs = case length xs of
-  n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
+  n | n > 0 && n <= 8 -> chargeFlatGas (200 * n) >> (poseidonCall =<< traverse int xs)
   _ -> typeError "invalid args passed to poseidon" $ show xs
 callBuiltin ("payable") [a] = flip SAddress True <$> getAddressVal a
 callBuiltin "require" (condVar : msg) = do
@@ -2442,9 +2591,19 @@ callBuiltin "require" (condVar : msg) = do
 callBuiltin "assert" [cond] = pure . const SNULL =<< assert =<< getBoolVal cond
 
 callBuiltin "create" args@(cName : src : argVals) = do
+  roCreate <- readOnly <$> getCurrentCallInfo
+  when roCreate $ invalidWrite "create is not allowed in a read-only (static/view) call" ("create" :: String)
   (contractName', contractSrc) <- (,) <$> getStringVal cName <*> getStringVal src
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
+  -- Audit finding 42: parsing/compiling untrusted Solidity at runtime is
+  -- expensive and previously cost the caller zero extra gas regardless of
+  -- source complexity. Apply a hard ceiling on source length and charge
+  -- gas proportional to it (200 + 200 per byte).
+  let maxContractSrcBytes = 128 * 1024 :: Int
+  when (length contractSrc > maxContractSrcBytes) $
+    invalidArguments "contract source exceeds maximum allowed size for create()" contractName'
+  chargeFlatGas $ 200 + 200 * length contractSrc
 
   creator <- getCurrentAddress
 
@@ -2466,9 +2625,15 @@ callBuiltin "create" args@(cName : src : argVals) = do
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@(salt : n : src : argVals) = do
+  roCreate2 <- readOnly <$> getCurrentCallInfo
+  when roCreate2 $ invalidWrite "create2 is not allowed in a read-only (static/view) call" ("create2" :: String)
   (contractName', contractSrc) <- (,) <$> getStringVal n <*> getStringVal src
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
+  let maxContractSrcBytes = 128 * 1024 :: Int
+  when (length contractSrc > maxContractSrcBytes) $
+    invalidArguments "contract source exceeds maximum allowed size for create2()" contractName'
+  chargeFlatGas $ 200 + 200 * length contractSrc
 
   creator <- getCurrentAddress
 
@@ -2815,7 +2980,16 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       return (n, newVar)
   let args = [(n, v) | (n, _, v) <- argsWithLoc]
 
-  val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  -- Promote readOnly based on declared function mutability. Solidity's
+  -- 'view'/'pure'/'constant' annotations are otherwise purely documentary
+  -- at runtime (audit finding 34): without this, a function marked 'view'
+  -- could still write to storage, emit events, or self-destruct.
+  let effectiveRo = ro || case theFunction ^. CC.funcStateMutability of
+        Just CC.Pure -> True
+        Just CC.View -> True
+        Just CC.Constant -> True
+        _ -> False
+  val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) effectiveRo ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
     matchedArgvals <- forM theModifiers $ \modi -> do
       let !margList =
               fromMaybe []

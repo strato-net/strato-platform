@@ -20,8 +20,10 @@ solidityPragma = do
     reserved "pragma"
     -- this is the word immediately following the pragma keyword (typically it is 'solidvm')
     pragmaName <- identifier
-    -- The follow is anything else after the pragmaName.
-    rest <- many (noneOf ";")
+    -- Cap the pragma argument span so a malformed source missing the trailing
+    -- ';' does not force the parser to scan the rest of the file (audit
+    -- finding 30).
+    rest <- boundedNoneOf 4096 ";"
     -- Modify the state of the parser to change the pragma version if a new version is found
     when (pragmaName == "solidvm") $ modifyState (\s -> s {pragmaVersion = rest})
     addPragma pragmaName rest

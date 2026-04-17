@@ -477,35 +477,39 @@ runSM maybeCode envBefore gi f = do
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
-  eVal <- try $ runReaderT f startingStateRef
+  -- Catch *all* synchronous exceptions so that neither ArithException
+  -- (divide-by-zero), ErrorCall ('error "..."'), nor unforeseen runtime
+  -- exceptions can escape the VM boundary and crash the node. Non-Solid
+  -- exceptions are wrapped as InternalError so callers can still observe a
+  -- typed failure.
+  let wrap :: SomeException -> SolidException
+      wrap e = case fromException e of
+        Just se -> se
+        Nothing -> InternalError "uncaught exception in VM" (show e)
+  eVal <- fmap (either (Left . wrap) Right) . try @_ @SomeException $ runReaderT f startingStateRef
   sstateAfter <- readIORef startingStateRef
   let envAfter = env sstateAfter
   case eVal of
-    -- NO errors will crash the VM.
-    -- InternalError should *never* happen.
-    -- TODO should also not happen, but since this is a work in progress they
-    -- are a fact of life and should be fixed on demand.
-    -- The rest should always be a user error and handled safely
+    -- Previously, `flags_svmDev` caused *all* SolidException errors to
+    -- re-throw and crash the node. That bypassed safe error reporting for
+    -- ordinary user errors during development, so we only log and return
+    -- Left. Keep the InternalError trace-log for visibility.
     Left se -> do
       $logErrorLS "runSM/error" se
-      if flags_svmDev
-        then do
-          $logErrorLS "runSM/error_code" maybeCode
-          throwIO se
-        else return (envAfter, Left se)
+      when flags_svmDev $ $logErrorLS "runSM/error_code" maybeCode
+      return (envAfter, Left se)
     Right value -> do
       Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
       return (envAfter, Right value)
 
 -- When calling a remote contract, the new `msg.sender` is the contract
--- that the call is initiated from.
+-- that the call is initiated from. Wrapped in 'finally' so the original
+-- sender is always restored even if 'mv' throws.
 pushSender :: MonadSM m => Address -> m a -> m a
 pushSender newSender mv = do
   oldSender <- Mod.get (Mod.Proxy @Env.Sender)
   Mod.put (Mod.Proxy @Env.Sender) (Env.Sender newSender)
-  ret <- mv
-  Mod.put (Mod.Proxy @Env.Sender) oldSender
-  return $ ret
+  mv `finally` Mod.put (Mod.Proxy @Env.Sender) oldSender
 
 startingAction :: Env.Environment -> Action
 startingAction env' =
@@ -712,9 +716,15 @@ withCallInfo ::
   m a ->
   m a
 withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
+  -- Snapshot the global Action record so events, action data, and
+  -- delegatecalls emitted by a reverted subcall do not persist. Previously
+  -- only storageMap/stateMap rollback was performed by popCallInfo, which
+  -- left _action.events etc. observable on-chain after revert.
+  actionBefore <- Mod.get (Mod.Proxy @Action)
   addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
   eRes <- try f
   popCallInfo $ isLeft eRes
+  when (isLeft eRes) $ Mod.put (Mod.Proxy @Action) actionBefore
   case eRes of
     Left (e :: SomeException) -> throwIO e
     Right res -> pure res
@@ -732,6 +742,13 @@ addCallInfo ::
   Bool ->
   m ()
 addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
+  -- Cap call-stack depth the same way EVM (EIP-150) does. Without this,
+  -- a contract with unbounded (mutual) recursion grows the CallInfo list
+  -- and eventually overflows the RTS stack, escaping runSM.
+  let maxCallDepth = 1024 :: Int
+  existing <- Mod.get (Mod.Proxy @[CallInfo])
+  when (length existing >= maxCallDepth) $
+    throwIO $ InternalError "Call depth exceeded" (show maxCallDepth)
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
@@ -796,9 +813,15 @@ withStaticCallInfo f = do
   case cs of
     [] -> internalError "withStaticCallInfo was called with an empty stack" ()
     (curFrame : rest) -> do
+      -- A staticcall must never emit events or otherwise mutate the
+      -- Action record. Snapshot and restore to defend against any code
+      -- path that would append (defense-in-depth alongside the readOnly
+      -- guards on emit/transfer/send/create).
+      actionBefore <- Mod.get (Mod.Proxy @Action)
       Mod.put (Mod.Proxy @[CallInfo]) $ curFrame{readOnly = True} : rest
       eResult <- try f
       Mod.put (Mod.Proxy @[CallInfo]) $ curFrame : rest
+      Mod.put (Mod.Proxy @Action) actionBefore
       case eResult of
         Left (e :: SomeException) -> throwIO e
         Right result -> pure result
@@ -966,19 +989,33 @@ addNewCodeCollection ch cc = do
       Mod.modify_ (Mod.Proxy @(OMap.OMap (Text, Keccak256) CodeCollection)) $ pure . (OMap.|> ((username, ch), cc))
     Nothing -> pure ()
 
+-- | EVM-compatible 256-block lookback limit for 'blockhash'. Prevents a
+-- contract from forcing the node to traverse an arbitrarily long chain of
+-- parent blocks (audit finding 7).
+maxBlockHashLookback :: Integer
+maxBlockHashLookback = 256
+
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
   $logInfoS "getBlockHashWithNumber" . T.pack $ "calling getBSum with " ++ format h
   bSum <- getBSum h
-  case num `compare` bSumNumber bSum of
-    Ordering.LT -> getBlockHashWithNumber num $ bSumParentHash bSum
-    Ordering.EQ -> return $ Just h
-    Ordering.GT -> return Nothing
+  let currentNum = bSumNumber bSum
+  if num < 0 || currentNum - num > maxBlockHashLookback
+    then return Nothing
+    else case num `compare` currentNum of
+      Ordering.LT -> getBlockHashWithNumber num $ bSumParentHash bSum
+      Ordering.EQ -> return $ Just h
+      Ordering.GT -> return Nothing
 
+-- | Throw a typed SolidException on missing block summaries instead of a
+-- native ErrorCall. The partial error otherwise bypassed runSM's
+-- exception handler and crashed the node (audit finding 7).
 getBSum :: (Keccak256 `A.Alters` BlockSummary) m => Keccak256 -> m BlockSummary
-getBSum bh =
-  fromMaybe (error $ "missing value in block summary DB: " ++ format bh)
-    <$> A.lookup (A.Proxy @BlockSummary) bh
+getBSum bh = do
+  m <- A.lookup (A.Proxy @BlockSummary) bh
+  case m of
+    Just b -> pure b
+    Nothing -> internalError "missing value in block summary DB" (format bh)
 
 getContractNameAndHash :: MonadSM m => Address -> m (SolidString, Keccak256)
 getContractNameAndHash address' = do

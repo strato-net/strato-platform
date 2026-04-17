@@ -11,7 +11,7 @@ import Data.Source
 import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.ParserTypes
-import Text.Parsec
+import Text.Parsec ()
 
 solidityAlias :: SolidityParser SourceUnit
 solidityAlias = do
@@ -19,7 +19,8 @@ solidityAlias = do
     symbol "type"
     aliasName <- identifier
     reserved "is"
-    rest <- many1 (noneOf ";") --TODO have to not do this, have it check if it is a simple type otherwise throw an error
+    -- Bounded to prevent parser DoS on a malformed alias missing ';'.
+    rest <- boundedNoneOf 1024 ";"
     semi
     pure (aliasName, rest)
   --Directly make store type rather than string of type?

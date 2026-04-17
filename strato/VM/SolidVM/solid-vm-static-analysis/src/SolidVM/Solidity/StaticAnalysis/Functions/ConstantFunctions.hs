@@ -7,6 +7,8 @@ module SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions
   )
 where
 
+import Blockchain.VM.SolidException (SolidException (InternalError))
+import Control.Exception (throw)
 import Control.Monad.Reader
 import Control.Monad.Trans.State
 import Data.Foldable (traverse_)
@@ -70,7 +72,7 @@ isLocalVariable name = foldr lookupVar False <$> get
 
 pushLocalVariable :: SolidString -> SourceAnnotation () -> SSS ()
 pushLocalVariable name decl = modify $ \case
-  [] -> error "This can't happen by the laws of physics"
+  [] -> throw $ InternalError "pushLocalVariable: empty scope stack" "ConstantFunctions detector"
   (x : xs) -> (M.insert name decl x) : xs
 
 pushLocalVariables :: [VarDefEntry] -> SSS ()

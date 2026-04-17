@@ -27,10 +27,20 @@ import Blockchain.Strato.Model.Address (addressToByteString)
 import Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import Data.Char (isDigit)
 import Data.List (isPrefixOf)
 import qualified Data.Vector as V
 import SolidVM.Model.Value
+import Text.Read (readMaybe)
+
+-- | Upper bound on the number of elements allowed in a decoded dynamic
+-- array or bytes field. Prevents a malicious ABI payload from forcing
+-- the decoder to allocate tens of gigabytes via a list comprehension.
+maxAbiDecodeElements :: Int
+maxAbiDecodeElements = 1024 * 1024 -- 1M elements
+
+-- | Valid Solidity intN/uintN widths must be a multiple of 8 in [8, 256].
+isValidIntBits :: Int -> Bool
+isValidIntBits b = b >= 8 && b <= 256 && b `mod` 8 == 0
 
 --------------------------------------------------------------------------------
 -- Byte-level primitives
@@ -104,6 +114,11 @@ isDynamicType TString = True
 isDynamicType (TArrayOf _) = True
 isDynamicType _ = False
 
+-- | Parse a Solidity ABI type descriptor string. Returns 'Nothing' for
+-- syntactically invalid inputs *and* for numerically invalid widths (e.g.
+-- @int0@, @uint1000@, @bytes33@). Previously any digit sequence was
+-- accepted, which produced crashing types like @TInt 0@ (negative exponent
+-- in 2^(-1)) and DoS-prone types like @TInt 10000000@.
 parseTypeDescriptor :: String -> Maybe TypeDescriptor
 parseTypeDescriptor s
   | "[]" `isSuffixOf` s =
@@ -116,15 +131,20 @@ parseTypeDescriptor s
       let bits = drop 4 s
        in if null bits
             then Just (TUint 256)
-            else if all isDigit bits then Just (TUint (read bits)) else Nothing
+            else do
+              b <- readMaybe bits
+              if isValidIntBits b then Just (TUint b) else Nothing
   | "int" `isPrefixOf` s =
       let bits = drop 3 s
        in if null bits
             then Just (TInt 256)
-            else if all isDigit bits then Just (TInt (read bits)) else Nothing
-  | "bytes" `isPrefixOf` s =
+            else do
+              b <- readMaybe bits
+              if isValidIntBits b then Just (TInt b) else Nothing
+  | "bytes" `isPrefixOf` s = do
       let n = drop 5 s
-       in if all isDigit n && not (null n) then Just (TBytesN (read n)) else Nothing
+      w <- readMaybe n
+      if w >= 1 && w <= 32 then Just (TBytesN w) else Nothing
   | otherwise = Nothing
   where
     isSuffixOf suffix str = drop (length str - length suffix) str == suffix
@@ -138,42 +158,101 @@ typeArgToString _ = Nothing
 -- ABI decoding
 --------------------------------------------------------------------------------
 
+-- | Read a 32-byte word at @offset@ from @bs@. Returns @Nothing@ when the
+-- buffer is too short (previously this silently produced a zero word via
+-- 'B.take'/'B.drop' truncation, letting attackers force 'address(0)' /
+-- 'false' in downstream decodes).
+readWord :: B.ByteString -> Int -> Maybe B.ByteString
+readWord bs offset
+  | offset < 0 = Nothing
+  | offset + 32 > B.length bs = Nothing
+  | otherwise = Just (B.take 32 (B.drop offset bs))
+
+-- | Decode a single ABI value. Out-of-bounds reads and obviously hostile
+-- dynamic sizes return 'SNULL' rather than silently fabricating zeros.
 decodeValue :: TypeDescriptor -> B.ByteString -> Int -> Value
-decodeValue (TUint _bits) bs offset =
-  let word = B.take 32 (B.drop offset bs)
-   in SInteger (bytesToIntegerBE word)
+decodeValue (TUint bits) bs offset =
+  case readWord bs offset of
+    Nothing -> SNULL
+    Just word ->
+      let raw = bytesToIntegerBE word
+          mask = (2 ^ (bits :: Int)) - 1
+       in SInteger (raw .&. mask)
 decodeValue (TInt bits) bs offset =
-  let word = B.take 32 (B.drop offset bs)
-      raw = bytesToIntegerBE word
-      maxPos = 2 ^ (bits - 1) - 1
-   in if raw > maxPos
-        then SInteger (raw - 2 ^ bits)
-        else SInteger raw
+  case readWord bs offset of
+    Nothing -> SNULL
+    Just word ->
+      -- Mask to declared bit width, then interpret as two's complement over
+      -- that same width. The previous formula subtracted 2^bits from the
+      -- full 256-bit raw value, which produced nonsense for bits < 256.
+      let raw = bytesToIntegerBE word
+          mask = (2 ^ (bits :: Int)) - 1
+          masked = raw .&. mask
+          signBit = 2 ^ (bits - 1)
+       in if masked >= signBit
+            then SInteger (masked - 2 ^ (bits :: Int))
+            else SInteger masked
 decodeValue TBool bs offset =
-  let word = B.take 32 (B.drop offset bs)
-   in SBool (bytesToIntegerBE word /= 0)
+  case readWord bs offset of
+    Nothing -> SNULL
+    Just word -> SBool (bytesToIntegerBE word /= 0)
 decodeValue TAddress bs offset =
-  let word = B.take 32 (B.drop offset bs)
-      addrBytes = B.drop 12 word
-      addrInt = bytesToIntegerBE addrBytes
-   in SAddress (fromInteger addrInt) False
+  case readWord bs offset of
+    Nothing -> SNULL
+    Just word ->
+      let addrBytes = B.drop 12 word
+          addrInt = bytesToIntegerBE addrBytes
+       in SAddress (fromInteger addrInt) False
 decodeValue (TBytesN n) bs offset =
-  let word = B.take 32 (B.drop offset bs)
-   in SBytes (B.take n word)
+  case readWord bs offset of
+    Nothing -> SNULL
+    Just word -> SBytes (B.take n word)
 decodeValue TBytes bs offset =
-  let dataOffset = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop offset bs)))
-      len = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop dataOffset bs)))
-   in SBytes (B.take len (B.drop (dataOffset + 32) bs))
+  case decodeDynamicBytes bs offset of
+    Nothing -> SNULL
+    Just payload -> SBytes payload
 decodeValue TString bs offset =
-  let dataOffset = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop offset bs)))
-      len = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop dataOffset bs)))
-   in SString (BC.unpack (B.take len (B.drop (dataOffset + 32) bs)))
+  case decodeDynamicBytes bs offset of
+    Nothing -> SNULL
+    Just payload -> SString (BC.unpack payload)
 decodeValue (TArrayOf elemType) bs offset =
-  let dataOffset = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop offset bs)))
-      len = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop dataOffset bs))) :: Int
-      elemsStart = dataOffset + 32
-      elems = [decodeValue elemType bs (elemsStart + i * 32) | i <- [0 .. len - 1]]
-   in SArray (V.fromList $ map Constant elems)
+  case readWord bs offset of
+    Nothing -> SNULL
+    Just offW ->
+      let dataOffset = fromIntegral (bytesToIntegerBE offW) :: Int
+       in case readWord bs dataOffset of
+            Nothing -> SNULL
+            Just lenW ->
+              let lenInt = bytesToIntegerBE lenW
+                  remainingBytes = B.length bs - (dataOffset + 32)
+                  -- Cap the decoded length at both a hard ceiling and the
+                  -- actual remaining buffer size to prevent OOM.
+                  maxByLen = remainingBytes `div` 32
+                  cap = fromIntegral (min (toInteger maxAbiDecodeElements) (toInteger maxByLen))
+                  len = if lenInt < 0 then 0
+                        else if lenInt > toInteger cap then cap
+                        else fromIntegral lenInt :: Int
+                  elemsStart = dataOffset + 32
+                  elems = [decodeValue elemType bs (elemsStart + i * 32) | i <- [0 .. len - 1]]
+               in SArray (V.fromList $ map Constant elems)
+
+-- | Shared dynamic-bytes reader used by TBytes and TString. Validates both
+-- the outer offset word and the payload bounds.
+decodeDynamicBytes :: B.ByteString -> Int -> Maybe B.ByteString
+decodeDynamicBytes bs offset = do
+  offW <- readWord bs offset
+  let dataOffset = fromIntegral (bytesToIntegerBE offW) :: Int
+  lenW <- readWord bs dataOffset
+  let lenInt = bytesToIntegerBE lenW
+      payloadStart = dataOffset + 32
+      remaining = B.length bs - payloadStart
+      cap = min (toInteger maxAbiDecodeElements) (toInteger remaining)
+      len = if lenInt < 0 || lenInt > cap
+              then fromIntegral (max 0 cap)
+              else fromIntegral lenInt
+  if payloadStart < 0 || payloadStart > B.length bs
+    then Nothing
+    else Just (B.take len (B.drop payloadStart bs))
 
 abiDecode :: B.ByteString -> [Value] -> Value
 abiDecode bs typeArgs =

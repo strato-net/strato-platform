@@ -108,10 +108,17 @@ mergeUnresolvedFileUnits (UFU i p u) (UFU j q v) = do
            then Right $ UFU (i <> j) (p <> q) (newFileUnits)
            else Left . T.pack $ "Duplicate values: " ++ show duplicates
 
-instance Semigroup (UnresolvedFileUnitsF a) where
-  (<>) = mergeUnresolvedFileUnitsIgnoreDuplicates
+-- | Semigroup uses the *checked* merge so duplicate contract/function
+-- names are flagged rather than silently swallowed by a left-biased union
+-- (audit finding 40). On conflict the rightmost wins via 'error' so the
+-- failure surfaces immediately; the checked merge tolerates overloadable
+-- function definitions but rejects genuine duplicates.
+instance Show a => Semigroup (UnresolvedFileUnitsF a) where
+  a <> b = case mergeUnresolvedFileUnits a b of
+    Right r -> r
+    Left e -> error $ "ImportResolver: refusing to silently overwrite duplicate definitions: " ++ T.unpack e
 
-instance Monoid (UnresolvedFileUnitsF a) where
+instance Show a => Monoid (UnresolvedFileUnitsF a) where
   mempty = def
   mappend = (<>)
 
@@ -177,7 +184,11 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
     else case expr of
       AddressLiteral x addr -> do
         lift (A.select (A.Proxy @AddressState) addr) >>= \case
-          Nothing -> pure (seen, resolved)
+          -- Previously silent; a typo / selfdestructed target produced
+          -- contracts with missing types that compiled without warning
+          -- (audit finding 52). Treat this as a hard error in step with
+          -- how 'StringLiteral' imports already behave.
+          Nothing -> throwE (x, T.pack $ "Import target address not found on-chain: " ++ show addr)
           Just AddressState {..} ->
             case addressStateCodeHash of
               SolidVMCode _ ch -> do
@@ -242,10 +253,20 @@ doResolve ::
   Text ->
   FileImportF a ->
   EndoM (ExceptT (a, Text) m) (S.Set Text, ImportMapF a)
+-- Thread the updated 'seen' set through each sibling import so one branch
+-- sees files discovered by its predecessors (audit finding 47). Previously
+-- the first tuple element was discarded via '\(_, r')', causing redundant
+-- compilation work and missing cycle detection across branches.
 doResolve f g fileName imp (seen, resolved) = case imp of
-  Simple path x -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> updateResolved x fileName (tShowExpr p) "" r'
-  Qualified path alias x -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> updateResolved x fileName (tShowExpr p) alias r'
-  Braced items path _ -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> foldrM (updateSingleItem fileName $ tShowExpr p) r' items
+  Simple path x -> resolvePath fileName path >>= \p ->
+    resolveFile f g p (seen, resolved) >>= \(seen', r') ->
+      (seen',) <$> updateResolved x fileName (tShowExpr p) "" r'
+  Qualified path alias x -> resolvePath fileName path >>= \p ->
+    resolveFile f g p (seen, resolved) >>= \(seen', r') ->
+      (seen',) <$> updateResolved x fileName (tShowExpr p) alias r'
+  Braced items path _ -> resolvePath fileName path >>= \p ->
+    resolveFile f g p (seen, resolved) >>= \(seen', r') ->
+      (seen',) <$> foldrM (updateSingleItem fileName $ tShowExpr p) r' items
 
 resolvePath :: Monad m => Text -> EndoM (ExceptT (a, Text) m) (ExpressionF a)
 resolvePath fileName (StringLiteral a path') =
