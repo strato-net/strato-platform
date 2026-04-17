@@ -3,6 +3,7 @@ import { startCronScheduler } from './cronScheduler';
 import { logInfo, logError } from './utils/logger';
 import { validateConfig } from './utils/validateConfig';
 import { healthMonitor } from './utils/healthMonitor';
+import { initNetworkConfig } from './utils/networkConfig';
 import express from 'express';
 
 dotenv.config();
@@ -13,6 +14,8 @@ async function main(): Promise<void> {
         if (!(await validateConfig())) {
             throw new Error('Configuration validation failed');
         }
+
+        await initNetworkConfig();
 
         logInfo('Main', 'Starting Price Oracle Service...');
         logInfo('Main', `STRATO Node: ${process.env.STRATO_NODE_URL}`);

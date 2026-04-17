@@ -4,7 +4,12 @@ import { logInfo, logError } from './logger';
 import { ORACLE_CONFIG } from './constants';
 
 const sourcesConfig = require('../config/sources.json');
-const assetsConfig = require('../config/assets.json');
+const assetsConfig = {
+    assets: {
+        ...require('../config/assets.upquark.json').assets,
+        ...require('../config/assets.helium.json').assets,
+    },
+};
 
 dotenv.config();
 
