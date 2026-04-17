@@ -15,8 +15,7 @@ import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
 import {
   USER_TOKEN_BALANCES_QUERY_KEY,
-  fetchUserTokenBalances,
-  findBalanceInTokenList,
+  getBalanceForAddressFiltered,
   invalidateUserTokenBalances,
 } from '@/queries/tokenBalancesQuery';
 
@@ -239,31 +238,12 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const fetchUsdstBalance = useCallback(async (signal?: AbortSignal) => {
     setLoadingUsdstBalance(true);
     try {
-      let list = queryClient.getQueryData<Token[]>(USER_TOKEN_BALANCES_QUERY_KEY);
-      if (!list?.length) {
-        try {
-          list = await queryClient.fetchQuery({
-            queryKey: USER_TOKEN_BALANCES_QUERY_KEY,
-            queryFn: ({ signal: qSignal }) => fetchUserTokenBalances(qSignal),
-          });
-        } catch {
-          list = [];
-        }
-      }
-      const cachedUsdst = list?.length ? findBalanceInTokenList(list, usdstAddress) : null;
-
-      const voucherPromise = api.get(`/vouchers/balance`, { signal });
-      const usdstPromise =
-        cachedUsdst !== null
-          ? Promise.resolve(cachedUsdst)
-          : api
-              .get(`/tokens/balance`, {
-                signal,
-                params: { address: `eq.${usdstAddress}` },
-              })
-              .then((r) => String(r.data?.[0]?.balance ?? "0"));
-
-      const [voucherResponse, usdstBal] = await Promise.all([voucherPromise, usdstPromise]);
+      const [usdstBal, voucherResponse] = await Promise.all([
+        getBalanceForAddressFiltered(usdstAddress, signal),
+        api.get(`/vouchers/balance`, {
+          signal,
+        }),
+      ]);
 
       if (signal?.aborted) return;
 
@@ -278,7 +258,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         setLoadingUsdstBalance(false);
       }
     }
-  }, [queryClient]);
+  }, []);
 
   const getEarningAssets = useCallback(async (showLoading: boolean = false) => {
     if (earningAssetsAbortControllerRef.current) {

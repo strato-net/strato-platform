@@ -1,7 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
-  type Token,
   Pool,
   SwapHistoryEntry,
   SetPoolRatesParams,
@@ -10,11 +8,7 @@ import {
 } from '@/interface';
 import {api} from '@/lib/axios';
 import { useUser } from '@/context/UserContext';
-import {
-  USER_TOKEN_BALANCES_QUERY_KEY,
-  fetchUserTokenBalances,
-  findBalanceInTokenList,
-} from '@/queries/tokenBalancesQuery';
+import { getBalanceForAddressFiltered } from '@/queries/tokenBalancesQuery';
 
 // ============================================================================
 // TYPES
@@ -26,8 +20,7 @@ const SwapContext = createContext<SwapContextType | undefined>(undefined);
 
 export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const { isLoggedIn } = useUser();
-  const queryClient = useQueryClient();
-  
+
   // ============================================================================
   // STATE
   // ============================================================================
@@ -406,62 +399,20 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Utility functions
+  // Always use GET /tokens/balance?address=eq.{addr} (same as develop) so swap / liquidity data matches backend.
   const fetchTokenBalances = useCallback(async (pool: Pool, _userAddress: string, usdstAddress: string) => {
-    const addrA = pool.tokenA.address.startsWith("0x")
-      ? pool.tokenA.address.slice(2)
-      : pool.tokenA.address;
-    const addrB = pool.tokenB.address.startsWith("0x")
-      ? pool.tokenB.address.slice(2)
-      : pool.tokenB.address;
-    const addrU = usdstAddress.startsWith("0x") ? usdstAddress.slice(2) : usdstAddress;
-
-    let list = queryClient.getQueryData<Token[]>(USER_TOKEN_BALANCES_QUERY_KEY);
-    if (!list?.length) {
-      try {
-        list = await queryClient.fetchQuery({
-          queryKey: USER_TOKEN_BALANCES_QUERY_KEY,
-          queryFn: ({ signal }) => fetchUserTokenBalances(signal),
-        });
-      } catch {
-        list = [];
-      }
-    }
-
-    let tokenABalance = findBalanceInTokenList(list, addrA) ?? findBalanceInTokenList(list, pool.tokenA.address);
-    let tokenBBalance = findBalanceInTokenList(list, addrB) ?? findBalanceInTokenList(list, pool.tokenB.address);
-    let usdstBalance = findBalanceInTokenList(list, addrU) ?? findBalanceInTokenList(list, usdstAddress);
-
-    const fetches: Promise<void>[] = [];
-    if (tokenABalance === null) {
-      fetches.push(
-        api.get(`/tokens/balance?address=eq.${addrA}`).then((r) => {
-          tokenABalance = r.data?.[0]?.balance != null ? String(r.data[0].balance) : "0";
-        })
-      );
-    }
-    if (tokenBBalance === null) {
-      fetches.push(
-        api.get(`/tokens/balance?address=eq.${addrB}`).then((r) => {
-          tokenBBalance = r.data?.[0]?.balance != null ? String(r.data[0].balance) : "0";
-        })
-      );
-    }
-    if (usdstBalance === null) {
-      fetches.push(
-        api.get(`/tokens/balance?address=eq.${addrU}`).then((r) => {
-          usdstBalance = r.data?.[0]?.balance != null ? String(r.data[0].balance) : "0";
-        })
-      );
-    }
-    if (fetches.length) await Promise.all(fetches);
+    const [tokenABalance, tokenBBalance, usdstBalance] = await Promise.all([
+      getBalanceForAddressFiltered(pool.tokenA.address),
+      getBalanceForAddressFiltered(pool.tokenB.address),
+      getBalanceForAddressFiltered(usdstAddress),
+    ]);
 
     return {
-      tokenABalance: tokenABalance ?? "0",
-      tokenBBalance: tokenBBalance ?? "0",
-      usdstBalance: usdstBalance ?? "0",
+      tokenABalance,
+      tokenBBalance,
+      usdstBalance,
     };
-  }, [queryClient]);
+  }, []);
 
   // History operations
   const refreshSwapHistory = useCallback(

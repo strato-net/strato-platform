@@ -44,7 +44,9 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
     queryKey: USER_TOKEN_BALANCES_QUERY_KEY,
     queryFn: ({ signal }) => fetchUserTokenBalances(signal),
     enabled: isLoggedIn,
-    staleTime: 45_000,
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const activeTokens = useMemo(() => {
@@ -86,7 +88,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       if (signal?.aborted) return;
       setRefetchError(null);
       try {
-        await queryClient.refetchQueries({
+        await queryClient.invalidateQueries({
           queryKey: USER_TOKEN_BALANCES_QUERY_KEY,
         });
       } catch (err) {

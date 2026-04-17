@@ -9,12 +9,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
-import type { Token } from "@/interface";
-import {
-  USER_TOKEN_BALANCES_QUERY_KEY,
-  fetchUserTokenBalances,
-  findBalanceInTokenList,
-} from "@/queries/tokenBalancesQuery";
+import { getBalanceForAddressPreferSharedList } from "@/queries/tokenBalancesQuery";
 import { formatBalance } from "@/utils/numberUtils";
 import {
   BalanceResponse,
@@ -145,45 +140,12 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       tokenAddress: string,
       signal?: AbortSignal
     ): Promise<BalanceResponse> => {
-      const addr = tokenAddress.startsWith("0x")
-        ? tokenAddress.slice(2)
-        : tokenAddress;
-
-      const cached = queryClient.getQueryData<Token[]>(USER_TOKEN_BALANCES_QUERY_KEY);
-      let fromList =
-        findBalanceInTokenList(cached, addr) ?? findBalanceInTokenList(cached, tokenAddress);
-      if (fromList !== null) {
-        return { balance: fromList };
-      }
-
-      let list: Token[] | undefined;
-      try {
-        list = await queryClient.fetchQuery({
-          queryKey: USER_TOKEN_BALANCES_QUERY_KEY,
-          queryFn: ({ signal: qSignal }) => fetchUserTokenBalances(qSignal),
-        });
-      } catch {
-        list = undefined;
-      }
-
-      fromList =
-        findBalanceInTokenList(list, addr) ?? findBalanceInTokenList(list, tokenAddress);
-      if (fromList !== null) {
-        return { balance: fromList };
-      }
-
-      const { data } = await api.get(`/tokens/balance?address=eq.${addr}`, {
+      const balance = await getBalanceForAddressPreferSharedList(
+        queryClient,
+        tokenAddress,
         signal,
-      });
-
-      if (Array.isArray(data) && data[0]) {
-        const tokenData = data[0];
-        const balance = tokenData.balance ? String(tokenData.balance) : "0";
-
-        return { balance };
-      }
-
-      return { balance: "0" };
+      );
+      return { balance };
     },
     [queryClient]
   );
