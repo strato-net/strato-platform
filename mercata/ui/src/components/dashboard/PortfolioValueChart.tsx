@@ -46,6 +46,9 @@ export const PORTFOLIO_CHART_TIME_RANGE_OPTIONS = [
   { label: "All Time", value: "all" },
 ] as const;
 
+/** Chart fetch keys — keep in sync with `PORTFOLIO_CHART_TIME_RANGE_OPTIONS`. */
+export type PortfolioChartTimeRange = (typeof PORTFOLIO_CHART_TIME_RANGE_OPTIONS)[number]["value"];
+
 // Convert timestamp to date or time string for display based on range
 const formatDate = (timestamp: number, isTimeRange: boolean): string => {
   if (isTimeRange) {
@@ -421,8 +424,10 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
           <div
             className={cn(
               "mt-3 gap-2 border-t border-border pt-3 sm:mt-4 sm:pt-4",
-              "grid grid-cols-3",
-              "md:flex md:flex-wrap md:items-center md:justify-center md:gap-2"
+              /* Mobile: 3-column grid */
+              "max-md:grid max-md:grid-cols-3",
+              /* Desktop: horizontal chips (flex must be md+ so it does not fight grid on small screens) */
+              "md:flex md:flex-wrap md:items-center md:justify-center"
             )}
           >
             {PORTFOLIO_CHART_TIME_RANGE_OPTIONS.map(({ label, value }) => (
@@ -431,8 +436,10 @@ const PortfolioValueChart: React.FC<PortfolioValueChartProps> = ({
                 type="button"
                 onClick={() => onTimeRangeChange(value)}
                 className={cn(
-                  "w-full rounded-md px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-2.5 sm:text-sm",
-                  value === "all" && "col-span-3 md:col-auto md:w-auto",
+                  "rounded-md px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-2.5 sm:text-sm",
+                  /* w-full in grid fills each cell; in flex row use intrinsic width */
+                  "w-auto max-md:w-full",
+                  value === "all" && "max-md:col-span-3",
                   selectedTimeRange === value
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"

@@ -1,18 +1,11 @@
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowRight, TrendingUp } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import PortfolioValueChart from "@/components/dashboard/PortfolioValueChart";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { activityFeedApi } from "@/lib/activityFeed";
 import { activityTypes } from "@/components/dashboard/activityTypes";
 import type { Event } from "@mercata/shared-types";
@@ -20,8 +13,8 @@ import { formatUnits } from "viem";
 import { formatBalance } from "@/utils/numberUtils";
 import type { CollateralData, NewLoanData } from "@/interface";
 import type { Token as WalletToken } from "@mercata/shared-types";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { getPortfolioAssetHref } from "@/utils/portfolioAssetRoutes";
+import { MIN_PORTFOLIO_IDLE_USD } from "@/utils/portfolioOpportunityUtils";
 import type { PortfolioYieldRollup } from "@/hooks/usePortfolioEarningRows";
 import type { IdleHoldingRow } from "@/hooks/usePortfolioIdleHoldings";
 import type { BalanceSnapshot } from "@mercata/shared-types";
@@ -370,7 +363,7 @@ export function PortfolioInsightsRow({
                 </span>
               ) : (
                 <span className="text-muted-foreground">
-                  No idle wallet balance over $10 with a price. Explore{" "}
+                  No idle wallet balance over ${MIN_PORTFOLIO_IDLE_USD} with a price. Explore{" "}
                   <Link to="/dashboard/earn-save" className="text-blue-600 hover:underline">
                     Easy Savings
                   </Link>

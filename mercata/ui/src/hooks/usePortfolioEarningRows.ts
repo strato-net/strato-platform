@@ -13,8 +13,7 @@ import {
   type EarnApyInfo,
 } from "@/utils/earnUtils";
 import { getPortfolioAssetHref } from "@/utils/portfolioAssetRoutes";
-
-const normAddr = (value?: string | null) => (value || "").toLowerCase().replace(/^0x/, "");
+import { normalizeTokenAddress } from "@/utils/portfolioOpportunityUtils";
 
 /** UI labels for earning-position row badges (KPI / wireframe taxonomy). */
 export function earningPositionBadges(
@@ -27,13 +26,16 @@ export function earningPositionBadges(
     apyInfo: EarnApyInfo | null;
   }
 ): string[] {
-  const a = normAddr(asset.address);
+  const a = normalizeTokenAddress(asset.address || "");
 
-  if (ctx.liquidityWithdrawableAddress && normAddr(ctx.liquidityWithdrawableAddress) === a) {
+  if (
+    ctx.liquidityWithdrawableAddress &&
+    normalizeTokenAddress(ctx.liquidityWithdrawableAddress) === a
+  ) {
     return ["Savings"];
   }
 
-  if (ctx.vaultShareTokenAddress && normAddr(ctx.vaultShareTokenAddress) === a) {
+  if (ctx.vaultShareTokenAddress && normalizeTokenAddress(ctx.vaultShareTokenAddress) === a) {
     return ["Vault"];
   }
 
@@ -92,7 +94,7 @@ export function usePortfolioEarningRows(earningAssets: EarningAsset[]) {
     const map = new Map<string, unknown>();
     pools?.forEach((pool: { lpToken?: { address?: string } }) => {
       const addr = pool.lpToken?.address;
-      if (addr) map.set(normAddr(addr), pool);
+      if (addr) map.set(normalizeTokenAddress(addr), pool);
     });
     return map;
   }, [pools]);
@@ -115,7 +117,7 @@ export function usePortfolioEarningRows(earningAssets: EarningAsset[]) {
       ) {
         const p =
           (pool as { address?: string; lpToken?: { address?: string; _symbol?: string } } | null) ||
-          (lpTokenPoolMap.get(normAddr(token.address)) as typeof pool) ||
+          (lpTokenPoolMap.get(normalizeTokenAddress(token.address)) as typeof pool) ||
           pools?.find(
             (candidate: { lpToken?: { _symbol?: string } }) => candidate.lpToken?._symbol === token._symbol
           );
@@ -152,7 +154,7 @@ export function usePortfolioEarningRows(earningAssets: EarningAsset[]) {
     [liquidityInfo?.withdrawable?.address, lpTokenPoolMap, pools, tokenApys, vaultState.alpha, vaultState.shareTokenAddress]
   );
 
-  const { rows, blendedApy, totalEstAnnualUsd, totalEarningValueUsd, bestApyRow, portfolioYieldRollup } = useMemo(() => {
+  const { rows, blendedApy, totalEstAnnualUsd, totalEarningValueUsd, portfolioYieldRollup } = useMemo(() => {
     const sorted = [...earningAssets].sort((a, b) => {
       const vA = parseFloat(a.value || "0");
       const vB = parseFloat(b.value || "0");
@@ -168,12 +170,11 @@ export function usePortfolioEarningRows(earningAssets: EarningAsset[]) {
     let estBaseSum = 0;
     let estRewardsSum = 0;
     let valueSum = 0;
-    let best: PortfolioEarningRow | null = null;
 
     for (const asset of sorted) {
       const valueUsd = parseFloat(asset.value || "0") || 0;
       const pool =
-        lpTokenPoolMap.get(normAddr(asset.address)) ||
+        lpTokenPoolMap.get(normalizeTokenAddress(asset.address)) ||
         pools?.find(
           (candidate: { lpToken?: { _symbol?: string } }) => candidate.lpToken?._symbol === asset._symbol
         );
@@ -224,10 +225,6 @@ export function usePortfolioEarningRows(earningAssets: EarningAsset[]) {
         }),
       };
       rowsInner.push(row);
-
-      if (apyNum != null && apyNum > 0 && valueUsd > 0) {
-        if (!best || (best.apyTotal ?? 0) < apyNum) best = row;
-      }
     }
 
     const portfolioYieldRollupInner: PortfolioYieldRollup | null =
@@ -257,10 +254,9 @@ export function usePortfolioEarningRows(earningAssets: EarningAsset[]) {
       blendedApy: blendedApyInner,
       totalEstAnnualUsd: totalEstAnnualFromBuckets,
       totalEarningValueUsd: valueSum,
-      bestApyRow: best,
       portfolioYieldRollup: portfolioYieldRollupInner,
     };
   }, [earningAssets, lpTokenPoolMap, pools, resolveTokenAPY, liquidityInfo?.withdrawable?.address, vaultState.shareTokenAddress]);
 
-  return { rows, blendedApy, totalEstAnnualUsd, totalEarningValueUsd, bestApyRow, portfolioYieldRollup };
+  return { rows, blendedApy, totalEstAnnualUsd, totalEarningValueUsd, portfolioYieldRollup };
 }

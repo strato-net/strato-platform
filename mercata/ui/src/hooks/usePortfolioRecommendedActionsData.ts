@@ -11,6 +11,7 @@ import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { mUsdstAddress } from "@/lib/constants";
 import { buildNativeRewardsApyInfo, findBestEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
 import {
+  MIN_PORTFOLIO_IDLE_USD,
   TOP_OPPORTUNITY_MIN_POOL_TVL,
   isPoolDisabled,
   isPoolPaused,
@@ -175,9 +176,8 @@ export function usePortfolioRecommendedActionsData(isLoggedIn: boolean) {
       })),
     ];
     const rankedCandidates = [...candidates].sort(compareOpportunities);
-    return rankedCandidates.filter(isEligibleForTopOpportunity).length > 0
-      ? rankedCandidates.filter(isEligibleForTopOpportunity)
-      : rankedCandidates;
+    const eligible = rankedCandidates.filter(isEligibleForTopOpportunity);
+    return eligible.length > 0 ? eligible : rankedCandidates;
   }, [
     lendingDisplayApyRaw,
     liquidityInfo?.totalUSDSTSupplied,
@@ -237,7 +237,7 @@ export function usePortfolioRecommendedActionsData(isLoggedIn: boolean) {
     let best: { usd: number; symbol: string } | null = null;
     for (const t of inactiveTokens) {
       const usd = walletTokenUsdApprox(t);
-      if (usd < 10) continue;
+      if (usd < MIN_PORTFOLIO_IDLE_USD) continue;
       if (!best || usd > best.usd) {
         best = { usd, symbol: t._symbol || t._name || "Token" };
       }

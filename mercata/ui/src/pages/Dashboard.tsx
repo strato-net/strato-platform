@@ -30,6 +30,10 @@ import { usePortfolioRecommendedActionsData } from "@/hooks/usePortfolioRecommen
 import { usePortfolioIdleHoldings } from "@/hooks/usePortfolioIdleHoldings";
 import PortfolioPositionsTable from "@/components/dashboard/portfolio/PortfolioPositionsTable";
 import {
+  PORTFOLIO_CHART_TIME_RANGE_OPTIONS,
+  type PortfolioChartTimeRange,
+} from "@/components/dashboard/PortfolioValueChart";
+import {
   PortfolioBorrowingOverview,
   PortfolioInsightsRow,
   PortfolioKpiStrip,
@@ -41,8 +45,10 @@ import {
   type PerformanceChartSlice,
 } from "@/components/dashboard/portfolio/PortfolioOverviewBlocks";
 
-const TIME_RANGES = ["1d", "7d", "1m", "3m", "6m", "1y", "all"] as const;
-type TimeRange = (typeof TIME_RANGES)[number];
+const VALID_CHART_TIME_RANGES = new Set<string>(
+  PORTFOLIO_CHART_TIME_RANGE_OPTIONS.map((o) => o.value)
+);
+type TimeRange = PortfolioChartTimeRange;
 
 type HistoryFetchTab = "netBalance" | "rewards";
 
@@ -96,7 +102,7 @@ const Dashboard = () => {
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
     const stored = localStorage.getItem("dashboard-timeRange");
-    if (stored && TIME_RANGES.includes(stored as TimeRange)) {
+    if (stored && VALID_CHART_TIME_RANGES.has(stored)) {
       return stored as TimeRange;
     }
     return "1m";
