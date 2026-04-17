@@ -1,25 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import pageHtml from "../strato-memecoin-partnership-onepager.html?raw";
 
 /**
- * Full-page iframe rendered from a blob URL so the one-pager HTML is delivered
- * inline with the JS bundle and is not fetched as a separate .html asset
- * (avoids WAF/Cloudflare blocks on raw .html requests in production).
+ * Renders the standalone one-pager HTML inline inside a Shadow DOM so its
+ * global `body` and `*` CSS cannot leak into the app. No separate asset
+ * request (would be blocked by WAF) and no iframe (would be blocked by CSP
+ * `frame-src`).
  */
 const CommunityRewardsOnePager = () => {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const url = URL.createObjectURL(new Blob([pageHtml], { type: "text/html" }));
-    setBlobUrl(url);
-    return () => URL.revokeObjectURL(url);
+    const host = hostRef.current;
+    if (!host || host.shadowRoot) return;
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = pageHtml;
   }, []);
 
-  return (
-    <main className="fixed inset-0 z-[100] bg-[#F4F5FB]">
-      {blobUrl && <iframe title="STRATO Community Partnership Program" src={blobUrl} className="h-full w-full border-0" />}
-    </main>
-  );
+  return <div ref={hostRef} className="fixed inset-0 z-[100] overflow-auto bg-[#F4F5FB]" />;
 };
 
 export default CommunityRewardsOnePager;
