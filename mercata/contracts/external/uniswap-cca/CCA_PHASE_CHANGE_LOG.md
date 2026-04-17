@@ -328,23 +328,41 @@ Execute parity validation scenarios and collect runtime evidence for the STRATO 
 - Used the smoke tests to uncover a real `StepLib` runtime issue under SolidVM execution: `blockDelta` needed an explicit low-40-bit mask rather than a plain `uint40(...)` cast.
 - Used the smoke tests to uncover ERC20 runtime call issues inside the auction path and rewired key token/currency calls to lower-level `address(...).call(...)` forms.
 - Recorded both new findings in `CCA_SOLIDVM_WORKAROUNDS.md`.
+- Pulled latest `origin/develop`, merged it into the working branch, rebuilt `solid-vm-cli` through the repo `Makefile`, and reran the smoke suite on the merged SolidVM runtime.
+- Confirmed the old `block.number` harness blocker is no longer the active issue in Phase 8: the after-end no-bid smoke path now passes on the rebuilt toolchain.
+- Instrumented the live-bid smoke path and isolated two additional runtime findings:
+  - the 4-argument `submitBid(maxPrice, amount, owner, hookData)` overload misdispatches under SolidVM runtime execution
+  - using the explicit 5-argument overload advances some bid state, but bid-id / checkpoint / graduation state is internally inconsistent
+- Recorded both new runtime findings and their evidence in `CCA_SOLIDVM_WORKAROUNDS.md`.
 
 ### Verification
 
-- `solid-vm-cli test "tests/CCA/CCAParitySmoke.test.sol"` now gets partway through runtime execution rather than failing at construction or token-receipt setup.
+- After rebuilding on top of merged latest `develop`, `solid-vm-cli test "tests/CCA/CCAParitySmoke.test.sol"` reaches the live-bid runtime path.
 - Current passing smoke assertions:
   - `aa receives tokens`
   - `ab has zero raised currency without bids`
   - `ac keeps all sale tokens before finalization`
+  - `ad sweeps unsold tokens after block advance`
+- With the live-bid path instrumented and forced through the explicit 5-argument overload, the smoke trace showed:
+  - `returned bidId` -> `1`
+  - `nextBidId` -> `1`
+  - `sumCurrencyDemandAboveClearingQ96` -> non-zero
+  - `bid0 owner` -> expected owner
+  - `bid0 maxPrice` -> expected bid price
+  - `checkpoint clearingPrice` -> `0`
+  - `stored clearingPrice` -> `FLOOR_PRICE`
+  - `currencyRaised` -> `0`
+  - `totalCleared` -> `0`
+  - `isGraduated` -> `0`
 
 ### Current Blockers
 
-- The current SolidVM test harness does not yet provide a clean way to advance `block.number`, which limits direct execution of after-end settlement scenarios for a contract that now keys off `block.number`.
-- The live-bid smoke path still has unresolved behavior around bid submission / state persistence, so the full scenario matrix in `CCA_PARITY_PLAN.md` is not yet complete.
+- The 4-argument `submitBid(..., bytes)` runtime path is not trustworthy under current SolidVM behavior, so convenience-overload parity is not yet established.
+- Even when the explicit 5-argument path is used, bid submission does not produce coherent bid-id / checkpoint / graduation state, so the full scenario matrix in `CCA_PARITY_PLAN.md` is still blocked on runtime behavior rather than harness setup.
 
 ### Result
 
-Phase 8 is in progress. It has already produced useful runtime evidence and uncovered two additional SolidVM execution quirks, but parity validation is not complete yet.
+Phase 8 is in progress. The current bottleneck has moved from the old test harness limitation to concrete SolidVM runtime behavior in overloaded bid submission and subsequent checkpoint/accounting state.
 
 ### Status
 

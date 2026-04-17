@@ -416,7 +416,89 @@ Behavior note:
 
 - this looks like a SolidVM runtime or execution-environment quirk rather than ordinary Solidity behavior
 
-### 20. Permit2 / `SafeTransferLib` flow was removed
+### 20. The 4-argument `submitBid(..., bytes)` overload misdispatched at runtime
+
+Observed behavior:
+
+- after rebuilding on top of latest `develop`, the no-bid smoke path still passed, but the live-bid smoke path failed when the test called:
+  - `submitBid(maxPrice, amount, owner, hookData)`
+- the failure was not a normal bid-validation revert; SolidVM behaved as if the dynamic `bytes` payload had been bound into the wrong parameter slot
+
+Evidence:
+
+- the 4-argument smoke path failed first with:
+  - `unknown variable: not found: "_hookData"`
+- after simplifying the contract-side forwarding path, the failure shape changed to:
+  - `argument type mismatch in '_submitBidCore':`
+  - `Argument 1: got Integer, expected uint32`
+  - `Argument 2: got Integer, expected uint16`
+  - `Argument 3: got Address, expected address`
+  - `Argument 4: got Bytes, expected uint32`
+- switching the smoke test to call the explicit 5-argument overload:
+  - `submitBid(maxPrice, amount, owner, prevTickPrice, hookData)`
+  moved execution past that specific overload-resolution failure
+
+Workaround:
+
+- for runtime debugging and parity investigation, bypassed the 4-argument overload in the smoke test and called the 5-argument overload explicitly
+- treated the 4-argument convenience entrypoint as runtime-unsafe under current SolidVM behavior until a smaller standalone repro proves otherwise
+
+Primary files:
+
+- `src/ContinuousClearingAuction.sol`
+- `tests/CCA/CCAParitySmoke.test.sol`
+
+Behavior note:
+
+- this appears to be a SolidVM runtime dispatch / argument-marshalling issue around overloaded functions with trailing dynamic `bytes` arguments
+
+### 21. Bid submission updated demand, but bid-id and checkpoint state were inconsistent at runtime
+
+Observed behavior:
+
+- using the explicit 5-argument `submitBid(...)` call allowed the smoke test to submit a bid far enough to mutate some auction state
+- however, the resulting runtime state was internally inconsistent:
+  - demand above clearing increased
+  - a bid existed in storage at `bidId = 0`
+  - but the returned `bidId` was `1`
+  - `nextBidId()` remained `1`
+  - `checkpoint()` returned a `clearingPrice` of `0`
+  - `currencyRaised()`, `totalCleared()`, and `isGraduated()` remained unchanged
+
+Evidence:
+
+- instrumented smoke-test output showed:
+  - `returned bidId` -> `1`
+  - `nextBidId` -> `1`
+  - `sumCurrencyDemandAboveClearingQ96` -> non-zero (`396140812571321687967719751680000`)
+  - `bid0 owner` -> non-zero / expected owner
+  - `bid0 maxPrice` -> `4294967298`
+- the immediate checkpoint trace then showed:
+  - `checkpoint clearingPrice` -> `0`
+  - `stored clearingPrice` -> `4294967296`
+  - `currencyRaised` -> `0`
+  - `totalCleared` -> `0`
+  - `isGraduated` -> `0`
+
+Workaround:
+
+- no production-safe workaround has been established yet
+- for debugging, the smoke test was instrumented to:
+  - probe `auction.bids(0)` directly
+  - log `nextBidId`, checkpoint state, raised currency, total cleared, and graduation status
+- current interpretation is that this is a SolidVM runtime state / return-value inconsistency rather than ordinary CCA logic alone
+
+Primary files:
+
+- `src/BidStorage.sol`
+- `src/ContinuousClearingAuction.sol`
+- `tests/CCA/CCAParitySmoke.test.sol`
+
+Behavior note:
+
+- this is runtime-relevant because it blocks parity validation of bid submission, checkpoint advancement, and graduation
+
+### 22. Permit2 / `SafeTransferLib` flow was removed
 
 Observed behavior:
 
@@ -433,7 +515,7 @@ Primary files:
 - `src/interfaces/external/IERC20Minimal.sol`
 - `src/ContinuousClearingAuction.sol`
 
-### 21. Block-number helper indirection was unnecessary and not worth preserving
+### 23. Block-number helper indirection was unnecessary and not worth preserving
 
 Observed behavior:
 
@@ -449,7 +531,7 @@ Primary files:
 - `lib/blocknumberish/src/BlockNumberish.sol`
 - `src/ContinuousClearingAuction.sol`
 
-### 22. Full compile success required a flatter, more explicit source style overall
+### 24. Full compile success required a flatter, more explicit source style overall
 
 Observed behavior:
 
