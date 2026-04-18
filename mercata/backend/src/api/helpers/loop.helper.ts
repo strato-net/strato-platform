@@ -184,7 +184,16 @@ export function quoteSwap(pool: SwapPoolHandle, dx: bigint): bigint {
 
 // ═══════════════════════════════════════════════════════════════
 // D* solver — mirrors LoopRouter.test.sol _computeFlashDebt*
-// Fixed-point iteration: D = (amount + X(D)) * price/unitScale * (L-1)/L
+// Fixed-point iteration. For a fresh position:
+//   D = (amount + X(D)) * price/unitScale * (L-1)/L
+// With an existing vault (currentCollateralTokens, currentDebt), the
+// target leverage applies to the whole final position, so the new debt
+// ΔD is the increment needed to reach L from (C1, D1) after adding
+// `amount` of principal. Final state:
+//   finalCollUSD = (C1_tokens + amount + X(ΔD)) * price/unitScale
+//   finalDebt    = D1 + ΔD
+// Target: finalCollUSD / (finalCollUSD - finalDebt) = L
+//   → ΔD = finalCollUSD * (L-1)/L - D1
 // ═══════════════════════════════════════════════════════════════
 
 interface DebtSolverParams {
@@ -193,18 +202,29 @@ interface DebtSolverParams {
   priceWAD: bigint;
   unitScale: bigint;
   pool: SwapPoolHandle;
+  currentCollateralTokens: bigint;
+  currentDebt: bigint;
 }
 
 export function computeTargetNewDebt(p: DebtSolverParams): bigint {
-  const { amount, targetLevWAD, priceWAD, unitScale, pool } = p;
+  const { amount, targetLevWAD, priceWAD, unitScale, pool, currentCollateralTokens: C1, currentDebt: D1 } = p;
   const levMinus1 = targetLevWAD - WAD;
 
-  let D = amount * priceWAD / unitScale * levMinus1 / WAD;
-  if (D === 0n) D = 1n;
+  // Underwater / zero-equity vaults can't be safely levered up via flash-mint:
+  // adding principal can't satisfy the CR check if existing debt already
+  // exceeds the base collateral value. Reject before iterating.
+  const baseCollUSD = (C1 + amount) * priceWAD / unitScale;
+  if (baseCollUSD <= D1) return 0n;
+
+  // Initial guess ignores swap impact: ΔD ≈ baseCollUSD * (L-1)/L − D1.
+  let D = baseCollUSD * levMinus1 / targetLevWAD - D1;
+  if (D <= 0n) D = 1n;
 
   for (let i = 0; i < 20; i++) {
     const X = quoteSwap(pool, D);
-    const targetDebt = (amount + X) * priceWAD / unitScale * levMinus1 / targetLevWAD;
+    const finalCollUSD = (C1 + amount + X) * priceWAD / unitScale;
+    const finalDebt = finalCollUSD * levMinus1 / targetLevWAD;
+    const targetDebt = finalDebt > D1 ? finalDebt - D1 : 0n;
     const diff = targetDebt > D ? targetDebt - D : D - targetDebt;
     D = targetDebt;
     if (diff < SOLVER_TOLERANCE) break;
@@ -299,52 +319,6 @@ export async function fetchCDPBootstrap(accessToken: string): Promise<CDPBootstr
     });
   }
   return { priceMap, assets };
-}
-
-// Narrow single-asset variant for executeLoop — same /mapping or= pattern as
-// fetchCDPBootstrap but key-filtered to one asset so the response is ~3 rows
-// instead of ~30.
-export async function fetchCDPAssetConfig(
-  accessToken: string,
-  asset: string,
-): Promise<{ price: bigint; config: CDPBootstrapRow | null }> {
-  const priceOracleAddr = constants.priceOracle;
-  const engineAddr = constants.cdpEngine;
-  const assetLower = asset.toLowerCase();
-  const mappingFilters = [
-    `and(address.eq.${priceOracleAddr},collection_name.eq.prices,key->>key.eq.${assetLower})`,
-    `and(address.eq.${engineAddr},collection_name.eq.collateralConfigs,key->>key.eq.${assetLower})`,
-    `and(address.eq.${engineAddr},collection_name.eq.isSupportedAsset,key->>key.eq.${assetLower},value.eq.true)`,
-  ];
-  const { data: rows } = await cirrus.get(accessToken, "/mapping", {
-    params: {
-      or: `(${mappingFilters.join(",")})`,
-      select: "collection_name,value::text",
-    },
-  });
-
-  let price = 0n;
-  let cfg: any = null;
-  let supported = false;
-  for (const r of (rows || []) as any[]) {
-    if (r.collection_name === "prices") price = BigInt(r.value || "0");
-    else if (r.collection_name === "collateralConfigs") { try { cfg = JSON.parse(r.value); } catch { /* skip */ } }
-    else if (r.collection_name === "isSupportedAsset") supported = true;
-  }
-  if (!supported || !cfg) return { price, config: null };
-
-  return {
-    price,
-    config: {
-      asset,
-      minCR: Number(cfg.minCR) / Number(WAD) * 100,
-      liquidationRatio: Number(cfg.liquidationRatio) / Number(WAD) * 100,
-      stabilityFeeRate: stabilityFeeRateToAPR(cfg.stabilityFeeRate),
-      debtFloor: cfg.debtFloor || "0",
-      debtCeiling: cfg.debtCeiling || "0",
-      unitScale: cfg.unitScale || WAD.toString(),
-    },
-  };
 }
 
 // ═══════════════════════════════════════════════════════════════

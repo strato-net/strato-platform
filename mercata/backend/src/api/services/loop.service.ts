@@ -21,7 +21,6 @@ import {
   findPoolForAsset,
   findSwapPool,
   fetchCDPBootstrap,
-  fetchCDPAssetConfig,
   fetchAssetSymbols,
   fetchLoopBaseYields,
   fetchPositionBootstrap,
@@ -39,6 +38,10 @@ const DEADLINE_BUFFER_SECS = 600; // 10 minutes
 const DEFAULT_STABILITY_APR = 2;   // % APR fallback
 const DEFAULT_MIN_CR = 155;        // % fallback
 const DEFAULT_LIQUIDATION_RATIO = 150; // % fallback
+// CDPEngine.mintFor CR check uses strict `<`; trim D* so solver rounding
+// and rateAccumulator drift between indexer snapshot and tx don't push it
+// onto the boundary. Within the UI's disclosed ~0.1% drift envelope.
+const SAFETY_DISCOUNT_BPS = 10n;
 
 // ═══════════════════════════════════════════════════════════════
 // Helpers
@@ -173,28 +176,46 @@ export async function executeLoop(
   userAddress: string,
   req: LoopExecuteRequest,
 ): Promise<LoopExecuteResponse> {
-  const [swapPool, cdpAsset] = await Promise.all([
+  const [swapPool, ctx] = await Promise.all([
     findSwapPool(accessToken, constants.USDST, req.asset),
-    fetchCDPAssetConfig(accessToken, req.asset),
+    fetchPositionBootstrap(accessToken, userAddress),
   ]);
   if (!swapPool) throw new Error(`No swap pool for USDST <-> ${req.asset}`);
 
-  const price = cdpAsset.price;
-  const unitScale = BigInt(cdpAsset.config?.unitScale || WAD.toString());
+  const assetLower = req.asset.toLowerCase();
+  const price = BigInt(ctx.priceMap.get(assetLower) || "0");
+  const cfg = ctx.assets.find((a) => a.asset.toLowerCase() === assetLower);
+  const unitScale = BigInt(cfg?.unitScale || WAD.toString());
   if (price === 0n) throw new Error(`No oracle price for ${req.asset}`);
 
-  const targetNewDebt = computeTargetNewDebt({
+  const vault = ctx.vaults.get(assetLower);
+  const rateAcc = ctx.rateAccumulators.get(assetLower);
+  if (vault && vault.scaledDebt > 0n && rateAcc === undefined) {
+    throw new Error("Stale indexer state: rate accumulator missing for active vault — retry");
+  }
+  const currentCollateralTokens = vault?.collateral ?? 0n;
+  const currentDebt = vault ? (vault.scaledDebt * (rateAcc ?? RAY)) / RAY : 0n;
+
+  const rawTargetNewDebt = computeTargetNewDebt({
     amount: BigInt(req.amount),
     targetLevWAD: BigInt(Math.round(req.targetLeverage * 1e18)),
     priceWAD: price,
     unitScale,
     pool: swapPool,
+    currentCollateralTokens,
+    currentDebt,
   });
-  if (targetNewDebt <= 0n) throw new Error("D* solver did not converge — target leverage may be unsupported");
+  if (rawTargetNewDebt <= 0n) {
+    throw new Error("Target leverage at or below current position — nothing to borrow");
+  }
+  const targetNewDebt = (rawTargetNewDebt * (10000n - SAFETY_DISCOUNT_BPS)) / 10000n;
 
   const maxSlippageBps = req.maxSlippageBps ?? DEFAULT_SLIPPAGE_BPS;
   const expectedSwapOut = quoteSwap(swapPool, targetNewDebt);
-  const minFinalCollateral = BigInt(req.amount) + (expectedSwapOut * (10000n - BigInt(maxSlippageBps))) / 10000n;
+  const minFinalCollateral =
+    currentCollateralTokens +
+    BigInt(req.amount) +
+    (expectedSwapOut * (10000n - BigInt(maxSlippageBps))) / 10000n;
 
   const deadline = Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECS;
   const txs = buildLeverageTxs(req, swapPool, targetNewDebt.toString(), minFinalCollateral.toString(), maxSlippageBps, deadline);

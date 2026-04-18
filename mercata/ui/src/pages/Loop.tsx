@@ -12,7 +12,7 @@ import { useTokenContext } from "@/context/TokenContext";
 import { loopService } from "@/services/loopService";
 import type { LoopBootstrapResponse, LoopPositionResponse } from "@mercata/shared-types";
 import { formatUsdFromWei } from "@/components/loop/loopFormat";
-import { ltvFromCR, maxLeverageFromMinCR, healthFactorAtLeverage, netCarryAPR } from "@/components/loop/loopMath";
+import { ltvFromCR, maxLeverageFromMinCR, healthFactorAtLeverage, netCarryAPR, minTargetLeverage } from "@/components/loop/loopMath";
 import MarketList, { type LoopMarketOption } from "@/components/loop/MarketList";
 import LoopHeader, { type LoopDetailTab } from "@/components/loop/LoopHeader";
 import LoopOverview from "@/components/loop/LoopOverview";
@@ -178,7 +178,9 @@ const Loop = ({ embedded = false }: LoopProps) => {
     if (!positionData || !selectedAssetAddress) return null;
     const addr = selectedAssetAddress.toLowerCase();
     const match = positionData.cdp.find((p) => p.asset.toLowerCase() === addr);
-    if (!match || match.leverage <= 1.01) return null;
+    if (!match) return null;
+    // Filter on debt, not leverage: underwater vaults clamp lev to 1.0.
+    try { if (BigInt(match.debt) === 0n) return null; } catch { return null; }
     return match;
   }, [positionData, selectedAssetAddress]);
 
@@ -216,6 +218,12 @@ const Loop = ({ embedded = false }: LoopProps) => {
 
   const leverageSliderMax = maxLeverageFromMinCR(assetMinCR);
   const maxLeverageDisplay = `${leverageSliderMax.toFixed(1)}x`;
+
+  const sliderMin = useMemo(
+    () => minTargetLeverage(filteredPosition?.leverage ?? 0),
+    [filteredPosition],
+  );
+  const effectiveLeverage = Math.min(leverageSliderMax, Math.max(sliderMin, leverage));
   const liquidityText = formatUsdFromWei(selectedOpportunity?.swapPoolUSDSTLiquidity);
   const maxLtvRatio = ltvFromCR(assetMinCR);
   const liquidationLtvRatio = ltvFromCR(assetLiqRatio);
@@ -299,16 +307,17 @@ const Loop = ({ embedded = false }: LoopProps) => {
             selectedAssetPrice={selectedAssetPrice}
             selectedTokenBalanceWei={selectedTokenBalanceWei}
             usdstBalanceWei={usdstBalance}
+            leverageSliderMin={sliderMin}
             leverageSliderMax={leverageSliderMax}
             liquidationLtvRatio={liquidationLtvRatio}
             assetStabilityAPR={assetStabilityAPR}
             poolSwapFeeBps={poolSwapFeeBps}
             collateralAmount={collateralAmount}
             onCollateralAmountChange={setCollateralAmount}
-            leverage={leverage}
+            leverage={effectiveLeverage}
             onLeverageChange={setLeverage}
             currentPosition={filteredPosition}
-            canExecute={Boolean(selectedAssetAddress)}
+            canExecute={Boolean(selectedAssetAddress) && !positionLoading}
             onExecute={executeLoop}
             onExecuted={refreshAfterExecute}
           />

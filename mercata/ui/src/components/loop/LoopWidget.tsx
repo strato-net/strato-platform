@@ -11,9 +11,14 @@ import { handleAmountInputChange } from "@/utils/transferValidation";
 import { LOOP_FEE } from "@/lib/constants";
 import { Row, ExpandableRow, InfoTip } from "./LoopRow";
 import { formatPct, formatFeeBps, formatCompact } from "./loopFormat";
-import { healthFactorColor } from "./loopMath";
+import { healthFactorColor, projectLoopedPosition } from "./loopMath";
 
 const SLIPPAGE_OPTIONS = [50, 100, 200] as const;
+
+const parseWei = (wei: string | undefined, decimals: number): number => {
+  if (!wei) return 0;
+  try { return Number(formatUnits(wei, decimals)); } catch { return 0; }
+};
 
 const SlippageButton = ({
   bps,
@@ -46,6 +51,7 @@ interface LoopWidgetProps {
   selectedAssetPrice: number;
   selectedTokenBalanceWei: string;
   usdstBalanceWei: string;
+  leverageSliderMin: number;
   leverageSliderMax: number;
   liquidationLtvRatio: number;
   assetStabilityAPR: number;
@@ -69,6 +75,7 @@ const LoopWidget = ({
   selectedAssetPrice,
   selectedTokenBalanceWei,
   usdstBalanceWei,
+  leverageSliderMin,
   leverageSliderMax,
   liquidationLtvRatio,
   assetStabilityAPR,
@@ -128,37 +135,44 @@ const LoopWidget = ({
   };
 
   const collateralAmountNumber = Math.max(0, Number.parseFloat(collateralAmount || "0") || 0);
-  const effectiveLtvRatio = leverage > 1 ? (leverage - 1) / leverage : 0;
-  const projectedExposure = collateralAmountNumber * leverage;
-  const projectedExposureUsd = projectedExposure * selectedAssetPrice;
-  const projectedDebtUsdst = Math.max(0, (projectedExposure - collateralAmountNumber) * selectedAssetPrice);
 
   const hasPosition = currentPosition !== null;
   const currentLeverage = currentPosition?.leverage ?? 0;
   const currentAPY = currentPosition?.estimatedCarryAPR ?? 0;
 
+  const currentCollateralTokens = parseWei(currentPosition?.collateral, selectedAssetDecimals);
+  const currentDebtUsd = parseWei(currentPosition?.debt, 18);
+
+  const projection = useMemo(() => projectLoopedPosition({
+    currentCollateralTokens,
+    currentDebtUsd,
+    addPrincipalTokens: collateralAmountNumber,
+    targetLeverage: leverage,
+    priceUsd: selectedAssetPrice,
+  }), [currentCollateralTokens, currentDebtUsd, collateralAmountNumber, leverage, selectedAssetPrice]);
+
+  const { finalCollateralTokens, finalCollateralUsd, finalDebtUsd, finalLeverage, finalLtv } = projection;
+
   const { projectedNetSupplyApy, breakEvenDays, entryCostPct } = useMemo(() => {
-    if (!selectedOpportunity || leverage <= 1) return { projectedNetSupplyApy: 0, breakEvenDays: 0, entryCostPct: 0 };
+    if (!selectedOpportunity || finalLeverage <= 1) return { projectedNetSupplyApy: 0, breakEvenDays: 0, entryCostPct: 0 };
     const { baseYieldAPR: baseYield, swapPoolUSDSTLiquidity } = selectedOpportunity;
-    const M = effectiveLtvRatio < 1 ? 1 / (1 - effectiveLtvRatio) : leverage;
-    // Assume the user holds the loop; swap fees and impact are one-time sunk costs,
-    // not recurring annualized drags. Projected APY = interest-rate spread only.
-    const gross = M * baseYield - (M - 1) * assetStabilityAPR;
+    const gross = finalLeverage * baseYield - (finalLeverage - 1) * assetStabilityAPR;
     const feePerLeg = poolSwapFeeBps / 10000;
     const poolReserve = Number(formatUnits(swapPoolUSDSTLiquidity || "0", 18));
-    const refUSD = collateralAmountNumber * selectedAssetPrice;
-    const avgLeg = refUSD > 0 ? (M - 1) * refUSD / Math.max(Math.ceil(M - 1), 1) : 0;
+    const swapUsd = projection.newDebtUsd;
+    const addPrincipalUsd = collateralAmountNumber * selectedAssetPrice;
     const g = 1 - feePerLeg;
-    const impact = poolReserve > 0 && avgLeg > 0 ? (g * avgLeg) / (poolReserve + g * avgLeg) : 0;
+    const impact = poolReserve > 0 && swapUsd > 0 ? (g * swapUsd) / (poolReserve + g * swapUsd) : 0;
     const net = Math.round(gross * 1000) / 1000;
-    const cost = Math.round((M - 1) * (feePerLeg + impact) * 100 * 1000) / 1000;
+    const legRatio = addPrincipalUsd > 0 ? swapUsd / addPrincipalUsd : 0;
+    const cost = Math.round(legRatio * (feePerLeg + impact) * 100 * 1000) / 1000;
     const days = net > 0 ? Math.ceil((cost / net) * 365) : 0;
     return { projectedNetSupplyApy: net, breakEvenDays: days, entryCostPct: cost };
-  }, [selectedOpportunity, leverage, collateralAmountNumber, selectedAssetPrice, assetStabilityAPR, poolSwapFeeBps]);
+  }, [selectedOpportunity, finalLeverage, collateralAmountNumber, selectedAssetPrice, assetStabilityAPR, poolSwapFeeBps, projection.newDebtUsd]);
 
   const projectedLiquidationPrice =
-    liquidationLtvRatio > 0 && selectedAssetPrice > 0 && effectiveLtvRatio > 0
-      ? (selectedAssetPrice * effectiveLtvRatio) / liquidationLtvRatio
+    liquidationLtvRatio > 0 && selectedAssetPrice > 0 && finalLtv > 0
+      ? (selectedAssetPrice * finalLtv) / liquidationLtvRatio
       : 0;
 
   const projectedLiquidationMovePct =
@@ -167,9 +181,11 @@ const LoopWidget = ({
       : 0;
 
   const projectedHealthFactor =
-    effectiveLtvRatio > 0 && liquidationLtvRatio > 0
-      ? Math.round((liquidationLtvRatio / effectiveLtvRatio) * 100) / 100
+    finalLtv > 0 && liquidationLtvRatio > 0
+      ? Math.round((liquidationLtvRatio / finalLtv) * 100) / 100
       : 0;
+
+  const atMaxLeverage = leverageSliderMin > leverageSliderMax;
 
   const runExecute = async () => {
     if (!isLoggedIn || !canExecute || !hasValidAmount) return;
@@ -223,17 +239,20 @@ const LoopWidget = ({
           </div>
           <Slider
             id="loop-leverage"
-            min={1.1}
+            min={Math.min(leverageSliderMin, leverageSliderMax)}
             max={leverageSliderMax}
             step={0.1}
             value={[leverage]}
             onValueChange={(value) => onLeverageChange(value[0] ?? leverage)}
-            disabled={!isLoggedIn}
+            disabled={!isLoggedIn || atMaxLeverage}
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>1.1x</span>
+            <span>{leverageSliderMin.toFixed(1)}x</span>
             <span className="inline-block w-12 text-right tabular-nums">{leverageSliderMax.toFixed(1)}x</span>
           </div>
+          {atMaxLeverage && (
+            <p className="text-xs text-amber-500">Position already at max leverage.</p>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -241,7 +260,7 @@ const LoopWidget = ({
             type="button"
             className="w-full"
             onClick={runExecute}
-            disabled={!isLoggedIn || executeLoading || !canExecute || !hasValidAmount}
+            disabled={!isLoggedIn || executeLoading || !canExecute || !hasValidAmount || atMaxLeverage}
           >
             {executeLoading ? "Processing..." : "Execute"}
           </Button>
@@ -299,16 +318,16 @@ const LoopWidget = ({
             tip="Total collateral value after looping, including borrowed and re-deposited amounts"
             open={exposureOpen}
             onOpenChange={setExposureOpen}
-            summary={<>{formatCompact(projectedExposure)} {assetSymbol || "Asset"}{projectedExposureUsd > 0 && <span className="text-muted-foreground">(${formatCompact(projectedExposureUsd)})</span>}</>}
+            summary={<>{formatCompact(finalCollateralTokens)} {assetSymbol || "Asset"}{finalCollateralUsd > 0 && <span className="text-muted-foreground">(${formatCompact(finalCollateralUsd)})</span>}</>}
           >
             <Row
-              label="New Exposure"
-              value={<>0.00 <span className="text-muted-foreground">→</span> {formatCompact(projectedExposure)} {assetSymbol || "Asset"}</>}
+              label="Exposure"
+              value={<>{formatCompact(currentCollateralTokens)} <span className="text-muted-foreground">→</span> {formatCompact(finalCollateralTokens)} {assetSymbol || "Asset"}</>}
             />
             <Row
-              label="New Debt"
-              tip="USDST minted against your collateral to fund the loop"
-              value={<>0.00 <span className="text-muted-foreground">→</span> {formatCompact(projectedDebtUsdst)} {borrowSymbol}</>}
+              label="Debt"
+              tip="USDST owed against your collateral"
+              value={<>{formatCompact(currentDebtUsd)} <span className="text-muted-foreground">→</span> {formatCompact(finalDebtUsd)} {borrowSymbol}</>}
             />
           </ExpandableRow>
           <ExpandableRow
@@ -318,12 +337,17 @@ const LoopWidget = ({
             onOpenChange={setLiquidationOpen}
             summary={<>{selectedAssetPrice > 0 ? `$${selectedAssetPrice.toFixed(2)}` : "0.00"} <span className="text-muted-foreground">→</span> ${projectedLiquidationPrice.toFixed(2)} ({projectedLiquidationMovePct.toFixed(2)}%)</>}
           >
-            <Row label="Loan To Value Ratio" tip="Ratio of debt to collateral value" value={`→ ${formatPct(effectiveLtvRatio * 100)}`} valueClass="text-emerald-500" />
+            <Row
+              label="Loan To Value Ratio"
+              tip="Ratio of debt to collateral value"
+              value={<>{hasPosition ? formatPct((currentPosition?.effectiveLTV ?? 0) * 100) : "—"} <span className="text-muted-foreground">→</span> {formatPct(finalLtv * 100)}</>}
+              valueClass="text-emerald-500"
+            />
             <Row label="Liquidation LTV" tip="LTV threshold that triggers liquidation" value={formatPct(liquidationLtvRatio * 100)} valueClass="text-amber-500" />
             <Row
               label="Health Factor"
               tip="How far your position is from liquidation. Below 1.0 = eligible for liquidation."
-              value={projectedHealthFactor > 0 ? projectedHealthFactor.toFixed(2) : "—"}
+              value={<>{hasPosition ? (currentPosition?.healthFactor ?? 0).toFixed(2) : "—"} <span className="text-muted-foreground">→</span> {projectedHealthFactor > 0 ? projectedHealthFactor.toFixed(2) : "—"}</>}
               valueClass={healthFactorColor(projectedHealthFactor)}
             />
           </ExpandableRow>

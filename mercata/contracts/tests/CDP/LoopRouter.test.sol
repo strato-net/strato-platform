@@ -7,6 +7,23 @@ contract User {
     }
 }
 
+// Returns normally from onFlashLoan but drains the flashed USDST, forcing
+// CDPEngine.flashMint to revert via the delta-based balance check rather
+// than through callback revert propagation.
+contract RogueFlashBorrower {
+    address public usdst;
+    address public drainTo;
+    function initialize(address _usdst, address _drainTo) external {
+        usdst = _usdst;
+        drainTo = _drainTo;
+    }
+    function onFlashLoan(address asset, uint amount) external {
+        // Returns normally even if transfer fails; we want the engine's
+        // balance delta check to be the cause of revert, not this callback.
+        ERC20(usdst).transfer(drainTo, amount);
+    }
+}
+
 contract Describe_LoopRouter is Authorizable {
     Mercata m;
     string[] emptyArray;
@@ -866,6 +883,26 @@ contract Describe_LoopRouter is Authorizable {
             reverted = true;
         }
         require(reverted, "unprimed onFlashLoan must revert via stale ctx check");
+    }
+
+    function it_flashmint_rogue_borrower_reverts() {
+        // Callback returns normally but drains the flashed USDST. The engine's
+        // `balanceAfter >= balanceBefore + amount` delta check must revert
+        // — the final safety net when callback propagation alone isn't enough
+        // (non-reverting buggy/malicious borrower).
+        User victim = new User();
+        RogueFlashBorrower rogue = new RogueFlashBorrower();
+        rogue.initialize(usdstAddr, address(victim));
+
+        bool reverted = false;
+        try {
+            cdpEngine.flashMint(address(rogue), collAddr, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "rogue drain must revert via balance delta check");
+        require(ERC20(usdstAddr).balanceOf(address(victim)) == 0, "drain rolled back");
+        require(ERC20(usdstAddr).balanceOf(address(rogue)) == 0, "rogue has no leftover USDST");
     }
 
     function it_flash_zero_quote_reverts() {
