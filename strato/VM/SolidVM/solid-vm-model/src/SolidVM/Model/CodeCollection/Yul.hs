@@ -139,12 +139,30 @@ extractYulStatement (YulLeave a) = a
 extractYulStatement (YulExpressionStatement a _) = a
 extractYulStatement (YulFunctionDef a _ _ _ _) = a
 
--- | The outer wrapper for an @assembly { ... }@ block. Kept as a separate
--- type (rather than inlining @[YulStatementF a]@ in 'StatementF') so that
--- future metadata (e.g. @"evmasm"@ flag, memory-safety annotations) can
--- be added without churning every pattern match.
-newtype InlineAssemblyF a = InlineAssembly
-  { yulBody :: [YulStatementF a]
+-- | The outer wrapper for an @assembly { ... }@ block.
+--
+-- Solidity grammar:
+--
+-- @
+-- assembly-statement = \'assembly\' \'"evmasm"\'? assembly-flags? \'{\' yul-statement* \'}\'
+-- assembly-flags     = \'(\' string-literal (\',\' string-literal)* \')\'
+-- @
+--
+-- Both the dialect marker and the flag list are metadata; e.g.
+-- @"memory-safe"@ is an assertion made by the author about the Yul
+-- code's behavior, not a directive that alters execution. The
+-- interpreter therefore ignores them; they're preserved purely so the
+-- AST round-trips through the unparser and so static-analysis passes
+-- can inspect them if needed.
+data InlineAssemblyF a = InlineAssembly
+  { -- | The Yul dialect name (currently only @"evmasm"@ is defined by
+    -- the Solidity grammar). 'Nothing' when the dialect is omitted.
+    yulDialect :: Maybe String,
+    -- | Assembly flags, e.g. @["memory-safe"]@. Empty when the flag
+    -- list is omitted. The parser preserves order.
+    yulFlags :: [String],
+    -- | The Yul block body.
+    yulBody :: [YulStatementF a]
   }
   deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
@@ -173,4 +191,4 @@ instance Arbitrary a => Arbitrary (YulStatementF a) where
       ]
 
 instance Arbitrary a => Arbitrary (InlineAssemblyF a) where
-  arbitrary = InlineAssembly <$> arbitrary
+  arbitrary = InlineAssembly Nothing [] <$> arbitrary

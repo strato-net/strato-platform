@@ -944,8 +944,10 @@ runStatement (CC.Throw expr pos) = do
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
   let listOfVals = mapMaybe (\x -> toBasic currentBlockNum x) argVals
   customError "Custom user error thrown" name listOfVals
-runStatement (CC.AssemblyStatement (CC.InlineAssembly body) pos) = do
+runStatement (CC.AssemblyStatement (CC.InlineAssembly _ _ body) pos) = do
   solidVMBreakpoint pos
+  -- Dialect marker and flag list (e.g. @"memory-safe"@) are metadata
+  -- that don't affect execution; preserved in the AST for unparsing.
   Yul.runInlineAssembly body
   return Nothing
 runStatement st@(CC.EmitStatement eventName exptups pos) = do

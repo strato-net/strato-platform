@@ -57,13 +57,19 @@ yulIdent = try . lexeme $ do
   return name
 
 -- | Top-level entrypoint: parse the body of an @assembly { ... }@ block
--- (including optional @"dialect"@ and flag list).
+-- including the optional dialect marker (@"evmasm"@ today) and the
+-- optional comma-separated flag list (e.g. @("memory-safe")@).
 inlineAssemblyBlock :: SolidityParser (Y.InlineAssemblyF (SourceAnnotation ()))
 inlineAssemblyBlock = do
-  _ <- optionMaybe (try stringLiteral)
-  _ <- optionMaybe (try (parens (commaSep stringLiteral)))
+  dialect <- optionMaybe (try stringLiteral)
+  flags <- option [] (try (parens (commaSep1 stringLiteral)))
   body <- braces (many yulStatement)
-  return $ Y.InlineAssembly body
+  return $
+    Y.InlineAssembly
+      { Y.yulDialect = dialect,
+        Y.yulFlags = flags,
+        Y.yulBody = body
+      }
 
 -- ---------------------------------------------------------------------------
 -- Statements

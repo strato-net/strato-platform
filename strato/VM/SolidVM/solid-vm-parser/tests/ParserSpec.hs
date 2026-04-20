@@ -149,6 +149,8 @@ spec = do
             ( "assembly { dst := mload(add(src, 32)) }",
               AssemblyStatement $
                 InlineAssembly
+                  Nothing
+                  []
                   [ YulAssign
                       ()
                       ["dst"]
@@ -219,7 +221,18 @@ spec = do
             ),
             ("revert f(x, y);", RevertStatement (Just "f") ([(Variable () "x"), (Variable () "y")])),
             ("revert(\"e\");", RevertStatement (Nothing) ([StringLiteral () "e"])),
-            ("revert f({ x: y , q: z });", RevertStatement (Just "f") ([Variable () "y", Variable () "z"]))
+            ("revert f({ x: y , q: z });", RevertStatement (Just "f") ([Variable () "y", Variable () "z"])),
+            ( "assembly \"evmasm\" (\"memory-safe\", \"foo\") { let x := 1 }",
+              AssemblyStatement $
+                InlineAssembly
+                  (Just "evmasm")
+                  ["memory-safe", "foo"]
+                  [ YulLet
+                      ()
+                      [YulTypedName "x" Nothing ()]
+                      (Just (YulLit () (YulNumber 1)))
+                  ]
+            )
           ]
     forM_ scases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseStatement input `shouldBe` Right (want ())
@@ -234,7 +247,10 @@ spec = do
             "assembly { let x := 5 }",
             "assembly { for { let i := 0 } lt(i, 3) { i := add(i, 1) } { mstore(i, 1) } }",
             "assembly { switch x case 0 { y := 1 } default { y := 2 } }",
-            "assembly \"evmasm\" { function f(a) -> b { b := mul(a, 2) } }"
+            "assembly \"evmasm\" { function f(a) -> b { b := mul(a, 2) } }",
+            "assembly (\"memory-safe\") { let x := 1 }",
+            "assembly \"evmasm\" (\"memory-safe\") { let x := 1 }",
+            "assembly (\"memory-safe\", \"foo\") { }"
           ]
     forM_ yulCases $ \input -> do
       it ("can parse yul " ++ input) $ parseStatement input `shouldSatisfy` isRight

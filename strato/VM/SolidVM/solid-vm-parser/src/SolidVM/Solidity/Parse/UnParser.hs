@@ -252,8 +252,17 @@ unparseStatementWith f (ModifierExecutor a) = f a $ "_;"
 unparseStatementWith f (Continue a) = f a $ "continue;"
 unparseStatementWith f (Throw e a) = f a $ "throw " ++ unparseExpression e ++ ";"
 unparseStatementWith f (Block a) = f a $ "{ }"
-unparseStatementWith f (AssemblyStatement (InlineAssembly body) a) =
-  f a $ "assembly {\n" ++ tab (unlines $ map unparseYulStatement body) ++ "}"
+unparseStatementWith f (AssemblyStatement (InlineAssembly mDialect flags body) a) =
+  f a $
+    "assembly"
+      ++ maybe "" (\d -> " \"" ++ d ++ "\"") mDialect
+      ++ ( case flags of
+             [] -> ""
+             fs -> " (" ++ List.intercalate ", " (map show fs) ++ ")"
+         )
+      ++ " {\n"
+      ++ tab (unlines $ map unparseYulStatement body)
+      ++ "}"
 unparseStatementWith f (EmitStatement eventName extups a) =
   let expVals = map (unparseExpression . snd) extups
    in f a $ "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
