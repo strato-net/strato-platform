@@ -108,11 +108,11 @@ mergeUnresolvedFileUnits (UFU i p u) (UFU j q v) = do
            then Right $ UFU (i <> j) (p <> q) (newFileUnits)
            else Left . T.pack $ "Duplicate values: " ++ show duplicates
 
--- | Semigroup uses the *checked* merge so duplicate contract/function
--- names are flagged rather than silently swallowed by a left-biased union
--- (audit finding 40). On conflict the rightmost wins via 'error' so the
--- failure surfaces immediately; the checked merge tolerates overloadable
--- function definitions but rejects genuine duplicates.
+-- | Audit finding 40: use the *checked* merge so duplicate
+-- contract/function names are flagged rather than silently swallowed by
+-- a left-biased union. Applied unconditionally — re-compiling a
+-- well-formed contract should never hit a duplicate, and the checked
+-- merge already tolerates overloadable function definitions.
 instance Show a => Semigroup (UnresolvedFileUnitsF a) where
   a <> b = case mergeUnresolvedFileUnits a b of
     Right r -> r
@@ -183,11 +183,11 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
     then pure (seen, resolved)
     else case expr of
       AddressLiteral x addr -> do
+        -- Audit finding 52: missing import target is now a hard
+        -- compilation error, mirroring how 'StringLiteral' imports
+        -- already behave when the source file can't be found. Applied
+        -- unconditionally.
         lift (A.select (A.Proxy @AddressState) addr) >>= \case
-          -- Previously silent; a typo / selfdestructed target produced
-          -- contracts with missing types that compiled without warning
-          -- (audit finding 52). Treat this as a hard error in step with
-          -- how 'StringLiteral' imports already behave.
           Nothing -> throwE (x, T.pack $ "Import target address not found on-chain: " ++ show addr)
           Just AddressState {..} ->
             case addressStateCodeHash of
@@ -253,10 +253,9 @@ doResolve ::
   Text ->
   FileImportF a ->
   EndoM (ExceptT (a, Text) m) (S.Set Text, ImportMapF a)
--- Thread the updated 'seen' set through each sibling import so one branch
--- sees files discovered by its predecessors (audit finding 47). Previously
--- the first tuple element was discarded via '\(_, r')', causing redundant
--- compilation work and missing cycle detection across branches.
+-- | Audit finding 47: thread the updated 'seen' set across sibling
+-- imports so a file discovered by one branch is visible to later
+-- branches. Applied unconditionally.
 doResolve f g fileName imp (seen, resolved) = case imp of
   Simple path x -> resolvePath fileName path >>= \p ->
     resolveFile f g p (seen, resolved) >>= \(seen', r') ->

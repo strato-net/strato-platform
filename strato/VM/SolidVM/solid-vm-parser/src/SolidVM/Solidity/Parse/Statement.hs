@@ -339,7 +339,7 @@ objectE = do
   return $ ObjectLiteral a $ Map.fromList exps
   where
     assoc = do
-      -- Bounded so a missing colon doesn't scan the rest of the file.
+      -- Audit finding 31: bounded so a missing ':' doesn't DoS the parser.
       k <- boundedNoneOf 1024 ":"
       void colon
       v <- literal
@@ -466,10 +466,8 @@ parseCreateArgs = do
   str3 <- uncurry StringLiteral <$> withPosition parseCreateConstructArgs -- Constructor Args
   return [str1, str2, str3]
 
--- | Hard cap on the contract source embedded inside a create(...) call when
--- no explicit @srcLength@ hint is available. Without a cap, a malicious
--- payload missing the terminator forces @manyTill anyChar@ to consume the
--- rest of the input, allocating a large @[Char]@ list (audit finding 31).
+-- | Audit finding 31: hard cap on embedded contract source inside
+-- @create(...)@ when no explicit @srcLength@ hint is available.
 maxEmbeddedContractSrcChars :: Int
 maxEmbeddedContractSrcChars = 512 * 1024
 
@@ -492,7 +490,7 @@ parseCreateConstructArgs = do
       void $ string "\",\""
       boundedManyTillString maxEmbeddedContractSrcChars "\")" <* eof
 
--- | Like @manyTill anyChar (try (string s))@ but bounded at @maxLen@
+-- | Like @manyTill anyChar (try (string s))@ but capped at @maxLen@
 -- characters. Fails explicitly once the cap is reached rather than
 -- allocating an unbounded char list.
 boundedManyTillString :: Int -> String -> SolidityParser String

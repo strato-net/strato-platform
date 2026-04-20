@@ -39,11 +39,12 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
-import BlockApps.Solidity.ABI.Codec (abiDecode)
+import BlockApps.Solidity.ABI.Codec (abiDecodeGated)
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception
+import Blockchain.SolidVM.ForkGate (auditForkActive)
 import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics
 import Blockchain.SolidVM.SM
@@ -281,13 +282,16 @@ create' creator newAddress ch cc contractName' valList = do
   let constructorArgs = fromMaybe [] . fmap CC._funcArgs $ contract' ^. CC.constructor
   resolvedValList <- resolveArgRefs creator contract' cc constructorArgs valList
 
-  -- Run the constructor. If it throws (e.g. the caller wraps this in
-  -- try/catch), roll back the AddressState write performed above so a
-  -- phantom account is not left in the creator's frame (audit finding 21).
-  (runTheConstructors creator newAddress ch cc contractName' resolvedValList) `catch`
-    \(e :: SomeException) -> do
-      A.delete (A.Proxy @AddressState) newAddress
-      throwIO e
+  -- Audit finding 21: post-audit, roll back the AddressState write
+  -- above if the constructor throws so no phantom account is left in
+  -- the creator's frame. Pre-audit keeps the phantom.
+  postAudit <- auditForkActive
+  if postAudit
+    then runTheConstructors creator newAddress ch cc contractName' resolvedValList
+           `catch` \(e :: SomeException) -> do
+             A.delete (A.Proxy @AddressState) newAddress
+             throwIO e
+    else runTheConstructors creator newAddress ch cc contractName' resolvedValList
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
@@ -484,8 +488,14 @@ call' from to' fnCalltype functionName valList = do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when (isExternal && isForbidden) $
           unknownFunction "logFunctionCall" (functionName, "asdf2" :: String) -- contract) -- ^. CC.contractName)
+        postAuditRo <- auditForkActive
+        -- Audit finding 44: pre-audit defaults @ro@ to 'False' when the
+        -- call stack is empty, which silently drops the read-only
+        -- invariant if a staticcall triggers a delegatecall with no
+        -- frame. Post-audit, treat delegatecall-with-no-frame as
+        -- read-only by default (conservative).
         let ro = case mCallInfo of
-              Nothing -> False
+              Nothing -> postAuditRo && fnCalltype == CC.DelegateCall
               Just ci -> readOnly ci
         resolvedValList <- resolveArgs shouldPushSender theFunction valList
         pure . bool id (pushSender from) shouldPushSender $
@@ -498,8 +508,9 @@ call' from to' fnCalltype functionName valList = do
         validateFunctionArguments cc contract theFunction valList >>= \case
           Just (theFunction', valList') -> do
             mCallInfo <- getCurrentCallInfoIfExists
+            postAuditRo2 <- auditForkActive
             let ro = case mCallInfo of
-                  Nothing -> False
+                  Nothing -> postAuditRo2 && fnCalltype == CC.DelegateCall
                   Just ci -> readOnly ci
             resolvedValList <- resolveArgs shouldPushSender theFunction' valList'
             pure . bool id (pushSender from) shouldPushSender $
@@ -507,8 +518,9 @@ call' from to' fnCalltype functionName valList = do
           _ -> case M.lookup "fallback" functionsIncludingConstructor of
             Just fallbackFunc -> do
               mCallInfo <- getCurrentCallInfoIfExists
+              postAuditRo3 <- auditForkActive
               let ro = case mCallInfo of
-                    Nothing -> False
+                    Nothing -> postAuditRo3 && fnCalltype == CC.DelegateCall
                     Just ci -> readOnly ci
               resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
               pure . bool id (pushSender from) shouldPushSender $
@@ -565,8 +577,9 @@ call' from to' fnCalltype functionName valList = do
         _ -> case M.lookup "fallback" functionsIncludingConstructor of
           Just fallbackFunc -> do
             mCallInfo <- getCurrentCallInfoIfExists
+            postAuditRo4 <- auditForkActive
             let ro = case mCallInfo of
-                  Nothing -> False
+                  Nothing -> postAuditRo4 && fnCalltype == CC.DelegateCall
                   Just ci -> readOnly ci
             resolvedValList <- resolveArgs shouldPushSender fallbackFunc valList
             pure . bool id (pushSender from) shouldPushSender $
@@ -631,20 +644,24 @@ argsToValsFromVars vars = do
       _ -> vals
 
 
--- | Zip struct field definitions with argument values, collecting trailing
--- args into an SVariadic when the last field has Variadic type.
--- Previously silently truncated on arity mismatch, hiding contract bugs
--- (audit finding 23). Now raises TooManyCooks / ArityMismatch when the
--- argument and field counts don't line up.
-zipStructFields :: [(SolidString, CC.FieldType, a)] -> [Value] -> [(SolidString, Value)]
-zipStructFields [] [] = []
-zipStructFields [] extra =
-  tooManyCooks 0 (length extra)
-zipStructFields [(name, ft, _)] args
+-- | Zip struct field definitions with argument values, collecting
+-- trailing args into an SVariadic when the last field has Variadic type.
+--
+-- The @strict@ flag (usually the result of 'auditForkActive') selects
+-- between the pre-audit permissive behaviour (silently truncate on
+-- arity mismatch) and the post-audit strict behaviour that raises
+-- 'TooManyCooks'/'ArityMismatch' (audit finding 23).
+zipStructFields :: Bool -> [(SolidString, CC.FieldType, a)] -> [Value] -> [(SolidString, Value)]
+zipStructFields _ [] [] = []
+zipStructFields strictArity [] extra
+  | strictArity = tooManyCooks 0 (length extra)
+  | otherwise = []
+zipStructFields _ [(name, ft, _)] args
   | CC.fieldTypeType ft == SVMType.Variadic = [(name, SVariadic args)]
-zipStructFields ((name, _, _) : rest) (v : vs) = (name, v) : zipStructFields rest vs
-zipStructFields missing [] =
-  arityMismatch "zipStructFields: not enough arguments for struct fields" 0 (length missing)
+zipStructFields strictArity ((name, _, _) : rest) (v : vs) = (name, v) : zipStructFields strictArity rest vs
+zipStructFields strictArity missing []
+  | strictArity = arityMismatch "zipStructFields: not enough arguments for struct fields" 0 (length missing)
+  | otherwise = []
 
 runModifiersAndStatements :: MonadSM m => [[CC.Statement]] -> [CC.Statement] -> m (Maybe Value)
 runModifiersAndStatements []   stmts = runStatementBlock stmts
@@ -668,17 +685,25 @@ runStatementBlock' = withLocalVars . runStatements
 runStatements :: MonadSM m => [CC.Statement] -> m (Maybe Value, [CC.Statement])
 runStatements [] = return (Nothing, [])
 runStatements (s : rest) = do
-  onTraced $ do
-    when False printFullStackTrace -- Too verbose, only turn on by hand when needed
-    funcName <- getCurrentFunctionName
-    liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
+  -- Audit finding 18 (post-fork): once selfdestruct has flagged the
+  -- current frame, stop running the remaining statements so they don't
+  -- observe zeroed storage. The flag is only set by selfdestruct when
+  -- 'auditForkActive' is True, so pre-fork behaviour is unchanged.
+  halt <- maybe False selfDestructed <$> getCurrentCallInfoIfExists
+  if halt
+    then return (Nothing, rest)
+    else do
+      onTraced $ do
+        when False printFullStackTrace -- Too verbose, only turn on by hand when needed
+        funcName <- getCurrentFunctionName
+        liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
 
-  decrementGas 1
-  ret <- runStatement s
+      decrementGas 1
+      ret <- runStatement s
 
-  case ret of
-    Nothing -> runStatements rest
-    v -> return (v, rest)
+      case ret of
+        Nothing -> runStatements rest
+        v -> return (v, rest)
 
 runStatement :: MonadSM m => CC.Statement -> m (Maybe Value)
 runStatement (CC.RevertStatement mString theArgs pos) = do
@@ -964,11 +989,13 @@ runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   return Nothing
 runStatement st@(CC.EmitStatement eventName exptups pos) = do
   -- emit MemberAdded(<address>, <enode>);
+  -- Audit finding 4: post-audit, block emission inside a read-only
+  -- (static/view) call.
   solidVMBreakpoint pos
-  -- Event emission is observable state; block it inside a staticcall/view
-  -- context so the readOnly invariant is not violated.
-  roEmit <- readOnly <$> getCurrentCallInfo
-  when roEmit $ invalidWrite "emit is not allowed in a read-only (static/view) call" eventName
+  postAudit <- auditForkActive
+  when postAudit $ do
+    ro <- readOnly <$> getCurrentCallInfo
+    when ro $ invalidWrite "emit is not allowed in a read-only (static/view) call" eventName
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM jsonSM expVals
@@ -1100,9 +1127,11 @@ expToVar x = do
 
 -- | Gas helpers for cryptographic builtins (audit finding 38). These are
 -- rough approximations of EVM precompile pricing — the exact EIP-2565 /
--- EIP-1108 formulas belong in GasInfo.hs, but the key invariant is that
--- every crypto call is now at least *proportional* to its work rather
--- than a flat 1 gas, so a 100M-gas budget can't fund billions of them.
+-- EIP-1108 formulas belong in 'GasInfo.hs'. The key invariant is that
+-- every crypto call is at least *proportional* to its work rather than
+-- a flat 1 gas, so a 100M-gas budget can't fund billions of them.
+-- Callers gate these via 'auditForkActive' so a pre-fork chain's gas
+-- accounting is preserved exactly.
 
 chargeFlatGas :: MonadSM m => Int -> m ()
 chargeFlatGas n = decrementGas (Gas $ fromIntegral n)
@@ -1400,7 +1429,14 @@ expToVar' ex@(CC.Binary _ "%" expr1 expr2) = do
 expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger (max `on` byteWidth)
 expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger (max `on` byteWidth)
 expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger (max `on` byteWidth)
-expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 safePow expr2 SInteger (\a b -> byteWidth a * b + b)
+expToVar' (CC.Binary _ "**" expr1 expr2) = do
+  -- Audit finding 36: post-audit caps exponent + estimated result size so
+  -- 'byteWidth small * big' isn't ~zero-gas. Pre-audit chain state
+  -- depends on unbounded '(^)', so gate via 'auditForkActive'.
+  postAudit <- auditForkActive
+  if postAudit
+    then expToVarInteger expr1 safePow expr2 SInteger (\a b -> byteWidth a * b + b)
+    else expToVarInteger expr1 (^) expr2 SInteger (\a b -> byteWidth a * b)
 expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger (\a b -> byteWidth a + b)
 expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger (const . byteWidth)
 expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 (\x i -> fromInteger (toInteger ((fromInteger x) :: Word256)) `shiftR` fromInteger i) expr2 SInteger (const . byteWidth)
@@ -1417,14 +1453,19 @@ expToVar' (CC.Binary _ "!=" expr1 expr2) = do
   ctract <- getCurrentContract
   (_, cc) <- getCurrentCodeCollection
   onTraced $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  return . Constant . SBool . not $ valEquals ctract cc val1 val2
+  -- Audit finding 41: post-audit uses a total-equality fallback that
+  -- returns 'False' for mismatched constructor pairs instead of
+  -- crashing the VM thread via 'todo'.
+  postAuditEq <- auditForkActive
+  return . Constant . SBool . not $ valEqualsGated postAuditEq ctract cc val1 val2
 expToVar' (CC.Binary _ "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
   (_, cc) <- getCurrentCodeCollection
   logVals val1 val2
-  return . Constant . SBool $ valEquals ctract cc val1 val2
+  postAuditEq <- auditForkActive
+  return . Constant . SBool $ valEqualsGated postAuditEq ctract cc val1 val2
 expToVar' (CC.Binary _ "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
@@ -1699,15 +1740,16 @@ expToVar' (CC.FunctionCall _ e args) = do
               return . Constant . fromMaybe SNULL $ res
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
+              strictArity <- auditForkActive
               case M.lookup structName $ contract' ^. CC.structs of
                 Just vals -> do
                   return . Constant . SStruct structName . fmap Constant . M.fromList $
-                    zipStructFields vals argVals
+                    zipStructFields strictArity vals argVals
                 Nothing -> do
                   cc <- getCurrentCodeCollection
                   let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs
                   return . Constant . SStruct structName . fmap Constant . M.fromList $
-                    zipStructFields vals' argVals
+                    zipStructFields strictArity vals' argVals
             Constant (SContractDef contractName') -> do
               decrementGas 500
               case argVals of
@@ -1724,8 +1766,10 @@ expToVar' (CC.FunctionCall _ e args) = do
             -- TODO: When gas gets more implemented ensure that this function does not
             --       consume more than 2300 gas
             Constant (SContractItem address' "transfer") -> do
-              roTransfer <- readOnly <$> getCurrentCallInfo
-              when roTransfer $ invalidWrite "transfer is not allowed in a read-only (static/view) call" (show address')
+              postAudit <- auditForkActive
+              when postAudit $ do
+                ro <- readOnly <$> getCurrentCallInfo
+                when ro $ invalidWrite "transfer is not allowed in a read-only (static/view) call" (show address')
               from <- getCurrentAddress
               case argVals of
                 [SInteger amount] -> do
@@ -1741,8 +1785,10 @@ expToVar' (CC.FunctionCall _ e args) = do
             -- TODO: When gas gets more implemented ensure that this function does not
             --       consume more than 2300 gas
             Constant (SContractItem address' "send") -> do
-              roSend <- readOnly <$> getCurrentCallInfo
-              when roSend $ invalidWrite "send is not allowed in a read-only (static/view) call" (show address')
+              postAudit <- auditForkActive
+              when postAudit $ do
+                ro <- readOnly <$> getCurrentCallInfo
+                when ro $ invalidWrite "send is not allowed in a read-only (static/view) call" (show address')
               from <- getCurrentAddress
               success <- case argVals of
                 [SInteger amount] -> do
@@ -2109,15 +2155,16 @@ byteWidth = go 0 . abs
   where go w 0 = w
         go w n = let !v = w + 32 in go v (n `shiftR` 256)
 
--- | Exponentiation with a hard cap on both the exponent and the estimated
--- result bit-length. Without a cap, a small base like @2 ** 10_000_000@
--- produces a multi-million-digit 'Integer' for zero additional gas, since
--- 'byteWidth' returns 0 for small bases. See audit finding 36.
+-- | Audit finding 36 (post-audit): capped exponentiation for @**@. A
+-- small base like @2@ has @byteWidth 0@, so @2 ** 10_000_000@ previously
+-- cost zero incremental gas while producing a multi-million-digit
+-- 'Integer'. The cap rejects exponents > 10^6 and results estimated to
+-- exceed 1 Mbit.
 maxExpExponent :: Integer
 maxExpExponent = 10 ^ (6 :: Int)
 
 maxExpBits :: Integer
-maxExpBits = 1 `shiftL` 20 -- 1 Mbit ≈ 128 KiB result
+maxExpBits = 1 `shiftL` 20
 
 safePow :: Integer -> Integer -> Integer
 safePow b e
@@ -2131,7 +2178,6 @@ safePow b e
       throw $ ArithmeticException "exponent result would exceed size limit" (show (b, e))
   | otherwise = b ^ e
   where
-    -- bit-length of |b|^e ≈ e * log2(|b|)
     bitsOfB = toInteger (integerLog2 (abs b)) + 1
     estimatedBits = e * bitsOfB
     integerLog2 :: Integer -> Int
@@ -2257,34 +2303,33 @@ binopAssign oper lhs rhs gasFormula = do
   setVar varToAssign next
   return $ Constant next
 
--- | Convert a value to an integer. Signedness and bit size are currently ignored;
--- we discourage fixed-size integer types in SolidVM but support this function for
--- backwards compatibility with existing Solidity contracts.
--- | Apply Solidity integer-cast semantics: truncate to the declared bit
--- width for uintN, and perform two's-complement sign-extension for intN.
--- When 'mSize' is 'Nothing' (bare 'int' / 'uint') we default to 256 bits.
--- Audit finding 37: previously 'mSize' and the signedness flag were
--- ignored, so 'uint8(256)' returned 256 instead of 0 and 'int8(128)'
--- returned 128 instead of -128.
+-- | Audit finding 37: post-audit, apply Solidity truncation and
+-- sign-extension to narrow int/uint casts. For @Nothing@ (bare
+-- @int@/@uint@) and @Just 256@ this is a no-op so common 256-bit paths
+-- match pre-audit exactly.
 applyIntCast :: Bool -> Maybe Int -> Integer -> Integer
-applyIntCast signed mSize n =
-  let bits = fromMaybe 256 mSize
-      bitMask = (2 ^ (bits :: Int)) - 1
+applyIntCast _ Nothing n = n
+applyIntCast _ (Just 256) n = n
+applyIntCast signed (Just bits) n =
+  let bitMask = (2 ^ (bits :: Int)) - 1
       truncated = n .&. bitMask
       signBit = 2 ^ (bits - 1)
    in if signed && truncated >= signBit
         then truncated - 2 ^ (bits :: Int)
         else truncated
 
+-- | Pre-audit 'intBuiltin' ignores signedness and bit-width entirely.
+-- Post-audit delegates to 'applyIntCast'. Gating happens at the call
+-- sites (see 'callBuiltin "int"' / "uint" / sized variants).
 intBuiltin :: Bool -> Maybe Int -> [Value] -> Value
-intBuiltin signed mSize [SEnumVal _ _ enumNum] = SInteger . applyIntCast signed mSize $ fromIntegral enumNum
-intBuiltin signed mSize [SInteger n] = SInteger $ applyIntCast signed mSize n
-intBuiltin signed mSize [SDecimal v] = SInteger . applyIntCast signed mSize $ decimalMantissa $ roundTo 0 v
-intBuiltin signed mSize [SString hex] = integerToValue $ applyIntCast signed mSize <$> parseBaseInt hex 16
-intBuiltin signed mSize [SString hex, SInteger 16] = integerToValue $ applyIntCast signed mSize <$> parseBaseInt hex 16
-intBuiltin signed mSize [SString dec, SInteger 10] = integerToValue $ applyIntCast signed mSize <$> parseBaseInt dec 10
-intBuiltin signed mSize [SBytes bs] = SInteger . applyIntCast signed mSize $ byteString2Integer bs
-intBuiltin signed mSize [SAddress a _] = SInteger . applyIntCast signed mSize $ fromIntegral $ unAddress a
+intBuiltin _ _ [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
+intBuiltin _ _ [SInteger n] = SInteger n
+intBuiltin _ _ [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
+intBuiltin _ _ [SString hex] = integerToValue $ parseBaseInt hex 16
+intBuiltin _ _ [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
+intBuiltin _ _ [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
+intBuiltin _ _ [SBytes bs] = SInteger $ byteString2Integer bs
+intBuiltin _ _ [SAddress a _] = SInteger $ fromIntegral $ unAddress a
 intBuiltin _ _ [SNULL] = SInteger 0
 intBuiltin _ _ [SReference{}] = SInteger 0
 intBuiltin signed mSize [] = typeError (funcName ++ " called with no arguments") ""
@@ -2332,21 +2377,45 @@ callBuiltinFunction n args' = do
         _ -> args'
   callBuiltin n args
 
--- | Invoke Builtins.ecPairing, throwing a SolidException if the input is
--- malformed (empty, not a multiple of 6, or contains off-curve / out-of-field
--- coordinates). This matches EIP-197's "revert on bad input" semantics rather
--- than silently returning False.
-ecPairingCall :: MonadSM m => [Integer] -> m Value
-ecPairingCall xs = case Builtins.ecPairing xs of
-  Just b -> pure (SBool b)
-  Nothing -> invalidArguments "ecPairing: empty, malformed, or off-curve input" xs
+-- | Dispatch 'ecPairing' between the pre- and post-audit implementations
+-- based on 'auditForkActive'. Post-audit treats malformed input / off-curve
+-- coordinates as a revert; pre-audit silently returns False (audit
+-- findings 1, 11, 50).
+ecPairingDispatch :: MonadSM m => [Integer] -> m Value
+ecPairingDispatch xs = do
+  post <- auditForkActive
+  when post $ chargePairingGas (length xs)
+  if post
+    then case Builtins.ecPairingPostAudit xs of
+      Just b -> pure (SBool b)
+      Nothing -> invalidArguments "ecPairing: empty, malformed, or off-curve input" xs
+    else pure . SBool $ Builtins.ecPairing xs
 
--- | Invoke Builtins.poseidonHash, throwing if any input is outside
--- [0, BN254 scalar field order).
-poseidonCall :: MonadSM m => [Integer] -> m Value
-poseidonCall xs = case Builtins.poseidonHash xs of
-  Just h -> pure (SInteger h)
-  Nothing -> invalidArguments "poseidon: input exceeds BN254 scalar field" xs
+-- | Dispatch 'poseidon' similarly. Post-audit rejects inputs outside
+-- @[0, bn254-scalar-order)@ to preserve collision resistance (finding 49)
+-- and charges 200 gas per input (audit finding 38).
+poseidonDispatch :: MonadSM m => [Integer] -> m Value
+poseidonDispatch xs = do
+  post <- auditForkActive
+  when post $ chargeFlatGas (200 * length xs)
+  if post
+    then case Builtins.poseidonHashPostAudit xs of
+      Just h -> pure (SInteger h)
+      Nothing -> invalidArguments "poseidon: input exceeds BN254 scalar field" xs
+    else pure . SInteger $ Builtins.poseidonHash xs
+
+-- | Audit finding 37: post-audit, pipe the result of 'intBuiltin' through
+-- 'applyIntCast' so narrow sized casts wrap / sign-extend per Solidity
+-- semantics. Pre-audit returns the raw integer.
+intBuiltinGated :: MonadSM m => Bool -> Maybe Int -> [Value] -> m Value
+intBuiltinGated signed mSize args = do
+  post <- auditForkActive
+  let v = intBuiltin signed mSize args
+  pure $ if post
+    then case v of
+      SInteger n -> SInteger (applyIntCast signed mSize n)
+      other -> other
+    else v
 
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltin "variadic" [SVariadic vs] = pure $ SVariadic vs
@@ -2380,13 +2449,17 @@ callBuiltin "address" [SBytes bs] = pure . flip SAddress False . Address . bytes
 callBuiltin "address" [SNULL] = return $ SAddress 0 False
 callBuiltin "address" [SReference{}] = return $ SAddress 0 False
 callBuiltin "address" vs = typeError "address cast" $ show vs
+-- Audit finding 3: post-audit, return 0 for @c == 0@ (EVM semantics)
+-- instead of crashing via an unhandled ArithException. Gated via
+-- 'auditForkActive' so existing chain state is preserved.
 callBuiltin ("addmod") [a', b', c'] = do
   (a,b,c) <- (,,) <$> int a' <*> int b' <*> int c'
-  -- EVM semantics: c == 0 returns 0 (do not crash the node).
-  return . SInteger $ if c == 0 then 0 else (a + b) `mod` c
+  post <- auditForkActive
+  return . SInteger $ if post && c == 0 then 0 else (a + b) `mod` c
 callBuiltin ("mulmod") [a', b', c'] = do
   (a,b,c) <- (,,) <$> int a' <*> int b' <*> int c'
-  return . SInteger $ if c == 0 then 0 else (a * b) `mod` c
+  post <- auditForkActive
+  return . SInteger $ if post && c == 0 then 0 else (a * b) `mod` c
 callBuiltin ("blockhash") [bNum] = do
   blockNum <- int bNum
   when (blockNum < 0) $ invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
@@ -2395,8 +2468,10 @@ callBuiltin ("blockhash") [bNum] = do
   maybeTheHash <- getBlockHashWithNumber blockNum (BlockHeader.parentHash curBlock)
   maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
 callBuiltin ("selfdestruct") [a'] = do
-  roSd <- readOnly <$> getCurrentCallInfo
-  when roSd $ invalidWrite "selfdestruct is not allowed in a read-only (static/view) call" ("selfdestruct" :: String)
+  postAudit <- auditForkActive
+  when postAudit $ do
+    ro <- readOnly <$> getCurrentCallInfo
+    when ro $ invalidWrite "selfdestruct is not allowed in a read-only (static/view) call" ("selfdestruct" :: String)
   a <- getAddressVal a'
   contract' <- getCurrentAddress
   contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract'
@@ -2404,13 +2479,11 @@ callBuiltin ("selfdestruct") [a'] = do
     pure newAddressState {addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
   sendRes <- pay "selfdestruct function" contract' a contractBalance
   _purgeRes <- purgeStorageMap contract'
-  -- TODO (audit finding 18): EVM 'SELFDESTRUCT' halts the current
-  -- execution context after performing the state changes. SolidVM
-  -- currently returns and lets subsequent statements run against the
-  -- zeroed contract, which can corrupt state. Implementing the halt
-  -- requires either a dedicated terminal SolidException that preserves
-  -- committed state (without triggering popCallInfo's rollback) or a
-  -- per-frame 'selfdestructed' flag that blocks further operations.
+  -- Audit finding 18: post-audit, mark the current frame as
+  -- selfdestructed so 'runStatements' halts at the next statement
+  -- boundary. Pre-audit still returns and lets subsequent statements
+  -- run against the zeroed contract.
+  when postAudit markSelfDestructed
   return $ SBool sendRes
 callBuiltin "account" vs = typeError "account cast" $ show vs
 callBuiltin "bool" [SBool b] = return $ SBool b
@@ -2431,12 +2504,12 @@ callBuiltin "bytes" [SString s, SString "raw"] = pure . SBytes $ BC.pack s
 callBuiltin "bytes" [SAddress a _] = pure . SBytes . B.pack . word160ToBytes $ unAddress a
 callBuiltin "bytes" [SNULL] = pure $ SBytes B.empty
 callBuiltin "bytes" [SReference _] = pure $ SBytes B.empty
-callBuiltin "uint" args = return $ intBuiltin False Nothing args
-callBuiltin "int" args = return $ intBuiltin True Nothing args
+callBuiltin "uint" args = intBuiltinGated False Nothing args
+callBuiltin "int" args = intBuiltinGated True Nothing args
 -- Handle sized integer type casts (uint256, uint128, uint120, int256, etc.)
 callBuiltin name args
-  | "uint" `isPrefixOf` name && all isDigit (drop 4 name) = return $ intBuiltin False (Just $ read $ drop 4 name) args
-  | "int" `isPrefixOf` name && all isDigit (drop 3 name) = return $ intBuiltin True (Just $ read $ drop 3 name) args
+  | "uint" `isPrefixOf` name && all isDigit (drop 4 name) = intBuiltinGated False (Just $ read $ drop 4 name) args
+  | "int" `isPrefixOf` name && all isDigit (drop 3 name) = intBuiltinGated True (Just $ read $ drop 3 name) args
 -- Handle sized bytes type casts (bytes1, bytes2, ..., bytes32)
 -- bytes32(integer) - convert to bytes representation, padded to correct size
 callBuiltin name [arg]
@@ -2457,19 +2530,30 @@ callBuiltin name [arg]
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
+-- Audit finding 33: post-audit, the non-bytes fallback uses
+-- @abi.encodePacked@ (Ethereum-compatible) and returns 'SBytes' instead
+-- of a hex-encoded 'SString'. Audit finding 38: post-audit also charges
+-- gas proportional to input size. Both gated via 'auditForkActive'.
 callBuiltin "keccak256" [SBytes bs] = do
-  chargeHashGas 30 6 (B.length bs)
+  post <- auditForkActive
+  when post $ chargeHashGas 30 6 (B.length bs)
   pure . SBytes . keccak256ToByteString $ hash bs
 callBuiltin "keccak256" args = do
-  -- Audit finding 33: the non-bytes fallback previously used RLP encoding,
-  -- which produces hashes incompatible with Ethereum's abi.encodePacked.
-  -- Fall back to packed ABI encoding to match Solidity semantics and
-  -- return SBytes instead of a hex string for cross-chain compat.
-  packed <- Builtins.abiEncodePacked args
-  chargeHashGas 30 6 (B.length packed)
-  pure . SBytes . keccak256ToByteString $ hash packed
+  post <- auditForkActive
+  if post
+    then do
+      packed <- Builtins.abiEncodePacked args
+      chargeHashGas 30 6 (B.length packed)
+      pure . SBytes . keccak256ToByteString $ hash packed
+    else pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
+-- Audit finding 16: post-audit, reject ecrecover inputs that don't
+-- satisfy the EIP-2 / Ethereum Yellow Paper validity rules (v∈{27,28},
+-- r∈[1,N-1], s∈[1,N/2], 32-byte hash). Returns @address(0)@ on
+-- rejection, matching the EVM precompile. Audit finding 38: also
+-- charges 3000 gas per EIP-198. Both gated.
 callBuiltin "ecrecover" [h', v', r', s'] = do
-    chargeFlatGas 3000 -- per EIP-198
+    post <- auditForkActive
+    when post $ chargeFlatGas 3000
     bytestringHash <- getBytesVal h'
     v <- int v'
     rIntHash <- case r' of
@@ -2484,101 +2568,122 @@ callBuiltin "ecrecover" [h', v', r', s'] = do
         Right y -> return y
         _ -> invalidArguments "parseHex: error parsing s: " s
       _ -> invalidArguments "ecrecover: s must be a hex string or an integer" s'
-    -- EIP-2 / Ethereum Yellow Paper validity rules. Invalid inputs must
-    -- return the zero address rather than recover from an arbitrary ECDSA
-    -- value; without these checks the implementation was vulnerable to
-    -- signature malleability and accepted nonsense v values.
-    let secp256k1N :: Integer
+    let zeroAddr = SAddress (fromInteger 0) False
+        secp256k1N :: Integer
         secp256k1N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
         halfN = secp256k1N `div` 2
-        validV = v == 27 || v == 28
-        validR = rIntHash >= 1 && rIntHash < secp256k1N
-        validS = sIntHash >= 1 && sIntHash < secp256k1N && sIntHash <= halfN
-        validHashLen = B.length bytestringHash == 32
-    if not (validV && validR && validS && validHashLen)
-      then return $ SAddress (fromInteger 0) False
+        postAuditValid =
+          (v == 27 || v == 28)
+            && rIntHash >= 1 && rIntHash < secp256k1N
+            && sIntHash >= 1 && sIntHash < secp256k1N && sIntHash <= halfN
+            && B.length bytestringHash == 32
+    if post && not postAuditValid
+      then return zeroAddr
       else do
         let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v
         case theSignerAddress of
-          Nothing -> return $ SAddress (fromInteger 0) False
+          Nothing -> return zeroAddr
           Just theAddress -> return $ SAddress theAddress False
-callBuiltin "verifyP256" (h' : r' : s' : p') = chargeFlatGas 3450 >> getBytesVal h' >>= \h -> case digestFromByteString @SHA256 h of
-  Nothing -> invalidArguments "Could not decode hash from string" h
-  Just digest -> do
-    pub <- case p' of
-      [x', y'] -> P256.pointFromIntegers <$> ((,) <$> int x' <*> int y')
-      [pub'] -> do
-        pubBS' <- case pub' of
-          SBytes bs -> pure bs
-          SString s -> case B16.decode $ DT.encodeUtf8 $ T.pack s of
-            Left e -> invalidArguments "Could not decode public key from string: invalid hex" (s, e)
-            Right b -> pure b
-          _ -> invalidArguments "Could not decode public key: invalid value" pub'
-        pubBS <- case B.length pubBS' of
-          65 -> pure $ B.drop 1 pubBS'
-          64 -> pure pubBS'
-          _ -> invalidArguments "Could not decode public key from bytestring: invalid length" pubBS'
-        case P256.pointFromBinary pubBS of
-          CryptoPassed p -> pure p
-          CryptoFailed e -> invalidArguments "Could not decode public key from bytestring" (pubBS', e)
-      _ -> invalidArguments "Invalid arguments for P-256 public key" p'
-    (r,s) <- (,) <$> int r' <*> int s'
-    sig <- case signatureFromIntegers (Mod.Proxy @Curve_P256R1) (r, s) of
-      CryptoPassed sig' -> pure sig'
-      CryptoFailed e -> invalidArguments "Invalid P256 signature" e
-    let !isValidSig = verifyDigest (Mod.Proxy @Curve_P256R1) pub sig digest
-    pure $ SBool isValidSig
+-- Audit finding 38: post-audit charges a flat 3450 gas for P-256 verify.
+callBuiltin "verifyP256" (h' : r' : s' : p') = do
+  post <- auditForkActive
+  when post $ chargeFlatGas 3450
+  h <- getBytesVal h'
+  case digestFromByteString @SHA256 h of
+    Nothing -> invalidArguments "Could not decode hash from string" h
+    Just digest -> do
+      pub <- case p' of
+        [x', y'] -> P256.pointFromIntegers <$> ((,) <$> int x' <*> int y')
+        [pub'] -> do
+          pubBS' <- case pub' of
+            SBytes bs -> pure bs
+            SString s -> case B16.decode $ DT.encodeUtf8 $ T.pack s of
+              Left e -> invalidArguments "Could not decode public key from string: invalid hex" (s, e)
+              Right b -> pure b
+            _ -> invalidArguments "Could not decode public key: invalid value" pub'
+          pubBS <- case B.length pubBS' of
+            65 -> pure $ B.drop 1 pubBS'
+            64 -> pure pubBS'
+            _ -> invalidArguments "Could not decode public key from bytestring: invalid length" pubBS'
+          case P256.pointFromBinary pubBS of
+            CryptoPassed p -> pure p
+            CryptoFailed e -> invalidArguments "Could not decode public key from bytestring" (pubBS', e)
+        _ -> invalidArguments "Invalid arguments for P-256 public key" p'
+      (r,s) <- (,) <$> int r' <*> int s'
+      sig <- case signatureFromIntegers (Mod.Proxy @Curve_P256R1) (r, s) of
+        CryptoPassed sig' -> pure sig'
+        CryptoFailed e -> invalidArguments "Invalid P256 signature" e
+      let !isValidSig = verifyDigest (Mod.Proxy @Curve_P256R1) pub sig digest
+      pure $ SBool isValidSig
+-- Audit finding 38: post-audit charges gas per EIP-198 (60 + 12/word sha256;
+-- 600 + 120/word ripemd160).
 callBuiltin "sha256" [SBytes bs] = do
-  chargeHashGas 60 12 (B.length bs)
+  post <- auditForkActive
+  when post $ chargeHashGas 60 12 (B.length bs)
   pure . SBytes $ SHA256.hash bs
 callBuiltin "sha256" args = do
-  chargeHashGas 60 12 0
+  post <- auditForkActive
+  when post $ chargeHashGas 60 12 0
   pure . SString . BC.unpack . B16.encode . SHA256.hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "ripemd160" [SBytes bs] = do
-  chargeHashGas 600 120 (B.length bs)
+  post <- auditForkActive
+  when post $ chargeHashGas 600 120 (B.length bs)
   pure . SBytes $ RIPEMD160.hash bs
 callBuiltin "ripemd160" args = do
-  chargeHashGas 600 120 0
+  post <- auditForkActive
+  when post $ chargeHashGas 600 120 0
   pure . SString . BC.unpack . B16.encode . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "base64encode" [SBytes bs] = pure . SBytes $ B64.encode bs
 callBuiltin "base64encode" [SString s] = pure . SString . BC.unpack . B64.encode . DT.encodeUtf8 $ T.pack s
 callBuiltin "base64urlencode" [SBytes bs] = pure . SBytes . BC.takeWhile (/= '=') $ B64URL.encode bs
 callBuiltin "base64urlencode" [SString s] = pure . SString . BC.unpack . BC.takeWhile (/= '=') . B64URL.encode . DT.encodeUtf8 $ T.pack s
+-- Audit findings 3, 32: post-audit modExp guards @m == 0@, fixes the
+-- @0^0 mod m@ result, and parenthesises the odd-exponent case. Audit
+-- finding 38: also charges gas proportional to byteWidth of inputs.
+-- Both gated.
 callBuiltin "modExp" [b, e, m] = do
   (bi, ei, mi) <- (,,) <$> int b <*> int e <*> int m
-  -- Charge proportional to the complexity of the computation. Not EIP-2565
-  -- exact, but enough to prevent ~zero-cost 2^huge abuse (audit finding 38).
-  chargeFlatGas $ 200 + fromInteger (toInteger (byteWidth bi + byteWidth ei + byteWidth mi))
-  pure . SInteger $ Builtins.modExp bi ei mi
+  post <- auditForkActive
+  when post $
+    chargeFlatGas $ 200 + fromInteger (toInteger (byteWidth bi + byteWidth ei + byteWidth mi))
+  pure . SInteger $ if post
+    then Builtins.modExpPostAudit bi ei mi
+    else Builtins.modExp bi ei mi
+-- Audit finding 38: post-audit charges EIP-196-ish flat fees for the
+-- BN254 group-arithmetic and pairing precompiles.
 callBuiltin "ecAdd" [a, b, c, d] = do
-  chargeFlatGas 150
   (x1, y1, x2, y2) <- (,,,) <$> int a <*> int b <*> int c <*> int d
-  case Builtins.ecAdd (x1, y1) (x2, y2) of
-    Just (x, y) -> pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
-    Nothing -> invalidArguments "ecAdd: input point is not on BN254 curve" (x1, y1, x2, y2)
+  post <- auditForkActive
+  when post $ chargeFlatGas 150
+  if post
+    then case Builtins.ecAddPostAudit (x1, y1) (x2, y2) of
+      Just (x, y) -> pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+      Nothing -> invalidArguments "ecAdd: input point is not on BN254 curve" (x1, y1, x2, y2)
+    else do
+      let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
+      pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
 callBuiltin "ecMul" [a, b, c] = do
-  chargeFlatGas 6000
   (x1, y1, s) <- (,,) <$> int a <*> int b <*> int c
-  case Builtins.ecMul (x1, y1) s of
-    Just (x, y) -> pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
-    Nothing -> invalidArguments "ecMul: input point is not on BN254 curve" (x1, y1, s)
-callBuiltin "ecPairing" [SVariadic xs] = do
-  chargePairingGas (length xs)
-  ecPairingCall =<< traverse int xs
-callBuiltin "ecPairing" [SArray xs] = do
-  chargePairingGas (V.length xs)
-  ecPairingCall =<< traverse getInt (V.toList xs)
-callBuiltin "ecPairing" xs = do
-  chargePairingGas (length xs)
-  ecPairingCall =<< traverse int xs
+  post <- auditForkActive
+  when post $ chargeFlatGas 6000
+  if post
+    then case Builtins.ecMulPostAudit (x1, y1) s of
+      Just (x, y) -> pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+      Nothing -> invalidArguments "ecMul: input point is not on BN254 curve" (x1, y1, s)
+    else do
+      let (x, y) = Builtins.ecMul (x1, y1) s
+      pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+callBuiltin "ecPairing" [SVariadic xs] = ecPairingDispatch =<< traverse int xs
+callBuiltin "ecPairing" [SArray xs] = ecPairingDispatch =<< traverse getInt (V.toList xs)
+callBuiltin "ecPairing" xs = ecPairingDispatch =<< traverse int xs
 callBuiltin "poseidon" [SVariadic xs] = case length xs of
-  n | n > 0 && n <= 8 -> chargeFlatGas (200 * n) >> (poseidonCall =<< traverse int xs)
+  n | n > 0 && n <= 8 -> poseidonDispatch =<< traverse int xs
   _ -> typeError "invalid args passed to poseidon" $ show xs
 callBuiltin "poseidon" [SArray xs] = case V.length xs of
-  n | n > 0 && n <= 8 -> chargeFlatGas (200 * n) >> (poseidonCall =<< traverse getInt (V.toList xs))
+  n | n > 0 && n <= 8 -> poseidonDispatch =<< traverse getInt (V.toList xs)
   _ -> typeError "invalid args passed to poseidon" $ show xs
 callBuiltin "poseidon" xs = case length xs of
-  n | n > 0 && n <= 8 -> chargeFlatGas (200 * n) >> (poseidonCall =<< traverse int xs)
+  n | n > 0 && n <= 8 -> poseidonDispatch =<< traverse int xs
   _ -> typeError "invalid args passed to poseidon" $ show xs
 callBuiltin ("payable") [a] = flip SAddress True <$> getAddressVal a
 callBuiltin "require" (condVar : msg) = do
@@ -2591,19 +2696,20 @@ callBuiltin "require" (condVar : msg) = do
 callBuiltin "assert" [cond] = pure . const SNULL =<< assert =<< getBoolVal cond
 
 callBuiltin "create" args@(cName : src : argVals) = do
-  roCreate <- readOnly <$> getCurrentCallInfo
-  when roCreate $ invalidWrite "create is not allowed in a read-only (static/view) call" ("create" :: String)
+  postAudit <- auditForkActive
+  when postAudit $ do
+    ro <- readOnly <$> getCurrentCallInfo
+    when ro $ invalidWrite "create is not allowed in a read-only (static/view) call" ("create" :: String)
   (contractName', contractSrc) <- (,) <$> getStringVal cName <*> getStringVal src
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
-  -- Audit finding 42: parsing/compiling untrusted Solidity at runtime is
-  -- expensive and previously cost the caller zero extra gas regardless of
-  -- source complexity. Apply a hard ceiling on source length and charge
-  -- gas proportional to it (200 + 200 per byte).
-  let maxContractSrcBytes = 128 * 1024 :: Int
-  when (length contractSrc > maxContractSrcBytes) $
-    invalidArguments "contract source exceeds maximum allowed size for create()" contractName'
-  chargeFlatGas $ 200 + 200 * length contractSrc
+  -- Audit finding 42: post-audit, cap the embedded contract source size
+  -- to bound the work done by the runtime parser/compiler AND charge
+  -- gas proportional to source length so compilation isn't free.
+  when postAudit $ do
+    when (length contractSrc > 128 * 1024) $
+      invalidArguments "contract source exceeds maximum allowed size for create()" contractName'
+    chargeFlatGas $ 200 + 200 * length contractSrc
 
   creator <- getCurrentAddress
 
@@ -2625,15 +2731,17 @@ callBuiltin "create" args@(cName : src : argVals) = do
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@(salt : n : src : argVals) = do
-  roCreate2 <- readOnly <$> getCurrentCallInfo
-  when roCreate2 $ invalidWrite "create2 is not allowed in a read-only (static/view) call" ("create2" :: String)
+  postAudit <- auditForkActive
+  when postAudit $ do
+    ro <- readOnly <$> getCurrentCallInfo
+    when ro $ invalidWrite "create2 is not allowed in a read-only (static/view) call" ("create2" :: String)
   (contractName', contractSrc) <- (,) <$> getStringVal n <*> getStringVal src
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
-  let maxContractSrcBytes = 128 * 1024 :: Int
-  when (length contractSrc > maxContractSrcBytes) $
-    invalidArguments "contract source exceeds maximum allowed size for create2()" contractName'
-  chargeFlatGas $ 200 + 200 * length contractSrc
+  when postAudit $ do
+    when (length contractSrc > 128 * 1024) $
+      invalidArguments "contract source exceeds maximum allowed size for create2()" contractName'
+    chargeFlatGas $ 200 + 200 * length contractSrc
 
   creator <- getCurrentAddress
 
@@ -2674,7 +2782,9 @@ callBuiltin "fastForward" (secs : mBlocks) = do
 
 callBuiltin "abiEncode" args = SBytes <$> Builtins.abiEncode args
 callBuiltin "abiEncodePacked" args = SBytes <$> Builtins.abiEncodePacked args
-callBuiltin "abiDecode" (SBytes bs : typeArgs) = return $ abiDecode bs typeArgs
+callBuiltin "abiDecode" (SBytes bs : typeArgs) = do
+  postAudit <- auditForkActive
+  return $ abiDecodeGated postAudit bs typeArgs
 callBuiltin "abiDecode" args = invalidArguments "abi.decode expects (bytes, types...)" args
 
 callBuiltin x args = unknownFunction (formatBuiltinError x args) x
@@ -2980,15 +3090,18 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       return (n, newVar)
   let args = [(n, v) | (n, _, v) <- argsWithLoc]
 
-  -- Promote readOnly based on declared function mutability. Solidity's
-  -- 'view'/'pure'/'constant' annotations are otherwise purely documentary
-  -- at runtime (audit finding 34): without this, a function marked 'view'
-  -- could still write to storage, emit events, or self-destruct.
-  let effectiveRo = ro || case theFunction ^. CC.funcStateMutability of
-        Just CC.Pure -> True
-        Just CC.View -> True
-        Just CC.Constant -> True
-        _ -> False
+  -- Audit finding 34: post-audit, promote readOnly on 'view'/'pure'/
+  -- 'constant' functions. Pre-audit these annotations were not enforced
+  -- at runtime; existing chain state depends on that, so the promotion
+  -- is gated via 'auditForkActive'.
+  postAudit <- auditForkActive
+  let effectiveRo
+        | not postAudit = ro
+        | otherwise = ro || case theFunction ^. CC.funcStateMutability of
+            Just CC.Pure -> True
+            Just CC.View -> True
+            Just CC.Constant -> True
+            _ -> False
   val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) effectiveRo ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
     matchedArgvals <- forM theModifiers $ \modi -> do
       let !margList =

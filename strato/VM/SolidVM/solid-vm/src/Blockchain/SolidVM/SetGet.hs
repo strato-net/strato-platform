@@ -44,6 +44,7 @@ import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
 import Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
+import qualified Blockchain.VM.ForkGate as ForkGate
 import Blockchain.Strato.Model.Address
 import Control.Monad
 import Control.Monad.IO.Class
@@ -97,19 +98,19 @@ toBasic currentBlockNum = \case
   SUserDefined _ _ x -> toBasic currentBlockNum x
   SBytes bs -> Just $ MS.BBytes bs
   SNULL ->
-    -- The original guard disables the feature only on Helium before its
-    -- fork, which means *every other network* — existing or new — silently
-    -- inherits the post-fork semantics. We preserve that runtime behavior
-    -- (changing it would fork state on live networks) but surface the
-    -- hardcoded network ID/block as named constants so future networks can
-    -- be added explicitly. See audit finding 39 for the long-term fix of
-    -- replacing this with a per-chain configuration flag.
+    -- Audit finding 39: replace the inverted @not (networkID == helium
+    -- && block < 33918)@ guard with an explicit per-network decision.
+    -- Runtime behaviour is unchanged (Helium still gates on block
+    -- 33918; every other network still has the feature enabled), but
+    -- adding a new network now forces an explicit choice in
+    -- 'ForkGate.Network' rather than silently inheriting post-fork
+    -- semantics from a hardcoded comparison.
     let heliumToBasicForkBlock = 33918 :: Integer
-        heliumNetworkId = 114784819836269
-        isPreHelium =
-          Conf.networkID (networkConfig ethConf) == heliumNetworkId
-            && currentBlockNum < heliumToBasicForkBlock
-        snullToBasicEnabled = not isPreHelium
+        nid = Conf.networkID (networkConfig ethConf)
+        snullToBasicEnabled = case ForkGate.networkOf nid of
+          ForkGate.Helium -> currentBlockNum >= heliumToBasicForkBlock
+          ForkGate.Upquark -> True
+          ForkGate.Other -> True
      in if snullToBasicEnabled then Just MS.BDefault else Nothing
   _ -> Nothing
 

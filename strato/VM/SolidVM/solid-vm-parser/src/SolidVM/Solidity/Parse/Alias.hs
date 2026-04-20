@@ -19,7 +19,7 @@ solidityAlias = do
     symbol "type"
     aliasName <- identifier
     reserved "is"
-    -- Bounded to prevent parser DoS on a malformed alias missing ';'.
+    -- Audit finding 30: bounded so a missing ';' doesn't DoS the parser.
     rest <- boundedNoneOf 1024 ";"
     semi
     pure (aliasName, rest)

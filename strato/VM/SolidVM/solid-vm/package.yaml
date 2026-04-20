@@ -9,6 +9,7 @@ library:
   exposed-modules:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.Builtins
+    - Blockchain.SolidVM.ForkGate
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
   ghc-options: -Wall -O2
