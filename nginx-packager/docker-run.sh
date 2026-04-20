@@ -31,7 +31,9 @@ RPC_PORT=${RPC_PORT:-8545}
 JSONRPC_ENABLED=${JSONRPC_ENABLED:-false}
 
 # Read config from ethconf.yaml (single source of truth)
-STRATO_HOSTNAME=$(yq '.apiConfig.apiHost' /config/ethconf.yaml)
+NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
+STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
+STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
 HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
 VAULT_URL=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml)
 INTERNAL_VAULT_URL=${INTERNAL_VAULT_URL:-http://${STRATO_HOSTNAME}:8093}

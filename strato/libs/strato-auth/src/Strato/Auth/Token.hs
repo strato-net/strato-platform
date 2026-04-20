@@ -24,10 +24,11 @@ import System.FileLock (withFileLock, SharedExclusive(Exclusive))
 import System.FilePath (takeDirectory)
 import Text.URI as URI
 
--- | Check if URI points to localhost (allows HTTP for local development)
+-- | Allow HTTP for local development: localhost, loopback, or unqualified hostnames (no dots)
 isLocalhost :: URI -> Bool
 isLocalhost uri = case URI.uriAuthority uri of
-  Right auth -> URI.unRText (URI.authHost auth) `elem` ["localhost", "127.0.0.1", "::1"]
+  Right auth -> let h = URI.unRText (URI.authHost auth)
+                in h `elem` ["localhost", "127.0.0.1", "::1"] || not (T.any (== '.') h)
   _ -> False
 
 tokenFilePath :: FilePath

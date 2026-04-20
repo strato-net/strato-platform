@@ -21,7 +21,7 @@ if (
   !fs.existsSync(safeApiKitPath)
 ) {
   throw new Error(
-    "Safe dependencies not found. Run `cd /Users/ariya/Documents/BlockApps/strato-platform/mercata/services/bridge && npm install && npm run build` first.",
+    "Safe dependencies not found. Run `cd mercata/services/bridge && npm install && npm run build` from the repo root first.",
   );
 }
 

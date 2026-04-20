@@ -1,4 +1,4 @@
-const STABLECOINS_ENDPOINT = 'https://YOUR_PUBLIC_STRATO_API_HOST/api/v1/metrics/stablecoins'
+const STABLECOINS_ENDPOINT = 'https://app.strato.nexus/api/metrics/stablecoins'
 const INCLUDED_SYMBOLS = ['USDST', 'USDC', 'USDT']
 const EXCLUDED_SYMBOLS = ['SUSDS', 'SYRUPUSDC']
 const METHODOLOGY = 'Counts circulating USD-pegged stablecoin supply on STRATO for USDST, USDC, and USDT. Excludes yield-bearing wrappers such as sUSDS and syrupUSDC.'

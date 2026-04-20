@@ -1,18 +1,14 @@
 import { api } from './axios';
 import { clearDismissedForUser, LAST_USER_ADDRESS_KEY } from '@/hooks/useLiquidationDismiss';
 
-// Check authentication status via server API call (works with HttpOnly cookies)
+// Check authentication status via server API call (works with HttpOnly cookies).
+// Uses fetch directly to bypass the Axios 401 interceptor — this is a probe,
+// not a user action, so a 401 here means "not logged in," not "session expired."
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
-    // Make a request to check auth status - the cookie will be sent automatically
-    await api.get('/user/me');
-    return true;
-  } catch (error) {
-    // If we get a 401, the user is not authenticated
-    if (error.response?.status === 401) {
-      return false;
-    }
-    // For other errors, assume authentication issue
+    const res = await fetch('/api/user/me', { credentials: 'include' });
+    return res.ok;
+  } catch {
     return false;
   }
 };

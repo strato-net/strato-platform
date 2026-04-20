@@ -29,6 +29,8 @@ library:
     - binary
     - blockapps-data
     - blockapps-datadefs
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
     - blockDB
     - bytestring
     - common-log
@@ -60,6 +62,7 @@ library:
     - prometheus-client
     - random
     - split
+    - strato-auth
     - strato-conf
     - vault-monad
     - strato-model

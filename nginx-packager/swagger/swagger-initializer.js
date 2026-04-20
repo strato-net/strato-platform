@@ -32,7 +32,7 @@ window.onload = function() {
   initializeCsrfToken().then(() => {
     // Initialize Swagger UI with CSRF token interceptor
     window.ui = SwaggerUIBundle({
-      url: "/docs/swagger.yaml",
+      url: "/openapi-ui/openapi.json",
       dom_id: '#swagger-ui',
       deepLinking: true,
       presets: [
