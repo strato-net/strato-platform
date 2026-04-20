@@ -193,7 +193,7 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
                 Nothing -> pure (seen, resolved)
                 Just (Left e) -> throwE (x, T.pack e)
                 Just (Right contents) -> case getNamedSUnits fileName (T.pack contents) of
-                  Nothing -> throwE (x, "Could not resolve source units of imported file: " <> fileName)
+                  Nothing -> throwE (x, "Import of " <> fileName <> " succeeded, but failed to parse")
                   Just l ->
                     let resolved' = M.insert fileName (Left l) resolved
                         eResolved' = snd <$> foldrM (doResolve getCCFromHash getNamedSUnits fileName) (S.insert fileName seen, resolved') (l ^. ufuImports)
