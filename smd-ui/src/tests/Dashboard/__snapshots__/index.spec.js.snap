@@ -342,7 +342,7 @@ ShallowWrapper {
             <withRouter(Connect(NumberCard))
               description="Loading..."
               iconClass="fa-server"
-              number="localhost"
+              number="N/A"
               textSize="h4"
             />
           </div>
@@ -1091,7 +1091,7 @@ ShallowWrapper {
               <withRouter(Connect(NumberCard))
                 description="Loading..."
                 iconClass="fa-server"
-                number="localhost"
+                number="N/A"
                 textSize="h4"
               />
             </div>,
@@ -1113,7 +1113,7 @@ ShallowWrapper {
               "children": <withRouter(Connect(NumberCard))
                 description="Loading..."
                 iconClass="fa-server"
-                number="localhost"
+                number="N/A"
                 textSize="h4"
               />,
               "className": "col-sm-6",
@@ -1126,7 +1126,7 @@ ShallowWrapper {
               "props": Object {
                 "description": "Loading...",
                 "iconClass": "fa-server",
-                "number": "localhost",
+                "number": "N/A",
                 "textSize": "h4",
               },
               "ref": null,
@@ -2186,7 +2186,7 @@ ShallowWrapper {
               <withRouter(Connect(NumberCard))
                 description="Loading..."
                 iconClass="fa-server"
-                number="localhost"
+                number="N/A"
                 textSize="h4"
               />
             </div>
@@ -2935,7 +2935,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   description="Loading..."
                   iconClass="fa-server"
-                  number="localhost"
+                  number="N/A"
                   textSize="h4"
                 />
               </div>,
@@ -2957,7 +2957,7 @@ ShallowWrapper {
                 "children": <withRouter(Connect(NumberCard))
                   description="Loading..."
                   iconClass="fa-server"
-                  number="localhost"
+                  number="N/A"
                   textSize="h4"
                 />,
                 "className": "col-sm-6",
@@ -2970,7 +2970,7 @@ ShallowWrapper {
                 "props": Object {
                   "description": "Loading...",
                   "iconClass": "fa-server",
-                  "number": "localhost",
+                  "number": "N/A",
                   "textSize": "h4",
                 },
                 "ref": null,
@@ -4384,7 +4384,7 @@ ShallowWrapper {
             <withRouter(Connect(NumberCard))
               description="Loading..."
               iconClass="fa-server"
-              number="localhost"
+              number="N/A"
               textSize="h4"
             />
           </div>
@@ -5133,7 +5133,7 @@ ShallowWrapper {
               <withRouter(Connect(NumberCard))
                 description="Loading..."
                 iconClass="fa-server"
-                number="localhost"
+                number="N/A"
                 textSize="h4"
               />
             </div>,
@@ -5155,7 +5155,7 @@ ShallowWrapper {
               "children": <withRouter(Connect(NumberCard))
                 description="Loading..."
                 iconClass="fa-server"
-                number="localhost"
+                number="N/A"
                 textSize="h4"
               />,
               "className": "col-sm-6",
@@ -5168,7 +5168,7 @@ ShallowWrapper {
               "props": Object {
                 "description": "Loading...",
                 "iconClass": "fa-server",
-                "number": "localhost",
+                "number": "N/A",
                 "textSize": "h4",
               },
               "ref": null,
@@ -6228,7 +6228,7 @@ ShallowWrapper {
               <withRouter(Connect(NumberCard))
                 description="Loading..."
                 iconClass="fa-server"
-                number="localhost"
+                number="N/A"
                 textSize="h4"
               />
             </div>
@@ -6977,7 +6977,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   description="Loading..."
                   iconClass="fa-server"
-                  number="localhost"
+                  number="N/A"
                   textSize="h4"
                 />
               </div>,
@@ -6999,7 +6999,7 @@ ShallowWrapper {
                 "children": <withRouter(Connect(NumberCard))
                   description="Loading..."
                   iconClass="fa-server"
-                  number="localhost"
+                  number="N/A"
                   textSize="h4"
                 />,
                 "className": "col-sm-6",
@@ -7012,7 +7012,7 @@ ShallowWrapper {
                 "props": Object {
                   "description": "Loading...",
                   "iconClass": "fa-server",
-                  "number": "localhost",
+                  "number": "N/A",
                   "textSize": "h4",
                 },
                 "ref": null,
@@ -8121,7 +8121,7 @@ ShallowWrapper {
             <withRouter(Connect(NumberCard))
               description="Loading..."
               iconClass="fa-server"
-              number="localhost"
+              number="N/A"
               textSize="h4"
             />
           </div>
@@ -8764,7 +8764,7 @@ ShallowWrapper {
               <withRouter(Connect(NumberCard))
                 description="Loading..."
                 iconClass="fa-server"
-                number="localhost"
+                number="N/A"
                 textSize="h4"
               />
             </div>,
@@ -8786,7 +8786,7 @@ ShallowWrapper {
               "children": <withRouter(Connect(NumberCard))
                 description="Loading..."
                 iconClass="fa-server"
-                number="localhost"
+                number="N/A"
                 textSize="h4"
               />,
               "className": "col-sm-6",
@@ -8799,7 +8799,7 @@ ShallowWrapper {
               "props": Object {
                 "description": "Loading...",
                 "iconClass": "fa-server",
-                "number": "localhost",
+                "number": "N/A",
                 "textSize": "h4",
               },
               "ref": null,
@@ -9549,7 +9549,7 @@ ShallowWrapper {
               <withRouter(Connect(NumberCard))
                 description="Loading..."
                 iconClass="fa-server"
-                number="localhost"
+                number="N/A"
                 textSize="h4"
               />
             </div>
@@ -10192,7 +10192,7 @@ ShallowWrapper {
                 <withRouter(Connect(NumberCard))
                   description="Loading..."
                   iconClass="fa-server"
-                  number="localhost"
+                  number="N/A"
                   textSize="h4"
                 />
               </div>,
@@ -10214,7 +10214,7 @@ ShallowWrapper {
                 "children": <withRouter(Connect(NumberCard))
                   description="Loading..."
                   iconClass="fa-server"
-                  number="localhost"
+                  number="N/A"
                   textSize="h4"
                 />,
                 "className": "col-sm-6",
@@ -10227,7 +10227,7 @@ ShallowWrapper {
                 "props": Object {
                   "description": "Loading...",
                   "iconClass": "fa-server",
-                  "number": "localhost",
+                  "number": "N/A",
                   "textSize": "h4",
                 },
                 "ref": null,

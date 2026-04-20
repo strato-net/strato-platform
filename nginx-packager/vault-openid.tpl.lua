@@ -40,27 +40,25 @@ if not nonempty(authz) and nonempty(user_access_token) then
   ngx.req.set_header("Authorization", authz)
 end
 
-if nonempty(authz) then
-  local verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
-  if verify_err or not verify_res then
-    log_vault_auth("jwt_verify_failed", "error=" .. tostring(verify_err))
-    ngx.status = 401
-    ngx.say("Authorization header is provided but the bearer token is invalid or expired: " .. (verify_err or "unknown error"))
-    ngx.exit(ngx.HTTP_UNAUTHORIZED)
-    return
-  end
-  log_vault_auth("jwt_verified")
-  unique_name = verify_res["sub"] or verify_res["preferred_username"] or unique_name
-  identity_provider_id = verify_res["iss"] or identity_provider_id
+if not nonempty(authz) then
+  log_vault_auth("no_token", "rejecting unauthenticated request")
+  ngx.status = 401
+  ngx.say("Missing Authorization or X-USER-ACCESS-TOKEN header")
+  ngx.exit(ngx.HTTP_UNAUTHORIZED)
+  return
 end
 
--- Keep internal STRATO bootstrap calls working when no token/session exists.
-if not nonempty(unique_name) then
-  unique_name = "strato-node"
+local verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
+if verify_err or not verify_res then
+  log_vault_auth("jwt_verify_failed", "error=" .. tostring(verify_err))
+  ngx.status = 401
+  ngx.say("Bearer token is invalid or expired: " .. (verify_err or "unknown error"))
+  ngx.exit(ngx.HTTP_UNAUTHORIZED)
+  return
 end
-if not nonempty(identity_provider_id) then
-  identity_provider_id = "local-auth-internal"
-end
+log_vault_auth("jwt_verified")
+unique_name = verify_res["sub"] or verify_res["preferred_username"] or unique_name
+identity_provider_id = verify_res["iss"] or identity_provider_id
 
 ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
 ngx.req.set_header("X-IDENTITY-PROVIDER-ID", identity_provider_id)

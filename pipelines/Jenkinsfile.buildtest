@@ -11,7 +11,7 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           strato-down || true
-          pkill convoke || true
+          pkill -f convoke || true
           docker rm -f $(docker ps -aq) || true
           docker system prune -f || true
           docker volume prune -fa || true
@@ -24,7 +24,6 @@ pipeline {
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
-        sh 'make clean-docker-sentinels'
         sh "git checkout BUILD_METADATA"
         sh 'make'
       }

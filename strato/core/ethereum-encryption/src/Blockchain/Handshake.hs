@@ -13,6 +13,7 @@ import qualified Blockchain.ECIES as ECIES
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.Strato.Model.Secp256k1
+import Control.Monad.Composable.Vault
 import Control.Monad.IO.Class
 import Crypto.Types.PubKey.ECC
 import Data.Binary

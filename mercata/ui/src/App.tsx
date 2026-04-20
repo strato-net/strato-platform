@@ -10,7 +10,6 @@ import {
   RainbowKitProvider,
 } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
-import { defineChain } from "viem";
 import "@rainbow-me/rainbowkit/styles.css";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
@@ -29,6 +28,7 @@ import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
+import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
@@ -54,6 +54,8 @@ import {
   metaMaskWallet,
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
+import { stratoWallet } from "@/lib/stratoWallet";
+import { initStratoChain, getStratoChain } from "@/lib/stratoChain";
 import AdminRoute from "./components/AdminRoute";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
@@ -76,6 +78,7 @@ import { initializeCsrfToken, csrfOnRequest } from "./lib/csrf";
 
 
 const queryClient = new QueryClient();
+const baseChains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
 
 const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
@@ -97,7 +100,7 @@ const App = () => {
 
     const fetchConfig = async () => {
       try {
-        const configData = await getConfig();
+        const [configData] = await Promise.all([getConfig(), initStratoChain()]);
         if (!cancelled) {
           setProjectId(configData.projectId ?? "PROJECT_ID_UNSET");
           if (configData.networkId) setNetworkId(String(configData.networkId));
@@ -128,26 +131,19 @@ const App = () => {
   useEffect(() => {
     if (!loading) {
       const appName = "Mercata";
-      const stratoChainId = networkId ? Number(networkId) : null;
-      const stratoChain =
-        stratoChainId != null && !Number.isNaN(stratoChainId) && Number.isSafeInteger(stratoChainId)
-          ? defineChain({
-              id: stratoChainId,
-              name: "STRATO",
-              nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
-              rpcUrls: { default: { http: [typeof window !== "undefined" ? `${window.location.origin}/api/rpc/${networkId}` : ""] } },
-            })
-          : null;
-      const baseChains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
+      const stratoChain = getStratoChain();
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
-        chains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
+        chains.map((chain) => [chain.id, chain === stratoChain ? http(`/rpc`) : http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
       );
 
       const connectors = connectorsForWallets(
         [
+          ...(stratoChain
+            ? [{ groupName: "STRATO", wallets: [stratoWallet] }]
+            : []),
           {
-            groupName: "Recommended",
+            groupName: "External",
             wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet],
           },
         ],
@@ -163,7 +159,7 @@ const App = () => {
 
       setWagmiConfig(config);
     }
-  }, [projectId, loading, networkId]);
+  }, [projectId, loading]);
 
   const networkIdStr = networkId ?? undefined;
   const creditCardTopUpAddressStr = creditCardTopUpAddress ?? undefined;
@@ -207,6 +203,14 @@ const App = () => {
                                               <Routes>
                                                 <Route path="/" element={<Index />} />
                                                 <Route path="/claim" element={<Claim />} />
+                                                <Route
+                                                  path="/communityrewards"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <CommunityRewardsOnePager />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
                                                 <Route
                                                   path="/dashboard"
                                                   element={
