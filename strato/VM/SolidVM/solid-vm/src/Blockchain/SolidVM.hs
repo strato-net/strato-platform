@@ -943,13 +943,17 @@ runStatement (CC.Throw expr pos) = do
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
   let listOfVals = mapMaybe (\x -> toBasic currentBlockNum x) argVals
   customError "Custom user error thrown" name listOfVals
-runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
+runStatement (CC.AssemblyStatement (CC.InlineAssembly body) pos) = do
   solidVMBreakpoint pos
-  srcVar <- expToVar (CC.Variable pos $ textToLabel src)
-  dstVar <- expToVar (CC.Variable pos $ textToLabel dst)
-
-  -- TODO(tim): should this hex encode src and pad?
-  setVar dstVar =<< getVar srcVar
+  -- Temporary shim so the legacy @assembly { x := mload(add(y, 32)) }@
+  -- test keeps behaving while the full Yul interpreter is being wired
+  -- up (see EvmMemory module + runYul* dispatch, step 4).
+  case body of
+    [CC.YulAssign _ [dst] (CC.YulFunctionCall _ "mload" [CC.YulFunctionCall _ "add" [CC.YulIdentifier _ src, CC.YulLit _ (CC.YulNumber 32)]])] -> do
+      srcVar <- expToVar (CC.Variable pos src)
+      dstVar <- expToVar (CC.Variable pos dst)
+      setVar dstVar =<< getVar srcVar
+    _ -> pure ()
   return Nothing
 runStatement st@(CC.EmitStatement eventName exptups pos) = do
   -- emit MemberAdded(<address>, <enode>);

@@ -17,6 +17,7 @@ library
       Blockchain.SolidVM.SM
   other-modules:
       Blockchain.SolidVM.Environment
+      Blockchain.SolidVM.EvmMemory
       Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
