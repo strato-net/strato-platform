@@ -62,8 +62,8 @@ const SafetyModuleSection = () => {
   const refreshData = (signal?: AbortSignal) => {
     refreshSafetyInfo(signal);
     if (isLoggedIn) {
-      void fetchTokens(signal);
-      void fetchUsdstBalance(signal);
+      fetchTokens(signal);
+      fetchUsdstBalance();
     }
   };
 
