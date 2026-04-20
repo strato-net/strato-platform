@@ -168,9 +168,9 @@ getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . 
   where filterAndExtract name vd = case extractKeys (_varType vd) of
           ([], _) -> Nothing
           (ks, v) -> Just (T.pack name, ks, v)
-        extractKeys (SVMType.Array entry _)     = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
-        extractKeys (SVMType.Mapping _ k entry) = let (ks, v) = extractKeys entry in (k:ks, v)
-        extractKeys v                           = ([], v)
+        extractKeys (SVMType.Array entry _)         = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
+        extractKeys (SVMType.Mapping _ k entry _ _) = let (ks, v) = extractKeys entry in (k:ks, v)
+        extractKeys v                               = ([], v)
 
 processTheMessages ::
   ( MonadIO m
@@ -220,7 +220,7 @@ processTheMessages messages = do
           pure []
         Right inheritedContracts -> pure $ map (T.pack . _contractName) inheritedContracts
       indexFkeys <- createIndexTable c cc nameParts inherited
-      collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
+      collectionFkeys <- concat <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
       eventFkeys <- createExpandEventTables c cc nameParts inherited
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 

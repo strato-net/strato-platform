@@ -59,14 +59,27 @@ export const hiddenSwapPools: Set<string> = new Set([
   "9c75280f9e2368005d2b7342f19c59f9176b5962", // sUSDST-USDST swap pool - This is a hot fix to hide the pool from the user
 ]);
 
-// Yield-bearing tokens benchmarked against a base asset for ratio-growth APY.
-// Verified on both https://app.strato.nexus and https://node1.testnet.strato.nexus (2026-03-26).
+// Yield-bearing tokens. APY computed from on-chain exchange rate history mapping.
 export const yieldBenchmarks = [
-  { tokenSymbol: "wstETH", baseSymbol: "ETH", tokenAddress: "f2aa370405030a434ae07e7826178325c675e925", baseAddress: "93fb7295859b2d70199e0a4883b7c320cf874e6c" },
-  { tokenSymbol: "rETH", baseSymbol: "ETH", tokenAddress: "2e4789eb7db143576da25990a3c0298917a8a87d", baseAddress: "93fb7295859b2d70199e0a4883b7c320cf874e6c" },
-  { tokenSymbol: "sUSDS", baseSymbol: "USDST", tokenAddress: "6e2d93d323edf1b3cc4672a909681b6a430cae64", baseAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010" },
-  { tokenSymbol: "syrupUSDC", baseSymbol: "USDC", tokenAddress: "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca", baseAddress: "6aeacaa19c68e53035bf495d15e0a328fc600ba8" },
+  { tokenSymbol: "wstETH", baseSymbol: "ETH", tokenAddress: "f2aa370405030a434ae07e7826178325c675e925" },
+  { tokenSymbol: "rETH", baseSymbol: "ETH", tokenAddress: "2e4789eb7db143576da25990a3c0298917a8a87d" },
+  { tokenSymbol: "sUSDS", baseSymbol: "USDST", tokenAddress: "6e2d93d323edf1b3cc4672a909681b6a430cae64" },
+  { tokenSymbol: "syrupUSDC", baseSymbol: "USDC", tokenAddress: "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca" },
+  // AAVE aTokens — yield from AAVE V3 liquidity index (getReserveNormalizedIncome)
+  { tokenSymbol: "aWETH", baseSymbol: "ETH", tokenAddress: "6d40952f0895d21d2bf20cd088f0eb9a1574583f" },
+  { tokenSymbol: "aWBTC", baseSymbol: "BTC", tokenAddress: "5f46258f73c405a58331c1a19e54add394637b06" },
+  { tokenSymbol: "aweETH", baseSymbol: "weETH", tokenAddress: "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1" },
+  { tokenSymbol: "awstETH", baseSymbol: "wstETH", tokenAddress: "2c33aa5f8bbfe3c15e356a5e87464310db1237be" },
+  { tokenSymbol: "aUSDC", baseSymbol: "USDC", tokenAddress: "465c7e3061bc239df88c37d315be52f5487959ec" },
+  { tokenSymbol: "aUSDT", baseSymbol: "USDT", tokenAddress: "7d2a2b963e1fa273b60f9b7891392903de5e66b8" },
 ];
+
+// For AAVE aTokens wrapping yield-bearing LSTs, composite APY = AAVE lending yield + underlying staking yield.
+// Maps aToken address → underlying token's exchange rate address (used to sum APYs).
+export const compositeYieldMap: Record<string, string> = {
+  "2c33aa5f8bbfe3c15e356a5e87464310db1237be": "f2aa370405030a434ae07e7826178325c675e925", // awstETH → wstETH
+  "6f247ad55cb444e3e8db0fe225aea2cf1ed62fe1": "00000000000000000000000000000000deadbeef", // aweETH → weETH
+};
 
 /*
    Network-specific defaults;
@@ -115,13 +128,13 @@ export const defaultSaveUsdstVaultFor: Record<string, string> = {
 };
 
 export const defaultEthCarryVaultFor: Record<string, string> = {
-  "114784819836269": "9086237097b44199baf7318987f2eb525471c802", // Helium testnet - set after deployment
-  "33056204878082667": "", // Upquark mainnet - set after deployment
+  "114784819836269": "ac8ce8b3d4aa4b9a359dad3bb792a563f7f2e2f5", // Helium testnet
+  "33056204878082667": "a94905d8bd117e9bfbe57aadffd7abbea760e028", // Upquark mainnet
 };
 
 export const defaultWbtcCarryVaultFor: Record<string, string> = {
-  "114784819836269": "dc334495dacd0419548729dc7f821dd2eb7d92a1", // Helium testnet - set after deployment
-  "33056204878082667": "", // Upquark mainnet - set after deployment
+  "114784819836269": "97d3b5da244094dd940a173b42240b36eb79dceb", // Helium testnet
+  "33056204878082667": "0b5831edcab6f06256a790340426236c31bb463f", // Upquark mainnet
 };
 
 export let bridgeUrl: string | undefined;

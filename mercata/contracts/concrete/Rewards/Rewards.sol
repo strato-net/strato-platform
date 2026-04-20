@@ -46,6 +46,7 @@ struct Activity {
     ActionableEvent[] actionableEvents; // Events that can trigger actions for this activity
     uint256 minAmount;           // Minimum amount required to qualify for rewards (0 = no minimum)
     uint256 weightMultiplier;    // Scaling factor for OneTime activities (1e18 = 1x, prevents unbounded stake growth)
+    bool directPayout;           // If true, OneTime actions credit rewards directly (no accrual, no idempotency)
 }
 
 /**
@@ -83,6 +84,7 @@ contract record Rewards is Ownable {
     event EmissionRateUpdated(uint256 indexed activityId, uint256 oldRate, uint256 newRate);
     event SourceContractUpdated(uint256 indexed activityId, address oldSourceContract, address newSourceContract);
     event RewardsClaimed(address indexed user, uint256 amount);
+    event DirectPayoutApplied(uint256 indexed activityId, address indexed user, uint256 amount);
     event MaxBatchSizeUpdated(uint256 oldMaxBatchSize, uint256 newMaxBatchSize);
     event ActivityMinAmountUpdated(uint256 indexed activityId, uint256 oldMinAmount, uint256 newMinAmount);
     event ActivityWeightUpdated(uint256 indexed activityId, uint256 oldWeight, uint256 newWeight);
@@ -218,7 +220,7 @@ contract record Rewards is Ownable {
         ActionableEvent[]  actionableEvents
     ) external onlyOwner returns (uint256) {
         require(actionableEvents.length > 0, "At least one actionable event required");
-        return _addActivity(name, ActivityType.Position, emissionRate, sourceContract, actionableEvents);
+        return _addActivity(name, ActivityType.Position, emissionRate, sourceContract, actionableEvents, false);
     }
 
     /**
@@ -237,7 +239,27 @@ contract record Rewards is Ownable {
     ) external onlyOwner returns (uint256) {
         ActionableEvent[]  actionableEvents = new ActionableEvent[](1);
         actionableEvents[0] = ActionableEvent(eventName, ActionType.Occurred);
-        return _addActivity(name, ActivityType.OneTime, emissionRate, sourceContract, actionableEvents);
+        return _addActivity(name, ActivityType.OneTime, emissionRate, sourceContract, actionableEvents, false);
+    }
+
+    /**
+     * @dev Register a new OneTime activity that credits rewards directly (no accrual, no idempotency)
+     * @param name Human-readable name for the activity
+     * @param sourceContract Address of the contract this activity tracks
+     * @param eventName Name of the event that triggers this one-time action
+     * @return activityId The auto-generated unique identifier for the activity
+     *
+     * Direct payout activities skip the idempotency check (blockNumber/eventIndex not required)
+     * because these events don't originate from on-chain event replay.
+     */
+    function addOneTimeDirectPayoutActivity(
+        string  name,
+        address sourceContract,
+        string  eventName
+    ) external onlyOwner returns (uint256) {
+        ActionableEvent[]  actionableEvents = new ActionableEvent[](1);
+        actionableEvents[0] = ActionableEvent(eventName, ActionType.Occurred);
+        return _addActivity(name, ActivityType.OneTime, 0, sourceContract, actionableEvents, true);
     }
 
     /**
@@ -259,7 +281,7 @@ contract record Rewards is Ownable {
         ActionableEvent[]  actionableEvents = new ActionableEvent[](2);
         actionableEvents[0] = ActionableEvent(depositEventName, ActionType.Deposit);
         actionableEvents[1] = ActionableEvent(withdrawEventName, ActionType.Withdraw);
-        return _addActivity(name, ActivityType.Position, emissionRate, sourceContract, actionableEvents);
+        return _addActivity(name, ActivityType.Position, emissionRate, sourceContract, actionableEvents, false);
     }
 
     /**
@@ -691,10 +713,13 @@ contract record Rewards is Ownable {
         ActivityType activityType,
         uint256 emissionRate,
         address sourceContract,
-        ActionableEvent[]  actionableEvents
+        ActionableEvent[]  actionableEvents,
+        bool directPayout
     ) internal returns (uint256) {
         require(sourceContract != address(0), "Invalid source contract address");
         require(bytes(name).length > 0, "Name cannot be empty");
+        require(!directPayout || activityType == ActivityType.OneTime, "Direct payout only for OneTime");
+        require(!directPayout || emissionRate == 0, "Direct payout must have zero emission rate");
 
         // Check for duplicate event names within the same sourceContract using the mapping
         for (uint256 evtIdx = 0; evtIdx < actionableEvents.length; evtIdx++) {
@@ -740,6 +765,7 @@ contract record Rewards is Ownable {
         activity.sourceContract = sourceContract;
         activity.minAmount = 0; // No minimum by default
         activity.weightMultiplier = 1e18; // 1x multiplier by default
+        activity.directPayout = directPayout;
 
         // Initialize activity state
         ActivityState storage state = activityStates[activityId];
@@ -778,7 +804,40 @@ contract record Rewards is Ownable {
      */
     function _handleAction(Action calldata action) internal {
         // ═══════════════════════════════════════════════════════════════════════
-        // IDEMPOTENCY CHECK
+        // ACTIVITY LOOKUP (before idempotency to handle direct payout path)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // Look up activity and action type by sourceContract and eventName
+        // Service passes raw event data, contract does the lookup
+        EventInfo storage eventInfo = sourceEventInfo[action.sourceContract][action.eventName];
+        require(eventInfo.activityId != 0, "Activity not found for source/event");
+
+        uint256 activityId = eventInfo.activityId;
+        ActionType actionType = eventInfo.actionType;
+
+        Activity storage activity = activities[activityId];      // Config
+        ActivityState storage state = activityStates[activityId]; // State
+
+        // Validate action inputs
+        require(action.user != address(0), "Invalid user");
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // DIRECT PAYOUT (no idempotency - blockNumber/eventIndex not applicable)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        if (activity.directPayout) {
+            // Direct payout skips idempotency because these events don't originate
+            // from on-chain event replay and have no valid blockNumber/eventIndex
+            if (action.amount == 0) return;
+            if (activity.minAmount > 0 && action.amount < activity.minAmount) return;
+
+            unclaimedRewards[action.user] += action.amount;
+            emit DirectPayoutApplied(activityId, action.user, action.amount);
+            return;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // IDEMPOTENCY CHECK (only for non-direct-payout activities)
         // ═══════════════════════════════════════════════════════════════════════
 
         // Calculate event hash from blockNumber and eventIndex (uniquely identifies event on chain)
@@ -799,24 +858,6 @@ contract record Rewards is Ownable {
         if (action.blockNumber > highestBlockSeen) {
             highestBlockSeen = action.blockNumber;
         }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // ACTIVITY LOOKUP
-        // ═══════════════════════════════════════════════════════════════════════
-
-        // Look up activity and action type by sourceContract and eventName
-        // Service passes raw event data, contract does the lookup
-        EventInfo storage eventInfo = sourceEventInfo[action.sourceContract][action.eventName];
-        require(eventInfo.activityId != 0, "Activity not found for source/event");
-
-        uint256 activityId = eventInfo.activityId;
-        ActionType actionType = eventInfo.actionType;
-
-        Activity storage activity = activities[activityId];      // Config
-        ActivityState storage state = activityStates[activityId]; // State
-
-        // Validate action inputs
-        require(action.user != address(0), "Invalid user");
 
         // Extra enforcement for OneTime safety (protects against governance misconfiguration)
         if (activity.activityType == ActivityType.OneTime) {

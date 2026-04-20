@@ -4,15 +4,19 @@ import { useSafetyContext } from "@/context/SafetyContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
+import { useEarnContext } from "@/context/EarnContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
+import { EarnApyInfo } from "@/utils/earnUtils";
 
 const SafetyModuleSection = () => {
   const { isLoggedIn } = useUser();
@@ -32,6 +36,27 @@ const SafetyModuleSection = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { tokenApys, tokenApysLoaded } = useEarnContext();
+
+  const safetyBestApyInfo = useMemo(
+    (): EarnApyInfo | null => {
+      const usdstApyEntry = tokenApys.find((entry) => entry.token?.toLowerCase?.() === usdstAddress.toLowerCase());
+      const safetyApy = usdstApyEntry?.apys.find((item) => item.source === "safety" && !item.poolAddress);
+      if (!safetyApy?.apy) return null;
+
+      const total = Number(safetyApy.apy);
+      if (!Number.isFinite(total) || total <= 0) return null;
+
+      return {
+        total,
+        source: "safety",
+        breakdown: [{ label: "Native APY", apy: safetyApy.apy }],
+      };
+    },
+    [tokenApys]
+  );
+  const safetyDisplayApy = safetyBestApyInfo?.total.toFixed(2)
+    || (safetyInfo?.apy && safetyInfo.apy !== "-" ? safetyInfo.apy : null);
 
 
   const refreshData = (signal?: AbortSignal) => {
@@ -561,6 +586,21 @@ const SafetyModuleSection = () => {
                       "1 safetyUSDST = 1 USDST"
                     )}
                   </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-muted-foreground text-sm sm:text-base inline-flex items-center gap-1">
+                    Best Available APY
+                    <BestApyInfoTooltip />
+                  </span>
+                  {loading || !tokenApysLoaded ? (
+                    <span className="text-muted-foreground animate-pulse text-sm sm:text-base">Loading...</span>
+                  ) : (
+                    <EarnApyTooltip info={safetyBestApyInfo}>
+                      <span className="font-medium text-sm sm:text-base sm:text-right cursor-default">
+                        {safetyDisplayApy ? `${safetyDisplayApy}%` : "N/A"}
+                      </span>
+                    </EarnApyTooltip>
+                  )}
                 </div>
                 {/* User-specific data - only show when logged in */}
                 {isLoggedIn && (

@@ -27,6 +27,7 @@ import {
   calculatePoolAPY,
   fetchMultiTokenStablePools,
   buildMultiTokenPoolEntry,
+  applyStablePoolFees,
   getUserPoolLiquidityFlowTotals,
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
@@ -132,11 +133,13 @@ export const getPools = async (
     }
   }));
 
+  const patchedPoolList = await applyStablePoolFees(accessToken, poolList);
+
   if (!userAddress) {
-    return poolList;
+    return patchedPoolList;
   }
 
-  return poolList.map((pool) => {
+  return patchedPoolList.map((pool) => {
     const flow = userLiquidityFlowTotals?.get(pool.address.toLowerCase()) || {
       totalDepositedUsd: 0n,
       totalWithdrawnUsd: 0n,

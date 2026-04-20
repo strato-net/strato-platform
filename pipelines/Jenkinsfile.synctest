@@ -34,7 +34,9 @@ pipeline {
                   ./strato
             """
             sh "sudo ./strato --wipe"
-            sh "sudo ./strato-run.sh"
+            withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+              sh "sudo ./strato-run.sh"
+            }
             script {
               def timeStart = System.currentTimeMillis()
               lib.waitLocalNodeIsSynced()
@@ -88,7 +90,9 @@ pipeline {
                   ./strato
             """
             sh "sudo ./strato --wipe"
-            sh "sudo ./strato-run.sh"
+            withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+              sh "sudo ./strato-run.sh"
+            }
             script {
               def timeStart = System.currentTimeMillis()
               lib.waitLocalNodeIsSynced()

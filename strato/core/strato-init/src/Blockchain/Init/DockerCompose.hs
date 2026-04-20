@@ -5,7 +5,7 @@ module Blockchain.Init.DockerCompose (generateDockerCompose) where
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (networkConfig, httpPort)
+import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
@@ -26,6 +26,8 @@ generateDockerCompose = do
   let conf = ethConf
       ssl = not $ null flags_sslDir
       portNum = show $ httpPort (networkConfig conf)
+      rpcPort = "8545"
+      stratoApiPort = show $ apiPort (apiConfig conf)
       userGid = uid ++ ":" ++ gid
       hostGateway = Just [localHostname ++ ":host-gateway"]
 
@@ -205,7 +207,10 @@ generateDockerCompose = do
                 ["apex", "docs", "postgrest", "prometheus", "smd", "mercata-backend", "mercata-ui"]
         
         , environment = Just $ Map.fromList $
-            [ ("JSONRPC_ENABLED", if flags_jsonrpc then "true" else "false")
+            [ ("STRATO_PORT_API", stratoApiPort)
+            , ("STRATO_PORT_VAULT_PROXY", "8013")
+            , ("JSONRPC_ENABLED", if flags_jsonrpc then "true" else "false")
+            , ("RPC_PORT", rpcPort)
             , ("ssl", if ssl then "true" else "false")
             ]
             ++ if flags_localAuth
