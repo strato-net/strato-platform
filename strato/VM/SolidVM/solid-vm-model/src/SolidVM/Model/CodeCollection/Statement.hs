@@ -18,7 +18,7 @@ module SolidVM.Model.CodeCollection.Statement
     getVarDefContext,
     SimpleStatementF (..),
     SimpleStatement,
-    InlineAssembly (..),
+    module SolidVM.Model.CodeCollection.Yul,
     ExpressionF (..),
     extractExpression,
     Expression,
@@ -38,9 +38,9 @@ import Data.Decimal
 import qualified Data.Map.Strict as Map
 import Data.OpenApi (ToSchema)
 import Data.Source
-import qualified Data.Text as T
 import GHC.Generics
 import qualified Generic.Random as GR
+import SolidVM.Model.CodeCollection.Yul
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type hiding (Decimal)
 import Test.QuickCheck
@@ -59,7 +59,7 @@ data StatementF a
   | Throw (ExpressionF a) a
   | ModifierExecutor a
   | EmitStatement String [(Maybe String, (ExpressionF a))] a
-  | AssemblyStatement InlineAssembly a
+  | AssemblyStatement (InlineAssemblyF a) a
   | SimpleStatement (SimpleStatementF a) a
   | RevertStatement (Maybe String) (ArgListF a) a
   | UncheckedStatement [StatementF a] a
@@ -145,22 +145,6 @@ instance Binary a => Binary (SimpleStatementF a)
 instance ToJSON a => ToJSON (SimpleStatementF a)
 
 instance FromJSON a => FromJSON (SimpleStatementF a)
-
--- Currently, the only supported inline assembly is:
--- assembly {
---  result := mload(add(source, 32))
--- }
--- Anything else is a parse error.
-data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic, NFData)
-
-instance Binary InlineAssembly
-
-instance ToJSON InlineAssembly
-
-instance FromJSON InlineAssembly
-
-instance Arbitrary InlineAssembly where
-  arbitrary = GR.genericArbitrary GR.uniform
 
 data ExpressionF a
   = PlusPlus a (ExpressionF a)
