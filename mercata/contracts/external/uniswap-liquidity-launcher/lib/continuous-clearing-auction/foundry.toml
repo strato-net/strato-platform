@@ -1,0 +1,59 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+optimizer = true
+optimizer_runs = 11111
+bytecode_hash = "none"
+solc = "0.8.26"
+verbosity = 2
+ffi = true
+
+fs_permissions = [
+  { access = "read-write", path = ".forge-snapshots" },
+  { access = "read", path = "script/" },
+]
+extra_output = ["storageLayout"]
+
+remappings = [
+  "forge-std=lib/forge-std/src",
+  "@openzeppelin/contracts=lib/openzeppelin-contracts/contracts",
+  "@openzeppelin/contracts-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts",
+  "solady=lib/solady/src",
+  "permit2=lib/permit2",
+  "v4-periphery=lib/v4-periphery",
+  "blocknumberish=lib/blocknumberish",
+  "continuous-clearing-auction=src/",
+  "test=test/",
+  "btt=test/btt/",
+]
+
+additional_compiler_profiles = [{ name = "via_ir", optimizer_runs = 11111, via_ir = true }]
+
+compilation_restrictions = [
+  { paths = "src/ContinuousClearingAuctionFactory.sol", via_ir = true }
+]
+
+[profile.default.fuzz]
+runs = 2500
+
+[profile.default.invariant]
+fail_on_revert = true
+runs = 100
+depth = 2500
+
+[profile.pr.fuzz]
+runs = 1000
+
+[profile.ci.fuzz]
+runs = 1000
+
+[fmt]
+line_length = 120
+tab_width = 4
+quote_style = "single"
+sort_imports = true
+number_underscore = "thousands"
+
+[lint]
+exclude_lints = ["mixed-case-variable"]
