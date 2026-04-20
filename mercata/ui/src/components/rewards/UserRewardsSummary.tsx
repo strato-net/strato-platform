@@ -289,7 +289,7 @@ export const UserRewardsSummary = ({
 
       <Card>
         <CardHeader className="px-4 md:px-6 pb-2 md:pb-3">
-          <CardTitle className="text-sm md:text-base">Rewards Overview</CardTitle>
+          <CardTitle className="text-sm md:text-base">Global Rewards Overview</CardTitle>
           <CardDescription className="text-xs">Global rewards statistics</CardDescription>
         </CardHeader>
         <CardContent className="px-4 md:px-6">
