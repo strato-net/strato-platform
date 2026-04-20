@@ -1,6 +1,7 @@
 import { bloc, cirrus } from "./mercataApiHelper";
 import { StratoPaths } from "../config/constants";
 import { StratoError } from "../errors";
+import { requestContext } from "./requestContext";
 
 export const until = async (
   predicate: (res: any) => boolean,
@@ -51,6 +52,12 @@ export const postAndWaitForTx = async (
     const results = response.data;
     if (!Array.isArray(results) || !results.length) {
       throw new StratoError("Invalid or empty transaction results", 400);
+    }
+
+    const store = requestContext.getStore();
+    if (store?.externalSigning && results[0]?.data !== undefined && results[0]?.status === undefined) {
+      store.unsignedTxs = results;
+      return { status: "unsigned", hash: results[0].hash };
     }
 
     const txHashes = results.map(result => {

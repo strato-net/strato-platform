@@ -90,7 +90,7 @@ type TokenContextType = {
 const TokenContext = createContext<TokenContextType | undefined>(undefined);
 
 export const TokenProvider = ({ children }: { children: ReactNode }) => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn,userAddress } = useUser();
   const queryClient = useQueryClient();
   const [tokens, setTokens] = useState<Token[]>([]);
   const [activeTokens, setActiveTokens] = useState<Token[]>([]);
@@ -495,7 +495,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         earningAssetsAbortControllerRef.current.abort();
       }
     };
-  }, [getEarningAssets, isLoggedIn]);
+  }, [getEarningAssets, isLoggedIn, userAddress]);
 
   // Net balance - fetch on mount + poll every 60s for logged-in users
   useEffect(() => {
@@ -513,7 +513,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         netBalanceAbortControllerRef.current.abort();
       }
     };
-  }, [fetchNetBalance, isLoggedIn]);
+  }, [fetchNetBalance, isLoggedIn, userAddress]);
 
 
   return (

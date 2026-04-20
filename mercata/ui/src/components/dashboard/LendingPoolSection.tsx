@@ -44,8 +44,8 @@ const LendingPoolSection = () => {
   const refreshLendingData = (signal?: AbortSignal) => {
     refreshLiquidity(signal);
     if (isLoggedIn) {
-      void fetchTokens(signal);
-      void fetchUsdstBalance(signal);
+      fetchTokens(signal);
+      fetchUsdstBalance();
     }
   };
 
