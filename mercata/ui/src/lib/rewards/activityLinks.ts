@@ -27,7 +27,12 @@ export const getActivityLink = (activityName: string): string | null => {
   if (lowerName.includes('save usdst') || lowerName.includes('saveusdst')) {
     return '/dashboard/earn-save';
   }
-  
+
+  // ETH Carry Vault
+  if (lowerName.includes('eth vault')) {
+    return '/dashboard/earn-yield-vault?vault=eth-carry';
+  }
+
   // Vault activities - goes to the Vault page
   if (lowerName.includes('vault')) {
     return '/dashboard/vault';

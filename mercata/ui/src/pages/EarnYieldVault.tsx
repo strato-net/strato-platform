@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatUnits } from "ethers";
-import { ArrowLeft, CircleDollarSign, TrendingUp, Wallet } from "lucide-react";
+import { ArrowLeft, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -24,6 +24,14 @@ import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits } from "@/utils/numberUtils";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import {
+  calculateEstimatedRewardsPerDay,
+  formatRoundedWithCommas,
+  roundByMagnitude,
+} from "@/services/rewardsService";
 
 const VAULT_META: Record<string, {
   title: string;
@@ -126,6 +134,8 @@ const EarnYieldVault = () => {
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
   const { getVaultInfo, getUserVaultInfo, loading: loadingVaults, refreshVaults } = useYieldVaultContext();
+  const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
+  const { userRewards, loading: rewardsUserLoading } = useRewardsUserInfo();
 
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
@@ -178,6 +188,68 @@ const EarnYieldVault = () => {
   const strategyHoldings = effectiveInfo?.strategyHoldings || [];
 
   const decimals = effectiveInfo?.decimals ?? 18;
+
+  const normalizedVaultAddress = effectiveInfo?.vaultAddress?.toLowerCase?.() || "";
+  // Strict match by on-chain sourceContract. If the Rewards activity isn't
+  // pointing at this vault address, no rewards UI renders for this page.
+  const matchesCarryActivity = (source: string | undefined): boolean => {
+    if (!normalizedVaultAddress) return false;
+    return (source || "").toLowerCase() === normalizedVaultAddress;
+  };
+  const carryRewardsActivity = useMemo(() => {
+    return (
+      rewardsActivities.find((activity) =>
+        matchesCarryActivity(activity.sourceContract)
+      ) || null
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedVaultAddress, rewardsActivities]);
+  const carryRewardEntries = useMemo(() => {
+    return (
+      userRewards?.activities.filter(({ activity }) =>
+        matchesCarryActivity(activity.sourceContract)
+      ) || []
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedVaultAddress, userRewards]);
+  const carryRewardPointsPerDollarPerDay = useMemo(() => {
+    try {
+      const emissionRate = carryRewardsActivity?.emissionRate;
+      const totalStakeUsd =
+        carryRewardsActivity?.totalStakeUsd ?? effectiveInfo?.tvlUsd ?? null;
+      if (!emissionRate || !totalStakeUsd) return null;
+      const totalStakeUsdBig = BigInt(totalStakeUsd);
+      if (totalStakeUsdBig <= 0n) return null;
+      const ptsPerDollarPerDayWei =
+        (BigInt(emissionRate) * 86400n * 10n ** 18n) / totalStakeUsdBig;
+      const decimal = formatUnits(ptsPerDollarPerDayWei, 18);
+      return formatRoundedWithCommas(roundByMagnitude(decimal));
+    } catch {
+      return null;
+    }
+  }, [carryRewardsActivity?.emissionRate, carryRewardsActivity?.totalStakeUsd, effectiveInfo?.tvlUsd]);
+  const carryRewardPointsPerDay = useMemo(() => {
+    if (carryRewardEntries.length === 0) return "0";
+    const rewardsPerDay = carryRewardEntries.reduce(
+      (total, { activity, userInfo: rewardUserInfo, personalEmissionRate }) => {
+        if (personalEmissionRate && BigInt(personalEmissionRate) > 0n) {
+          return total + BigInt(personalEmissionRate) * 86400n;
+        }
+        return (
+          total +
+          BigInt(
+            calculateEstimatedRewardsPerDay(
+              rewardUserInfo?.stake || "0",
+              activity.totalStake || "0",
+              activity.emissionRate || "0"
+            )
+          )
+        );
+      },
+      0n
+    );
+    return formatRoundedWithCommas(roundByMagnitude(formatUnits(rewardsPerDay, 18)));
+  }, [carryRewardEntries]);
 
   const depositDisabled = !isLoggedIn || !isDeployed;
   const redeemDisabled = !isLoggedIn || !isDeployed || hasPendingWithdrawal;
@@ -387,6 +459,19 @@ const EarnYieldVault = () => {
       hint: "NAV: share claim × exchange ratio × oracle price",
       icon: <CircleDollarSign className="h-4 w-4 text-violet-600 dark:text-violet-400" />,
     },
+    {
+      label: "Estimated Rewards/Day",
+      value:
+        loadingVaults || rewardsActivitiesLoading || rewardsUserLoading
+          ? "..."
+          : isLoggedIn
+            ? `${carryRewardPointsPerDay} points`
+            : "--",
+      hint: carryRewardPointsPerDollarPerDay
+        ? `Points you can earn per day at the current rate (${carryRewardPointsPerDollarPerDay} pts/$1/day)`
+        : "Points you can earn per day at the current rate",
+      icon: <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
+    },
   ];
 
   return (
@@ -508,7 +593,7 @@ const EarnYieldVault = () => {
                   </Card>
                 </section>
 
-                <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                   {metrics.map((metric) => (
                     <Card key={metric.label} className="border border-border/70">
                       <CardContent className="pt-4 space-y-3">
@@ -761,6 +846,15 @@ const EarnYieldVault = () => {
                   </p>
                 )}
               </div>
+            )}
+            {carryRewardsActivity?.name && !rewardsUserLoading && (
+              <RewardsWidget
+                userRewards={userRewards}
+                activityName={carryRewardsActivity.name}
+                inputAmount={actionAmount}
+                isWithdrawal={actionMode === "redeem"}
+                actionLabel={actionMode === "redeem" ? "Withdraw" : "Deposit"}
+              />
             )}
             <div className="flex flex-col gap-2">
               <Button
