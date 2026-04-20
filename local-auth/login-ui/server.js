@@ -100,11 +100,21 @@ app.get('/login', async (req, res) => {
         { params: { login_challenge } }
       );
 
-      // If user is already authenticated, skip login
-      if (loginRequest.skip) {
+      // If Hydra says skip, or user already has a Kratos session, auto-accept
+      let subject = loginRequest.skip ? loginRequest.subject : null;
+      if (!subject) {
+        try {
+          const { data: session } = await axios.get(
+            `${KRATOS_PUBLIC_URL}/sessions/whoami`,
+            { headers: { Cookie: req.headers.cookie || '' } }
+          );
+          subject = session.identity.id;
+        } catch (_) {}
+      }
+      if (subject) {
         const { data: completion } = await axios.put(
           `${HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/login/accept`,
-          { subject: loginRequest.subject },
+          { subject, remember: true, remember_for: 3600 },
           { params: { login_challenge } }
         );
         return res.redirect(completion.redirect_to);
@@ -134,7 +144,7 @@ app.get('/login', async (req, res) => {
             <div id="kc-registration-container">
               <span id="mercata-register-or-text">OR</span>
               <div id="kc-registration">
-                <span><a href="/auth/ui/registration">Register</a></span>
+                <span><a href="/auth/ui/registration?login_challenge=${login_challenge}">Register</a></span>
               </div>
             </div>
           </div>
@@ -283,94 +293,34 @@ app.get('/consent', async (req, res) => {
       { params: { consent_challenge } }
     );
 
-    // Auto-accept consent for first-party apps (skip UI)
-    if (consentRequest.skip || consentRequest.client.client_id === 'strato-local') {
-      const { data: completion } = await axios.put(
-        `${HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent/accept`,
-        {
-          grant_scope: consentRequest.requested_scope,
-          grant_access_token_audience: consentRequest.requested_access_token_audience,
-          remember: true,
-          remember_for: 3600,
-          session: {
-            id_token: {
-              sub: consentRequest.subject,
-              email: consentRequest.context?.identity?.traits?.email || consentRequest.subject,
-              name: consentRequest.context?.identity?.traits?.name || consentRequest.subject
-            }
-          }
-        },
-        { params: { consent_challenge } }
-      );
-      return res.redirect(completion.redirect_to);
-    }
-
-    res.send(html('Authorize Application', `
-      <div class="alert alert-warning"><strong>${consentRequest.client.client_name || consentRequest.client.client_id}</strong> wants to access your account.</div>
-      <p class="instruction">Requested permissions:</p>
-      <ul>
-        ${consentRequest.requested_scope.map(s => `<li>${s}</li>`).join('')}
-      </ul>
-      <div id="kc-form">
-        <div id="kc-form-wrapper">
-          <form method="POST" action="/auth/ui/consent">
-            <input type="hidden" name="consent_challenge" value="${consent_challenge}">
-            <div id="kc-form-buttons" class="form-group">
-              <input class="pf-c-button pf-m-primary pf-m-block btn-lg" type="submit" name="action" value="Allow"/>
-            </div>
-            <div class="form-group" style="margin-top:-5px">
-              <button type="submit" name="action" value="reject" class="pf-c-button pf-m-block btn-lg" style="background:var(--kc-surface);color:var(--kc-text);border:1px solid var(--kc-border);width:100%;height:36px;line-height:36px;font-size:16px;cursor:pointer">Deny</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    `, 'login-consent'));
-  } catch (error) {
-    console.error('Consent error:', error.response?.data || error.message);
-    res.status(500).send(html('Error', `<div class="alert alert-error">Consent error: ${error.message}</div>`));
-  }
-});
-
-// Handle consent form submission
-app.post('/consent', async (req, res) => {
-  const { consent_challenge, action } = req.body;
-
-  try {
-    if (action === 'reject') {
-      const { data: completion } = await axios.put(
-        `${HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent/reject`,
-        { error: 'access_denied', error_description: 'User denied access' },
-        { params: { consent_challenge } }
-      );
-      return res.redirect(completion.redirect_to);
-    }
-
-    const { data: consentRequest } = await axios.get(
-      `${HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent`,
-      { params: { consent_challenge } }
-    );
-
+    // Auto-accept consent — in localAuth mode all clients are first-party
     const { data: completion } = await axios.put(
       `${HYDRA_ADMIN_URL}/admin/oauth2/auth/requests/consent/accept`,
       {
         grant_scope: consentRequest.requested_scope,
         grant_access_token_audience: consentRequest.requested_access_token_audience,
         remember: true,
-        remember_for: 3600
+        remember_for: 3600,
+        session: {
+          id_token: {
+            sub: consentRequest.subject,
+            email: consentRequest.context?.identity?.traits?.email || consentRequest.subject,
+            name: consentRequest.context?.identity?.traits?.name || consentRequest.subject
+          }
+        }
       },
       { params: { consent_challenge } }
     );
-
-    res.redirect(completion.redirect_to);
+    return res.redirect(completion.redirect_to);
   } catch (error) {
-    console.error('Consent submit error:', error.response?.data || error.message);
-    res.status(500).send(html('Error', `<div class="alert alert-error">Error: ${error.message}</div>`));
+    console.error('Consent error:', error.response?.data || error.message);
+    res.status(500).send(html('Error', `<div class="alert alert-error">Consent error: ${error.message}</div>`));
   }
 });
 
 // Registration page
 app.get('/registration', async (req, res) => {
-  const { flow } = req.query;
+  const { flow, login_challenge } = req.query;
 
   if (flow) {
     try {
@@ -413,7 +363,7 @@ app.get('/registration', async (req, res) => {
         </div>
         <div id="kc-info" class="login-pf-signup">
           <div id="kc-info-wrapper" class="">
-            <span><a href="/auth/ui/login">Back to Login</a></span>
+            <span><a href="/auth/ui/login${login_challenge ? '?login_challenge=' + login_challenge : ''}">Back to Login</a></span>
           </div>
         </div>
       `, 'login-register'));
@@ -423,12 +373,25 @@ app.get('/registration', async (req, res) => {
     }
   }
 
-  res.redirect(`${KRATOS_BROWSER_URL}/self-service/registration/browser`);
+  const baseUrl = KRATOS_BROWSER_URL.replace(/\/auth\/kratos$/, '');
+  const returnTo = login_challenge
+    ? `&return_to=${encodeURIComponent(baseUrl + '/auth/ui/login?login_challenge=' + login_challenge)}`
+    : '';
+  res.redirect(`${KRATOS_BROWSER_URL}/self-service/registration/browser?${returnTo}`);
 });
 
 // Logout
 app.get('/logout', async (req, res) => {
   const { logout_challenge } = req.query;
+
+  // Kill Kratos session so the whoami auto-login doesn't re-admit the user
+  try {
+    const { data: session } = await axios.get(
+      `${KRATOS_PUBLIC_URL}/sessions/whoami`,
+      { headers: { Cookie: req.headers.cookie || '' } }
+    );
+    await axios.delete(`${KRATOS_ADMIN_URL}/admin/sessions/${session.id}`);
+  } catch (_) {}
 
   if (logout_challenge) {
     try {
@@ -444,6 +407,23 @@ app.get('/logout', async (req, res) => {
   }
 
   res.redirect('/auth/ui/login');
+});
+
+app.get('/error', async (req, res) => {
+  const { error, error_description } = req.query;
+  res.send(html('Error', `
+    <div class="alert alert-error">
+      <strong>${error || 'Unknown error'}</strong>
+      ${error_description ? `<p>${error_description}</p>` : ''}
+    </div>
+    <div id="kc-form">
+      <div id="kc-form-wrapper">
+        <div id="kc-form-buttons" class="form-group">
+          <a href="/auth/ui/login" style="display:block"><input class="pf-c-button pf-m-primary pf-m-block btn-lg" type="button" value="Back to Login" onclick="window.location='/auth/ui/login'"/></a>
+        </div>
+      </div>
+    </div>
+  `));
 });
 
 app.get('/', (req, res) => {

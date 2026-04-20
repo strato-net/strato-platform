@@ -34,6 +34,7 @@ import           Control.Error                         (note)
 import           Control.Exception                     hiding (try)
 import           Control.Monad                         (forM_)
 import qualified Control.Monad.Change.Alter            as A
+import           Control.Monad.Composable.Vault
 import           Control.Monad.IO.Class
 import           Crypto.Types.PubKey.ECC
 import           Data.Binary
