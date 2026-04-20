@@ -35,7 +35,6 @@ import           Blockchain.Model.SyncState
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP       (processDataStream')
 import           Blockchain.Strato.Model.Host
-import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.SyncDB
@@ -46,6 +45,7 @@ import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.Change.Modify           (Accessible (..))
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Composable.Base
+import           Control.Monad.Composable.Vault
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader

@@ -12,7 +12,7 @@ Stablecoin supply on STRATO counts the circulating supply of canonical USD-pegge
 
 ## Data Source
 
-- Public stablecoins endpoint: `https://YOUR_PUBLIC_STRATO_API_HOST/api/v1/metrics/stablecoins`
+- Public stablecoins endpoint: `https://app.strato.nexus/api/metrics/stablecoins`
 - The endpoint is read-only and unauthenticated
 - The endpoint returns current stablecoin supply snapshots for STRATO-recognized canonical stablecoins
 
@@ -33,7 +33,7 @@ Stablecoin supply on STRATO counts the circulating supply of canonical USD-pegge
 
 ## Notes
 
-- Current prod stablecoin supply is approximately `$814.9M` using this methodology
+- Current prod stablecoin supply is approximately `$987.8K` as of 2026-04-17 using this methodology
 - Stablecoin supply is tracked separately from STRATO TVL
 - If a different DefiLlama file path or stablecoin-specific adapter shape is preferred for STRATO, this asset set and methodology can be moved accordingly
 
@@ -51,5 +51,5 @@ Counts circulating USD-pegged stablecoin supply on STRATO for `USDST`, `USDC`, a
 
 ## Data Source
 
-- `https://YOUR_PUBLIC_STRATO_API_HOST/api/v1/metrics/stablecoins`
+- `https://app.strato.nexus/api/metrics/stablecoins`
 - Public, read-only, unauthenticated

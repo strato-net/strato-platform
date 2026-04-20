@@ -1,7 +1,35 @@
 import { NextFunction, Request, Response } from "express";
 import { getRpcUpstream } from "../../config/rpc.config";
+import { eth, bloc } from "../../utils/mercataApiHelper";
+import { StratoPaths } from "../../config/constants";
 
 class RpcController {
+  static async submitSignedTx(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const result = await eth.post(req.accessToken!, "/transaction", req.body);
+      res.status(200).json(result.data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async txResults(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const result = await bloc.post(req.accessToken!, StratoPaths.result, req.body);
+      res.status(200).json(result.data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async proxy(
     req: Request,
     res: Response,

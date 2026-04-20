@@ -51,6 +51,7 @@ library
     , strato-model
     , text
     , transformers
+    , vault-monad
   default-language: Haskell2010
 
 test-suite blockstanbul-test

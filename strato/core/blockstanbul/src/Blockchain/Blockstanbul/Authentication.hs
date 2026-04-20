@@ -37,6 +37,7 @@ import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Control.Lens as L
 import Control.Monad (unless)
+import Control.Monad.Composable.Vault
 import Control.Monad.Except
 import Data.Either.Extra
 import Data.List

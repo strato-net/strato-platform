@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail } from "lucide-react";
+import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail, Gift } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
@@ -21,6 +21,9 @@ import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
 import { useRewards } from "@/hooks/useRewards";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
+import { formatBalance, safeBigInt } from "@/utils/numberUtils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
@@ -93,6 +96,15 @@ const Dashboard = () => {
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
   const { state: rewardsState } = useRewards();
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
+  const { userRewards: rewardsUserInfo } = useRewardsUserInfo();
+  const communityBonusFormatted = useMemo(() => {
+    const bonus = rewardsUserInfo?.bonusRewards;
+    if (!bonus || safeBigInt(bonus) <= 0n) return null;
+    const numeric = formatBalance(bonus, "points", 18, 18, 18)
+      .replace(/\s*points?\s*$/i, "")
+      .trim();
+    return formatRoundedWithCommas(roundByMagnitude(numeric));
+  }, [rewardsUserInfo?.bonusRewards]);
   const highestIncentiveApy = useMemo(() => {
     if (!rewardsActivities.length) return 0;
     return rewardsActivities.reduce((maxApy, activity) => {
@@ -304,9 +316,9 @@ const Dashboard = () => {
                 title="Rewards"
                 value={(() => {
                   if (rankLoading) return "Loading...";
-                  if (!totalEarned) return "0 Reward Points";
+                  if (!totalEarned) return "0 pts";
                   const totalEarnedNum = parseFloat(totalEarned) / 1e18;
-                  return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`;
+                  return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} pts`;
                 })()}
                 icon={<Coins className="text-white" size={18} />}
                 color="bg-purple-500"
@@ -314,7 +326,7 @@ const Dashboard = () => {
                 isActive={activeTab === 'rewards'}
                 isLoading={rankLoading}
                 additionalContent={
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -338,6 +350,20 @@ const Dashboard = () => {
                         "View Leaderboard"
                       )}
                     </Button>
+                    {communityBonusFormatted && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/dashboard/rewards`);
+                        }}
+                        title={`Community bonus: +${communityBonusFormatted} pts — view on Rewards page`}
+                        className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 whitespace-nowrap"
+                      >
+                        <Gift className="h-3.5 w-3.5" />
+                        +{communityBonusFormatted} Bonus
+                      </button>
+                    )}
                   </div>
                 }
               />

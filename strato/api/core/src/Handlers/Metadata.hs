@@ -25,10 +25,8 @@ where
 
 import BlockApps.Logging
 import Blockchain.Model.SyncState
-import Blockchain.Strato.Model.Address
 import Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
-import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
 import Blockchain.SyncDB (getSyncStatusNow, getBestSequencedBlockInfo)
@@ -38,24 +36,21 @@ import Control.Monad.Reader
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Map (Map, fromList)
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromMaybe)
 import Data.OpenApi hiding (url, server)
 import GHC.Generics
-import qualified LabeledError
 import Servant
 import Servant.Client
-import qualified Strato.Strato23.API.Types as V
 import UnliftIO
 
 type UrlMap = Map String String
 
 data MetadataResponse = MetadataResponse
-  { nodePubKey :: V.PublicKey,
-    nodeAddress :: Address,
-    validators :: [Validator],
+  { validators :: [Validator],
     isSynced :: Bool,
     isVaultPasswordSet :: Bool,
     networkID :: String, -- cuz JSON can't rep integers > 2^53
+    chainId :: String,
     urls :: UrlMap
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
@@ -69,7 +64,6 @@ server
   :: ( MonadUnliftIO m
      , MonadLogger m
      , Accessible UrlMap m
-     , Accessible V.PublicKey m
      )
   => ServerT API m
 server = getMetaData
@@ -82,15 +76,13 @@ instance ToSchema MetadataResponse where
 
 exMetadataRespone :: MetadataResponse
 exMetadataRespone =
-  let pubKey = (fromJust $ importPublicKey $ LabeledError.b16Decode "exMetadataResponse" "04b1145444ab72758420e9dec9dc21b5aab0b84ed5f709677b9e9bfe477b8dffcd8e9a88338769f6d1a958c3063620593d504f6b4e0c56f72a6ca98fae7ce92eb7")
-   in MetadataResponse
-        pubKey
-        (fromPublicKey pubKey)
-        [Validator 0xdeadbeef]
-        True
-        True
-        "0"
-        (fromList [("vault", "http://vault.com")])
+  MetadataResponse
+    [Validator 0xdeadbeef]
+    True
+    True
+    "0"
+    "0"
+    (fromList [("vault", "http://vault.com")])
 
 -- | The model's field modifiers will match the JSON instances
 metadataSchemaOptions :: SchemaOptions
@@ -102,7 +94,6 @@ metadataSchemaOptions =
 getMetaData ::
   ( MonadLogger m,
     MonadUnliftIO m,
-    Accessible V.PublicKey m,
     Accessible UrlMap m
   ) =>
   m MetadataResponse
@@ -110,14 +101,9 @@ getMetaData =
   do
     validators <- fromMaybe [] . fmap bestSequencedBlockValidators <$> runStratoRedisIO getBestSequencedBlockInfo
     isSynced <- checkIsSynced
-    V.AddressAndKey a k <- getPubKeyAndAddress
     urlMap <- access (Proxy @UrlMap)
-    pure $ MetadataResponse k a validators isSynced True (show $ Conf.networkID (networkConfig ethConf)) urlMap
-
-getPubKeyAndAddress :: (MonadLogger m, Accessible V.PublicKey m) => m V.AddressAndKey
-getPubKeyAndAddress = do
-  pub <- access (Proxy @V.PublicKey)
-  pure $ V.AddressAndKey (fromPublicKey pub) pub
+    let nc = networkConfig ethConf
+    pure $ MetadataResponse validators isSynced True (show $ Conf.networkID nc) (show $ Conf.chainId nc) urlMap
 
 checkIsSynced :: MonadIO m => m Bool
 checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow

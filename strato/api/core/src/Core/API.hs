@@ -36,7 +36,6 @@ import           Blockchain.Strato.Discovery.Data.Peer (HasPeerDB)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
-import           Blockchain.Strato.Model.Secp256k1
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify       (Accessible, Outputs)
 import           Data.Source.Map
@@ -61,7 +60,7 @@ import qualified Handlers.TransactionResult        as TransactionResult
 import           Handlers.TxLast                   hiding (API, server)
 import qualified Handlers.TxLast                   as TxLast
 import           Servant
-import qualified Strato.Strato23.API.Types         as V
+
 import           UnliftIO
 
 type CoreAPI =
@@ -87,10 +86,8 @@ type MonadCoreAPI m =
     Accessible Metadata.UrlMap m,
     Accessible [RawTransaction] m,
     Accessible Stats.TransactionCount m,
-    Accessible V.PublicKey m,
     BlkLast.GetLastBlocks m,
     TxLast.GetLastTransactions m,
-    HasVault m,
     Selectable Account.AccountsFilterParams [AddressStateRef] m,
     Selectable Block.BlocksFilterParams [Block] m,
     Selectable Keccak256 SourceMap m,
