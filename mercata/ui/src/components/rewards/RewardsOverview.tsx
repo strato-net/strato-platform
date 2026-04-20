@@ -7,19 +7,13 @@ import CopyButton from "@/components/ui/copy";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
+import { truncateAddress } from "@/utils/numberUtils";
 
 interface RewardsOverviewProps {
   state: RewardsState | null;
   loading: boolean;
   onRefresh?: () => void;
 }
-
-
-const truncateTokenAddress = (address: string, front: number = 6, back: number = 4) => {
-  if (!address) return "";
-  if (address.length <= front + back) return address;
-  return `${address.substring(0, front)}...${address.substring(address.length - back)}`;
-};
 
 export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -164,7 +158,7 @@ export const RewardsOverview = ({ state, loading, onRefresh }: RewardsOverviewPr
               {state.rewardToken && (
                 <div className="flex items-center gap-1 mt-1">
                   <p className="text-sm font-semibold font-mono">
-                    {truncateTokenAddress(state.rewardToken)}
+                    {truncateAddress(state.rewardToken)}
                   </p>
                   <CopyButton address={state.rewardToken} />
                 </div>

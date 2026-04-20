@@ -10,13 +10,14 @@ import {
   roundByMagnitude,
   formatRoundedWithCommas,
 } from "@/services/rewardsService";
-import { formatBalance } from "@/utils/numberUtils";
+import { formatBalance, truncateAddress } from "@/utils/numberUtils";
 import { Loader2, Coins, Star, Gift, Info, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+import CopyButton from "@/components/ui/copy";
 
 interface UserRewardsSummaryProps {
   userRewards: UserRewardsData | null;
@@ -300,6 +301,20 @@ export const UserRewardsSummary = ({
                 <Activity className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                 <span className="text-muted-foreground">Activities:</span>
                 <span className="font-semibold truncate">{activityCountLabel}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Coins className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                <span className="text-muted-foreground">Reward Token:</span>
+                {rewardsState?.rewardToken ? (
+                  <span className="flex items-center gap-1 min-w-0">
+                    <span className="font-semibold font-mono truncate">
+                      {truncateAddress(rewardsState.rewardToken)}
+                    </span>
+                    <CopyButton address={rewardsState.rewardToken} />
+                  </span>
+                ) : (
+                  <span className="font-semibold">?</span>
+                )}
               </div>
             </div>
           )}
