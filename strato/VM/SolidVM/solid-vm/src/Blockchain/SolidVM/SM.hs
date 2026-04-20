@@ -131,8 +131,11 @@ data CallInfo = CallInfo
     -- blocks. Layout follows the Solidity convention:
     --   0x00-0x3f scratch, 0x40-0x5f free memory pointer (init 0x80),
     --   0x60-0x7f zero slot, 0x80.. allocated.
-    -- Lazily initialized by 'Blockchain.SolidVM.EvmMemory.newEvmMemory'.
     evmMemory :: !(IORef BC.ByteString),
+    -- | Raw EVM-style storage (slot → word) used by Yul 'sload' /
+    -- 'sstore' for slots that don't map to a bridgeable state variable
+    -- of the current contract (see "Blockchain.SolidVM.EvmStorage").
+    evmStorage :: !(IORef (M.Map Word256 Word256)),
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
@@ -738,6 +741,7 @@ addCallInfo ::
   m ()
 addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
   memRef <- liftIO $ newIORef initialEvmMemoryBytes
+  slotRef <- liftIO $ newIORef M.empty
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
@@ -750,6 +754,7 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
             stateMap = M.empty,
             storageMap = M.empty,
             evmMemory = memRef,
+            evmStorage = slotRef,
             readOnly = ro,
             isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,

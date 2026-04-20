@@ -1391,6 +1391,27 @@ contract qq {
       -- double(11) + 21 = 22 + 21 = 43
       getAll [[Field "stored"]] `shouldReturn` [BInteger 43]
 
+    it "bridges sstore to named state variable slots" . runTest $ do
+      runBS
+        [r|
+contract qq {
+  uint a;
+  uint b;
+  constructor() {
+    a = 1;
+    b = 2;
+    assembly {
+      // Slot 0 = a (first declared scalar), slot 1 = b.
+      sstore(0, mul(sload(0), 10))  // a := a * 10 = 10
+      sstore(1, add(sload(0), sload(1)))  // b := a + b = 10 + 2 = 12
+      // Slot 99 has no named mapping; it lives in the raw EVM-slot map
+      // and is invisible to Solidity.
+      sstore(99, 777)
+    }
+  }
+}|]
+      getFields ["a", "b"] `shouldReturn` [BInteger 10, BInteger 12]
+
   it "can handle nested mappings" . runTest $ do
     runBS
       [r|

@@ -26,6 +26,7 @@ module Blockchain.SolidVM.Yul
 where
 
 import Blockchain.SolidVM.EvmMemory
+import qualified Blockchain.SolidVM.EvmStorage as Store
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
@@ -417,6 +418,9 @@ evalBuiltin _ name args = case (name, args) of
   ("keccak256", [off, len]) -> do
     bs <- mloadBytes (fromIntegral off) (fromIntegral len)
     one $ keccak256ToWord256 (hash bs)
+  -- Storage (see "Blockchain.SolidVM.EvmStorage")
+  ("sload", [slot]) -> one =<< Store.sload slot
+  ("sstore", [slot, val]) -> Store.sstore slot val >> pure []
   -- Halt-style opcodes. We translate STOP to an empty return; REVERT
   -- throws SolidVM's standard revert path; INVALID halts with an error.
   ("stop", []) -> do
