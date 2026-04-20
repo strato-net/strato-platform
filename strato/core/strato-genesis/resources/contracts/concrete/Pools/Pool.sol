@@ -113,7 +113,7 @@ contract record Pool is Ownable {
     modifier onlyPoolFactory() {
         require(
             msg.sender == address(poolFactory)
-            || msg.sender == owner(), // admin override would be useful here
+            || msg.sender == owner(), // admin override would be useful here - ariya
             "Caller is not PoolFactory");
         _;
     }
