@@ -746,17 +746,17 @@ runUnshield uopts = do
       TIO.putStrLn $ "  Recipient: " <> T.pack (uoRecipient uopts)
       exitSuccess
     else do
-      -- Step 3: Get chain ID and merkle root
-      TIO.putStrLn "\nFetching chain ID..."
+      -- Step 3: Get network ID and merkle root
+      TIO.putStrLn "\nFetching network ID..."
       let metadataUrl = BaseUrl Http "localhost" 8081 "/strato-api/eth/v1.2"
       metadataResult <- runServant metadataUrl getMetaDataClient
-      chainId <- case metadataResult of
+      netId <- case metadataResult of
         Left clientErr -> do
           TIO.hPutStrLn stderr $ "Failed to get metadata: " <> T.pack (show clientErr)
           exitFailure
         Right metadata -> do
           let cid = read (networkID metadata) :: Integer
-          TIO.putStrLn $ "Chain ID: " <> T.pack (show cid)
+          TIO.putStrLn $ "Network ID: " <> T.pack (show cid)
           return cid
       
       TIO.putStrLn "Fetching merkle root..."
@@ -846,7 +846,7 @@ runUnshield uopts = do
             , ccAnnotationData = BS.empty
             , ccMemo = BS.empty
             }
-      boundParamsHashResult <- getBoundParamsHash (fromIntegral treeNum) chainId [dummyCiphertext] True -- True = unshield
+      boundParamsHashResult <- getBoundParamsHash (fromIntegral treeNum) netId [dummyCiphertext] True -- True = unshield
       boundParamsHash <- case boundParamsHashResult of
         Left err -> do
           TIO.hPutStrLn stderr $ "Failed to get boundParamsHash: " <> err
@@ -923,7 +923,7 @@ runUnshield uopts = do
                           (T.pack $ uoTokenAddress uopts)
                           actualAmount
                           (T.pack $ uoRecipient uopts)
-                          chainId
+                          netId
                           (fromIntegral treeNum)
       
       TIO.putStrLn "\nSending unshield transaction..."
@@ -1052,17 +1052,17 @@ runTransfer topts = do
       TIO.putStrLn $ "  Recipient: " <> recipientAddr
       exitSuccess
     else do
-      -- Step 3: Get chain ID and merkle root
-      TIO.putStrLn "\nFetching chain ID..."
+      -- Step 3: Get network ID and merkle root
+      TIO.putStrLn "\nFetching network ID..."
       let metadataUrl = BaseUrl Http "localhost" 8081 "/strato-api/eth/v1.2"
       metadataResult <- runServant metadataUrl getMetaDataClient
-      chainId <- case metadataResult of
+      netId <- case metadataResult of
         Left clientErr -> do
           TIO.hPutStrLn stderr $ "Failed to get metadata: " <> T.pack (show clientErr)
           exitFailure
         Right metadata -> do
           let cid = read (networkID metadata) :: Integer
-          TIO.putStrLn $ "Chain ID: " <> T.pack (show cid)
+          TIO.putStrLn $ "Network ID: " <> T.pack (show cid)
           return cid
       
       TIO.putStrLn "Fetching merkle root..."
@@ -1182,7 +1182,7 @@ runTransfer topts = do
         Right ct -> return ct
       
       -- Get bound params hash using the ACTUAL ciphertexts
-      boundParamsHashResult <- getBoundParamsHash (fromIntegral treeNum) chainId 
+      boundParamsHashResult <- getBoundParamsHash (fromIntegral treeNum) netId 
                                  [changeCiphertext, transferCiphertext] False
       boundParamsHash <- case boundParamsHashResult of
         Left err -> do
@@ -1263,7 +1263,7 @@ runTransfer topts = do
                           [changeCommitment, transferCommitment]
                           [changeCiphertext, transferCiphertext]
                           (T.pack $ toTokenAddress topts)
-                          chainId
+                          netId
                           (fromIntegral treeNum)
       
       TIO.putStrLn "\nSending shielded transfer transaction..."

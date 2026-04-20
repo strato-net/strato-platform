@@ -2,7 +2,8 @@
 
 // context/UserContext.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/axios";
+import { useAccount, useWalletClient } from "wagmi";
+import { api, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 
@@ -37,7 +38,9 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
-  const [userAddress, setUserAddress] = useState<string | null>(null);
+  const account = useAccount();
+  const { data: walletClient } = useWalletClient();
+  const [stratoAddress, setStratoAddress] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [userName, setUserName] = useState<string | null>(null)
@@ -63,16 +66,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       // If authenticated and we don't have user data, try to get it
       if (authenticated) {
         const storedUser = localStorage.getItem("user");
-        if (!storedUser || !userAddress) {
+        if (!storedUser || !stratoAddress) {
           try {
             const response = await api.get('/user/me');
             const newUserAddress = response.data.userAddress;
             const serverIsAdmin = response.data.isAdmin;
             const userName = response.data.userName
             setUserName(userName)
-            if (newUserAddress !== userAddress) {
+            if (newUserAddress !== stratoAddress) {
               localStorage.setItem("user", JSON.stringify(response.data));
-              setUserAddress(newUserAddress);
+              setStratoAddress(newUserAddress);
             }
             if (serverIsAdmin !== isAdmin) {
               setIsAdmin(serverIsAdmin);
@@ -84,17 +87,17 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           // Use stored user data if available
           const userData = JSON.parse(storedUser);
-          if (userData.userAddress !== userAddress) {
-            setUserAddress(userData.userAddress);
+          if (userData.userAddress !== stratoAddress) {
+            setStratoAddress(userData.userAddress);
           }
           if (userData.isAdmin !== undefined && userData.isAdmin !== isAdmin) {
             setIsAdmin(userData.isAdmin);
           }
         }
       } else {
-        if (userAddress) {
+        if (stratoAddress) {
           localStorage.removeItem("user");
-          setUserAddress(null);
+          setStratoAddress(null);
           setIsAdmin(false);
         }
       }
@@ -201,6 +204,48 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     await getOpenIssues();
   };
 
+  const userAddress = account.isConnected && account.address ? account.address : stratoAddress;
+  const effectiveLoggedIn = isLoggedIn || (account.isConnected && !!account.address);
+
+  useEffect(() => {
+    const connected = account.isConnected && account.address;
+    setConnectedWalletAddress(connected ? account.address : null);
+    if (connected && walletClient) {
+      setWalletSigner(async (unsignedTx: any) => {
+        const d = unsignedTx.data;
+        return walletClient.signTypedData({
+          domain: {
+            name: "STRATO",
+            version: "1",
+          },
+          types: {
+            Transaction: [
+              { name: "to", type: "address" },
+              { name: "funcName", type: "string" },
+              { name: "args", type: "string[]" },
+              { name: "nonce", type: "uint256" },
+              { name: "gasLimit", type: "uint256" },
+              { name: "network", type: "string" },
+            ],
+          },
+          primaryType: "Transaction",
+          message: {
+            to: `0x${d.to}` as `0x${string}`,
+            funcName: d.functionName,
+            args: d.args,
+            nonce: BigInt(d.nonce),
+            gasLimit: BigInt(d.gasLimit),
+            network: d.network,
+          },
+        });
+      });
+    } else {
+      setWalletSigner(null);
+    }
+  }, [account.isConnected, account.address, walletClient]);
+
+  const setUserAddress = (addr: string | null) => setStratoAddress(addr);
+
   const refreshAuth = () => {
     checkAuthenticationStatus();
   };
@@ -221,7 +266,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     userAddress,
     setUserAddress,
     userName,
-    isLoggedIn,
+    isLoggedIn: effectiveLoggedIn,
     isAdmin,
     logout,
     refreshAuth,
@@ -243,7 +288,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getContractDetails,
     contractDetailsResults,
     contractDetailsResultsLoading,
-  }), [userAddress, isLoggedIn, isAdmin, loading, userName,
+  }), [userAddress, effectiveLoggedIn, isAdmin, loading, userName,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,

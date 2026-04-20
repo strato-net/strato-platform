@@ -21,6 +21,7 @@ import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.Strato.Model.Secp256k1
 import Control.Exception
 import Control.Monad
+import Control.Monad.Composable.Vault
 import Control.Monad.IO.Class
 import "cipher-aes" Crypto.Cipher.AES
 import "cryptonite" Crypto.Hash (hashInitWith, hashUpdate)
