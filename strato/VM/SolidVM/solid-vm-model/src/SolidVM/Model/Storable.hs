@@ -119,35 +119,62 @@ instance JSON.ToJSON BasicValue where
 instance JSON.FromJSON BasicValue where
   parseJSON v = do
     theString <- JSON.parseJSON v
-    case basicParse theString of
-      Just theBasicValue -> pure theBasicValue
-      Nothing ->
-        fail $ "in parseJSON for BasicValue, basicParse fails for: " ++ show (theString :: String)
+    -- 'basicParse' is total: unrecognised inputs fall back to 'BString'.
+    -- Returning 'fail' here would be silently swallowed by
+    -- 'Data.JsonStream.Parser.valueWith' and surface upstream as
+    -- "Nothing parsed." with no diagnostic.
+    maybe
+      (fail $ "in parseJSON for BasicValue, basicParse fails for: " ++ show (theString :: String))
+      pure
+      (basicParse theString)
 
--- | Parse a textual BasicValue. Returns 'Nothing' on malformed input instead
--- of crashing the caller. Previously used partial @read@ which threw
--- uncatchable ErrorCall on invalid addresses / integers.
+-- | Parse a textual BasicValue. Always succeeds: any input that does not
+-- match a more specific pattern (or matches one whose payload fails a
+-- 'readMaybe') is returned as a 'BString' so callers (in particular
+-- @FromJSON@ for 'BasicValue') never observe @Nothing@.
+--
+-- Returning @Nothing@ here would surface as an Aeson parse failure, and
+-- 'Data.JsonStream.Parser.valueWith' in the @json-stream@ package silently
+-- swallows those (@AE.Error _ -> loop np@). One unrecognised 'BasicValue'
+-- anywhere in a genesis file then causes @eitherDecode@ to return the
+-- unhelpful "Nothing parsed." error. The pre-audit code achieved the same
+-- "always succeed" property by wrapping partial @read@ calls in @Just@ so
+-- a failure was a bottom thunk rather than a parse-time rejection.
 basicParse :: String -> Maybe BasicValue
 basicParse input =
   case readMaybe input of
-    Just val -> return $ BString val
-    Nothing -> foldr tryMatch Nothing patterns
+    Just val -> Just $ BString val
+    Nothing -> Just $ foldr tryMatch fallback patterns
   where
-    tryMatch :: (String, [String] -> Maybe BasicValue) -> Maybe BasicValue -> Maybe BasicValue
+    fallback :: BasicValue
+    fallback = BString (encodeUtf8 (T.pack input))
+
+    tryMatch :: (String, [String] -> Maybe BasicValue) -> BasicValue -> BasicValue
     tryMatch (regex, constructor) acc =
-                case input =~ regex :: [[String]] of
-                          [_:matches] -> constructor matches
-                          _ -> acc
+      case input =~ regex :: [[String]] of
+        [_ : matches] -> fromMaybe acc (constructor matches)
+        _             -> acc
+
     patterns :: [(String, [String] -> Maybe BasicValue)]
     patterns =
-      [
-        ("false", \[] -> Just $ BBool False),
-        ("true", \[] -> Just $ BBool True),
-        ("address\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> BAddress <$> readMaybe accountString),
-        ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)", \[enumName, enumValName, enumValNum] -> BEnumVal enumName enumValName <$> readMaybe enumValNum),
-        ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)", \[contractName, accountString] -> BContract contractName <$> readMaybe accountString),
-        ("([0-9]+)", \[numString] -> BInteger <$> readMaybe numString),
-        ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> (BString . encodeUtf8 . T.pack) <$> readMaybe theString)
+      [ ("false", \[] -> Just $ BBool False)
+      , ("true",  \[] -> Just $ BBool True)
+      , ( "address\\(([a-zA-Z0-9\\:]+)\\)"
+        , \[accountString] -> BAddress <$> readMaybe accountString
+        )
+      , ( "([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)"
+        , \[enumName, enumValName, enumValNum] ->
+            BEnumVal enumName enumValName <$> readMaybe enumValNum
+        )
+      , ( "([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)"
+        , \[contractName, accountString] ->
+            BContract contractName <$> readMaybe accountString
+        )
+      , ("([0-9]+)", \[numString] -> BInteger <$> readMaybe numString)
+      , ( "(\"([^\"\\\\]|\\.)*\")"
+        , \[theString, _] ->
+            (BString . encodeUtf8 . T.pack) <$> readMaybe theString
+        )
       ]
 
 textToBasicValue :: Text -> BasicValue
