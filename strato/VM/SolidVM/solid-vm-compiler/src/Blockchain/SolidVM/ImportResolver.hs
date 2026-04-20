@@ -41,9 +41,11 @@ import           Control.Monad.Trans.Except
 import           Control.Lens                         hiding (assign, from, to, bimap, Context)
 import           Data.Default
 import           Data.Foldable                        (foldl', foldrM)
+import           Data.List                            (sortBy)
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
-import           Data.Maybe                           (fromJust, fromMaybe)
+import           Data.Maybe                           (fromJust, fromMaybe, mapMaybe)
+import           Data.Ord                             (comparing, Down(..))
 import qualified Data.Set                             as S
 import           Data.Text                            (Text)
 import qualified Data.Text                            as T
@@ -247,14 +249,25 @@ doResolve f g fileName imp (seen, resolved) = case imp of
   Qualified path alias x -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> updateResolved x fileName (tShowExpr p) alias r'
   Braced items path _ -> resolvePath fileName path >>= \p -> resolveFile f g p (seen, resolved) >>= \(_, r') -> (seen,) <$> foldrM (updateSingleItem fileName $ tShowExpr p) r' items
 
-resolvePath :: Monad m => Text -> EndoM (ExceptT (a, Text) m) (ExpressionF a)
-resolvePath fileName (StringLiteral a path') =
+resolvePath ::
+  A.Selectable FilePath (Either String String) m =>
+  Text -> EndoM (ExceptT (a, Text) m) (ExpressionF a)
+resolvePath fileName (StringLiteral a path') = do
   let path = T.pack path'
-      fileDir = case reverse $ T.splitOn "/" fileName of
-                  [] -> []
-                  (_:xs) -> xs
+      fileDirForward = case T.splitOn "/" fileName of
+                         [] -> []
+                         xs -> init xs
+      fileDir = reverse fileDirForward
       pathDir = T.splitOn "/" path
-   in maybe (pure $ StringLiteral a path') (pure . lit' a) $ resolvePath' fileDir pathDir
+  mRemapped <- case pathDir of
+    ("" : _) -> pure Nothing
+    ("." : _) -> pure Nothing
+    (".." : _) -> pure Nothing
+    _ -> lift $ tryRemap fileDirForward path
+  case mRemapped of
+    Just remapped -> pure . lit' a $ normalizePath remapped
+    Nothing ->
+      maybe (pure $ StringLiteral a path') (pure . lit' a) $ resolvePath' fileDir pathDir
 resolvePath _ expr = pure expr
 
 resolvePath' :: [Text] -> [Text] -> Maybe Text
@@ -266,6 +279,62 @@ resolvePath' fileDir pathDir = case pathDir of
   ("." : pathRest) -> resolvePath' fileDir pathRest
   [] -> Nothing
   pathRest -> Just . T.intercalate "/" $ reverse fileDir ++ pathRest
+
+-- | Walk up the directory tree from the importing file looking for a
+-- @remappings.txt@. If found and a remapping's key is a prefix of the import
+-- path, return the substituted path joined with the directory that held the
+-- @remappings.txt@ (so the result is interpretable by the file loader the
+-- same way the importing file's path was).
+tryRemap ::
+  A.Selectable FilePath (Either String String) m =>
+  [Text] -> Text -> m (Maybe Text)
+tryRemap dirSegments path = loop dirSegments
+  where
+    loop segs = do
+      let dir = T.intercalate "/" segs
+          remapFile = if T.null dir
+                        then "remappings.txt"
+                        else T.unpack $ dir <> "/remappings.txt"
+      mContents <- A.select (A.Proxy @(Either String String)) remapFile
+      let found = case mContents of
+            Just (Right contents) ->
+              case applyRemapping (parseRemappings (T.pack contents)) path of
+                Just substituted ->
+                  Just $ if T.null dir then substituted else dir <> "/" <> substituted
+                Nothing -> Nothing
+            _ -> Nothing
+      case found of
+        Just _ -> pure found
+        Nothing -> case segs of
+          [] -> pure Nothing
+          _ -> loop (init segs)
+
+parseRemappings :: Text -> [(Text, Text)]
+parseRemappings = mapMaybe parseLine . T.lines
+  where
+    parseLine line =
+      let t = T.strip line
+       in if T.null t || "#" `T.isPrefixOf` t
+            then Nothing
+            else case T.breakOn "=" t of
+                   (k, v) | T.null v || T.null k -> Nothing
+                          | otherwise -> Just (T.strip k, T.strip (T.drop 1 v))
+
+applyRemapping :: [(Text, Text)] -> Text -> Maybe Text
+applyRemapping remappings path =
+  let matches = filter ((`T.isPrefixOf` path) . fst) remappings
+      sorted = sortBy (comparing (Down . T.length . fst)) matches
+   in case sorted of
+        ((k, v) : _) -> Just $ v <> T.drop (T.length k) path
+        _ -> Nothing
+
+-- | Collapse accidental @//@ runs introduced when joining a remapping's
+-- value (which often ends with @/@) to the rest of the path. Preserves a
+-- leading @/@ for absolute paths.
+normalizePath :: Text -> Text
+normalizePath p = case T.splitOn "/" p of
+  [] -> p
+  (prefix : rest) -> T.intercalate "/" (prefix : filter (not . T.null) rest)
 
 updateResolved :: (Monad m, Show a) => a -> Text -> Text -> Text -> EndoM (ExceptT (a, Text) m) (ImportMapF a)
 updateResolved x fileName path qualifier resolved = case M.lookup path resolved of
