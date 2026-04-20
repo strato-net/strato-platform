@@ -9,7 +9,6 @@ import {
   calculatePersonalEmissionRate,
   parseActivityType,
   fetchRewardsContractData,
-  fetchActivityIds,
   fetchActivities,
   fetchActivityStates,
   fetchUserInfo,
@@ -290,12 +289,16 @@ export const fetchRewardsOverview = async (
   try {
     // All these functions now use the same cached contract state, so they're fast
     // fetchAllUsersLeaderboard also uses cached contract state + cached claimed rewards
-    const [contractData, activityIds, activityStatesMap, allUsersLeaderboard] = await Promise.all([
+    const [contractData, activitiesMap, activityStatesMap, allUsersLeaderboard] = await Promise.all([
       fetchRewardsContractData(accessToken, rewardsAddress, forceRefresh),
-      fetchActivityIds(accessToken, rewardsAddress, forceRefresh),
+      fetchActivities(accessToken, rewardsAddress, forceRefresh),
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
       fetchAllUsersLeaderboard(accessToken, rewardsAddress, forceRefresh)
     ]);
+
+    // Count only actively-emitting activities (matches UI visibility filter)
+    const activeActivityCount = Array.from(activitiesMap.values())
+      .filter((a) => BigInt(a.emissionRate || "0") > 0n).length;
 
     // Hardcoded season info for now
     const currentSeason = 2;
@@ -337,7 +340,7 @@ export const fetchRewardsOverview = async (
       rewardTokenSymbol,
       totalRewardsEmission: contractData.totalRewardsEmission,
       lastBlockHandled: contractData.highestBlockSeen,
-      activityCount: activityIds.length,
+      activityCount: activeActivityCount,
       totalStake: totalStake.toString(),
       totalDistributed: totalDistributed.toString(),
       currentSeason
