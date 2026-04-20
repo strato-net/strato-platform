@@ -19,6 +19,7 @@ import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad
+import Control.Monad.Composable.Vault
 import Control.Monad.State.Class
 import qualified Data.Map.Strict as M
 import Data.Maybe

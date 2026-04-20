@@ -16,7 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_sslDir)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Strato.Model.Validator
@@ -30,6 +30,7 @@ import Data.Maybe
 import qualified Data.Yaml as YAML
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
+import System.Process (readProcess)
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
@@ -214,6 +215,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     unless destOauthExists $ liftIO $ do
       if flags_localAuth
         then do
+          localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
           envClientId <- lookupEnv "OAUTH_CLIENT_ID"
           envClientSecret <- lookupEnv "OAUTH_CLIENT_SECRET"
           clientId <- case envClientId of
@@ -223,7 +225,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
             Just cs | not (null cs) -> return cs
             _ -> generatePassword 48
           let localOauthConfig = unlines
-                [ "discoveryUrl: \"http://localhost:8081/auth/.well-known/openid-configuration\""
+                [ "discoveryUrl: \"http://" ++ localHostname ++ ":" ++ show flags_httpPort ++ "/auth/.well-known/openid-configuration\""
                 , "clientId: \"" ++ clientId ++ "\""
                 , "clientSecret: \"" ++ clientSecret ++ "\""
                 ]

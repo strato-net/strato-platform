@@ -40,7 +40,6 @@ import GHC.Stack
 import SQLM
 import Servant.Client (ClientM)
 import Strato.Auth.Client (runWithAuth, runWithUserToken)
-import qualified Strato.Strato23.API.Types         as V
 import UnliftIO hiding (Handler (..))
 
 data Should a = Don't a | Do a
@@ -55,8 +54,7 @@ data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
     gasLimit :: Integer,
-    globalNonceCounter :: Cache Address Nonce,
-    nodePubKey :: V.PublicKey
+    globalNonceCounter :: Cache Address Nonce
   }
 
 --------------------------------------------------------------------------------

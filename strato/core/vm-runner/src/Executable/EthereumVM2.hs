@@ -93,9 +93,15 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
       Just block -> do
         let bHeader = blockBlockData block
             bHash = blockHeaderHash bHeader
-            -- bro if there are any maybes in this list thaz BAD
-            -- private txs don't affect stateroot we compute
-            otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> [t | t <- blockReceiptTransactions block]
+            allTxs = blockReceiptTransactions block
+            allWrapped = wrapIngestBlockTransaction bHash <$> allTxs
+            otxs = catMaybes allWrapped
+            droppedCount = length allTxs - length otxs
+        when (droppedCount > 0) $
+          $logWarnS "preprepare" . T.pack $
+            "Dropped " ++ show droppedCount ++ " of " ++ show (length allTxs)
+            ++ " tx(s) with unrecoverable signatures in preprepare block #"
+            ++ show (number bHeader) ++ " (" ++ format bHash ++ ")"
         mSumm <- A.lookup (A.Proxy @BlockSummary) (parentHash bHeader)
         case mSumm of
           Nothing -> pure Nothing

@@ -36,13 +36,13 @@ import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
-import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Threads
 import           Blockchain.TimerSource
 import           Control.Concurrent hiding (yield)
 import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
 import           Control.Monad (forever, forM_, when, void)
+import           Control.Monad.Composable.Vault
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Resource

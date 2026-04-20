@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RewardsOverview } from "@/components/rewards/RewardsOverview";
 import { ActivitiesTable } from "@/components/rewards/ActivitiesTable";
 import { UserRewardsSection } from "@/components/rewards/UserRewardsSection";
+import { UserRewardsSummary } from "@/components/rewards/UserRewardsSummary";
 import { LeaderboardTable } from "@/components/rewards/LeaderboardTable";
 import { useRewards } from "@/hooks/useRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
@@ -123,12 +124,24 @@ const Rewards = () => {
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to start earning CATA tokens and track your rewards" />
           )}
-          {/* Global Overview - visible to all */}
-          <div className="mb-6">
-            <RewardsOverview state={state} loading={stateLoading} onRefresh={handleRefresh} />
-          </div>
+          {/* Personal summary cards at top for logged-in users; guests see the global overview here */}
+          {isLoggedIn ? (
+            <div className="mb-6">
+              <UserRewardsSummary
+                userRewards={userRewards}
+                loading={userRewardsLoading}
+                onClaimSuccess={handleClaimSuccess}
+                rewardsState={state}
+                rewardsStateLoading={stateLoading}
+              />
+            </div>
+          ) : (
+            <div className="mb-6">
+              <RewardsOverview state={state} loading={stateLoading} onRefresh={handleRefresh} />
+            </div>
+          )}
 
-          {/* Tabs for Activities, My Rewards, and Leaderboard */}
+          {/* Tabs for Activities, Active Positions, and Leaderboard */}
           <Tabs
             value={activeTab}
             onValueChange={(value) => setActiveTab(value as "activities" | "my-rewards" | "leaderboard")}
@@ -136,7 +149,7 @@ const Rewards = () => {
           >
             <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="activities">Activities (Season {state?.currentSeason || 2})</TabsTrigger>
-               <TabsTrigger value="my-rewards">My Rewards</TabsTrigger>
+               <TabsTrigger value="my-rewards">My Active Positions</TabsTrigger>
               <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             </TabsList>
 
