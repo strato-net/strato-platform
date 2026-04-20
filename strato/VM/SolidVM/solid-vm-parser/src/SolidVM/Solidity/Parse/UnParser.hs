@@ -28,7 +28,6 @@ import SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
-import Text.Printf
 
 sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = List.sortBy (\x y -> f x `compare` f y)
@@ -253,7 +252,8 @@ unparseStatementWith f (ModifierExecutor a) = f a $ "_;"
 unparseStatementWith f (Continue a) = f a $ "continue;"
 unparseStatementWith f (Throw e a) = f a $ "throw " ++ unparseExpression e ++ ";"
 unparseStatementWith f (Block a) = f a $ "{ }"
-unparseStatementWith f (AssemblyStatement (MloadAdd32 dst src) a) = f a $ printf "assembly { %s := mload(add(%s, 32)) }" dst src
+unparseStatementWith f (AssemblyStatement (InlineAssembly body) a) =
+  f a $ "assembly {\n" ++ tab (unlines $ map unparseYulStatement body) ++ "}"
 unparseStatementWith f (EmitStatement eventName extups a) =
   let expVals = map (unparseExpression . snd) extups
    in f a $ "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
@@ -426,3 +426,70 @@ unparseFileImport (Braced i e _) = "{ " ++ (List.intercalate ", " $ unparseItemI
 unparseItemImport :: ItemImportF a -> String
 unparseItemImport (Named n _) = Text.unpack n
 unparseItemImport (Aliased n a _) = Text.unpack $ n <> " as " <> a
+
+-- ---------------------------------------------------------------------------
+-- Yul (inline assembly) unparsing
+
+unparseYulStatement :: YulStatementF a -> String
+unparseYulStatement (YulBlock _ body) =
+  "{\n" ++ tab (unlines $ map unparseYulStatement body) ++ "}"
+unparseYulStatement (YulLet _ names Nothing) =
+  "let " ++ List.intercalate ", " (map unparseYulTypedName names)
+unparseYulStatement (YulLet _ names (Just e)) =
+  "let " ++ List.intercalate ", " (map unparseYulTypedName names)
+    ++ " := "
+    ++ unparseYulExpression e
+unparseYulStatement (YulAssign _ names e) =
+  List.intercalate ", " names ++ " := " ++ unparseYulExpression e
+unparseYulStatement (YulIfStmt _ cond body) =
+  "if " ++ unparseYulExpression cond ++ " {\n"
+    ++ tab (unlines $ map unparseYulStatement body)
+    ++ "}"
+unparseYulStatement (YulSwitch _ e cases md) =
+  "switch " ++ unparseYulExpression e ++ "\n"
+    ++ List.intercalate "\n" (map unparseYulCase cases)
+    ++ maybe "" (\b -> "\ndefault {\n" ++ tab (unlines $ map unparseYulStatement b) ++ "}") md
+unparseYulStatement (YulFor _ iBlk cond pBlk body) =
+  "for {\n" ++ tab (unlines $ map unparseYulStatement iBlk) ++ "} "
+    ++ unparseYulExpression cond
+    ++ " {\n"
+    ++ tab (unlines $ map unparseYulStatement pBlk)
+    ++ "} {\n"
+    ++ tab (unlines $ map unparseYulStatement body)
+    ++ "}"
+unparseYulStatement (YulBreak _) = "break"
+unparseYulStatement (YulContinue _) = "continue"
+unparseYulStatement (YulLeave _) = "leave"
+unparseYulStatement (YulExpressionStatement _ e) = unparseYulExpression e
+unparseYulStatement (YulFunctionDef _ name params rets body) =
+  "function " ++ name
+    ++ "(" ++ List.intercalate ", " (map unparseYulTypedName params) ++ ")"
+    ++ ( case rets of
+           [] -> ""
+           xs -> " -> " ++ List.intercalate ", " (map unparseYulTypedName xs)
+       )
+    ++ " {\n"
+    ++ tab (unlines $ map unparseYulStatement body)
+    ++ "}"
+
+unparseYulCase :: (YulLiteral, [YulStatementF a]) -> String
+unparseYulCase (lit, body) =
+  "case " ++ unparseYulLiteral lit ++ " {\n"
+    ++ tab (unlines $ map unparseYulStatement body)
+    ++ "}"
+
+unparseYulExpression :: YulExpressionF a -> String
+unparseYulExpression (YulIdentifier _ n) = n
+unparseYulExpression (YulFunctionCall _ n args) =
+  n ++ "(" ++ List.intercalate ", " (map unparseYulExpression args) ++ ")"
+unparseYulExpression (YulLit _ lit) = unparseYulLiteral lit
+
+unparseYulLiteral :: YulLiteral -> String
+unparseYulLiteral (YulNumber i) = show i
+unparseYulLiteral (YulString s) = show s
+unparseYulLiteral (YulHexString s) = "hex\"" ++ s ++ "\""
+unparseYulLiteral (YulBool b) = if b then "true" else "false"
+
+unparseYulTypedName :: YulTypedNameF a -> String
+unparseYulTypedName (YulTypedName n Nothing _) = n
+unparseYulTypedName (YulTypedName n (Just t) _) = n ++ ":" ++ t

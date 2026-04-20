@@ -25,6 +25,7 @@ library
       SolidVM.Solidity.Parse.Imports
       SolidVM.Solidity.Parse.Parser
       SolidVM.Solidity.Parse.Types
+      SolidVM.Solidity.Parse.Yul
       Paths_solid_vm_parser
   hs-source-dirs:
       src/
