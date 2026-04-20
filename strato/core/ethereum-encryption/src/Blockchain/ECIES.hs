@@ -13,6 +13,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Secp256k1
 import Codec.Utils
 import Control.Monad
+import Control.Monad.Composable.Vault
 import Control.Monad.IO.Class
 import "cipher-aes" Crypto.Cipher.AES
 import Crypto.Hash.SHA256

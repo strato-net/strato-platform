@@ -11,8 +11,11 @@ else
   exit 1
 fi
 
-STRATO_HOSTNAME=$(grep 'apiHost:' /config/ethconf.yaml | awk '{print $2}' | tr -d '"')
-STRATO_API_URL="http://${STRATO_HOSTNAME}:3000/eth/v1.2"
+NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
+STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
+STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
+STRATO_API_URL="http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2"
+export NODE_URL
 
 echo "Waiting for STRATO node to finish syncing (checking ${STRATO_API_URL}/metadata for isSynced=true)..."
 echo "  This may take a long time if the node is catching up with the network."

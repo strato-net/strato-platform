@@ -25,7 +25,7 @@ const router = Router();
  *                 userName:
  *                   type: string
  */
-router.get("/me", authHandler.authorizeRequest(), UserController.me);
+router.get("/me", authHandler.authorizeRequest(false), UserController.me);
 
 /**
  * @openapi
