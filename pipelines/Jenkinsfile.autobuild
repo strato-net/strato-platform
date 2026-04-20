@@ -46,13 +46,11 @@ pipeline {
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
-        sh 'make clean-docker-sentinels'
         sh "git checkout BUILD_METADATA"
         sh 'make'
 
         // Build central services
         // Need to clean sentinels here again in order for image tags to match what will be added in the docker-compose - TODO: find out why
-        sh 'make clean-docker-sentinels'
         // TODO: replace vault-wrapper and highway make-targets with ones that don't rely on build_common_docker (should depend on build_common instead)
         sh 'REPO=dev make vault-wrapper vault-nginx bridge bridge-nginx oracle highway highway-nginx docker-compose'
       }
