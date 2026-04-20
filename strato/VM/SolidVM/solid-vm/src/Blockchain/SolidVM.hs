@@ -48,6 +48,7 @@ import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
+import qualified Blockchain.SolidVM.Yul as Yul
 import Blockchain.SolidVM.TraceTools
 import SolidVM.Solidity.StaticAnalysis.Typechecker (showType)
 import Blockchain.Strato.Model.Address
@@ -945,15 +946,7 @@ runStatement (CC.Throw expr pos) = do
   customError "Custom user error thrown" name listOfVals
 runStatement (CC.AssemblyStatement (CC.InlineAssembly body) pos) = do
   solidVMBreakpoint pos
-  -- Temporary shim so the legacy @assembly { x := mload(add(y, 32)) }@
-  -- test keeps behaving while the full Yul interpreter is being wired
-  -- up (see EvmMemory module + runYul* dispatch, step 4).
-  case body of
-    [CC.YulAssign _ [dst] (CC.YulFunctionCall _ "mload" [CC.YulFunctionCall _ "add" [CC.YulIdentifier _ src, CC.YulLit _ (CC.YulNumber 32)]])] -> do
-      srcVar <- expToVar (CC.Variable pos src)
-      dstVar <- expToVar (CC.Variable pos dst)
-      setVar dstVar =<< getVar srcVar
-    _ -> pure ()
+  Yul.runInlineAssembly body
   return Nothing
 runStatement st@(CC.EmitStatement eventName exptups pos) = do
   -- emit MemberAdded(<address>, <enode>);

@@ -21,6 +21,7 @@ library
       Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
+      Blockchain.SolidVM.Yul
       Paths_solid_vm
   hs-source-dirs:
       src/
