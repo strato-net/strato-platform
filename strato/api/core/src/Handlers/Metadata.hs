@@ -50,7 +50,7 @@ data MetadataResponse = MetadataResponse
     isSynced :: Bool,
     isVaultPasswordSet :: Bool,
     networkID :: String, -- cuz JSON can't rep integers > 2^53
-    evmChainId :: String,
+    chainId :: String,
     urls :: UrlMap
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)

@@ -5,6 +5,8 @@ import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Token } from "@/interface";
+import { useWriteContract, useChains, useSwitchChain } from "wagmi";
+import { getStratoChainId } from "@/lib/stratoChain";
 
 import { useUser } from "@/context/UserContext";
 import { useTokenContext, BulkTransferItem, BulkTransferResponse } from "@/context/TokenContext";
@@ -24,10 +26,32 @@ import { ChevronDown, Upload } from "lucide-react";
 import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
+const erc20TransferAbi = [
+  {
+    name: "transfer",
+    type: "function",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "value", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
+const ensureHexPrefix = (addr: string): `0x${string}` =>
+  (addr.startsWith("0x") ? addr : `0x${addr}`) as `0x${string}`;
+
 const Transfer = () => {
-  const { userAddress, isLoggedIn } = useUser();
+  const { userAddress, userName, isLoggedIn } = useUser();
   const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
+  const { writeContractAsync } = useWriteContract();
+  const chains = useChains();
+  const stratoChainId = getStratoChainId();
+  const stratoChain = stratoChainId ? chains.find((c) => c.id === stratoChainId) : undefined;
+  const { switchChainAsync } = useSwitchChain();
   const { toast } = useToast();
+  const isVaultUser = !!userName;
   const guestMode = !isLoggedIn;
   useEffect(() => {
     document.title = "Transfer Assets | STRATO";
@@ -92,11 +116,33 @@ const Transfer = () => {
     try {
       setSwapLoading(true);
       setShowConfirmModal(false);
-      await transferToken({
-        address: fromAsset.address,
-        to: recipient,
-        value: safeParseUnits(fromAmount, 18).toString(),
-      });
+      const weiValue = safeParseUnits(fromAmount, 18).toString();
+
+      if (isVaultUser) {
+        await transferToken({
+          address: fromAsset.address,
+          to: recipient,
+          value: weiValue,
+        });
+      } else {
+        if (stratoChain) await switchChainAsync({ chainId: stratoChain.id });
+        const nonceRes = await fetch("/rpc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionCount", params: [userAddress, "latest"] }),
+        }).then((r) => r.json());
+        const nonce = Number(nonceRes.result);
+        await writeContractAsync({
+          chainId: stratoChain?.id,
+          address: ensureHexPrefix(fromAsset.address),
+          abi: erc20TransferAbi,
+          functionName: "transfer",
+          args: [ensureHexPrefix(recipient), BigInt(weiValue)],
+          nonce: Number(nonce),
+          gas: 1000000n,
+        });
+      }
+
       toast({
         title: "Success",
         description: `Transferred ${fromAmount} ${
@@ -109,7 +155,7 @@ const Transfer = () => {
       const updatedTokens = await fetchUserTokens();
       const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
       if (updatedToken) {
-        setFromAsset(updatedToken); // triggers re-render with updated balance
+        setFromAsset(updatedToken);
       } else {
         setFromAsset(null)
       }

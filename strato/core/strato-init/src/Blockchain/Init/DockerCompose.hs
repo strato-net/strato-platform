@@ -8,7 +8,7 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_localAuth, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
@@ -205,7 +205,8 @@ generateDockerCompose = do
                 ["apex", "docs", "postgrest", "prometheus", "smd", "mercata-backend", "mercata-ui"]
         
         , environment = Just $ Map.fromList $
-            [ ("ssl", if ssl then "true" else "false")
+            [ ("JSONRPC_ENABLED", if flags_jsonrpc then "true" else "false")
+            , ("ssl", if ssl then "true" else "false")
             ]
             ++ if flags_localAuth
                then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")

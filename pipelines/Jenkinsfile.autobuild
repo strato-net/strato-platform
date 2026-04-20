@@ -97,7 +97,8 @@ pipeline {
             --nodeHost=\$(</host) \\
             --vaultUrl=https://\$(</host):8093/strato/v2.3 \\
             --fileServerUrl=https://\$(</host):44300/highway \\
-            --sslDir='/home/ubuntu/letsencrypt-ssl'
+            --sslDir='/home/ubuntu/letsencrypt-ssl' \\
+            --jsonrpc
         """
         sh 'chmod +x run.sh'
         sh './run.sh'

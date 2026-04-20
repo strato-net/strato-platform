@@ -205,6 +205,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const userAddress = account.isConnected && account.address ? account.address : stratoAddress;
+  const effectiveLoggedIn = isLoggedIn || (account.isConnected && !!account.address);
 
   useEffect(() => {
     const connected = account.isConnected && account.address;
@@ -265,7 +266,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     userAddress,
     setUserAddress,
     userName,
-    isLoggedIn,
+    isLoggedIn: effectiveLoggedIn,
     isAdmin,
     logout,
     refreshAuth,
@@ -287,7 +288,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getContractDetails,
     contractDetailsResults,
     contractDetailsResultsLoading,
-  }), [userAddress, isLoggedIn, isAdmin, loading, userName,
+  }), [userAddress, effectiveLoggedIn, isAdmin, loading, userName,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,
