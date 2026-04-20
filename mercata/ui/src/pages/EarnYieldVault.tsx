@@ -134,8 +134,16 @@ const EarnYieldVault = () => {
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
   const { getVaultInfo, getUserVaultInfo, loading: loadingVaults, refreshVaults } = useYieldVaultContext();
-  const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
-  const { userRewards, loading: rewardsUserLoading } = useRewardsUserInfo();
+  const {
+    activities: rewardsActivities,
+    loading: rewardsActivitiesLoading,
+    refetch: refetchRewardsActivities,
+  } = useRewardsActivities();
+  const {
+    userRewards,
+    loading: rewardsUserLoading,
+    refetch: refetchUserRewards,
+  } = useRewardsUserInfo();
 
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
@@ -302,6 +310,23 @@ const EarnYieldVault = () => {
 
   const isActionAmountValid = amountWei > 0n && amountWei <= actionMaxWei;
 
+  // Refresh vault + rewards state after any user action. The rewards poller
+  // is an off-chain indexer, so we schedule a delayed second pass to give it
+  // a window to ingest the Deposit/Withdraw event before we read stake.
+  const REWARDS_POLLER_DELAY_MS = 10000;
+  const refreshAfterAction = async () => {
+    await Promise.allSettled([
+      refreshVaults(),
+      refetchRewardsActivities(),
+      refetchUserRewards(),
+    ]);
+    window.setTimeout(() => {
+      Promise.allSettled([refetchRewardsActivities(), refetchUserRewards()]).catch(
+        () => undefined
+      );
+    }, REWARDS_POLLER_DELAY_MS);
+  };
+
   const handleActionRequest = (mode: Exclude<ActionMode, null>) => {
     if (!isLoggedIn) {
       toast({
@@ -341,7 +366,7 @@ const EarnYieldVault = () => {
         });
       }
       setActionMode(null);
-      await refreshVaults();
+      await refreshAfterAction();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Transaction failed";
       toast({ title: `${actionMode === "deposit" ? "Deposit" : "Redeem"} failed`, description: msg, variant: "destructive" });
@@ -360,7 +385,7 @@ const EarnYieldVault = () => {
         description: `Claiming ${formatTokenAmount(claimableAssets, decimals)} ${assetSymbol}.`,
         variant: "success",
       });
-      await refreshVaults();
+      await refreshAfterAction();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Claim failed";
       toast({ title: "Claim failed", description: msg, variant: "destructive" });
@@ -383,7 +408,7 @@ const EarnYieldVault = () => {
         variant: "success",
       });
       setActionMode(null);
-      await refreshVaults();
+      await refreshAfterAction();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Redeem failed";
       toast({ title: "Redeem failed", description: msg, variant: "destructive" });
@@ -447,14 +472,14 @@ const EarnYieldVault = () => {
         ? "..."
         : isLoggedIn
           ? (() => {
-              const sharesBn = BigInt(userShares || "0");
-              const priceBn = BigInt(userInfo?.assetPriceWad || "0");
-              const usdPart = formatUsdAmount(positionUsdWad);
-              if (sharesBn <= 0n) return "--";
-              if (priceBn <= 0n && BigInt(positionUsdWad || "0") <= 0n) return "--";
-              const underlyingHint = `${formatTokenAmount(redeemableAssets, decimals)} ${assetSymbol}`;
-              return `${usdPart} (${underlyingHint})`;
-            })()
+            const sharesBn = BigInt(userShares || "0");
+            const priceBn = BigInt(userInfo?.assetPriceWad || "0");
+            const usdPart = formatUsdAmount(positionUsdWad);
+            if (sharesBn <= 0n) return "--";
+            if (priceBn <= 0n && BigInt(positionUsdWad || "0") <= 0n) return "--";
+            const underlyingHint = `${formatTokenAmount(redeemableAssets, decimals)} ${assetSymbol}`;
+            return `${usdPart} (${underlyingHint})`;
+          })()
           : "--",
       hint: "NAV: share claim × exchange ratio × oracle price",
       icon: <CircleDollarSign className="h-4 w-4 text-violet-600 dark:text-violet-400" />,
