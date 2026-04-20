@@ -176,6 +176,62 @@ const addYieldVaultTokenPrices = async (
   }
 };
 
+/**
+ * USD-denominated per-share price for each carry vault (1e18 WAD).
+ * Composes the vault's underlying-per-share NAV (idle + deployed) / totalShares with the
+ * asset's USD oracle price. Keyed by vault address (lowercased, no 0x prefix).
+ *
+ * Rationale: `priceMap` already stores the underlying-denominated price (ETH per share for
+ * the ETH carry vault) for portfolio math; consumers that need the USD value of a stake
+ * denominated in carry-vault shares must apply the asset's USD oracle on top.
+ */
+export const getCarryVaultUsdPriceMap = async (
+  accessToken: string,
+  priceMap: OraclePriceMap
+): Promise<Map<string, string>> => {
+  const out = new Map<string, string>();
+  const vaultAddrs = [config.ethCarryVault, config.wbtcCarryVault].filter(
+    (a): a is string => typeof a === "string" && a.replace(/^0x/i, "").length > 0
+  );
+  if (!vaultAddrs.length) return out;
+
+  for (const vaultAddress of vaultAddrs) {
+    const { data: rows } = await cirrus.get(accessToken, `/${YieldVault}`, {
+      params: {
+        address: `eq.${vaultAddress}`,
+        select: "address,_asset,deployedAssets::text,_totalSupply::text",
+      },
+    });
+    const v = rows?.[0];
+    if (!v?._asset || !v.address) continue;
+
+    const { data: balRows } = await cirrus.get(accessToken, `/${Token}-_balances`, {
+      params: {
+        address: `eq.${v._asset}`,
+        key: `eq.${vaultAddress}`,
+        select: "value::text",
+      },
+    });
+
+    const idle = BigInt(balRows?.[0]?.value || "0");
+    const deployed = BigInt(v.deployedAssets || "0");
+    const totalAssets = idle + deployed;
+    const totalShares = BigInt(v._totalSupply || "0");
+    if (totalShares === 0n) continue;
+
+    const pricePerShareUnderlying = (totalAssets * DECIMALS) / totalShares;
+
+    const assetKey = String(v._asset).toLowerCase();
+    const assetUsdPriceStr = priceMap.get(assetKey) || priceMap.get(v._asset) || "0";
+    const assetUsdPriceWad = BigInt(assetUsdPriceStr);
+    if (assetUsdPriceWad === 0n) continue;
+
+    const pricePerShareUsdWad = (pricePerShareUnderlying * assetUsdPriceWad) / DECIMALS;
+    out.set(String(v.address).toLowerCase(), pricePerShareUsdWad.toString());
+  }
+  return out;
+};
+
 export const getCompletePriceMap = async (
   accessToken: string
 ): Promise<Map<string, string>> => {

@@ -40,7 +40,8 @@ oneTX size =
       chainId = Nothing,
       r = 1 `shiftL` 200,
       s = 1 `shiftL` 133,
-      v = 27
+      v = 27,
+      txVersion = 0
     }
 
 --benchPrivateKey :: PrivateKey

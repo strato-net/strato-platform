@@ -55,6 +55,7 @@ import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
 import           Control.Monad.Composable.Kafka
+import           Control.Monad.Composable.Vault
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                         as B
@@ -94,12 +95,10 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Secp256k1
 
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
 import           Control.Monad                           (void)
-import           Control.Monad.Composable.Vault          (VaultM)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis

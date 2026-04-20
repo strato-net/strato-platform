@@ -50,7 +50,8 @@ data Transaction
         chainId :: Maybe Integer,
         r :: Integer,
         s :: Integer,
-        v :: Word8
+        v :: Word8,
+        txVersion :: Word8
       }
   | ContractCreationTX
       { nonce :: Integer,
@@ -62,7 +63,8 @@ data Transaction
         chainId :: Maybe Integer,
         r :: Integer,
         s :: Integer,
-        v :: Word8
+        v :: Word8,
+        txVersion :: Word8
       }
   | EthereumTX
       { nonce :: Integer,
@@ -186,20 +188,22 @@ toEthV recId Nothing = 27 + toInteger recId
 toEthV recId (Just cid) = cid * 2 + 35 + toInteger recId
 
 instance RLPSerializable Transaction where
-  -- 10 fields: STRATO format (MessageTX or ContractCreationTX)
+  -- 10 fields: STRATO legacy format (MessageTX or ContractCreationTX)
   rlpDecode (RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, vVal, rVal, sVal]) =
     case partial of
           p@MessageTX {} ->
             p
               { v = fromInteger $ rlpDecode vVal,
                 r = rlpDecode rVal,
-                s = rlpDecode sVal
+                s = rlpDecode sVal,
+                txVersion = 0
               }
           p@ContractCreationTX {} ->
             p
               { v = fromInteger $ rlpDecode vVal,
                 r = rlpDecode rVal,
-                s = rlpDecode sVal
+                s = rlpDecode sVal,
+                txVersion = 0
               }
           _ -> error "rlpDecode Transaction: unexpected partial decode result"
     where
@@ -221,6 +225,29 @@ instance RLPSerializable Transaction where
         s = rlpDecode sVal,
         v = ethVToRecoveryId rawV
       }
+  -- EIP-2718 style typed transaction envelope: type_byte || rlp_payload
+  rlpDecode (RLPString bytes)
+    | not (B.null bytes) && B.head bytes > 0 && B.head bytes < 0x80 =
+        let typeByte = B.head bytes
+            inner = rlpDeserialize (B.tail bytes)
+        in case inner of
+            RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, vVal, rVal, sVal] ->
+              let partial = partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7]
+              in case partial of
+                  p@MessageTX {} ->
+                    p { v = fromInteger $ rlpDecode vVal,
+                        r = rlpDecode rVal,
+                        s = rlpDecode sVal,
+                        txVersion = typeByte
+                      }
+                  p@ContractCreationTX {} ->
+                    p { v = fromInteger $ rlpDecode vVal,
+                        r = rlpDecode rVal,
+                        s = rlpDecode sVal,
+                        txVersion = typeByte
+                      }
+                  _ -> error "rlpDecode Transaction: unexpected partial decode for typed TX"
+            _ -> error "rlpDecode Transaction: unexpected RLP structure in typed TX envelope"
   rlpDecode x = error ("rlp object has wrong format in call to rlpDecode: " ++ show x)
 
   rlpEncode t@EthereumTX{..} =
@@ -232,16 +259,23 @@ instance RLPSerializable Transaction where
           rlpEncode s
         ]
       x -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show x
-  rlpEncode t =
-    case partialRLPEncode t of
-      RLPArray items ->
-        RLPArray $ items ++
-        [
-          rlpEncode $ toInteger (v t),
-          rlpEncode (r t),
-          rlpEncode (s t)
-        ]
-      x -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show x
+  -- Version > 0: EIP-2718 style typed envelope (type_byte || rlp_payload)
+  rlpEncode t
+    | txVersion t > 0 =
+        let innerItems = case partialRLPEncode t of
+              RLPArray items -> items
+              x -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show x
+            innerRLP = RLPArray $ innerItems ++ [rlpEncode $ toInteger (v t), rlpEncode (r t), rlpEncode (s t)]
+        in RLPString (B.singleton (txVersion t) <> rlpSerialize innerRLP)
+    | otherwise =
+        case partialRLPEncode t of
+          RLPArray items ->
+            RLPArray $ items ++
+            [ rlpEncode $ toInteger (v t),
+              rlpEncode (r t),
+              rlpEncode (s t)
+            ]
+          x -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show x
 
 instance ShortDescription Transaction where
   shortDescription MessageTX {..} = shorten 90 $
@@ -269,7 +303,8 @@ partialRLPDecode (RLPArray [RLPScalar 1, n, gl, cName, ags, net, cd]) =
       chainId = Nothing,
       r = error "r not initialized in partialRLPDecode",
       s = error "s not initialized in partialRLPDecode",
-      v = error "v not initialized in partialRLPDecode"
+      v = error "v not initialized in partialRLPDecode",
+      txVersion = 0
     }
 partialRLPDecode (RLPArray [RLPScalar 2, n, gl, toAddr, fn, ags, net]) =
   MessageTX
@@ -282,7 +317,8 @@ partialRLPDecode (RLPArray [RLPScalar 2, n, gl, toAddr, fn, ags, net]) =
       chainId = Nothing,
       r = error "r not initialized in partialRLPDecode",
       s = error "s not initialized in partialRLPDecode",
-      v = error "v not initialized in partialRLPDecode"
+      v = error "v not initialized in partialRLPDecode",
+      txVersion = 0
     }
 partialRLPDecode x = error ("rlp object has wrong format in call to partialRLPDecode: " ++ show x)
 

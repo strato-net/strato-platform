@@ -10,7 +10,6 @@ module Blockchain.Strato.Model.Secp256k1
     PublicKey (..),
     Signature (..),
     SharedKey (..),
-    HasVault (..),
     newPrivateKey,
     exportPrivateKey,
     importPrivateKey,
@@ -31,8 +30,6 @@ where
 import Blockchain.Data.RLP
 import Control.DeepSeq
 import Control.Monad
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State.Strict (StateT)
 import Crypto.Random.Entropy
 import qualified Crypto.Secp256k1 as S
 import Data.ASN1.Types
@@ -43,7 +40,6 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce
-import Data.Conduit (ConduitT)
 import Data.Data
 import Data.Maybe
 import Data.OpenApi (ToSchema(..), binarySchema)
@@ -74,30 +70,6 @@ newtype SharedKey = SharedKey B.ByteString deriving (Show, Eq)
 newtype Signature = Signature S.CompactRecSig
   deriving (Show, Eq, Generic)
   deriving newtype (NFData)
-
--------------------------------------------------------------------
-------------------------- TYPECLASSES -----------------------------
--------------------------------------------------------------------
-
--- This type class allows for the abstraction of common secp256k1 operations
---  in some monad that "has a vault" which stores the private key
---  In prod, this is the vault-wrapper, and we use its servant client
---  In tests, the private key is either in the monad, or a global key
-class Monad m => HasVault m where
-  sign :: B.ByteString -> m Signature
-  getPub :: m PublicKey
-  getShared :: PublicKey -> m SharedKey
-
--- some instances we use elsewhere
-instance HasVault m => HasVault (ConduitT i o m) where
-  sign = lift . sign
-  getPub = lift getPub
-  getShared = lift . getShared
-
-instance HasVault m => HasVault (StateT s m) where
-  sign = lift . sign
-  getPub = lift getPub
-  getShared = lift . getShared
 
 -------------------------------------------------------------------
 ----------------------------- KEYS --------------------------------
@@ -283,11 +255,11 @@ instance ToSchema Signature where
 -- we can keep the sigVs normal here.
 
 recoverPub :: Signature -> B.ByteString -> Maybe PublicKey
-recoverPub (Signature (S.CompactRecSig r s v)) msgHash =
+recoverPub (Signature (S.CompactRecSig r s v)) msgHash = do
   let sig' = S.CompactRecSig s r v -- the swapped sig
-      sig = fromMaybe (error "could not import recsig") (S.importCompactRecSig sig')
-      mesg = fromMaybe (error "could not import msgHash") (S.msg msgHash)
-   in PublicKey <$> (S.recover sig mesg)
+  sig  <- S.importCompactRecSig sig'
+  mesg <- S.msg msgHash
+  PublicKey <$> S.recover sig mesg
 
 signMsg :: PrivateKey -> B.ByteString -> Signature
 signMsg pk msgHash =
