@@ -339,7 +339,7 @@ normalizePath p = case T.splitOn "/" p of
 updateResolved :: (Monad m, Show a) => a -> Text -> Text -> Text -> EndoM (ExceptT (a, Text) m) (ImportMapF a)
 updateResolved x fileName path qualifier resolved = case M.lookup path resolved of
   Just (Right (FileUnits _ us)) -> do
-    let natives = fromMaybe M.empty $ M.lookup Nothing us
+    let natives = exportedUnits us
         fUnits = M.lookup fileName resolved
     fUnits' <- case fUnits of
       Just (Left (UFU _ ps us')) -> pure . Right . FileUnits ps $ M.singleton Nothing us' <> M.singleton (Just qualifier) natives
@@ -360,13 +360,24 @@ updateSingleItem f p i m = do
         Right (FileUnits _ u) -> u
       natives = case pathUnits of
         Left (UFU _ _ u) -> u
-        Right (FileUnits _ u) -> fromMaybe M.empty $ M.lookup Nothing u
+        Right (FileUnits _ u) -> exportedUnits u
   (n, i') <- case i of
     Named n x ->
       let nStr = textToLabel n
        in fmap (nStr,) . maybe (throwE (x, "Could not find item " <> n <> " in file " <> p)) pure $ M.lookup nStr natives
     Aliased n a x -> fmap (textToLabel a,) . maybe (throwE (x, "Could not find item " <> n <> " in file " <> p)) pure $ M.lookup (textToLabel n) natives
   flip (M.insert f) m . resolveUnits <$> unionUnits (extractItemImport i) (Just "") (M.singleton n i') fileUnits
+
+-- | Items a file makes visible to other files that import from it.
+-- Includes locally-defined items (under 'Nothing') and items the file
+-- flat-imported from its own dependencies (under @Just ""@ — a Braced
+-- or Simple unqualified import). Qualified imports (@Just alias@) are
+-- intentionally excluded, since in Solidity they are only accessible
+-- inside the importing file as @alias.X@.
+exportedUnits :: Map (Maybe Text) (FileUnitMapF a) -> FileUnitMapF a
+exportedUnits u =
+  fromMaybe M.empty (M.lookup Nothing u)
+    <> fromMaybe M.empty (M.lookup (Just "") u)
 
 unionUnits :: (Monad m, Show a, Show b, Ord a, Ord k) => x -> k -> Map a b -> EndoM (ExceptT (x, Text) m) (Map k (Map a b))
 unionUnits x k v' m = do
