@@ -935,6 +935,7 @@ blockappsAddresses = S.fromList
   , Address 0xac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7
   , Address 0x304f41812ce9a1db4fa9c58aff7904ea3e77d51a
   , Address 0x292dd9591f506845ef05a9f3b8116e641cbcb4bb
+  , Address 0xf1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14
   ]
 
 -- | Resolve the deployer's username for Cirrus table namespacing.

@@ -31,19 +31,17 @@ import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.SyncDB
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.SQL
-import Control.Monad.Composable.Vault
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
-import Core.API hiding (nodePubKey)
+import Core.API
 import Data.Aeson
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
@@ -73,8 +71,6 @@ import Servant
 import Servant.Multipart
 import Servant.OpenApi
 import Servant.Swagger.UI
-import qualified Strato.Strato23.API.Types as V
-import Strato.Strato23.Client
 import System.Clock
 import Text.Tools
 import UnliftIO hiding (Handler)
@@ -116,12 +112,6 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
 instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
   select p = lift . select p
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible V.PublicKey (ReaderT BlocEnv m) where
-  access _ = asks nodePubKey
-
-instance {-# OVERLAPPING #-} (Monad m, Accessible V.PublicKey m) => Accessible V.PublicKey (ReaderT a m) where
-  access = lift . access
-
 instance {-# OVERLAPPING #-} Accessible (Maybe SyncStatus) IO where
   access _ = fmap SyncStatus <$> runStratoRedisIO getSyncStatus
 
@@ -131,37 +121,17 @@ instance {-# OVERLAPPING #-} Accessible (Maybe BestBlock) IO where
 instance {-# OVERLAPPING #-} Accessible (Maybe WorldBestBlock) IO where
   access _ = fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo
 
-type FullAPI = Header "X-USER-ACCESS-TOKEN" Text :> (CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI)
+type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
-newtype AccessToken = AccessToken { getAccessToken :: Maybe Text }
-
-instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m, Accessible VaultData m) => HasVault (ReaderT AccessToken m) where
-  sign msgHash = do
-    AccessToken jwtToken <- ask
-    case jwtToken of
-      Nothing -> error "sign: missing user access token"
-      Just token -> blocVaultWrapperWithUserToken token $ postSignature Nothing (V.MsgHash msgHash)
-  getPub = do
-    AccessToken jwtToken <- ask
-    case jwtToken of
-      Nothing -> error "getPub: missing user access token"
-      Just token -> fmap V.unPubKey . blocVaultWrapperWithUserToken token $ getKey Nothing Nothing
-  getShared _ = error "getShared ReaderT VaultData: unimplemented"
-
-fullServer ::
-  ( MonadBlocAPI n,
-    n ~ ReaderT AccessToken m
-  ) =>
-  ServerT FullAPI m
-fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (AccessToken jwtToken)) coreApiServer
-                 :<|> hoistServer (Proxy :: Proxy BlocAPI) (flip runReaderT (AccessToken jwtToken)) bloc
+fullServer :: MonadBlocAPI m => ServerT FullAPI m
+fullServer = coreApiServer :<|> bloc
 
 ----------------
 
 hoistCoreServer :: BlocEnv -> UrlMap -> Servant.Server FullAPI
 hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
-    convertErrors :: VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO))))) a -> Handler a
+    convertErrors :: ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO)))) a -> Handler a
     convertErrors x = Handler $ do
       y <- liftIO
         . try
@@ -170,7 +140,6 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
         . runCirrusM
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
-        . runVaultM (vaultUrl . urlConfig $ ethConf)
         $ x `catch` handleRuntimeError `catch` handleApiError
       case y of
         Right a -> pure a
@@ -178,34 +147,6 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErr
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
-
-ensureNodePubKey :: IO V.PublicKey
-ensureNodePubKey =
-  runLoggingT $
-    runVaultM (vaultUrl . urlConfig $ ethConf) waitForNodePubKey
-  where
-    waitForNodePubKey :: VaultM (LoggingT IO) V.PublicKey
-    waitForNodePubKey = do
-      getResult <- try $ fmap V.unPubKey . blocVaultWrapper $ getKey Nothing Nothing
-      case getResult of
-        Right pubKey -> return pubKey
-        Left err -> do
-          liftIO $ putStrLn $ "Vault key lookup failed: " ++ show (err :: ApiError)
-          if isMissingUserError err
-            then do
-              liftIO $ putStrLn "Node key does not exist. Creating key in Vault..."
-              _ <- blocVaultWrapper (postKey Nothing)
-              liftIO $ putStrLn "Node key created in Vault."
-              fmap V.unPubKey . blocVaultWrapper $ getKey Nothing Nothing
-            else throwIO err
-
-    isMissingUserError :: ApiError -> Bool
-    isMissingUserError (VaultWrapperError clientErr) =
-      "statusCode = 400" `T.isInfixOf` errTxt &&
-      "doesn't exist" `T.isInfixOf` errTxt
-      where
-        errTxt = T.pack (show clientErr)
-    isMissingUserError _ = False
 
 main :: IO ()
 main = do
@@ -247,15 +188,12 @@ main = do
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
 
-  pubKey <- ensureNodePubKey
-
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
             Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
-            Bloc.Monad.globalNonceCounter = nonceCache,
-            Bloc.Monad.nodePubKey = pubKey
+            Bloc.Monad.globalNonceCounter = nonceCache
           }
   let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
       bindPort = Conf.apiPort (Conf.apiConfig ethConf)
