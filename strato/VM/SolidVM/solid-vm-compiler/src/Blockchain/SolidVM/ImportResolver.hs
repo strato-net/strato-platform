@@ -382,8 +382,14 @@ exportedUnits u =
 unionUnits :: (Monad m, Show a, Show b, Ord a, Ord k) => x -> k -> Map a b -> EndoM (ExceptT (x, Text) m) (Map k (Map a b))
 unionUnits x k v' m = do
   let v = fromMaybe M.empty $ M.lookup k m
-      n = M.intersection v v'
-  if null n then pure $ M.insert k (v <> v') m else throwE (x, T.pack $ "Duplicate values: " ++ show n)
+      -- An overlap is fine when the two entries represent the same
+      -- declaration reached via different paths (diamond re-export):
+      -- prefer the one already in scope. It's only a real collision
+      -- when the incoming declaration genuinely differs.
+      incompatible = M.filter id $ M.intersectionWith (\a b -> show a /= show b) v v'
+  if M.null incompatible
+    then pure $ M.insert k (v <> v') m
+    else throwE (x, T.pack $ "Duplicate values: " ++ show incompatible)
 
 lit :: Default a => Text -> ExpressionF a
 lit = lit' def
