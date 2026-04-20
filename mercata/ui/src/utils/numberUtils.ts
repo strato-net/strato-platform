@@ -23,7 +23,7 @@ export const ensureHexPrefix = (address: string | undefined | null): `0x${string
 };
 
 /**
- * Shortens an address to "front…back" form (e.g. 0x1234…abcd).
+ * Shortens an address to "front…back" form (e.g. 0x123456…abcd).
  */
 export const truncateAddress = (
   address: string | undefined | null,
