@@ -29,7 +29,7 @@ export const getActivityLink = (activityName: string): string | null => {
   }
 
   // ETH Carry Vault
-  if (lowerName.includes('eth vault')) {
+  if (lowerName.includes('eth carry vault')) {
     return '/dashboard/earn-yield-vault?vault=eth-carry';
   }
 
