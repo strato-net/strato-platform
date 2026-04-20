@@ -127,12 +127,20 @@ data CallInfo = CallInfo
     localVariables :: NE.NonEmpty (Map SolidString Variable),
     stateMap :: !(M.Map Address AddressStateModification),
     storageMap :: !(M.Map (Address, MS.StoragePath) MS.BasicValue),
+    -- | EVM-style byte-addressable memory used by inline assembly (Yul)
+    -- blocks. Layout follows the Solidity convention:
+    --   0x00-0x3f scratch, 0x40-0x5f free memory pointer (init 0x80),
+    --   0x60-0x7f zero slot, 0x80.. allocated.
+    evmMemory :: !(IORef BC.ByteString),
+    -- | Raw EVM-style storage (slot → word) used by Yul 'sload' /
+    -- 'sstore' for slots that don't map to a bridgeable state variable
+    -- of the current contract (see "Blockchain.SolidVM.EvmStorage").
+    evmStorage :: !(IORef (M.Map Word256 Word256)),
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
     isFreeFunction :: Bool
   }
-  deriving (Show)
 
 {-
 BlockData
@@ -732,6 +740,8 @@ addCallInfo ::
   Bool ->
   m ()
 addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
+  memRef <- liftIO $ newIORef initialEvmMemoryBytes
+  slotRef <- liftIO $ newIORef M.empty
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
@@ -743,6 +753,8 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
             localVariables = NE.singleton initialLocalVariables,
             stateMap = M.empty,
             storageMap = M.empty,
+            evmMemory = memRef,
+            evmStorage = slotRef,
             readOnly = ro,
             isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,
@@ -750,6 +762,14 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
           }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
+
+-- | The 128-byte initial EVM memory layout: scratch (0x00-0x3f) + free
+-- memory pointer set to 0x80 (0x40-0x5f) + zero slot (0x60-0x7f).
+initialEvmMemoryBytes :: BC.ByteString
+initialEvmMemoryBytes =
+  BC.replicate 0x40 '\0'
+    <> BC.pack (replicate 31 '\0' ++ ['\x80'])
+    <> BC.replicate 0x20 '\0'
 
 uncheckedCallInfo :: MonadSM m => m ()
 uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case

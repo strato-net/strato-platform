@@ -11,7 +11,6 @@ import Data.List (uncons)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Source
-import qualified Data.Text as T
 import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
@@ -19,6 +18,7 @@ import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.ParserTypes
 import SolidVM.Solidity.Parse.Types
+import SolidVM.Solidity.Parse.Yul (inlineAssemblyBlock)
 import Text.Parsec hiding (uncons)
 import Text.Parsec.Expr
 import Text.Read (readMaybe)
@@ -537,18 +537,5 @@ literal =
 
 inlineAssembly :: SolidityParser Statement
 inlineAssembly = do
-  ~(a, e) <- withPosition $
-    braces $ do
-      let match = void . lexeme . string
-      dst <- identifier
-      match ":="
-      match "mload"
-      src <- parens $ do
-        match "add"
-        parens $ do
-          src <- identifier
-          void comma
-          match "32"
-          return src
-      return $ MloadAdd32 (T.pack dst) (T.pack src)
-  pure $ AssemblyStatement e a
+  ~(a, body) <- withPosition inlineAssemblyBlock
+  pure $ AssemblyStatement body a

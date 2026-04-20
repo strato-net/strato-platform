@@ -270,11 +270,10 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
     });
   });
 
-  const { isVaultPasswordSet = false  } = await getStratoMetadata();
-  if (isVaultPasswordSet === false) {
-    winston.error('Vault password not set!');
+  if (!process.env.vaultUrl) {
+    winston.error('Vault URL not configured!');
     isNodeHealthy = false;
-    failedChecks.push("STRATO Vault password is not set");
+    failedChecks.push("STRATO Vault is not configured");
   }
 
 

@@ -82,14 +82,12 @@ instance ToJSON EthConf where
 data ApiConfig = ApiConfig
   { apiPort :: Int
   , apiListenAddress :: String
-  , apiHost :: String
   } deriving (Show, Eq, Generic, ToJSON)
 
 instance FromJSON ApiConfig where
   parseJSON = withObject "ApiConfig" $ \v -> ApiConfig
     <$> v .:? "apiPort" .!= 3000
     <*> v .:? "apiListenAddress" .!= "127.0.0.1"
-    <*> v .:? "apiHost" .!= "localhost"
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
@@ -154,8 +152,8 @@ data ContractsConf = ContractsConf
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data UrlConfig = UrlConfig
-  { vaultUrl :: String
-  , vaultUrlDocker :: String
+  { nodeUrl :: String  -- Canonical external URL: http(s)://hostname[:port]
+  , vaultUrl :: String
   , fileServerUrl :: String
   , notificationServerUrl :: String
   , repoUrl :: String  -- Docker registry URL prefix for images
@@ -257,7 +255,6 @@ instance Default ApiConfig where
   def = ApiConfig
     { apiPort = 3000
     , apiListenAddress = "127.0.0.1"
-    , apiHost = "localhost"
     }
 
 instance Default DebugConfig where
@@ -273,8 +270,8 @@ instance Default ContractsConf where
 
 instance Default UrlConfig where
   def = UrlConfig
-    { vaultUrl = "https://vault.blockapps.net:8093"
-    , vaultUrlDocker = "https://vault.blockapps.net:8093"
+    { nodeUrl = "http://localhost:8081"
+    , vaultUrl = "https://vault.blockapps.net:8093"
     , fileServerUrl = ""
     , notificationServerUrl = ""
     , repoUrl = ""

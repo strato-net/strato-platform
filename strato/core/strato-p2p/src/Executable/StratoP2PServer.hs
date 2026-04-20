@@ -35,12 +35,12 @@ import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Host
-import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Threads
 import           Blockchain.TimerSource
 import           Conduit
 import           Control.Lens                          ((^.))
 import           Control.Monad
+import           Control.Monad.Composable.Vault
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
 import qualified Data.Conduit.List                     as CL

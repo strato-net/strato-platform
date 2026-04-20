@@ -1273,7 +1273,144 @@ contract qq {
     stored = result;
   }
 }|]
-      getAll [[Field "stored"]] `shouldReturn` [BString "alright."]
+      -- With the real Yul interpreter, @source@ is materialized into
+      -- EVM memory in Solidity's standard layout (length word at ptr,
+      -- data at ptr+32). @mload(ptr + 32)@ then reads a 32-byte word
+      -- containing the 8 bytes of "alright." zero-padded to 32 bytes.
+      getAll [[Field "stored"]]
+        `shouldReturn` [BBytes $ BC.pack "alright." <> BC.replicate 24 '\0']
+
+    it "evaluates let bindings and arithmetic" . runTest $ do
+      runBS
+        [r|
+contract qq {
+  uint stored;
+  constructor() {
+    uint result;
+    assembly {
+      let a := 7
+      let b := 3
+      result := add(mul(a, 10), b)
+    }
+    stored = result;
+  }
+}|]
+      getAll [[Field "stored"]] `shouldReturn` [BInteger 73]
+
+    it "supports if/switch/for control flow" . runTest $ do
+      runBS
+        [r|
+contract qq {
+  uint sumSq;
+  uint chosen;
+  constructor() {
+    uint s;
+    uint c;
+    assembly {
+      let mode := 2
+      switch mode
+      case 0 { c := 10 }
+      case 1 { c := 20 }
+      default { c := 30 }
+
+      let n := 0
+      for { let i := 0 } lt(i, 4) { i := add(i, 1) } {
+        if gt(i, 0) { n := add(n, mul(i, i)) }
+      }
+      s := n
+    }
+    sumSq = s;
+    chosen = c;
+  }
+}|]
+      -- 1^2 + 2^2 + 3^2 = 14; switch matches case 2 fallthrough to default
+      getFields ["sumSq", "chosen"] `shouldReturn` [BInteger 14, BInteger 30]
+
+    it "round-trips a word through EVM memory" . runTest $ do
+      runBS
+        [r|
+contract qq {
+  uint stored;
+  constructor() {
+    uint r;
+    assembly {
+      let ptr := mload(0x40)
+      mstore(ptr, 0xdeadbeef)
+      r := mload(ptr)
+      // Bump the free-memory pointer so we don't clobber the word we just wrote
+      mstore(0x40, add(ptr, 32))
+    }
+    stored = r;
+  }
+}|]
+      getAll [[Field "stored"]] `shouldReturn` [BInteger 0xdeadbeef]
+
+    it "computes keccak256 of bytes laid out in memory" . runTest $ do
+      runBS
+        [r|
+contract qq {
+  bytes32 h;
+  constructor() {
+    bytes32 out;
+    assembly {
+      // Write the four bytes "abcd" into the scratch area, then hash
+      // exactly those four bytes.
+      mstore8(0, 0x61)
+      mstore8(1, 0x62)
+      mstore8(2, 0x63)
+      mstore8(3, 0x64)
+      out := keccak256(0, 4)
+    }
+    h = out;
+  }
+}|]
+      -- keccak256("abcd") per test vectors
+      getAll [[Field "h"]]
+        `shouldReturn` [ BBytes $
+                           LabeledError.b16Decode
+                             "SolidVMSpec.hs"
+                             "48bed44d1bcd124a28c27f343a817e5f5243190d3c52bf347daf876de1dbbf77"
+                       ]
+
+    it "calls user-defined Yul functions" . runTest $ do
+      runBS
+        [r|
+contract qq {
+  uint stored;
+  constructor() {
+    uint r;
+    assembly {
+      function double(x) -> y { y := mul(x, 2) }
+      function addTwo(a, b) -> c, d { c := add(a, 1) d := add(b, 1) }
+      let p, q := addTwo(10, 20)
+      r := add(double(p), q)
+    }
+    stored = r;
+  }
+}|]
+      -- double(11) + 21 = 22 + 21 = 43
+      getAll [[Field "stored"]] `shouldReturn` [BInteger 43]
+
+    it "bridges sstore to named state variable slots" . runTest $ do
+      runBS
+        [r|
+contract qq {
+  uint a;
+  uint b;
+  constructor() {
+    a = 1;
+    b = 2;
+    assembly {
+      // Slot 0 = a (first declared scalar), slot 1 = b.
+      sstore(0, mul(sload(0), 10))  // a := a * 10 = 10
+      sstore(1, add(sload(0), sload(1)))  // b := a + b = 10 + 2 = 12
+      // Slot 99 has no named mapping; it lives in the raw EVM-slot map
+      // and is invisible to Solidity.
+      sstore(99, 777)
+    }
+  }
+}|]
+      getFields ["a", "b"] `shouldReturn` [BInteger 10, BInteger 12]
 
   it "can handle nested mappings" . runTest $ do
     runBS

@@ -30,7 +30,7 @@ import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
 import Bloc.Database.Queries (getContractByAddress, withCodeCollectionCache)
-import Bloc.Monad
+import Bloc.Monad ()
 import Bloc.Server.Utils
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
@@ -335,16 +335,16 @@ functionResult ::
 functionResult txHash txResult@TransactionResult {..} funcName addr = do
   case transactionResultMessage of
       "Success!" -> do
-        let txResp = transactionResultResponse
-        mReturnTypes <- lift $ getReturnTypes addr funcName
-        let mFormattedResponse = svmValueToSolidityValues txResp mReturnTypes
-        formattedResponse <- lift $ blocMaybe ("Failed to parse response: "
-                                               <> Text.pack txResp) mFormattedResponse
-        return $ BlocTransactionResult
-                      Success
-                      txHash
-                      (Just txResult)
-                      (Just $ Call formattedResponse)
+        case transactionResultResponse of
+          Nothing -> return $ BlocTransactionResult Success txHash (Just txResult) Nothing
+          Just svmVal -> do
+            mReturnTypes <- lift $ getReturnTypes addr funcName
+            let formattedResponse = svmValueToSolidityValues svmVal mReturnTypes
+            return $ BlocTransactionResult
+                          Success
+                          txHash
+                          (Just txResult)
+                          (Just $ Call formattedResponse)
       stratoMsg -> throwIO $ UserError $ Text.pack stratoMsg
 
 getReturnTypes ::

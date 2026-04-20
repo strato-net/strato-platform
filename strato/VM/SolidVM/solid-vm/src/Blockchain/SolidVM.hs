@@ -48,6 +48,7 @@ import Blockchain.SolidVM.GasInfo
 import Blockchain.SolidVM.Metrics
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
+import qualified Blockchain.SolidVM.Yul as Yul
 import Blockchain.SolidVM.TraceTools
 import SolidVM.Solidity.StaticAnalysis.Typechecker (showType)
 import Blockchain.Strato.Model.Address
@@ -943,13 +944,11 @@ runStatement (CC.Throw expr pos) = do
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
   let listOfVals = mapMaybe (\x -> toBasic currentBlockNum x) argVals
   customError "Custom user error thrown" name listOfVals
-runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
+runStatement (CC.AssemblyStatement (CC.InlineAssembly _ _ body) pos) = do
   solidVMBreakpoint pos
-  srcVar <- expToVar (CC.Variable pos $ textToLabel src)
-  dstVar <- expToVar (CC.Variable pos $ textToLabel dst)
-
-  -- TODO(tim): should this hex encode src and pad?
-  setVar dstVar =<< getVar srcVar
+  -- Dialect marker and flag list (e.g. @"memory-safe"@) are metadata
+  -- that don't affect execution; preserved in the AST for unparsing.
+  Yul.runInlineAssembly body
   return Nothing
 runStatement st@(CC.EmitStatement eventName exptups pos) = do
   -- emit MemberAdded(<address>, <enode>);

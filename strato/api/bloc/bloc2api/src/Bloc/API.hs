@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
@@ -46,11 +47,11 @@ type BlocAPI =
     -- /search endpoints
     :<|> GetBlocTransactionResult
     :<|> PostBlocTransactionResults
-    -- /transaction endpoints
-    :<|> PostBlocTransactionParallel
-    :<|> PostBlocTransactionBody
+    -- /transaction endpoints (token header only on these)
+    :<|> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text :> PostBlocTransactionParallel
+    :<|> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text :> PostBlocTransactionBody
     :<|> PostBlocTransactionUnsigned
-    :<|> PostBlocTransaction
+    :<|> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text :> PostBlocTransaction
 
 --Unsure what this will break if anything but remove later
 instance ToSample Text where

@@ -4,7 +4,7 @@
 module ParserSpec where
 
 import Control.Monad
-import Data.Either (isLeft)
+import Data.Either (isRight)
 import Data.Source.Annotation as SA
 import Data.Source.Position as SP
 import SolidVM.Model.CodeCollection.Statement
@@ -147,7 +147,25 @@ spec = do
         scases =
           [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus () $ Variable () "x"),
             ( "assembly { dst := mload(add(src, 32)) }",
-              AssemblyStatement $ MloadAdd32 "dst" "src"
+              AssemblyStatement $
+                InlineAssembly
+                  Nothing
+                  []
+                  [ YulAssign
+                      ()
+                      ["dst"]
+                      ( YulFunctionCall
+                          ()
+                          "mload"
+                          [ YulFunctionCall
+                              ()
+                              "add"
+                              [ YulIdentifier () "src",
+                                YulLit () (YulNumber 32)
+                              ]
+                          ]
+                      )
+                  ]
             ),
             ( "Nom storage nom = ns[10];",
               SimpleStatement $
@@ -203,11 +221,36 @@ spec = do
             ),
             ("revert f(x, y);", RevertStatement (Just "f") ([(Variable () "x"), (Variable () "y")])),
             ("revert(\"e\");", RevertStatement (Nothing) ([StringLiteral () "e"])),
-            ("revert f({ x: y , q: z });", RevertStatement (Just "f") ([Variable () "y", Variable () "z"]))
+            ("revert f({ x: y , q: z });", RevertStatement (Just "f") ([Variable () "y", Variable () "z"])),
+            ( "assembly \"evmasm\" (\"memory-safe\", \"foo\") { let x := 1 }",
+              AssemblyStatement $
+                InlineAssembly
+                  (Just "evmasm")
+                  ["memory-safe", "foo"]
+                  [ YulLet
+                      ()
+                      [YulTypedName "x" Nothing ()]
+                      (Just (YulLit () (YulNumber 1)))
+                  ]
+            )
           ]
     forM_ scases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseStatement input `shouldBe` Right (want ())
 
-    let fcases = ["assembly {}", "assembly { dst := mload(src) }", "assembly { dst := add(src, 32) }"]
-    forM_ fcases $ \input -> do
-      it ("cannot parse " ++ input) $ parseStatement input `shouldSatisfy` isLeft
+    -- Shapes that the old hardcoded grammar rejected but the full Yul
+    -- parser now accepts. Asserting only @isRight@ so we don't have to
+    -- spell out the full AST for every variation.
+    let yulCases =
+          [ "assembly {}",
+            "assembly { dst := mload(src) }",
+            "assembly { dst := add(src, 32) }",
+            "assembly { let x := 5 }",
+            "assembly { for { let i := 0 } lt(i, 3) { i := add(i, 1) } { mstore(i, 1) } }",
+            "assembly { switch x case 0 { y := 1 } default { y := 2 } }",
+            "assembly \"evmasm\" { function f(a) -> b { b := mul(a, 2) } }",
+            "assembly (\"memory-safe\") { let x := 1 }",
+            "assembly \"evmasm\" (\"memory-safe\") { let x := 1 }",
+            "assembly (\"memory-safe\", \"foo\") { }"
+          ]
+    forM_ yulCases $ \input -> do
+      it ("can parse yul " ++ input) $ parseStatement input `shouldSatisfy` isRight
