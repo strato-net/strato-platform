@@ -255,7 +255,10 @@ lookupError :: SolidString -> SSS [(SolidString, Type)]
 lookupError name = do
   cc <- asks codeCollection
   c <- asks contract
-  let err = fromMaybe [] $ msum [(M.lookup name (_errors c)), (M.lookup name (_flErrors cc))]
+  -- Also look in parent contracts so errors inherited from interfaces or
+  -- abstract bases resolve to their correct argument signatures.
+  let parentErrs = msum [M.lookup name (_errors p) | p <- fromMaybe [] $ getParentsAnnotated cc c]
+      err = fromMaybe [] $ msum [M.lookup name (_errors c), M.lookup name (_flErrors cc), parentErrs]
   pure $ f <$> err
   where
     f (t, ft, _) = (t, indexedTypeType ft)
@@ -1029,7 +1032,11 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
 typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "root" = pure $ Static (SVMType.Address False) x
-typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
+typecheckMember t@(Static (SVMType.Contract c) x) n = do
+  result <- lookupContractFunction x c n
+  case result of
+    Bottom{} -> tryUsings (SVMType.Contract c) x t n
+    _ -> pure result
 typecheckMember (Static (SVMType.UnknownLabel c) x) n = do
   e <- typecheckMember (Static (SVMType.Enum Nothing c Nothing) x) n
   case e of
@@ -1052,7 +1059,16 @@ typecheckMember (Static (SVMType.UnknownLabel c) x) n = do
             t -> pure t
         t -> pure t
     t -> pure t
-typecheckMember t@(Static svmType x) n = do
+typecheckMember t@(Static svmType x) n = tryUsings svmType x t n
+typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> labelToText n) <$ context' x
+
+-- | Consult @using For@ directives to resolve a member access that the
+-- receiver type didn't handle directly. Used both as the fallback for
+-- generic static types and as a fallback for 'Contract' types whose own
+-- functions/constants/structs don't define the requested member —
+-- the 'using SafeERC20 for IERC20;' pattern is the motivating case.
+tryUsings :: SVMType.Type -> SourceAnnotation Text -> Type' -> SolidString -> SSS Type'
+tryUsings svmType x t n = do
   let unknownMember = pure . bottom $ ("Unknown member: " <> showType svmType <> "." <> labelToText n) <$ x
   c <- asks contract
   cc <- asks codeCollection
@@ -1075,7 +1091,6 @@ typecheckMember t@(Static svmType x) n = do
                 _ -> unknownMember
               _ -> unknownMember
       pure $ pickType' x results
-typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> labelToText n) <$ context' x
 
 typecheckFuncs :: Annotated CodeCollectionF -> SourceAnnotation Text -> SolidString -> Annotated FuncF -> Annotated FuncF -> Type'
 typecheckFuncs cc x n f g = runIdentity $ typecheck' (subtypeFromCC cc) ignoreTops (functionType cc x n f) (functionType cc x n g)
@@ -1835,7 +1850,8 @@ getVarTypeByName' name ctx = do
     Nothing -> do
       c <- asks contract
       cc <- asks codeCollection
-      let mVarDecl = ((\v -> (Mutable, _varType v, ctx)) <$> M.lookup name (_storageDefs c))
+      let parentErrors = M.unions $ map _errors $ fromMaybe [] $ getParentsAnnotated cc c
+          mVarDecl = ((\v -> (Mutable, _varType v, ctx)) <$> M.lookup name (_storageDefs c))
               <|> ((\v -> (id, _constType v, ctx)) <$> M.lookup name (_constants c))
               <|> ((\v -> (id, _constType v, ctx)) <$> M.lookup name (_flConstants cc))
               <|> (const (id, SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_enums c))
@@ -1844,6 +1860,9 @@ getVarTypeByName' name ctx = do
               <|> (const (id, SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c))
               <|> (const (id, SVMType.Error Nothing name, ctx) <$> M.lookup name (_errors c))
               <|> (const (id, SVMType.Error Nothing name, ctx) <$> M.lookup name (_flErrors cc))
+              -- Errors defined in a parent contract (including interfaces the
+              -- child inherits from) are visible to the child via inheritance.
+              <|> (const (id, SVMType.Error Nothing name, ctx) <$> M.lookup name parentErrors)
       case mVarDecl of
         Just (mut, e@(SVMType.Enum {}), ctx') ->
           pure . Sum $
@@ -2142,8 +2161,11 @@ tcExpr (IndexAccess _ a (Just b)) = do
   typecheckIndex a' b'
 tcExpr (IndexAccess _ a Nothing) = tcExpr a
 tcExpr (MemberAccess x var name) | name `elem` ["call", "delegatecall", "staticcall"] =
+  -- Accept either a string (SolidVM's legacy function-name convention) or
+  -- bytes (real Solidity's ABI-encoded call data, used by Multicall-style
+  -- delegatecall patterns) as the first argument.
   sumType' (addressType' x) (addressType' x) ~> tcExpr var !> (pure $
-      Function (Product (stringType' x, Static SVMType.Variadic x, []) x)
+      Function (Product (sumType' (stringType' x) (bytesType' x), Static SVMType.Variadic x, []) x)
                (Static SVMType.Variadic x)
                x [] [] False
     )
