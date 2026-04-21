@@ -9,6 +9,9 @@ module Blockchain.SolidVM.Builtins
     encodeDynamicValue,
     abiEncode,
     abiEncodePacked,
+    abiEncodeWithSelector,
+    abiEncodeWithSignature,
+    abiEncodeCall,
 
     -- * Non-ABI builtins
     push,
@@ -24,6 +27,7 @@ import BlockApps.Solidity.ABI.Codec
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
 import Blockchain.Strato.Model.Address (addressToByteString)
+import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.VM.SolidException
 import Control.Monad ((<=<))
 import qualified Crypto.Hash.Poseidon as Poseidon
@@ -165,3 +169,64 @@ abiEncodePacked = fmap fold . traverse encodeValuePacked
     encodeValuePacked (SArray vec)       = fold <$> traverse (encodeValuePacked <=< weakGetVar) vec
     encodeValuePacked SNULL              = pure B.empty
     encodeValuePacked _                  = pure B.empty
+
+-- | abi.encodeWithSelector(selector, ...args) — prepend an explicit 4-byte
+-- selector to the ABI-encoded argument list.
+abiEncodeWithSelector :: MonadSM m => [Value] -> m B.ByteString
+abiEncodeWithSelector (selVal : rest) = do
+  let selector = B.take 4 $ selectorBytes selVal
+  flat <- flattenTupleValues rest
+  encoded <- abiEncode flat
+  pure $ selector <> encoded
+abiEncodeWithSelector args =
+  invalidArguments "abi.encodeWithSelector expects (bytes4, ...)" args
+
+-- | abi.encodeWithSignature(sig, ...args) — compute the selector as the
+-- first 4 bytes of keccak256(sig), then ABI-encode the remaining args.
+abiEncodeWithSignature :: MonadSM m => [Value] -> m B.ByteString
+abiEncodeWithSignature (SString sig : rest) = do
+  let selector = B.take 4 . keccak256ToByteString . hash $ BC.pack sig
+  flat <- flattenTupleValues rest
+  encoded <- abiEncode flat
+  pure $ selector <> encoded
+abiEncodeWithSignature args =
+  invalidArguments "abi.encodeWithSignature expects (string, ...)" args
+
+-- | abi.encodeCall(function, (args...)) — derive a selector from the
+-- function reference's name and ABI-encode the tuple of arguments. SolidVM
+-- lacks the full Solidity signature during encoding, so we fall back to
+-- keccak256 of just the function name; low-level dispatch in SolidVM does
+-- not rely on the selector, so this is only observable if a caller decodes
+-- the bytes themselves.
+abiEncodeCall :: MonadSM m => [Value] -> m B.ByteString
+abiEncodeCall (fn : rest) = do
+  let selector = B.take 4 . keccak256ToByteString . hash . BC.pack $ functionReferenceName fn
+  flat <- flattenTupleValues rest
+  encoded <- abiEncode flat
+  pure $ selector <> encoded
+abiEncodeCall args =
+  invalidArguments "abi.encodeCall expects (function, args)" args
+
+-- | Extract an explicit selector from a bytes/string value; used by
+-- abi.encodeWithSelector so callers can pass either a bytes4 literal or a
+-- precomputed string of selector bytes.
+selectorBytes :: Value -> B.ByteString
+selectorBytes (SBytes bs) = bs
+selectorBytes (SString s) = BC.pack s
+selectorBytes (SInteger n) = encodeUint256 n
+selectorBytes _ = B.replicate 4 0
+
+functionReferenceName :: Value -> String
+functionReferenceName (SFunction name _)         = name
+functionReferenceName (SContractFunction _ name) = name
+functionReferenceName _                          = ""
+
+-- | Solidity tuple literals like @(a, b)@ reach builtins as a single
+-- @STuple@ value; flatten one level so @abiEncode@ treats them as
+-- positional args.
+flattenTupleValues :: MonadSM m => [Value] -> m [Value]
+flattenTupleValues = fmap concat . traverse flatten
+  where
+    flatten :: MonadSM m => Value -> m [Value]
+    flatten (STuple vec) = traverse weakGetVar (V.toList vec)
+    flatten v = pure [v]

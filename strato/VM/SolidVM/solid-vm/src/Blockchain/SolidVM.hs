@@ -1277,6 +1277,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SBuiltinVariable "abi", "encode") -> return $ Constant $ SFunction "abiEncode" Nothing
     (SBuiltinVariable "abi", "decode") -> return $ Constant $ SFunction "abiDecode" Nothing
     (SBuiltinVariable "abi", "encodePacked") -> return $ Constant $ SFunction "abiEncodePacked" Nothing
+    (SBuiltinVariable "abi", "encodeWithSelector") -> return $ Constant $ SFunction "abiEncodeWithSelector" Nothing
+    (SBuiltinVariable "abi", "encodeWithSignature") -> return $ Constant $ SFunction "abiEncodeWithSignature" Nothing
+    (SBuiltinVariable "abi", "encodeCall") -> return $ Constant $ SFunction "abiEncodeCall" Nothing
     (SBuiltinVariable "super", method) -> do
       ctract <- getCurrentContract
       (_, cc) <- getCurrentCodeCollection
@@ -2508,6 +2511,9 @@ callBuiltin "fastForward" (secs : mBlocks) = do
 
 callBuiltin "abiEncode" args = SBytes <$> Builtins.abiEncode args
 callBuiltin "abiEncodePacked" args = SBytes <$> Builtins.abiEncodePacked args
+callBuiltin "abiEncodeWithSelector" args = SBytes <$> Builtins.abiEncodeWithSelector args
+callBuiltin "abiEncodeWithSignature" args = SBytes <$> Builtins.abiEncodeWithSignature args
+callBuiltin "abiEncodeCall" args = SBytes <$> Builtins.abiEncodeCall args
 callBuiltin "abiDecode" (SBytes bs : typeArgs) = return $ abiDecode bs typeArgs
 callBuiltin "abiDecode" args = invalidArguments "abi.decode expects (bytes, types...)" args
 

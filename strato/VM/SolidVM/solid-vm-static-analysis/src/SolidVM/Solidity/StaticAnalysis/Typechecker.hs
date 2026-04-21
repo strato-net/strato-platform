@@ -873,6 +873,9 @@ typecheckMember (Static (SVMType.UnknownLabel "block") x) "chainid" = pure $ Sta
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "proposer" = pure $ Static (SVMType.Address False) x
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encode" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encodePacked" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
+typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encodeWithSelector" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
+typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encodeWithSignature" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
+typecheckMember (Static (SVMType.UnknownLabel "abi") x) "encodeCall" = pure $ Function (Static SVMType.Variadic x) (bytesType' x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "abi") x) "decode" = pure $ Function (bytesType' x) (Static SVMType.Variadic x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "type") x) "name" = pure $ (Static (SVMType.String Nothing) x)
 typecheckMember (Static (SVMType.UnknownLabel "type") x) "creationCode" = pure $ (Static (SVMType.String Nothing) x)
@@ -914,6 +917,10 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
 -- Static: argType, ContextType
 typecheckMember (Static (SVMType.Address _) x) "creator" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Address _) x) "root" = pure $ Static (SVMType.Address False) x
+typecheckMember (Static (SVMType.Address _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Address _) x) "nonce" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Address _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Address _) x) "code" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of
