@@ -133,7 +133,7 @@ const App = () => {
       const stratoChain = getStratoChain();
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
-        chains.map((chain) => [chain.id, chain === stratoChain ? http(`/rpc`) : http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
+        chains.map((chain) => [chain.id, chain === stratoChain ? http(`/rpc`) : http()])
       );
 
       const connectors = connectorsForWallets(

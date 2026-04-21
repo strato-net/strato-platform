@@ -25,11 +25,12 @@ const DepositsPage = () => {
   const handleMetalPurchase = useCallback(() => setMetalRefreshKey(k => k + 1), []);
 
   useEffect(() => {
+    if (!isLoggedIn) return;
     loadNetworksAndTokens().catch((error) => {
       console.error('Failed to load networks and tokens:', error);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isLoggedIn]);
 
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">

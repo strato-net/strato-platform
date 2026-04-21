@@ -53,7 +53,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
-import { redirectToLogin } from "@/lib/auth";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
@@ -254,6 +254,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const { writeContractAsync } = useWriteContract();
   const { switchChain } = useSwitchChain();
   const { signTypedDataAsync } = useSignTypedData();
+  const { openConnectModal } = useConnectModal();
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
@@ -875,7 +876,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => { if (guestMode) redirectToLogin(); else setFundingMode("bridge"); }}
+              onClick={() => { if (guestMode) openConnectModal?.(); else setFundingMode("bridge"); }}
               className={`relative rounded-md border-2 p-3 text-left transition-colors ${
                 fundingMode === "bridge"
                   ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
@@ -889,7 +890,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             </button>
             <button
               type="button"
-              onClick={() => { if (guestMode) redirectToLogin(); else { setFundingMode("metals"); fetchTokens(); } }}
+              onClick={() => { if (guestMode) openConnectModal?.(); else { setFundingMode("metals"); fetchTokens(); } }}
               className={`relative rounded-md border-2 p-3 text-left transition-colors ${
                 fundingMode === "metals"
                   ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
