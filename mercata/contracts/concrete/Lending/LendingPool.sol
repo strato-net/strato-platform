@@ -628,7 +628,10 @@ contract record LendingPool is Ownable, Pausable {
         uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
         if (collateralToSeize > borrowerCollateral) {
             collateralToSeize = borrowerCollateral; // seize all remaining
+            debtToCover = (collateralToSeize * priceColl * 10000) / (priceDebt * cConfig.liquidationBonus);
+            require(debtToCover > 0, "Collateral too small to cover any debt at bonus");
         }
+
 
         // Enforce minimum collateral out requested from user
         require(collateralToSeize > 0, "There is no collateral to seize");
