@@ -107,6 +107,10 @@ contract record LendingPool is Ownable, Pausable {
     constructor(address initialOwner) Ownable(initialOwner) { }
 
     function initialize(address _registry, address _poolConfigurator, address _tokenFactory, address _feeCollector, address _safetyModule) external onlyOwner {
+        // One-time initialization guard: borrowIndex is 0 only before the first call;
+        // `initialize` sets it to RAY and `_accrue` only grows it thereafter.
+        require(borrowIndex == 0, "Borrow index is not zero; re-initialization not allowed");
+
         // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
         RAY = 1e27;
         SECONDS_PER_YEAR = 31536000;
