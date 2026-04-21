@@ -97,10 +97,6 @@ data TypeF' a
 
 type Type' = Annotated TypeF'
 
-withAnn :: Text -> Type' -> Type'
-withAnn msg (Bottom x) = Bottom $ (msg <$) <$> x
-withAnn _   t          = t
-
 showType :: Type -> Text
 showType (SVMType.Int s b) =
   (if fromMaybe False s then "" else "u")
@@ -212,16 +208,31 @@ varDefsToType' x BlankEntry = pure $ topType' x
 varDefsToType' _ VarDefEntry {..} = case vardefType of
   Nothing -> pure $ topType' vardefContext
   Just t -> case t of
-    SVMType.UnknownLabel l -> do
-      let ls = T.splitOn "." $ labelToText l
-          embedMember f [] = f ""
-          embedMember f [z] = f z
-          embedMember f (z:zs) = embedMember (MemberAccess vardefContext (f z) . textToLabel) zs
-      tcExpr (embedMember (Variable vardefContext . textToLabel) ls) >>= \case
-        Bottom{} -> pure . bottom $ "Unknown type: " <> labelToText l <$ vardefContext
-        Function _ r _ _ _ _ -> pure r
-        t' -> pure t'
+    SVMType.UnknownLabel l -> resolveLabelType vardefContext l
     _ -> pure . Mutable $ Static t vardefContext
+
+-- | Resolve a type label that may be a dotted qualified name such as
+-- @Container.Nested@ (a struct or enum defined inside a contract,
+-- interface, or library). Flat names fall through to 'getVarTypeByName''
+-- so the existing storage/constants/enums/structs/errors lookups still
+-- apply; dotted names build a chain of member accesses and type-check
+-- that expression, pulling the struct's constructor return type out of
+-- the resulting 'Function'.
+resolveLabelType :: SourceAnnotation Text -> SolidString -> SSS Type'
+resolveLabelType x l =
+  case T.splitOn "." (labelToText l) of
+    [_] ->
+      getVarTypeByName' l x >>= \case
+        Bottom{} -> pure . bottom $ "Unknown type: " <> labelToText l <$ x
+        t' -> pure t'
+    segments ->
+      let embedMember f [] = f ""
+          embedMember f [z] = f z
+          embedMember f (z:zs) = embedMember (MemberAccess x (f z) . textToLabel) zs
+       in tcExpr (embedMember (Variable x . textToLabel) segments) >>= \case
+            Bottom{} -> pure . bottom $ "Unknown type: " <> labelToText l <$ x
+            Function _ r _ _ _ _ -> pure r
+            t' -> pure t'
 
 lookupEnum :: SolidString -> SSS [SolidString]
 lookupEnum name = do
@@ -1326,7 +1337,7 @@ functionHelper test cc c funcName f@Func {..} =
                       argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
                         fmap catMaybes . for (M.elems argVals) $ \case
                           VarDefEntry mType _ _ x -> for mType $ \case
-                            SVMType.UnknownLabel l -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                            SVMType.UnknownLabel l -> resolveLabelType x l
                             t -> pure $ Static t x
                           _ -> pure Nothing
                       mods <- flip evalStateT ((Nothing, argVals) :| []) $
@@ -1376,7 +1387,7 @@ functionHelper test cc c funcName f@Func {..} =
                           argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
                             fmap catMaybes . for (M.elems argVals) $ \case
                               VarDefEntry mType _ _ x -> for mType $ \case
-                                SVMType.UnknownLabel l -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                                SVMType.UnknownLabel l -> resolveLabelType x l
                                 t -> pure $ Static t x
                               _ -> pure Nothing
                           mods <- flip evalStateT ((Nothing, argVals) :| []) $
@@ -1407,7 +1418,7 @@ functionHelper test cc c funcName f@Func {..} =
                     argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
                       fmap catMaybes . for (M.elems argVals) $ \case
                         VarDefEntry mType _ _ x -> for mType $ \case
-                          SVMType.UnknownLabel l -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                          SVMType.UnknownLabel l -> resolveLabelType x l
                           t -> pure $ Static t x
                         _ -> pure Nothing
                     mods <- flip evalStateT ((Nothing, argVals) :| []) $
