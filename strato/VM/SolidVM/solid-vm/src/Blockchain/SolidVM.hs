@@ -3430,7 +3430,16 @@ validateFunctionArguments cc contract' func argVals = checkFunc $ func : CC._fun
           if r == stringToLabel "" || r == u
             then pure . Just $ SStruct u x
             else pure Nothing
-        (SContract r x, SVMType.UnknownLabel u) -> pure . bool Nothing (Just $ SContract r x) $ r == u
+        (SContract r x, SVMType.UnknownLabel u) ->
+          -- An instance of contract @r@ is acceptable where @u@ is
+          -- expected if @r@ IS @u@ or inherits from @u@ (including
+          -- through an interface). Without this, a concrete impl like
+          -- MockAT can't be passed to a constructor expecting IAT.
+          let ancestors = case cc ^. CC.contracts . at r of
+                Just rc -> either (const []) (map CC._contractName) (CC.getParents cc rc)
+                Nothing -> []
+              compatible = r == u || u `elem` ancestors
+           in pure . bool Nothing (Just $ SContract r x) $ compatible
         (SArray vs, SVMType.Array y ml) ->
           if (Just $ V.length vs) `SVMType.maybeEq` (fromIntegral <$> ml)
             then fmap SArray . sequence <$> traverse (fmap (fmap Constant) . marshalValue . (y,) <=< getVar) vs
