@@ -5,6 +5,7 @@ import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
 import { useUser } from '@/context/UserContext';
 import BridgeIn from '@/components/bridge/BridgeIn';
+import { BridgeWagmiScope } from '@/components/bridge/BridgeWagmiScope';
 import RecentTransactions from '@/components/bridge/RecentTransactions';
 import { useBridgeContext } from '@/context/BridgeContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
@@ -43,7 +44,9 @@ const DepositsPage = () => {
           )}
           <div className="mb-8 grid grid-cols-1 xl:grid-cols-12 gap-6">
             <div className="xl:col-span-7">
-              <BridgeIn guestMode={!isLoggedIn} fundingMode={fundingMode} onFundingModeChange={setFundingMode} onMetalPurchase={handleMetalPurchase} />
+              <BridgeWagmiScope>
+                <BridgeIn guestMode={!isLoggedIn} fundingMode={fundingMode} onFundingModeChange={setFundingMode} onMetalPurchase={handleMetalPurchase} />
+              </BridgeWagmiScope>
             </div>
             <div className="xl:col-span-5">
               <RecentTransactions fundingMode={fundingMode} metalRefreshKey={metalRefreshKey} />

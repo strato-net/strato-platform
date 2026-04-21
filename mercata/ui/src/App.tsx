@@ -9,8 +9,9 @@ import {
   connectorsForWallets,
   RainbowKitProvider,
 } from "@rainbow-me/rainbowkit";
-import { createConfig, http } from "wagmi";
+import { createConfig, createStorage, http } from "wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
+import { BridgeWagmiConfigProvider } from "@/components/bridge/BridgeWagmiScope";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
 import { OracleProvider } from "@/context/OracleContext";
@@ -85,6 +86,7 @@ const App = () => {
   const [creditCardTopUpAddress, setCreditCardTopUpAddress] = useState<string | null>(null);
   const [contactEnabled, setContactEnabled] = useState(false);
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
+  const [bridgeWagmiConfig, setBridgeWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
 
@@ -136,7 +138,10 @@ const App = () => {
         chains.map((chain) => [chain.id, chain === stratoChain ? http(`/rpc`) : http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
       );
 
-      const connectors = connectorsForWallets(
+      // App-wide wallet connection (user identity). Uses a namespaced storage key so
+      // it does NOT inherit any legacy wagmi state from before this split — which
+      // prevents a stale bridge-page MM session from hijacking the app's user.
+      const appConnectors = connectorsForWallets(
         [
           ...(stratoChain
             ? [{ groupName: "STRATO", wallets: [stratoWallet] }]
@@ -149,14 +154,39 @@ const App = () => {
         { projectId, appName }
       );
 
-      const config = createConfig({
-        connectors,
+      const appConfig = createConfig({
+        connectors: appConnectors,
         chains: chains as unknown as readonly [typeof mainnet, ...(typeof baseChains)],
         transports,
+        storage: createStorage({ key: "wagmi.app", storage: window.localStorage }),
         ssr: true,
       });
 
-      setWagmiConfig(config);
+      // Bridge-only wallet connection (external chain signing for deposit/withdraw).
+      // Keeps the default "wagmi" storage key so existing users' previously-connected
+      // external wallet is preserved here with no reconnect friction.
+      const bridgeConnectors = connectorsForWallets(
+        [
+          {
+            groupName: "External",
+            wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet],
+          },
+        ],
+        { projectId, appName }
+      );
+
+      const bridgeConfig = createConfig({
+        connectors: bridgeConnectors,
+        chains: baseChains,
+        transports: Object.fromEntries(
+          baseChains.map((chain) => [chain.id, http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
+        ),
+        storage: createStorage({ key: "wagmi", storage: window.localStorage }),
+        ssr: true,
+      });
+
+      setWagmiConfig(appConfig);
+      setBridgeWagmiConfig(bridgeConfig);
     }
   }, [projectId, loading]);
 
@@ -171,7 +201,7 @@ const App = () => {
     return <SyncingPage />;
   }
 
-  if (!wagmiConfig) {
+  if (!wagmiConfig || !bridgeWagmiConfig) {
     return <div>Loading configuration...</div>;
   }
 
@@ -181,6 +211,7 @@ const App = () => {
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <WagmiProvider config={wagmiConfig}>
             <RainbowKitProvider>
+              <BridgeWagmiConfigProvider config={bridgeWagmiConfig}>
               <UserProvider>
                 <UserTokensProvider>
                   <SwapProvider>
@@ -449,6 +480,7 @@ const App = () => {
                   </SwapProvider>
                 </UserTokensProvider>
               </UserProvider>
+              </BridgeWagmiConfigProvider>
             </RainbowKitProvider>
           </WagmiProvider>
         </ThemeProvider>

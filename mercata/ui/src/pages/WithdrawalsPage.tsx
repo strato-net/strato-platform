@@ -5,6 +5,7 @@ import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs as AntdTabs } from "antd";
 import BridgeOut from "@/components/bridge/BridgeOut";
+import { BridgeWagmiScope } from "@/components/bridge/BridgeWagmiScope";
 import WithdrawTransactionDetails from "@/components/dashboard/WithdrawTransactionDetails";
 import { useSearchParams, Link } from "react-router-dom";
 import { useBridgeContext } from "@/context/BridgeContext";
@@ -139,7 +140,9 @@ const WithdrawalsPage = () => {
                       }
                     />
                     <div className="mt-4 flex-1 min-h-0 overflow-auto p-1 -m-1">
-                      <BridgeOut isSaving={activeTab === "from-savings"} guestMode={!isLoggedIn} />
+                      <BridgeWagmiScope>
+                        <BridgeOut isSaving={activeTab === "from-savings"} guestMode={!isLoggedIn} />
+                      </BridgeWagmiScope>
                     </div>
                   </div>
                 </CardContent>
