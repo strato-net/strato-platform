@@ -32,6 +32,10 @@ import {
   formatRoundedWithCommas,
   roundByMagnitude,
 } from "@/services/rewardsService";
+import { useEarnContext } from "@/context/EarnContext";
+import { findBestEarnApyInfo } from "@/utils/earnUtils";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 
 const VAULT_META: Record<string, {
   title: string;
@@ -82,13 +86,6 @@ const formatExchangeRate = (exchangeRate: string, assetSymbol: string): string =
   }
 };
 
-const formatPercent = (value: string): string => {
-  if (!value || value === "-") return "-";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return "-";
-  return `${num.toFixed(2)}%`;
-};
-
 const formatUsdAmount = (value: string): string => {
   try {
     const num = Number(formatUnits(value || "0", 18));
@@ -134,6 +131,7 @@ const EarnYieldVault = () => {
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
   const { getVaultInfo, getUserVaultInfo, loading: loadingVaults, refreshVaults } = useYieldVaultContext();
+  const { tokenApys } = useEarnContext();
   const {
     activities: rewardsActivities,
     loading: rewardsActivitiesLoading,
@@ -174,14 +172,17 @@ const EarnYieldVault = () => {
   const shareSymbol = effectiveInfo?.shareSymbol || "Shares";
   const exchangeRate = formatExchangeRate(effectiveInfo?.exchangeRate || "0", assetSymbol);
   const tvlDisplay = loadingVaults ? "..." : formatUsdAmount(effectiveInfo?.tvlUsd || "0");
-  const apyDisplay = (() => {
-    if (loadingVaults) return "...";
-    const raw = effectiveInfo?.apy ?? "-";
-    if (isDeployed) {
-      const n = Number(raw);
-      if (!raw || raw === "-" || !Number.isFinite(n) || n === 0) return "—";
+  const bestApyInfo = useMemo(
+    () => findBestEarnApyInfo(tokenApys, effectiveInfo?.vaultAddress),
+    [effectiveInfo?.vaultAddress, tokenApys]
+  );
+  const bestApyDisplay = (() => {
+    if (loadingVaults) return { label: "...", className: "text-foreground" };
+    const rawTotal = bestApyInfo?.total;
+    if (!isDeployed || !rawTotal || !Number.isFinite(rawTotal) || rawTotal <= 0) {
+      return { label: "—", className: "text-muted-foreground" };
     }
-    return formatPercent(typeof raw === "string" ? raw : String(raw));
+    return { label: `+${rawTotal.toFixed(2)}%`, className: "text-foreground" };
   })();
   const userShares = userInfo?.userShares || "0";
   const redeemableAssets = userInfo?.redeemableAssets || "0";
@@ -579,10 +580,21 @@ const EarnYieldVault = () => {
                           </p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground">Yield</p>
-                          <p className="mt-1 text-lg font-semibold">{apyDisplay}</p>
+                          <p className="text-muted-foreground inline-flex items-center gap-1">
+                            Best Available APY
+                            <BestApyInfoTooltip />
+                          </p>
+                          {loadingVaults || rewardsActivitiesLoading ? (
+                            <p className="mt-1 text-lg font-semibold">...</p>
+                          ) : (
+                            <EarnApyTooltip info={bestApyInfo}>
+                              <p className={`mt-1 text-lg font-semibold cursor-default ${bestApyDisplay.className}`}>
+                                {bestApyDisplay.label}
+                              </p>
+                            </EarnApyTooltip>
+                          )}
                           <p className="text-xs text-muted-foreground mt-1">
-                            Estimated annualized yield
+                            Estimated annualized total yield, including rewards and native fees
                           </p>
                         </div>
                       </div>
