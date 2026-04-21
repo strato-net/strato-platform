@@ -923,6 +923,133 @@ contract Describe_LendingPool_Basic is Authorizable {
         catch {/* expected */}
     }
 
+    /// @notice When a direct liquidationCall requests more debt than the borrower's
+    ///         collateral can cover at the configured liquidation bonus, debtToCover
+    ///         must be proportionally reduced so the liquidator does not subsidize
+    ///         the protocol (mirrors Aave V2/V3).
+    function it_lending_fe_caps_debt_to_cover_when_collateral_insufficient() public {
+        LendingPool pool = m.lendingPool();
+        PriceOracle oracle = m.priceOracle();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        // Track prior balances so assertions are delta-based (prior tests may leave dust).
+        uint liquidatorUsdstPrior = IERC20(USDST).balanceOf(address(this));
+        uint liquidatorSilvstPrior = IERC20(SILVST).balanceOf(address(this));
+        uint badDebtPrior = pool.badDebt();
+
+        uint collatAmount = 10e18;
+        oracle.setAssetPrice(SILVST, 100e18);
+
+        User user = new User();
+        Token(SILVST).mint(address(user), collatAmount);
+        user.do(SILVST, "approve", address(cv), collatAmount);
+        user.do(address(pool), "supplyCollateral", address(SILVST), collatAmount);
+        user.do(address(pool), "borrowMax");
+        uint initialDebt = pool.getUserDebt(address(user));
+
+        // Tank price so HF < 0.95 (100% close factor allowed) and collateral cannot cover full debt.
+        oracle.setAssetPrice(SILVST, 50e18);
+        require(pool.getHealthFactor(address(user)) < 95e16, "HF must be < 0.95 to allow 100% close factor");
+
+        (uint ltv, uint lt, uint bonus, uint _, uint foo, uint psf) = pool.getAssetConfig(SILVST);
+        uint priceDebt = oracle.getAssetPrice(USDST);
+        uint priceColl = oracle.getAssetPrice(SILVST);
+
+        // Precondition: asking for full debt should exceed what the borrower's collateral can cover.
+        uint debtToCoverReq = initialDebt;
+        uint wouldBeSeize = (debtToCoverReq * priceDebt * bonus) / (priceColl * 10000);
+        require(wouldBeSeize > collatAmount, "Test setup: requested debt must exceed coverage");
+
+        // Mint exactly the requested amount; any leftover proves the cap worked.
+        Token(USDST).mint(address(this), debtToCoverReq);
+        IERC20(USDST).approve(address(lp), INFINITY);
+
+        pool.liquidationCall(address(SILVST), address(user), debtToCoverReq, zeroMinCollateralOut);
+
+        // (1) All of the borrower's SILVST collateral is seized.
+        require_equal(
+            cv.userCollaterals(address(user), address(SILVST)),
+            0,
+            "All collateral should be seized when the cap binds."
+        );
+
+        // (2) Liquidator received exactly the borrower's full collateral balance.
+        require_equal(
+            IERC20(SILVST).balanceOf(address(this)) - liquidatorSilvstPrior,
+            collatAmount,
+            "Liquidator should receive exactly the borrower's SILVST."
+        );
+
+        // (3) Liquidator was charged the REDUCED debt (inverse of the seize formula), NOT the full request.
+        uint expectedPaid = (collatAmount * priceColl * 10000) / (priceDebt * bonus);
+        uint liquidatorBalAfter = IERC20(USDST).balanceOf(address(this));
+        uint actualPaid = (liquidatorUsdstPrior + debtToCoverReq) - liquidatorBalAfter;
+        require_equal(actualPaid, expectedPaid, "Liquidator should pay the proportionally-reduced debtToCover.");
+        require(actualPaid < debtToCoverReq, "Liquidator must pay strictly less than requested when cap binds.");
+
+        // (4) Bonus invariant: USD value of seized collateral >= USD value of debt paid.
+        uint collatValueUsd = collatAmount * priceColl / 1e18;
+        uint debtValueUsd = actualPaid * priceDebt / 1e18;
+        require(collatValueUsd >= debtValueUsd, "Collateral value must be >= debt paid (liquidation bonus preserved).");
+
+        // (5) Uncovered remainder is recognized as bad debt; borrower's loan is cleared.
+        require(pool.badDebt() > badDebtPrior, "Uncovered remainder should be recognized as bad debt.");
+        LoanInfo memory loan = pool.getUserLoan(address(user));
+        require(loan.scaledDebt == 0, "User loan scaledDebt should be zero when all collateral is seized.");
+
+        // Cleanup: burn the refunded USDST and the seized SILVST so global balances remain stable.
+        Token(USDST).burn(address(this), IERC20(USDST).balanceOf(address(this)) - liquidatorUsdstPrior);
+        Token(SILVST).burn(address(this), IERC20(SILVST).balanceOf(address(this)) - liquidatorSilvstPrior);
+    }
+
+    /// @notice minCollateralOut must still bind on the capped liquidation path.
+    ///         If the borrower's full collateral is less than what the liquidator
+    ///         requires, the call must revert instead of silently delivering less.
+    function it_lending_ff_capped_liquidation_respects_minCollateralOut() public {
+        LendingPool pool = m.lendingPool();
+        PriceOracle oracle = m.priceOracle();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        uint liquidatorUsdstPrior = IERC20(USDST).balanceOf(address(this));
+
+        uint collatAmount = 10e18;
+        oracle.setAssetPrice(SILVST, 100e18);
+
+        User user = new User();
+        Token(SILVST).mint(address(user), collatAmount);
+        user.do(SILVST, "approve", address(cv), collatAmount);
+        user.do(address(pool), "supplyCollateral", address(SILVST), collatAmount);
+        user.do(address(pool), "borrowMax");
+        uint initialDebt = pool.getUserDebt(address(user));
+
+        oracle.setAssetPrice(SILVST, 50e18);
+        require(pool.getHealthFactor(address(user)) < 95e16, "HF must be < 0.95 to allow 100% close factor");
+
+        Token(USDST).mint(address(this), initialDebt);
+        IERC20(USDST).approve(address(lp), INFINITY);
+
+        // minCollateralOut just above what the borrower actually has → must revert.
+        try pool.liquidationCall(address(SILVST), address(user), initialDebt, collatAmount + 1) {
+            revert("Liquidation must revert when seized collateral < minCollateralOut");
+        } catch {/* expected */}
+
+        // Collateral must be untouched on revert — that is exactly what minCollateralOut guards.
+        require_equal(
+            cv.userCollaterals(address(user), address(SILVST)),
+            collatAmount,
+            "Collateral must be untouched after reverted liquidation."
+        );
+        // Debt may only ever grow (accrual); it must never have been reduced.
+        require(
+            pool.getUserDebt(address(user)) >= initialDebt,
+            "Debt must not decrease after reverted liquidation."
+        );
+
+        Token(USDST).burn(address(this), IERC20(USDST).balanceOf(address(this)) - liquidatorUsdstPrior);
+    }
+
     function it_lending_ga_handles_multiple_collateral_cross_liquidation() public {
         LendingPool pool = m.lendingPool();
         PriceOracle oracle = m.priceOracle();
