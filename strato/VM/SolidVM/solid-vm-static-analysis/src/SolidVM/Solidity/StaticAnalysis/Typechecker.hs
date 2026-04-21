@@ -1173,7 +1173,18 @@ checkOverrides cc c funcName f =
         [] -> case mOs of
           Nothing -> functionType cc ctx funcName f
           Just _ -> bottom $ "Function " <> tFuncName <> " is declared override, but none of its parents have a function by the same name" <$ ctx
-        ps@((n, (parent, p)) : _) -> case mOs of
+        ps@((n, (parent, p)) : _) ->
+          -- When every parent with a same-named function is an interface,
+          -- the override keyword is optional: interface functions are
+          -- implicitly virtual, and Solidity lets implementations omit
+          -- `override` for them. Treat missing overrides in that case as
+          -- an empty override list so the normal virtual-parent path runs.
+          let allParentsInterfaces =
+                all (\(_, (par, _)) -> par ^. contractType == InterfaceType) ps
+              effectiveOs = case mOs of
+                Nothing | allParentsInterfaces -> Just []
+                other -> other
+          in case effectiveOs of
           Nothing ->
             bottom $
               T.concat
