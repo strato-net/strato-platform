@@ -558,8 +558,14 @@ context' (Sum (a :| _)) = context' a
 context' MultiVariate {..} = multiVariateContext
 context' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _ a) = a
 
-typecheck' :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> Type' -> Type' -> m Type'
-typecheck' unify r1 r2 = case (r1, r2) of
+typecheck' ::
+  Monad m =>
+  SubtypeReconcile ->
+  (SourceAnnotation Text -> SolidString -> Type -> m Type') ->
+  Type' ->
+  Type' ->
+  m Type'
+typecheck' isSub unify r1 r2 = case (r1, r2) of
   (Bottom e1, Bottom e2) -> pure $ Bottom (e1 <> e2)
   (Bottom e, _) -> pure $ Bottom e
   (_, Bottom e) -> pure $ Bottom e
@@ -568,27 +574,27 @@ typecheck' unify r1 r2 = case (r1, r2) of
   (m@(Static t x), Top names _) -> m <$ reduceType' x . (m :) <$> traverse (\n -> unify x n t) (S.toList names)
   (Top _ _, m) -> pure m
   (m, Top _ _) -> pure m
-  (Mutable t1, Mutable t2) -> Mutable <$> typecheck' unify t1 t2
-  (Mutable t1, t2) -> typecheck' unify t1 t2
-  (t1, Mutable t2) -> typecheck' unify t1 t2
-  (t1, Sum t2) -> pickType' (context' t1) <$> traverse (typecheck' unify t1) (NE.toList t2)
-  (Sum t1, t2) -> pickType' (context' t2) <$> traverse (flip (typecheck' unify) t2) (NE.toList t1)
-  (Static t1 _, Static t2 x) -> pure $ case typecheckStatic t1 t2 of
+  (Mutable t1, Mutable t2) -> Mutable <$> typecheck' isSub unify t1 t2
+  (Mutable t1, t2) -> typecheck' isSub unify t1 t2
+  (t1, Mutable t2) -> typecheck' isSub unify t1 t2
+  (t1, Sum t2) -> pickType' (context' t1) <$> traverse (typecheck' isSub unify t1) (NE.toList t2)
+  (Sum t1, t2) -> pickType' (context' t2) <$> traverse (flip (typecheck' isSub unify) t2) (NE.toList t1)
+  (Static t1 _, Static t2 x) -> pure $ case typecheckStaticWith isSub t1 t2 of
     Left msg -> bottom $ msg <$ x
     Right t -> Static t x
   (a, Static SVMType.Variadic _) -> pure a
   (Static SVMType.Variadic _, b) -> pure b
-  (Product (a,b,c) x, Product (d,e,f) _) -> typecheckProduct unify x (a:b:c) (d:e:f)
-  (MultiVariate a _, MultiVariate b _) -> typecheck' unify a b
-  (MultiVariate a _, Product (x1,x2,xs) x) -> typecheckProduct unify x (replicate (2 + length xs) a) (x1:x2:xs)
-  (Product (x1,x2,xs) x, MultiVariate a _) -> typecheckProduct unify x (x1:x2:xs) (replicate (2 + length xs) a)
-  (MultiVariate a _, b) -> typecheck' unify a b
-  (a, MultiVariate b _) -> typecheck' unify a b
-  (Product (a,b,c) x, d) -> typecheckProduct unify x (a:b:c) [d]
-  (a, Product (b,c,d) x) -> typecheckProduct unify x [a] (b:c:d)
+  (Product (a,b,c) x, Product (d,e,f) _) -> typecheckProduct isSub unify x (a:b:c) (d:e:f)
+  (MultiVariate a _, MultiVariate b _) -> typecheck' isSub unify a b
+  (MultiVariate a _, Product (x1,x2,xs) x) -> typecheckProduct isSub unify x (replicate (2 + length xs) a) (x1:x2:xs)
+  (Product (x1,x2,xs) x, MultiVariate a _) -> typecheckProduct isSub unify x (x1:x2:xs) (replicate (2 + length xs) a)
+  (MultiVariate a _, b) -> typecheck' isSub unify a b
+  (a, MultiVariate b _) -> typecheck' isSub unify a b
+  (Product (a,b,c) x, d) -> typecheckProduct isSub unify x (a:b:c) [d]
+  (a, Product (b,c,d) x) -> typecheckProduct isSub unify x [a] (b:c:d)
   (Function a1 v1 x _ _ _, Function a2 v2 _ _ _ _) -> do
-    a <- typecheck' unify a1 a2
-    v <- typecheck' unify v1 v2
+    a <- typecheck' isSub unify a1 a2
+    v <- typecheck' isSub unify v1 v2
     pure $ case (a, v) of
       (Bottom es, Bottom ess) -> Bottom (es <> ess)
       (Bottom es, _) -> Bottom es
@@ -608,7 +614,9 @@ typecheck' unify r1 r2 = case (r1, r2) of
         <$ context' a
 
 typecheck :: Type' -> Type' -> SSS Type'
-typecheck = typecheck' setVarType'
+typecheck r1 r2 = do
+  cc <- asks codeCollection
+  typecheck' (subtypeFromCC cc) setVarType' r1 r2
 
 (~>) :: Type' -> SSS Type' -> SSS Type'
 a ~> b = b >>= typecheck a
@@ -631,8 +639,15 @@ ma !> mb = do
 
 infixl 5 !>
 
-typecheckProduct :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> SourceAnnotation Text -> [Type'] -> [Type'] -> m Type'
-typecheckProduct unify c t1 t2 = typecheckProduct' t1 t2
+typecheckProduct ::
+  Monad m =>
+  SubtypeReconcile ->
+  (SourceAnnotation Text -> SolidString -> Type -> m Type') ->
+  SourceAnnotation Text ->
+  [Type'] ->
+  [Type'] ->
+  m Type'
+typecheckProduct isSub unify c t1 t2 = typecheckProduct' t1 t2
   where
     p1 = toType c t1
     p2 = toType c t2
@@ -662,7 +677,7 @@ typecheckProduct unify c t1 t2 = typecheckProduct' t1 t2
         )
           <$ c
     typecheckProduct' (x : xs) (y : ys) = do
-      t <- typecheck' unify x y
+      t <- typecheck' isSub unify x y
       ts <- typecheckProduct' xs ys
       pure $ case (t, ts) of
         (Bottom es, Bottom ess) -> Bottom (es <> ess)
@@ -681,6 +696,55 @@ theLastPartOf :: SolidString -> Text
 theLastPartOf = unsafeHead . reverse . T.splitOn "." . labelToText
   where unsafeHead [] = error "Data.Text.splitOn returned an empty list. This should not be possible"
         unsafeHead (x:_) = x
+
+-- | Reconcile two contract/label names when one may inherit from the
+-- other. Returns @Just@ the more specific (descendant) name when the two
+-- are equal or related by inheritance, @Nothing@ otherwise.
+type SubtypeReconcile = SolidString -> SolidString -> Maybe SolidString
+
+-- | Transitive parent names of a contract, looked up by name in the code
+-- collection. Empty when the contract is missing or has no parents.
+ancestorNames :: Annotated CodeCollectionF -> SolidString -> [SolidString]
+ancestorNames cc = go S.empty
+  where
+    go seen name
+      | name `S.member` seen = []
+      | otherwise = case M.lookup name (cc ^. contracts) of
+          Nothing -> []
+          Just c ->
+            let ps = c ^. Con.parents
+                seen' = S.insert name seen
+             in ps ++ concatMap (go seen') ps
+
+-- | Build a 'SubtypeReconcile' from a code collection. Names are related
+-- if they're equal or if one contract inherits from the other; the
+-- descendant is returned as the more specific common type.
+subtypeFromCC :: Annotated CodeCollectionF -> SubtypeReconcile
+subtypeFromCC cc a b
+  | a == b = Just a
+  | b `elem` ancestorNames cc a = Just a
+  | a `elem` ancestorNames cc b = Just b
+  | otherwise = Nothing
+
+-- | 'typecheckStatic' extended with inheritance-aware reconciliation of
+-- contract/label names: if the pure check fails on a label mismatch, try
+-- the provided 'SubtypeReconcile' before reporting an error.
+typecheckStaticWith :: SubtypeReconcile -> Type -> Type -> Either Text Type
+typecheckStaticWith isSub t1 t2 = case typecheckStatic t1 t2 of
+  Right r -> Right r
+  Left msg -> case tryInherit t1 t2 of
+    Just r -> Right r
+    Nothing -> Left msg
+  where
+    tryInherit (SVMType.UnknownLabel a) (SVMType.UnknownLabel b) =
+      SVMType.UnknownLabel <$> isSub a b
+    tryInherit (SVMType.Contract a) (SVMType.Contract b) =
+      SVMType.Contract <$> isSub a b
+    tryInherit (SVMType.UnknownLabel a) (SVMType.Contract b) =
+      SVMType.Contract <$> isSub a b
+    tryInherit (SVMType.Contract a) (SVMType.UnknownLabel b) =
+      SVMType.Contract <$> isSub a b
+    tryInherit _ _ = Nothing
 
 typecheckStatic :: Type -> Type -> Either Text Type
 typecheckStatic (SVMType.Int s1 b1) (SVMType.Int s2 b2) =
@@ -981,7 +1045,7 @@ typecheckMember t@(Static svmType x) n = do
   let unknownMember = pure . bottom $ ("Unknown member: " <> showType svmType <> "." <> labelToText n) <$ x
   c <- asks contract
   cc <- asks codeCollection
-  case filter (\(Using _ t' _ _) -> maybe True (isRight . typecheckStatic svmType) t') $ c ^. usings ++ cc ^. flUsings of
+  case filter (\(Using _ t' _ _) -> maybe True (isRight . typecheckStaticWith (subtypeFromCC cc) svmType) t') $ c ^. usings ++ cc ^. flUsings of
     [] -> unknownMember
     us -> do
       results <- forM us $ \(Using c' _ _ _) -> do
@@ -1003,7 +1067,7 @@ typecheckMember t@(Static svmType x) n = do
 typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> labelToText n) <$ context' x
 
 typecheckFuncs :: Annotated CodeCollectionF -> SourceAnnotation Text -> SolidString -> Annotated FuncF -> Annotated FuncF -> Type'
-typecheckFuncs cc x n f g = runIdentity $ typecheck' ignoreTops (functionType cc x n f) (functionType cc x n g)
+typecheckFuncs cc x n f g = runIdentity $ typecheck' (subtypeFromCC cc) ignoreTops (functionType cc x n f) (functionType cc x n g)
 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> SolidString -> m Type'
 getConstructorType' x l = do
@@ -1356,6 +1420,7 @@ statementsHelperM args ss = do
       modifierError "you cannot return a value as part of a modifier" (x)
     Just m -> do
       let x = _modifierContext m
+      cc <- asks codeCollection
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ traverse statementHelper ss
       let ret = case fst $ NE.head s of
             Nothing -> Unit x
@@ -1368,7 +1433,7 @@ statementsHelperM args ss = do
                         (Bottom es, _) -> pure $ Bottom es
                         (_, Bottom ess) -> pure $ Bottom ess
                         _ -> do
-                          t' <- typecheck' ignoreTops a b
+                          t' <- typecheck' (subtypeFromCC cc) ignoreTops a b
                           case t' of
                             Bottom _ -> pure . bottom $ "not all paths return a value." <$ x
                             _ -> pure t'
@@ -1390,6 +1455,7 @@ statementsHelper args ss = do
       pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
     Just f -> do
       let x = _funcContext f
+      cc <- asks codeCollection
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ traverse statementHelper ss
       let ret = case fst $ NE.head s of
             Nothing -> Unit x
@@ -1402,7 +1468,7 @@ statementsHelper args ss = do
                         (Bottom es, _) -> pure $ Bottom es
                         (_, Bottom ess) -> pure $ Bottom ess
                         _ -> do
-                          t' <- typecheck' ignoreTops a b
+                          t' <- typecheck' (subtypeFromCC cc) ignoreTops a b
                           case t' of
                             Bottom _ -> pure . bottom $ ("not all paths return a value: " <> T.pack (show rs)) <$ x
                             _ -> pure t'
@@ -1813,18 +1879,20 @@ ignoreTops :: Monad m => SourceAnnotation Text -> SolidString -> Type -> m Type'
 ignoreTops ann _ _ = pure $ topType' ann
 
 setVarType' :: SourceAnnotation Text -> SolidString -> Type -> SSS Type'
-setVarType' ctx name ty = state setType'
+setVarType' ctx name ty = do
+  cc <- asks codeCollection
+  state (setType' (subtypeFromCC cc))
   where
-    setType' (m :| ms) = case M.lookup name $ snd m of
+    setType' isSub (m :| ms) = case M.lookup name $ snd m of
       Nothing -> case ms of
         [] -> (bottom $ ("Unknown variable: " <> labelToText name) <$ ctx, m :| [])
-        (r : est) -> NE.cons m <$> setType' (r :| est)
+        (r : est) -> NE.cons m <$> setType' isSub (r :| est)
       Just BlankEntry -> (bottom $ ("Variable listed as BlankEntry: " <> labelToText name) <$ ctx, m :| ms)
       Just t@VarDefEntry {..} -> case vardefType of
         Nothing ->
           let t' = t {vardefType = Just ty}
            in (Static ty ctx, (M.insert name t' <$> m) :| ms)
-        Just ty' -> case typecheckStatic ty ty' of
+        Just ty' -> case typecheckStaticWith isSub ty ty' of
           Right ty'' -> (Static ty'' ctx, m :| ms)
           Left e -> (bottom $ ("Variable " <> labelToText name <> " being updated with wrong type: " <> e) <$ ctx, m :| ms)
 
