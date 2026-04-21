@@ -1,81 +1,106 @@
 # Price Oracle Service
 
-Fetches asset prices from multiple sources and pushes them to the STRATO blockchain.
+The oracle is a long-running Node service. It fetches asset prices from multiple external providers (Alchemy, CoinGecko, CoinMarketCap, DefiLlama, CoinAPI, TwelveData, OANDA, Metals.dev, MetalsAPI, CommodityPriceAPI), aggregates each asset's price by median (minimum 3 valid sources), and pushes the result to the `PriceOracle` contract on STRATO. Three write methods are used: `setAssetPrices`, `setRebaseFactors`, and `setExchangeRates`.
 
-## Features
+- **How it works end-to-end** -> [docs/FLOW.md](docs/FLOW.md)
+- **Runbooks -- add/remove an asset, add/remove a source** -> [docs/OPERATIONS.md](docs/OPERATIONS.md)
 
-- **Median Aggregation**: Robust price calculation using median of all valid sources
-- **Minimum Source Requirement**: Requires at least 3 valid sources to submit a price
-- **Batch Updates**: Multiple assets updated in single transaction
-- **Configurable Interval**: Update schedule via `CRON_SCHEDULE` cron pattern (e.g., '0 */15 * * * *' for :00, :15, :30, :45 or '30 7,22,37,52 * * * *' for :07:30, :22:30, :37:30, :52:30)
-- **Parallel Processing**: All feeds run simultaneously
-- **Automatic Retry**: All API calls retry twice on failure
-- **Health Monitoring**: Service marks itself unhealthy on persistent failures
-- **Balance Checks**: Validates USDST balance before transactions
-- **Transaction Metrics**: Records transaction timing data to AWS CloudWatch (optional)
-- **Weekend Fallback**: Metals weekend feed falls back to metals-batch prices when insufficient sources
+---
 
-## Environment Variables
+## Source map
 
-```env
-# STRATO Configuration
-STRATO_NODE_URL=https://node1.mercata-testnet.blockapps.net/
-PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000001002
-
-# OAuth Configuration
-OAUTH_CLIENT_ID=your-client-id
-OAUTH_CLIENT_SECRET=your-client-secret
-OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid_configuration
-
-# API Keys
-ALCHEMY_API_KEY=your-alchemy-key
-COINMARKETCAP_API_KEY=your-coinmarketcap-key
-COINGECKO_API_KEY=your-coingecko-api-key
-METALS_DEV_API_KEY=your-metals-dev-key
-METALS_API_API_KEY=your-metals-api-key
-COMMODITIES_API_KEY=your-commodities-api-key
-COMMODITY_PRICE_API_KEY=your-commodity-price-api-key
-COINAPI_API_KEY=your-coinapi-api-key
-DEFILLAMA_API_KEY=your-defillama-api-key  # Pro/API plan: https://defillama.com/subscription
-TWELVEDATA_API_KEY=your-twelvedata-key
-OANDA_API_KEY=your-oanda-api-key
-OANDA_ACCOUNT_ID=your-oanda-account-id  # Fetch via: curl -H "Authorization: Bearer API_KEY" https://api-fxpractice.oanda.com/v3/accounts
-
-# Oracle Configuration
-CRON_SCHEDULE="0 */15 * * * *"
-
-# Token Configuration (Optional)
-USDST_ADDRESS=86a5ae535ded415203c3e27d654f9a1d454c553b  # USDST contract address
-GAS_FEE_USDST=1  # Gas fee in USDST (0.01 = 1, default: 1)
-
-# AWS Configuration (for CloudWatch Metrics - Optional)
-# Leave CLOUDWATCH_NAMESPACE empty to disable metrics
-AWS_REGION=us-east-1
-CLOUDWATCH_NAMESPACE=Testnet/Oracle/Transactions
+```text
+src/
+├── index.ts                          Express /health, startup, calls startCronScheduler()
+├── cronScheduler.ts                  Main orchestrator: processAllAssets(), cron, median, aggregation
+├── adapters/
+│   └── genericRestAdapter.ts         Universal REST adapter driven by sources.json; also fetchRebaseFactor, fetchExchangeRate, generateConstantPrices
+├── config/
+│   ├── assets.json                   What to price: targetAssetAddress, constantPrice, weekendProxy, equivalentAssets, rebase, exchangeRate, submit
+│   └── sources.json                  Where to fetch: url, params, parse, headers, apiKeyEnvVar, symbolMapping, assets
+├── types/
+│   └── index.ts                      Asset, SourceConfig, RebaseConfig, ExchangeRateConfig, AggregatedPrice, CallListArg, etc.
+└── utils/
+    ├── oraclePusher.ts               pushAssetPrices, pushRebaseFactors, pushExchangeRates + callListAndWait + waitForTransaction
+    ├── priceReader.ts                Fetches previous on-chain prices from Cirrus for change detection
+    ├── balanceChecker.ts             Pre-flight USDST + Voucher balance check; exits on critically low balance
+    ├── configLoader.ts               Loads assets.json + sources.json, resolves API keys from env
+    ├── validateConfig.ts             Startup validation: env vars, OAuth, asset/source cross-refs, MIN_VALID_SOURCES
+    ├── oauth.ts                      STRATO OpenID auth (token + user address)
+    ├── apiClient.ts                  Axios wrapper with retry (withRetry) and withTimeout
+    ├── healthMonitor.ts              Error/warning flag files for /health
+    ├── logger.ts                     Structured console logging with secret redaction + Slack forwarding
+    ├── slackNotifier.ts              Sends warnings/errors to Slack (optional, needs SLACK_BOT_TOKEN)
+    ├── txMetricsService.ts           CloudWatch transaction metrics (optional, needs CLOUDWATCH_NAMESPACE)
+    └── constants.ts                  ORACLE_CONFIG, TIMEOUTS, GAS_PARAMS, RETRY_DELAYS, CONSTANTS (balance thresholds)
 ```
 
-## Development
+---
+
+## Configuration
+
+### Required environment variables
+
+| Variable | Purpose |
+| - | - |
+| `STRATO_NODE_URL` | STRATO node base URL |
+| `PRICE_ORACLE_ADDRESS` | PriceOracle contract address (no `0x` prefix) |
+| `USERNAME`, `PASSWORD` | BlockApps credentials |
+| `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` | OAuth client credentials |
+| `OAUTH_DISCOVERY_URL` | OpenID discovery endpoint |
+| `ALCHEMY_API_KEY` | Alchemy (prices + exchange-rate/rebase `eth_call`) |
+| `COINMARKETCAP_API_KEY` | CoinMarketCap |
+| `COINGECKO_API_KEY` | CoinGecko Pro |
+| `METALS_DEV_API_KEY` | Metals.dev |
+| `METALS_API_API_KEY` | MetalsAPI |
+| `COMMODITY_PRICE_API_KEY` | CommodityPriceAPI |
+| `COINAPI_API_KEY` | CoinAPI |
+| `DEFILLAMA_API_KEY` | DefiLlama Pro |
+| `TWELVEDATA_API_KEY` | TwelveData |
+| `OANDA_API_KEY`, `OANDA_ACCOUNT_ID` | OANDA |
+
+### Optional environment variables
+
+| Variable | Default | Purpose |
+| - | - | - |
+| `HEALTH_PORT` | `3000` | Express port for `/health` |
+| `CRON_SCHEDULE` | `0 */15 * * * *` (every 15 min) | 6-field cron (includes seconds) |
+| `USDST_ADDRESS` | `937efa7e3a77e20bbdbd7c0d32b6514f368c1010` | USDST token for balance check |
+| `VOUCHER_ADDRESS` | `000000000000000000000000000000000000100e` | Voucher token for balance check |
+| `GAS_FEE_USDST` | `1` (= 0.01 USDST) | Gas estimate per tx, multiplied by 1e16 |
+| `GAS_FEE_VOUCHER` | `100` (= 1 Voucher) | Gas estimate per tx, multiplied by 1e16 |
+| `MIN_TRANSACTIONS_THRESHOLD` | `100` | Mark unhealthy if estimated txs remaining <= this |
+| `SLACK_BOT_TOKEN` | _(disabled)_ | Slack bot token for warning/error notifications |
+| `SLACK_WARNING_CHANNEL` | `#ops-monitoring` | Slack channel |
+| `ORACLE_NAME` | `Dev Oracle` | Identifier in Slack messages |
+| `AWS_REGION` | `us-east-1` | CloudWatch region |
+| `CLOUDWATCH_NAMESPACE` | _(disabled)_ | Set to enable tx metrics (e.g. `Testnet/Oracle/Transactions`) |
+
+### Config JSON files
+
+- [`src/config/assets.json`](src/config/assets.json) -- one entry per asset. See [FLOW.md](docs/FLOW.md) for the full schema. Current categories: crypto (ETH, WBTC), stablecoins (USDC, USDT, USDST), precious metals (XAU, XAG), gold-backed tokens (PAXG, XAUT), yield-bearing (RETH, WSTETH, SUSDS, SYRUPUSDC, WEETH), Aave aTokens (AWETH, AWBTC, AWEETH, AWSTETH, AUSDC, AUSDT), xStock wrappers (WSPYX, WTSLAX), and proxy-only feeds (KAG, SPYX, TSLAX, WEETH).
+- [`src/config/sources.json`](src/config/sources.json) -- one entry per external price provider. Each entry declares the URL, parse path, API-key env var, and which assets it covers. See [OPERATIONS.md -- Add a source](docs/OPERATIONS.md#add-a-source).
+
+---
+
+## Running
 
 ```bash
 npm install
 npm run build
-npm run dev
+npm run dev     # development
+npm start       # production
 ```
 
-## Health Check
+The service runs one cycle immediately on startup, then schedules `CRON_SCHEDULE`.
 
-```bash
-curl http://localhost:3000/health
+## Health check
+
+```
+GET /health
 ```
 
-**Response:**
-- **200 OK**: Service is healthy
-- **503 Service Unavailable**: Service is unhealthy (after retry failure)
+- **200** -- healthy (no `oracle-error.flag` file).
+- **500** -- unhealthy (`oracle-error.flag` exists and is non-empty).
 
-## Health Monitoring
-
-The service automatically marks itself as unhealthy when:
-- Any API source fails twice in a row
-- Transaction submission fails twice in a row  
-- USDST balance check fails twice in a row
-- USDST balance is below minimum threshold (10 USDST) 
+The flag file is appended to by `logError()` (every error call writes to it). To recover, fix the underlying issue, delete the flag, and restart.
