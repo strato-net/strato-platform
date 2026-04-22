@@ -406,7 +406,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?
+              /cirrus/search/Bid?
             </code>
           </div>
         </div>,
@@ -1953,7 +1953,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?
+              /cirrus/search/Bid?
             </code>
           </div>,
           "className": "row",
@@ -1966,7 +1966,7 @@ ShallowWrapper {
           "props": Object {
             "children": <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?
+              /cirrus/search/Bid?
             </code>,
             "className": "col-sm-12 smd-pad-8",
           },
@@ -1978,13 +1978,13 @@ ShallowWrapper {
             "props": Object {
               "children": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/Bid?",
+                "/cirrus/search/Bid?",
               ],
             },
             "ref": null,
             "rendered": Array [
               "Query URL: ",
-              "http://localhost/cirrus/search/Bid?",
+              "/cirrus/search/Bid?",
             ],
             "type": "code",
           },
@@ -2527,7 +2527,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?
+                /cirrus/search/Bid?
               </code>
             </div>
           </div>,
@@ -4074,7 +4074,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?
+                /cirrus/search/Bid?
               </code>
             </div>,
             "className": "row",
@@ -4087,7 +4087,7 @@ ShallowWrapper {
             "props": Object {
               "children": <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?
+                /cirrus/search/Bid?
               </code>,
               "className": "col-sm-12 smd-pad-8",
             },
@@ -4099,13 +4099,13 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   "Query URL: ",
-                  "http://localhost/cirrus/search/Bid?",
+                  "/cirrus/search/Bid?",
                 ],
               },
               "ref": null,
               "rendered": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/Bid?",
+                "/cirrus/search/Bid?",
               ],
               "type": "code",
             },
@@ -4915,7 +4915,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+              /cirrus/search/Bid?state=eq.1&amount=eq.5678
             </code>
           </div>
         </div>,
@@ -6565,7 +6565,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+              /cirrus/search/Bid?state=eq.1&amount=eq.5678
             </code>
           </div>,
           "className": "row",
@@ -6578,7 +6578,7 @@ ShallowWrapper {
           "props": Object {
             "children": <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+              /cirrus/search/Bid?state=eq.1&amount=eq.5678
             </code>,
             "className": "col-sm-12 smd-pad-8",
           },
@@ -6590,13 +6590,13 @@ ShallowWrapper {
             "props": Object {
               "children": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678",
+                "/cirrus/search/Bid?state=eq.1&amount=eq.5678",
               ],
             },
             "ref": null,
             "rendered": Array [
               "Query URL: ",
-              "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678",
+              "/cirrus/search/Bid?state=eq.1&amount=eq.5678",
             ],
             "type": "code",
           },
@@ -7158,7 +7158,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+                /cirrus/search/Bid?state=eq.1&amount=eq.5678
               </code>
             </div>
           </div>,
@@ -8808,7 +8808,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+                /cirrus/search/Bid?state=eq.1&amount=eq.5678
               </code>
             </div>,
             "className": "row",
@@ -8821,7 +8821,7 @@ ShallowWrapper {
             "props": Object {
               "children": <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+                /cirrus/search/Bid?state=eq.1&amount=eq.5678
               </code>,
               "className": "col-sm-12 smd-pad-8",
             },
@@ -8833,13 +8833,13 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   "Query URL: ",
-                  "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678",
+                  "/cirrus/search/Bid?state=eq.1&amount=eq.5678",
                 ],
               },
               "ref": null,
               "rendered": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678",
+                "/cirrus/search/Bid?state=eq.1&amount=eq.5678",
               ],
               "type": "code",
             },
@@ -9560,7 +9560,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+              /cirrus/search/Bid?state=eq.1&amount=eq.5678
             </code>
           </div>
         </div>,
@@ -11210,7 +11210,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+              /cirrus/search/Bid?state=eq.1&amount=eq.5678
             </code>
           </div>,
           "className": "row",
@@ -11223,7 +11223,7 @@ ShallowWrapper {
           "props": Object {
             "children": <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+              /cirrus/search/Bid?state=eq.1&amount=eq.5678
             </code>,
             "className": "col-sm-12 smd-pad-8",
           },
@@ -11235,13 +11235,13 @@ ShallowWrapper {
             "props": Object {
               "children": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678",
+                "/cirrus/search/Bid?state=eq.1&amount=eq.5678",
               ],
             },
             "ref": null,
             "rendered": Array [
               "Query URL: ",
-              "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678",
+              "/cirrus/search/Bid?state=eq.1&amount=eq.5678",
             ],
             "type": "code",
           },
@@ -11803,7 +11803,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+                /cirrus/search/Bid?state=eq.1&amount=eq.5678
               </code>
             </div>
           </div>,
@@ -13453,7 +13453,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+                /cirrus/search/Bid?state=eq.1&amount=eq.5678
               </code>
             </div>,
             "className": "row",
@@ -13466,7 +13466,7 @@ ShallowWrapper {
             "props": Object {
               "children": <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678
+                /cirrus/search/Bid?state=eq.1&amount=eq.5678
               </code>,
               "className": "col-sm-12 smd-pad-8",
             },
@@ -13478,13 +13478,13 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   "Query URL: ",
-                  "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678",
+                  "/cirrus/search/Bid?state=eq.1&amount=eq.5678",
                 ],
               },
               "ref": null,
               "rendered": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678",
+                "/cirrus/search/Bid?state=eq.1&amount=eq.5678",
               ],
               "type": "code",
             },
@@ -14153,7 +14153,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/null?
+              /cirrus/search/null?
             </code>
           </div>
         </div>,
@@ -15437,7 +15437,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/null?
+              /cirrus/search/null?
             </code>
           </div>,
           "className": "row",
@@ -15450,7 +15450,7 @@ ShallowWrapper {
           "props": Object {
             "children": <code>
               Query URL: 
-              http://localhost/cirrus/search/null?
+              /cirrus/search/null?
             </code>,
             "className": "col-sm-12 smd-pad-8",
           },
@@ -15462,13 +15462,13 @@ ShallowWrapper {
             "props": Object {
               "children": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/null?",
+                "/cirrus/search/null?",
               ],
             },
             "ref": null,
             "rendered": Array [
               "Query URL: ",
-              "http://localhost/cirrus/search/null?",
+              "/cirrus/search/null?",
             ],
             "type": "code",
           },
@@ -15772,7 +15772,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/null?
+                /cirrus/search/null?
               </code>
             </div>
           </div>,
@@ -17056,7 +17056,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/null?
+                /cirrus/search/null?
               </code>
             </div>,
             "className": "row",
@@ -17069,7 +17069,7 @@ ShallowWrapper {
             "props": Object {
               "children": <code>
                 Query URL: 
-                http://localhost/cirrus/search/null?
+                /cirrus/search/null?
               </code>,
               "className": "col-sm-12 smd-pad-8",
             },
@@ -17081,13 +17081,13 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   "Query URL: ",
-                  "http://localhost/cirrus/search/null?",
+                  "/cirrus/search/null?",
                 ],
               },
               "ref": null,
               "rendered": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/null?",
+                "/cirrus/search/null?",
               ],
               "type": "code",
             },
@@ -17615,7 +17615,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
+              /cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
             </code>
           </div>
         </div>,
@@ -19315,7 +19315,7 @@ ShallowWrapper {
           >
             <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
+              /cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
             </code>
           </div>,
           "className": "row",
@@ -19328,7 +19328,7 @@ ShallowWrapper {
           "props": Object {
             "children": <code>
               Query URL: 
-              http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
+              /cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
             </code>,
             "className": "col-sm-12 smd-pad-8",
           },
@@ -19340,13 +19340,13 @@ ShallowWrapper {
             "props": Object {
               "children": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P",
+                "/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P",
               ],
             },
             "ref": null,
             "rendered": Array [
               "Query URL: ",
-              "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P",
+              "/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P",
             ],
             "type": "code",
           },
@@ -19917,7 +19917,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
+                /cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
               </code>
             </div>
           </div>,
@@ -21617,7 +21617,7 @@ ShallowWrapper {
             >
               <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
+                /cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
               </code>
             </div>,
             "className": "row",
@@ -21630,7 +21630,7 @@ ShallowWrapper {
             "props": Object {
               "children": <code>
                 Query URL: 
-                http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
+                /cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P
               </code>,
               "className": "col-sm-12 smd-pad-8",
             },
@@ -21642,13 +21642,13 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   "Query URL: ",
-                  "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P",
+                  "/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P",
                 ],
               },
               "ref": null,
               "rendered": Array [
                 "Query URL: ",
-                "http://localhost/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P",
+                "/cirrus/search/Bid?state=eq.1&amount=eq.5678&name=eq.P",
               ],
               "type": "code",
             },
