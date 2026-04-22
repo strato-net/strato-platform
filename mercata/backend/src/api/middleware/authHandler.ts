@@ -50,8 +50,10 @@ class AuthHandler {
         let token = getTokenFromHeader(req);
         const walletAddress = req.headers["x-wallet-address"] as string | undefined;
 
-        const effectiveAllowAnon = allowAnonAccess ?? ["GET", "HEAD", "OPTIONS"].includes(req.method);
-        const isServiceUser = !token && effectiveAllowAnon;
+        const isSafeMethod = ["GET", "HEAD", "OPTIONS"].includes(req.method);
+        const effectiveAllowAnon = allowAnonAccess ?? isSafeMethod;
+        const walletAuthenticated = !!walletAddress && isSafeMethod;
+        const isServiceUser = !token && (effectiveAllowAnon || walletAuthenticated);
 
         if (isServiceUser) {
           token = await getServiceToken();

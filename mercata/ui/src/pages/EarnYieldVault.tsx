@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatUnits } from "ethers";
-import { ArrowLeft, CircleDollarSign, TrendingUp, Wallet } from "lucide-react";
+import { ArrowLeft, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -24,6 +24,18 @@ import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits } from "@/utils/numberUtils";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import {
+  calculateEstimatedRewardsPerDay,
+  formatRoundedWithCommas,
+  roundByMagnitude,
+} from "@/services/rewardsService";
+import { useEarnContext } from "@/context/EarnContext";
+import { findBestEarnApyInfo } from "@/utils/earnUtils";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 
 const VAULT_META: Record<string, {
   title: string;
@@ -74,13 +86,6 @@ const formatExchangeRate = (exchangeRate: string, assetSymbol: string): string =
   }
 };
 
-const formatPercent = (value: string): string => {
-  if (!value || value === "-") return "-";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return "-";
-  return `${num.toFixed(2)}%`;
-};
-
 const formatUsdAmount = (value: string): string => {
   try {
     const num = Number(formatUnits(value || "0", 18));
@@ -126,6 +131,17 @@ const EarnYieldVault = () => {
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
   const { getVaultInfo, getUserVaultInfo, loading: loadingVaults, refreshVaults } = useYieldVaultContext();
+  const { tokenApys } = useEarnContext();
+  const {
+    activities: rewardsActivities,
+    loading: rewardsActivitiesLoading,
+    refetch: refetchRewardsActivities,
+  } = useRewardsActivities();
+  const {
+    userRewards,
+    loading: rewardsUserLoading,
+    refetch: refetchUserRewards,
+  } = useRewardsUserInfo();
 
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
@@ -156,14 +172,17 @@ const EarnYieldVault = () => {
   const shareSymbol = effectiveInfo?.shareSymbol || "Shares";
   const exchangeRate = formatExchangeRate(effectiveInfo?.exchangeRate || "0", assetSymbol);
   const tvlDisplay = loadingVaults ? "..." : formatUsdAmount(effectiveInfo?.tvlUsd || "0");
-  const apyDisplay = (() => {
-    if (loadingVaults) return "...";
-    const raw = effectiveInfo?.apy ?? "-";
-    if (isDeployed) {
-      const n = Number(raw);
-      if (!raw || raw === "-" || !Number.isFinite(n) || n === 0) return "—";
+  const bestApyInfo = useMemo(
+    () => findBestEarnApyInfo(tokenApys, effectiveInfo?.vaultAddress),
+    [effectiveInfo?.vaultAddress, tokenApys]
+  );
+  const bestApyDisplay = (() => {
+    if (loadingVaults) return { label: "...", className: "text-foreground" };
+    const rawTotal = bestApyInfo?.total;
+    if (!isDeployed || !rawTotal || !Number.isFinite(rawTotal) || rawTotal <= 0) {
+      return { label: "—", className: "text-muted-foreground" };
     }
-    return formatPercent(typeof raw === "string" ? raw : String(raw));
+    return { label: `+${rawTotal.toFixed(2)}%`, className: "text-foreground" };
   })();
   const userShares = userInfo?.userShares || "0";
   const redeemableAssets = userInfo?.redeemableAssets || "0";
@@ -178,6 +197,68 @@ const EarnYieldVault = () => {
   const strategyHoldings = effectiveInfo?.strategyHoldings || [];
 
   const decimals = effectiveInfo?.decimals ?? 18;
+
+  const normalizedVaultAddress = effectiveInfo?.vaultAddress?.toLowerCase?.() || "";
+  // Strict match by on-chain sourceContract. If the Rewards activity isn't
+  // pointing at this vault address, no rewards UI renders for this page.
+  const matchesCarryActivity = (source: string | undefined): boolean => {
+    if (!normalizedVaultAddress) return false;
+    return (source || "").toLowerCase() === normalizedVaultAddress;
+  };
+  const carryRewardsActivity = useMemo(() => {
+    return (
+      rewardsActivities.find((activity) =>
+        matchesCarryActivity(activity.sourceContract)
+      ) || null
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedVaultAddress, rewardsActivities]);
+  const carryRewardEntries = useMemo(() => {
+    return (
+      userRewards?.activities.filter(({ activity }) =>
+        matchesCarryActivity(activity.sourceContract)
+      ) || []
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedVaultAddress, userRewards]);
+  const carryRewardPointsPerDollarPerDay = useMemo(() => {
+    try {
+      const emissionRate = carryRewardsActivity?.emissionRate;
+      const totalStakeUsd =
+        carryRewardsActivity?.totalStakeUsd ?? effectiveInfo?.tvlUsd ?? null;
+      if (!emissionRate || !totalStakeUsd) return null;
+      const totalStakeUsdBig = BigInt(totalStakeUsd);
+      if (totalStakeUsdBig <= 0n) return null;
+      const ptsPerDollarPerDayWei =
+        (BigInt(emissionRate) * 86400n * 10n ** 18n) / totalStakeUsdBig;
+      const decimal = formatUnits(ptsPerDollarPerDayWei, 18);
+      return formatRoundedWithCommas(roundByMagnitude(decimal));
+    } catch {
+      return null;
+    }
+  }, [carryRewardsActivity?.emissionRate, carryRewardsActivity?.totalStakeUsd, effectiveInfo?.tvlUsd]);
+  const carryRewardPointsPerDay = useMemo(() => {
+    if (carryRewardEntries.length === 0) return "0";
+    const rewardsPerDay = carryRewardEntries.reduce(
+      (total, { activity, userInfo: rewardUserInfo, personalEmissionRate }) => {
+        if (personalEmissionRate && BigInt(personalEmissionRate) > 0n) {
+          return total + BigInt(personalEmissionRate) * 86400n;
+        }
+        return (
+          total +
+          BigInt(
+            calculateEstimatedRewardsPerDay(
+              rewardUserInfo?.stake || "0",
+              activity.totalStake || "0",
+              activity.emissionRate || "0"
+            )
+          )
+        );
+      },
+      0n
+    );
+    return formatRoundedWithCommas(roundByMagnitude(formatUnits(rewardsPerDay, 18)));
+  }, [carryRewardEntries]);
 
   const depositDisabled = !isLoggedIn || !isDeployed;
   const redeemDisabled = !isLoggedIn || !isDeployed || hasPendingWithdrawal;
@@ -230,6 +311,23 @@ const EarnYieldVault = () => {
 
   const isActionAmountValid = amountWei > 0n && amountWei <= actionMaxWei;
 
+  // Refresh vault + rewards state after any user action. The rewards poller
+  // is an off-chain indexer, so we schedule a delayed second pass to give it
+  // a window to ingest the Deposit/Withdraw event before we read stake.
+  const REWARDS_POLLER_DELAY_MS = 10000;
+  const refreshAfterAction = async () => {
+    await Promise.allSettled([
+      refreshVaults(),
+      refetchRewardsActivities(),
+      refetchUserRewards(),
+    ]);
+    window.setTimeout(() => {
+      Promise.allSettled([refetchRewardsActivities(), refetchUserRewards()]).catch(
+        () => undefined
+      );
+    }, REWARDS_POLLER_DELAY_MS);
+  };
+
   const handleActionRequest = (mode: Exclude<ActionMode, null>) => {
     if (!isLoggedIn) {
       toast({
@@ -269,7 +367,7 @@ const EarnYieldVault = () => {
         });
       }
       setActionMode(null);
-      await refreshVaults();
+      await refreshAfterAction();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Transaction failed";
       toast({ title: `${actionMode === "deposit" ? "Deposit" : "Redeem"} failed`, description: msg, variant: "destructive" });
@@ -288,7 +386,7 @@ const EarnYieldVault = () => {
         description: `Claiming ${formatTokenAmount(claimableAssets, decimals)} ${assetSymbol}.`,
         variant: "success",
       });
-      await refreshVaults();
+      await refreshAfterAction();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Claim failed";
       toast({ title: "Claim failed", description: msg, variant: "destructive" });
@@ -311,7 +409,7 @@ const EarnYieldVault = () => {
         variant: "success",
       });
       setActionMode(null);
-      await refreshVaults();
+      await refreshAfterAction();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Redeem failed";
       toast({ title: "Redeem failed", description: msg, variant: "destructive" });
@@ -375,17 +473,30 @@ const EarnYieldVault = () => {
         ? "..."
         : isLoggedIn
           ? (() => {
-              const sharesBn = BigInt(userShares || "0");
-              const priceBn = BigInt(userInfo?.assetPriceWad || "0");
-              const usdPart = formatUsdAmount(positionUsdWad);
-              if (sharesBn <= 0n) return "--";
-              if (priceBn <= 0n && BigInt(positionUsdWad || "0") <= 0n) return "--";
-              const underlyingHint = `${formatTokenAmount(redeemableAssets, decimals)} ${assetSymbol}`;
-              return `${usdPart} (${underlyingHint})`;
-            })()
+            const sharesBn = BigInt(userShares || "0");
+            const priceBn = BigInt(userInfo?.assetPriceWad || "0");
+            const usdPart = formatUsdAmount(positionUsdWad);
+            if (sharesBn <= 0n) return "--";
+            if (priceBn <= 0n && BigInt(positionUsdWad || "0") <= 0n) return "--";
+            const underlyingHint = `${formatTokenAmount(redeemableAssets, decimals)} ${assetSymbol}`;
+            return `${usdPart} (${underlyingHint})`;
+          })()
           : "--",
       hint: "NAV: share claim × exchange ratio × oracle price",
       icon: <CircleDollarSign className="h-4 w-4 text-violet-600 dark:text-violet-400" />,
+    },
+    {
+      label: "Estimated Rewards/Day",
+      value:
+        loadingVaults || rewardsActivitiesLoading || rewardsUserLoading
+          ? "..."
+          : isLoggedIn
+            ? `${carryRewardPointsPerDay} points`
+            : "--",
+      hint: carryRewardPointsPerDollarPerDay
+        ? `Points you can earn per day at the current rate (${carryRewardPointsPerDollarPerDay} pts/$1/day)`
+        : "Points you can earn per day at the current rate",
+      icon: <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
     },
   ];
 
@@ -469,10 +580,21 @@ const EarnYieldVault = () => {
                           </p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground">Yield</p>
-                          <p className="mt-1 text-lg font-semibold">{apyDisplay}</p>
+                          <p className="text-muted-foreground inline-flex items-center gap-1">
+                            Best Available APY
+                            <BestApyInfoTooltip />
+                          </p>
+                          {loadingVaults || rewardsActivitiesLoading ? (
+                            <p className="mt-1 text-lg font-semibold">...</p>
+                          ) : (
+                            <EarnApyTooltip info={bestApyInfo}>
+                              <p className={`mt-1 text-lg font-semibold cursor-default ${bestApyDisplay.className}`}>
+                                {bestApyDisplay.label}
+                              </p>
+                            </EarnApyTooltip>
+                          )}
                           <p className="text-xs text-muted-foreground mt-1">
-                            Estimated annualized yield
+                            Estimated annualized total yield, including rewards and native fees
                           </p>
                         </div>
                       </div>
@@ -508,7 +630,7 @@ const EarnYieldVault = () => {
                   </Card>
                 </section>
 
-                <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                   {metrics.map((metric) => (
                     <Card key={metric.label} className="border border-border/70">
                       <CardContent className="pt-4 space-y-3">
@@ -761,6 +883,15 @@ const EarnYieldVault = () => {
                   </p>
                 )}
               </div>
+            )}
+            {carryRewardsActivity?.name && !rewardsUserLoading && (
+              <RewardsWidget
+                userRewards={userRewards}
+                activityName={carryRewardsActivity.name}
+                inputAmount={actionAmount}
+                isWithdrawal={actionMode === "redeem"}
+                actionLabel={actionMode === "redeem" ? "Withdraw" : "Deposit"}
+              />
             )}
             <div className="flex flex-col gap-2">
               <Button

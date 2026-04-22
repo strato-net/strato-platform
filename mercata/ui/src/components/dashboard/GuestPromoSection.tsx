@@ -112,13 +112,10 @@ const GuestPromoSection = ({ variant, showFeatureCards = true }: GuestPromoSecti
     return { dailyPointsStr: formatDailyPoints(perDay), emissionFillPct: fillPct };
   }, [userRewards, rewardsState]);
 
-  const highestNativeApy = useMemo(() => {
+  const highestAvailableApy = useMemo(() => {
     let best = 0;
     for (const info of buildEarnApyMap(tokenApys).values()) {
-      const rewardsItem = info.breakdown.find((b) => b.label === "Rewards APY");
-      const rewardsVal = rewardsItem ? parseFloat(rewardsItem.apy) : 0;
-      const organic = info.total - rewardsVal;
-      if (organic > best) best = organic;
+      if (info.total > best) best = info.total;
     }
     return best > 0 ? best.toFixed(1) : null;
   }, [tokenApys]);
@@ -136,16 +133,16 @@ const GuestPromoSection = ({ variant, showFeatureCards = true }: GuestPromoSecti
                 <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-green-400" />
                 <span className="text-white text-[11px] md:text-xs font-medium">Live Now</span>
               </div>
-              <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-1.5 md:mb-2 leading-tight">
-                {tokenApysLoaded && highestNativeApy
-                  ? `Earn Up to ${highestNativeApy}% APY`
+              <h1 className="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-2 leading-tight">
+                {tokenApysLoaded && highestAvailableApy
+                  ? `Earn Up to ${highestAvailableApy}% APY`
                   : !tokenApysLoaded
                     ? <span className="inline-flex items-center gap-2">Earn Up to <Loader2 className="w-5 h-5 md:w-7 md:h-7 animate-spin opacity-60" /> APY</span>
                     : "Start Earning Today"
                 }
               </h1>
-              <p className="text-white/60 text-xs md:text-base mb-3 md:mb-6 leading-snug">
-                Plus 11,111 reward points daily, just for holding
+              <p className="text-white/60 text-sm md:text-base mb-6">
+                Including 11,111 reward points daily, just for holding
               </p>
               <button
                 onClick={() => navigate("/dashboard/earn")}
@@ -202,9 +199,9 @@ const GuestPromoSection = ({ variant, showFeatureCards = true }: GuestPromoSecti
               <span className="text-white text-[11px] md:text-xs font-medium">Live Now</span>
             </div>
 
-            <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-1.5 md:mb-2 leading-tight">
-              {tokenApysLoaded && highestNativeApy
-                ? `Earn Up to ${highestNativeApy}% APY`
+            <h1 className="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-2 leading-tight">
+              {tokenApysLoaded && highestAvailableApy
+                ? `Earn Up to ${highestAvailableApy}% APY`
                 : !tokenApysLoaded
                   ? <span className="inline-flex items-center gap-2">Earn Up to <Loader2 className="w-5 h-5 md:w-7 md:h-7 animate-spin opacity-60" /> APY</span>
                   : "Start Earning Today"

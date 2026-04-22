@@ -28,6 +28,7 @@ import StratoStats from "./pages/StratoStats";
 import Rewards from "./pages/Rewards";
 import ReferFriend from "./pages/ReferFriend";
 import Claim from "./pages/Claim";
+import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
@@ -132,7 +133,7 @@ const App = () => {
       const stratoChain = getStratoChain();
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
-        chains.map((chain) => [chain.id, chain === stratoChain ? http(`/rpc`) : http(`/api/rpc/${chain.id}`, { onFetchRequest: csrfOnRequest })])
+        chains.map((chain) => [chain.id, chain === stratoChain ? http(`/rpc`) : http()])
       );
 
       const connectors = connectorsForWallets(
@@ -201,6 +202,14 @@ const App = () => {
                                               <Routes>
                                                 <Route path="/" element={<Index />} />
                                                 <Route path="/claim" element={<Claim />} />
+                                                <Route
+                                                  path="/communityrewards"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <CommunityRewardsOnePager />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
                                                 <Route
                                                   path="/dashboard"
                                                   element={
