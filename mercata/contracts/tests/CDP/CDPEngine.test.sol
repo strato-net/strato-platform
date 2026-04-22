@@ -359,7 +359,8 @@ contract Describe_CDPEngine is Authorizable {
         // Verify we're at the min collateral ratio
         uint256 cr = cdpEngine.collateralizationRatio(
             address(this),
-            collateralTokenAddress
+            collateralTokenAddress,
+            priceOracle.getAssetPrice(collateralTokenAddress)
         );
         (uint256 _lr1, uint256 _minCR1, uint256 _pen1, uint256 _cf1, uint256 _sfr1, uint256 _floor1, uint256 _ceil1, uint256 _unit1, bool _pause1) = cdpEngine.collateralConfigs(collateralTokenAddress);
         require(
@@ -418,7 +419,8 @@ contract Describe_CDPEngine is Authorizable {
         );
         uint256 initialCR = cdpEngine.collateralizationRatio(
             address(this),
-            collateralTokenAddress
+            collateralTokenAddress,
+            priceOracle.getAssetPrice(collateralTokenAddress)
         );
 
         // Repay partial debt
@@ -432,7 +434,8 @@ contract Describe_CDPEngine is Authorizable {
         uint256 finalUSDSTBalance = ERC20(usdstAddress).balanceOf(address(this));
         uint256 finalCR = cdpEngine.collateralizationRatio(
             address(this),
-            collateralTokenAddress
+            collateralTokenAddress,
+            priceOracle.getAssetPrice(collateralTokenAddress)
         );
 
         // USDST should be burned (balance decreased)
@@ -489,7 +492,8 @@ contract Describe_CDPEngine is Authorizable {
         // Check CR is infinite (no debt)
         uint256 cr = cdpEngine.collateralizationRatio(
             address(this),
-            collateralTokenAddress
+            collateralTokenAddress,
+            priceOracle.getAssetPrice(collateralTokenAddress)
         );
         require(cr == 2 ** 256 - 1, "CR should be max when no debt");
 
@@ -520,7 +524,8 @@ contract Describe_CDPEngine is Authorizable {
         // Check CR
         uint256 cr = cdpEngine.collateralizationRatio(
             address(this),
-            collateralTokenAddress
+            collateralTokenAddress,
+            priceOracle.getAssetPrice(collateralTokenAddress)
         );
 
         // Expected CR = 15000 / 1500 = 10 =  10e18 WAD
@@ -549,7 +554,8 @@ contract Describe_CDPEngine is Authorizable {
         // Check CR (should be max uint when no debt)
         uint256 cr = cdpEngine.collateralizationRatio(
             address(this),
-            collateralTokenAddress
+            collateralTokenAddress,
+            priceOracle.getAssetPrice(collateralTokenAddress)
         );
         require(cr == 2 ** 256 - 1, "CR should be max when no debt");
     }
@@ -574,7 +580,8 @@ contract Describe_CDPEngine is Authorizable {
         // Verify position is currently safe
         uint256 cr = cdpEngine.collateralizationRatio(
             address(this),
-            collateralTokenAddress
+            collateralTokenAddress,
+            priceOracle.getAssetPrice(collateralTokenAddress)
         );
         require(cr > LIQUIDATION_RATIO, "Position should be safe initially");
 
@@ -608,7 +615,8 @@ contract Describe_CDPEngine is Authorizable {
         // Verify position is currently safe
         uint256 cr = cdpEngine.collateralizationRatio(
             address(this),
-            collateralTokenAddress
+            collateralTokenAddress,
+            priceOracle.getAssetPrice(collateralTokenAddress)
         );
         require(cr > LIQUIDATION_RATIO, "Position should be safe initially");
 
@@ -668,7 +676,8 @@ contract Describe_CDPEngine is Authorizable {
         // Verify position is exactly at min collateral ratio (withdrew maximum possible)
         uint256 cr = cdpEngine.collateralizationRatio(
             address(this),
-            collateralTokenAddress
+            collateralTokenAddress,
+            priceOracle.getAssetPrice(collateralTokenAddress)
         );
         (uint256 _lr2, uint256 _minCR2, uint256 _pen2, uint256 _cf2, uint256 _sfr2, uint256 _floor2, uint256 _ceil2, uint256 _unit2, bool _pause2) = cdpEngine.collateralConfigs(collateralTokenAddress);
         require(
@@ -970,7 +979,7 @@ contract Describe_CDPEngine is Authorizable {
         userB.do(address(cdpEngine), "mint", collateralTokenAddress, mintAmount);
 
         // Verify position is initially safe
-        uint256 initialCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        uint256 initialCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(initialCR >= LIQUIDATION_RATIO, "Position should be safe initially");
 
         // Price crash: Drop collateral price from $5 to $1.5 (70% drop)
@@ -979,7 +988,7 @@ contract Describe_CDPEngine is Authorizable {
         priceOracle.setAssetPrice(collateralTokenAddress, newPrice);
 
         // Verify position is now unsafe
-        uint256 newCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        uint256 newCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(newCR < LIQUIDATION_RATIO, "Position should be underwater after price drop");
 
         // Get state before liquidation
@@ -1037,7 +1046,7 @@ contract Describe_CDPEngine is Authorizable {
         userB.do(address(cdpEngine), "mint", collateralTokenAddress, mintAmount);
 
         // Verify position is initially safe
-        uint256 initialCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        uint256 initialCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(initialCR >= LIQUIDATION_RATIO, "Position should be safe initially");
 
         // SEVERE Price crash: Drop collateral price from $5 to $1 (80% drop)
@@ -1047,7 +1056,7 @@ contract Describe_CDPEngine is Authorizable {
 
 
         // Verify position is severely underwater
-        uint256 newCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        uint256 newCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(newCR < LIQUIDATION_RATIO, "Position should be severely underwater after price crash");
         // Get state before liquidation
         uint256 userBCollateralBefore = cdpVault.userCollaterals(address(userB), collateralTokenAddress);
@@ -1093,7 +1102,7 @@ contract Describe_CDPEngine is Authorizable {
         userB.do(address(cdpEngine), "mint", collateralTokenAddress, mintAmount);
 
         // Verify position is safe
-        uint256 cr = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        uint256 cr = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(cr > LIQUIDATION_RATIO, "Position should be safe");
 
         // UserA tries to liquidate (should fail)
@@ -1146,7 +1155,7 @@ contract Describe_CDPEngine is Authorizable {
         require(userBUSDSTAfter == userBUSDSTBefore + borrowAmount, "UserB should receive borrowed USDST");
         require(userBDebtAfter == userBDebtBefore + borrowAmount, "UserB debt should increase by borrow amount");
 
-        uint256 crAfterBorrow = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        uint256 crAfterBorrow = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(crAfterBorrow > LIQUIDATION_RATIO, "Position should be healthy after borrowing");
 
         uint256 expectedCR = (depositAmount * priceOracle.getAssetPrice(collateralTokenAddress)) / borrowAmount;
@@ -1170,7 +1179,7 @@ contract Describe_CDPEngine is Authorizable {
 
         require(userBUSDSTBefore == userBUSDSTAfterRepay, "UserB should have burned exactly the borrowed amount");
 
-        uint256 crAfterRepay = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        uint256 crAfterRepay = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(crAfterRepay == 2**256 - 1, "CR should be max when no debt exists");
 
         // === PHASE 4: FINAL VERIFICATION ===
@@ -1210,7 +1219,7 @@ contract Describe_CDPEngine is Authorizable {
         );
 
         // Check CR (should be infinite - no debt yet)
-        uint256 crAfterDeposit = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 crAfterDeposit = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(crAfterDeposit == 2**256 - 1, "Step 1: CR should be infinite with no debt");
 
         // log(" ═══════════════════════════════════════════════════════════════════
@@ -1233,7 +1242,7 @@ contract Describe_CDPEngine is Authorizable {
         );
 
         // Check CR after first mint
-        uint256 crAfterFirstMint = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 crAfterFirstMint = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(crAfterFirstMint > LIQUIDATION_RATIO, "Step 2: Position should be healthy after first mint");
 
         // Expected CR: $50,000 / $1,000 = 50.0 (5000%)
@@ -1283,7 +1292,7 @@ contract Describe_CDPEngine is Authorizable {
         );
 
         uint256 totalMinted = firstMintAmount + secondMintAmount;
-        uint256 crAfterSecondMint = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 crAfterSecondMint = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
 
         require(crAfterSecondMint == (totalCollateralAfterSecondDeposit * currentPrice) / totalMinted, "Step 4: CR should be approximately 10000% after second mint");
 
@@ -1302,7 +1311,7 @@ contract Describe_CDPEngine is Authorizable {
         uint256 newPrice = currentPrice * princeIncreaseMultiplier;
         priceOracle.setAssetPrice(collateralTokenAddress, newPrice);
 
-        uint256 crAfterPriceIncrease = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 crAfterPriceIncrease = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(
             crAfterPriceIncrease > crAfterSecondMint,
             "Step 5: CR should improve after price appreciation by princeIncreaseMultiplier"
@@ -1317,7 +1326,7 @@ contract Describe_CDPEngine is Authorizable {
         // // ═══════════════════════════════════════════════════════════════════
 
         uint256 balanceBeforeRepay = ERC20(usdstAddress).balanceOf(address(this));
-        uint256 crBeforeRepay = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 crBeforeRepay = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
 
         require(
             ERC20(usdstAddress).approve(address(cdpEngine), partialRepayAmount),
@@ -1327,7 +1336,7 @@ contract Describe_CDPEngine is Authorizable {
         cdpEngine.repay(collateralTokenAddress, partialRepayAmount);
 
         uint256 balanceAfterRepay = ERC20(usdstAddress).balanceOf(address(this));
-        uint256 crAfterRepay = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 crAfterRepay = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
 
         require(
             balanceAfterRepay == balanceBeforeRepay - partialRepayAmount,
@@ -1374,7 +1383,7 @@ contract Describe_CDPEngine is Authorizable {
         );
 
         // Verify position remains healthy after withdrawal
-        uint256 crAfterWithdraw = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 crAfterWithdraw = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(crAfterWithdraw > LIQUIDATION_RATIO, "Step 7: Position should remain healthy after withdrawal");
 
         // log(   " ═══════════════════════════════════════════════════════════════════
@@ -1396,7 +1405,7 @@ contract Describe_CDPEngine is Authorizable {
 
         // Verify we're at min collateral ratio threshold
         (uint256 _lr1, uint256 _minCR1, uint256 _pen1, uint256 _cf1, uint256 _sfr1, uint256 _floor1, uint256 _ceil1, uint256 _unit1, bool _pause1) = cdpEngine.collateralConfigs(collateralTokenAddress);
-        uint256 crAfterMaxWithdraw = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 crAfterMaxWithdraw = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(
             crAfterMaxWithdraw >= _minCR1 &&
             crAfterMaxWithdraw <= _minCR1 + 1e15,
@@ -1438,7 +1447,7 @@ contract Describe_CDPEngine is Authorizable {
         cdpEngine.repayAll(collateralTokenAddress);
 
         // Verify no debt remains (CR should be infinite)
-        uint256 crAfterFullRepay = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 crAfterFullRepay = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         (, uint256 debtAfterFullRepay) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(debtAfterFullRepay == 0, "Step 9: Debt should be 0 after full repayment");
         require(crAfterFullRepay == 2**256 - 1, "Step 9: CR should be infinite after full repayment");
@@ -1485,7 +1494,7 @@ contract Describe_CDPEngine is Authorizable {
         );
 
         // Verify the CDP system is in a clean state for this user
-        uint256 finalCR = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 finalCR = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(finalCR == 2**256 - 1, "Step 11: Final CR should be infinite (no debt)");
 
     }
@@ -1626,7 +1635,7 @@ contract Describe_CDPEngine is Authorizable {
         // log("Engine vault collateral", cdpEngine.vaults(address(this), collateralTokenAddress).collateral);
         // log("CDPVault collateral", cdpVault.userCollaterals(address(this), collateralTokenAddress));
         // log("Debt", cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt);
-        // log("CR", cdpEngine.collateralizationRatio(address(this), collateralTokenAddress));
+        // log("CR", cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress)));
 
         (collateral, _) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
@@ -1641,7 +1650,7 @@ contract Describe_CDPEngine is Authorizable {
         // log("Max withdrawable", maxWithdrawable);
         // log("Engine vault collateral", cdpEngine.vaults(address(this), collateralTokenAddress).collateral);
         // log("CDPVault collateral", cdpVault.userCollaterals(address(this), collateralTokenAddress));
-        // log("CR", cdpEngine.collateralizationRatio(address(this), collateralTokenAddress));
+        // log("CR", cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress)));
 
         (collateral, _) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
@@ -1812,6 +1821,9 @@ contract Describe_CDPEngine is Authorizable {
         uint256 sixMonths = 182 * 24 * 60 * 60; // ~6 months
         fastForward(sixMonths);
 
+        // Refresh oracle price so the write-path staleness gate accepts it.
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+
         // Trigger accrual
         cdpEngine.mint(collateralTokenAddress, 1);
 
@@ -1822,6 +1834,9 @@ contract Describe_CDPEngine is Authorizable {
 
         // Fast forward another 6 months
         fastForward(sixMonths);
+
+        // Refresh oracle price before the next write-path call.
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
 
         // Trigger accrual again
         cdpEngine.mint(collateralTokenAddress, 1);
@@ -2089,9 +2104,12 @@ contract Describe_CDPEngine is Authorizable {
 
         // Half-year passes; second borrow triggers first accrual period.
         fastForward(182 * 24 * 60 * 60);
+        // Restamp oracle before the write-path mint (staleness gate).
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
         cdpEngine.mint(collateralTokenAddress, 100e18);
 
         // Complete the year from initial borrow, then trigger accrual again.
+        // No oracle refresh needed: repay does not consult the price oracle.
         fastForward(183 * 24 * 60 * 60);
         cdpEngine.repay(collateralTokenAddress, 1);
 
@@ -2413,6 +2431,8 @@ contract Describe_CDPEngine is Authorizable {
         // -------- Step 1: mint ugly #2 (accrual first) --------
         uint256 mint2 = 2345678912345678901234;
         fastForward(987654);
+        // Restamp oracle before the write-path mint (staleness gate).
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
         (uint256 rateBefore1, , uint256 totalScaledBefore1) =
             cdpEngine.collateralGlobalStates(collateralTokenAddress);
         cdpEngine.mint(collateralTokenAddress, mint2);
@@ -2470,6 +2490,8 @@ contract Describe_CDPEngine is Authorizable {
         // -------- Step 3: mint ugly #3 (accrual first) --------
         uint256 mint3 = 345678912345678901234;
         fastForward(246801);
+        // Restamp oracle before the write-path mint (staleness gate).
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
         (uint256 rateBefore3, , uint256 totalScaledBefore3) =
             cdpEngine.collateralGlobalStates(collateralTokenAddress);
         cdpEngine.mint(collateralTokenAddress, mint3);
@@ -2525,30 +2547,93 @@ contract Describe_CDPEngine is Authorizable {
         require(totalScaledBefore4 - totalScaledAfter4 == expectedScaledDelta4, "Multi ugly step4: total scaled delta mismatch");
     }
 
-    // function it_cdp_engine_reverts_mint_with_stale_prices() {
-    //     // Set up collateral
-    //     uint256 collateralAmount = 1000e18;
-    //     require(
-    //         ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
-    //         "Collateral approval failed"
-    //     );
-    //     cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+    // ============ ORACLE STALENESS TESTS ============
 
-    //     // Set initial price
-    //     priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+    /**
+     * Exercises the priceMaxAge staleness guard on CDPEngine write paths:
+     *   1. Write paths (mint, withdraw) revert once the oracle timestamp is older than priceMaxAge.
+     *   2. The owner bypass (priceMaxAge = 0) re-enables operations during an oracle incident.
+     *   3. Refreshing the oracle price restores the normal (guarded) happy path.
+     *   4. setPriceMaxAge is onlyOwner.
+     */
+    function it_cdp_engine_enforces_oracle_staleness_on_write_paths() {
+        uint256 maxAge = cdpEngine.priceMaxAge();
+        require(maxAge > 0, "Test assumes staleness gate is enabled by default");
 
-    //     // Advance time beyond the staleness threshold (25 minutes > 20 minutes)
-    //     fastForward(1500); // 25 minutes
+        // Establish a healthy position while the oracle price (just set in beforeEach) is fresh.
+        uint256 depositAmount = 1000e18;
+        uint256 initialMint   = 100e18;
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), depositAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+        cdpEngine.mint(collateralTokenAddress, initialMint);
 
-    //     // Try to mint without updating prices - should fail due to stale price
-    //     bool reverted = false;
-    //     try cdpEngine.mint(collateralTokenAddress, 100e18) {
-    //         // Should not reach here
-    //     } catch {
-    //         reverted = true;
-    //     }
-    //     require(reverted, "Mint should revert with stale prices");
-    // }
+        // Advance past the freshness window without pushing a new price. The oracle's
+        // lastUpdated for this asset is now `maxAge + 1` seconds in the past.
+        fastForward(maxAge + 1);
+
+        // mint must revert: the staleness gate fires before any collateral math.
+        bool mintReverted = false;
+        try {
+            cdpEngine.mint(collateralTokenAddress, 1e18);
+        } catch {
+            mintReverted = true;
+        }
+        require(mintReverted, "mint should revert when oracle price is stale");
+
+        // withdraw with outstanding debt must also revert (same gate).
+        bool withdrawReverted = false;
+        try {
+            cdpEngine.withdraw(collateralTokenAddress, 1e18);
+        } catch {
+            withdrawReverted = true;
+        }
+        require(withdrawReverted, "withdraw should revert when oracle price is stale");
+
+        // Owner bypass: setting priceMaxAge = 0 disables the gate for incident recovery.
+        cdpEngine.setPriceMaxAge(0);
+        require(cdpEngine.priceMaxAge() == 0, "priceMaxAge should be 0 after bypass");
+        // With the gate off, the same call that just reverted should now succeed.
+        cdpEngine.mint(collateralTokenAddress, 1e18);
+
+        // Re-enable the gate. While the price is still stale, mint reverts again.
+        cdpEngine.setPriceMaxAge(maxAge);
+        bool mintRevertedAgain = false;
+        try {
+            cdpEngine.mint(collateralTokenAddress, 1e18);
+        } catch {
+            mintRevertedAgain = true;
+        }
+        require(mintRevertedAgain, "mint should revert again after re-enabling staleness gate");
+
+        // Refreshing the oracle price restamps lastUpdated to the current block; mint succeeds.
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        cdpEngine.mint(collateralTokenAddress, 1e18);
+    }
+
+    /**
+     * setPriceMaxAge is onlyOwner: a random user cannot widen or disable the staleness gate.
+     */
+    function it_cdp_engine_setPriceMaxAge_is_onlyOwner() {
+        uint256 originalMaxAge = cdpEngine.priceMaxAge();
+
+        bool reverted = false;
+        try {
+            userA.do(address(cdpEngine), "setPriceMaxAge", 0);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Non-owner should not be able to setPriceMaxAge");
+        require(cdpEngine.priceMaxAge() == originalMaxAge, "priceMaxAge should be unchanged after non-owner call");
+
+        // Owner can change it.
+        cdpEngine.setPriceMaxAge(7200);
+        require(cdpEngine.priceMaxAge() == 7200, "Owner setPriceMaxAge should update the value");
+        // Restore default so we don't leak state into later tests.
+        cdpEngine.setPriceMaxAge(originalMaxAge);
+    }
 
     // ============ MIN COLLATERAL RATIO TESTS ============
 
@@ -2640,7 +2725,7 @@ contract Describe_CDPEngine is Authorizable {
         (, uint256 scaledDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
         (uint256 rateAccumulator, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
         uint256 actualDebt = (scaledDebt * rateAccumulator) / RAY;
-        uint256 actualCR = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 actualCR = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         uint256 collateralInVault = cdpVault.userCollaterals(address(this), collateralTokenAddress);
         uint256 price = priceOracle.getAssetPrice(collateralTokenAddress);
         // log("Actual debt", actualDebt);
@@ -2665,7 +2750,7 @@ contract Describe_CDPEngine is Authorizable {
         // Verify that after withdrawal, CR is still >= minCR
         // Note: withdrawMax() already performs the withdrawal internally, so we just need to check the final state
         (uint256 _lr2, uint256 _minCR2, uint256 _pen2, uint256 _cf2, uint256 _sfr2, uint256 _floor2, uint256 _ceil2, uint256 _unit2, bool _pause2) = cdpEngine.collateralConfigs(collateralTokenAddress);
-        uint256 cr = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 cr = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(cr >= _minCR2, "CR should be >= minCR after max withdrawal");
     }
 
@@ -2694,7 +2779,7 @@ contract Describe_CDPEngine is Authorizable {
         // Verify that after minting, CR is still >= minCR
         // Note: mintMax() already performs the minting internally, so we just need to check the final state
         (uint256 _lr3, uint256 _minCR3, uint256 _pen3, uint256 _cf3, uint256 _sfr3, uint256 _floor3, uint256 _ceil3, uint256 _unit3, bool _pause3) = cdpEngine.collateralConfigs(collateralTokenAddress);
-        uint256 cr = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 cr = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress, priceOracle.getAssetPrice(collateralTokenAddress));
         require(cr >= _minCR3, "CR should be >= minCR after max mint");
     }
 

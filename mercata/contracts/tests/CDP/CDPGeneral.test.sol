@@ -345,7 +345,7 @@ contract Describe_CDPGeneral is Authorizable {
         log("✅ Large amount precision handled correctly");
 
         // Test collateralization ratio calculation precision
-        uint cr = engine.collateralizationRatio(address(user1), ETHST);
+        uint cr = engine.collateralizationRatio(address(user1), ETHST, m.priceOracle().getAssetPrice(ETHST));
         require(cr > 0, "Collateralization ratio should be positive");
         log("✅ Collateralization ratio precision handled correctly");
     }
@@ -622,7 +622,7 @@ contract Describe_CDPGeneral is Authorizable {
         // (This is more of a monitoring test - actual gas measurement would need different tools)
 
         // Test efficient state reads
-        uint cr = engine.collateralizationRatio(address(user1), ETHST);
+        uint cr = engine.collateralizationRatio(address(user1), ETHST, m.priceOracle().getAssetPrice(ETHST));
         uint badDebt = engine.badDebtUSDST(ETHST);
         uint juniorIndex = engine.juniorIndex();
 

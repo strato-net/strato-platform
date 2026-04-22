@@ -201,7 +201,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(user1USDSTBalance == mintAmount, "USDST not minted correctly");
 
         // Check collateralization ratio
-        uint cr = engine.collateralizationRatio(address(user1), ETHST);
+        uint cr = engine.collateralizationRatio(address(user1), ETHST, m.priceOracle().getAssetPrice(ETHST));
         // log("📊 Collateralization ratio: " + string(cr / 1e16) + "% (healthy)");
 
         // log("✅ User1 minted " + string(mintAmount / 1e18) + " USDST against ETHST collateral");
