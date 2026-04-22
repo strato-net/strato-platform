@@ -7,6 +7,7 @@ import "../Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
 import "../Lending/LendingRegistry.sol";
 import "../Metals/MetalForge.sol";
+import "StratoCustodyVault.sol";
 
 /**
  * @title MercataBridge
@@ -113,6 +114,9 @@ contract record MercataBridge is Ownable {
     /// @param isNative Whether the asset is a native STRATO asset
     event AssetUpdated(bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken, bool isNative);
 
+    /// @notice Emitted when the StratoCustodyVault address is updated
+    event StratoCustodyVaultUpdated(address newVault, address oldVault);
+
     /// @notice Emitted when the metal forge address is updated
     event MetalForgeUpdated(address newForge, address oldForge);
 
@@ -147,6 +151,9 @@ contract record MercataBridge is Ownable {
 
     /// @notice MetalForge contract for auto-forging metals on deposit
     address public metalForge;
+
+    /// @notice StratoCustodyVault contract for holding native tokens on withdrawal
+    address public stratoCustodyVault;
 
     /// @notice USDST token address for cross-chain minting/redeeming
     /// @dev Default USDST address: 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
@@ -243,7 +250,8 @@ contract record MercataBridge is Ownable {
     function initialize(
         address _tokenFactory,
         address _lendingRegistry,
-        address _metalForge
+        address _metalForge,
+        address _stratoCustodyVault
     ) external onlyOwner {
         DECIMAL_PLACES = 18;
         USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
@@ -252,6 +260,7 @@ contract record MercataBridge is Ownable {
         setTokenFactory(_tokenFactory);
         setLendingRegistry(_lendingRegistry);
         setMetalForge(_metalForge);
+        setStratoCustodyVault(_stratoCustodyVault);
     }
 
     // ───────────── Admin related functions ─────────────
@@ -423,6 +432,17 @@ contract record MercataBridge is Ownable {
         require(newLendingRegistry != address(0), "MB: zero lending registry address");
         emit LendingRegistryUpdated(newLendingRegistry, lendingRegistry);
         lendingRegistry = newLendingRegistry;
+    }
+    
+    /**
+     * @dev Sets the lending registry address
+     * @notice Only the owner can update the lending registry address
+     * @param newLendingRegistry The new lending registry address (must not be zero address)
+     */
+    function setStratoCustodyVault(address newVault) public onlyOwner {
+        require(newVault != address(0), "MB: zero vault address");
+        emit StratoCustodyVaultUpdated(newVault, stratoCustodyVault);
+        stratoCustodyVault = newVault;
     }
 
     /**
@@ -785,30 +805,38 @@ contract record MercataBridge is Ownable {
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
-        DepositActionRequest req = depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
-        if (req.action == DepositAction.AUTO_SAVE) {
-            try {
-                _autoSave(d, externalChainId, normalizedTxHash);
-            }
-            catch {
-                uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
-                require(actualMintedAmount > 0, "MB: no tokens minted");
-            }
-            delete depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
-        }
-        else if (req.action == DepositAction.AUTO_FORGE) {
-            try {
-                _autoForge(d, externalChainId, normalizedTxHash, req.targetToken);
-            }
-            catch {
-                uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
-                require(actualMintedAmount > 0, "MB: no tokens minted");
-            }
-            delete depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
+        AssetInfo a = assets[d.externalToken][externalChainId];
+        if (a.isNative) {
+            require(stratoCustodyVault != address(0), "MB: vault not set");
+            uint256 actualUnlockedAmount = StratoCustodyVault(stratoCustodyVault).unlock(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
+            require(actualUnlockedAmount > 0, "MB: no tokens unlocked");
         }
         else {
-            uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
-            require(actualMintedAmount > 0, "MB: no tokens minted");
+            DepositActionRequest req = depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
+            if (req.action == DepositAction.AUTO_SAVE) {
+                try {
+                    _autoSave(d, externalChainId, normalizedTxHash);
+                }
+                catch {
+                    uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
+                    require(actualMintedAmount > 0, "MB: no tokens minted");
+                }
+                delete depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
+            }
+            else if (req.action == DepositAction.AUTO_FORGE) {
+                try {
+                    _autoForge(d, externalChainId, normalizedTxHash, req.targetToken);
+                }
+                catch {
+                    uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
+                    require(actualMintedAmount > 0, "MB: no tokens minted");
+                }
+                delete depositActionRequests[d.stratoRecipient][externalChainId][normalizedTxHash];
+            }
+            else {
+                uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
+                require(actualMintedAmount > 0, "MB: no tokens minted");
+            }
         }
 
         d.bridgeStatus = BridgeStatus.COMPLETED;
@@ -1047,8 +1075,16 @@ contract record MercataBridge is Ownable {
         WithdrawalInfo w = withdrawals[id];
         require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
-        uint256 actualBurnedAmount = _burnFunds(w.stratoToken, w.stratoTokenAmount);
-        require(actualBurnedAmount > 0, "MB: no tokens burned");
+        AssetInfo a = assets[w.externalToken][w.externalChainId];
+        if (a.isNative) {
+            require(stratoCustodyVault != address(0), "MB: vault not set");
+            IERC20(w.stratoToken).approve(stratoCustodyVault, w.stratoTokenAmount);
+            uint256 actualLockedAmount = StratoCustodyVault(stratoCustodyVault).lock(w.stratoToken, address(this), w.stratoTokenAmount);
+            require(actualLockedAmount > 0, "MB: no tokens locked");
+        } else {
+            uint256 actualBurnedAmount = _burnFunds(w.stratoToken, w.stratoTokenAmount);
+            require(actualBurnedAmount > 0, "MB: no tokens burned");
+        }
 
         w.bridgeStatus = BridgeStatus.COMPLETED;
         w.timestamp = block.timestamp;
