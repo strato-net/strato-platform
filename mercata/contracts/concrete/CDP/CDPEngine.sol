@@ -58,11 +58,11 @@ contract record CDPEngine is Ownable {
     mapping(address => bool) public record isSupportedAsset;
 
     uint256 public feeToReserveBps; // portion of feeUSD sent to CDPReserve (0..10000)
-    // uint public priceMaxAge = 1200;
+    uint public priceMaxAge = 1200;
 
     event FeeToReserveBpsSet(uint256 oldBps, uint256 newBps);
     event FeesRouted(address indexed asset, uint256 toReserve, uint256 toCollector);
-    // event PriceMaxAgeSet(uint oldMaxAge, uint newMaxAge);
+    event PriceMaxAgeSet(uint oldMaxAge, uint newMaxAge);
 
     // ─────────────── Events ───────────────
     event CollateralConfigured(
@@ -160,7 +160,7 @@ contract record CDPEngine is Ownable {
         // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
         RAY = 1e27;
         WAD = 1e18;
-        // priceMaxAge = 1200;
+        priceMaxAge = 1200; // 20 minutes: owner-tunable via setPriceMaxAge
 
         require(_registry != address(0), "CDPEngine: invalid registry");
         registry = CDPRegistry(_registry);
@@ -184,11 +184,26 @@ contract record CDPEngine is Ownable {
         emit FeeToReserveBpsSet(old, newBps);
     }
 
-    // function setPriceMaxAge(uint newMaxAge) external onlyOwner {
-    //     uint old = priceMaxAge;
-    //     priceMaxAge = newMaxAge;
-    //     emit PriceMaxAgeSet(old, newMaxAge);
-    // }
+    /**
+     * @notice Set the maximum allowed age (seconds) for oracle prices on write paths.
+     * @dev Set to 0 to disable the staleness check (e.g., during oracle infra incidents).
+     *      Recommended value: multiple of the oracle push cadence (e.g., 3600 for a 15-min cron).
+     */
+    function setPriceMaxAge(uint newMaxAge) external onlyOwner {
+        uint old = priceMaxAge;
+        priceMaxAge = newMaxAge;
+        emit PriceMaxAgeSet(old, newMaxAge);
+    }
+
+    /**
+     * @dev Revert if the given oracle `timestamp` is older than `priceMaxAge`.
+     *      No-op if priceMaxAge == 0 (feature disabled / oracle-incident bypass).
+     */
+    function _requireFreshTimestamp(uint timestamp) internal view {
+        uint maxAge = priceMaxAge;
+        if (maxAge == 0) return;
+        require(block.timestamp - timestamp <= maxAge, "CDPEngine: stale price");
+    }
 
     /**
      * @notice Internal helper to route fees between Reserve and FeeCollector
@@ -236,7 +251,10 @@ contract record CDPEngine is Ownable {
         // Optimistically reduce collateral, then validate CR if debt remains
         vault.collateral -= amount;
         if (vault.scaledDebt > 0) {
-            uint crAfter = collateralizationRatio(msg.sender, asset);
+            (uint price, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
+            require(price > 0, "invalid price");
+            _requireFreshTimestamp(timestamp);
+            uint crAfter = collateralizationRatio(msg.sender, asset, price);
             require(crAfter >= collateralConfigs[asset].minCR, "CDPEngine: below min CR");
         }
         // Perform custody move after checks
@@ -262,7 +280,7 @@ contract record CDPEngine is Ownable {
             // Compute collateral required to keep CR >= minCR
             (uint price, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
             require(price > 0, "invalid price");
-            // require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
+            _requireFreshTimestamp(timestamp);
             CollateralConfig memory config = collateralConfigs[asset];
             uint requiredCollateralValue = (debt * config.minCR) / WAD;
             uint requiredCollateral = (requiredCollateralValue * config.unitScale) / price;
@@ -300,7 +318,7 @@ contract record CDPEngine is Ownable {
         // Value collateral in USD and compute borrow headroom from minCR
         (uint price, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
         require(price > 0, "invalid price");
-        // require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
+        _requireFreshTimestamp(timestamp);
         uint collateralValueUSD_calc = (userVault.collateral * price) / assetConfig.unitScale;
         uint maxBorrowableUSD = (collateralValueUSD_calc * WAD) / assetConfig.minCR;
         require(currentDebt + amountUSD < maxBorrowableUSD, "CDPEngine: insufficient collateral");
@@ -339,7 +357,7 @@ contract record CDPEngine is Ownable {
         // Compute borrow headroom from collateral value and minCR
         (uint price, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
         require(price > 0, "invalid price");
-        // require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
+        _requireFreshTimestamp(timestamp);
         uint collateralValueUSD_calc = (userVault.collateral * price) / config.unitScale;
         uint maxBorrowableUSD = (collateralValueUSD_calc * WAD) / config.minCR;
         require(maxBorrowableUSD > currentDebt, "No borrowing power");
@@ -460,13 +478,15 @@ contract record CDPEngine is Ownable {
         Vault storage borrowerVault = vaults[borrower][collateralAsset];
         require(borrowerVault.scaledDebt > 0, "CDPEngine: no debt to liquidate");
 
-        uint borrowerCR = collateralizationRatio(borrower, collateralAsset);
-        require(borrowerCR < config.liquidationRatio, "CDPEngine: position healthy");
-
-        // Prices & caps
+        // Prices & caps. Staleness is enforced here to block profitable stale-price liquidations;
+        // admin can widen priceMaxAge (or set it to 0) if the oracle lags during an incident.
+        // One oracle call serves both the health check and the seize math below.
         (uint priceCollWei, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(collateralAsset);
         require(priceCollWei > 0, "CDPEngine: invalid collateral price");
-        // require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
+        _requireFreshTimestamp(timestamp);
+
+        uint borrowerCR = collateralizationRatio(borrower, collateralAsset, priceCollWei);
+        require(borrowerCR < config.liquidationRatio, "CDPEngine: position healthy");
 
         uint totalDebtWei   = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
         uint closeFactorCap = (totalDebtWei * config.closeFactorBps) / 10000;
@@ -728,14 +748,17 @@ contract record CDPEngine is Ownable {
 
 
 
-    function collateralizationRatio(address user, address asset) public view returns (uint crWad) {
-        CollateralGlobalState storage s = collateralGlobalStates[asset];
+    /**
+     * @notice Compute collateralizationRatio given an externally supplied oracle price.
+     * @param user  Vault owner.
+     * @param asset Collateral asset.
+     * @param price Oracle price (1e18 scale). Ignored when the vault has no debt.
+     */
+    function collateralizationRatio(address user, address asset, uint price) public view returns (uint crWad) {
         Vault storage v = vaults[user][asset];
-        uint debtUSD = (v.scaledDebt * s.rateAccumulator) / RAY;
+        uint debtUSD = (v.scaledDebt * collateralGlobalStates[asset].rateAccumulator) / RAY;
         if (debtUSD == 0) return (2**256 - 1);
-        (uint price, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
         require(price > 0, "invalid price");
-        // require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
         uint unitScale = collateralConfigs[asset].unitScale;
         uint collateralUSD = unitScale == 0 ? 0 : (v.collateral * price) / unitScale;
         return (collateralUSD * WAD) / debtUSD;
