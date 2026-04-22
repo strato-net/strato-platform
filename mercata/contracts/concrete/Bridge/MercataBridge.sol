@@ -250,8 +250,7 @@ contract record MercataBridge is Ownable {
     function initialize(
         address _tokenFactory,
         address _lendingRegistry,
-        address _metalForge,
-        address _stratoCustodyVault
+        address _metalForge
     ) external onlyOwner {
         DECIMAL_PLACES = 18;
         USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
@@ -260,7 +259,6 @@ contract record MercataBridge is Ownable {
         setTokenFactory(_tokenFactory);
         setLendingRegistry(_lendingRegistry);
         setMetalForge(_metalForge);
-        setStratoCustodyVault(_stratoCustodyVault);
     }
 
     // ───────────── Admin related functions ─────────────
