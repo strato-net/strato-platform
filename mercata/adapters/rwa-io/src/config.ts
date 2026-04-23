@@ -53,6 +53,19 @@ export const config = {
         volume: "69dd09eda008b4e0b36d0630",
       },
     },
+    {
+      address: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+      symbol: "USDST",
+      rwaIoAssetId: "69ea0d3102db7539c0aa451c",
+      timeSeries: {
+        aum: "69ea0d3102db7539c0aa451f",
+        circulatingSupply: "69ea0d3102db7539c0aa4521",
+        marketCap: "69ea0d3102db7539c0aa4520",
+        nav: "69ea0d3102db7539c0aa451e",
+        price: "69ea0d3102db7539c0aa451d",
+        volume: "69ea0d3102db7539c0aa4522",
+      },
+    },
   ],
   /** Cron expression — every hour at minute 0 */
   cronSchedule: "0 * * * *",
