@@ -16,12 +16,22 @@ export const createSafeTransactions = async (
 
   const allTransactionProposals: SafeTransactionData[] = [];
 
+  // Isolate per-chain failures: a misconfigured chain (e.g. missing
+  // externalBridgeVault) must not block other chains in the same batch.
   for (const [externalChainId, chainWithdrawals] of withdrawalsByChain) {
-    const chainProposals = await createWithdrawalProposals(
-      externalChainId,
-      chainWithdrawals as NonEmptyArray<WithdrawalInfo>
-    );
-    allTransactionProposals.push(...chainProposals);
+    try {
+      const chainProposals = await createWithdrawalProposals(
+        externalChainId,
+        chainWithdrawals as NonEmptyArray<WithdrawalInfo>
+      );
+      allTransactionProposals.push(...chainProposals);
+    } catch (err) {
+      logError("SafeService", err as Error, {
+        operation: "createWithdrawalProposals",
+        externalChainId,
+        withdrawalCount: chainWithdrawals.length,
+      });
+    }
   }
 
   logInfo(

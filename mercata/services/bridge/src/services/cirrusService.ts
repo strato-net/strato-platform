@@ -8,6 +8,7 @@ import {
   AssetInfo,
   BridgeInfo,
 } from "../types";
+import { logError } from "../utils/logger";
 
 const { bridge, oracle } = config;
 const { address: bridgeAddress } = bridge;
@@ -129,27 +130,41 @@ export const getDepositsByStatus = async (
     getEnabledChains(),
   ]);
 
-  return data.map(
+  // Skip (and log) deposits whose asset or chain can't be resolved instead of
+  // throwing — one poison-pill row must not stall the entire batch.
+  return data.flatMap(
     ({ value: v, key: externalChainId, key2: externalTxHash }) => {
       const externalToken = v?.externalToken;
       const asset = assetMapping.get(`${externalToken}:${externalChainId}`);
 
-      if (!asset || !asset?.externalDecimals)
-        throw new Error(
-          `Asset info not found for external token ${externalToken} on chain ${externalChainId}`
+      if (!asset || !asset?.externalDecimals) {
+        logError(
+          "CirrusService",
+          new Error(
+            `Asset info not found for external token ${externalToken} on chain ${externalChainId}`
+          ),
+          { operation: "getDepositsByStatus", externalTxHash, externalChainId }
         );
+        return [];
+      }
 
       const chainInfo = enabledChains.get(Number(externalChainId));
-      if (!chainInfo || !chainInfo?.depositRouter)
-        throw new Error(`Chain info not found for chain ${externalChainId}`);
+      if (!chainInfo || !chainInfo?.depositRouter) {
+        logError(
+          "CirrusService",
+          new Error(`Chain info not found for chain ${externalChainId}`),
+          { operation: "getDepositsByStatus", externalTxHash, externalChainId }
+        );
+        return [];
+      }
 
-      return {
+      return [{
         ...v,
         externalChainId,
         externalTxHash,
         externalDecimals: asset.externalDecimals,
         depositRouter: chainInfo.depositRouter,
-      };
+      }];
     }
   );
 };
