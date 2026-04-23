@@ -2,14 +2,12 @@ import { config } from "./config";
 import { fetchWithRetry } from "./fetchWithRetry";
 import { logInfo, logError } from "./logger";
 import { floorToHour } from "./time";
-import { getTvlTimeSeriesId, pushRecords } from "./rwaIoClient";
+import { pushRecords } from "./rwaIoClient";
 
 interface TvlMetricsResponse {
   timestamp: string;
   totalUsd: string;
 }
-
-let cachedTsId: string | undefined;
 
 /**
  * Fetch the current TVL from the STRATO metrics endpoint.
@@ -40,16 +38,12 @@ async function fetchTvl(): Promise<{ totalUsd: string; timestamp: string }> {
 export async function pushTvl(): Promise<void> {
   const { totalUsd, timestamp } = await fetchTvl();
 
-  if (!cachedTsId) {
-    cachedTsId = await getTvlTimeSeriesId();
-  }
-
   const hourTimestamp = floorToHour(new Date(timestamp));
 
   logInfo("Fetched TVL from STRATO", { totalUsd, hourTimestamp });
 
   await pushRecords({
-    tsId: cachedTsId,
+    tsId: config.rwaIo.projectTimeSeries.tvl,
     records: [{ timestamp: hourTimestamp, value: totalUsd }],
   });
 }

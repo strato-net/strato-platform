@@ -14,6 +14,13 @@ export const config = {
     apiKey: requireEnv("RWA_IO_API_KEY"),
     slug: "strato",
     baseUrl: "https://api.rwa.io",
+    projectTimeSeries: {
+      aum: "69c2f2b5367bd1e5bc20f0b6",
+      marketCap: "69c2f2b5367bd1e5bc20f0b7",
+      price: "69c2f2b5367bd1e5bc20f0b5",
+      totalVolume: "69c2f2b5367bd1e5bc20f0b8",
+      tvl: "69c2f2b5367bd1e5bc20f0b9",
+    },
   },
   strato: {
     baseUrl: "https://app.strato.nexus",
