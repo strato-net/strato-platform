@@ -40,6 +40,8 @@ import "Savings/SaveUSDSTVault.sol";
 
 //Bridging
 import "./Bridge/MercataBridge.sol";
+import "./Bridge/StratoNativeBridge.sol";
+import "./Bridge/StratoNativeCustodyVault.sol";
 
 //CDP
 import "CDP/CDPRegistry.sol";
@@ -70,6 +72,8 @@ contract record Mercata is Authorizable {
     PoolConfigurator public poolConfigurator;
     LendingRegistry public lendingRegistry;
     MercataBridge public mercataBridge;
+    StratoNativeBridge public stratoNativeBridge;
+    StratoNativeCustodyVault public stratoNativeCustodyVault;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;
@@ -163,6 +167,12 @@ contract record Mercata is Authorizable {
         address mercataBridgeImpl = address(new MercataBridge(implOwnerIgnored));
         mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
 
+        address stratoNativeBridgeImpl = address(new StratoNativeBridge(implOwnerIgnored));
+        stratoNativeBridge = StratoNativeBridge(address(new Proxy(stratoNativeBridgeImpl, this)));
+
+        address stratoNativeCustodyVaultImpl = address(new StratoNativeCustodyVault(implOwnerIgnored));
+        stratoNativeCustodyVault = StratoNativeCustodyVault(address(new Proxy(stratoNativeCustodyVaultImpl, this)));
+
         // Use existing CATA reward token
         cataToken = Token(address(0x2680dc6693021cd3fefb84351570874fbef8332a));
 
@@ -216,6 +226,11 @@ contract record Mercata is Authorizable {
 
         mercataBridge.initialize(address(tokenFactory), address(lendingRegistry), address(metalForge));
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));
+
+        stratoNativeBridge.initialize(address(tokenFactory), address(stratoNativeCustodyVault));
+        stratoNativeCustodyVault.initialize(address(stratoNativeBridge));
+        Ownable(stratoNativeBridge).transferOwnership(address(adminRegistry));
+        Ownable(stratoNativeCustodyVault).transferOwnership(address(adminRegistry));
 
         adminRegistry.swapAdmin(this, msg.sender);
     }
