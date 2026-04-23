@@ -1,5 +1,6 @@
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../Tokens/TokenFactory.sol";
 
 contract Escrow is Ownable {
   struct Deposit {
@@ -16,18 +17,37 @@ contract Escrow is Ownable {
   mapping(address => Deposit) public deposits;
   mapping(address => mapping (address => bool)) public depositRecipients;
 
+  TokenFactory public tokenFactory;
+  bool private locked;
+
   event Deposited(address indexed ephemeralAddress, uint quantity, address[] indexed tokens, uint256[] amounts, address indexed sender, uint expiry);
   event Redeemed(address indexed ephemeralAddress, address[] indexed tokens, uint256[] amounts, address sender, address recipient);
   event Cancelled(address indexed ephemeralAddress, uint quantity, address[] indexed tokens, uint256[] amounts, address sender);
+  event TokenFactoryUpdated(address indexed oldFactory, address indexed newFactory);
+
+  modifier nonReentrant() {
+    require(!locked, "REENTRANT");
+    locked = true;
+    _;
+    locked = false;
+  }
 
   constructor(address _initialOwner) Ownable(_initialOwner) { }
 
   uint public fee = 1e16;
 
-  function deposit(address[] tokens, uint256[] amounts, address ephemeralAddress, uint expiry, uint quantity) external {
+  function setTokenFactory(address _tokenFactory) external onlyOwner {
+    require(_tokenFactory != address(0), "tokenFactory=0"); 
+    tokenFactory = TokenFactory(_tokenFactory);
+    emit TokenFactoryUpdated(_tokenFactory);
+  }
+
+  function deposit(address[] tokens, uint256[] amounts, address ephemeralAddress, uint expiry, uint quantity) external nonReentrant {
     require(ephemeralAddress != address(0), "ephemeral=0");
     require(expiry > 0, "expiry=0");
     require(quantity > 0, "quantity=0");
+    require(tokens.length == amounts.length, "length mismatch");
+    require(address(tokenFactory) != address(0), "tokenFactory not set");
 
     Deposit storage d = deposits[ephemeralAddress];
     require(d.tokens.length == 0 && d.amounts.length == 0, "active deposit exists");
@@ -36,6 +56,7 @@ contract Escrow is Ownable {
         address token = tokens[i];
         require(token != address(0), "token=0");
         require(amounts[i] > 0, "amount=0");
+        require(tokenFactory.isFactoryToken(token), "token not from factory");
         bool ok = IERC20(token).transferFrom(msg.sender, address(this), quantity * amounts[i]);
         require(ok, "transferFrom failed");
     }
@@ -68,7 +89,7 @@ contract Escrow is Ownable {
     uint8 v,
     string r,
     string s
-  ) external {
+  ) external nonReentrant {
     string h = redemptionHash(recipient);
     address ephemeralAddress = recoverSigner(h, v, r, s);
 
@@ -118,7 +139,7 @@ contract Escrow is Ownable {
 
   function cancelDeposit(
     address ephemeralAddress
-  ) external {
+  ) external nonReentrant {
     Deposit storage d = deposits[ephemeralAddress];
     require(d.sender == msg.sender, "unauthorized cancellation request");
     require(d.tokens.length > 0 && d.amounts.length > 0, "no deposit");

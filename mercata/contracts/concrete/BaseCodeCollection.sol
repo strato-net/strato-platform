@@ -202,6 +202,7 @@ contract record Mercata is Authorizable {
 
         address escrowImpl = address(new Escrow(implOwnerIgnored));
         escrow = Escrow(address(new Proxy(escrowImpl, this)));
+        escrow.setTokenFactory(address(tokenFactory));
         Ownable(escrow).transferOwnership(address(adminRegistry));
 
         address metalForgeImpl = address(new MetalForge(implOwnerIgnored));
