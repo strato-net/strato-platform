@@ -277,6 +277,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         : selectedToken.externalToken;
 
       const res = await bridgeOutAPI({
+        routeType: selectedToken.routeType,
         externalChainId: currentNetwork.chainId,
         externalRecipient: address,
         externalToken,

@@ -22,6 +22,7 @@ export type BridgeMappingRow = {
 };
 
 export type BridgeAssetInfo = {
+  routeType: "standard" | "native";
   externalChainId: string;
   externalToken: string;
   externalName: string;
@@ -38,6 +39,12 @@ export type BridgeableAssetRoute = {
   externalChainId: string;
   AssetInfo: BridgeAssetInfo;
   isDefaultRoute: boolean;
+};
+
+export type NativeBridgeAssetRow = {
+  key?: string;
+  key2?: string | number;
+  value?: unknown;
 };
 
 // ============================================================================
@@ -272,6 +279,7 @@ const toBridgeAssetInfo = (value: unknown, externalToken: string, externalChainI
   const raw = value as Record<string, unknown>;
   if (typeof raw.stratoToken !== "string" || raw.stratoToken.length === 0) return null;
   return {
+    routeType: "standard",
     externalChainId,
     externalToken,
     externalName: typeof raw.externalName === "string" ? raw.externalName : "",
@@ -323,6 +331,44 @@ export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): Bridgeab
         AssetInfo: { ...asset, stratoToken, enabled: true },
       });
     }
+  }
+
+  return routes;
+}
+
+export function parseNativeBridgeAssets(rows: NativeBridgeAssetRow[]): BridgeableAssetRoute[] {
+  const routes: BridgeableAssetRoute[] = [];
+
+  for (const row of rows) {
+    const stratoToken = typeof row.key === "string" ? normalizeBridgeAddress(row.key) : "";
+    const externalChainId = toBridgeChainId(row.key2);
+    if (!stratoToken || !externalChainId || !row.value || typeof row.value !== "object") continue;
+
+    const raw = row.value as Record<string, unknown>;
+    const representationToken = typeof raw.representationToken === "string"
+      ? normalizeBridgeAddress(raw.representationToken)
+      : "";
+    if (!representationToken) continue;
+
+    const asset: BridgeAssetInfo = {
+      routeType: "native",
+      externalChainId,
+      externalToken: representationToken,
+      externalName: typeof raw.externalName === "string" ? raw.externalName : "",
+      externalSymbol: typeof raw.externalSymbol === "string" ? raw.externalSymbol : "",
+      externalDecimals: "18",
+      maxPerWithdrawal: raw.maxPerWithdrawal != null ? String(raw.maxPerWithdrawal) : "0",
+      stratoToken,
+      enabled: raw.enabled === true,
+    };
+
+    routes.push({
+      id: `${representationToken}-${externalChainId}-${stratoToken}-native`,
+      externalToken: representationToken,
+      externalChainId,
+      AssetInfo: asset,
+      isDefaultRoute: true,
+    });
   }
 
   return routes;

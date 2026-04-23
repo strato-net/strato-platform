@@ -3,15 +3,19 @@ import { config } from "../config";
 import {
   ChainInfo,
   WithdrawalInfo,
+  NativeWithdrawalInfo,
   NonEmptyArray,
   DepositInfo,
+  NativeDepositInfo,
   AssetInfo,
   BridgeInfo,
 } from "../types";
 
-const { bridge, oracle } = config;
+const { bridge, nativeBridge, oracle } = config;
 const { address: bridgeAddress } = bridge;
+const { address: nativeBridgeAddress } = nativeBridge;
 const MERCATA_URL = "BlockApps-MercataBridge";
+const NATIVE_BRIDGE_URL = "BlockApps-StratoNativeBridge";
 const ORACLE_URL = "BlockApps-PriceOracle";
 
 // Get all enabled chains from the bridge contract
@@ -97,6 +101,30 @@ export const getWithdrawalsByStatus = async (
   }));
 };
 
+export const getNativeWithdrawalsByStatus = async (
+  status: string
+): Promise<NativeWithdrawalInfo[]> => {
+  if (!nativeBridgeAddress) return [];
+
+  const data = await cirrus.get(
+    `/${NATIVE_BRIDGE_URL}-withdrawals?select=*`,
+    {
+      params: {
+        "value->>bridgeStatus": `eq.${status}`,
+        address: `eq.${nativeBridgeAddress}`,
+        order: "value->>requestedAt.asc",
+      },
+    }
+  );
+
+  if (!Array.isArray(data) || data.length === 0) return [];
+
+  return data.map((item) => ({
+    ...item.value,
+    withdrawalId: item.key,
+  }));
+};
+
 // Get deposits by status (reusable function)
 export const getDepositsByStatus = async (
   status: string
@@ -149,6 +177,31 @@ export const getDepositsByStatus = async (
       };
     }
   );
+};
+
+export const getNativeDepositsByStatus = async (
+  status: string
+): Promise<NativeDepositInfo[]> => {
+  if (!nativeBridgeAddress) return [];
+
+  const data = await cirrus.get(
+    `/${NATIVE_BRIDGE_URL}-deposits?select=*`,
+    {
+      params: {
+        "value->>bridgeStatus": `eq.${status}`,
+        address: `eq.${nativeBridgeAddress}`,
+        order: "value->>timestamp.asc",
+      },
+    }
+  );
+
+  if (!Array.isArray(data) || data.length === 0) return [];
+
+  return data.map(({ value, key: externalChainId, key2: externalTxHash }) => ({
+    ...value,
+    externalChainId,
+    externalTxHash,
+  }));
 };
 
 export const getBridgeInfo = async (): Promise<BridgeInfo | null> => {

@@ -2,7 +2,7 @@ import { ethers } from "ethers";
 import { config, getChainRpcUrl, ERC20_ABI, ZERO_ADDRESS } from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, DepositArgs, ConfirmDepositArgs, SafeTransactionData } from "../types";
+import { NonEmptyArray, WithdrawalInfo, DepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
@@ -57,6 +57,51 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
   }
 };
 
+export const recordNativeDepositBatch = async (
+  depositArgs: NonEmptyArray<NativeDepositArgs>
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  try {
+    await execute(
+      depositArgs.map((deposit) => ({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "recordDeposit",
+        args: {
+          externalChainId: deposit.externalChainId,
+          externalSender: deposit.externalSender,
+          externalTxHash: deposit.externalTxHash,
+          representationToken: deposit.representationToken,
+          stratoRecipient: deposit.stratoRecipient,
+          stratoTokenAmount: deposit.stratoTokenAmount,
+        },
+      }))
+    );
+
+    logInfo(
+      "BridgeService",
+      `Successfully recorded ${depositArgs.length} native deposits`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+
+    if (
+      errorMessage.includes("SNB: duplicate deposit")
+    ) {
+      logInfo(
+        "BridgeService",
+        `Native deposits already processed by another server: ${depositArgs.length} deposits (${depositArgs.map((d) => d.externalTxHash).join(", ")})`,
+      );
+      return;
+    }
+
+    throw error;
+  }
+};
+
 export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
   const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
   const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
@@ -96,6 +141,50 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
   }
 };
 
+export const confirmNativeDepositBatch = async (
+  deposits: NonEmptyArray<ConfirmNativeDepositArgs>
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
+  const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
+
+  try {
+    await execute(
+      deposits.map((deposit) => ({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "confirmDeposit",
+        args: {
+          externalChainId: deposit.externalChainId,
+          externalTxHash: deposit.externalTxHash,
+        },
+      }))
+    );
+
+    logInfo(
+      "BridgeService",
+      `Successfully confirmed ${deposits.length} native deposits`,
+    );
+
+    await mintVouchersForDeposits(stratoRecipients);
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+
+    if (errorMessage.includes("SNB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Native deposits already confirmed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
+      );
+      return;
+    }
+
+    throw error;
+  }
+};
+
 export const reviewDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
   const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
   const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
@@ -128,6 +217,47 @@ export const reviewDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositA
     }
     
     // Re-throw other errors
+    throw error;
+  }
+};
+
+export const reviewNativeDepositBatch = async (
+  deposits: NonEmptyArray<ConfirmNativeDepositArgs>
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
+
+  try {
+    await execute(
+      deposits.map((deposit) => ({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "reviewDeposit",
+        args: {
+          externalChainId: deposit.externalChainId,
+          externalTxHash: deposit.externalTxHash,
+        },
+      }))
+    );
+
+    logInfo(
+      "BridgeService",
+      `Successfully set ${deposits.length} native deposits to pending review`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+
+    if (errorMessage.includes("SNB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Native deposits already reviewed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
+      );
+      return;
+    }
+
     throw error;
   }
 };
@@ -252,6 +382,78 @@ export const handleRejectedWithdrawalBatch = async (
     }
     
     // Re-throw other errors
+    throw error;
+  }
+};
+
+export const finaliseNativeWithdrawalBatch = async (
+  ids: NonEmptyArray<Number>,
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  try {
+    await execute(
+      ids.map((id) => ({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "finaliseWithdrawal",
+        args: { id },
+      }))
+    );
+
+    logInfo(
+      "BridgeService",
+      `Successfully finalized ${ids.length} native withdrawals`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+
+    if (errorMessage.includes("SNB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Native withdrawals already finalized by another server: ${ids.length} withdrawals (${ids.join(", ")})`,
+      );
+      return;
+    }
+
+    throw error;
+  }
+};
+
+export const handleRejectedNativeWithdrawalBatch = async (
+  ids: NonEmptyArray<Number>,
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  try {
+    await execute(
+      ids.map((id) => ({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "abortWithdrawal",
+        args: { id },
+      }))
+    );
+
+    logInfo(
+      "BridgeService",
+      `Successfully aborted ${ids.length} rejected native withdrawals`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+
+    if (errorMessage.includes("SNB: not abortable")) {
+      logInfo(
+        "BridgeService",
+        `Native withdrawals already aborted by another server: ${ids.length} withdrawals (${ids.join(", ")})`,
+      );
+      return;
+    }
+
     throw error;
   }
 };

@@ -2,20 +2,28 @@ import { config } from "../config";
 import {
   confirmDepositBatch,
   reviewDepositBatch,
+  confirmNativeDepositBatch,
+  reviewNativeDepositBatch,
   confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
+  finaliseNativeWithdrawalBatch,
+  handleRejectedNativeWithdrawalBatch,
 } from "../services/bridgeService";
-import { NonEmptyArray, WithdrawalInfo, DepositInfo, ConfirmDepositArgs } from "../types";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositInfo, NativeDepositInfo, ConfirmDepositArgs, ConfirmNativeDepositArgs } from "../types";
 import {
   getWithdrawalsByStatus,
+  getNativeWithdrawalsByStatus,
   getDepositsByStatus,
+  getNativeDepositsByStatus,
   getSafeTxHashFromEvents,
 } from "../services/cirrusService";
 import { monitorSafeTransactionStatusBatch } from "../services/safeService";
+import { monitorExternalTransactionStatusBatch } from "../services/externalTxService";
 import { logInfo, logError } from "../utils/logger";
 import { safeToBigInt } from "../utils/utils";
 import { verifyDepositsBatch } from "../services/verificationService";
+import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationService";
 import { checkBalances } from "../utils/balanceCheck";
 
 export const startWithdrawalRequestPolling = (): void => {
@@ -99,6 +107,61 @@ export const startDepositInitiatedPolling = (): void => {
   setInterval(poll, pollingInterval);
 };
 
+export const startNativeDepositInitiatedPolling = (): void => {
+  const pollingInterval =
+    Number((config as any)?.polling?.withdrawalInterval) || 5 * 60 * 1000;
+
+  const poll = async () => {
+    try {
+      const deposits: NativeDepositInfo[] = await getNativeDepositsByStatus("1");
+      if (!Array.isArray(deposits) || deposits.length === 0) return;
+
+      const verificationResults = await verifyNativeRedemptionsBatch(deposits);
+
+      const results: ConfirmNativeDepositArgs[] = deposits.map((deposit) => ({
+        externalChainId: deposit.externalChainId,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        verified: verificationResults.get(deposit.externalTxHash) === true,
+      }));
+
+      const { verifiedDeposits, failedDeposits } = results.reduce(
+        (acc, result) => {
+          if (result.verified) {
+            acc.verifiedDeposits.push(result);
+          } else {
+            acc.failedDeposits.push(result);
+          }
+          return acc;
+        },
+        {
+          verifiedDeposits: [] as ConfirmNativeDepositArgs[],
+          failedDeposits: [] as ConfirmNativeDepositArgs[],
+        },
+      );
+
+      if (verifiedDeposits.length > 0) {
+        await confirmNativeDepositBatch(
+          verifiedDeposits as NonEmptyArray<ConfirmNativeDepositArgs>,
+        );
+      }
+
+      if (failedDeposits.length > 0) {
+        await reviewNativeDepositBatch(
+          failedDeposits as NonEmptyArray<ConfirmNativeDepositArgs>,
+        );
+      }
+    } catch (e: any) {
+      logError("MercataPolling", e as Error, {
+        operation: "startNativeDepositInitiatedPolling",
+      });
+    }
+  };
+
+  void poll();
+  setInterval(poll, pollingInterval);
+};
+
 export const startWithdrawalTxPolling = (): void => {
   const pollingInterval = config.polling.bridgeOutInterval ?? 5 * 60 * 1000;
   type Withdrawal = { id: Number, safeTxHash: string };
@@ -154,12 +217,72 @@ export const startWithdrawalTxPolling = (): void => {
   setInterval(poll, pollingInterval);
 };
 
+export const startNativeWithdrawalTxPolling = (): void => {
+  const pollingInterval = config.polling.bridgeOutInterval ?? 5 * 60 * 1000;
+  type Withdrawal = { id: Number; txHash: string };
+
+  const poll = async () => {
+    try {
+      const pending: NativeWithdrawalInfo[] = await getNativeWithdrawalsByStatus("2");
+      if (!Array.isArray(pending) || pending.length === 0) return;
+
+      const toFinalize: Array<Number> = [];
+      const toReject: Array<Number> = [];
+      const byChain = new Map<bigint, Array<Withdrawal>>();
+
+      for (const w of pending) {
+        const id = Number(w.withdrawalId);
+        if (!w.externalTxHash) {
+          toReject.push(id);
+          continue;
+        }
+
+        const cid = safeToBigInt(w.externalChainId);
+        (byChain.get(cid) ?? byChain.set(cid, []).get(cid)!).push({
+          id,
+          txHash: w.externalTxHash,
+        });
+      }
+
+      for (const [chainId, withdrawals] of byChain) {
+        const statuses = await monitorExternalTransactionStatusBatch(
+          withdrawals as NonEmptyArray<Withdrawal>,
+          safeToBigInt(chainId)
+        );
+        for (const { id } of withdrawals) {
+          const st = statuses.get(id);
+          if (st === "executed") toFinalize.push(id);
+          else if (st === "rejected") toReject.push(id);
+        }
+      }
+
+      if (toFinalize.length) {
+        await finaliseNativeWithdrawalBatch(toFinalize as NonEmptyArray<Number>);
+      }
+      if (toReject.length) {
+        await handleRejectedNativeWithdrawalBatch(toReject as NonEmptyArray<Number>);
+      }
+    } catch (e: any) {
+      logError("MercataPolling", e as Error, {
+        operation: "startNativeWithdrawalTxPolling",
+        error: e.message,
+        errorStack: e.stack,
+      });
+    }
+  };
+
+  void poll();
+  setInterval(poll, pollingInterval);
+};
+
 export const initializeMercataPolling = async () => {
   logInfo("MercataPolling", "Initializing Mercata polling...");
 
   startDepositInitiatedPolling();
+  startNativeDepositInitiatedPolling();
   startWithdrawalRequestPolling();
   startWithdrawalTxPolling();
+  startNativeWithdrawalTxPolling();
 
   logInfo("MercataPolling", "Mercata polling initialized");
 };

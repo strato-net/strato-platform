@@ -105,6 +105,22 @@ export interface ConfirmDepositArgs {
   verified: boolean;
 }
 
+export interface NativeDepositArgs {
+  externalChainId: string | number;
+  externalSender: string;
+  representationToken: string;
+  externalTxHash: string;
+  stratoRecipient: string;
+  stratoTokenAmount: string;
+}
+
+export interface ConfirmNativeDepositArgs {
+  externalChainId: string | number;
+  externalTxHash: string;
+  stratoRecipient: string;
+  verified: boolean;
+}
+
 export interface DepositInfo {
   bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
   externalSender: string;
@@ -119,6 +135,19 @@ export interface DepositInfo {
   externalTxHash: string;
   externalDecimals: number;
   depositRouter: string;
+}
+
+export interface NativeDepositInfo {
+  bridgeStatus: string;
+  externalSender: string;
+  externalTxHash: string;
+  externalChainId: string | number;
+  representationToken: string;
+  requestedAt: string;
+  stratoRecipient: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  timestamp: string;
 }
 
 
@@ -137,6 +166,22 @@ export interface WithdrawalInfo {
 
   withdrawalId: string;
   useHotWallet?: boolean;
+}
+
+export interface NativeWithdrawalInfo {
+  bridgeStatus: string;
+  externalTxHash: string;
+  externalChainId: string | number;
+  externalRecipient: string;
+  representationToken: string;
+  externalTokenAmount: string;
+  requestedAt: string;
+  stratoSender: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  timestamp: string;
+
+  withdrawalId: string;
 }
 
 export interface ChainInfo {

@@ -323,9 +323,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     return availableNetworks.find((n) => n.chainName === selectedNetwork) || null;
   }, [availableNetworks, selectedNetwork]);
 
+  const depositableBridgeTokens = useMemo(
+    () => bridgeableTokens.filter((token) => token.routeType !== "native"),
+    [bridgeableTokens]
+  );
+
   const { sourceTokenRoutes, matchingActions } = useMemo(() => {
     if (!selectedToken) return { sourceTokenRoutes: prevCardsRef.current.routes, matchingActions: prevCardsRef.current.actions };
-    const routes = bridgeableTokens.filter((token) =>
+    const routes = depositableBridgeTokens.filter((token) =>
       token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
     );
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
@@ -333,7 +338,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     const actions = depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
     if (routes.length > 0) prevCardsRef.current = { routes, actions };
     return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
-  }, [bridgeableTokens, selectedToken, depositActions]);
+  }, [depositableBridgeTokens, selectedToken, depositActions]);
 
   const getApyInfo = useMemo(() => {
     const m = buildEarnApyMap(tokenApys);
@@ -394,13 +399,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
   const uniqueExternalTokens = useMemo(() => {
     const seen = new Set<string>();
-    return bridgeableTokens.filter((token) => {
+    return depositableBridgeTokens.filter((token) => {
       const key = (token.externalToken || "").toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [bridgeableTokens]);
+  }, [depositableBridgeTokens]);
 
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
@@ -473,13 +478,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     if (!selectedNetwork && availableNetworks.length) {
       setSelectedNetwork(availableNetworks[0].chainName);
     }
-    if (!selectedToken && bridgeableTokens.length) {
-      setSelectedToken(bridgeableTokens[0]);
+    if (!selectedToken && depositableBridgeTokens.length) {
+      setSelectedToken(depositableBridgeTokens[0]);
     } else if (
       selectedToken &&
-      !bridgeableTokens.some((t) => t.id === selectedToken.id)
+      !depositableBridgeTokens.some((t) => t.id === selectedToken.id)
     ) {
-      setSelectedToken(bridgeableTokens[0] || null);
+      setSelectedToken(depositableBridgeTokens[0] || null);
     }
 
     const currentExternal = (selectedToken?.externalToken || "").toLowerCase();
@@ -492,7 +497,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     prevExternalTokenRef.current = currentExternal;
   }, [
     availableNetworks,
-    bridgeableTokens,
+    depositableBridgeTokens,
     selectedNetwork,
     selectedToken,
     setSelectedNetwork,
@@ -1007,8 +1012,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                 <div className="flex items-center gap-2">
                   <Select value={(selectedToken?.externalToken || "").toLowerCase()}
                     onValueChange={(val) => {
-                      const match = bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
-                        || bridgeableTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
+                      const match = depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
+                        || depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
                       setSelectedToken(match);
                     }}
                     disabled={!uniqueExternalTokens.length || guestMode || isLoading}>

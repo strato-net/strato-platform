@@ -7,10 +7,12 @@ import { getTokenMetadata } from "../helpers/cirrusHelpers";
 import { 
   buildQueryParams, 
   BridgeMappingRow,
+  NativeBridgeAssetRow,
   enrichTransactionData, 
   enrichAssetsWithTokenData,
   executeParallelQueries,
   parseBridgeRouteMappings,
+  parseNativeBridgeAssets,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@mercata/shared-types";
@@ -18,11 +20,12 @@ import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices, getRebaseFactors } from "./oracle.service";
 import { toUTCTime } from "../helpers/cirrusHelpers";
 
-const { MercataBridge, Token, LendingPool, LendingRegistry, mercataBridge, DECIMALS } = constants;
+const { MercataBridge, StratoNativeBridge, Token, LendingPool, LendingRegistry, mercataBridge, DECIMALS } = constants;
 
 export const requestWithdrawal = async (
   accessToken: string,
   {
+    routeType,
     externalChainId,
     externalRecipient,
     externalToken,
@@ -31,6 +34,10 @@ export const requestWithdrawal = async (
   }: WithdrawalRequestParams,
   userAddress: string
 ): Promise<TransactionResponse> => {
+  if (routeType === "native") {
+    throw new Error("Use the native bridge withdrawal route for native requests");
+  }
+
   const tx = await buildFunctionTx(
     [
       {
@@ -47,6 +54,55 @@ export const requestWithdrawal = async (
           externalChainId,
           externalRecipient,
           externalToken,
+          stratoToken,
+          stratoTokenAmount,
+        },
+      },
+    ],
+    userAddress,
+    accessToken
+  );
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+};
+
+export const requestNativeWithdrawal = async (
+  accessToken: string,
+  {
+    externalChainId,
+    externalRecipient,
+    stratoToken,
+    stratoTokenAmount,
+  }: WithdrawalRequestParams,
+  userAddress: string
+): Promise<TransactionResponse> => {
+  if (!constants.stratoNativeBridge) {
+    throw new Error("STRATO_NATIVE_BRIDGE is not configured");
+  }
+  if (!constants.stratoNativeCustodyVault) {
+    throw new Error("STRATO_NATIVE_CUSTODY_VAULT is not configured");
+  }
+
+  const tx = await buildFunctionTx(
+    [
+      {
+        contractName: extractContractName(Token),
+        contractAddress: stratoToken,
+        method: "approve",
+        args: {
+          spender: constants.stratoNativeCustodyVault,
+          value: stratoTokenAmount,
+        },
+      },
+      {
+        contractName: extractContractName(StratoNativeBridge),
+        contractAddress: constants.stratoNativeBridge,
+        method: "requestWithdrawal",
+        args: {
+          externalChainId,
+          externalRecipient,
           stratoToken,
           stratoTokenAmount,
         },
@@ -112,17 +168,33 @@ export const getBridgeTransactions = async (
 };
 
 export const getBridgeableTokens = async (accessToken: string, chainId?: string): Promise<BridgeToken[]> => {
-  const params: Record<string, string> = {
+  const standardParams: Record<string, string> = {
     select: "collection_name,externalToken:key->>key,externalChainId:key->>key2,targetStratoToken:key->>key3,mappingValue:value",
     collection_name: "in.(assets,assetRouteEnabled)",
     address: `eq.${mercataBridge}`
   };
-  if (chainId) params["key->>key2"] = `eq.${chainId}`;
+  if (chainId) standardParams["key->>key2"] = `eq.${chainId}`;
 
-  const { data: mappings } = await cirrus.get(accessToken, "/mapping", { params });
-  if (!Array.isArray(mappings) || !mappings.length) return [];
+  const nativeParams: Record<string, string> = {
+    address: `eq.${constants.stratoNativeBridge}`,
+    select: "key,key2,value",
+  };
+  if (chainId) nativeParams["key2"] = `eq.${chainId}`;
 
-  const routes = parseBridgeRouteMappings(mappings as BridgeMappingRow[]);
+  const [standardResponse, nativeResponse] = await Promise.all([
+    cirrus.get(accessToken, "/mapping", { params: standardParams }),
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${StratoNativeBridge}-assets`, { params: nativeParams })
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const standardRoutes = Array.isArray(standardResponse.data)
+    ? parseBridgeRouteMappings(standardResponse.data as BridgeMappingRow[])
+    : [];
+  const nativeRoutes = Array.isArray(nativeResponse.data)
+    ? parseNativeBridgeAssets(nativeResponse.data as NativeBridgeAssetRow[])
+    : [];
+  const routes = [...standardRoutes, ...nativeRoutes];
   if (!routes.length) return [];
 
   const tokenAddressSet = new Set<string>();

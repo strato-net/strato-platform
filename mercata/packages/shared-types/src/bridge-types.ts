@@ -27,6 +27,7 @@ export interface NetworkConfig {
  */
 export interface BridgeToken {
   id: string;
+  routeType: BridgeRouteType;
   stratoToken: string;           // Key: address of the STRATO token
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
@@ -41,6 +42,8 @@ export interface BridgeToken {
   stratoTokenImage?: string;     // First image URL from TokenFactory images
   rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
 }
+
+export type BridgeRouteType = "standard" | "native";
 
 /**
  * A post-deposit action (earn yield or forge metal) returned by /bridge/depositActions
@@ -115,6 +118,7 @@ export type BridgeTransactionTab = 'DepositRecorded' | 'WithdrawalInitiated' | '
  * Parameters for requesting a withdrawal
  */
 export interface WithdrawalRequestParams {
+  routeType?: BridgeRouteType;
   externalChainId: string;
   externalRecipient: string;
   externalToken: string;

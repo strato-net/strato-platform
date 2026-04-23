@@ -8,6 +8,7 @@ export function validateRequestWithdrawal(args: any) {
 
   // Step 1: Basic presence and types
   const baseSchema = Joi.object({
+    routeType: Joi.string().valid("standard", "native").optional(),
     externalChainId: Joi.string().required(),
     externalToken: Joi.string().required(),
     stratoToken: Joi.string().required(),
@@ -22,6 +23,12 @@ export function validateRequestWithdrawal(args: any) {
 
   // Step 2: Format and logic checks
   const finalSchema = Joi.object({
+    routeType: Joi.string()
+      .valid("standard", "native")
+      .optional()
+      .messages({
+        "any.only": "routeType must be either 'standard' or 'native'.",
+      }),
     externalChainId: Joi.string()
       .required()
       .custom((value, helpers) => {

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { 
   requestWithdrawal,
+  requestNativeWithdrawal as requestNativeWithdrawalService,
   requestDepositAction,
   getDepositActions,
   getBridgeableTokens,
@@ -30,8 +31,42 @@ class BridgeController {
     try {
       const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
-      
-      const result: TransactionResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
+
+      const params = body as WithdrawalRequestParams;
+      const result: TransactionResponse = params.routeType === "native"
+        ? await requestNativeWithdrawalService(
+            accessToken,
+            { ...params, routeType: "native" },
+            userAddress as string
+          )
+        : await requestWithdrawal(accessToken, params, userAddress as string);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async requestNativeWithdrawal(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateRequestWithdrawal(body);
+
+      const result: TransactionResponse = await requestNativeWithdrawalService(
+        accessToken,
+        {
+          ...(body as WithdrawalRequestParams),
+          routeType: "native",
+        },
+        userAddress as string
+      );
 
       res.json({
         success: true,
