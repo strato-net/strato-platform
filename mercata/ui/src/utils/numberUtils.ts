@@ -23,6 +23,19 @@ export const ensureHexPrefix = (address: string | undefined | null): `0x${string
 };
 
 /**
+ * Shortens an address to "front…back" form (e.g. 0x123456…abcd).
+ */
+export const truncateAddress = (
+  address: string | undefined | null,
+  front: number = 6,
+  back: number = 4
+): string => {
+  if (!address) return "";
+  if (address.length <= front + back) return address;
+  return `${address.slice(0, front)}...${address.slice(-back)}`;
+};
+
+/**
  * Safely parses a string to BigInt using parseUnits, handling edge cases
  * that would normally cause parseUnits to throw an error.
  * 
