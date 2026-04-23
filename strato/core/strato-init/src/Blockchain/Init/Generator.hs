@@ -16,7 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_sslDir)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Strato.Model.Validator
@@ -30,6 +30,7 @@ import Data.Maybe
 import qualified Data.Yaml as YAML
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
+import System.Process (readProcess)
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
@@ -116,11 +117,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
   -- Check if node already exists
   nodeExists <- doesFileExist (".ethereumH" </> "ethconf.yaml")
   when nodeExists $ do
-    if hasFlags
-      then liftIO $ error $ "Node already exists at " ++ nodeDir ++ ". Run without options to use it, or remove the directory to recreate."
-      else do
-        liftIO $ putStrLn $ "Node already exists at " ++ nodeDir ++ ", skipping setup."
-        return ()
+    when hasFlags $ liftIO $
+      putStrLn $ "\ESC[1;33mWarning: Node already exists at " ++ nodeDir ++ ". Flags are ignored. To recreate, stop the node and remove the directory first.\ESC[0m"
+    liftIO $ putStrLn $ "Node already exists at " ++ nodeDir ++ ", skipping setup."
   
   unless nodeExists $ do
     liftIO $ putStrLn $ "Setting up STRATO node: " ++ nodeDir
@@ -216,6 +215,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     unless destOauthExists $ liftIO $ do
       if flags_localAuth
         then do
+          localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
           envClientId <- lookupEnv "OAUTH_CLIENT_ID"
           envClientSecret <- lookupEnv "OAUTH_CLIENT_SECRET"
           clientId <- case envClientId of
@@ -225,7 +225,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
             Just cs | not (null cs) -> return cs
             _ -> generatePassword 48
           let localOauthConfig = unlines
-                [ "discoveryUrl: \"http://localhost:8081/auth/.well-known/openid-configuration\""
+                [ "discoveryUrl: \"http://" ++ localHostname ++ ":" ++ show flags_httpPort ++ "/auth/.well-known/openid-configuration\""
                 , "clientId: \"" ++ clientId ++ "\""
                 , "clientSecret: \"" ++ clientSecret ++ "\""
                 ]

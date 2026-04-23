@@ -1,5 +1,7 @@
 #!/bin/sh
-STRATO_HOSTNAME=$(grep 'apiHost:' /config/ethconf.yaml | awk '{print $2}' | tr -d '"')
+NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
+STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
+NODE_HOST=$(echo "$NODE_URL" | sed 's|https\?://||')
 cp /etc/prometheus/strato_prometheus.tpl.yml /tmp/strato_prometheus.yml
 sed -i "s;__NODE_HOST_MARKER__;${NODE_HOST:-localhost};" /tmp/strato_prometheus.yml
 sed -i "s;__STRATO_HOSTNAME__;${STRATO_HOSTNAME:-localhost};" /tmp/strato_prometheus.yml

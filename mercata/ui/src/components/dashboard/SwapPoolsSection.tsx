@@ -15,6 +15,7 @@ import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useEarnContext } from "@/context/EarnContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
 
 const SwapPoolsSection = () => {
@@ -238,7 +239,10 @@ const SwapPoolsSection = () => {
                   )}
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
                     <div className="text-left sm:text-right">
-                      <div className="text-sm text-muted-foreground">Best Available APY</div>
+                      <div className="text-sm text-muted-foreground inline-flex items-center gap-1">
+                        Best Available APY
+                        <BestApyInfoTooltip />
+                      </div>
                       <EarnApyTooltip info={apyInfo}>
                         <div className="font-medium cursor-default">{displayedApy}</div>
                       </EarnApyTooltip>

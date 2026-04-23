@@ -18,6 +18,7 @@ import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { redirectToLogin } from '@/lib/auth';
 import EarnApyTooltip from '@/components/earn/EarnApyTooltip';
+import { BestApyInfoTooltip } from '@/components/earn/BestApyInfoTooltip';
 import MintProgressModal, { type ProgressStep } from '../../../MintProgressModal';
 import LoanForm from './LoanForm';
 import VaultBreakdown from './VaultBreakdown';
@@ -895,7 +896,10 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
           <div className="space-y-1 text-sm text-muted-foreground">
             {resolvedVaultApyInfo && (
               <div className="flex items-center justify-between gap-3">
-                <span>Best Available APY</span>
+                <span className="inline-flex items-center gap-1">
+                  Best Available APY
+                  <BestApyInfoTooltip />
+                </span>
                 <EarnApyTooltip info={resolvedVaultApyInfo} side="top" align="end">
                   <span className="font-medium text-foreground cursor-default">
                     {resolvedVaultApyInfo.total.toFixed(2)}%

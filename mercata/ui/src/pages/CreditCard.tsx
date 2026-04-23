@@ -19,7 +19,7 @@ import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import type { BridgeToken } from "@mercata/shared-types";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
-import { Loader2, CreditCard, DollarSign, Plus, Settings, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { Loader2, CreditCard, DollarSign, Plus, Settings, ChevronDown, ChevronUp, Clock, Info } from "lucide-react";
 import { safeParseUnits } from "@/utils/numberUtils";
 import {
   CARD_PROVIDERS,
@@ -495,6 +495,20 @@ export default function CreditCardPage() {
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to link your card wallet and set up automatic top-ups" />
           )}
+
+          <div className="mb-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-4">
+            <div className="flex gap-3">
+              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-foreground">How it works</h2>
+                <p className="text-sm text-muted-foreground">
+                  Connect your crypto debit card wallet to STRATO and keep it funded automatically.
+                  Link a card from a supported provider, choose your network and token, and optionally
+                  set a balance threshold to trigger automatic top-ups so your card is always ready to use.
+                </p>
+              </div>
+            </div>
+          </div>
 
           {loading ? (
             <div className="flex items-center gap-2 text-muted-foreground py-12">

@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 -- |
@@ -40,11 +41,12 @@ data SourceUnitF a
   | Import a (SolidVM.FileImportF a)
   | Alias a String String
   | FLContract SolidVM.Contract -- All contracts are file level, but the name 'Contract' is used in many different places
-  | FLFunc String SolidVM.Func
-  | FLConstant Text.Text SolidVM.ConstantDecl
-  | FLStruct Text.Text SolidVM.Def
-  | FLEnum Text.Text SolidVM.Def
-  | FLError Text.Text SolidVM.Def
+  | FLFunc String (SolidVM.FuncF a)
+  | FLConstant Text.Text (SolidVM.ConstantDeclF a)
+  | FLStruct Text.Text (SolidVM.DefF a)
+  | FLEnum Text.Text (SolidVM.DefF a)
+  | FLError Text.Text (SolidVM.DefF a)
+  | FLUsing (SolidVM.UsingF a)
   | DummySourceUnit
   deriving (Eq, Show, Generic, NFData, Functor)
 
@@ -75,7 +77,7 @@ solidityContract = do
   let allFunctions = Map.fromListWith parseOverloads [(stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [c | (_, ConstructorDeclaration c) <- declarations]
   let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
-  let using = [(n, [u]) | (n, UsingDeclaration u) <- declarations]
+  let using = [u | (_, UsingDeclaration u) <- declarations]
   mCtor <-
     case ctorList of
       (_:_:_) -> fail "multiple constructors defined"
@@ -95,7 +97,7 @@ solidityContract = do
         SolidVM._events = Map.fromList events,
         SolidVM._functions = allFunctions,
         SolidVM._modifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations],
-        SolidVM._usings = Map.fromListWith (++) using,
+        SolidVM._usings = using,
         SolidVM._constructor = mCtor,
         SolidVM._contractType = kind,
         SolidVM._importedFrom = Nothing,
@@ -118,6 +120,10 @@ solidityFreeFunction = do
   when (SolidVM._funcVisibility a /= Just SolidVM.Internal) $ fail "Free functions always have implicit Internal visibility."
   return $ FLFunc fname a
 
+-- | Parses a free using declaration
+solidityFreeUsing :: SolidityParser SourceUnit
+solidityFreeUsing = FLUsing <$> usingDeclaration True
+
 data Declaration
   = FuncDeclaration SolidVM.Func
   | ConstructorDeclaration SolidVM.Func
@@ -139,7 +145,7 @@ solidityDeclaration :: Bool -> SolidityParser (String, Declaration)
 solidityDeclaration free =
   structDeclaration
     <|> enumDeclaration
-    <|> usingDeclaration
+    <|> (("using",) . UsingDeclaration <$> usingDeclaration free)
     <|> errorDeclaration
     <|> functionDeclaration free
     <|> modifierDeclaration
@@ -252,19 +258,20 @@ enumDeclaration = do
           }
     )
 
-usingDeclaration :: SolidityParser (String, Declaration)
-usingDeclaration = do
-  ~(a, (usingContract', usingType')) <- withPosition $ do
+usingDeclaration :: Bool -> SolidityParser Xabi.Using
+usingDeclaration free = do
+  ~(a, (usingContract', usingType', isGlobal)) <- withPosition $ do
     reserved "using"
     usingContract' <- identifier
     reserved "for"
-    usingType' <- many1 $ noneOf ";"
-    semi
-    pure (usingContract', usingType')
-  return
-    ( usingType',
-      UsingDeclaration (Xabi.Using usingContract' usingType' a)
-    )
+    usingType' <- (Nothing <$ char '*') <|> (Just <$> simpleTypeExpression)
+    isGlobal' <- isJust <$> optionMaybe (reserved "global")
+    if not free && isGlobal'
+      then fail "Using statements inside of contracts cannot be marked as global"
+      else do
+        semi
+        pure (usingContract', usingType', isGlobal')
+  return $ Xabi.Using usingContract' usingType' isGlobal a
 
 {- Variables -}
 

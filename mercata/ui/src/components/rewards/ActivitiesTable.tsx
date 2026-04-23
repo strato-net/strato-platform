@@ -12,8 +12,10 @@ import { Link } from "react-router-dom";
 import { getActivityLink } from "@/lib/rewards/activityLinks";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { useEarnContext } from "@/context/EarnContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
+import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
 import { buildNativeRewardsApyInfo, EarnApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo } from "@/utils/earnUtils";
 
 interface ActivitiesTableProps {
@@ -93,12 +95,21 @@ const InfoTooltip = ({ content }: { content: string }) => {
 export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) => {
   const { tokenApys } = useEarnContext();
   const { saveUsdstInfo } = useSaveUsdstContext();
+  const { vaults: yieldVaults } = useYieldVaultContext();
   const loginButtonClass = "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
   const visibleActivities = activities.filter(
     (activity) => safeBigInt(activity?.emissionRate || "0") > 0n
   );
   const saveUsdstVaultAddress = saveUsdstInfo?.vaultAddress?.toLowerCase?.() || "";
   const usdstAddress = saveUsdstInfo?.assetAddress || "";
+  // Carry-style ERC4626 yield vaults (eth-carry, wbtc-carry). Address-keyed so
+  // we don't depend on activity name. Backend publishes their combined APY
+  // (native strategy yield + CATA rewards) into tokenApys via addCarryVaultApys.
+  const carryVaultAddresses = new Set(
+    Object.values(yieldVaults)
+      .map((vault) => vault?.vaultAddress?.toLowerCase?.() || "")
+      .filter((addr): addr is string => addr.length > 0)
+  );
 
   const getBestAvailableApyInfo = (activity: Activity): EarnApyInfo | null => {
     const lowerName = activity.name?.toLowerCase?.() || "";
@@ -118,6 +129,10 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
       (saveUsdstVaultAddress && normalizedSource === saveUsdstVaultAddress)
     ) {
       return findBestEarnApyInfo(tokenApys, saveUsdstInfo?.vaultAddress);
+    }
+
+    if (carryVaultAddresses.has(normalizedSource)) {
+      return findBestEarnApyInfo(tokenApys, normalizedSource);
     }
 
     if (lowerName.includes("direct mint") || lowerName.includes("bridge")) {
@@ -187,7 +202,7 @@ export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) =
                 <TableHead>
                   <div className="flex items-center gap-1">
                  Best Available APY
-                    <InfoTooltip content="Best Available APY shows the highest stacked yield available for this activity, combining Native APY, Base APY, and Rewards APY when applicable. Hover over the APY value to see the full breakdown." />
+                    <BestApyInfoTooltip />
                   </div>
                 </TableHead>
                 <TableHead>Type</TableHead>

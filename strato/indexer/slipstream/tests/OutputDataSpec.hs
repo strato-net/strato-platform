@@ -428,7 +428,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
                   ("enum_val", SVMType.Enum Nothing "" Nothing),
                   ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing),
                   ("strukt", SVMType.Struct Nothing ""),
-                  ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
+                  ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool) Nothing Nothing)
                 ]
             )
 
@@ -575,6 +575,8 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
                     Nothing
                     (SVMType.Bytes Nothing Nothing)
                     (SVMType.Int Nothing Nothing)
+                    Nothing
+                    Nothing
                 ),
                 ("owner", (SVMType.Account False)),
                 ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
@@ -643,7 +645,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
                   ("enum_val", SVMType.Enum Nothing "" Nothing),
                   ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing),
                   ("strukt", SVMType.Struct Nothing ""),
-                  ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
+                  ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool) Nothing Nothing)
                 ]
             )
 

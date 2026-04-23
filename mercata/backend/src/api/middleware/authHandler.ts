@@ -3,6 +3,7 @@ import RestStatus from "http-status-codes";
 import { JWTPayload } from "jose";
 import { verifyAccessTokenSignature } from "../../utils/authHelper";
 import { getServiceToken, createOrGetKey } from "../../utils/authHelper";
+import { requestContext } from "../../utils/requestContext";
 // ————————————————————————————————————————————————————————————————
 // Helper functions, with explicit return types
 // ————————————————————————————————————————————————————————————————
@@ -40,23 +41,25 @@ interface CustomJwtPayload extends JWTPayload {
 class AuthHandler {
   /**
    * Middleware that enforces OAuth on incoming requests.
-   * @param allowAnonAccess if true, will fall back to a service-token.
+   * @param allowAnonAccess true = always allow anonymous, false = always require auth,
+   *   undefined (default) = allow anonymous for safe methods (GET/HEAD/OPTIONS), require auth for mutating methods.
    */
-  static authorizeRequest(allowAnonAccess = false): RequestHandler {
+  static authorizeRequest(allowAnonAccess?: boolean): RequestHandler {
     return async (req, res, next) => {
       try {
         let token = getTokenFromHeader(req);
-        // if it is service user do not set userAddress and userName
-        const isServiceUser = !token && allowAnonAccess
+        const walletAddress = req.headers["x-wallet-address"] as string | undefined;
+
+        const isSafeMethod = ["GET", "HEAD", "OPTIONS"].includes(req.method);
+        const effectiveAllowAnon = allowAnonAccess ?? isSafeMethod;
+        const walletAuthenticated = !!walletAddress && isSafeMethod;
+        const isServiceUser = !token && (effectiveAllowAnon || walletAuthenticated);
 
         if (isServiceUser) {
-          // The token obtained from the trusted oauth2 server can be trusted here, but is still always verified further in a resource server.
-
           token = await getServiceToken();
         }
 
         if (token) {
-          // Verify JWT signature and extract payload using cached JWKS (loaded at startup)
           let payload: CustomJwtPayload;
           try {
             payload = await verifyAccessTokenSignature(token) as CustomJwtPayload;
@@ -66,13 +69,22 @@ class AuthHandler {
           }
 
           if (!isServiceUser) {
-            // fetch or create user key in Strato
-            let address = await createOrGetKey(token);
             let userName: string = payload["preferred_username"];
-            req.address = address;
+            req.address = walletAddress
+              ? walletAddress.replace(/^0x/i, "").toLowerCase()
+              : await createOrGetKey(token);
             req.userName = userName;
+          } else if (walletAddress) {
+            req.address = walletAddress.replace(/^0x/i, "").toLowerCase();
           }
           req.accessToken = token;
+
+          if (walletAddress) {
+            return requestContext.run(
+              { externalSigning: true, userAddress: walletAddress.replace(/^0x/i, "").toLowerCase() },
+              next
+            );
+          }
           return next();
         } else {
           res.set('WWW-Authenticate', 'Bearer');

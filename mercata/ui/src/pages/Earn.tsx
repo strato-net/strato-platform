@@ -34,10 +34,11 @@ import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
-import { CircleArrowDown, PiggyBank, Star, TrendingUp } from "lucide-react";
+import { CircleArrowDown, PiggyBank, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import stratoVaultLogo from "@/assets/strato-vault-logo.png";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { EarnApyInfo, buildNativeRewardsApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo, findVaultEarnApyInfo } from "@/utils/earnUtils";
 import {
   mUsdstAddress,
@@ -170,13 +171,6 @@ const formatCarryVaultApyDisplayForLive = (
   }
   return formatApyDisplay(apy);
 };
-const formatPointsMultiplier = (scaledTenths: bigint): string => {
-  const whole = scaledTenths / 10n;
-  const frac = scaledTenths % 10n;
-  if (frac === 0n) return `${whole.toString()}x points`;
-  return `${whole.toString()}.${frac.toString()}x points`;
-};
-
 const formatMaxAmount = (weiAmount: bigint): string => {
   const [whole, frac = ""] = formatUnits(weiAmount, 18).split(".");
   return `${whole}.${frac.slice(0, 18)}`.replace(/\.?0+$/, "");
@@ -439,6 +433,24 @@ const Earn = () => {
 
   const vaultEarnApyInfo = useMemo(() => findVaultEarnApyInfo(tokenApys), [tokenApys]);
   const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
+
+  // Combined (native + CATA rewards) APY per carry yield vault, keyed by cfg.key.
+  // Backend publishes entries keyed by vault address via addCarryVaultApys.
+  const yieldVaultApyInfos = useMemo<Record<string, EarnApyInfo | null>>(() => {
+    const out: Record<string, EarnApyInfo | null> = {};
+    for (const cfg of YIELD_VAULTS) {
+      const vaultAddress = yieldVaults[cfg.key]?.vaultAddress;
+      out[cfg.key] = findBestEarnApyInfo(tokenApys, vaultAddress);
+    }
+    return out;
+  }, [tokenApys, yieldVaults]);
+  const getYieldVaultDisplayApyRaw = (key: string): string | undefined => {
+    const info = yieldVaultApyInfos[key];
+    if (info) return info.total.toFixed(2);
+    // Fallback to the native-only APY from yield-vault context in case the
+    // backend hasn't surfaced combined entries yet on this network.
+    return yieldVaults[key]?.apy;
+  };
   const getPoolEarnApyInfo = (pool: Pool) => findBestEarnApyInfo(tokenApys, pool.lpToken?.address);
   const getPoolDisplayApy = (pool: Pool) => {
     const info = getPoolEarnApyInfo(pool);
@@ -548,42 +560,11 @@ const Earn = () => {
     return map;
   }, [rewardsActivities]);
 
-  const rewardsBaseEmission = useMemo(() => {
-    const emissions: bigint[] = [];
-
-    const vaultContract = vaultState.shareTokenAddress?.toLowerCase();
-    if (vaultContract) {
-      const vaultActivity = rewardActivityByContract.get(vaultContract);
-      if (vaultActivity && vaultActivity.emissionRate > 0n) emissions.push(vaultActivity.emissionRate);
-    }
-
-    for (const pool of sortedPools) {
-      const activity = rewardActivityByContract.get(pool.lpToken?.address?.toLowerCase());
-      if (activity && activity.emissionRate > 0n) emissions.push(activity.emissionRate);
-    }
-
-    const lendingActivity = rewardActivityByContract.get(mUsdstAddress.toLowerCase());
-    if (lendingActivity && lendingActivity.emissionRate > 0n) emissions.push(lendingActivity.emissionRate);
-
-    if (emissions.length === 0) return 0n;
-    return emissions.reduce((min, curr) => (curr < min ? curr : min), emissions[0]);
-  }, [rewardActivityByContract, sortedPools, vaultState.shareTokenAddress]);
-
   const getRewardMeta = (contractAddress?: string) => {
     const contract = contractAddress?.toLowerCase();
-    if (!contract || rewardsBaseEmission <= 0n) {
-      return { pointsLabel: "-", featured: false };
-    }
+    if (!contract) return { earnsRewards: false };
     const activity = rewardActivityByContract.get(contract);
-    if (!activity || activity.emissionRate <= 0n) {
-      return { pointsLabel: "-", featured: false };
-    }
-    const scaledTenths = (activity.emissionRate * 10n + rewardsBaseEmission / 2n) / rewardsBaseEmission;
-    const featured = scaledTenths >= 15n;
-    return {
-      pointsLabel: formatPointsMultiplier(scaledTenths),
-      featured,
-    };
+    return { earnsRewards: Boolean(activity && activity.emissionRate > 0n) };
   };
 
   const vaultRewardMeta = getRewardMeta(vaultState.shareTokenAddress);
@@ -617,10 +598,11 @@ const Earn = () => {
       rows.push({ kind: "saveUsdst", apySortValue: parseApy(saveUsdstDisplayApyRaw) });
       rows.push({ kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) });
       for (let i = 0; i < YIELD_VAULTS.length; i++) {
-        const yv = yieldVaults[YIELD_VAULTS[i].key];
+        const cfg = YIELD_VAULTS[i];
+        const yv = yieldVaults[cfg.key];
         rows.push({
           kind: "yieldVault",
-          apySortValue: yv?.deployed ? parseApy(yv.apy) : Number.NEGATIVE_INFINITY,
+          apySortValue: yv?.deployed ? parseApy(getYieldVaultDisplayApyRaw(cfg.key)) : Number.NEGATIVE_INFINITY,
           vaultIndex: i,
         });
       }
@@ -634,7 +616,7 @@ const Earn = () => {
     }
 
     return rows.sort(compareOpportunities);
-  }, [activeFilter, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied]);
+  }, [activeFilter, lendingDisplayApyRaw, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, liquidityInfo?.totalUSDSTSupplied, yieldVaults, yieldVaultApyInfos]);
 
   const vaultAlpha = formatApyDisplay(vaultDisplayApyRaw);
   const rankedTopCandidates = useMemo<OpportunityRow[]>(() => {
@@ -643,7 +625,7 @@ const Earn = () => {
       { kind: "vault", apySortValue: parseApy(vaultDisplayApyRaw) },
       ...YIELD_VAULTS.map((v, i) => ({
         kind: "yieldVault" as const,
-        apySortValue: yieldVaults[v.key]?.deployed ? parseApy(yieldVaults[v.key]?.apy) : Number.NEGATIVE_INFINITY,
+        apySortValue: yieldVaults[v.key]?.deployed ? parseApy(getYieldVaultDisplayApyRaw(v.key)) : Number.NEGATIVE_INFINITY,
         vaultIndex: i,
       })),
       { kind: "lending", apySortValue: parseApy(lendingDisplayApyRaw) },
@@ -657,7 +639,7 @@ const Earn = () => {
     return rankedCandidates.filter(isEligibleForTopOpportunity).length > 0
       ? rankedCandidates.filter(isEligibleForTopOpportunity)
       : rankedCandidates;
-  }, [lendingDisplayApyRaw, liquidityInfo?.totalUSDSTSupplied, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, yieldVaults]);
+  }, [lendingDisplayApyRaw, liquidityInfo?.totalUSDSTSupplied, saveUsdstDisplayApyRaw, saveUsdstTvl, sortedPools, tokenApys, tokenApysLoaded, vaultDisplayApyRaw, vaultState.totalEquity, yieldVaults, yieldVaultApyInfos]);
   const getOpportunityMeta = (opportunity: OpportunityRow) => {
     if (opportunity.kind === "saveUsdst") {
       return {
@@ -694,10 +676,10 @@ const Earn = () => {
       return {
         title: cfg.name,
         subtitle: cfg.subtitle,
-        apyRaw: isLive ? vaultData?.apy : undefined,
+        apyRaw: isLive ? getYieldVaultDisplayApyRaw(cfg.key) : undefined,
         tvl: isLive ? (vaultData?.tvlUsd || "0") : "0",
         badge: cfg.badge,
-        rateLabel: "APY",
+        rateLabel: "Best Available APY",
         actionLabel: isLive ? "Deposit" : "Coming Soon",
         onCardClick: () => navigate(`/dashboard/earn-yield-vault?vault=${cfg.key}`),
         onActionClick: () => navigate(`/dashboard/earn-yield-vault?vault=${cfg.key}`),
@@ -735,7 +717,9 @@ const Earn = () => {
   const getOpportunityApyInfo = (opportunity: OpportunityRow): EarnApyInfo | null => {
     if (opportunity.kind === "saveUsdst") return saveUsdstApyInfo;
     if (opportunity.kind === "vault") return resolvedVaultApyInfo;
-    if (opportunity.kind === "yieldVault") return null;
+    if (opportunity.kind === "yieldVault") {
+      return yieldVaultApyInfos[YIELD_VAULTS[opportunity.vaultIndex].key] ?? null;
+    }
     if (opportunity.kind === "lending") return lendingEarnApyInfo;
     return getPoolEarnApyInfo(opportunity.pool);
   };
@@ -803,10 +787,10 @@ const Earn = () => {
       const cfg = YIELD_VAULTS[topOpportunity.vaultIndex];
       const vd = yieldVaults[cfg.key];
       if (!vd?.deployed) return formatApyDisplay(undefined);
-      return formatCarryVaultApyDisplayForLive(vd.apy);
+      return formatCarryVaultApyDisplayForLive(getYieldVaultDisplayApyRaw(cfg.key));
     }
     return formatApyDisplay(topOpportunityMeta.apyRaw);
-  }, [topOpportunity, topOpportunityMeta.apyRaw, yieldVaults]);
+  }, [topOpportunity, topOpportunityMeta.apyRaw, yieldVaults, yieldVaultApyInfos]);
   const featuredOpportunityMeta = useMemo(
     () => (configuredFeaturedOpportunity ? getOpportunityMeta(configuredFeaturedOpportunity) : null),
     [
@@ -834,10 +818,10 @@ const Earn = () => {
       const cfg = YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex];
       const vd = yieldVaults[cfg.key];
       if (!vd?.deployed) return formatApyDisplay(undefined);
-      return formatCarryVaultApyDisplayForLive(vd.apy);
+      return formatCarryVaultApyDisplayForLive(getYieldVaultDisplayApyRaw(cfg.key));
     }
     return formatApyDisplay(featuredOpportunityMeta.apyRaw);
-  }, [configuredFeaturedOpportunity, featuredOpportunityMeta, yieldVaults]);
+  }, [configuredFeaturedOpportunity, featuredOpportunityMeta, yieldVaults, yieldVaultApyInfos]);
 
   const pageLoading =
     vaultState.loading ||
@@ -949,8 +933,9 @@ const Earn = () => {
                         </div>
                       </div>
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
-                        <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                        <p className="text-[11px] font-medium text-muted-foreground md:text-xs inline-flex items-center gap-1">
                           {featuredOpportunityMeta.rateLabel}
+                          {featuredOpportunityMeta.rateLabel === "Best Available APY" && <BestApyInfoTooltip />}
                         </p>
                         <EarnApyTooltip info={featuredOpportunityApyInfo}>
                           <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${featuredOpportunityApy.className} cursor-default`}>
@@ -963,13 +948,13 @@ const Earn = () => {
                         <p className="text-sm font-medium text-foreground/80 md:text-sm">
                           {configuredFeaturedOpportunity.kind === "yieldVault"
                             ? (() => {
-                                const vd =
-                                  yieldVaults[
-                                    YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].key
-                                  ];
-                                const s = formatYieldVaultTvlUsd(vd);
-                                return s === "--" ? "--" : `$${s}`;
-                              })()
+                              const vd =
+                                yieldVaults[
+                                YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].key
+                                ];
+                              const s = formatYieldVaultTvlUsd(vd);
+                              return s === "--" ? "--" : `$${s}`;
+                            })()
                             : `$${formatUsd(featuredOpportunityMeta.tvl)}`}
                         </p>
                       </div>
@@ -1001,7 +986,7 @@ const Earn = () => {
                 </div>
               )}
 
-                <div>
+              <div>
                 <Card
                   className="h-full cursor-pointer rounded-[22px] border border-blue-300/70 bg-gradient-to-br from-[#f8fbff] via-[#f4f8ff] to-[#edf3ff] shadow-[0_6px_18px_rgba(37,99,235,0.07)] dark:border-blue-400/35 dark:from-[#0f1a33] dark:via-[#101a35] dark:to-[#111c3a]"
                   role="button"
@@ -1050,8 +1035,9 @@ const Earn = () => {
                       </div>
                     </div>
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl bg-white/45 px-3 py-2.5 dark:bg-white/5">
-                      <p className="text-[11px] font-medium text-muted-foreground md:text-xs">
+                      <p className="text-[11px] font-medium text-muted-foreground md:text-xs inline-flex items-center gap-1">
                         {topOpportunityMeta.rateLabel}
+                        {topOpportunityMeta.rateLabel === "Best Available APY" && <BestApyInfoTooltip />}
                       </p>
                       <EarnApyTooltip info={topOpportunityApyInfo}>
                         <span className={`text-[22px] leading-none font-semibold md:text-[28px] ${topOpportunityApy.className} cursor-default`}>
@@ -1064,10 +1050,10 @@ const Earn = () => {
                       <p className="text-sm font-medium text-foreground/80 md:text-sm">
                         {topOpportunity.kind === "yieldVault"
                           ? (() => {
-                              const vd = yieldVaults[YIELD_VAULTS[topOpportunity.vaultIndex].key];
-                              const s = formatYieldVaultTvlUsd(vd);
-                              return s === "--" ? "--" : `$${s}`;
-                            })()
+                            const vd = yieldVaults[YIELD_VAULTS[topOpportunity.vaultIndex].key];
+                            const s = formatYieldVaultTvlUsd(vd);
+                            return s === "--" ? "--" : `$${s}`;
+                          })()
                           : `$${formatUsd(topOpportunityMeta.tvl)}`}
                       </p>
                     </div>
@@ -1109,11 +1095,10 @@ const Earn = () => {
                     size="sm"
                     variant="ghost"
                     onClick={() => setActiveFilter("all")}
-                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${
-                      activeFilter === "all"
+                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${activeFilter === "all"
                         ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
                         : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                    }`}
+                      }`}
                   >
                     All
                   </Button>
@@ -1121,11 +1106,10 @@ const Earn = () => {
                     size="sm"
                     variant="ghost"
                     onClick={() => setActiveFilter("vaults")}
-                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${
-                      activeFilter === "vaults"
+                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${activeFilter === "vaults"
                         ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
                         : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                    }`}
+                      }`}
                   >
                     Vaults
                   </Button>
@@ -1133,11 +1117,10 @@ const Earn = () => {
                     size="sm"
                     variant="ghost"
                     onClick={() => setActiveFilter("pools")}
-                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${
-                      activeFilter === "pools"
+                    className={`h-9 rounded-full px-6 text-base font-medium transition-all ${activeFilter === "pools"
                         ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
                         : "bg-transparent text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                    }`}
+                      }`}
                   >
                     Pools
                   </Button>
@@ -1148,16 +1131,20 @@ const Earn = () => {
             <Card className="border border-border/70 overflow-hidden">
               <CardContent className="p-0">
                 <div className="w-full max-w-full overflow-x-auto">
-                  <table className="w-full min-w-[1260px]">
+                  <table className="w-full min-w-[1140px]">
                     <thead className="bg-muted/40">
                       <tr className="border-b border-border/50">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Opportunity</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Best Available APY</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Rewards</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">TVL</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Position</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide">Action</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Opportunity</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
+                          <span className="inline-flex items-center gap-1">
+                            Best Available APY
+                            <BestApyInfoTooltip />
+                          </span>
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">TVL</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Your Position</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">Type</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground tracking-wide">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1185,6 +1172,9 @@ const Earn = () => {
                                   </div>
                                   <p className="font-medium truncate">Savings Vault</p>
                                   <Badge variant="secondary" className="text-[10px]">Savings Vault</Badge>
+                                  {saveUsdstRewardMeta.earnsRewards && (
+                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Rewards</Badge>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-4 py-3">
@@ -1193,19 +1183,6 @@ const Earn = () => {
                                     {saveUsdstApyDisplay.label}
                                   </p>
                                 </EarnApyTooltip>
-                              </td>
-                              <td className="px-4 py-3">
-                                {saveUsdstRewardMeta.pointsLabel !== "-" ? (
-                                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                    <Star className="h-4 w-4 text-amber-500" />
-                                    <span className="font-medium text-foreground">{saveUsdstRewardMeta.pointsLabel}</span>
-                                    {saveUsdstRewardMeta.featured && (
-                                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Boosted</Badge>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">--</span>
-                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">
@@ -1264,6 +1241,9 @@ const Earn = () => {
                                   />
                                   <p className="font-medium truncate">Diversified Vault</p>
                                   <Badge variant="secondary" className="text-[10px]">Diversified Vault</Badge>
+                                  {vaultRewardMeta.earnsRewards && (
+                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Rewards</Badge>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-4 py-3">
@@ -1272,19 +1252,6 @@ const Earn = () => {
                                     {vaultAlpha.label}
                                   </p>
                                 </EarnApyTooltip>
-                              </td>
-                              <td className="px-4 py-3">
-                                {vaultRewardMeta.pointsLabel !== "-" ? (
-                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                    <Star className="h-4 w-4 text-amber-500" />
-                                    <span className="font-medium text-foreground">{vaultRewardMeta.pointsLabel}</span>
-                                    {vaultRewardMeta.featured && (
-                                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Boosted</Badge>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">--</span>
-                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">${formatUsd(vaultState.totalEquity)}</p>
@@ -1299,9 +1266,6 @@ const Earn = () => {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-end gap-3">
-                                  {vaultRewardMeta.pointsLabel !== "-" && (
-                                    <div className="hidden" />
-                                  )}
                                   <Button
                                     className="h-9 min-w-[108px] justify-center"
                                     size="sm"
@@ -1324,8 +1288,9 @@ const Earn = () => {
                           const cfg = YIELD_VAULTS[opportunity.vaultIndex];
                           const yvData = yieldVaults[cfg.key] ?? null;
                           const yvLive = Boolean(yvData?.deployed);
+                          const yvApyInfo = yieldVaultApyInfos[cfg.key];
                           const yvApyDisplay = yvLive
-                            ? formatCarryVaultApyDisplayForLive(yvData?.apy)
+                            ? formatCarryVaultApyDisplayForLive(getYieldVaultDisplayApyRaw(cfg.key))
                             : { label: "--", className: "text-muted-foreground" };
                           return (
                             <tr
@@ -1354,21 +1319,19 @@ const Earn = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <p className={`text-sm font-semibold ${yvApyDisplay.className}`}>
-                                  {yvApyDisplay.label}
-                                </p>
-                                <p className="text-xs text-muted-foreground">APY</p>
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className="text-sm text-muted-foreground">--</span>
+                                <EarnApyTooltip info={yvApyInfo}>
+                                  <p className={`text-sm font-semibold cursor-default ${yvApyDisplay.className}`}>
+                                    {yvApyDisplay.label}
+                                  </p>
+                                </EarnApyTooltip>
                               </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">
                                   {yvLive
                                     ? (() => {
-                                        const s = formatYieldVaultTvlUsd(yvData);
-                                        return s === "--" ? "--" : `$${s}`;
-                                      })()
+                                      const s = formatYieldVaultTvlUsd(yvData);
+                                      return s === "--" ? "--" : `$${s}`;
+                                    })()
                                     : "--"}
                                 </p>
                                 <p className="text-xs text-muted-foreground">TVL</p>
@@ -1429,6 +1392,9 @@ const Earn = () => {
                                   </div>
                                   <p className="font-medium truncate">USDST Lending Pool</p>
                                   <Badge variant="secondary" className="text-[10px]">Lending</Badge>
+                                  {lendingRewardMeta.earnsRewards && (
+                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Rewards</Badge>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-4 py-3">
@@ -1437,19 +1403,6 @@ const Earn = () => {
                                     {formatApyDisplay(lendingDisplayApyRaw).label}
                                   </p>
                                 </EarnApyTooltip>
-                              </td>
-                              <td className="px-4 py-3">
-                                {lendingRewardMeta.pointsLabel !== "-" ? (
-                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                    <Star className="h-4 w-4 text-amber-500" />
-                                    <span className="font-medium text-foreground">{lendingRewardMeta.pointsLabel}</span>
-                                    {lendingRewardMeta.featured && (
-                                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Boosted</Badge>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">--</span>
-                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">
@@ -1468,9 +1421,6 @@ const Earn = () => {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-end gap-2">
-                                  {lendingRewardMeta.pointsLabel !== "-" && (
-                                    <div className="hidden" />
-                                  )}
                                   <Button
                                     className="h-9 min-w-[108px] justify-center"
                                     size="sm"
@@ -1511,6 +1461,9 @@ const Earn = () => {
                                   <TokenPairIcon pool={pool} />
                                   <p className="font-medium truncate">{pool.poolName}</p>
                                   <Badge variant="secondary" className="text-[10px]">Pool</Badge>
+                                  {poolRewardMeta.earnsRewards && (
+                                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Rewards</Badge>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-4 py-3">
@@ -1519,19 +1472,6 @@ const Earn = () => {
                                     {formatApyDisplay(getPoolDisplayApy(pool)).label}
                                   </p>
                                 </EarnApyTooltip>
-                              </td>
-                              <td className="px-4 py-3">
-                                {poolRewardMeta.pointsLabel !== "-" ? (
-                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                    <Star className="h-4 w-4 text-amber-500" />
-                                    <span className="font-medium text-foreground">{poolRewardMeta.pointsLabel}</span>
-                                    {poolRewardMeta.featured && (
-                                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Boosted</Badge>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">--</span>
-                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <p className="text-sm font-semibold">${formatUsd(pool.totalLiquidityUSD)}</p>
@@ -1546,9 +1486,6 @@ const Earn = () => {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-end gap-2">
-                                  {poolRewardMeta.pointsLabel !== "-" && (
-                                    <div className="hidden" />
-                                  )}
                                   <Button
                                     className="h-9 min-w-[108px] justify-center"
                                     size="sm"
@@ -1570,7 +1507,7 @@ const Earn = () => {
 
                       {(activeFilter === "pools" && !poolsLoading && sortedPools.length === 0) && (
                         <tr>
-                          <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={7}>
+                          <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
                             No pool opportunities available.
                           </td>
                         </tr>

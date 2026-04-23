@@ -49,4 +49,5 @@ library
     , strato-model
     , text
     , unix
+    , vault-monad
   default-language: Haskell2010

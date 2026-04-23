@@ -69,7 +69,7 @@ Login before the very first run:
 strato-login
 ```
 
-> To obtain the credentials for your node server, submit a request for client credentials at https://support.blockapps.net
+> To get the credentials for your node server, submit a request for client credentials at https://support.blockapps.net
 
 
 Start the node:
@@ -94,5 +94,27 @@ Stop and wipe all data:
 
 ```
 strato-down
-rm -rf mynode
+rm -rf mynode/
 ```
+
+### 5. Patch App on a Running Node (for development and testing)
+
+Steps to rebuild and patch the app on a running STRATO node.
+
+#### Rebuild the App Images
+
+```
+make app
+```
+
+This builds both app images and prints the command to deploy them (similar to `make` but only builds the app)
+
+#### Patch the App on a Node
+
+Stop and restart the node with the new images:
+```
+strato-down
+strato-up mynode --patch-app mercata-backend:<tag> mercata-ui:<tag>
+```
+
+Use the exact image tags printed by `make app`.
