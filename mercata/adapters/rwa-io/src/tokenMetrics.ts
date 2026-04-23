@@ -7,7 +7,6 @@ import {
   TokenizedAssetTimeSeriesIds,
 } from "./rwaIoClient";
 
-const WAD = BigInt("1000000000000000000"); // 10^18
 const WAD_NUMBER = 1e18;
 
 /**
@@ -67,7 +66,6 @@ interface TokenStatsToken {
 }
 
 interface TokenStatsResponse {
-  totalMarketCap: string;
   tokens: TokenStatsToken[];
 }
 
@@ -98,7 +96,7 @@ interface TvlResponse {
 
 let tvlCache: TvlResponse | undefined;
 
-async function fetchTvl(): Promise<TvlResponse> {
+export async function fetchTvl(): Promise<TvlResponse> {
   if (tvlCache) return tvlCache;
 
   const url = config.strato.tvlEndpoint;
