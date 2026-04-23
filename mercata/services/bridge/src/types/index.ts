@@ -119,6 +119,10 @@ export interface DepositInfo {
   externalTxHash: string;
   externalDecimals: number;
   depositRouter: string;
+  // Enriched from asset/chain registry so the verification layer can route
+  // to the right check without a second lookup:
+  isNative: boolean;
+  representationBridge: string;
 }
 
 

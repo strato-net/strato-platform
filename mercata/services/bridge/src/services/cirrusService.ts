@@ -149,6 +149,8 @@ export const getDepositsByStatus = async (
         externalTxHash,
         externalDecimals: asset.externalDecimals,
         depositRouter: chainInfo.depositRouter,
+        isNative: !!asset.isNative,
+        representationBridge: chainInfo.representationBridge || "",
       };
     }
   );

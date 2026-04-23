@@ -1,3 +1,5 @@
+import { id as keccakId } from "ethers";
+
 // Constants
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const STRATO_DECIMALS = 18;
@@ -10,6 +12,14 @@ export const ERC20_ABI = [
 // DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)
 export const DEPOSIT_EVENT_SIGNATURE =
   "0x55426533b384af6fcfee0e834a6407e3ffc370a0b1b53400c4e6ec92d7f1f750";
+
+// RepresentationBurned(address indexed stratoToken, address indexed from, address indexed stratoRecipient, address representationToken, uint256 amount)
+// Emitted by StratoRepresentationBridge.redeem() when a holder returns their
+// representation to STRATO. Computed at load so we never drift from the
+// on-chain event signature.
+export const REP_BURN_EVENT_SIGNATURE = keccakId(
+  "RepresentationBurned(address,address,address,address,uint256)",
+);
 
 // Transfer(address,address,uint256)
 export const TRANSFER_EVENT_SIGNATURE =

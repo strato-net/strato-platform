@@ -209,7 +209,9 @@ export async function createWithdrawalProposals(
   const safeHotWalletAddress = config.safe.hotWalletAddress || "";
   const hasHotWallet = !!safeHotWalletAddress;
 
-  // Resolve vault and rep bridge addresses from on-chain chain config
+  // Resolve vault and rep bridge addresses from on-chain chain config. Both
+  // may be unset on a legacy or half-migrated chain, which is fine for routes
+  // that don't need them — we validate per-withdrawal below based on isNative.
   const enabledChains = await getEnabledChains();
   const chainInfo = enabledChains.get(externalChainId);
   if (!chainInfo) {
@@ -218,13 +220,6 @@ export async function createWithdrawalProposals(
 
   const vaultAddress = chainInfo.externalBridgeVault;
   const repBridgeAddress = chainInfo.representationBridge;
-
-  if (!vaultAddress) {
-    throw new Error(`externalBridgeVault not configured for chain ${externalChainId}`);
-  }
-  if (!repBridgeAddress) {
-    throw new Error(`representationBridge not configured for chain ${externalChainId}`);
-  }
 
   // Look up asset info to determine isNative per withdrawal
   const externalTokenAddresses = [...new Set(withdrawals.map(w => ensureHexPrefix(w.externalToken)))] as NonEmptyArray<string>;
@@ -300,6 +295,23 @@ export async function createWithdrawalProposals(
     const asset = assetInfoMap.get(assetKey);
     const isNative = asset?.isNative ?? false;
 
+    // Only require the address the route actually uses. Previously both were
+    // required up-front, which stranded non-native legacy withdrawals on
+    // chains that hadn't yet been set up with a representationBridge (and
+    // vice-versa). The STRATO-side requestWithdrawal() also rejects these
+    // cases pre-escrow, so hitting this throw here indicates on-chain config
+    // drift from the service's view.
+    if (isNative && !repBridgeAddress) {
+      throw new Error(
+        `representationBridge not configured for chain ${externalChainId} (required for native withdrawal ${withdrawal.withdrawalId})`,
+      );
+    }
+    if (!isNative && !vaultAddress) {
+      throw new Error(
+        `externalBridgeVault not configured for chain ${externalChainId} (required for non-native withdrawal ${withdrawal.withdrawalId})`,
+      );
+    }
+
     const descriptor = buildTxDescriptor({
       type: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? "eth" : "erc20",
       isNative,
@@ -307,8 +319,8 @@ export async function createWithdrawalProposals(
       externalTokenAmount: withdrawal.externalTokenAmount,
       externalToken: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? undefined : withdrawal.externalToken,
       stratoToken: isNative ? withdrawal.stratoToken : undefined,
-      vaultAddress: ensureHexPrefix(vaultAddress),
-      repBridgeAddress: ensureHexPrefix(repBridgeAddress),
+      vaultAddress: vaultAddress ? ensureHexPrefix(vaultAddress) : "",
+      repBridgeAddress: repBridgeAddress ? ensureHexPrefix(repBridgeAddress) : "",
       nonce,
     });
 

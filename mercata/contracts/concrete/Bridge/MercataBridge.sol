@@ -978,11 +978,26 @@ contract record MercataBridge is Ownable {
         require(externalRecipient != address(0), "MB: invalid external recipient");
         require(stratoToken != address(0), "MB: invalid strato token");
         require(stratoTokenAmount > 0, "MB: invalid strato token amount");
-        require(chains[externalChainId].enabled, "MB: chain not enabled");
+        ChainInfo chainInfo = chains[externalChainId];
+        require(chainInfo.enabled, "MB: chain not enabled");
 
         AssetInfo a = assets[externalToken][externalChainId];
         _requireRouteEnabled(externalToken, externalChainId, stratoToken);
         require(TokenFactory(tokenFactory).isTokenActive(stratoToken), "MB: inactive token");
+
+        // Reject before escrowing if the destination chain is not fully
+        // configured for this asset family. Otherwise the relayer would
+        // later fail to produce a proposal and the user's funds would sit in
+        // INITIATED until someone manually aborted. This is the contract-side
+        // half of the fix; safeHelper also only requires the relevant address
+        // per asset family, so legacy non-native chains don't need repBridge
+        // and native chains don't need externalBridgeVault.
+        if (a.isNative) {
+            require(chainInfo.representationBridge != address(0), "MB: rep bridge missing");
+            require(stratoCustodyVault != address(0), "MB: vault not set");
+        } else {
+            require(chainInfo.externalBridgeVault != address(0), "MB: external vault missing");
+        }
 
         // Example: 1e18 USDCST tokens / 10^(18-6) = 1e18 / 10^12 = 1e6 USDC
         // Round down to the nearest integer
