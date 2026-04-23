@@ -91,6 +91,15 @@ generateDockerCompose = do
         , logging = noLogging
         }
 
+  let rwaIoAdapter = def
+        { image = "mercata-rwa-io-adapter:" ++ stratoVersionTag ++ "-" ++ hashRwaIoAdapter
+        , environment = Just $ Map.fromList
+            [ ("RWA_IO_API_KEY", "${RWA_IO_API_KEY}")
+            ]
+        , restart = Just "unless-stopped"
+        , logging = noLogging
+        }
+
   let smd = def
         { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
         , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
@@ -329,6 +338,7 @@ generateDockerCompose = do
   let baseServices =
             [ ("mercata-backend", mercataBackend)
             , ("mercata-ui", mercataUi)
+            , ("rwa-io-adapter", rwaIoAdapter)
             , ("smd", smd)
             , ("apex", apex)
             , ("redis", redis)

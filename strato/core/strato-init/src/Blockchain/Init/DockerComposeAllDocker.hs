@@ -91,6 +91,16 @@ generateDockerComposeAllDocker = do
         , logging = noLogging
         }
 
+  let rwaIoAdapter = def
+        { image = "${RWAIOADAPTER_IMAGE:-" ++ repoUrl ++ "mercata-rwa-io-adapter:" ++ stratoVersion ++ "-" ++ hashRwaIoAdapter ++ "}"
+        , build = Just "./mercata/adapters/rwa-io"
+        , environment = Just $ Map.fromList
+            [ ("RWA_IO_API_KEY", "${RWA_IO_API_KEY}")
+            ]
+        , restart = Just "unless-stopped"
+        , logging = noLogging
+        }
+
   let smd = def
         { image = "${SMD_IMAGE:-" ++ repoUrl ++ "smd:" ++ stratoVersion ++ "-" ++ hashSmd ++ "}"
         , build = Just "."
@@ -363,6 +373,7 @@ generateDockerComposeAllDocker = do
         , services = Map.fromList
             [ ("mercata-backend", mercataBackend)
             , ("mercata-ui", mercataUi)
+            , ("rwa-io-adapter", rwaIoAdapter)
             , ("smd", smd)
             , ("apex", apex)
             , ("redis", redis)
