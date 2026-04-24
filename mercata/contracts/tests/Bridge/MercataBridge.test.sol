@@ -1711,24 +1711,40 @@ contract Describe_MercataBridge is Authorizable {
         require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "mUSDST should be exchangable");
     }
 
-    function it_bridge_autosave_reversion_causes_mint_to_recipient() {
+    function it_bridge_autosave_reversion_completes_deposit_with_direct_mint_fallback() {
         uint256 amount = 1000e18;
         address recipient = address(new User());
         string memory txHash = keccak256("example transaction hash");
+        string memory normalizedTxHash = txHash.normalizeHex();
 
         // First initiate deposit
         relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x6666), amount, txHash, recipient, address(usdstToken));
 
         relayer.do(address(bridge), "requestDepositAction", recipient, externalChainId, txHash, uint(1), address(0));
 
+        (DepositAction requestedAction, address requestedTargetToken) = bridge.depositActionRequests(recipient, externalChainId, normalizedTxHash);
+        require(requestedAction == DepositAction.AUTO_SAVE, "Auto-save request should be set");
+        require(requestedTargetToken == address(0), "Auto-save target should be empty");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == 0, "Recipient should start with no USDST");
+        require(IERC20(address(mUSDST)).balanceOf(recipient) == 0, "Recipient should start with no mUSDST");
+
         // Confirm the deposit with auto save, which will fail due to disabled minting of mUSDST
         adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(mUSDST), "mint", address(mercata.liquidityPool()));
         relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
 
         // Verify deposit was completed — falls back to minting USDST directly
-        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash.normalizeHex());
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, normalizedTxHash);
         require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
-        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Tokens should be minted");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == amount, "Fallback should mint USDST");
+        require(IERC20(address(mUSDST)).balanceOf(recipient) == 0, "Failed auto-save should not mint mUSDST");
+
+        bool reverted = false;
+        try {
+            relayer.do(address(bridge), "confirmDeposit", externalChainId, txHash);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Completed deposit should not be confirmable again");
     }
 
     // ============ AUTO FORGE TESTS ============
