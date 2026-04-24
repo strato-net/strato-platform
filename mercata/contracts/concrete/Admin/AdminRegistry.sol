@@ -72,8 +72,12 @@ contract record AdminRegistry is Ownable {
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
         if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
+            log("TRACE AdminRegistry.castVoteOnIssue entered admin branch");
+            log("TRACE msg.sender", msg.sender);
+            log("TRACE _target", _target);
             address sender = msg.sender;
             if (adminMap[msg.sender] == 0) {
+                log("TRACE entered delegated admin vote branch");
                 if (_target != tx.origin) {
                     bool authorizationGranted = false;
                     try {
@@ -86,6 +90,8 @@ contract record AdminRegistry is Ownable {
                 sender = _target;
                 _target = msg.sender;
             }
+            log("TRACE vote sender", sender);
+            log("TRACE issue target", _target);
             string issueId = _getIssueId(_target, _func, _args);
             bool hasVoted = votesMap[issueId][sender] != 0;
 
