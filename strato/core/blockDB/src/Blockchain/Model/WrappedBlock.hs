@@ -291,6 +291,7 @@ instance TransactionLike OutputTx where
   txGasLimit = txGasLimit . otBaseTx
   txCode = txCode . otBaseTx
   txChainId = txChainId . otBaseTx
+  txTxData = txTxData . otBaseTx
 
   morphTx t =
     OutputTx
