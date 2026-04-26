@@ -63,11 +63,199 @@ export interface MultiNodeConfig {
   enabled: boolean;
 }
 
+// ----------------------------------------------------------------------------
+// Token Sale TPS scenario (Scenario 1)
+// ----------------------------------------------------------------------------
+// This scenario replays the "Fund > Bridge-In (Ethereum → STRATO, USDC →
+// GOLDST)" composition that the Mercata UI performs at /dashboard/deposits.
+// It is a two-step sequence against mercata/backend:
+//   1. POST /api/bridge/requestDepositAction (action = 2 AUTO_FORGE)
+//   2. POST /api/metal-forge/buy (USDST → metal on STRATO)
+// Plus a set of warm-up GETs that the Fund page issues on mount. The on-chain
+// Ethereum side (Permit2 + DepositRouter.deposit) is NOT replayed per
+// iteration because it burns real gas and real blocktime; configure a real
+// externalTxHash to reuse, or leave blank to skip the bridge request.
+// ----------------------------------------------------------------------------
+
+export interface TokenSaleUser {
+  username: string;
+  password: string;
+}
+
+/** Post-deposit action codes used by /api/bridge/requestDepositAction. */
+export type BridgeDepositAction = 1 | 2; // 1=AUTO_SAVE (lend USDST), 2=AUTO_FORGE (buy metal)
+
+export interface TokenSaleScenarioConfig {
+  enabled: boolean;
+  /** Backend URL (e.g. https://app.testnet.strato.nexus). Defaults to node[0].url. */
+  backendUrl?: string;
+  /** Total number of sales (bridge+forge or buy-metal pairs) to execute. */
+  totalTxCount: number;
+  /** Target time window in milliseconds (1000 sales / 30s = 30000). */
+  timeWindowMs: number;
+  /** Number of concurrent virtual users submitting sales. */
+  concurrentUsers: number;
+  /** Network identifier label, e.g. "helium". Used only for report metadata. */
+  networkLabel?: string;
+  /** STRATO chain ID (e.g. 114784819836269 for helium testnet). Used for metadata. */
+  chainId?: string | number;
+
+  /* ---- Bridge-in phase (POST /api/bridge/requestDepositAction) ---- */
+  /** External chain ID string the deposit originates on (e.g. "1" Ethereum, "11155111" Sepolia). */
+  externalChainId?: string;
+  /** Reusable external tx hash. If empty, the bridge request step is skipped. */
+  externalTxHash?: string;
+  /** Post-deposit action (2 = AUTO_FORGE metal). */
+  action?: BridgeDepositAction;
+
+  /* ---- Buy-metal phase (POST /api/metal-forge/buy) ---- */
+  /** Metal token address on STRATO (hex, no 0x). E.g. GOLDST. */
+  metalTokenAddress: string;
+  /** Pay token address on STRATO (hex, no 0x). E.g. USDST. */
+  payTokenAddress: string;
+  /** Pay amount in 18-decimal wei string. */
+  payAmount: string;
+  /** Minimum metal output in wei (slippage guard). */
+  minMetalOut: string;
+
+  /* ---- Behaviour toggles ---- */
+  /** If true, do the Fund-page warm-up GETs once per user before hitting the POSTs. */
+  includePageLoad?: boolean;
+  /** If true, only perform the buy-metal step (skip /bridge/requestDepositAction). */
+  skipBridgeRequest?: boolean;
+  /** If true, only perform the bridge-request step (skip /metal-forge/buy). */
+  skipBuyMetal?: boolean;
+
+  /* ---- Auth ---- */
+  /** Optional list of pre-provisioned user credentials. Falls back to node[0] auth. */
+  users?: TokenSaleUser[];
+  /** Optional OpenID discovery URL for user auth (falls back to node[0].auth). */
+  openIdDiscoveryUrl?: string;
+  /** Optional OAuth client id / secret for user auth. */
+  clientId?: string;
+  clientSecret?: string;
+}
+
+// ----------------------------------------------------------------------------
+// JSON-RPC stress scenario (Scenario 2)
+// ----------------------------------------------------------------------------
+
+export interface JsonRpcMethodSpec {
+  method: string;
+  /** Weight for random selection (higher = more frequent). */
+  weight?: number;
+  /** Static params. If omitted a sensible default is generated. */
+  params?: any[];
+}
+
+export interface JsonRpcStressScenarioConfig {
+  enabled: boolean;
+  /** Full RPC URL (e.g. https://app.testnet.strato.nexus/rpc/114784819836269). */
+  rpcUrl: string;
+  /** Number of concurrent virtual users. */
+  concurrentUsers: number;
+  /** Duration in ms each user runs for. */
+  durationMs: number;
+  /** Optional per-user delay between calls (ms). */
+  thinkTimeMs?: number;
+  /** Methods to rotate through. If empty, a built-in default set is used. */
+  methods?: JsonRpcMethodSpec[];
+  /** If true each request uses the node[0] bearer token. */
+  authenticated?: boolean;
+}
+
+// ----------------------------------------------------------------------------
+// Full application simulation (Scenario 3)
+// ----------------------------------------------------------------------------
+
+export interface FullAppWorkflowStep {
+  name: string;
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  /** Path templated with {placeholders} interpolated from the user's context. */
+  path: string;
+  /** If true, include Authorization: Bearer header. */
+  auth?: boolean;
+  /** Optional JSON body (POST/PUT). */
+  body?: any;
+  /** Optional query parameters. */
+  query?: Record<string, string | number | boolean>;
+  /** Optional think time before this step (ms). */
+  thinkTimeMs?: number;
+}
+
+export interface FullAppScenarioConfig {
+  enabled: boolean;
+  /** Base URL (e.g. https://app.testnet.strato.nexus). */
+  baseUrl: string;
+  /** Number of concurrent virtual users. */
+  concurrentUsers: number;
+  /** Total test duration in ms. */
+  durationMs: number;
+  /** Iterations of the workflow per user (if omitted, loops for durationMs). */
+  iterationsPerUser?: number;
+  /** Ordered workflow steps. If empty uses built-in default. */
+  workflow?: FullAppWorkflowStep[];
+  /** Optional list of user credentials. */
+  users?: TokenSaleUser[];
+  /** Fallback auth fields. */
+  openIdDiscoveryUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
+}
+
+// ----------------------------------------------------------------------------
+// Sepolia → STRATO bridge-in scenario (Scenario 4)
+// ----------------------------------------------------------------------------
+
+export interface BridgeInScenarioConfig {
+  enabled: boolean;
+  /** Number of bridge-in transactions to execute. */
+  totalBridgeIns: number;
+  /** Time window within which to submit them (ms). */
+  timeWindowMs: number;
+  /** Sepolia chain ID (11155111). */
+  sepoliaChainId: number;
+  /** Sepolia JSON-RPC URL (Infura/Alchemy/etc). */
+  sepoliaRpcUrl: string;
+  /** Private key of the funded Sepolia account signing the deposits (0x-prefixed). */
+  sepoliaPrivateKey: string;
+  /** DepositRouter contract address on Sepolia (0x-prefixed). */
+  depositRouterAddress: string;
+  /** Mode: "ETH" uses depositETH (no approval needed); "ERC20" uses deposit. */
+  depositMode?: "ETH" | "ERC20";
+  /** Sepolia ERC20 token address for ERC20 mode. */
+  sepoliaTokenAddress?: string;
+  /** Amount per bridge-in (wei string). For ETH: value sent. For ERC20: token amount. */
+  amountPerTx: string;
+  /** Recipient address on STRATO (hex, no 0x). */
+  stratoRecipientAddress: string;
+  /** Corresponding STRATO-side token address (hex, no 0x). */
+  targetStratoToken: string;
+  /** STRATO backend URL (used for post-bridge verification/minting checks). */
+  stratoBackendUrl?: string;
+  /** If true, wait for each Sepolia tx to be mined before sending next. */
+  awaitSepoliaConfirmation?: boolean;
+  /** Max seconds to wait for STRATO-side confirmation (mint) after Sepolia tx confirms. */
+  stratoConfirmTimeoutSec?: number;
+  /** Starting nonce override — if omitted, read from chain. */
+  startNonce?: number;
+  /** Gas limit override for deposit tx (default 250000). */
+  gasLimit?: number;
+  /** Max fee per gas in gwei. */
+  maxFeePerGasGwei?: number;
+  /** Max priority fee per gas in gwei. */
+  maxPriorityFeePerGasGwei?: number;
+}
+
 export interface ScenariosConfig {
   contractDeploy: ContractDeployScenarioConfig;
   functionCall: FunctionCallScenarioConfig;
   mixedWorkload: MixedWorkloadScenarioConfig;
   multiNode: MultiNodeConfig;
+  tokenSale: TokenSaleScenarioConfig;
+  jsonRpcStress: JsonRpcStressScenarioConfig;
+  fullApp: FullAppScenarioConfig;
+  bridgeIn: BridgeInScenarioConfig;
 }
 
 export interface ReportConfig {

@@ -8,6 +8,10 @@ import { writeHtmlReport } from "./report/htmlReport";
 import { ContractDeployScenario } from "./scenarios/contractDeploy";
 import { FunctionCallScenario } from "./scenarios/functionCall";
 import { MixedWorkloadScenario } from "./scenarios/mixedWorkload";
+import { TokenSaleScenario } from "./scenarios/tokenSale";
+import { JsonRpcStressScenario } from "./scenarios/jsonRpcStress";
+import { FullAppSimulationScenario } from "./scenarios/fullAppSimulation";
+import { BridgeInScenario } from "./scenarios/bridgeIn";
 import { BaseScenario } from "./scenarios/base";
 import { LoadTestConfig, LoadTestReport, ScenarioResult } from "./types";
 
@@ -17,12 +21,21 @@ program
   .name("strato-load-test")
   .description("STRATO blockchain load testing framework")
   .option("-c, --config <path>", "Path to config YAML file", "config.yaml")
-  .option("-s, --scenario <name>", "Run a specific scenario (contractDeploy, functionCall, mixedWorkload)")
-  .option("--batch-size <n>", "Override batch size", parseInt)
-  .option("--batch-count <n>", "Override batch count", parseInt)
+  .option(
+    "-s, --scenario <name>",
+    "Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale | jsonRpcStress | fullApp | bridgeIn",
+  )
+  .option("--batch-size <n>", "Override batch size (low-level scenarios)", parseInt)
+  .option("--batch-count <n>", "Override batch count (low-level scenarios)", parseInt)
+  .option("--concurrent-users <n>", "Override concurrent users for tokenSale/jsonRpcStress/fullApp", parseInt)
+  .option("--duration <ms>", "Override durationMs for jsonRpcStress/fullApp", parseInt)
+  .option("--total-tx <n>", "Override totalTxCount (tokenSale) or totalBridgeIns (bridgeIn)", parseInt)
+  .option("--time-window <ms>", "Override timeWindowMs for tokenSale/bridgeIn", parseInt)
+  .option("--backend-url <url>", "Override backend URL (tokenSale/fullApp)")
+  .option("--rpc-url <url>", "Override RPC URL (jsonRpcStress)")
   .option("--nodes <names>", "Comma-separated node names to target", (v) => v.split(","))
   .option("--report-dir <path>", "Output directory for reports")
-  .option("--submit-mode <mode>", "Submit mode: sequential (default) or pipeline (submit all batches before confirming)")
+  .option("--submit-mode <mode>", "Submit mode: sequential (default) or pipeline")
   .option("-v, --verbose", "Enable verbose logging", false);
 
 async function runScenarioOnNodes(
@@ -54,6 +67,12 @@ async function main(): Promise<void> {
       nodes: opts.nodes,
       reportDir: opts.reportDir,
       submitMode: opts.submitMode,
+      concurrentUsers: opts.concurrentUsers,
+      duration: opts.duration,
+      totalTx: opts.totalTx,
+      timeWindow: opts.timeWindow,
+      backendUrl: opts.backendUrl,
+      rpcUrl: opts.rpcUrl,
     });
   } catch (err: any) {
     console.error(`Configuration error: ${err.message}`);
@@ -92,6 +111,18 @@ async function main(): Promise<void> {
   }
   if (config.scenarios.mixedWorkload.enabled) {
     scenarios.push(new MixedWorkloadScenario(config, collector, opts.verbose));
+  }
+  if (config.scenarios.tokenSale.enabled) {
+    scenarios.push(new TokenSaleScenario(config, collector, opts.verbose));
+  }
+  if (config.scenarios.jsonRpcStress.enabled) {
+    scenarios.push(new JsonRpcStressScenario(config, collector, opts.verbose));
+  }
+  if (config.scenarios.fullApp.enabled) {
+    scenarios.push(new FullAppSimulationScenario(config, collector, opts.verbose));
+  }
+  if (config.scenarios.bridgeIn.enabled) {
+    scenarios.push(new BridgeInScenario(config, collector, opts.verbose));
   }
 
   if (scenarios.length === 0) {

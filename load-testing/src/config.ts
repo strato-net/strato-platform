@@ -76,6 +76,67 @@ export function loadConfig(configPath: string): LoadTestConfig {
         enabled: false,
         ...raw.scenarios?.multiNode,
       },
+      tokenSale: {
+        enabled: false,
+        totalTxCount: 1000,
+        timeWindowMs: 30000,
+        concurrentUsers: 50,
+        networkLabel: "helium",
+        chainId: 114784819836269,
+        // Bridge-in phase (requires a real externalTxHash on the backend
+        // otherwise /api/bridge/requestDepositAction rejects). Skipped by
+        // default; enable by setting skipBridgeRequest: false and providing
+        // a valid externalTxHash that exists on externalChainId.
+        externalChainId: "1",
+        externalTxHash: "",
+        action: 2,
+        // Buy-metal phase (default: USDST -> GOLDST on helium testnet).
+        metalTokenAddress: "",
+        payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+        payAmount: "1000000000000000",
+        minMetalOut: "0",
+        includePageLoad: true,
+        skipBridgeRequest: true,
+        skipBuyMetal: false,
+        ...raw.scenarios?.tokenSale,
+      },
+      jsonRpcStress: {
+        enabled: false,
+        rpcUrl: "https://app.testnet.strato.nexus/rpc/114784819836269",
+        concurrentUsers: 300,
+        durationMs: 60000,
+        thinkTimeMs: 0,
+        authenticated: true,
+        methods: [],
+        ...raw.scenarios?.jsonRpcStress,
+      },
+      fullApp: {
+        enabled: false,
+        baseUrl: "https://app.testnet.strato.nexus",
+        concurrentUsers: 300,
+        durationMs: 120000,
+        workflow: [],
+        ...raw.scenarios?.fullApp,
+      },
+      bridgeIn: {
+        enabled: false,
+        totalBridgeIns: 50,
+        timeWindowMs: 30000,
+        sepoliaChainId: 11155111,
+        sepoliaRpcUrl: "",
+        sepoliaPrivateKey: "",
+        depositRouterAddress: "",
+        depositMode: "ETH",
+        amountPerTx: "1000000000000",
+        stratoRecipientAddress: "",
+        targetStratoToken: "",
+        awaitSepoliaConfirmation: false,
+        stratoConfirmTimeoutSec: 180,
+        gasLimit: 250000,
+        maxFeePerGasGwei: 30,
+        maxPriorityFeePerGasGwei: 2,
+        ...raw.scenarios?.bridgeIn,
+      },
     },
     report: { ...DEFAULTS.report!, ...raw.report },
   };
@@ -83,16 +144,34 @@ export function loadConfig(configPath: string): LoadTestConfig {
   return config;
 }
 
+export interface CliOverrides {
+  batchSize?: number;
+  batchCount?: number;
+  scenario?: string;
+  nodes?: string[];
+  reportDir?: string;
+  submitMode?: SubmitMode;
+  concurrentUsers?: number;
+  duration?: number;
+  totalTx?: number;
+  timeWindow?: number;
+  backendUrl?: string;
+  rpcUrl?: string;
+}
+
+const KNOWN_SCENARIOS = new Set([
+  "contractDeploy",
+  "functionCall",
+  "mixedWorkload",
+  "tokenSale",
+  "jsonRpcStress",
+  "fullApp",
+  "bridgeIn",
+]);
+
 export function applyCliOverrides(
   config: LoadTestConfig,
-  overrides: {
-    batchSize?: number;
-    batchCount?: number;
-    scenario?: string;
-    nodes?: string[];
-    reportDir?: string;
-    submitMode?: SubmitMode;
-  },
+  overrides: CliOverrides,
 ): LoadTestConfig {
   if (overrides.batchSize !== undefined) {
     config.scenarios.contractDeploy.batchSize = overrides.batchSize;
@@ -102,19 +181,20 @@ export function applyCliOverrides(
   if (overrides.batchCount !== undefined) {
     config.scenarios.contractDeploy.batchCount = overrides.batchCount;
     config.scenarios.functionCall.batchCount = overrides.batchCount;
-    // For mixed workload, adjust totalTxCount
     config.scenarios.mixedWorkload.totalTxCount =
       overrides.batchCount * config.scenarios.mixedWorkload.batchSize;
   }
   if (overrides.scenario) {
-    // Disable all, then enable just the requested one
-    config.scenarios.contractDeploy.enabled = false;
-    config.scenarios.functionCall.enabled = false;
-    config.scenarios.mixedWorkload.enabled = false;
-    if (overrides.scenario === "contractDeploy") config.scenarios.contractDeploy.enabled = true;
-    else if (overrides.scenario === "functionCall") config.scenarios.functionCall.enabled = true;
-    else if (overrides.scenario === "mixedWorkload") config.scenarios.mixedWorkload.enabled = true;
-    else throw new Error(`Unknown scenario: ${overrides.scenario}`);
+    if (!KNOWN_SCENARIOS.has(overrides.scenario)) {
+      throw new Error(
+        `Unknown scenario: ${overrides.scenario}. Known: ${Array.from(KNOWN_SCENARIOS).join(", ")}`,
+      );
+    }
+    // Disable all, then enable only the requested one
+    for (const key of KNOWN_SCENARIOS) {
+      (config.scenarios as any)[key].enabled = false;
+    }
+    (config.scenarios as any)[overrides.scenario].enabled = true;
   }
   if (overrides.nodes && overrides.nodes.length > 0) {
     config.nodes = config.nodes.filter((n) => overrides.nodes!.includes(n.name));
@@ -129,6 +209,30 @@ export function applyCliOverrides(
     config.scenarios.contractDeploy.submitMode = overrides.submitMode;
     config.scenarios.functionCall.submitMode = overrides.submitMode;
     config.scenarios.mixedWorkload.submitMode = overrides.submitMode;
+  }
+  if (overrides.concurrentUsers !== undefined) {
+    config.scenarios.tokenSale.concurrentUsers = overrides.concurrentUsers;
+    config.scenarios.jsonRpcStress.concurrentUsers = overrides.concurrentUsers;
+    config.scenarios.fullApp.concurrentUsers = overrides.concurrentUsers;
+  }
+  if (overrides.duration !== undefined) {
+    config.scenarios.jsonRpcStress.durationMs = overrides.duration;
+    config.scenarios.fullApp.durationMs = overrides.duration;
+  }
+  if (overrides.totalTx !== undefined) {
+    config.scenarios.tokenSale.totalTxCount = overrides.totalTx;
+    config.scenarios.bridgeIn.totalBridgeIns = overrides.totalTx;
+  }
+  if (overrides.timeWindow !== undefined) {
+    config.scenarios.tokenSale.timeWindowMs = overrides.timeWindow;
+    config.scenarios.bridgeIn.timeWindowMs = overrides.timeWindow;
+  }
+  if (overrides.backendUrl) {
+    config.scenarios.tokenSale.backendUrl = overrides.backendUrl;
+    config.scenarios.fullApp.baseUrl = overrides.backendUrl;
+  }
+  if (overrides.rpcUrl) {
+    config.scenarios.jsonRpcStress.rpcUrl = overrides.rpcUrl;
   }
   return config;
 }
