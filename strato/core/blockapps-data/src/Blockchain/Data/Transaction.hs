@@ -104,6 +104,14 @@ instance TransactionLike Transaction where
 
   txChainId = chainId
 
+  txGasPrice MessageTX {} = 0
+  txGasPrice ContractCreationTX {} = 0
+  txGasPrice EthereumTX {..} = gasPrice
+
+  txValue MessageTX {} = 0
+  txValue ContractCreationTX {} = 0
+  txValue EthereumTX {..} = value
+
   txTxData MessageTX {} = Nothing
   txTxData ContractCreationTX {} = Nothing
   txTxData EthereumTX {..} = Just txData
@@ -113,15 +121,17 @@ instance TransactionLike Transaction where
       | Just fn <- txFuncName t ->
           MessageTX n gl (fromJust $ txDestination t) fn args network cid r s v 0
       | otherwise ->
-          EthereumTX n 0 gl (txDestination t) 0 (fromJust $ txTxData t) cid r s v
+          EthereumTX n gp gl (txDestination t) val (fromJust $ txTxData t) cid r s v
     ContractCreation
       | Just cn <- txContractName t ->
           ContractCreationTX n gl cn args network (fromJust $ txCode t) cid r s v 0
       | otherwise ->
-          EthereumTX n 0 gl Nothing 0 (fromJust $ txTxData t) cid r s v
+          EthereumTX n gp gl Nothing val (fromJust $ txTxData t) cid r s v
     where
       n = txNonce t
+      gp = txGasPrice t
       gl = txGasLimit t
+      val = txValue t
       args = txArgs t
       network = txNetwork t
       cid = txChainId t

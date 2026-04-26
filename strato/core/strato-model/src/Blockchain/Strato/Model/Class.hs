@@ -127,6 +127,8 @@ class (RLPSerializable t) => TransactionLike t where
   txGasLimit :: t -> Integer
   txCode :: t -> Maybe Code
   txChainId :: t -> Maybe Integer
+  txGasPrice :: t -> Integer
+  txValue :: t -> Integer
   txTxData :: t -> Maybe B.ByteString
 
   morphTx :: (TransactionLike t2) => t2 -> t
@@ -146,6 +148,8 @@ class (RLPSerializable t) => TransactionLike t where
     txGasLimit,
     txCode,
     txChainId,
+    txGasPrice,
+    txValue,
     txTxData,
     morphTx
     #-}
