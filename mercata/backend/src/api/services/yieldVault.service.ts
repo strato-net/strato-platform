@@ -7,9 +7,10 @@ import { getServiceToken } from "../../utils/authHelper";
 import { getOraclePrices } from "./oracle.service";
 import { FunctionInput } from "../../types/types";
 
-const { YieldVault, Token } = constants;
+const { YieldVault, Token, CDPEngine, CDPRegistry, cdpRegistry } = constants;
 
 const WAD = 10n ** 18n;
+const RAY = 10n ** 27n;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface YieldVaultDef {
@@ -57,9 +58,49 @@ export interface YieldVaultPendingWithdrawal {
   receiver: string;
 }
 
+/**
+ * One row of a strategy's composition. Aggregates everything the strategy
+ * "controls" of a given asset: ERC-20 wallet balance + CDP collateral locked
+ * in the CDPEngine. Liabilities (USDST debt) are tracked separately on
+ * `YieldVaultStrategyHolding.usdstDebt` and not netted here.
+ */
+export interface StrategyAsset {
+  tokenAddress: string;
+  tokenSymbol: string;
+  decimals: number;
+  /** Total raw token units = walletBalance + cdpCollateral. */
+  amount: string;
+}
+
 export interface YieldVaultStrategyHolding {
   strategyAddress: string;
   deployedAssets: string;
+  /**
+   * Assets controlled by the strategy (ERC-20 wallet + CDP collateral),
+   * merged per token address.
+   */
+  composition: StrategyAsset[];
+  /**
+   * Total USDST borrowed by this strategy across all CDP positions, in
+   * 18-decimal units. Accrued at the indexed rateAccumulator (slightly
+   * under-states real-time interest until the next on-chain accrual).
+   */
+  usdstDebt: string;
+}
+
+interface StrategyTokenBalance {
+  tokenAddress: string;
+  tokenSymbol: string;
+  decimals: number;
+  balance: string;
+}
+
+interface StrategyCdpPosition {
+  assetAddress: string;
+  assetSymbol: string;
+  collateralDecimals: number;
+  collateral: string;
+  debtUsdst: string;
 }
 
 export interface YieldVaultUserInfo extends YieldVaultInfo {
@@ -268,6 +309,207 @@ const getYieldVaultRequest = async (
   return data?.[0]?.value || null;
 };
 
+/**
+ * Per-token ERC-20 balances held at `strategyAddress`. Discovered by querying
+ * the Token contract's `_balances` mapping with `key = strategyAddress` and
+ * `value > 0`, then batch-resolving symbol/decimals from the Token table.
+ *
+ * This intentionally surfaces gross holdings only; debt-side positions (e.g.
+ * USDST borrowed against collateral) are tracked elsewhere and not netted here.
+ */
+const getStrategyTokenHoldings = async (
+  serviceToken: string,
+  strategyAddress: string
+): Promise<StrategyTokenBalance[]> => {
+  const { data: balRows } = await cirrus.get(serviceToken, `/${Token}-_balances`, {
+    params: {
+      key: `eq.${strategyAddress}`,
+      value: "gt.0",
+      select: "address,value::text",
+      order: "value.desc",
+    },
+  });
+
+  const rows = (balRows || []) as Array<{ address?: string; value?: string }>;
+  if (rows.length === 0) return [];
+
+  const tokenAddresses = Array.from(
+    new Set(
+      rows
+        .map((r) => String(r.address || "").trim())
+        .filter((addr) => addr.length > 0)
+    )
+  );
+  if (tokenAddresses.length === 0) return [];
+
+  const { data: metaRows } = await cirrus.get(serviceToken, `/${Token}`, {
+    params: {
+      address: `in.(${tokenAddresses.join(",")})`,
+      select: "address,_symbol,customDecimals",
+    },
+  });
+
+  const metaMap = new Map<string, { symbol: string; decimals: number }>();
+  for (const row of (metaRows || []) as Array<Record<string, unknown>>) {
+    const addr = String(row.address || "");
+    if (!addr) continue;
+    metaMap.set(addr, {
+      symbol: String(row._symbol || ""),
+      decimals: Number(row.customDecimals ?? 18),
+    });
+  }
+
+  return rows.map((r) => {
+    const rawAddr = String(r.address || "");
+    const meta = metaMap.get(rawAddr);
+    return {
+      tokenAddress: normalizeAddress(rawAddr),
+      tokenSymbol: meta?.symbol || "",
+      decimals: Number.isFinite(meta?.decimals) ? (meta!.decimals as number) : 18,
+      balance: String(r.value || "0"),
+    };
+  });
+};
+
+/**
+ * Resolve the active CDPEngine address from the registry. Returns "" if not
+ * configured. Cached-free per call; the registry select is a tiny FK lookup.
+ */
+const getCdpEngineAddress = async (serviceToken: string): Promise<string> => {
+  if (!cdpRegistry) return "";
+  try {
+    const { data } = await cirrus.get(serviceToken, `/${CDPRegistry}`, {
+      params: {
+        address: `eq.${cdpRegistry}`,
+        select: "cdpEngine:cdpEngine_fkey(address)",
+      },
+    });
+    return String(data?.[0]?.cdpEngine?.address || "");
+  } catch {
+    return "";
+  }
+};
+
+/**
+ * CDP positions opened by `strategyAddress` against the CDPEngine.
+ *
+ * Reads `CDPEngine-vaults` keyed on (user=strategyAddress, asset=*) and
+ * accrues each row's USDST debt with the indexed `rateAccumulator`:
+ *     debtUSDST = scaledDebt * rateAccumulator / RAY
+ *
+ * The rate accumulator stored in Cirrus is the last on-chain value; it under-
+ * states by the seconds since the last `_accrue` call. This matches how the
+ * existing CDP service reports user debt.
+ */
+const getStrategyCdpPositions = async (
+  serviceToken: string,
+  cdpEngineAddress: string,
+  strategyAddress: string
+): Promise<StrategyCdpPosition[]> => {
+  if (!cdpEngineAddress || !strategyAddress) return [];
+
+  const { data: vaultRows } = await cirrus.get(serviceToken, `/${CDPEngine}-vaults`, {
+    params: {
+      address: `eq.${cdpEngineAddress}`,
+      key: `eq.${strategyAddress}`,
+      select: "asset:key2,Vault:value",
+    },
+  });
+
+  const rows = (vaultRows || []) as Array<{
+    asset?: string;
+    Vault?: { collateral?: string; scaledDebt?: string };
+  }>;
+  if (rows.length === 0) return [];
+
+  const assetAddresses = Array.from(
+    new Set(
+      rows
+        .map((r) => String(r.asset || "").trim())
+        .filter((addr) => addr.length > 0)
+    )
+  );
+  if (assetAddresses.length === 0) return [];
+
+  const [{ data: stateRows }, { data: tokenRows }] = await Promise.all([
+    cirrus.get(serviceToken, `/${CDPEngine}-collateralGlobalStates`, {
+      params: {
+        address: `eq.${cdpEngineAddress}`,
+        key: `in.(${assetAddresses.join(",")})`,
+        select: "asset:key,CollateralGlobalState:value",
+      },
+    }),
+    cirrus.get(serviceToken, `/${Token}`, {
+      params: {
+        address: `in.(${assetAddresses.join(",")})`,
+        select: "address,_symbol,customDecimals",
+      },
+    }),
+  ]);
+
+  const rateMap = new Map<string, bigint>();
+  for (const row of (stateRows || []) as Array<Record<string, any>>) {
+    const asset = String(row.asset || "");
+    const rateRaw = row?.CollateralGlobalState?.rateAccumulator;
+    if (!asset || !rateRaw) continue;
+    try {
+      rateMap.set(asset, BigInt(rateRaw));
+    } catch {
+      // skip malformed
+    }
+  }
+
+  const tokenMap = new Map<string, { symbol: string; decimals: number }>();
+  for (const row of (tokenRows || []) as Array<Record<string, unknown>>) {
+    const addr = String(row.address || "");
+    if (!addr) continue;
+    tokenMap.set(addr, {
+      symbol: String(row._symbol || ""),
+      decimals: Number(row.customDecimals ?? 18),
+    });
+  }
+
+  const positions: StrategyCdpPosition[] = [];
+  for (const r of rows) {
+    const rawAddr = String(r.asset || "");
+    if (!rawAddr) continue;
+
+    let collateral = 0n;
+    let scaledDebt = 0n;
+    try {
+      collateral = BigInt(r.Vault?.collateral || "0");
+      scaledDebt = BigInt(r.Vault?.scaledDebt || "0");
+    } catch {
+      continue;
+    }
+    if (collateral === 0n && scaledDebt === 0n) continue;
+
+    const rate = rateMap.get(rawAddr) ?? RAY;
+    const debtUsdst = (scaledDebt * rate) / RAY;
+    const meta = tokenMap.get(rawAddr);
+
+    positions.push({
+      assetAddress: normalizeAddress(rawAddr),
+      assetSymbol: meta?.symbol || "",
+      collateralDecimals: meta?.decimals ?? 18,
+      collateral: collateral.toString(),
+      debtUsdst: debtUsdst.toString(),
+    });
+  }
+
+  positions.sort((a, b) => {
+    const ad = BigInt(a.debtUsdst);
+    const bd = BigInt(b.debtUsdst);
+    if (bd !== ad) return bd > ad ? 1 : -1;
+    const ac = BigInt(a.collateral);
+    const bc = BigInt(b.collateral);
+    if (bc !== ac) return bc > ac ? 1 : -1;
+    return 0;
+  });
+
+  return positions;
+};
+
 const getStrategyHoldings = async (
   accessToken: string,
   vaultAddress: string
@@ -281,10 +523,134 @@ const getStrategyHoldings = async (
     },
   });
 
-  return (data || []).map((row: Record<string, unknown>) => ({
+  const baseHoldings = (data || []).map((row: Record<string, unknown>) => ({
     strategyAddress: normalizeAddress(String(row.key || "")),
     deployedAssets: String(row.value || "0"),
   }));
+
+  if (baseHoldings.length === 0) return [];
+
+  // Resolve CDPEngine once for all strategies; per-strategy CDP queries reuse it.
+  const cdpEngineAddress = await getCdpEngineAddress(accessToken);
+
+  const [tokenBalanceLists, cdpPositionLists] = await Promise.all([
+    Promise.all(
+      baseHoldings.map((h: { strategyAddress: string }) =>
+        getStrategyTokenHoldings(accessToken, h.strategyAddress).catch(
+          () => [] as StrategyTokenBalance[]
+        )
+      )
+    ),
+    Promise.all(
+      baseHoldings.map((h: { strategyAddress: string }) =>
+        cdpEngineAddress
+          ? getStrategyCdpPositions(accessToken, cdpEngineAddress, h.strategyAddress).catch(
+              () => [] as StrategyCdpPosition[]
+            )
+          : Promise.resolve([] as StrategyCdpPosition[])
+      )
+    ),
+  ]);
+
+  return baseHoldings.map(
+    (h: { strategyAddress: string; deployedAssets: string }, i: number) => {
+      const composition = mergeStrategyComposition(
+        tokenBalanceLists[i],
+        cdpPositionLists[i]
+      );
+      const usdstDebt = sumUsdstDebt(cdpPositionLists[i]);
+      return {
+        ...h,
+        composition,
+        usdstDebt,
+      };
+    }
+  );
+};
+
+/**
+ * Merge ERC-20 wallet balances and CDP collateral into a single per-token
+ * composition list. Token symbol/decimals come from whichever source resolved
+ * them first. Sorted by symbol alphabetically (case-insensitive) so that the
+ * UI renders predictably across refreshes.
+ */
+const mergeStrategyComposition = (
+  tokenBalances: StrategyTokenBalance[],
+  cdpPositions: StrategyCdpPosition[]
+): StrategyAsset[] => {
+  const merged = new Map<
+    string,
+    { tokenAddress: string; tokenSymbol: string; decimals: number; amount: bigint }
+  >();
+
+  const upsert = (
+    addr: string,
+    symbol: string,
+    decimals: number,
+    delta: bigint
+  ) => {
+    if (!addr || delta === 0n) return;
+    const existing = merged.get(addr);
+    if (existing) {
+      existing.amount += delta;
+      if (!existing.tokenSymbol && symbol) existing.tokenSymbol = symbol;
+    } else {
+      merged.set(addr, {
+        tokenAddress: addr,
+        tokenSymbol: symbol || "",
+        decimals: Number.isFinite(decimals) ? decimals : 18,
+        amount: delta,
+      });
+    }
+  };
+
+  for (const tb of tokenBalances) {
+    let bal = 0n;
+    try {
+      bal = BigInt(tb.balance || "0");
+    } catch {
+      bal = 0n;
+    }
+    upsert(tb.tokenAddress, tb.tokenSymbol, tb.decimals, bal);
+  }
+
+  for (const pos of cdpPositions) {
+    let coll = 0n;
+    try {
+      coll = BigInt(pos.collateral || "0");
+    } catch {
+      coll = 0n;
+    }
+    upsert(pos.assetAddress, pos.assetSymbol, pos.collateralDecimals, coll);
+  }
+
+  return Array.from(merged.values())
+    .filter((row) => row.amount > 0n)
+    .map((row) => ({
+      tokenAddress: row.tokenAddress,
+      tokenSymbol: row.tokenSymbol,
+      decimals: row.decimals,
+      amount: row.amount.toString(),
+    }))
+    .sort((a, b) => {
+      const sa = (a.tokenSymbol || a.tokenAddress).toLowerCase();
+      const sb = (b.tokenSymbol || b.tokenAddress).toLowerCase();
+      if (sa < sb) return -1;
+      if (sa > sb) return 1;
+      return 0;
+    });
+};
+
+const sumUsdstDebt = (cdpPositions: StrategyCdpPosition[]): string => {
+  let total = 0n;
+  for (const pos of cdpPositions) {
+    try {
+      total += BigInt(pos.debtUsdst || "0");
+    } catch {
+      // skip malformed
+    }
+  }
+  return total.toString();
 };
 
 const getFirstDepositDate = async (
