@@ -1188,4 +1188,191 @@ contract Describe_PriceOracle {
         uint256 expectedTwap = (P1 + P2 + P3 + P4) / 4;
         require(twap == expectedTwap, "TWAP with wrapped queue: should be average of P1,P2,P3,P4");
     }
+
+    // ============ DEVIATION THRESHOLD TESTS ============
+
+    function it_price_oracle_can_set_deviation_threshold() {
+        oracle.setPriceDeviationThreshold(tokenA, 500); // 5%
+        require(oracle.priceDeviationThresholdBps(tokenA) == 500, "Threshold not stored");
+    }
+
+    function it_price_oracle_can_clear_deviation_threshold() {
+        oracle.setPriceDeviationThreshold(tokenA, 500);
+        oracle.setPriceDeviationThreshold(tokenA, 0);
+        require(oracle.priceDeviationThresholdBps(tokenA) == 0, "Threshold not cleared");
+    }
+
+    function it_price_oracle_reverts_setting_threshold_for_zero_address() {
+        bool reverted = false;
+        try {
+            oracle.setPriceDeviationThreshold(zeroAddress, 500);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when asset is zero address");
+    }
+
+    function it_price_oracle_reverts_setting_threshold_above_10000() {
+        bool reverted = false;
+        try {
+            oracle.setPriceDeviationThreshold(tokenA, 10001);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when threshold exceeds 10000 bps");
+    }
+
+    function it_price_oracle_reverts_setting_threshold_by_non_owner() {
+        bool reverted = false;
+        try {
+            user1.do(address(oracle), "setPriceDeviationThreshold", tokenA, 500);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when non-owner sets threshold");
+    }
+
+    function it_price_oracle_first_price_set_ignores_threshold() {
+        // Even with a tight 0.01% threshold, the first price for an asset is unbounded
+        oracle.setPriceDeviationThreshold(tokenA, 1);
+        oracle.setAssetPrice(tokenA, 100e8);
+        require(oracle.prices(tokenA) == 100e8, "First price set should ignore threshold");
+    }
+
+    function it_price_oracle_zero_threshold_allows_any_update() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        // Threshold defaults to 0; any jump is allowed
+        oracle.setAssetPrice(tokenA, 1000e8);
+        require(oracle.prices(tokenA) == 1000e8, "Zero threshold should allow any jump");
+    }
+
+    function it_price_oracle_allows_update_within_threshold() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        oracle.setPriceDeviationThreshold(tokenA, 1000); // 10%
+        oracle.setAssetPrice(tokenA, 105e8);
+        require(oracle.prices(tokenA) == 105e8, "Update within threshold should succeed");
+    }
+
+    function it_price_oracle_allows_update_at_threshold_boundary() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        oracle.setPriceDeviationThreshold(tokenA, 1000); // 10%
+
+        // Upper boundary: 100e8 + (100e8 * 1000 / 10000) = 110e8
+        oracle.setAssetPrice(tokenA, 110e8);
+        require(oracle.prices(tokenA) == 110e8, "Update at upper boundary should succeed");
+
+        // Lower boundary from new previous (110e8): 110e8 - (110e8 * 1000 / 10000) = 99e8
+        oracle.setAssetPrice(tokenA, 99e8);
+        require(oracle.prices(tokenA) == 99e8, "Update at lower boundary should succeed");
+    }
+
+    function it_price_oracle_blocks_update_above_threshold() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        uint256 priorTs = oracle.lastUpdated(tokenA);
+        oracle.setPriceDeviationThreshold(tokenA, 1000); // 10%
+
+        fastForward(60); // ensure block.timestamp moves forward
+        oracle.setAssetPrice(tokenA, 120e8); // +20%, above threshold
+
+        require(oracle.prices(tokenA) == 100e8, "Price unchanged after upper-bound breach");
+        require(oracle.lastUpdated(tokenA) == priorTs, "Timestamp unchanged after breach");
+    }
+
+    function it_price_oracle_blocks_update_below_threshold() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        uint256 priorTs = oracle.lastUpdated(tokenA);
+        oracle.setPriceDeviationThreshold(tokenA, 1000); // 10%
+
+        fastForward(60);
+        oracle.setAssetPrice(tokenA, 80e8); // -20%, below threshold
+
+        require(oracle.prices(tokenA) == 100e8, "Price unchanged after lower-bound breach");
+        require(oracle.lastUpdated(tokenA) == priorTs, "Timestamp unchanged after breach");
+    }
+
+    function it_price_oracle_blocked_update_does_not_revert() {
+        oracle.setAssetPrice(tokenA, 100e8);
+        oracle.setPriceDeviationThreshold(tokenA, 1000);
+
+        bool reverted = false;
+        try {
+            oracle.setAssetPrice(tokenA, 200e8);
+        } catch {
+            reverted = true;
+        }
+        require(!reverted, "Excessive update should not revert");
+    }
+
+    function it_price_oracle_batch_filters_excessive_updates() {
+        // Baseline prices
+        address[] memory assets = new address[](3);
+        uint256[] memory pricesArr = new uint256[](3);
+        assets[0] = tokenA;
+        assets[1] = tokenB;
+        assets[2] = tokenC;
+        pricesArr[0] = 100e8;
+        pricesArr[1] = 200e8;
+        pricesArr[2] = 300e8;
+        oracle.setAssetPrices(assets, pricesArr);
+
+        // Only tokenB has a 10% threshold
+        oracle.setPriceDeviationThreshold(tokenB, 1000);
+        uint256 priorTokenBTs = oracle.lastUpdated(tokenB);
+
+        // Batch with tokenB exceeding threshold; tokenA/tokenC are unconstrained
+        fastForward(60);
+        address[] memory assets2 = new address[](3);
+        uint256[] memory pricesArr2 = new uint256[](3);
+        assets2[0] = tokenA;
+        assets2[1] = tokenB;
+        assets2[2] = tokenC;
+        pricesArr2[0] = 110e8;
+        pricesArr2[1] = 260e8; // +30% over 10% threshold -> blocked
+        pricesArr2[2] = 320e8;
+
+        oracle.setAssetPrices(assets2, pricesArr2);
+
+        require(oracle.prices(tokenA) == 110e8, "TokenA should update");
+        require(oracle.prices(tokenB) == 200e8, "TokenB blocked - price unchanged");
+        require(oracle.lastUpdated(tokenB) == priorTokenBTs, "TokenB blocked - lastUpdated unchanged");
+        require(oracle.prices(tokenC) == 320e8, "TokenC should update");
+    }
+
+    function it_price_oracle_batch_handles_all_blocked_updates() {
+        // Baseline
+        address[] memory assets = new address[](2);
+        uint256[] memory pricesArr = new uint256[](2);
+        assets[0] = tokenA;
+        assets[1] = tokenB;
+        pricesArr[0] = 100e8;
+        pricesArr[1] = 200e8;
+        oracle.setAssetPrices(assets, pricesArr);
+
+        oracle.setPriceDeviationThreshold(tokenA, 1000);
+        oracle.setPriceDeviationThreshold(tokenB, 1000);
+        uint256 priorA = oracle.lastUpdated(tokenA);
+        uint256 priorB = oracle.lastUpdated(tokenB);
+
+        fastForward(60);
+        address[] memory assets2 = new address[](2);
+        uint256[] memory pricesArr2 = new uint256[](2);
+        assets2[0] = tokenA;
+        assets2[1] = tokenB;
+        pricesArr2[0] = 200e8;
+        pricesArr2[1] = 400e8;
+
+        // Should not revert; filtered arrays passed to event are zero-length
+        bool reverted = false;
+        try {
+            oracle.setAssetPrices(assets2, pricesArr2);
+        } catch {
+            reverted = true;
+        }
+        require(!reverted, "Batch with all blocked updates should not revert");
+
+        require(oracle.prices(tokenA) == 100e8, "TokenA price unchanged");
+        require(oracle.prices(tokenB) == 200e8, "TokenB price unchanged");
+        require(oracle.lastUpdated(tokenA) == priorA, "TokenA timestamp unchanged");
+        require(oracle.lastUpdated(tokenB) == priorB, "TokenB timestamp unchanged");
+    }
 }
