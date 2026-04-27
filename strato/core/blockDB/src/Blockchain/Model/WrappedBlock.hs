@@ -294,6 +294,7 @@ instance TransactionLike OutputTx where
   txGasPrice = txGasPrice . otBaseTx
   txValue = txValue . otBaseTx
   txTxData = txTxData . otBaseTx
+  txTxVersion = txTxVersion . otBaseTx
 
   morphTx t =
     OutputTx
