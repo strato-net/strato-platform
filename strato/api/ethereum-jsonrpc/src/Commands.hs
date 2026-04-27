@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications  #-}
@@ -47,6 +48,8 @@ import Data.Time.Clock (UTCTime(..))
 import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.Aeson (FromJSON(..), withObject, (.:?), (.!=))
+import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
 import Prelude hiding (id)
@@ -602,11 +605,26 @@ eth_getFilterLogs = toMethod "eth_getFilterLogs" f ()
     f :: RpcResult Server String
     f = throwError $ rpcError (-32601) "eth_getFilterLogs not yet implemented"
 
+data LogFilter = LogFilter
+  { lfFromBlock :: String
+  , lfToBlock   :: String
+  , lfAddress   :: Maybe String
+  , lfTopics    :: [String]
+  } deriving (Show, Generic)
+
+instance FromJSON LogFilter where
+  parseJSON = withObject "LogFilter" $ \o ->
+    LogFilter
+      <$> o .:? "fromBlock" .!= "latest"
+      <*> o .:? "toBlock"   .!= "latest"
+      <*> o .:? "address"
+      <*> o .:? "topics"    .!= []
+
 eth_getLogs :: Method Server
-eth_getLogs = toMethod "eth_getLogs" f ()
+eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getLogs not yet implemented"
+    f :: LogFilter -> RpcResult Server String
+    f _filt = throwError $ rpcError (-32601) "eth_getLogs not yet implemented"
 
 eth_getWork :: Method Server
 eth_getWork = toMethod "eth_getWork" f ()
