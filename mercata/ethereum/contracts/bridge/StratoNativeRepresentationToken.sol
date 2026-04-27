@@ -16,6 +16,7 @@ contract StratoNativeRepresentationToken is
     UUPSUpgradeable
 {
     bytes32 public constant BRIDGE_ROLE = keccak256("BRIDGE_ROLE");
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     error InvalidAddress();
     error ZeroAmount();
@@ -37,6 +38,7 @@ contract StratoNativeRepresentationToken is
         __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(UPGRADER_ROLE, admin);
     }
 
     function mint(address to, uint256 amount) external onlyRole(BRIDGE_ROLE) {
@@ -51,7 +53,7 @@ contract StratoNativeRepresentationToken is
         _burn(_msgSender(), amount);
     }
 
-    function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
+    function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
 
     function version() external pure returns (string memory) {
         return "1.0.0";

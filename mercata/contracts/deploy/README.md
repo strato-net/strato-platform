@@ -30,7 +30,13 @@ npm run deploy
 - `OAUTH_CLIENT_ID` - OAuth client ID
 - `OAUTH_CLIENT_SECRET` - OAuth client secret
 
-**Output**: Prints all deployed contract addresses, including `SaveUSDSTVault`, and provides ready-to-paste `.env` snippets.
+**Output**: Prints all deployed contract addresses, including `SaveUSDSTVault`, `StratoNativeBridge`, and `StratoNativeCustodyVault`, and provides ready-to-paste `.env` snippets.
+
+**Native bridge role seeding**:
+- During full `Mercata` deployment, the native STRATO contracts now take explicit `bridgeOperator`, `admin`, and `guardian` addresses in `initialize(...)`.
+- The bundled `BaseCodeCollection` deploy seeds those direct-call roles to the deploying admin account (`tx.origin`) rather than the proxy owner.
+- This avoids the native runtime roles pointing at `AdminRegistry`, whose governance execution path does not satisfy the native bridge's direct role checks.
+- After deployment, rotate these roles as needed using the native bridge and custody vault setter functions once your intended operator, admin, and guardian addresses are known.
 
 #### `upgrade.js`
 Script for upgrading existing proxy contracts to new implementations.
@@ -148,6 +154,66 @@ for ((i=0; i<${#UPGRADES[@]}; i+=4)); do
   npm run upgrade -- --proxy-address "$PROXY_ADDRESS" --contract-name "$CONTRACT_NAME" --contract-file "$CONTRACT_FILE" --constructor-args "$CONSTRUCTOR_ARGS" +OVERRIDE-CHECKS
 done
 ```
+
+#### `initialize-native-bridge.js`
+Initialize freshly deployed `StratoNativeBridge` and `StratoNativeCustodyVault` proxies.
+
+**Usage**:
+```bash
+npm run initialize:native-bridge -- \
+  --bridge-address <bridge-proxy> \
+  --vault-address <vault-proxy> \
+  --token-factory <token-factory> \
+  --bridge-operator <operator> \
+  --guardian <guardian>
+```
+
+**Required Arguments**:
+- `--bridge-address` - Proxy address of `StratoNativeBridge`
+- `--vault-address` - Proxy address of `StratoNativeCustodyVault`
+- `--token-factory` - STRATO `TokenFactory` address
+- `--bridge-operator` - Runtime operator allowed to process native deposits/withdrawals
+- `--guardian` - Guardian allowed to pause the native bridge and custody vault
+
+**What it does**:
+- Calls `StratoNativeBridge.initialize(_tokenFactory, _custodyVault, _bridgeOperator, _guardian)`
+- Calls `StratoNativeCustodyVault.initialize(_bridge, _guardian)`
+- Leaves route/config/wiring changes under owner governance (`AdminRegistry` when used as proxy owner)
+- Prints governance vote IDs if either initialize call requires approval
+
+#### `configure-native-route.js`
+Configure or update a native STRATO bridge route on `StratoNativeBridge`.
+
+**Usage**:
+```bash
+npm run configure:native-route -- \
+  --bridge-address <bridge-proxy> \
+  --external-chain-id <chain-id> \
+  --external-bridge <external-bridge> \
+  --representation-token <representation-token> \
+  --external-name <name> \
+  --external-symbol <symbol> \
+  --max-per-withdrawal <amount> \
+  --strato-token <strato-token> \
+  [--enabled <true|false>]
+```
+
+**Required Arguments**:
+- `--bridge-address` - Proxy address of `StratoNativeBridge`
+- `--external-chain-id` - External chain ID for the route
+- `--external-bridge` - External representation bridge expected for this route
+- `--representation-token` - External representation token mapped to the STRATO token
+- `--external-name` - Display name for the external asset
+- `--external-symbol` - Display symbol for the external asset
+- `--max-per-withdrawal` - Per-withdrawal cap as an unsigned integer string (`0` disables the cap)
+- `--strato-token` - STRATO token address backing the route
+
+**Optional Arguments**:
+- `--enabled` - Route enabled flag (`true` by default)
+
+**What it does**:
+- Calls `StratoNativeBridge.setAsset(enabled, externalChainId, externalBridge, representationToken, externalName, externalSymbol, maxPerWithdrawal, stratoToken)`
+- Prints a governance vote ID if the route update requires approval
 
 ## Directory Structure
 

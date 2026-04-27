@@ -8,12 +8,17 @@ import { logError, logInfo } from "../utils/logger";
 
 const decodeIndexedAddress = (topic: string): string => `0x${topic.slice(26)}`.toLowerCase();
 
-const decodeAmountFromLogData = (data: string): string => {
-  if (!data.startsWith("0x") || data.length < 66) {
+const decodeNativeRedemptionData = (
+  data: string,
+): { amount: string; redemptionId: string } => {
+  if (!data.startsWith("0x") || data.length < 130) {
     throw new Error(`Invalid log data: ${data}`);
   }
 
-  return BigInt(`0x${data.slice(2, 66)}`).toString();
+  return {
+    amount: BigInt(`0x${data.slice(2, 66)}`).toString(),
+    redemptionId: BigInt(`0x${data.slice(66, 130)}`).toString(),
+  };
 };
 
 const parseNativeDepositLog = (chainId: number, log: any): NativeDepositArgs | null => {
@@ -21,13 +26,17 @@ const parseNativeDepositLog = (chainId: number, log: any): NativeDepositArgs | n
     return null;
   }
 
+  const { amount, redemptionId } = decodeNativeRedemptionData(log.data);
+
   return {
     externalChainId: chainId,
+    externalBridge: log.address.toLowerCase(),
+    externalRedemptionId: redemptionId,
     externalSender: decodeIndexedAddress(log.topics[2]),
     representationToken: decodeIndexedAddress(log.topics[1]),
     externalTxHash: log.transactionHash,
     stratoRecipient: decodeIndexedAddress(log.topics[3]),
-    stratoTokenAmount: decodeAmountFromLogData(log.data),
+    stratoTokenAmount: amount,
   };
 };
 

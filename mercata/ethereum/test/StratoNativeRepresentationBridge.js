@@ -9,6 +9,9 @@ describe("StratoNativeRepresentationBridge", function () {
   let bridge;
   let token;
   let stratoToken;
+  const sourceChainId = 2001n;
+  const sourceWithdrawalId = 17n;
+  let sourceBridge;
 
   beforeEach(async function () {
     [admin, operator, user, stratoRecipient] = await ethers.getSigners();
@@ -34,21 +37,80 @@ describe("StratoNativeRepresentationBridge", function () {
     await bridge.grantRole(bridgeOperatorRole, operator.address);
 
     stratoToken = ethers.Wallet.createRandom().address;
+    sourceBridge = ethers.Wallet.createRandom().address;
     await bridge.setTokenMapping(stratoToken, await token.getAddress());
   });
 
   it("mints representation tokens only through an operator on a mapped route", async function () {
     await expect(
-      bridge.connect(operator).mintRepresentation(stratoToken, user.address, 250n),
+      bridge
+        .connect(operator)
+        .mintRepresentation(
+          sourceChainId,
+          sourceBridge,
+          sourceWithdrawalId,
+          stratoToken,
+          user.address,
+          250n,
+        ),
     )
       .to.emit(bridge, "RepresentationMinted")
-      .withArgs(stratoToken, await token.getAddress(), user.address, 250n);
+      .withArgs(
+        sourceChainId,
+        sourceBridge,
+        sourceWithdrawalId,
+        stratoToken,
+        await token.getAddress(),
+        user.address,
+        250n,
+        ethers.keccak256(
+          ethers.AbiCoder.defaultAbiCoder().encode(
+            ["uint256", "address", "uint256"],
+            [sourceChainId, sourceBridge, sourceWithdrawalId],
+          ),
+        ),
+      );
 
     expect(await token.balanceOf(user.address)).to.equal(250n);
   });
 
+  it("rejects duplicate mints for the same STRATO withdrawal id", async function () {
+    await bridge
+      .connect(operator)
+      .mintRepresentation(
+        sourceChainId,
+        sourceBridge,
+        sourceWithdrawalId,
+        stratoToken,
+        user.address,
+        250n,
+      );
+
+    await expect(
+      bridge
+        .connect(operator)
+        .mintRepresentation(
+          sourceChainId,
+          sourceBridge,
+          sourceWithdrawalId,
+          stratoToken,
+          user.address,
+          250n,
+        ),
+    ).to.be.revertedWithCustomError(bridge, "DuplicateMint");
+  });
+
   it("redeems by pulling user tokens into the bridge, burning them, and emitting the redemption event", async function () {
-    await bridge.connect(operator).mintRepresentation(stratoToken, user.address, 250n);
+    await bridge
+      .connect(operator)
+      .mintRepresentation(
+        sourceChainId,
+        sourceBridge,
+        sourceWithdrawalId,
+        stratoToken,
+        user.address,
+        250n,
+      );
     await token.connect(user).approve(await bridge.getAddress(), 200n);
 
     await expect(
@@ -68,7 +130,16 @@ describe("StratoNativeRepresentationBridge", function () {
   it("does not let a bridge-role holder burn another user's balance directly", async function () {
     const bridgeRole = await token.BRIDGE_ROLE();
 
-    await bridge.connect(operator).mintRepresentation(stratoToken, user.address, 100n);
+    await bridge
+      .connect(operator)
+      .mintRepresentation(
+        sourceChainId,
+        sourceBridge,
+        sourceWithdrawalId,
+        stratoToken,
+        user.address,
+        100n,
+      );
     await token.grantRole(bridgeRole, operator.address);
 
     await expect(token.connect(operator).burn(100n)).to.be.reverted;
@@ -96,5 +167,57 @@ describe("StratoNativeRepresentationBridge", function () {
         .connect(user)
         .requestRedemption(await unmappedToken.getAddress(), 10n, stratoRecipient.address),
     ).to.be.revertedWithCustomError(bridge, "TokenNotMapped");
+  });
+
+  it("does not allow silent remapping of a live route", async function () {
+    const Token = await ethers.getContractFactory("StratoNativeRepresentationToken");
+    const replacementToken = await upgrades.deployProxy(
+      Token,
+      ["Wrapped STRATO V2", "wSTRATO2", admin.address],
+      { initializer: "initialize" },
+    );
+    await replacementToken.waitForDeployment();
+
+    await expect(
+      bridge.setTokenMapping(stratoToken, await replacementToken.getAddress()),
+    ).to.be.revertedWithCustomError(bridge, "ExistingTokenMapping");
+  });
+
+  it("only migrates mappings while paused and after legacy supply is cleared", async function () {
+    const Token = await ethers.getContractFactory("StratoNativeRepresentationToken");
+    const replacementToken = await upgrades.deployProxy(
+      Token,
+      ["Wrapped STRATO V2", "wSTRATO2", admin.address],
+      { initializer: "initialize" },
+    );
+    await replacementToken.waitForDeployment();
+
+    await bridge
+      .connect(operator)
+      .mintRepresentation(
+        sourceChainId,
+        sourceBridge,
+        sourceWithdrawalId,
+        stratoToken,
+        user.address,
+        1n,
+      );
+
+    await expect(
+      bridge.migrateTokenMapping(stratoToken, await replacementToken.getAddress(), false),
+    ).to.be.reverted;
+
+    await token.connect(user).approve(await bridge.getAddress(), 1n);
+    await bridge
+      .connect(user)
+      .requestRedemption(await token.getAddress(), 1n, stratoRecipient.address);
+
+    await bridge.pause();
+    await bridge.migrateTokenMapping(stratoToken, await replacementToken.getAddress(), true);
+
+    expect(await bridge.stratoToRepresentation(stratoToken)).to.equal(
+      await replacementToken.getAddress(),
+    );
+    expect(await bridge.routeFrozen(stratoToken)).to.equal(true);
   });
 });

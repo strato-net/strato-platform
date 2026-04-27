@@ -193,6 +193,42 @@ async function deployImplementationAsync(tokenObj, contractArgs, baseOptions) {
 }
 
 /**
+ * Call a contract method asynchronously and poll for the receipt.
+ *
+ * As of 04-22-2026, contract calls also route through the caller's user-contract,
+ * so the synchronous `rest.call` resolver crashes reading `a.data.contents` (data is null).
+ * `isAsync: true` + `rest.getBlocResults` bypasses the broken resolver and gives us the
+ * raw tx receipt so we can assert success ourselves.
+ */
+async function callAsync(tokenObj, callArgs, baseOptions) {
+  const asyncOptions = { ...baseOptions, isAsync: true };
+  const response = await rest.call(tokenObj, callArgs, asyncOptions);
+  const responseArray = Array.isArray(response) ? response : [response];
+  const hashes = responseArray.map((r) => r && r.hash).filter(Boolean);
+  if (hashes.length === 0) {
+    throw new Error(
+      'rest.call returned no tx hash; cannot poll for receipt: ' + JSON.stringify(response)
+    );
+  }
+
+  const finalResults = await util.until(
+    (results) => Array.isArray(results) && results.length > 0 &&
+      results.every((r) => r && r.status && r.status !== 'Pending'),
+    (opts) => rest.getBlocResults(tokenObj, hashes, opts),
+    { config, isAsync: true },
+    60000
+  );
+
+  const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
+  if (!final || final.status !== 'Success') {
+    throw new Error(
+      'Contract call failed: ' + JSON.stringify(final || finalResults)
+    );
+  }
+  return final;
+}
+
+/**
  * Main upgrade function
  */
 async function main() {
@@ -358,16 +394,21 @@ async function main() {
         cacheNonce: true,
       };
 
-      const upgradeResult = await rest.call(tokenObj, callArgs, callOptions);
+      // Async + poll: the sync resolver crashes on user-contract-routed calls (reads
+      // `.contents` on a null `data` field). We lose direct access to the solidity
+      // return value (vote issue id, if any) but confirm success via the receipt.
+      const upgradeReceipt = await callAsync(tokenObj, callArgs, callOptions);
 
-      if (upgradeResult[0]) {
-          console.log('\n======  Upgrade  Pending  ======');
-          console.log("Proxy Uploaded and Upgrade Requested.")
-          console.log("Governance Vote Required.\nVote Issue ID: " + upgradeResult[0]);
+      // If setLogicContract went through governance, the tx still succeeds here but
+      // the new implementation only takes effect after the vote resolves. Surface
+      // whatever the receipt tells us so the operator can follow up.
+      const voteHint = upgradeReceipt && upgradeReceipt.txResult && upgradeReceipt.txResult.message;
+      console.log('\n====== Upgrade Submitted ======');
+      console.log(`Tx status: ${upgradeReceipt.status}`);
+      if (voteHint) {
+        console.log(`Note (may indicate governance vote required): ${voteHint}`);
       }
-      else {
-          console.log('\n====== Upgrade Successful ======');
-      }
+      console.log('If this proxy is under governance, confirm the vote resolves before treating the upgrade as live.');
 
       console.log(`Proxy Address: ${proxyAddress}`);
       console.log(`New Implementation: ${implementationAddress}`);

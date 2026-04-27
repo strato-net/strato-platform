@@ -120,9 +120,11 @@ export const startNativeDepositInitiatedPolling = (): void => {
 
       const results: ConfirmNativeDepositArgs[] = deposits.map((deposit) => ({
         externalChainId: deposit.externalChainId,
-        externalTxHash: deposit.externalTxHash,
+        externalBridge: deposit.externalBridge,
+        externalRedemptionId: deposit.externalRedemptionId,
+        depositId: deposit.depositId,
         stratoRecipient: deposit.stratoRecipient,
-        verified: verificationResults.get(deposit.externalTxHash) === true,
+        verified: verificationResults.get(deposit.depositId) === true,
       }));
 
       const { verifiedDeposits, failedDeposits } = results.reduce(

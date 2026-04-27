@@ -72,6 +72,8 @@ export const recordNativeDepositBatch = async (
         method: "recordDeposit",
         args: {
           externalChainId: deposit.externalChainId,
+          externalBridge: deposit.externalBridge,
+          externalRedemptionId: deposit.externalRedemptionId,
           externalSender: deposit.externalSender,
           externalTxHash: deposit.externalTxHash,
           representationToken: deposit.representationToken,
@@ -93,7 +95,7 @@ export const recordNativeDepositBatch = async (
     ) {
       logInfo(
         "BridgeService",
-        `Native deposits already processed by another server: ${depositArgs.length} deposits (${depositArgs.map((d) => d.externalTxHash).join(", ")})`,
+        `Native deposits already processed by another server: ${depositArgs.length} deposits (${depositArgs.map((d) => `${d.externalBridge}:${d.externalRedemptionId}`).join(", ")})`,
       );
       return;
     }
@@ -148,7 +150,7 @@ export const confirmNativeDepositBatch = async (
     throw new Error("Native bridge address not configured");
   }
 
-  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
+  const depositIds = deposits.map((deposit) => deposit.depositId);
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
@@ -159,7 +161,8 @@ export const confirmNativeDepositBatch = async (
         method: "confirmDeposit",
         args: {
           externalChainId: deposit.externalChainId,
-          externalTxHash: deposit.externalTxHash,
+          externalBridge: deposit.externalBridge,
+          externalRedemptionId: deposit.externalRedemptionId,
         },
       }))
     );
@@ -176,7 +179,7 @@ export const confirmNativeDepositBatch = async (
     if (errorMessage.includes("SNB: bad state")) {
       logInfo(
         "BridgeService",
-        `Native deposits already confirmed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
+        `Native deposits already confirmed by another server: ${deposits.length} deposits (${depositIds.join(", ")})`,
       );
       return;
     }
@@ -228,7 +231,7 @@ export const reviewNativeDepositBatch = async (
     throw new Error("Native bridge address not configured");
   }
 
-  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
+  const depositIds = deposits.map((deposit) => deposit.depositId);
 
   try {
     await execute(
@@ -238,7 +241,8 @@ export const reviewNativeDepositBatch = async (
         method: "reviewDeposit",
         args: {
           externalChainId: deposit.externalChainId,
-          externalTxHash: deposit.externalTxHash,
+          externalBridge: deposit.externalBridge,
+          externalRedemptionId: deposit.externalRedemptionId,
         },
       }))
     );
@@ -253,7 +257,7 @@ export const reviewNativeDepositBatch = async (
     if (errorMessage.includes("SNB: bad state")) {
       logInfo(
         "BridgeService",
-        `Native deposits already reviewed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
+        `Native deposits already reviewed by another server: ${deposits.length} deposits (${depositIds.join(", ")})`,
       );
       return;
     }

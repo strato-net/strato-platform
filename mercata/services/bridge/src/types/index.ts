@@ -107,6 +107,8 @@ export interface ConfirmDepositArgs {
 
 export interface NativeDepositArgs {
   externalChainId: string | number;
+  externalBridge: string;
+  externalRedemptionId: string | number;
   externalSender: string;
   representationToken: string;
   externalTxHash: string;
@@ -116,7 +118,9 @@ export interface NativeDepositArgs {
 
 export interface ConfirmNativeDepositArgs {
   externalChainId: string | number;
-  externalTxHash: string;
+  externalBridge: string;
+  externalRedemptionId: string | number;
+  depositId: string;
   stratoRecipient: string;
   verified: boolean;
 }
@@ -139,9 +143,12 @@ export interface DepositInfo {
 
 export interface NativeDepositInfo {
   bridgeStatus: string;
+  depositId: string;
+  externalBridge: string;
   externalSender: string;
   externalTxHash: string;
   externalChainId: string | number;
+  externalRedemptionId: string | number;
   representationToken: string;
   requestedAt: string;
   stratoRecipient: string;
@@ -172,6 +179,7 @@ export interface NativeWithdrawalInfo {
   bridgeStatus: string;
   externalTxHash: string;
   externalChainId: string | number;
+  externalBridge: string;
   externalRecipient: string;
   representationToken: string;
   externalTokenAmount: string;

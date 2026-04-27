@@ -197,10 +197,9 @@ export const getNativeDepositsByStatus = async (
 
   if (!Array.isArray(data) || data.length === 0) return [];
 
-  return data.map(({ value, key: externalChainId, key2: externalTxHash }) => ({
+  return data.map(({ value, key: depositId }) => ({
     ...value,
-    externalChainId,
-    externalTxHash,
+    depositId,
   }));
 };
 

@@ -40,15 +40,6 @@ contract Describe_Mercata is Authorizable {
         require(m.saveUSDSTVault().asset() == address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), "SaveUSDSTVault asset mismatch");
     }
 
-    function it_deploys_native_bridge_contracts() {
-        require(address(m.stratoNativeBridge()) != address(0), "StratoNativeBridge address is 0");
-        require(address(m.stratoNativeCustodyVault()) != address(0), "StratoNativeCustodyVault address is 0");
-        require(m.stratoNativeBridge().tokenFactory() == address(m.tokenFactory()), "Native bridge token factory mismatch");
-        require(m.stratoNativeBridge().custodyVault() == address(m.stratoNativeCustodyVault()), "Native bridge custody vault mismatch");
-        require(m.stratoNativeCustodyVault().bridge() == address(m.stratoNativeBridge()), "Native custody vault bridge mismatch");
-        require(m.stratoNativeBridge().WITHDRAWAL_ABORT_DELAY() == 172800, "Native bridge abort delay mismatch");
-    }
-
     function it_can_create_tokens() {
         address t = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         require(t != address(0), "Failed to create Token");

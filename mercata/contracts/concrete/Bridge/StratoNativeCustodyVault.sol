@@ -9,6 +9,7 @@ import "../../abstract/ERC20/IERC20.sol";
 contract record StratoNativeCustodyVault is Ownable {
     /// @notice Authorized bridge contract that manages liabilities in this vault.
     address public bridge;
+    address public guardian;
 
     /// @notice Circuit breaker for vault lock/unlock operations.
     bool public paused;
@@ -33,11 +34,22 @@ contract record StratoNativeCustodyVault is Ownable {
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
-    function initialize(address _bridge) external onlyOwner {
+    function initialize(
+        address _bridge,
+        address _guardian
+    ) external onlyOwner {
+        require(_guardian != address(0), "SNCV: zero guardian");
+        guardian = _guardian;
         _setBridge(_bridge);
     }
 
-    function setBridge(address newBridge) external onlyOwner {
+    function setGuardian(address newGuardian) external onlyOwner {
+        require(newGuardian != address(0), "SNCV: zero guardian");
+        guardian = newGuardian;
+    }
+
+    function setBridge(address newBridge) external {
+        require(msg.sender == owner(), "SNCV: only owner");
         _setBridge(newBridge);
     }
 
@@ -47,7 +59,15 @@ contract record StratoNativeCustodyVault is Ownable {
         bridge = newBridge;
     }
 
-    function setPause(bool _paused) external onlyOwner {
+    function setPause(bool _paused) external {
+        if (_paused) {
+            require(
+                msg.sender == owner() || msg.sender == guardian,
+                "SNCV: not guardian"
+            );
+        } else {
+            require(msg.sender == owner(), "SNCV: only owner unpauses");
+        }
         paused = _paused;
         emit PauseToggled(_paused);
     }
