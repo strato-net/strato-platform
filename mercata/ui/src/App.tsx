@@ -70,6 +70,7 @@ import { VaultProvider } from "@/context/VaultContext";
 import { SaveUsdstProvider } from "@/context/SaveUsdstContext";
 import { YieldVaultProvider } from "@/context/YieldVaultContext";
 import Borrow from "./pages/Borrow";
+import Loop from "./pages/Loop";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -247,6 +248,22 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <Borrow />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/loop"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Loop />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/loop/:routeType/:asset"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <Loop />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />

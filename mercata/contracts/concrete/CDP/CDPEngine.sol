@@ -58,7 +58,6 @@ contract record CDPEngine is Ownable {
     mapping(address => bool) public record isSupportedAsset;
 
     uint256 public feeToReserveBps; // portion of feeUSD sent to CDPReserve (0..10000)
-    // uint public priceMaxAge = 1200;
 
     event FeeToReserveBpsSet(uint256 oldBps, uint256 newBps);
     event FeesRouted(address indexed asset, uint256 toReserve, uint256 toCollector);
@@ -430,6 +429,77 @@ contract record CDPEngine is Ownable {
 
         emit USDSTBurned(msg.sender, asset, owed, assetState.totalScaledDebt, assetState.rateAccumulator);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
+    }
+
+    // ───────────────────── Router On-Behalf-Of Actions ─────────────────────
+
+    function depositFor(address from, address user, address asset, uint amount) external onlyOwner onlyActiveAsset(asset) {
+        require(amount > 0, "CDPEngine: Invalid amount");
+        _cdpVault().depositFrom(from, user, asset, amount);
+        vaults[user][asset].collateral += amount;
+        emit Deposited(user, asset, amount);
+        emit VaultUpdated(user, asset, vaults[user][asset].collateral, vaults[user][asset].scaledDebt);
+    }
+
+    function mintFor(address recipient, address user, address asset, uint amountUSD) external onlyOwner whenNotPaused(asset) onlyActiveAsset(asset) {
+        _accrue(asset);
+        require(amountUSD > 0, "CDPEngine: zero amount");
+        CollateralConfig memory assetConfig = collateralConfigs[asset];
+        CollateralGlobalState storage assetState = collateralGlobalStates[asset];
+        Vault storage userVault = vaults[user][asset];
+        uint currentDebt = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        (uint price, ) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
+        require(price > 0, "invalid price");
+        uint collateralValueUSD_calc = (userVault.collateral * price) / assetConfig.unitScale;
+        uint maxBorrowableUSD = (collateralValueUSD_calc * WAD) / assetConfig.minCR;
+        require(currentDebt + amountUSD < maxBorrowableUSD, "CDPEngine: insufficient collateral");
+        if (assetConfig.debtCeiling > 0) {
+            uint assetDebtUSD = (assetState.totalScaledDebt * assetState.rateAccumulator) / RAY;
+            require(assetDebtUSD + amountUSD <= assetConfig.debtCeiling, "CDPEngine: debt ceiling exceeded");
+        }
+        uint scaledAdd = (amountUSD * RAY + assetState.rateAccumulator - 1) / assetState.rateAccumulator;
+        userVault.scaledDebt += scaledAdd;
+        assetState.totalScaledDebt += scaledAdd;
+        uint totalDebtAfter = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        if (assetConfig.debtFloor > 0) {
+            require(totalDebtAfter >= assetConfig.debtFloor, "CDPEngine: below debt floor");
+        }
+        Token(_usdst()).mint(recipient, amountUSD);
+        emit USDSTMinted(user, asset, amountUSD, assetState.totalScaledDebt, assetState.rateAccumulator);
+        emit VaultUpdated(user, asset, userVault.collateral, userVault.scaledDebt);
+    }
+
+    /**
+     * @notice Flash-mint USDST to `borrower`, invoke its onFlashLoan callback,
+     *         then require full repayment and burn the flashed supply.
+     * @dev    Zero net USDST supply change across the call. Ceiling/floor checks
+     *         intentionally do NOT fire here — any permanent debt is created via
+     *         `mintFor` inside the callback, which enforces them.
+     * @dev    `borrower` is passed explicitly (Maker-pattern) because when the
+     *         engine is owned by AdminRegistry, `msg.sender` inside this body
+     *         is AdminRegistry rather than the router that initiated the flash.
+     * @param borrower The contract that receives the flashed USDST and must
+     *                 implement `onFlashLoan(address asset, uint amount)`.
+     * @param asset    Collateral asset context (gates active/pause like mintFor).
+     * @param amount   Flash-minted USDST amount in wei (1e18).
+     */
+    function flashMint(
+        address borrower,
+        address asset,
+        uint amount
+    ) external onlyOwner whenNotPaused(asset) onlyActiveAsset(asset) {
+        require(amount > 0, "CDPEngine: flash amount zero");
+        require(borrower != address(0), "CDPEngine: flash borrower zero");
+        Token usdstTok = Token(_usdst());
+        // Delta-based repayment: any pre-existing borrower USDST balance is
+        // excluded from the repayment accounting so it can't be "burned as repayment".
+        uint balanceBefore = usdstTok.balanceOf(borrower);
+        usdstTok.mint(borrower, amount);
+        // SolidVM dispatches by function name over address.call.
+        address(borrower).call("onFlashLoan", asset, amount);
+        uint balanceAfter = usdstTok.balanceOf(borrower);
+        require(balanceAfter >= balanceBefore + amount, "CDPEngine: flash not repaid");
+        usdstTok.burn(borrower, amount);
     }
 
     /**

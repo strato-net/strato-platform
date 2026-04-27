@@ -18,7 +18,7 @@ import {
   HandCoins,
   Vault,
   CreditCard,
-  ArrowDownToLine
+  ArrowDownToLine,
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';

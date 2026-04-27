@@ -46,6 +46,7 @@ import "CDP/CDPRegistry.sol";
 import "CDP/CDPEngine.sol";
 import "CDP/CDPVault.sol";
 import "CDP/CDPReserve.sol";
+import "CDP/LoopRouter.sol";
 
 //Escrow
 import "Escrow/Escrow.sol";
@@ -78,6 +79,7 @@ contract record Mercata is Authorizable {
     CDPVault public cdpVault;
     CDPRegistry public cdpRegistry;
     CDPReserve public cdpReserve;
+    LoopRouter public loopRouter;
     SafetyModule public safetyModule;
     SaveUSDSTVault public saveUSDSTVault;
     Rewards public rewards;
@@ -199,6 +201,11 @@ contract record Mercata is Authorizable {
 
         cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
         Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
+
+        address loopRouterImpl = address(new LoopRouter(implOwnerIgnored));
+        loopRouter = LoopRouter(address(new Proxy(loopRouterImpl, this)));
+        loopRouter.initialize(address(cdpRegistry));
+        Ownable(loopRouter).transferOwnership(address(adminRegistry));
 
         address escrowImpl = address(new Escrow(implOwnerIgnored));
         escrow = Escrow(address(new Proxy(escrowImpl, this)));
