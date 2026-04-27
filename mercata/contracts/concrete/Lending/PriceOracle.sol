@@ -25,6 +25,7 @@ contract record PriceOracle is Ownable {
     mapping(address => OracleState) public record oracleState;
     mapping(address => uint256) public record rebaseFactors;
     mapping(address => uint256) public record exchangeRates;
+    mapping(address => uint256) public record priceDeviationThresholdBps;
 
     uint256 public queueSize = 2;  // Global queue size, synced to per-asset on push
 
@@ -33,6 +34,8 @@ contract record PriceOracle is Ownable {
     event BatchPricesUpdated(address[] assets, uint256[] priceValues, uint256 timestamp);
     event RebaseFactorsUpdated(address[] assets, uint256[] factors, uint256 timestamp);
     event ExchangeRatesUpdated(address[] assets, uint256[] rates, uint256 timestamp);
+    event PriceDeviationThresholdUpdated(address indexed asset, uint256 thresholdBps, uint256 timestamp);
+    event PriceDeviationThresholdExceeded(address indexed asset, uint256 previousPrice, uint256 attemptedPrice, uint256 thresholdBps, uint256 timestamp);
 
     constructor(address _owner) Ownable(_owner) {}
 
@@ -172,13 +175,28 @@ contract record PriceOracle is Ownable {
     /**
      * @dev Internal helper to set price for a single asset with validation
      */
-    function _setAssetPrice(address asset, uint256 price) internal {
+    function _setAssetPrice(address asset, uint256 price) internal returns (bool) {
         require(asset != address(0), "Invalid asset address");
         require(price > 0, "Price must be greater than 0");
+
+        uint256 previousPrice = prices[asset];
+        uint256 thresholdBps = priceDeviationThresholdBps[asset];
+        if (thresholdBps > 0 && previousPrice > 0 && _exceedsPriceDeviation(previousPrice, price, thresholdBps)) {
+            emit PriceDeviationThresholdExceeded(asset, previousPrice, price, thresholdBps, block.timestamp);
+            return false;
+        }
 
         _pushObservation(asset, lastUpdated[asset], prices[asset]);
         prices[asset] = price;
         lastUpdated[asset] = block.timestamp;
+        return true;
+    }
+
+    function _exceedsPriceDeviation(uint256 previousPrice, uint256 newPrice, uint256 thresholdBps) internal pure returns (bool) {
+        uint256 maxDeviation = (previousPrice * thresholdBps) / 10000;
+        uint256 minPrice = previousPrice > maxDeviation ? previousPrice - maxDeviation : 1;
+        uint256 maxPrice = previousPrice + maxDeviation;
+        return newPrice < minPrice || newPrice > maxPrice;
     }
 
     /**
@@ -189,12 +207,20 @@ contract record PriceOracle is Ownable {
         queueSize = newSize;
     }
 
+    function setPriceDeviationThreshold(address asset, uint256 thresholdBps) external onlyOwner {
+        require(asset != address(0), "Invalid asset address");
+        require(thresholdBps <= 10000, "Threshold too high");
+        priceDeviationThresholdBps[asset] = thresholdBps;
+        emit PriceDeviationThresholdUpdated(asset, thresholdBps, block.timestamp);
+    }
+
     /**
      * @dev Set price for a single asset
      */
     function setAssetPrice(address asset, uint256 price) external onlyOwner {
-        _setAssetPrice(asset, price);
-        emit PriceUpdated(asset, price, block.timestamp);
+        if (_setAssetPrice(asset, price)) {
+            emit PriceUpdated(asset, price, block.timestamp);
+        }
     }
 
     /**
@@ -204,11 +230,27 @@ contract record PriceOracle is Ownable {
         require(assets.length == priceValues.length, "Arrays length mismatch");
         require(assets.length > 0, "Empty arrays");
 
+        bool[] memory updated = new bool[](assets.length);
+        uint256 updatedCount = 0;
         for (uint256 i = 0; i < assets.length; i++) {
-            _setAssetPrice(assets[i], priceValues[i]);
+            if (_setAssetPrice(assets[i], priceValues[i])) {
+                updated[i] = true;
+                updatedCount++;
+            }
         }
 
-        emit BatchPricesUpdated(assets, priceValues, block.timestamp);
+        address[] memory updatedAssets = new address[](updatedCount);
+        uint256[] memory updatedPriceValues = new uint256[](updatedCount);
+        uint256 writeIndex = 0;
+        for (uint256 i = 0; i < assets.length; i++) {
+            if (updated[i]) {
+                updatedAssets[writeIndex] = assets[i];
+                updatedPriceValues[writeIndex] = priceValues[i];
+                writeIndex++;
+            }
+        }
+
+        emit BatchPricesUpdated(updatedAssets, updatedPriceValues, block.timestamp);
     }
 
     /**
