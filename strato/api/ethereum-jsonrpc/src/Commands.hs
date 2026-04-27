@@ -56,6 +56,7 @@ import Prelude hiding (id)
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
+import Control.Monad.Composable.CodeDB (runCodeDBM, lookupCodeCollection)
 
 type Server = IO
 
@@ -624,7 +625,10 @@ eth_getLogs :: Method Server
 eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
   where
     f :: LogFilter -> RpcResult Server [Value]
-    f _filt = return [dummyLog]
+    f _filt = do
+      -- TODO: use code collection to re-encode decoded Cirrus events to EVM log format
+      _cc <- runCodeDBM $ lookupCodeCollection (hash ("" :: B.ByteString))
+      return [dummyLog]
 
 dummyLog :: Value
 dummyLog = object

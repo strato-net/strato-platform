@@ -1,0 +1,39 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           codedb-monad
+version:        0.1.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Control.Monad.Composable.CodeDB
+  other-modules:
+      Paths_codedb_monad
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , blockapps-data
+    , blockapps-datadefs
+    , blockapps-mpdbs
+    , common-log
+    , composable-monads-base
+    , esqueleto
+    , monad-alter
+    , mtl
+    , persistent
+    , persistent-postgresql
+    , resourcet
+    , solid-vm-compiler
+    , solid-vm-model
+    , source-tools
+    , strato-conf
+    , strato-model
+    , text
+    , unliftio-core
+  default-language: Haskell2010

@@ -21,6 +21,7 @@ executables:
       - core-api2
       - bytestring
       - case-insensitive
+      - codedb-monad
       - containers
       - ethereum-rlp
       - format
