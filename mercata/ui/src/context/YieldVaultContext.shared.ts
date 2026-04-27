@@ -32,6 +32,7 @@ export type YieldVaultInfo = {
       amount: string;
     }[];
     usdstDebt: string;
+    baseApyPct: number | null;
   }[];
   maxDeploy: string;
   minIdleRequirement: string;

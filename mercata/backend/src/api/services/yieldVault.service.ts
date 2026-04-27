@@ -3,15 +3,67 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
+import { yieldBenchmarks, compositeYieldMap } from "../../config/config";
 import { getServiceToken } from "../../utils/authHelper";
 import { getOraclePrices } from "./oracle.service";
+import {
+  getYieldWindowBounds,
+  getYieldExchangeRateRowsCached,
+  indexYieldHistoryRows,
+  mergeBackfillRows,
+  computeExchangeRateAPY,
+} from "../helpers/earnYield.helper";
 import { FunctionInput } from "../../types/types";
 
-const { YieldVault, Token, CDPEngine, CDPRegistry, cdpRegistry } = constants;
+const { YieldVault, Token, CDPEngine, CDPRegistry, cdpRegistry, priceOracle } = constants;
 
 const WAD = 10n ** 18n;
 const RAY = 10n ** 27n;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const SECONDS_PER_YEAR = 31_536_000n;
+
+/**
+ * Maker-style fixed-point exponent — same algorithm as CDPEngine._rpow.
+ * Used to compound a per-second RAY rate into an annual factor.
+ */
+const rpowRay = (x: bigint, n: bigint): bigint => {
+  let z = n % 2n !== 0n ? x : RAY;
+  let xCopy = x;
+  for (let nCopy = n / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / RAY;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / RAY;
+    }
+  }
+  return z;
+};
+
+/**
+ * Convert a per-second stability-fee rate (RAY) to a per-year decimal
+ * (e.g. RAY = 1.000000001547125957... per second → ~5% APR → 0.05).
+ */
+const stabilityFeeRayToAnnualDecimal = (rateRay: bigint): number => {
+  if (rateRay <= RAY) return 0;
+  const annualFactor = rpowRay(rateRay, SECONDS_PER_YEAR);
+  if (annualFactor <= RAY) return 0;
+  // (annualFactor - RAY) / RAY → fraction in [0, ~big)
+  // Convert with sub-RAY precision via 1e18 scaling.
+  const scaled = ((annualFactor - RAY) * WAD) / RAY;
+  return Number(scaled) / 1e18;
+};
+
+/**
+ * Convert a positive WAD value (1e18-scaled USD) to a Number safely without
+ * blowing past 2^53. Loses sub-cent precision for huge values; that's fine
+ * for APY display.
+ */
+const wadToFloat = (wad: bigint): number => {
+  if (wad === 0n) return 0;
+  const sign = wad < 0n ? -1 : 1;
+  const abs = wad < 0n ? -wad : wad;
+  // 1e18 / 1e6 = 1e12; Number(abs / 1e6) is safe up to ~9e15 → 9e21 wad → ~9e3 trillion USD.
+  return (sign * Number(abs / 1_000_000n)) / 1e12;
+};
 
 export interface YieldVaultDef {
   key: string;
@@ -86,6 +138,16 @@ export interface YieldVaultStrategyHolding {
    * under-states real-time interest until the next on-chain accrual).
    */
   usdstDebt: string;
+  /**
+   * Forward-looking Base APY for this strategy, in percent (decimal points,
+   * e.g. 4.83 for 4.83%). Computed as:
+   *   net annual yield (USD) / equity (USD) × 100
+   * where `net annual yield = Σ (asset × baseApy) − Σ (debt × stabilityFee)`,
+   * priced via the oracle, and `equity = deployedAssets × ETH/USD`.
+   * `null` when inputs are missing (no oracle price for ETH, no benchmark
+   * yields for any held asset, etc.).
+   */
+  baseApyPct: number | null;
 }
 
 interface StrategyTokenBalance {
@@ -101,6 +163,21 @@ interface StrategyCdpPosition {
   collateralDecimals: number;
   collateral: string;
   debtUsdst: string;
+  /** Per-second RAY-scaled stability fee for this collateral asset. */
+  stabilityFeeRateRay: string;
+}
+
+interface StrategyApyContext {
+  /** Full oracle priceMap (key → price WAD). */
+  priceMap: Map<string, string>;
+  /** Per-token base APY decimal (e.g. 0.045 for 4.5%) keyed by token address. */
+  baseApyMap: Map<string, number>;
+  /** Vault underlying asset address (e.g. ETH for the ETH carry vault). */
+  vaultAssetAddress: string;
+  /** Vault underlying decimals. */
+  vaultAssetDecimals: number;
+  /** Vault underlying USD price (WAD per 1 full token). */
+  vaultAssetPriceWad: bigint;
 }
 
 export interface YieldVaultUserInfo extends YieldVaultInfo {
@@ -431,12 +508,19 @@ const getStrategyCdpPositions = async (
   );
   if (assetAddresses.length === 0) return [];
 
-  const [{ data: stateRows }, { data: tokenRows }] = await Promise.all([
+  const [{ data: stateRows }, { data: configRows }, { data: tokenRows }] = await Promise.all([
     cirrus.get(serviceToken, `/${CDPEngine}-collateralGlobalStates`, {
       params: {
         address: `eq.${cdpEngineAddress}`,
         key: `in.(${assetAddresses.join(",")})`,
         select: "asset:key,CollateralGlobalState:value",
+      },
+    }),
+    cirrus.get(serviceToken, `/${CDPEngine}-collateralConfigs`, {
+      params: {
+        address: `eq.${cdpEngineAddress}`,
+        key: `in.(${assetAddresses.join(",")})`,
+        select: "asset:key,CollateralConfig:value",
       },
     }),
     cirrus.get(serviceToken, `/${Token}`, {
@@ -457,6 +541,14 @@ const getStrategyCdpPositions = async (
     } catch {
       // skip malformed
     }
+  }
+
+  const stabilityFeeMap = new Map<string, string>();
+  for (const row of (configRows || []) as Array<Record<string, any>>) {
+    const asset = String(row.asset || "");
+    const stabRaw = row?.CollateralConfig?.stabilityFeeRate;
+    if (!asset || !stabRaw) continue;
+    stabilityFeeMap.set(asset, String(stabRaw));
   }
 
   const tokenMap = new Map<string, { symbol: string; decimals: number }>();
@@ -487,6 +579,7 @@ const getStrategyCdpPositions = async (
     const rate = rateMap.get(rawAddr) ?? RAY;
     const debtUsdst = (scaledDebt * rate) / RAY;
     const meta = tokenMap.get(rawAddr);
+    const stabilityFeeRateRay = stabilityFeeMap.get(rawAddr) || RAY.toString();
 
     positions.push({
       assetAddress: normalizeAddress(rawAddr),
@@ -494,25 +587,170 @@ const getStrategyCdpPositions = async (
       collateralDecimals: meta?.decimals ?? 18,
       collateral: collateral.toString(),
       debtUsdst: debtUsdst.toString(),
+      stabilityFeeRateRay: stabilityFeeRateRay,
     });
   }
-
-  positions.sort((a, b) => {
-    const ad = BigInt(a.debtUsdst);
-    const bd = BigInt(b.debtUsdst);
-    if (bd !== ad) return bd > ad ? 1 : -1;
-    const ac = BigInt(a.collateral);
-    const bc = BigInt(b.collateral);
-    if (bc !== ac) return bc > ac ? 1 : -1;
-    return 0;
-  });
 
   return positions;
 };
 
+/**
+ * Per-token base APY decimal (e.g. 0.045 for 4.5%) for the protocol's
+ * yield-bearing benchmarks, mirroring the `source: "base"` entries published
+ * by `addBaseYieldApys` in earn.service.ts.
+ *
+ * Uses the cached exchange-rate-history fetcher so this stays cheap on
+ * repeated /info refreshes.
+ */
+const getStrategyBaseApyMap = async (
+  serviceToken: string
+): Promise<Map<string, number>> => {
+  const out = new Map<string, number>();
+  try {
+    const { windowStart, windowEndExclusive, anchorsMs } = getYieldWindowBounds(Date.now());
+    const exchangeRateAddrs = (yieldBenchmarks || [])
+      .map((b) => String(b?.tokenAddress || "").trim())
+      .filter((addr) => addr.length > 0);
+
+    if (exchangeRateAddrs.length === 0) return out;
+
+    const rows = await getYieldExchangeRateRowsCached(serviceToken, {
+      priceOracle,
+      exchangeRateAddrs,
+      windowStart,
+      windowEndExclusive,
+      anchorsMs,
+    });
+
+    const history = indexYieldHistoryRows(mergeBackfillRows(rows ?? []));
+
+    for (const benchmark of yieldBenchmarks) {
+      const tokenAddress = String(benchmark?.tokenAddress || "").trim();
+      if (!tokenAddress) continue;
+
+      const apyStr = computeExchangeRateAPY(tokenAddress, history, anchorsMs);
+      if (!apyStr) continue;
+
+      const underlying = compositeYieldMap?.[tokenAddress];
+      const underlyingApyStr = underlying
+        ? computeExchangeRateAPY(underlying, history, anchorsMs)
+        : null;
+
+      const totalPct =
+        parseFloat(apyStr) + (underlyingApyStr ? parseFloat(underlyingApyStr) : 0);
+      if (!Number.isFinite(totalPct) || totalPct <= 0) continue;
+
+      out.set(tokenAddress.toLowerCase(), totalPct / 100);
+    }
+  } catch {
+    // degrade silently — base APY computation is best-effort
+  }
+  return out;
+};
+
+/**
+ * Per-strategy forward Base APY, denominated to the vault's underlying:
+ *   netAnnualUSD = Σ (compositionUsd_i × baseApy_i) − Σ (cdpDebtUsd_j × stabRate_j)
+ *   equityUsd    = deployedAssets × ETH/USD
+ *   baseApyPct   = netAnnualUSD / equityUsd × 100
+ *
+ * The percent is invariant to whether you express both legs in USD or ETH (the
+ * ETH/USD factor cancels), so we render this as the strategy's ETH APY for
+ * the ETH carry vault.
+ */
+const computeStrategyBaseApyPct = (
+  deployedAssets: bigint,
+  composition: StrategyAsset[],
+  cdpPositions: StrategyCdpPosition[],
+  ctx: StrategyApyContext
+): number | null => {
+  if (deployedAssets <= 0n) return null;
+  if (ctx.vaultAssetPriceWad <= 0n) return null;
+
+  // equity in USD WAD = deployedAssets × ETH/USD / 10^vaultAssetDecimals
+  const vaultAssetUnit = 10n ** BigInt(ctx.vaultAssetDecimals);
+  if (vaultAssetUnit === 0n) return null;
+  const equityUsdWad = (deployedAssets * ctx.vaultAssetPriceWad) / vaultAssetUnit;
+  if (equityUsdWad <= 0n) return null;
+
+  // Sum gross asset yield in USD/yr.
+  // Numeric path (Number, not bigint) because APY is a small decimal we can
+  // multiply against per-asset USD value directly.
+  let grossYieldUsd = 0;
+  let yieldComponents = 0;
+  for (const asset of composition) {
+    const apyDec = ctx.baseApyMap.get(asset.tokenAddress.toLowerCase());
+    if (!apyDec || apyDec <= 0) continue;
+
+    const priceWadStr =
+      ctx.priceMap.get(asset.tokenAddress) ||
+      ctx.priceMap.get(asset.tokenAddress.toLowerCase()) ||
+      "0";
+    let priceWad = 0n;
+    try {
+      priceWad = BigInt(priceWadStr);
+    } catch {
+      priceWad = 0n;
+    }
+    if (priceWad <= 0n) continue;
+
+    let amount = 0n;
+    try {
+      amount = BigInt(asset.amount);
+    } catch {
+      amount = 0n;
+    }
+    if (amount <= 0n) continue;
+
+    const tokenUnit = 10n ** BigInt(asset.decimals);
+    if (tokenUnit === 0n) continue;
+    const amountUsdWad = (amount * priceWad) / tokenUnit;
+    if (amountUsdWad <= 0n) continue;
+
+    grossYieldUsd += wadToFloat(amountUsdWad) * apyDec;
+    yieldComponents += 1;
+  }
+
+  // Sum borrow cost in USD/yr (USDST debt × per-asset annualized stability fee).
+  let borrowCostUsd = 0;
+  for (const pos of cdpPositions) {
+    let debt = 0n;
+    try {
+      debt = BigInt(pos.debtUsdst || "0");
+    } catch {
+      debt = 0n;
+    }
+    if (debt <= 0n) continue;
+
+    let stabRay = 0n;
+    try {
+      stabRay = BigInt(pos.stabilityFeeRateRay || RAY.toString());
+    } catch {
+      stabRay = RAY;
+    }
+    const annualDec = stabilityFeeRayToAnnualDecimal(stabRay);
+    if (annualDec <= 0) continue;
+
+    // USDST is 18 decimals and ≈ $1, so debtUsd ≈ debt / 1e18.
+    borrowCostUsd += wadToFloat(debt) * annualDec;
+  }
+
+  // If we have no benchmark yields and no debt, we can't say anything.
+  if (yieldComponents === 0 && borrowCostUsd === 0) return null;
+
+  const netUsd = grossYieldUsd - borrowCostUsd;
+  const equityUsd = wadToFloat(equityUsdWad);
+  if (equityUsd <= 0) return null;
+
+  const apyPct = (netUsd / equityUsd) * 100;
+  if (!Number.isFinite(apyPct)) return null;
+  return Number(apyPct.toFixed(2));
+};
+
 const getStrategyHoldings = async (
   accessToken: string,
-  vaultAddress: string
+  vaultAddress: string,
+  apyCtx: StrategyApyContext | null
 ): Promise<YieldVaultStrategyHolding[]> => {
   const { data } = await cirrus.get(accessToken, `/${YieldVault}-strategyDebt`, {
     params: {
@@ -559,10 +797,32 @@ const getStrategyHoldings = async (
         cdpPositionLists[i]
       );
       const usdstDebt = sumUsdstDebt(cdpPositionLists[i]);
+
+      let baseApyPct: number | null = null;
+      if (apyCtx) {
+        let deployed = 0n;
+        try {
+          deployed = BigInt(h.deployedAssets || "0");
+        } catch {
+          deployed = 0n;
+        }
+        try {
+          baseApyPct = computeStrategyBaseApyPct(
+            deployed,
+            composition,
+            cdpPositionLists[i],
+            apyCtx
+          );
+        } catch {
+          baseApyPct = null;
+        }
+      }
+
       return {
         ...h,
         composition,
         usdstDebt,
+        baseApyPct,
       };
     }
   );
@@ -795,16 +1055,17 @@ export const getYieldVaultInfo = async (
   const assetAddress = vaultState._asset || "";
   if (!assetAddress) return fallback;
 
-  const [assetTokenData, liveAssetBalance, filteredPrices, strategyHoldings] = await Promise.all([
+  // Pull metadata, balances, the full oracle price map, and the per-token
+  // base APY map in one parallel batch. We need the full price map (not just
+  // the vault's underlying) so that `computeStrategyBaseApyPct` can USD-price
+  // every asset the strategy holds.
+  const [assetTokenData, liveAssetBalance, priceMap, baseApyMap] = await Promise.all([
     cirrus.get(serviceToken, `/${Token}`, {
       params: { address: `eq.${assetAddress}`, select: "_symbol" },
     }),
     getAssetBalance(serviceToken, assetAddress, def.address),
-    getOraclePrices(serviceToken, {
-      key: `eq.${assetAddress}`,
-      select: "asset:key,price:value::text",
-    }),
-    getStrategyHoldings(serviceToken, def.address).catch(() => []),
+    getOraclePrices(serviceToken),
+    getStrategyBaseApyMap(serviceToken),
   ]);
 
   const idleAssets = parseBigIntLike(liveAssetBalance);
@@ -828,20 +1089,37 @@ export const getYieldVaultInfo = async (
         ? "Idle reserve requirement reached"
         : null;
 
-  let assetPrice = parseBigIntLike(
-    filteredPrices.get(assetAddress) || filteredPrices.get(assetAddress.toLowerCase()) || "0"
-  );
-  if (assetPrice <= 0n) {
-    const allPrices = await getOraclePrices(serviceToken);
-    const norm = assetAddress.toLowerCase().replace(/^0x/, "");
-    for (const [k, v] of allPrices) {
-      if (!k || !v) continue;
-      if (k.toLowerCase().replace(/^0x/, "") === norm) {
-        assetPrice = parseBigIntLike(v);
-        break;
+  let assetPrice = 0n;
+  {
+    const direct =
+      priceMap.get(assetAddress) || priceMap.get(assetAddress.toLowerCase());
+    if (direct) {
+      assetPrice = parseBigIntLike(direct);
+    } else {
+      const norm = assetAddress.toLowerCase().replace(/^0x/, "");
+      for (const [k, v] of priceMap) {
+        if (!k || !v) continue;
+        if (k.toLowerCase().replace(/^0x/, "") === norm) {
+          assetPrice = parseBigIntLike(v);
+          break;
+        }
       }
     }
   }
+
+  const apyCtx: StrategyApyContext = {
+    priceMap,
+    baseApyMap,
+    vaultAssetAddress: assetAddress,
+    vaultAssetDecimals: decimals,
+    vaultAssetPriceWad: assetPrice,
+  };
+  const strategyHoldings = await getStrategyHoldings(
+    serviceToken,
+    def.address,
+    apyCtx
+  ).catch(() => [] as YieldVaultStrategyHolding[]);
+
   const tvlUsd = underlyingUsdWad(idleAssets + deployedAssets, assetPrice, decimals);
   const apy = await computeApy(serviceToken, def.address, assetAddress, totalAssets, totalShares);
 

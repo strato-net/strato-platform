@@ -695,7 +695,7 @@ const EarnYieldVault = () => {
                       {strategyHoldings.map((holding) => (
                         <Card key={holding.strategyAddress} className="border border-border/70">
                           <CardContent className="pt-4 space-y-4">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <div className="space-y-1">
                                 <p className="text-xs text-muted-foreground">Strategy Address</p>
                                 <div className="flex items-center gap-1">
@@ -707,6 +707,32 @@ const EarnYieldVault = () => {
                                 <p className="text-xs text-muted-foreground">Deployed Capital</p>
                                 <p className="text-lg font-semibold">
                                   {formatTokenAmount(holding.deployedAssets, decimals)} {assetSymbol}
+                                </p>
+                              </div>
+                              <div className="space-y-1 sm:text-right">
+                                <p className="text-xs text-muted-foreground">Base APY</p>
+                                {(() => {
+                                  const apy = holding.baseApyPct;
+                                  if (apy === null || apy === undefined || !Number.isFinite(apy)) {
+                                    return (
+                                      <p className="text-lg font-semibold text-muted-foreground">—</p>
+                                    );
+                                  }
+                                  const sign = apy > 0 ? "+" : apy < 0 ? "" : "";
+                                  const tone =
+                                    apy > 0
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : apy < 0
+                                        ? "text-red-600 dark:text-red-400"
+                                        : "text-foreground";
+                                  return (
+                                    <p className={`text-lg font-semibold ${tone}`}>
+                                      {`${sign}${apy.toFixed(2)}%`}
+                                    </p>
+                                  );
+                                })()}
+                                <p className="text-[11px] text-muted-foreground">
+                                  Forward yield in {assetSymbol}
                                 </p>
                               </div>
                             </div>
