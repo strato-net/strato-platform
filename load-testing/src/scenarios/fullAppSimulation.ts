@@ -1,6 +1,7 @@
 import { BaseScenario } from "./base";
 import { NodeClients } from "../api/client";
 import { BackendClient } from "../api/backendClient";
+import { OAuthClient } from "../auth/oauth";
 import { runForDuration } from "../concurrency";
 import {
   ScenarioResult,
@@ -74,7 +75,7 @@ export class FullAppSimulationScenario extends BaseScenario {
   private buildClientPool(
     cfg: FullAppScenarioConfig,
     fallback: AuthConfig,
-  ): BackendClient[] {
+  ): { pool: BackendClient[]; oauthByUser: Map<string, OAuthClient> } {
     const users =
       cfg.users && cfg.users.length > 0
         ? cfg.users
@@ -83,20 +84,34 @@ export class FullAppSimulationScenario extends BaseScenario {
     const clientId = cfg.clientId || fallback.clientId;
     const clientSecret = cfg.clientSecret || fallback.clientSecret;
 
+    // Dedupe OAuthClients by (clientId, username). Multiple BackendClients
+    // mapped to the same Keycloak account share one bearer + one in-flight
+    // refresh promise — required because Keycloak rate-limits per-user grants.
+    const oauthByUser = new Map<string, OAuthClient>();
+    const oauthKey = (username: string) => `${clientId}::${username}`;
+    for (const u of users) {
+      const key = oauthKey(u.username);
+      if (!oauthByUser.has(key)) {
+        oauthByUser.set(
+          key,
+          new OAuthClient({
+            openIdDiscoveryUrl: discoveryUrl,
+            clientId,
+            clientSecret,
+            username: u.username,
+            password: u.password,
+          }),
+        );
+      }
+    }
+
     const pool: BackendClient[] = [];
     for (let i = 0; i < cfg.concurrentUsers; i++) {
       const u = users[i % users.length];
-      pool.push(
-        new BackendClient(cfg.baseUrl, {
-          openIdDiscoveryUrl: discoveryUrl,
-          clientId,
-          clientSecret,
-          username: u.username,
-          password: u.password,
-        }),
-      );
+      const oauth = oauthByUser.get(oauthKey(u.username))!;
+      pool.push(new BackendClient(cfg.baseUrl, oauth));
     }
-    return pool;
+    return { pool, oauthByUser };
   }
 
   async run(clients: NodeClients): Promise<ScenarioResult> {
@@ -104,19 +119,21 @@ export class FullAppSimulationScenario extends BaseScenario {
     const node = this.config.nodes[0];
     const workflow = cfg.workflow && cfg.workflow.length > 0 ? cfg.workflow : DEFAULT_WORKFLOW;
 
-    const pool = this.buildClientPool(cfg, node.auth);
+    const { pool, oauthByUser } = this.buildClientPool(cfg, node.auth);
     console.log(
-      `[fullApp] ${cfg.concurrentUsers} users for ${cfg.durationMs}ms against ${cfg.baseUrl} (${workflow.length} steps)`,
+      `[fullApp] ${cfg.concurrentUsers} users for ${cfg.durationMs}ms against ${cfg.baseUrl} ` +
+        `(${workflow.length} steps, ${oauthByUser.size} unique OAuth account(s))`,
     );
 
-    // Warm up auth for everyone concurrently, but tolerate individual failures.
+    // Warm up: M parallel grants (one per UNIQUE Keycloak account). Each
+    // BackendClient just borrows the cached bearer.
     await Promise.all(
-      pool.map(async (c, idx) => {
+      [...oauthByUser.entries()].map(async ([key, oauth]) => {
         try {
-          await c.init();
-          await c.getToken();
+          await oauth.init();
+          await oauth.getToken();
         } catch (err: any) {
-          console.warn(`[fullApp] warmup ${idx} failed: ${err.message}`);
+          console.warn(`[fullApp] OAuth warmup failed for ${key}: ${err.message}`);
         }
       }),
     );

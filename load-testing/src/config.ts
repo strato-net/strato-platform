@@ -98,6 +98,8 @@ export function loadConfig(configPath: string): LoadTestConfig {
         includePageLoad: true,
         skipBridgeRequest: true,
         skipBuyMetal: false,
+        logBalances: "none",
+        metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6", // helium testnet MetalForge
         ...raw.scenarios?.tokenSale,
       },
       jsonRpcStress: {

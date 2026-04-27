@@ -143,21 +143,36 @@ async function main(): Promise<void> {
     console.log();
   }
 
-  // Compute stats
+  // Compute stats. Enumerate (scenario, node) pairs from the recorded TxMetrics
+  // themselves — scenarios may emit per-leg sub-scopes (e.g. "tokenSale:buyMetal",
+  // "jsonRpcStress:eth_blockNumber") which are NOT the same string as the parent
+  // ScenarioResult.scenario. Filtering by the parent name alone would yield 0
+  // hits and a blank summary table.
+  const allTxMetrics = collector.getAllTxMetrics();
   const scenarioNodePairs = new Set<string>();
+  for (const m of allTxMetrics) {
+    scenarioNodePairs.add(`${m.scenario}::${m.nodeName}`);
+  }
+  // Keep parent-scope names too, even if they had no direct metrics, so they
+  // appear (with zeros) in the summary for empty scenarios.
   for (const r of allResults) {
     scenarioNodePairs.add(`${r.scenario}::${r.nodeName}`);
   }
 
-  const scenarioStats = Array.from(scenarioNodePairs).map((key) => {
-    const [scenario, nodeName] = key.split("::");
-    return computeScenarioStats(
-      collector.getAllTxMetrics(),
-      collector.getAllBatchMetrics(),
-      scenario,
-      nodeName,
-    );
-  });
+  const scenarioStats = Array.from(scenarioNodePairs)
+    .map((key) => {
+      const [scenario, nodeName] = key.split("::");
+      return computeScenarioStats(
+        collector.getAllTxMetrics(),
+        collector.getAllBatchMetrics(),
+        scenario,
+        nodeName,
+      );
+    })
+    // Drop empty rows — when a scenario only emits per-leg sub-scopes (e.g.
+    // tokenSale -> tokenSale:buyMetal), the parent name itself has 0 metrics
+    // and would otherwise show as a misleading "0/0 succeeded" row.
+    .filter((s) => s.totalTxCount > 0);
 
   const timeline = computeTimeline(collector.getAllTxMetrics());
 

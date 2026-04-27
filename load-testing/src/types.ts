@@ -85,6 +85,15 @@ export interface TokenSaleUser {
 /** Post-deposit action codes used by /api/bridge/requestDepositAction. */
 export type BridgeDepositAction = 1 | 2; // 1=AUTO_SAVE (lend USDST), 2=AUTO_FORGE (buy metal)
 
+/**
+ * Granularity for token-balance logging during a tokenSale run.
+ *  - "none"    – never read balances (max throughput)
+ *  - "summary" – read once before and once after the run, log the deltas
+ *  - "perStep" – read before and after every single iteration (slow, full
+ *                visibility — adds ~6 extra GETs of overhead per sale call)
+ */
+export type BalanceLoggingMode = "none" | "summary" | "perStep";
+
 export interface TokenSaleScenarioConfig {
   enabled: boolean;
   /** Backend URL (e.g. https://app.testnet.strato.nexus). Defaults to node[0].url. */
@@ -125,6 +134,16 @@ export interface TokenSaleScenarioConfig {
   skipBridgeRequest?: boolean;
   /** If true, only perform the bridge-request step (skip /metal-forge/buy). */
   skipBuyMetal?: boolean;
+
+  /* ---- Balance logging ---- */
+  /** How aggressively to capture token-balance transitions. Default "none"
+   *  (preserves pre-feature throughput). Set to "summary" for run-level
+   *  before/after, or "perStep" for per-iteration before/after. */
+  logBalances?: BalanceLoggingMode;
+  /** MetalForge contract address on STRATO (hex, with or without 0x). Used to
+   *  read counterparty / treasury balances via Cirrus. Defaults to the helium
+   *  testnet MetalForge (c5ed981b816a626981a5747d125e0e7296b2c7c6). */
+  metalForgeAddress?: string;
 
   /* ---- Auth ---- */
   /** Optional list of pre-provisioned user credentials. Falls back to node[0] auth. */

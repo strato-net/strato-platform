@@ -13,9 +13,20 @@ export class BackendClient {
   private axios: AxiosInstance;
   private oauth: OAuthClient | null;
 
+  /**
+   * `auth` accepts either:
+   *   - an `AuthConfig` (the legacy form — a fresh OAuthClient is created
+   *     internally), OR
+   *   - a pre-built `OAuthClient` instance, which lets multiple BackendClients
+   *     share one Keycloak session + one cached bearer + one in-flight refresh.
+   *     This is the recommended form when `concurrentUsers` exceeds the size
+   *     of the `users` pool — sharing prevents Keycloak's per-user grant rate
+   *     limit from kicking in under concurrency.
+   *   - `null` to disable auth entirely.
+   */
   constructor(
     baseUrl: string,
-    auth: AuthConfig | null,
+    auth: OAuthClient | AuthConfig | null,
     timeoutMs: number = 60000,
   ) {
     this.axios = axios.create({
@@ -28,7 +39,13 @@ export class BackendClient {
         "X-Requested-With": "XMLHttpRequest",
       },
     });
-    this.oauth = auth ? new OAuthClient(auth) : null;
+    if (auth instanceof OAuthClient) {
+      this.oauth = auth;
+    } else if (auth) {
+      this.oauth = new OAuthClient(auth);
+    } else {
+      this.oauth = null;
+    }
   }
 
   async init(): Promise<void> {

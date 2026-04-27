@@ -97,6 +97,12 @@ scenarios:
     # includePageLoad: true                 # default (4 Fund-page GETs once per user during warmup)
     # skipBridgeRequest: true               # default (set false + supply externalTxHash to include bridge leg)
     # skipBuyMetal: false                   # default
+    # --- balance logging ---
+    # logBalances: "none"                   # default — "none" | "summary" | "perStep"
+    #                                       # none:    no balance reads (max throughput, pre-feature behaviour)
+    #                                       # summary: one snapshot before + one after the whole run
+    #                                       # perStep: snapshot before + after every iteration (adds ~6 GETs/sale)
+    # metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6"   # default (helium MetalForge — used for forge-side balance reads)
     # --- optional user pool (cycles across concurrentUsers for more realistic auth load) ---
     # users:
     #   - { username: "loadtest1", password: "pw1" }

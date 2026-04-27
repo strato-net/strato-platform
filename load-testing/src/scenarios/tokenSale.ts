@@ -1,5 +1,6 @@
 import { BackendClient } from "../api/backendClient";
 import { NodeClients } from "../api/client";
+import { OAuthClient } from "../auth/oauth";
 import { BaseScenario } from "./base";
 import { runRateLimited } from "../concurrency";
 import {
@@ -7,7 +8,16 @@ import {
   TxMetric,
   TokenSaleScenarioConfig,
   AuthConfig,
+  BalanceLoggingMode,
 } from "../types";
+import {
+  takeBalanceSnapshot,
+  formatSnapshot,
+  formatDiff,
+  diffObject,
+  SnapshotTargets,
+  BalanceSnapshot,
+} from "../api/balanceSnapshot";
 
 /**
  * Scenario 1 — Token Sale TPS.
@@ -56,31 +66,53 @@ export class TokenSaleScenario extends BaseScenario {
     const clientId = cfg.clientId || fallback.auth.clientId;
     const clientSecret = cfg.clientSecret || fallback.auth.clientSecret;
 
+    // Dedupe OAuthClients by (clientId, username). Multiple BackendClients
+    // mapped to the same Keycloak account share one bearer + one in-flight
+    // refresh promise — required because Keycloak rate-limits per-user grants
+    // (>1 in <1 s returns 400/429). See OAuthClient.fetchAndCache for the
+    // single-flight + retry logic.
+    const oauthByUser = new Map<string, OAuthClient>();
+    const oauthKey = (username: string) => `${clientId}::${username}`;
+    for (const u of users) {
+      const key = oauthKey(u.username);
+      if (!oauthByUser.has(key)) {
+        oauthByUser.set(
+          key,
+          new OAuthClient({
+            openIdDiscoveryUrl: discoveryUrl,
+            clientId,
+            clientSecret,
+            username: u.username,
+            password: u.password,
+          }),
+        );
+      }
+    }
+
+    // Warm up: M parallel grants (one per UNIQUE user). Different users hit
+    // different Keycloak rate-limit buckets so this fans out cleanly.
+    await Promise.all(
+      [...oauthByUser.entries()].map(async ([key, oauth]) => {
+        try {
+          await oauth.init();
+          await oauth.getToken();
+        } catch (err: any) {
+          console.warn(`[tokenSale] OAuth warmup failed for ${key}: ${err.message}`);
+        }
+      }),
+    );
+
+    // Build N BackendClients, round-robin across the M shared OAuthClients.
     const pool: BackendClient[] = [];
     for (let i = 0; i < cfg.concurrentUsers; i++) {
       const u = users[i % users.length];
-      const authCfg: AuthConfig = {
-        openIdDiscoveryUrl: discoveryUrl,
-        clientId,
-        clientSecret,
-        username: u.username,
-        password: u.password,
-      };
-      pool.push(new BackendClient(backendUrl, authCfg));
+      const oauth = oauthByUser.get(oauthKey(u.username))!;
+      pool.push(new BackendClient(backendUrl, oauth));
     }
 
-    // Warm up all clients (OAuth discovery + first token fetch) in parallel.
-    await Promise.all(
-      pool.map(async (c, idx) => {
-        try {
-          await c.init();
-          await c.getToken();
-        } catch (err: any) {
-          console.warn(
-            `[tokenSale] Warmup failed for client #${idx}: ${err.message}`,
-          );
-        }
-      }),
+    console.log(
+      `[tokenSale] OAuth: ${oauthByUser.size} unique account(s) shared across ` +
+        `${pool.length} BackendClient(s)`,
     );
 
     this.backendClients = pool;
@@ -198,6 +230,37 @@ export class TokenSaleScenario extends BaseScenario {
     const bridgeBody = willBridge ? this.buildBridgeRequestBody(cfg) : null;
     const buyBody = willBuy ? this.buildBuyMetalBody(cfg) : null;
 
+    // Resolve balance-snapshot configuration up-front. Snapshots are limited
+    // to the buy-metal leg — only that step actually moves tokens; the bridge
+    // request leg merely posts a hash for an already-broadcast Ethereum tx.
+    const logBalances: BalanceLoggingMode = cfg.logBalances ?? "none";
+    const snapshotTargets: SnapshotTargets = {
+      payTokenAddress: cfg.payTokenAddress,
+      metalTokenAddress: cfg.metalTokenAddress,
+      metalForgeAddress: cfg.metalForgeAddress ?? "c5ed981b816a626981a5747d125e0e7296b2c7c6",
+    };
+    const snapshotsEnabled = logBalances !== "none" && willBuy;
+    const perStepBalances = snapshotsEnabled && logBalances === "perStep";
+
+    if (perStepBalances) {
+      console.warn(
+        `[tokenSale] logBalances=perStep — adds ~6 GETs of overhead per sale ` +
+          `(payToken / metalToken / vouchers x buyer + payToken / metalToken x MetalForge ` +
+          `+ /metal-forge/configs). Set logBalances: "summary" or "none" for max throughput.`,
+      );
+    }
+
+    // ---- Pre-run snapshot (sampled from client[0]) ----
+    let preRunSnap: BalanceSnapshot | null = null;
+    if (snapshotsEnabled && this.backendClients[0]) {
+      try {
+        preRunSnap = await takeBalanceSnapshot(this.backendClients[0], snapshotTargets);
+        console.log(`[tokenSale] ${formatSnapshot("pre-run [user 0]", preRunSnap)}`);
+      } catch (err: any) {
+        console.warn(`[tokenSale] pre-run snapshot failed: ${err.message}`);
+      }
+    }
+
     console.log(
       `[tokenSale] ${cfg.totalTxCount} sales (bridge=${willBridge} buy=${willBuy}) ` +
         `across ${cfg.concurrentUsers} users over ${cfg.timeWindowMs}ms ` +
@@ -239,8 +302,17 @@ export class TokenSaleScenario extends BaseScenario {
           });
         }
 
-        // --- buy-metal step ---
+        // --- buy-metal step (with optional per-step balance bracketing) ---
         if (willBuy && buyBody) {
+          let stepBefore: BalanceSnapshot | null = null;
+          if (perStepBalances) {
+            try {
+              stepBefore = await takeBalanceSnapshot(client, snapshotTargets);
+            } catch (err: any) {
+              console.warn(`[tokenSale] sale #${i}: pre-step snapshot failed: ${err.message}`);
+            }
+          }
+
           const submitTime = Date.now();
           const res = await client.request("POST", "/api/metal-forge/buy", {
             body: buyBody,
@@ -264,9 +336,38 @@ export class TokenSaleScenario extends BaseScenario {
             success: ok,
             hashOverride: hash,
           });
+
+          if (perStepBalances && stepBefore) {
+            let stepAfter: BalanceSnapshot | null = null;
+            try {
+              stepAfter = await takeBalanceSnapshot(client, snapshotTargets);
+            } catch (err: any) {
+              console.warn(`[tokenSale] sale #${i}: post-step snapshot failed: ${err.message}`);
+            }
+            if (stepAfter) {
+              // Surface buy-metal error / response body when the call failed —
+              // load tests are useless without knowing why a request failed.
+              const failureLine = ok
+                ? ""
+                : `\n    httpStatus=${res.status} respErr=${res.error ?? "?"} ` +
+                  `respBody=${JSON.stringify(data).slice(0, 600)}`;
+              console.log(
+                `[tokenSale] sale #${i} user=${i % this.backendClients.length} status=${ok ? "ok" : "fail"}` +
+                  failureLine + "\n" +
+                  `    ${formatSnapshot("before", stepBefore)}\n` +
+                  `    ${formatSnapshot("after ", stepAfter)}\n` +
+                  `    ${formatDiff(stepBefore, stepAfter)}`,
+              );
+              // Attach diff to the buy-metal metric so it lands in the JSON report.
+              const lastMetric = txMetrics[txMetrics.length - 1];
+              if (lastMetric) {
+                (lastMetric as any).balanceDiff = diffObject(stepBefore, stepAfter);
+              }
+            }
+          }
         }
 
-        if (this.verbose && i % 50 === 0) {
+        if (this.verbose && i % 50 === 0 && !perStepBalances) {
           const lastMetric = txMetrics[txMetrics.length - 1];
           this.log(
             `sale #${i}: ${lastMetric?.status} ${lastMetric?.submitDuration}ms ` +
@@ -276,6 +377,22 @@ export class TokenSaleScenario extends BaseScenario {
       },
     );
     const runEnd = Date.now();
+
+    // ---- Post-run snapshot ----
+    if (snapshotsEnabled && this.backendClients[0]) {
+      try {
+        const postRunSnap = await takeBalanceSnapshot(
+          this.backendClients[0],
+          snapshotTargets,
+        );
+        console.log(`[tokenSale] ${formatSnapshot("post-run [user 0]", postRunSnap)}`);
+        if (preRunSnap) {
+          console.log(`[tokenSale] run-aggregate ${formatDiff(preRunSnap, postRunSnap)}`);
+        }
+      } catch (err: any) {
+        console.warn(`[tokenSale] post-run snapshot failed: ${err.message}`);
+      }
+    }
 
     // Aggregate sale-level stats. A "sale" here is: 1 bridgeRequest + 1
     // buyMetal call (or whichever subset is enabled). Count the successes
