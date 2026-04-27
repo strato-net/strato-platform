@@ -48,7 +48,7 @@ import Data.Time.Clock (UTCTime(..))
 import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Aeson (FromJSON(..), withObject, (.:?), (.!=))
+import Data.Aeson (FromJSON(..), Value(..), object, (.=), withObject, (.:?), (.!=))
 import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
@@ -623,8 +623,25 @@ instance FromJSON LogFilter where
 eth_getLogs :: Method Server
 eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
   where
-    f :: LogFilter -> RpcResult Server String
-    f _filt = throwError $ rpcError (-32601) "eth_getLogs not yet implemented"
+    f :: LogFilter -> RpcResult Server [Value]
+    f _filt = return [dummyLog]
+
+dummyLog :: Value
+dummyLog = object
+  [ "address" .= ("0x000000000000000000000000000000000000100a" :: String)
+  , "topics" .=
+    [ "0x9c5d829b9b23efc461f9aeef91979ec04bb903feb3bee4f26d22114abfc7335b" :: String
+    , "0x00000000000000000000000093fb7295859b2d70199e0a4883b7c320cf874e6c"
+    , "0x000000000000000000000000937efa7e3a77e20bbdbd7c0d32b6514f368c1010"
+    ]
+  , "data" .= ("0x0000000000000000000000000000000000000000000000000000000000001017" :: String)
+  , "blockNumber" .= ("0x1" :: String)
+  , "transactionHash" .= ("0x0000000000000000000000000000000000000000000000000000000000000000" :: String)
+  , "transactionIndex" .= ("0x0" :: String)
+  , "blockHash" .= ("0x0000000000000000000000000000000000000000000000000000000000000000" :: String)
+  , "logIndex" .= ("0x0" :: String)
+  , "removed" .= False
+  ]
 
 eth_getWork :: Method Server
 eth_getWork = toMethod "eth_getWork" f ()
