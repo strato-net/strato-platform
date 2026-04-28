@@ -7,6 +7,7 @@ module EthLog
   ( EthLog(..)
   , eventRowToLog
   , eventToLog
+  , matchesTopics
   ) where
 
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLog, findEventDef)
@@ -91,3 +92,15 @@ eventToLog cc row =
   where
     extractText (String s) = Just s
     extractText _          = Nothing
+
+matchesTopics :: [String] -> EthLog -> Bool
+matchesTopics [] _ = True
+matchesTopics filterTopics l =
+  and $ zipWith matchTopic filterTopics (topics l ++ repeat B.empty)
+  where
+    matchTopic "" _ = True
+    matchTopic ft logTopic =
+      let stripped = if take 2 ft == "0x" then drop 2 ft else ft
+      in case B16.decode (BC.pack stripped) of
+           Right decoded -> decoded == logTopic
+           Left _        -> False

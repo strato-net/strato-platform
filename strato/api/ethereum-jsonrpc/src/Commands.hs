@@ -9,7 +9,7 @@ module Commands
 where
 
 import Binary
-import EthLog (eventRowToLog)
+import EthLog (eventRowToLog, matchesTopics)
 import TransactionReceipt (TransactionReceipt, mkTransactionReceipt)
 import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
@@ -633,7 +633,8 @@ eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
           mAddr     = fmap T.pack (lfAddress filt)
       rows <- runCodeDBM $ queryEvents mAddr fromBlock toBlock
       logs <- runCodeDBM $ mapM eventRowToLog rows
-      return $ map toJSON logs
+      let filtered = filter (matchesTopics (lfTopics filt)) logs
+      return $ map toJSON filtered
 
 eth_getWork :: Method Server
 eth_getWork = toMethod "eth_getWork" f ()
