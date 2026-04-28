@@ -649,7 +649,7 @@ mkLogEntry :: Keccak256 -> Keccak256 -> Log -> LogDB
 mkLogEntry bHash tHash Log {..} = LogDB bHash tHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
 mkEventEntry :: Event -> EventDB
-mkEventEntry Event {..} = EventDB evBlockHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
+mkEventEntry Event {..} = EventDB evBlockHash evTxHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult ::
   VMBase m =>

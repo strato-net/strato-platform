@@ -148,6 +148,7 @@ LogDB
 
 EventDB
     blockHash Keccak256
+    transactionHash Keccak256
     contractAddress Address
     name String
     args [String]
