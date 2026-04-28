@@ -24,6 +24,9 @@ executables:
       - codedb-monad
       - containers
       - ethereum-rlp
+      - evm-solidity
+      - solid-vm-model
+      - source-tools
       - format
       - http-client
       - http-types

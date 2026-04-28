@@ -17,12 +17,15 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
     , blockapps-data
     , blockapps-datadefs
     , blockapps-mpdbs
+    , bytestring
     , common-log
     , composable-monads-base
+    , containers
     , esqueleto
     , monad-alter
     , mtl

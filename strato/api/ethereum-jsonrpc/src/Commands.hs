@@ -9,6 +9,7 @@ module Commands
 where
 
 import Binary
+import EthLog (eventRowToLog)
 import TransactionReceipt (TransactionReceipt, mkTransactionReceipt)
 import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
@@ -48,7 +49,7 @@ import Data.Time.Clock (UTCTime(..))
 import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Aeson (FromJSON(..), Value(..), object, (.=), withObject, (.:?), (.!=))
+import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), withObject, (.:?), (.!=))
 import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
@@ -56,7 +57,7 @@ import Prelude hiding (id)
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
-import Control.Monad.Composable.CodeDB (runCodeDBM, lookupCodeCollection)
+import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents)
 
 type Server = IO
 
@@ -625,27 +626,14 @@ eth_getLogs :: Method Server
 eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
   where
     f :: LogFilter -> RpcResult Server [Value]
-    f _filt = do
-      -- TODO: use code collection to re-encode decoded Cirrus events to EVM log format
-      _cc <- runCodeDBM $ lookupCodeCollection (hash ("" :: B.ByteString))
-      return [dummyLog]
-
-dummyLog :: Value
-dummyLog = object
-  [ "address" .= ("0x000000000000000000000000000000000000100a" :: String)
-  , "topics" .=
-    [ "0x9c5d829b9b23efc461f9aeef91979ec04bb903feb3bee4f26d22114abfc7335b" :: String
-    , "0x00000000000000000000000093fb7295859b2d70199e0a4883b7c320cf874e6c"
-    , "0x000000000000000000000000937efa7e3a77e20bbdbd7c0d32b6514f368c1010"
-    ]
-  , "data" .= ("0x0000000000000000000000000000000000000000000000000000000000001017" :: String)
-  , "blockNumber" .= ("0x1" :: String)
-  , "transactionHash" .= ("0x0000000000000000000000000000000000000000000000000000000000000000" :: String)
-  , "transactionIndex" .= ("0x0" :: String)
-  , "blockHash" .= ("0x0000000000000000000000000000000000000000000000000000000000000000" :: String)
-  , "logIndex" .= ("0x0" :: String)
-  , "removed" .= False
-  ]
+    f filt = do
+      let fromBlock = maybe 0 (\x -> x) $ parseBlockNum (lfFromBlock filt)
+          toBlock   = maybe maxBlock (\x -> x) $ parseBlockNum (lfToBlock filt)
+          maxBlock  = 999999999
+          mAddr     = fmap T.pack (lfAddress filt)
+      rows <- runCodeDBM $ queryEvents mAddr fromBlock toBlock
+      logs <- runCodeDBM $ mapM eventRowToLog rows
+      return $ map toJSON logs
 
 eth_getWork :: Method Server
 eth_getWork = toMethod "eth_getWork" f ()
