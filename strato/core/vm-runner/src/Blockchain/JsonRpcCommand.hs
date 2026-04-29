@@ -29,6 +29,7 @@ import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Keccak256 (hash)
 import Blockchain.VMContext (ContextBestBlockInfo (..), CurrentBlockHash (..), VMBase, getContextBestBlockInfo)
 import Control.Lens ((^.))
+import Control.Applicative ((<|>))
 import Control.Monad ((<=<), void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -41,8 +42,11 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import Prelude hiding (id)
 import qualified SolidVM.Model.CodeCollection as CC
+import SolidVM.Model.CodeCollection.VarDef (IndexedType (..))
+import SolidVM.Model.CodeCollection.Visibility (Visibility (..))
 import SolidVM.Model.SolidString (SolidString, labelToText, stringToLabel)
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
+import qualified SolidVM.Model.Type as SVMType
 import Text.Format (format)
 
 produceResponse :: HasKafka m => String -> B.ByteString -> m ()
@@ -146,9 +150,13 @@ resolveFunction addr selector = do
     Nothing -> return Nothing
     Just contract -> case matchSelector contract selector of
       Just hit -> return $ Just hit
-      Nothing -> followProxy addr contract >>= \case
-        Nothing -> return Nothing
-        Just implContract -> return $ matchSelector implContract selector
+      Nothing -> case matchStorageGetter contract selector of
+        Just hit -> return $ Just hit
+        Nothing -> followProxy addr contract >>= \case
+          Nothing -> return Nothing
+          Just implContract -> return $
+            matchSelector implContract selector
+            <|> matchStorageGetter implContract selector
 
 lookupContract :: VMBase m => Address -> m (Maybe CC.Contract)
 lookupContract addr =
@@ -182,3 +190,35 @@ matchSelector :: CC.Contract -> B.ByteString -> Maybe (SolidString, CC.Func)
 matchSelector contract selector =
   let enumSizes = [(labelToText n, length names) | (n, (names, _)) <- M.toList (CC._enums contract)]
    in matchFunction enumSizes selector (M.toList $ CC._functions contract)
+
+matchStorageGetter :: CC.Contract -> B.ByteString -> Maybe (SolidString, CC.Func)
+matchStorageGetter contract selector = go (M.toList $ CC._storageDefs contract)
+  where
+    go [] = Nothing
+    go ((varName, varDecl) : rest)
+      | CC._varVisibility varDecl /= Just Public = go rest
+      | computeSelector varName argTypes == selector = Just (varName, syntheticFunc)
+      | otherwise = go rest
+      where
+        (argTypes, retType) = getterSignature (CC._varType varDecl)
+        syntheticFunc = CC.Func
+          { CC._funcArgs = zipWith (\i t -> (Nothing, IndexedType i t Nothing)) [0..] argTypes
+          , CC._funcVals = [(Nothing, IndexedType 0 retType Nothing)]
+          , CC._funcStateMutability = Nothing
+          , CC._funcContents = Nothing
+          , CC._funcVisibility = Just Public
+          , CC._funcVirtual = False
+          , CC._funcOverrides = Nothing
+          , CC._funcConstructorCalls = M.empty
+          , CC._funcModifiers = []
+          , CC._funcContext = CC._varContext varDecl
+          , CC._funcIsFree = False
+          , CC._funcOverload = []
+          }
+
+getterSignature :: SVMType.Type -> ([SVMType.Type], SVMType.Type)
+getterSignature (SVMType.Array elemT _) = ([SVMType.Int Nothing Nothing], elemT)
+getterSignature (SVMType.Mapping _ keyT valT _ _) =
+  let (innerArgs, innerRet) = getterSignature valT
+   in (keyT : innerArgs, innerRet)
+getterSignature t = ([], t)
