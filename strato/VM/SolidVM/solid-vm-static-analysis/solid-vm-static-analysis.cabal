@@ -43,3 +43,19 @@ library
     , text
     , transformers
   default-language: Haskell2010
+
+test-suite audit-fix-spec
+  type: exitcode-stdio-1.0
+  main-is: AuditFixMain.hs
+  other-modules:
+      OptimizerAuditFixSpec
+  hs-source-dirs:
+      tests/
+  build-depends:
+      base
+    , data-default
+    , hspec
+    , solid-vm-model
+    , solid-vm-static-analysis
+    , source-tools
+  default-language: Haskell2010

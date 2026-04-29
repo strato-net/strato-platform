@@ -8,6 +8,7 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.SolidVM.CodeCollectionDB
+    - Blockchain.SolidVM.ImportResolver
     - Blockchain.SolidVM.Metrics
     - SolidVM.CodeCollectionTools
   ghc-options: -Wall -O2
@@ -30,3 +31,28 @@ library:
   - strato-model
   - text
   - transformers
+
+tests:
+  audit-fix-spec:
+    main: AuditFixMain.hs
+    source-dirs: tests/
+    other-modules:
+      - ImportResolverAuditFixSpec
+    dependencies:
+      - aeson
+      - blockapps-mpdbs
+      - bytestring
+      - containers
+      - data-default
+      - hspec
+      - lens
+      - lrucache
+      - monad-alter
+      - mtl
+      - solid-vm-compiler
+      - solid-vm-model
+      - solid-vm-parser
+      - source-tools
+      - strato-model
+      - text
+      - transformers

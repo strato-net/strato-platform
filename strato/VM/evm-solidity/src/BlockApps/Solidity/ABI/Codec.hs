@@ -99,7 +99,7 @@ data TypeDescriptor
   | TString
   | TBytesN Int
   | TArrayOf TypeDescriptor
-  deriving (Show)
+  deriving (Eq, Show)
 
 isDynamicType :: TypeDescriptor -> Bool
 isDynamicType TBytes = True

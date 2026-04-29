@@ -86,3 +86,34 @@ library
     , unordered-containers
     , vector
   default-language: Haskell2010
+
+test-suite audit-fix-spec
+  type: exitcode-stdio-1.0
+  main-is: AuditFixMain.hs
+  other-modules:
+      BlockApps.Solidity.ABI.CodecAuditFixSpec
+  hs-source-dirs:
+      test/
+  ghc-options: -Wall -Werror
+  build-depends:
+      Decimal
+    , QuickCheck
+    , aeson
+    , base
+    , base16-bytestring
+    , bimap
+    , bytestring
+    , containers
+    , evm-solidity
+    , hspec
+    , monad-alter
+    , ordered-containers
+    , parsec
+    , scientific
+    , solid-vm-model
+    , strato-model
+    , text
+    , transformers
+    , unordered-containers
+    , vector
+  default-language: Haskell2010

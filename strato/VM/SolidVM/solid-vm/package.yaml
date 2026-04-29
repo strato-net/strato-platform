@@ -10,6 +10,7 @@ library:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.Builtins
     - Blockchain.SolidVM.ForkGate
+    - Blockchain.SolidVM.SetGet
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
   ghc-options: -Wall -O2
@@ -78,6 +79,16 @@ executables:
       - text
 
 tests:
+  audit-fix-spec:
+    source-dirs: audit-tests/
+    main: AuditFixMain.hs
+    other-modules:
+      - BuiltinsAuditFixSpec
+      - SetGetAuditFixSpec
+    dependencies:
+      - hspec
+      - solid-vm
+      - solid-vm-model
   solid-vm-spec:
     source-dirs: tests/
     main: Main.hs

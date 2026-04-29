@@ -12,10 +12,10 @@ build-type:     Simple
 library
   exposed-modules:
       Blockchain.SolidVM.CodeCollectionDB
+      Blockchain.SolidVM.ImportResolver
       Blockchain.SolidVM.Metrics
       SolidVM.CodeCollectionTools
   other-modules:
-      Blockchain.SolidVM.ImportResolver
       Paths_solid_vm_compiler
   hs-source-dirs:
       src/
@@ -36,6 +36,34 @@ library
     , solid-vm-model
     , solid-vm-parser
     , solid-vm-static-analysis
+    , source-tools
+    , strato-model
+    , text
+    , transformers
+  default-language: Haskell2010
+
+test-suite audit-fix-spec
+  type: exitcode-stdio-1.0
+  main-is: AuditFixMain.hs
+  other-modules:
+      ImportResolverAuditFixSpec
+  hs-source-dirs:
+      tests/
+  build-depends:
+      aeson
+    , base
+    , blockapps-mpdbs
+    , bytestring
+    , containers
+    , data-default
+    , hspec
+    , lens
+    , lrucache
+    , monad-alter
+    , mtl
+    , solid-vm-compiler
+    , solid-vm-model
+    , solid-vm-parser
     , source-tools
     , strato-model
     , text
