@@ -54,6 +54,8 @@ generateDockerComposeAllDocker = do
             , ("TOKEN_FACTORY", "${TOKEN_FACTORY}")
             , ("ADMIN_REGISTRY", "${ADMIN_REGISTRY}")
             , ("MERCATA_BRIDGE", "${MERCATA_BRIDGE}")
+            , ("STRATO_NATIVE_BRIDGE", "${STRATO_NATIVE_BRIDGE}")
+            , ("STRATO_NATIVE_CUSTODY_VAULT", "${STRATO_NATIVE_CUSTODY_VAULT}")
             , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID}")
             , ("STRATO_HOSTNAME", "${STRATO_HOSTNAME:-strato}")
             , ("STRATO_PORT_API", "${STRATO_PORT_API:-3000}")
