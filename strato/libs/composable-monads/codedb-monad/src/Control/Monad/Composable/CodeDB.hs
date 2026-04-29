@@ -119,6 +119,7 @@ lookupCodeHash addr = do
 data EventRow = EventRow
   { erAddress           :: Text
   , erBlockHash         :: Text
+  , erTransactionHash   :: Text
   , erBlockNumber       :: Text
   , erTransactionSender :: Text
   , erEventIndex        :: Int
@@ -130,12 +131,12 @@ queryEvents :: Maybe Text -> Integer -> Integer -> CodeDBM IO [EventRow]
 queryEvents mAddr fromBlock toBlock = do
   let baseQuery = case mAddr of
         Just _addr ->
-          "SELECT address, block_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
+          "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
           \FROM \"event\" WHERE LOWER(address) = LOWER(?) \
           \AND CAST(block_number AS numeric) >= ? AND CAST(block_number AS numeric) <= ? \
           \ORDER BY CAST(block_number AS numeric), event_index"
         Nothing ->
-          "SELECT address, block_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
+          "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
           \FROM \"event\" WHERE CAST(block_number AS numeric) >= ? AND CAST(block_number AS numeric) <= ? \
           \ORDER BY CAST(block_number AS numeric), event_index"
       params = case mAddr of
@@ -144,9 +145,9 @@ queryEvents mAddr fromBlock toBlock = do
   rows <- cirrusQuery $ SQL.rawSql baseQuery params
   return $ map toEventRow rows
 
-toEventRow :: (SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Int, SQL.Single Text, SQL.Single Text) -> EventRow
-toEventRow (SQL.Single addr, SQL.Single bHash, SQL.Single bNum, SQL.Single txSender, SQL.Single eIdx, SQL.Single eName, SQL.Single attrsText) =
-  EventRow addr bHash bNum txSender eIdx eName attrs
+toEventRow :: (SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Int, SQL.Single Text, SQL.Single Text) -> EventRow
+toEventRow (SQL.Single addr, SQL.Single bHash, SQL.Single txHash, SQL.Single bNum, SQL.Single txSender, SQL.Single eIdx, SQL.Single eName, SQL.Single attrsText) =
+  EventRow addr bHash txHash bNum txSender eIdx eName attrs
   where
     attrs = case decode (BL.fromStrict $ Text.encodeUtf8 attrsText) of
       Just m  -> m
