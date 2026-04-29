@@ -59,6 +59,31 @@ contract Describe_AdminRegistry is Authorizable {
         token = new TestERC20("Test Token", "TEST", address(adminRegistry));
     }
 
+    function voteToQueue(address _target, string _func, variadic _args) internal returns (string) {
+        string memory issueId = adminRegistry.getIssueId(_target, _func, _args);
+        adminRegistry.castVoteOnIssue(_target, _func, _args);
+        user1.do(address(adminRegistry), "castVoteOnIssue", _target, _func, _args);
+        require(issueExecutableAt(issueId) != 0, "Issue should be queued");
+        return issueId;
+    }
+
+    function executeQueued(address _target, string _func, variadic _args) internal returns (variadic) {
+        fastForward(172800);
+        return adminRegistry.executeIssue(_target, _func, _args);
+    }
+
+    function issueExecutableAt(string _issueId) internal returns (uint) {
+        (, uint executableAt,) = adminRegistry.timelocks(_issueId);
+        return executableAt;
+    }
+
+    function assertTimelock(string _issueId, uint _queuedAt, uint _executableAt, uint _expiresAt) internal {
+        (uint queuedAt, uint executableAt, uint expiresAt) = adminRegistry.timelocks(_issueId);
+        require(queuedAt == _queuedAt, "Unexpected queuedAt");
+        require(executableAt == _executableAt, "Unexpected executableAt");
+        require(expiresAt == _expiresAt, "Unexpected expiresAt");
+    }
+
     // ============ CONSTRUCTOR TESTS ============
 
     function it_admin_registry_sets_initial_admins() {
@@ -82,6 +107,14 @@ contract Describe_AdminRegistry is Authorizable {
         singleRegistry.initialize(singleAdmin);
         require(singleRegistry.isAdminAddress(admin1), "Should have one admin");
         require(!singleRegistry.isAdminAddress(admin2), "Should not have second admin");
+
+        TestERC20 singleAdminToken = new TestERC20("Single Admin Token", "SAT", address(singleRegistry));
+        string memory issueId = singleRegistry.getIssueId(address(singleAdminToken), "mint", admin3, 1000e18);
+        (bool executed, variadic result) = singleRegistry.castVoteOnIssue(address(singleAdminToken), "mint", admin3, 1000e18);
+        require(executed, "Single admin issue should execute immediately");
+        require(ERC20(singleAdminToken).balanceOf(admin3) == 1000e18, "Single admin token should mint immediately");
+        (, uint executableAt,) = singleRegistry.timelocks(issueId);
+        require(executableAt == 0, "Single admin issue should not be queued");
     }
 
     // ============ BASIC VOTING TESTS ============
@@ -115,9 +148,13 @@ contract Describe_AdminRegistry is Authorizable {
         uint voteIndex2 = adminRegistry.votesMap(issueId, admin1);
         require(voteIndex2 == voteIndex1, "Vote count should not increase when same admin votes twice");
 
-        // Now add a second DIFFERENT admin's vote - should execute
+        // Now add a second DIFFERENT admin's vote - should queue
         (bool executed3, variadic result3) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
-        require(executed3, "Should execute with two different admin votes");
+        require(!executed3, "Should queue with two different admin votes");
+        require(issueExecutableAt(issueId) != 0, "Issue should be queued");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted before delay");
+
+        executeQueued(address(token), "mint", admin3, 1000e18);
         require(ERC20(token).balanceOf(admin3) == 1000e18, "Token should be minted after two votes");
     }
 
@@ -298,9 +335,13 @@ contract Describe_AdminRegistry is Authorizable {
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
         require(!executed1, "Should not execute with only one vote");
 
-        // Second vote - should execute (using user1 as second admin)
+        // Second vote - should queue (using user1 as second admin)
         (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
-        require(executed2, "Should execute with two votes");
+        require(!executed2, "Should queue with two votes");
+        require(issueExecutableAt(issueId) != 0, "Issue should be queued");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted before delay");
+
+        executeQueued(address(token), "mint", admin3, 1000e18);
         require(ERC20(token).balanceOf(admin3) == 1000e18, "Token should be minted after execution");
     }
 
@@ -311,10 +352,12 @@ contract Describe_AdminRegistry is Authorizable {
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(adminRegistry), "createContract", "TestContract", src, "hello");
         require(!executed1, "Should not execute contract creation with one vote");
 
-        // Second vote - should execute
+        // Second vote - should queue
         (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createContract", "TestContract", src, "hello");
-        require(executed2, "Should execute contract creation with two votes");
-        address newContract = address(result2);
+        require(!executed2, "Should queue contract creation with two votes");
+
+        variadic result3 = executeQueued(address(adminRegistry), "createContract", "TestContract", src, "hello");
+        address newContract = address(result3);
         require(newContract != address(0), "New contract should be created");
 
         string memory val = newContract.call("val");
@@ -329,10 +372,12 @@ contract Describe_AdminRegistry is Authorizable {
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(adminRegistry), "createSaltedContract", salt, "TestContract", src, "hello");
         require(!executed1, "Should not execute salted contract creation with one vote");
 
-        // Second vote - should execute
+        // Second vote - should queue
         (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createSaltedContract", salt, "TestContract", src, "hello");
-        require(executed2, "Should execute salted contract creation with two votes");
-        address newContract = address(result2);
+        require(!executed2, "Should queue salted contract creation with two votes");
+
+        variadic result3 = executeQueued(address(adminRegistry), "createSaltedContract", salt, "TestContract", src, "hello");
+        address newContract = address(result3);
         require(newContract != address(0), "New contract should be created");
 
         string memory val = newContract.call("val");
@@ -344,9 +389,11 @@ contract Describe_AdminRegistry is Authorizable {
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
         require(!executed1, "Should not execute threshold update with one vote");
 
-        // Second vote - should execute
+        // Second vote - should queue
         (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
-        require(executed2, "Should execute threshold update with two votes");
+        require(!executed2, "Should queue threshold update with two votes");
+        executeQueued(address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
+        require(adminRegistry.votingThresholds(address(token), "mint") == 5000, "Threshold should update after delay");
     }
 
     function it_admin_registry_handles_whitelist_operations() {
@@ -355,14 +402,18 @@ contract Describe_AdminRegistry is Authorizable {
         require(!executed1, "Should not execute whitelist add with one vote");
 
         (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "addWhitelist", address(token), "mint", admin3);
-        require(executed2, "Should execute whitelist add with two votes");
+        require(!executed2, "Should queue whitelist add with two votes");
+        executeQueued(address(adminRegistry), "addWhitelist", address(token), "mint", admin3);
+        require(adminRegistry.whitelist(address(token), "mint", admin3), "Whitelist should be added after delay");
 
         // Remove from whitelist
         (bool executed3, variadic result3) = adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(token), "mint", admin3);
         require(!executed3, "Should not execute whitelist remove with one vote");
 
         (bool executed4, variadic result4) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "removeWhitelist", address(token), "mint", admin3);
-        require(executed4, "Should execute whitelist remove with two votes");
+        require(!executed4, "Should queue whitelist remove with two votes");
+        executeQueued(address(adminRegistry), "removeWhitelist", address(token), "mint", admin3);
+        require(!adminRegistry.whitelist(address(token), "mint", admin3), "Whitelist should be removed after delay");
     }
 
     function it_admin_registry_handles_admin_management() {
@@ -371,6 +422,8 @@ contract Describe_AdminRegistry is Authorizable {
         require(adminRegistry.admins(2) == address(0), "Admin was added before enough votes were cast");
 
         user1.do(address(adminRegistry), "addAdmin", admin3);
+        require(adminRegistry.admins(2) == address(0), "Admin was added before timelock elapsed");
+        executeQueued(address(adminRegistry), "_addAdmin", admin3);
         require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "New admin was not added correctly");
         require(adminRegistry.isAdminAddress(admin3), "Admin3 should be admin after voting");
 
@@ -379,6 +432,8 @@ contract Describe_AdminRegistry is Authorizable {
         require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "Admin was removed before enough votes were cast");
 
         user1.do(address(adminRegistry), "removeAdmin", admin3);
+        require(adminRegistry.admins(2) != address(0), "Admin was removed before timelock elapsed");
+        executeQueued(address(adminRegistry), "_removeAdmin", admin3);
         require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin was not removed correctly");
         require(!adminRegistry.isAdminAddress(admin3), "Admin3 should not be admin after removal");
 
@@ -387,6 +442,7 @@ contract Describe_AdminRegistry is Authorizable {
         require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin was swapped before enough votes were cast");
 
         user1.do(address(adminRegistry), "swapAdmin", admin1, admin3);
+        executeQueued(address(adminRegistry), "_swapAdmin", admin1, admin3);
         require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin swap should maintain same count");
     }
 
@@ -400,12 +456,14 @@ contract Describe_AdminRegistry is Authorizable {
         // Vote on first issue
         adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        executeQueued(address(token), "mint", admin3, 1000e18);
 
         require(ERC20(token).balanceOf(admin3) == 1000e18, "First issue should be executed");
 
         // Vote on second issue
         adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 2000e18);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 2000e18);
+        executeQueued(address(token), "mint", admin3, 2000e18);
 
         require(ERC20(token).balanceOf(admin3) == 3000e18, "Second issue should be executed");
     }
@@ -429,9 +487,11 @@ contract Describe_AdminRegistry is Authorizable {
         uint voteIndex2 = adminRegistry.votesMap(issueId, admin1);
         require(voteIndex2 == voteIndex1, "Same admin voting twice should be idempotent");
 
-        // Third vote from different admin - should execute
+        // Third vote from different admin - should queue
         (bool executed3, variadic result3) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
-        require(executed3, "Should execute with two different admin votes");
+        require(!executed3, "Should queue with two different admin votes");
+        require(issueExecutableAt(issueId) != 0, "Issue should be queued");
+        executeQueued(address(token), "mint", admin3, 1000e18);
         require(ERC20(token).balanceOf(admin3) == 1000e18, "Token should be minted");
     }
 
@@ -453,6 +513,7 @@ contract Describe_AdminRegistry is Authorizable {
         // First add user2 to whitelist for token mint function
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(token), "mint", address(user2));
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "addWhitelist", address(token), "mint", address(user2));
+        executeQueued(address(adminRegistry), "addWhitelist", address(token), "mint", address(user2));
 
         // Now user2 should be able to vote on token mint issues
         (bool executed, variadic result) = user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
@@ -464,10 +525,13 @@ contract Describe_AdminRegistry is Authorizable {
         // Set custom threshold to 50% (5000 basis points)
         adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
+        executeQueued(address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
 
-        // With 2 admins, 50% threshold should require 1 vote
+        // With 2 admins, 50% threshold should require 1 vote to queue
         (bool executed, variadic result) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
-        require(executed, "Should execute with 50% threshold and 1 vote");
+        require(!executed, "Should queue with 50% threshold and 1 vote");
+        executeQueued(address(token), "mint", admin3, 1000e18);
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Token should be minted after delay");
     }
 
     function it_admin_registry_executes_old_issue_when_admin_count_decreases() {
@@ -491,15 +555,16 @@ contract Describe_AdminRegistry is Authorizable {
         // Step 2: Vote to remove user1 (the second admin) - this requires both admins to vote
         adminRegistry.removeAdmin(address(user1));
         user1.do(address(adminRegistry), "removeAdmin", address(user1));
+        executeQueued(address(adminRegistry), "_removeAdmin", address(user1));
 
         // Verify user1 is no longer an admin
         require(!adminRegistry.isAdminAddress(address(user1)), "User1 should no longer be an admin");
         require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin");
 
         // Step 3: Admin1 calls the same issue again (adding admin3)
-        // Now with only 1 admin, 1 vote = 100% (exceeds 67% threshold)
-        adminRegistry.addAdmin(admin3);
-        // Should execute this time
+        // Now with only 1 admin, 1 vote = 100%, so it executes immediately
+        (bool executed, variadic result) = adminRegistry.castVoteOnIssue(address(adminRegistry), "_addAdmin", admin3);
+        require(executed, "Single admin issue should execute immediately");
 
         // Verify admin3 was added
         require(adminRegistry.isAdminAddress(admin3), "Admin3 should now be an admin");
@@ -533,10 +598,13 @@ contract Describe_AdminRegistry is Authorizable {
     function it_cannot_execute_internal_functions() {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(adminRegistry), "_getIssueId", 5000);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(adminRegistry), "_getIssueId", 5000);
+        executeQueued(address(adminRegistry), "setVotingThreshold", address(adminRegistry), "_getIssueId", 5000);
 
         bool reverted = false;
         try {
             adminRegistry.castVoteOnIssue(address(adminRegistry), "_getIssueId", address(0xdeadbeef), "parmesan", 7);
+            fastForward(172800);
+            adminRegistry.executeIssue(address(adminRegistry), "_getIssueId", address(0xdeadbeef), "parmesan", 7);
         } catch {
             reverted = true;
         }
@@ -554,6 +622,7 @@ contract Describe_AdminRegistry is Authorizable {
         // Step 1: Remove user1 (second admin) - this should succeed
         adminRegistry.removeAdmin(address(user1));
         user1.do(address(adminRegistry), "removeAdmin", address(user1));
+        executeQueued(address(adminRegistry), "_removeAdmin", address(user1));
 
         // Verify user1 is no longer an admin and only admin1 remains
         require(!adminRegistry.isAdminAddress(address(user1)), "User1 should no longer be an admin");
@@ -562,8 +631,8 @@ contract Describe_AdminRegistry is Authorizable {
         // Step 2: Try to remove the last admin (admin1) - this should revert
         bool reverted = false;
         try {
-            // Since we're now the only admin, our single vote would normally execute immediately
-            // But the _removeAdmin function should revert before execution
+            // Since we're now the only admin, our single vote executes immediately
+            // But the _removeAdmin function should revert during execution
             adminRegistry.removeAdmin(admin1);
         } catch {
             reverted = true;
@@ -601,10 +670,12 @@ contract Describe_AdminRegistry is Authorizable {
         // Add a third admin
         adminRegistry.addAdmin(admin3);
         user1.do(address(adminRegistry), "addAdmin", admin3);
+        executeQueued(address(adminRegistry), "_addAdmin", admin3);
 
         // Set threshold to 100% so 2 votes won't execute (need 3 votes with 3 admins)
         adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
+        executeQueued(address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
 
         // Create an issue with proposer's vote
         string memory issueId = adminRegistry.getIssueId(address(token), "mint", nonAdmin, 1000e18);
@@ -630,6 +701,132 @@ contract Describe_AdminRegistry is Authorizable {
             reverted = true;
         }
         require(reverted, "Should revert when trying to dismiss issue with multiple votes");
+    }
+
+    function it_admin_registry_cannot_execute_before_timelock_delay() {
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        require(issueExecutableAt(issueId) == block.timestamp + 172800, "Executable timestamp should include delay");
+
+        bool reverted = false;
+        try {
+            adminRegistry.executeIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should not execute before timelock delay");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted before delay");
+    }
+
+    function it_admin_registry_timelock_struct_defaults_to_zero() {
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        assertTimelock(issueId, 0, 0, 0);
+
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        assertTimelock(issueId, 0, 0, 0);
+    }
+
+    function it_admin_registry_timelock_struct_records_queue_window() {
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        uint queuedAt = block.timestamp;
+        assertTimelock(issueId, queuedAt, queuedAt + 172800, queuedAt + 172800 + 1209600);
+
+        string memory otherIssueId = adminRegistry.getIssueId(address(token), "mint", admin3, 2000e18);
+        assertTimelock(otherIssueId, 0, 0, 0);
+    }
+
+    function it_admin_registry_cannot_vote_on_queued_issue() {
+        voteToQueue(address(token), "mint", admin3, 1000e18);
+
+        bool reverted = false;
+        try {
+            adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should not allow votes on queued issue");
+    }
+
+    function it_admin_registry_clear_timelock_zeroes_struct_fields_after_vote_withdrawal() {
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        require(issueExecutableAt(issueId) != 0, "Issue should be queued");
+
+        adminRegistry.withdrawVote(address(token), "mint", admin3, 1000e18);
+
+        assertTimelock(issueId, 0, 0, 0);
+        require(adminRegistry.currentIssues(issueId), "Issue should remain active after unqueue");
+        require(adminRegistry.votesMap(issueId, admin1) == 0, "Withdrawn vote should be cleared");
+        require(adminRegistry.votesMap(issueId, address(user1)) > 0, "Remaining vote should stay recorded");
+    }
+
+    function it_admin_registry_clear_issue_zeroes_timelock_struct_after_execution() {
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        require(issueExecutableAt(issueId) != 0, "Issue should be queued");
+
+        executeQueued(address(token), "mint", admin3, 1000e18);
+
+        assertTimelock(issueId, 0, 0, 0);
+        require(!adminRegistry.currentIssues(issueId), "Issue should be cleared after execution");
+        require(adminRegistry.votesMap(issueId, admin1) == 0, "Admin1 vote should be cleared");
+        require(adminRegistry.votesMap(issueId, address(user1)) == 0, "User1 vote should be cleared");
+    }
+
+    function it_admin_registry_requeue_after_clear_timelock_restarts_delay() {
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        (, uint firstExecutableAt,) = adminRegistry.timelocks(issueId);
+
+        adminRegistry.withdrawVote(address(token), "mint", admin3, 1000e18);
+        assertTimelock(issueId, 0, 0, 0);
+
+        fastForward(1);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+
+        uint requeuedAt = block.timestamp;
+        assertTimelock(issueId, requeuedAt, requeuedAt + 172800, requeuedAt + 172800 + 1209600);
+        require(issueExecutableAt(issueId) > firstExecutableAt, "Requeued issue should restart delay");
+    }
+
+    function it_admin_registry_can_withdraw_vote_from_queued_issue() {
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        adminRegistry.withdrawVote(address(token), "mint", admin3, 1000e18);
+
+        require(adminRegistry.currentIssues(issueId), "Issue should remain active with one vote");
+        require(adminRegistry.votesMap(issueId, admin1) == 0, "Withdrawn vote should be cleared");
+        require(adminRegistry.votesMap(issueId, address(user1)) > 0, "Other vote should remain");
+        require(issueExecutableAt(issueId) == 0, "Issue should unqueue when threshold is no longer met");
+
+        fastForward(172800);
+        bool reverted = false;
+        try {
+            adminRegistry.executeIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Unqueued issue should not execute");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted after vote withdrawal");
+    }
+
+    function it_admin_registry_rechecks_voting_threshold_before_execution() {
+        adminRegistry.addAdmin(address(user2));
+        user1.do(address(adminRegistry), "addAdmin", address(user2));
+        executeQueued(address(adminRegistry), "_addAdmin", address(user2));
+
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        require(issueExecutableAt(issueId) != 0, "Issue should queue with two of three votes");
+
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
+        executeQueued(address(adminRegistry), "setVotingThreshold", address(token), "mint", 10000);
+
+        bool reverted = false;
+        try {
+            adminRegistry.executeIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Issue should not execute when threshold is no longer met");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted after threshold change");
     }
 
     function it_admin_registry_cannot_dismiss_nonexistent_issue() {
