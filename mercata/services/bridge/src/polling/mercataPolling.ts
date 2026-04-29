@@ -4,6 +4,8 @@ import {
   reviewDepositBatch,
   confirmNativeDepositBatch,
   reviewNativeDepositBatch,
+  confirmNativeWithdrawalBatch,
+  queueManualNativeWithdrawalBatch,
   confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
@@ -219,6 +221,44 @@ export const startWithdrawalTxPolling = (): void => {
   setInterval(poll, pollingInterval);
 };
 
+export const startNativeWithdrawalRequestPolling = (): void => {
+  const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
+
+  const poll = async () => {
+    try {
+      const initiatedWithdrawals: NativeWithdrawalInfo[] =
+        await getNativeWithdrawalsByStatus("1");
+      if (initiatedWithdrawals.length === 0) return;
+
+      const instantWithdrawals = initiatedWithdrawals.filter(
+        (withdrawal) => withdrawal.useInstantPath,
+      );
+      const approvalWithdrawals = initiatedWithdrawals.filter(
+        (withdrawal) => !withdrawal.useInstantPath,
+      );
+
+      if (instantWithdrawals.length > 0) {
+        await confirmNativeWithdrawalBatch(
+          instantWithdrawals as NonEmptyArray<NativeWithdrawalInfo>,
+        );
+      }
+
+      if (approvalWithdrawals.length > 0) {
+        await queueManualNativeWithdrawalBatch(
+          approvalWithdrawals as NonEmptyArray<NativeWithdrawalInfo>,
+        );
+      }
+    } catch (e: any) {
+      logError("MercataPolling", e as Error, {
+        operation: "startNativeWithdrawalRequestPolling",
+      });
+    }
+  };
+
+  void poll();
+  setInterval(poll, pollingInterval);
+};
+
 export const startNativeWithdrawalTxPolling = (): void => {
   const pollingInterval = config.polling.bridgeOutInterval ?? 5 * 60 * 1000;
   type Withdrawal = { id: Number; txHash: string };
@@ -283,6 +323,7 @@ export const initializeMercataPolling = async () => {
   startDepositInitiatedPolling();
   startNativeDepositInitiatedPolling();
   startWithdrawalRequestPolling();
+  startNativeWithdrawalRequestPolling();
   startWithdrawalTxPolling();
   startNativeWithdrawalTxPolling();
 

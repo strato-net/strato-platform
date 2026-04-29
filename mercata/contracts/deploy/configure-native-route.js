@@ -10,6 +10,7 @@
  *     --external-name <name> \
  *     --external-symbol <symbol> \
  *     --max-per-withdrawal <amount> \
+ *     [--instant-withdrawal-threshold <amount>] \
  *     --strato-token <addr> \
  *     [--enabled <true|false>]
  */
@@ -151,11 +152,19 @@ async function main() {
     externalName: args['external-name'],
     externalSymbol: args['external-symbol'],
     maxPerWithdrawal: String(args['max-per-withdrawal']).trim(),
+    instantWithdrawalThreshold: String(
+      args['instant-withdrawal-threshold'] == null
+        ? '0'
+        : args['instant-withdrawal-threshold']
+    ).trim(),
     stratoToken: args['strato-token'],
   };
 
   if (!/^[0-9]+$/.test(callArgs.maxPerWithdrawal)) {
     throw new Error('max-per-withdrawal must be an unsigned integer string');
+  }
+  if (!/^[0-9]+$/.test(callArgs.instantWithdrawalThreshold)) {
+    throw new Error('instant-withdrawal-threshold must be an unsigned integer string');
   }
 
   console.log('Native route configuration plan:');

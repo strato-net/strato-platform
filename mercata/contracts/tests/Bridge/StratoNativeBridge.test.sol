@@ -119,12 +119,40 @@ contract Describe_StratoNativeBridge is Authorizable {
             "Wrapped Native STRATO",
             "wNST",
             500e18,
+            100e18,
             nativeTokenAddress
         );
     }
 
     function it_native_withdrawal_locks_funds_in_vault() {
-        require(true, "SolidVM harness smoke check");
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 withdrawalId = user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        );
+
+        (
+            BridgeStatus bridgeStatus,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint256 stratoTokenAmount,
+            bool useInstantPath
+        ) = nativeBridge.getWithdrawalInfo(withdrawalId);
+
+        require(bridgeStatus == BridgeStatus.INITIATED, "Withdrawal should be initiated");
+        require(stratoTokenAmount == 50e18, "Locked amount should match request");
+        require(useInstantPath, "Amount under threshold should use instant path");
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 50e18, "Vault should lock requested amount");
     }
 
     function it_native_withdrawal_requires_vault_allowance_not_bridge_allowance() {
@@ -177,5 +205,35 @@ contract Describe_StratoNativeBridge is Authorizable {
 
     function it_native_custody_vault_proxy_upgrade_preserves_locked_balances() {
         require(true, "SolidVM harness smoke check");
+    }
+
+    function it_native_withdrawal_above_instant_threshold_requires_manual_lane() {
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 150e18);
+        uint256 withdrawalId = user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            150e18
+        );
+
+        (
+            BridgeStatus bridgeStatus,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint256 stratoTokenAmount,
+            bool useInstantPath
+        ) = nativeBridge.getWithdrawalInfo(withdrawalId);
+
+        require(bridgeStatus == BridgeStatus.INITIATED, "Withdrawal should remain initiated");
+        require(stratoTokenAmount == 150e18, "Locked amount should match request");
+        require(!useInstantPath, "Amount above threshold should require approval lane");
     }
 }

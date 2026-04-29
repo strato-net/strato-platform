@@ -23,6 +23,7 @@ contract record StratoNativeBridge is Ownable {
         string externalName;
         string externalSymbol;
         uint256 maxPerWithdrawal;
+        uint256 instantWithdrawalThreshold;
         address stratoToken;
     }
 
@@ -55,6 +56,7 @@ contract record StratoNativeBridge is Ownable {
         address stratoToken;
         uint256 stratoTokenAmount;
         uint256 timestamp;
+        bool useInstantPath;
     }
 
     event PauseToggled(bool depositsPaused, bool withdrawalsPaused);
@@ -68,6 +70,7 @@ contract record StratoNativeBridge is Ownable {
         string externalName,
         string externalSymbol,
         uint256 maxPerWithdrawal,
+        uint256 instantWithdrawalThreshold,
         address stratoToken
     );
     event NativeDepositInitiated(
@@ -112,7 +115,8 @@ contract record StratoNativeBridge is Ownable {
         address representationToken,
         address stratoSender,
         address stratoToken,
-        uint256 stratoTokenAmount
+        uint256 stratoTokenAmount,
+        bool useInstantPath
     );
     event NativeWithdrawalPending(uint256 indexed withdrawalId, string externalTxHash);
     event NativeWithdrawalCompleted(uint256 indexed withdrawalId);
@@ -242,7 +246,8 @@ contract record StratoNativeBridge is Ownable {
         uint256 externalTokenAmount,
         address stratoSender,
         address stratoToken,
-        uint256 stratoTokenAmount
+        uint256 stratoTokenAmount,
+        bool useInstantPath
     ) {
         NativeWithdrawalInfo w = withdrawals[id];
         return (
@@ -255,7 +260,8 @@ contract record StratoNativeBridge is Ownable {
             w.externalTokenAmount,
             w.stratoSender,
             w.stratoToken,
-            w.stratoTokenAmount
+            w.stratoTokenAmount,
+            w.useInstantPath
         );
     }
 
@@ -299,7 +305,8 @@ contract record StratoNativeBridge is Ownable {
         address representationToken,
         string externalName,
         string externalSymbol,
-        uint256 maxPerWithdrawal
+        uint256 maxPerWithdrawal,
+        uint256 instantWithdrawalThreshold
     ) {
         NativeAssetConfig asset = assets[stratoToken][externalChainId];
         return (
@@ -308,7 +315,8 @@ contract record StratoNativeBridge is Ownable {
             asset.representationToken,
             asset.externalName,
             asset.externalSymbol,
-            asset.maxPerWithdrawal
+            asset.maxPerWithdrawal,
+            asset.instantWithdrawalThreshold
         );
     }
 
@@ -320,6 +328,7 @@ contract record StratoNativeBridge is Ownable {
         string externalName,
         string externalSymbol,
         uint256 maxPerWithdrawal,
+        uint256 instantWithdrawalThreshold,
         address stratoToken
     ) external onlyOwner {
         require(externalChainId > 0, "SNB: invalid external chain id");
@@ -337,6 +346,7 @@ contract record StratoNativeBridge is Ownable {
             externalName,
             externalSymbol,
             maxPerWithdrawal,
+            instantWithdrawalThreshold,
             stratoToken
         );
         stratoTokenByRepresentation[representationToken][externalChainId] = stratoToken;
@@ -349,6 +359,7 @@ contract record StratoNativeBridge is Ownable {
             externalName,
             externalSymbol,
             maxPerWithdrawal,
+            instantWithdrawalThreshold,
             stratoToken
         );
     }
@@ -381,6 +392,9 @@ contract record StratoNativeBridge is Ownable {
         );
         require(actualLockedAmount > 0, "SNB: no tokens locked");
 
+        bool useInstantPath = asset.instantWithdrawalThreshold > 0
+            && actualLockedAmount <= asset.instantWithdrawalThreshold;
+
         id = ++withdrawalCounter;
         withdrawals[id] = NativeWithdrawalInfo(
             BridgeStatus.INITIATED,
@@ -394,7 +408,8 @@ contract record StratoNativeBridge is Ownable {
             msg.sender,
             stratoToken,
             actualLockedAmount,
-            block.timestamp
+            block.timestamp,
+            useInstantPath
         );
 
         emit NativeWithdrawalRequested(
@@ -405,7 +420,8 @@ contract record StratoNativeBridge is Ownable {
             asset.representationToken,
             msg.sender,
             stratoToken,
-            actualLockedAmount
+            actualLockedAmount,
+            useInstantPath
         );
     }
 

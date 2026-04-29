@@ -1,12 +1,140 @@
-import { ethers } from "ethers";
-import { config, getChainRpcUrl, ERC20_ABI, ZERO_ADDRESS } from "../config";
+import {
+  config,
+  getNativeRepresentationBridgeAddress,
+  ERC20_ABI,
+  ZERO_ADDRESS,
+} from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, DepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
 import { ensureHexPrefix } from "../utils/utils";
+import { eth } from "../utils/api";
+import axios from "axios";
+
+let cachedStratoNetworkId: bigint | null = null;
+const announcedManualNativeWithdrawals = new Map<string, string | null>();
+
+const getStratoNetworkId = async (): Promise<bigint> => {
+  if (cachedStratoNetworkId != null) {
+    return cachedStratoNetworkId;
+  }
+
+  const metadata: any = await eth.get("/metadata");
+  const networkId = metadata?.networkID;
+  if (networkId == null) {
+    throw new Error("Network ID not found in STRATO metadata");
+  }
+
+  cachedStratoNetworkId = BigInt(networkId.toString());
+  return cachedStratoNetworkId;
+};
+
+const buildNativeMintRequest = (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+) => {
+  const bridgeAddress = getNativeRepresentationBridgeAddress(
+    Number(withdrawal.externalChainId),
+  );
+  if (!bridgeAddress) {
+    throw new Error(
+      `CHAIN_${Number(withdrawal.externalChainId)}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS is not configured`,
+    );
+  }
+
+  return {
+    idempotencyKey: [
+      sourceChainId,
+      ensureHexPrefix(config.nativeBridge.address!),
+      withdrawal.withdrawalId,
+    ].join(":"),
+    sourceChainId: sourceChainId.toString(),
+    sourceBridge: ensureHexPrefix(config.nativeBridge.address!),
+    sourceWithdrawalId: withdrawal.withdrawalId,
+    externalChainId: String(withdrawal.externalChainId),
+    representationBridge: ensureHexPrefix(bridgeAddress),
+    stratoToken: ensureHexPrefix(withdrawal.stratoToken),
+    recipient: ensureHexPrefix(withdrawal.externalRecipient),
+    amount: String(withdrawal.externalTokenAmount),
+  };
+};
+
+const nativeExecutorHeaders = () => ({
+  ...(config.nativeBridge.mintExecutorToken
+    ? { Authorization: `Bearer ${config.nativeBridge.mintExecutorToken}` }
+    : {}),
+});
+
+const getNativeMintExecutorUrl = (): string => {
+  const url = config.nativeBridge.mintExecutorUrl;
+  if (!url) {
+    throw new Error(
+      "NATIVE_MINT_EXECUTOR_URL is required for instant native outbound minting",
+    );
+  }
+  return url.replace(/\/$/, "");
+};
+
+const submitNativeMint = async (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+): Promise<string> => {
+  const payload = buildNativeMintRequest(withdrawal, sourceChainId);
+  const response = await axios.post(
+    `${getNativeMintExecutorUrl()}/native-mints/execute`,
+    payload,
+    {
+      headers: {
+        "Content-Type": "application/json",
+        ...nativeExecutorHeaders(),
+      },
+      timeout: config.api.defaults.timeout,
+    },
+  );
+
+  const txHash = response.data?.txHash;
+  if (!txHash || typeof txHash !== "string") {
+    throw new Error("Native mint executor response missing txHash");
+  }
+
+  return txHash;
+};
+
+const proposeManualNativeMint = async (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+): Promise<string | null> => {
+  const payload = buildNativeMintRequest(withdrawal, sourceChainId);
+  const proposalUrl = config.nativeBridge.mintProposerUrl;
+  if (!proposalUrl) {
+    return null;
+  }
+
+  const response = await axios.post(
+    `${proposalUrl.replace(/\/$/, "")}/native-mints/propose`,
+    payload,
+    {
+      headers: {
+        "Content-Type": "application/json",
+        ...nativeExecutorHeaders(),
+      },
+      timeout: config.api.defaults.timeout,
+    },
+  );
+
+  const proposalReference =
+    response.data?.proposalId ||
+    response.data?.reference ||
+    response.data?.url ||
+    null;
+
+  return proposalReference && typeof proposalReference === "string"
+    ? proposalReference
+    : null;
+};
 
 export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
   const externalChainIds = depositArgs.map((deposit) => deposit.externalChainId);
@@ -387,6 +515,119 @@ export const handleRejectedWithdrawalBatch = async (
     
     // Re-throw other errors
     throw error;
+  }
+};
+
+export const confirmNativeWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<NativeWithdrawalInfo>,
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  const sourceChainId = await getStratoNetworkId();
+  const failures: Array<{ withdrawalId: string; message: string }> = [];
+  let successful = 0;
+
+  for (const withdrawal of withdrawals) {
+    if (!withdrawal.useInstantPath) {
+      failures.push({
+        withdrawalId: withdrawal.withdrawalId,
+        message: "native withdrawal is not instant-eligible",
+      });
+      continue;
+    }
+
+    try {
+      const externalTxHash = await submitNativeMint(withdrawal, sourceChainId);
+
+      await execute({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "confirmWithdrawal",
+        args: {
+          id: Number(withdrawal.withdrawalId),
+          externalTxHash,
+        },
+      });
+
+      successful += 1;
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+
+      if (errorMessage.includes("SNB: bad state")) {
+        logInfo(
+          "BridgeService",
+          `Native withdrawal already confirmed by another server: ${withdrawal.withdrawalId}`,
+        );
+        continue;
+      }
+
+      failures.push({
+        withdrawalId: withdrawal.withdrawalId,
+        message: errorMessage,
+      });
+      logError("BridgeService", error as Error, {
+        operation: "confirmNativeWithdrawalBatch",
+        withdrawalId: withdrawal.withdrawalId,
+        externalChainId: withdrawal.externalChainId,
+      });
+    }
+  }
+
+  if (successful > 0) {
+    logInfo(
+      "BridgeService",
+      `Successfully confirmed ${successful} native withdrawals`,
+    );
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      `Failed to confirm ${failures.length} native withdrawals: ${failures
+        .map((failure) => `${failure.withdrawalId} (${failure.message})`)
+        .join(", ")}`,
+    );
+  }
+};
+
+export const queueManualNativeWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<NativeWithdrawalInfo>,
+) => {
+  const sourceChainId = await getStratoNetworkId();
+
+  for (const withdrawal of withdrawals) {
+    if (withdrawal.useInstantPath) {
+      continue;
+    }
+
+    if (announcedManualNativeWithdrawals.has(withdrawal.withdrawalId)) {
+      continue;
+    }
+
+    try {
+      const proposalReference = await proposeManualNativeMint(
+        withdrawal,
+        sourceChainId,
+      );
+      announcedManualNativeWithdrawals.set(
+        withdrawal.withdrawalId,
+        proposalReference,
+      );
+
+      const baseMessage =
+        `Native withdrawal ${withdrawal.withdrawalId} exceeds the instant threshold and remains pending manual approval/execution`;
+      const suffix = proposalReference
+        ? ` (reference: ${proposalReference})`
+        : "";
+      logInfo("BridgeService", `${baseMessage}${suffix}`);
+    } catch (error) {
+      logError("BridgeService", error as Error, {
+        operation: "queueManualNativeWithdrawalBatch",
+        withdrawalId: withdrawal.withdrawalId,
+        externalChainId: withdrawal.externalChainId,
+      });
+    }
   }
 };
 

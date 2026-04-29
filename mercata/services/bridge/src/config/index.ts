@@ -35,6 +35,9 @@ const config = {
   },
   nativeBridge: {
     address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,
+    mintExecutorUrl: process.env.NATIVE_MINT_EXECUTOR_URL,
+    mintExecutorToken: process.env.NATIVE_MINT_EXECUTOR_TOKEN,
+    mintProposerUrl: process.env.NATIVE_MINT_PROPOSER_URL,
   },
   oracle: {
     address: process.env.PRICE_ORACLE_ADDRESS,

@@ -188,6 +188,7 @@ export interface NativeWithdrawalInfo {
   stratoToken: string;
   stratoTokenAmount: string;
   timestamp: string;
+  useInstantPath?: boolean;
 
   withdrawalId: string;
 }

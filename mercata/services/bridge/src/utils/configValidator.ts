@@ -117,6 +117,32 @@ export async function validateBridgeConfig(): Promise<boolean> {
     }
   }
 
+  if (config.nativeBridge.address) {
+    if (!config.nativeBridge.mintExecutorUrl) {
+      warnings.push(
+        "NATIVE_MINT_EXECUTOR_URL is not configured - instant native withdrawals will stay pending until an external executor is configured",
+      );
+    }
+
+    if (
+      config.nativeBridge.mintExecutorUrl &&
+      !/^https?:\/\//.test(config.nativeBridge.mintExecutorUrl)
+    ) {
+      errors.push(
+        `Invalid native mint executor URL format: ${config.nativeBridge.mintExecutorUrl}`,
+      );
+    }
+
+    if (
+      config.nativeBridge.mintProposerUrl &&
+      !/^https?:\/\//.test(config.nativeBridge.mintProposerUrl)
+    ) {
+      errors.push(
+        `Invalid native mint proposer URL format: ${config.nativeBridge.mintProposerUrl}`,
+      );
+    }
+  }
+
   // Validate voucher contract address format
   if (config.voucher.contractAddress) {
     if (!/^(0x)?[a-fA-F0-9]{40}$/.test(config.voucher.contractAddress)) {

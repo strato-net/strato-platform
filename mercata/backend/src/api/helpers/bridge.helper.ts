@@ -29,6 +29,7 @@ export type BridgeAssetInfo = {
   externalSymbol: string;
   externalDecimals: string;
   maxPerWithdrawal: string;
+  instantWithdrawalThreshold?: string;
   stratoToken: string;
   enabled: boolean;
 };
@@ -358,6 +359,10 @@ export function parseNativeBridgeAssets(rows: NativeBridgeAssetRow[]): Bridgeabl
       externalSymbol: typeof raw.externalSymbol === "string" ? raw.externalSymbol : "",
       externalDecimals: "18",
       maxPerWithdrawal: raw.maxPerWithdrawal != null ? String(raw.maxPerWithdrawal) : "0",
+      instantWithdrawalThreshold:
+        raw.instantWithdrawalThreshold != null
+          ? String(raw.instantWithdrawalThreshold)
+          : "0",
       stratoToken,
       enabled: raw.enabled === true,
     };

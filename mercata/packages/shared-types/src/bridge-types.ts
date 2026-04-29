@@ -37,6 +37,7 @@ export interface BridgeToken {
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
+  instantWithdrawalThreshold?: string; // Native-only; amount eligible for automatic instant bridge-out
   enabled: boolean;              // effective route enabled state
   isDefaultRoute: boolean;       // true when route token matches asset default token
   stratoTokenImage?: string;     // First image URL from TokenFactory images
