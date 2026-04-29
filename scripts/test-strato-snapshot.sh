@@ -25,12 +25,20 @@ assert_contains() {
   }
 }
 
+assert_no_appledouble() {
+  local path="$1"
+  if find "$path" -name '._*' -print -quit | grep -q .; then
+    echo "unexpected AppleDouble metadata under $path" >&2
+    exit 1
+  fi
+}
+
 make_fixture_snapshot() {
   local staging="$TMP/staging"
   mkdir -p "$staging/payload/ethereumH/state"
   mkdir -p "$staging/payload/postgres/base"
   mkdir -p "$staging/payload/redis"
-  mkdir -p "$staging/payload/kafka"
+  mkdir -p "$staging/payload/kafka/kafka-logs/__cluster_metadata-0"
   mkdir -p "$staging/payload/secrets"
 
   echo "state-from-snapshot" > "$staging/payload/ethereumH/state/value"
@@ -149,6 +157,7 @@ assert_contains "$NODE/.ethereumH/state/value" "state-from-snapshot"
 assert_contains "$NODE/.ethereumH/ethconf.yaml" "nodeUrl: http://local-dev-node:8081"
 assert_contains "$NODE/.ethereumH/ethconf.yaml" "password: snapshotpass"
 assert_contains "$NODE/secrets/postgres_password" "snapshotpass"
+assert_no_appledouble "$NODE"
 
 if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium >/tmp/strato-snapshot-restore.out 2>&1; then
   echo "restore should reject existing state without --force" >&2
@@ -156,6 +165,7 @@ if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapsho
 fi
 
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.tar.gz" --network helium --force
+assert_no_appledouble "$NODE"
 
 cat > "$TMP/metadata.json" <<'JSON'
 {
@@ -183,6 +193,8 @@ cat > "$TMP/cirrus.json" <<'JSON'
 JSON
 
 CREATED="$TMP/created.tar.gz"
+echo "appledouble" > "$NODE/.ethereumH/state/._value"
+echo "appledouble" > "$NODE/kafka/._log"
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
   --network helium \
   --output "$CREATED" \
@@ -195,6 +207,11 @@ STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" inspect "$CREATED" > "$TMP/created-inspect.out"
 assert_contains "$TMP/created-inspect.out" "apiIndexerTip: 100"
 assert_contains "$TMP/created-inspect.out" "cirrusTip: 100"
+if tar -tzf "$CREATED" | grep -E '(^|/)\._' > "$TMP/created-appledouble.out"; then
+  echo "created archive should not contain AppleDouble metadata" >&2
+  cat "$TMP/created-appledouble.out" >&2
+  exit 1
+fi
 
 DOCKER_FAKEBIN="$TMP/docker-fakebin"
 mkdir -p "$DOCKER_FAKEBIN"

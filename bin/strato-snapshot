@@ -127,6 +127,16 @@ fetch_source() {
   fi
 }
 
+tar_without_appledouble() {
+  COPYFILE_DISABLE=1 tar --exclude='._*' --exclude='./._*' --exclude='*/._*' "$@"
+}
+
+scrub_appledouble_files() {
+  local path="$1"
+  [[ -e "$path" ]] || return 0
+  find "$path" -name '._*' -exec rm -rf {} +
+}
+
 make_archive() {
   local staging="$1"
   local output="$2"
@@ -135,16 +145,16 @@ make_archive() {
   case "$output" in
     *.tar.zst|*.tzst)
       if command -v zstd >/dev/null 2>&1; then
-        (cd "$staging" && tar -cf - .) | zstd -T0 -q -o "$output"
+        (cd "$staging" && tar_without_appledouble -cf - .) | zstd -T0 -q -o "$output"
       else
-        (cd "$staging" && tar --zstd -cpf "$output" .)
+        (cd "$staging" && tar_without_appledouble --zstd -cpf "$output" .)
       fi
       ;;
     *.tar.gz|*.tgz)
-      (cd "$staging" && tar -czpf "$output" .)
+      (cd "$staging" && tar_without_appledouble -czpf "$output" .)
       ;;
     *.tar)
-      (cd "$staging" && tar -cpf "$output" .)
+      (cd "$staging" && tar_without_appledouble -cpf "$output" .)
       ;;
     *)
       die "unsupported output extension; use .tar.zst, .tar.gz, or .tar"
@@ -185,12 +195,20 @@ copy_dir_contents() {
   (cd "$src" && tar -cf - .) | (cd "$dest" && tar -xpf -)
 }
 
+copy_dir_contents_without_appledouble() {
+  local src="$1"
+  local dest="$2"
+  [[ -d "$src" ]] || return 0
+  mkdir -p "$dest"
+  (cd "$src" && tar_without_appledouble -cf - .) | (cd "$dest" && tar -xpf -)
+}
+
 copy_ethereum_payload() {
   local src="$1"
   local dest="$2"
   [[ -d "$src" ]] || die "missing .ethereumH state directory"
   mkdir -p "$dest"
-  (cd "$src" && tar -cf - --exclude='./ethconf.yaml' .) | (cd "$dest" && tar -xpf -)
+  (cd "$src" && tar_without_appledouble --exclude='./ethconf.yaml' -cf - .) | (cd "$dest" && tar_without_appledouble -xpf -)
 }
 
 read_ethconf_value() {
@@ -887,16 +905,18 @@ stage_payload() {
 
   mkdir -p "$staging/payload/secrets"
   copy_ethereum_payload "$node_dir/.ethereumH" "$staging/payload/ethereumH"
-  copy_dir_contents "$node_dir/postgres" "$staging/payload/postgres"
-  copy_dir_contents "$node_dir/redis" "$staging/payload/redis"
-  copy_dir_contents "$node_dir/kafka" "$staging/payload/kafka"
+  copy_dir_contents_without_appledouble "$node_dir/postgres" "$staging/payload/postgres"
+  copy_dir_contents_without_appledouble "$node_dir/redis" "$staging/payload/redis"
+  copy_dir_contents_without_appledouble "$node_dir/kafka" "$staging/payload/kafka"
 
   [[ -f "$node_dir/secrets/postgres_password" ]] || die "missing secrets/postgres_password"
   cp "$node_dir/secrets/postgres_password" "$staging/payload/secrets/postgres_password"
 
   if [[ "$include_prometheus" == "true" && -d "$node_dir/prometheus" ]]; then
-    copy_dir_contents "$node_dir/prometheus" "$staging/payload/prometheus"
+    copy_dir_contents_without_appledouble "$node_dir/prometheus" "$staging/payload/prometheus"
   fi
+
+  scrub_appledouble_files "$staging/payload"
 }
 
 remove_restored_state() {

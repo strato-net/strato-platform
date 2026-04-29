@@ -130,6 +130,7 @@ The archive must not include:
 - `secrets/oauth_credentials.yaml`
 - `secrets/ssl/`
 - `.ethereumH/ethconf.yaml`
+- macOS AppleDouble metadata files (`._*`)
 
 `ethconf.yaml` is intentionally excluded because it contains host-specific values and embeds the local Postgres password. Restore preserves the target node's generated config, then rewrites only the Postgres password fields to match the restored database.
 
