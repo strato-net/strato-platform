@@ -518,6 +518,23 @@ export const handleRejectedWithdrawalBatch = async (
   }
 };
 
+const ensureNativeWithdrawalPending = async (
+  withdrawal: NativeWithdrawalInfo,
+) => {
+  if (String(withdrawal.bridgeStatus) === "2") {
+    return;
+  }
+
+  await execute({
+    contractName: "StratoNativeBridge",
+    contractAddress: config.nativeBridge.address!,
+    method: "markWithdrawalPending",
+    args: {
+      id: Number(withdrawal.withdrawalId),
+    },
+  });
+};
+
 export const confirmNativeWithdrawalBatch = async (
   withdrawals: NonEmptyArray<NativeWithdrawalInfo>,
 ) => {
@@ -539,6 +556,7 @@ export const confirmNativeWithdrawalBatch = async (
     }
 
     try {
+      await ensureNativeWithdrawalPending(withdrawal);
       const externalTxHash = await submitNativeMint(withdrawal, sourceChainId);
 
       await execute({
@@ -594,6 +612,10 @@ export const confirmNativeWithdrawalBatch = async (
 export const queueManualNativeWithdrawalBatch = async (
   withdrawals: NonEmptyArray<NativeWithdrawalInfo>,
 ) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
   const sourceChainId = await getStratoNetworkId();
 
   for (const withdrawal of withdrawals) {
@@ -606,6 +628,7 @@ export const queueManualNativeWithdrawalBatch = async (
     }
 
     try {
+      await ensureNativeWithdrawalPending(withdrawal);
       const proposalReference = await proposeManualNativeMint(
         withdrawal,
         sourceChainId,

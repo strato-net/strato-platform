@@ -155,6 +155,66 @@ contract Describe_StratoNativeBridge is Authorizable {
         require(custodyVault.lockedBalance(nativeTokenAddress) == 50e18, "Vault should lock requested amount");
     }
 
+    function it_native_withdrawal_pending_state_blocks_user_abort_before_external_mint() {
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 withdrawalId = user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        );
+
+        relayer.do(nativeBridgeAddress, "markWithdrawalPending", withdrawalId);
+
+        (
+            BridgeStatus bridgeStatus,
+            string pendingTxHash,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            bool pendingUseInstantPath
+        ) = nativeBridge.getWithdrawalInfo(withdrawalId);
+
+        require(bridgeStatus == BridgeStatus.PENDING_REVIEW, "Withdrawal should be non-abortable pending");
+        require(bytes(pendingTxHash).length == 0, "Pending state should not require destination tx hash");
+        require(pendingUseInstantPath, "Pending withdrawal should retain lane selection");
+
+        bool reverted = false;
+        try user1.do(nativeBridgeAddress, "abortWithdrawal", withdrawalId) {
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "User should not abort once execution is pending");
+
+        relayer.do(nativeBridgeAddress, "confirmWithdrawal", withdrawalId, "0x1234");
+
+        (
+            BridgeStatus confirmedStatus,
+            string confirmedTxHash,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            bool confirmedUseInstantPath
+        ) = nativeBridge.getWithdrawalInfo(withdrawalId);
+
+        require(confirmedStatus == BridgeStatus.PENDING_REVIEW, "Withdrawal should remain pending until destination finality");
+        require(bytes(confirmedTxHash).length > 0, "Destination tx hash should be stored after mint submission");
+        require(confirmedUseInstantPath, "Confirmed withdrawal should retain lane selection");
+    }
+
     function it_native_withdrawal_requires_vault_allowance_not_bridge_allowance() {
         require(true, "SolidVM harness smoke check");
     }

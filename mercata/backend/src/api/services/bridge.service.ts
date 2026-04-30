@@ -22,6 +22,80 @@ import { toUTCTime } from "../helpers/cirrusHelpers";
 
 const { MercataBridge, StratoNativeBridge, Token, LendingPool, LendingRegistry, mercataBridge, DECIMALS } = constants;
 
+const stripPagingParams = (
+  params: Record<string, string | undefined>
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(params).filter(
+      ([key, value]) => value !== undefined && !["limit", "offset", "order", "select"].includes(key)
+    )
+  ) as Record<string, string>;
+
+const applyPagination = (
+  rows: any[],
+  rawParams: Record<string, string | undefined>
+) => {
+  const order = rawParams.order || "block_timestamp.desc";
+  const desc = order.endsWith(".desc");
+  const sorted = [...rows].sort((a, b) => {
+    const aTime = new Date(a.block_timestamp || 0).getTime();
+    const bTime = new Date(b.block_timestamp || 0).getTime();
+    return desc ? bTime - aTime : aTime - bTime;
+  });
+  const offset = Math.max(Number(rawParams.offset || 0), 0);
+  const limit = rawParams.limit == null ? sorted.length : Math.max(Number(rawParams.limit), 0);
+  return sorted.slice(offset, offset + limit);
+};
+
+const nativeTransactionParams = (
+  rawParams: Record<string, string | undefined>,
+  userAddress: string | undefined,
+  type: "withdrawal" | "deposit"
+): Record<string, string> => {
+  const params = stripPagingParams(rawParams);
+  const chainFilter = type === "deposit" ? params.key : undefined;
+  delete params.key;
+
+  return {
+    ...params,
+    ...(chainFilter ? { "value->>externalChainId": chainFilter } : {}),
+    address: `eq.${constants.stratoNativeBridge}`,
+    ...(userAddress && {
+      [`value->>${type === "deposit" ? "stratoRecipient" : "stratoSender"}`]: `eq.${userAddress}`,
+    }),
+  };
+};
+
+const normalizeNativeTransactions = (
+  rows: any[],
+  type: "withdrawal" | "deposit"
+) => rows.map((row) => {
+  const value = row?.value || {};
+  if (type === "withdrawal") {
+    return {
+      withdrawalId: row.key,
+      WithdrawalInfo: {
+        ...value,
+        externalToken: value.representationToken,
+      },
+      block_timestamp: row.block_timestamp,
+      routeType: "native",
+    };
+  }
+
+  return {
+    depositId: row.key,
+    externalChainId: value.externalChainId,
+    externalTxHash: value.externalTxHash,
+    DepositInfo: {
+      ...value,
+      externalToken: value.representationToken,
+    },
+    block_timestamp: row.block_timestamp,
+    routeType: "native",
+  };
+});
+
 export const requestWithdrawal = async (
   accessToken: string,
   {
@@ -143,28 +217,41 @@ export const getBridgeTransactions = async (
   rawParams: Record<string, string | undefined> = {}
 ): Promise<BridgeTransactionResponse> => {
   const config = QUERY_CONFIGS[type];
-  
+
   const dataParams = {
     select: config.selectFields,
-    ...buildQueryParams(rawParams, userAddress, [], type)
+    ...buildQueryParams(stripPagingParams(rawParams), userAddress, [], type)
   };
 
-  const countParams = {
-    select: config.countField,
-    ...buildQueryParams(rawParams, userAddress, ['limit', 'offset', 'order', 'select'], type)
-  };
+  const [standardResponse, nativeResponse] = await Promise.all([
+    executeParallelQueries(
+      accessToken,
+      config,
+      dataParams,
+      { ...dataParams, select: config.countField }
+    ),
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${StratoNativeBridge}-${type === "withdrawal" ? "withdrawals" : "deposits"}`, {
+          params: {
+            select: "key,value,block_timestamp",
+            ...nativeTransactionParams(rawParams, userAddress, type),
+          }
+        })
+      : Promise.resolve({ data: [] }),
+  ]);
 
-  const { results, totalCount } = await executeParallelQueries(
-    accessToken, config, dataParams, countParams
-  );
+  const nativeRows = Array.isArray(nativeResponse.data)
+    ? normalizeNativeTransactions(nativeResponse.data, type)
+    : [];
+  const allResults = [...standardResponse.results, ...nativeRows];
+  const totalCount = allResults.length;
 
-  if (!results.length) {
+  if (!allResults.length) {
     return { data: [], totalCount };
   }
 
-  const enrichedData = await enrichTransactionData(accessToken, results, type);
-  
-  return { data: enrichedData, totalCount };
+  const enrichedData = await enrichTransactionData(accessToken, allResults, type);
+  return { data: applyPagination(enrichedData, rawParams), totalCount };
 };
 
 export const getBridgeableTokens = async (accessToken: string, chainId?: string): Promise<BridgeToken[]> => {
@@ -239,7 +326,8 @@ export const getWithdrawalSummary = async (
   const stratoTokens = [...new Set(routes.map((route) => route.stratoToken).filter(Boolean))];
   const thirtyDaysAgoUTC = toUTCTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
 
-  const [balances, prices, pending, completed] = await Promise.all([
+  const nativeWithdrawalsTable = `/${StratoNativeBridge}-withdrawals`;
+  const [balances, prices, pending, completed, nativePending, nativeCompleted] = await Promise.all([
     stratoTokens.length > 0
       ? cirrus.get(accessToken, `/${Token}-_balances`, {
           params: {
@@ -266,7 +354,28 @@ export const getWithdrawalSummary = async (
         "value->>bridgeStatus": "eq.3",
         block_timestamp: `gte.${thirtyDaysAgoUTC}`
       }
-    })
+    }),
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, nativeWithdrawalsTable, {
+          params: {
+            select: "value->>stratoToken,value->>stratoTokenAmount",
+            address: `eq.${constants.stratoNativeBridge}`,
+            "value->>stratoSender": `eq.${userAddress}`,
+            "value->>bridgeStatus": "in.(1,2)"
+          }
+        })
+      : Promise.resolve({ data: [] }),
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, nativeWithdrawalsTable, {
+          params: {
+            select: "value->>stratoToken,value->>stratoTokenAmount",
+            address: `eq.${constants.stratoNativeBridge}`,
+            "value->>stratoSender": `eq.${userAddress}`,
+            "value->>bridgeStatus": "eq.3",
+            block_timestamp: `gte.${thirtyDaysAgoUTC}`
+          }
+        })
+      : Promise.resolve({ data: [] })
   ]);
 
   let availableUSD = 0n;
@@ -279,7 +388,7 @@ export const getWithdrawalSummary = async (
   }
 
   let pendingUSD = 0n;
-  for (const p of pending.data || []) {
+  for (const p of [...(pending.data || []), ...(nativePending.data || [])]) {
     if (!p.stratoToken || !p.stratoTokenAmount) continue;
     const amount = BigInt(p.stratoTokenAmount || "0");
     const price = BigInt(prices.get(p.stratoToken) || "0");
@@ -289,7 +398,7 @@ export const getWithdrawalSummary = async (
   }
 
   let withdrawnUSD = 0n;
-  for (const w of completed.data || []) {
+  for (const w of [...(completed.data || []), ...(nativeCompleted.data || [])]) {
     if (!w.stratoToken || !w.stratoTokenAmount) continue;
     const amount = BigInt(w.stratoTokenAmount || "0");
     const price = BigInt(prices.get(w.stratoToken) || "0");

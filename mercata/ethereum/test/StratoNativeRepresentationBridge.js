@@ -169,6 +169,30 @@ describe("StratoNativeRepresentationBridge", function () {
     ).to.be.revertedWithCustomError(bridge, "TokenNotMapped");
   });
 
+  it("rejects redemptions when the route is disabled", async function () {
+    await bridge
+      .connect(operator)
+      .mintRepresentation(
+        sourceChainId,
+        sourceBridge,
+        sourceWithdrawalId,
+        stratoToken,
+        user.address,
+        100n,
+      );
+    await token.connect(user).approve(await bridge.getAddress(), 100n);
+    await bridge.disableTokenMapping(stratoToken);
+
+    await expect(
+      bridge
+        .connect(user)
+        .requestRedemption(await token.getAddress(), 100n, stratoRecipient.address),
+    ).to.be.revertedWithCustomError(bridge, "RouteDisabled");
+
+    expect(await token.balanceOf(user.address)).to.equal(100n);
+    expect(await token.totalSupply()).to.equal(100n);
+  });
+
   it("does not allow silent remapping of a live route", async function () {
     const Token = await ethers.getContractFactory("StratoNativeRepresentationToken");
     const replacementToken = await upgrades.deployProxy(

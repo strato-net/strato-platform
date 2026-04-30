@@ -166,7 +166,9 @@ contract StratoNativeRepresentationBridge is
         if (representationToken == address(0)) revert InvalidAddress();
         if (stratoRecipient == address(0)) revert InvalidAddress();
         if (amount == 0) revert ZeroAmount();
-        if (representationToStrato[representationToken] == address(0)) revert TokenNotMapped();
+        address stratoToken = representationToStrato[representationToken];
+        if (stratoToken == address(0)) revert TokenNotMapped();
+        if (!routeActive[stratoToken]) revert RouteDisabled();
 
         IERC20(representationToken).safeTransferFrom(msg.sender, address(this), amount);
         StratoNativeRepresentationToken(representationToken).burn(amount);

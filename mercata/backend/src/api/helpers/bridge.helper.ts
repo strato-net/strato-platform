@@ -157,17 +157,42 @@ async function fetchTokenSymbols(accessToken: string, addresses: Set<string>): P
 
 async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Promise<Map<string, { externalName: string; externalSymbol: string }>> {
   if (!tokens.size) return new Map();
-  const { data } = await cirrus.get(accessToken, `/${constants.MercataBridge}-assets`, {
-    params: {
-      address: `eq.${constants.mercataBridge}`,
-      key: `in.(${[...tokens].join(",")})`,
-      select: "key,value->>externalName,value->>externalSymbol,value->>externalChainId",
-    }
-  });
+  const [standardResponse, nativeResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${constants.MercataBridge}-assets`, {
+      params: {
+        address: `eq.${constants.mercataBridge}`,
+        key: `in.(${[...tokens].join(",")})`,
+        select: "key,value->>externalName,value->>externalSymbol,value->>externalChainId",
+      }
+    }),
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${constants.StratoNativeBridge}-assets`, {
+          params: {
+            address: `eq.${constants.stratoNativeBridge}`,
+            select: "key,key2,value",
+          }
+        })
+      : Promise.resolve({ data: [] }),
+  ]);
   const map = new Map<string, { externalName: string; externalSymbol: string }>();
-  for (const a of data || []) {
+  for (const a of standardResponse.data || []) {
     const key = getBridgePairKey(normalizeBridgeAddress(a.key), toBridgeChainId(a.externalChainId));
     if (!map.has(key)) map.set(key, { externalName: a.externalName || "-", externalSymbol: a.externalSymbol || "-" });
+  }
+  for (const row of nativeResponse.data || []) {
+    const raw = row?.value;
+    if (!raw || typeof raw !== "object") continue;
+    const representationToken = typeof raw.representationToken === "string" ? normalizeBridgeAddress(raw.representationToken) : "";
+    const externalChainId = toBridgeChainId(row.key2);
+    if (!representationToken || !externalChainId || !tokens.has(stripHex(representationToken))) continue;
+
+    const key = getBridgePairKey(representationToken, externalChainId);
+    if (!map.has(key)) {
+      map.set(key, {
+        externalName: typeof raw.externalName === "string" ? raw.externalName : "-",
+        externalSymbol: typeof raw.externalSymbol === "string" ? raw.externalSymbol : "-",
+      });
+    }
   }
   return map;
 }

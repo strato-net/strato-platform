@@ -35,63 +35,73 @@ export const verifyNativeRedemptionsBatch = async (
     return results;
   }
 
-  const receipts = await getTransactionReceiptsBatch(
-    Number(deposits[0].externalChainId),
-    deposits.map((deposit) => deposit.externalTxHash),
-  );
-
+  const depositsByChain = new Map<number, NativeDepositInfo[]>();
   for (const deposit of deposits) {
-    try {
-      const expectedBridgeAddress = getNativeRepresentationBridgeAddress(
-        Number(deposit.externalChainId),
-      );
-      if (!expectedBridgeAddress) {
-        results.set(deposit.depositId, false);
-        continue;
-      }
+    const externalChainId = Number(deposit.externalChainId);
+    const chainDeposits = depositsByChain.get(externalChainId) || [];
+    chainDeposits.push(deposit);
+    depositsByChain.set(externalChainId, chainDeposits);
+  }
 
-      const receipt = receipts.get(deposit.externalTxHash);
-      if (!receipt || receipt.status !== "0x1") {
-        results.set(deposit.depositId, false);
-        continue;
-      }
+  for (const [externalChainId, chainDeposits] of depositsByChain) {
+    const receipts = await getTransactionReceiptsBatch(
+      externalChainId,
+      [...new Set(chainDeposits.map((deposit) => deposit.externalTxHash))],
+    );
 
-      const matchingLog = receipt.logs.find((log) => {
-        if (!log.address || normalizeAddress(log.address) !== normalizeAddress(expectedBridgeAddress)) {
-          return false;
+    for (const deposit of chainDeposits) {
+      try {
+        const expectedBridgeAddress = getNativeRepresentationBridgeAddress(
+          externalChainId,
+        );
+        if (!expectedBridgeAddress) {
+          results.set(deposit.depositId, false);
+          continue;
         }
 
-        return (
-          log.topics.length >= 4 &&
-          log.topics[0].toLowerCase() === NATIVE_REDEMPTION_EVENT_SIGNATURE.toLowerCase()
-        );
-      });
+        const receipt = receipts.get(deposit.externalTxHash);
+        if (!receipt || receipt.status !== "0x1") {
+          results.set(deposit.depositId, false);
+          continue;
+        }
 
-      if (!matchingLog) {
+        const matchingLog = receipt.logs.find((log) => {
+          if (!log.address || normalizeAddress(log.address) !== normalizeAddress(expectedBridgeAddress)) {
+            return false;
+          }
+
+          return (
+            log.topics.length >= 4 &&
+            log.topics[0].toLowerCase() === NATIVE_REDEMPTION_EVENT_SIGNATURE.toLowerCase()
+          );
+        });
+
+        if (!matchingLog) {
+          results.set(deposit.depositId, false);
+          continue;
+        }
+
+        const representationToken = decodeIndexedAddress(matchingLog.topics[1]);
+        const externalSender = decodeIndexedAddress(matchingLog.topics[2]);
+        const stratoRecipient = decodeIndexedAddress(matchingLog.topics[3]);
+        const { amount, redemptionId } = decodeNativeRedemptionData(matchingLog.data);
+
+        const verified =
+          normalizeAddress(matchingLog.address) === normalizeAddress(deposit.externalBridge) &&
+          representationToken === normalizeAddress(deposit.representationToken) &&
+          externalSender === normalizeAddress(deposit.externalSender) &&
+          stratoRecipient === normalizeAddress(deposit.stratoRecipient) &&
+          amount === BigInt(deposit.stratoTokenAmount) &&
+          redemptionId === BigInt(deposit.externalRedemptionId);
+
+        results.set(deposit.depositId, verified);
+      } catch (error) {
+        logError("NativeVerificationService", error as Error, {
+          operation: "verifyNativeRedemptionsBatch",
+          externalTxHash: deposit.externalTxHash,
+        });
         results.set(deposit.depositId, false);
-        continue;
       }
-
-      const representationToken = decodeIndexedAddress(matchingLog.topics[1]);
-      const externalSender = decodeIndexedAddress(matchingLog.topics[2]);
-      const stratoRecipient = decodeIndexedAddress(matchingLog.topics[3]);
-      const { amount, redemptionId } = decodeNativeRedemptionData(matchingLog.data);
-
-      const verified =
-        normalizeAddress(matchingLog.address) === normalizeAddress(deposit.externalBridge) &&
-        representationToken === normalizeAddress(deposit.representationToken) &&
-        externalSender === normalizeAddress(deposit.externalSender) &&
-        stratoRecipient === normalizeAddress(deposit.stratoRecipient) &&
-        amount === BigInt(deposit.stratoTokenAmount) &&
-        redemptionId === BigInt(deposit.externalRedemptionId);
-
-      results.set(deposit.depositId, verified);
-    } catch (error) {
-      logError("NativeVerificationService", error as Error, {
-        operation: "verifyNativeRedemptionsBatch",
-        externalTxHash: deposit.externalTxHash,
-      });
-      results.set(deposit.depositId, false);
     }
   }
 

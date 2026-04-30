@@ -270,12 +270,18 @@ export const startNativeWithdrawalTxPolling = (): void => {
 
       const toFinalize: Array<Number> = [];
       const toReject: Array<Number> = [];
+      const pendingInstantExecution: NativeWithdrawalInfo[] = [];
+      const pendingManualExecution: NativeWithdrawalInfo[] = [];
       const byChain = new Map<bigint, Array<Withdrawal>>();
 
       for (const w of pending) {
         const id = Number(w.withdrawalId);
         if (!w.externalTxHash) {
-          toReject.push(id);
+          if (w.useInstantPath) {
+            pendingInstantExecution.push(w);
+          } else {
+            pendingManualExecution.push(w);
+          }
           continue;
         }
 
@@ -298,6 +304,16 @@ export const startNativeWithdrawalTxPolling = (): void => {
         }
       }
 
+      if (pendingInstantExecution.length > 0) {
+        await confirmNativeWithdrawalBatch(
+          pendingInstantExecution as NonEmptyArray<NativeWithdrawalInfo>,
+        );
+      }
+      if (pendingManualExecution.length > 0) {
+        await queueManualNativeWithdrawalBatch(
+          pendingManualExecution as NonEmptyArray<NativeWithdrawalInfo>,
+        );
+      }
       if (toFinalize.length) {
         await finaliseNativeWithdrawalBatch(toFinalize as NonEmptyArray<Number>);
       }
