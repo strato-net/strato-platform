@@ -4,7 +4,7 @@
 module ActionFidelitySpec where
 
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action

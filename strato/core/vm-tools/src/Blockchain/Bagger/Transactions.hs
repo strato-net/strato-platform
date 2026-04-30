@@ -11,7 +11,7 @@ import Blockchain.Data.TransactionResultStatus
 import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Delta
+import SolidVM.Model.Delta
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq

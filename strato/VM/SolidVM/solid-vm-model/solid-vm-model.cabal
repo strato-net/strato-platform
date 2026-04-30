@@ -25,6 +25,8 @@ library
       SolidVM.Model.CodeCollection.VarDef
       SolidVM.Model.CodeCollection.VariableDecl
       SolidVM.Model.CodeCollection.Visibility
+      SolidVM.Model.Delta
+      SolidVM.Model.Event
       SolidVM.Model.SolidString
       SolidVM.Model.Storable
       SolidVM.Model.Type
