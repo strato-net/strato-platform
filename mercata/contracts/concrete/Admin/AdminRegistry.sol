@@ -3,7 +3,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record AdminRegistry is Ownable {
     uint public constant MINIMUM_DELAY = 86400; // 24 hours
-    uint public constant GRACE_PERIOD = 1209600; // 14 days
+    uint public constant GRACE_PERIOD = 86400; // 24 hours
     uint public constant MIN_VOTING_THRESHOLD_BPS = 5000; // 50%
     uint public constant MIN_ADMIN_COUNT = 3;
 
@@ -26,6 +26,8 @@ contract record AdminRegistry is Ownable {
     mapping (string => Timelock) public record timelocks; // timelocks[issueId] = Timelock(queuedAt, executableAt, expiresAt)
     
     mapping (address => mapping (string => mapping (address => bool))) public record whitelist; 
+
+    mapping (address => mapping (string => bool)) public record instantFunctions;
     
     mapping (address => mapping (string => uint)) public record votingThresholds;
 
@@ -85,9 +87,11 @@ contract record AdminRegistry is Ownable {
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
-        if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
+        bool senderCanGovern = adminMap[msg.sender] != 0 || isGuardian(msg.sender);
+        bool targetCanGovern = adminMap[_target] != 0 || isGuardian(_target);
+        if (senderCanGovern || targetCanGovern) {
             address sender = msg.sender;
-            if (adminMap[msg.sender] == 0) {
+            if (!senderCanGovern) {
                 if (_target != tx.origin) {
                     bool authorizationGranted = false;
                     try {
@@ -101,22 +105,28 @@ contract record AdminRegistry is Ownable {
                 _target = msg.sender;
             }
             string issueId = _getIssueId(_target, _func, _args);
-            require(timelocks[issueId].executableAt == 0, "Cannot vote on queued issue");
-            bool hasVoted = votesMap[issueId][sender] != 0;
-
-            _createIssue(sender, issueId, _target, _func, _args);
-
-            if (!hasVoted) {
-                votes[issueId].push(sender);
-                votesMap[issueId][sender] = votes[issueId].length;
-                emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
-            }
-
-            if (_shouldExecute(issueId, _target, _func, _args)) {
-                _queueIssue(sender, issueId, _target, _func, _args);
-                return (false, issueId);
+            if (_shouldExecuteInstantly(sender, _target, _func)) {
+                variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
+                return (true, ret);
             } else {
-                return (false, issueId);
+                require(adminMap[sender] != 0, "Only admins can vote on non-instant issues");
+                require(timelocks[issueId].executableAt == 0, "Cannot vote on queued issue");
+                bool hasVoted = votesMap[issueId][sender] != 0;
+
+                _createIssue(sender, issueId, _target, _func, _args);
+
+                if (!hasVoted) {
+                    votes[issueId].push(sender);
+                    votesMap[issueId][sender] = votes[issueId].length;
+                    emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
+                }
+
+                if (_shouldExecute(issueId, _target, _func, _args)) {
+                    _queueIssue(sender, issueId, _target, _func, _args);
+                    return (false, issueId);
+                } else {
+                    return (false, issueId);
+                }
             }
         } else {
             // Non-admin path: only execute if whitelisted
@@ -131,6 +141,15 @@ contract record AdminRegistry is Ownable {
             variadic ret = _executeIssue(sender, issueId, target, _func, _args);
             return (true, ret);
         }
+    }
+
+    function isGuardian(address _account) public virtual returns (bool) {
+        // TODO for the agent that will add Guardian logic: remove this function prob and just replace its usage with whatever data path exposes guardian statuses
+        return false;
+    }
+
+    function _shouldExecuteInstantly(address _sender, address _target, string _func) internal returns (bool) {
+        return instantFunctions[_target][_func] && (adminMap[_sender] != 0 || isGuardian(_sender));
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
@@ -274,8 +293,11 @@ contract record AdminRegistry is Ownable {
                 _func != "_removeVote" &&
                 _func != "_queueIssue" &&
                 _func != "_shouldExecute" &&
+                _func != "_shouldExecuteInstantly" &&
                 _func != "_swapAdmin" &&
                 _func != "executeIssue" &&
+                _func != "isGuardian" &&
+                _func != "setInstantFunction" &&
                 _func != "setVotingThreshold" &&
                 _func != "setDefaultVotingThresholdBps" &&
                 _func != "withdrawVote" &&
@@ -289,6 +311,11 @@ contract record AdminRegistry is Ownable {
 
     function removeWhitelist(address _target, string _func, address _user) external onlyOwner {
         whitelist[_target][_func][_user] = false;
+    }
+
+    function setInstantFunction(address _target, string _func, bool _enabled) external onlyOwner {
+        require(_target != address(this), "Cannot add governance functions for instant execution");
+        instantFunctions[_target][_func] = _enabled;
     }
 
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
