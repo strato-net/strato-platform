@@ -55,9 +55,11 @@ const resolvePromoRows = (
 
 interface GuestPromoSectionProps {
   variant: 1 | 2 | 3; // 1 = logged out, 2 = logged in 0 portfolio, 3 = logged in with portfolio
+  /** Gold/USDST promo cards; guests only (default true). */
+  showFeatureCards?: boolean;
 }
 
-const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
+const GuestPromoSection = ({ variant, showFeatureCards = true }: GuestPromoSectionProps) => {
   const navigate = useNavigate();
   const [rewardsButtonHovered, setRewardsButtonHovered] = useState(false);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
@@ -99,7 +101,6 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
     }
     if (totalPerSec === 0n) return { dailyPointsStr: null, emissionFillPct: 0 };
     const perDay = Number((totalPerSec * 86400n) / BigInt(1e9)) / 1e9;
-    console.log("[GuestPromoSection] dailyPoints full precision:", perDay);
 
     let fillPct = 0;
     const totalEmission = rewardsState?.totalRewardsEmission;
@@ -121,22 +122,22 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
 
   if (variant === 3) {
     return (
-      <div className="mb-8">
+      <div className="mb-4 md:mb-8">
         <div
           className="rounded-2xl overflow-hidden"
           style={{ background: "linear-gradient(135deg, #0A0F29 0%, #001B70 55%, #102a80 100%)" }}
         >
           <div className="flex flex-col lg:flex-row">
-            <div className="flex-1 px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-7">
-              <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 mb-5">
-                <span className="w-2 h-2 rounded-full bg-green-400" />
-                <span className="text-white text-xs font-medium">Live Now</span>
+            <div className="flex-1 px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-7">
+              <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-2.5 py-0.5 md:px-3 md:py-1 mb-2 md:mb-5">
+                <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-green-400" />
+                <span className="text-white text-[11px] md:text-xs font-medium">Live Now</span>
               </div>
               <h1 className="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-2 leading-tight">
                 {tokenApysLoaded && highestAvailableApy
                   ? `Earn Up to ${highestAvailableApy}% APY`
                   : !tokenApysLoaded
-                    ? <span className="inline-flex items-center gap-2">Earn Up to <Loader2 className="w-7 h-7 animate-spin opacity-60" /> APY</span>
+                    ? <span className="inline-flex items-center gap-2">Earn Up to <Loader2 className="w-5 h-5 md:w-7 md:h-7 animate-spin opacity-60" /> APY</span>
                     : "Start Earning Today"
                 }
               </h1>
@@ -145,20 +146,20 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
               </p>
               <button
                 onClick={() => navigate("/dashboard/earn")}
-                className="inline-flex items-center gap-2 border border-white/30 text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-white/10 transition-colors"
+                className="inline-flex items-center gap-2 border border-white/30 text-white rounded-full px-4 py-2 text-xs md:text-sm font-medium hover:bg-white/10 transition-colors md:px-5 md:py-2.5"
               >
                 Start Earning
-                <ArrowRight size={16} />
+                <ArrowRight size={14} className="md:w-4 md:h-4" />
               </button>
             </div>
 
-            <div className="lg:w-[360px] xl:w-[400px] px-4 py-5 md:px-6 md:py-6 bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col justify-center gap-2">
-              <h3 className="text-white font-bold text-xl mb-1">Your Daily Points</h3>
-              <p className="text-white/50 text-base mb-4">
+            <div className="lg:w-[360px] xl:w-[400px] px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6 bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col justify-center gap-1 md:gap-2 shrink-0">
+              <h3 className="text-white font-bold text-base md:text-xl mb-0.5 md:mb-1">Your Daily Points</h3>
+              <p className="text-white/50 text-sm md:text-base mb-2 md:mb-4 tabular-nums">
                 {dailyPointsStr ? `${dailyPointsStr} pts/day` : "—"}
               </p>
               <div>
-                <div className="w-full h-2 bg-white/10 rounded-full mb-5">
+                <div className="w-full h-1.5 md:h-2 bg-white/10 rounded-full mb-2 md:mb-5">
                   <div
                     className="h-full bg-blue-500 rounded-full transition-[width] duration-[400ms]"
                     style={{ width: rewardsButtonHovered ? "100%" : `${emissionFillPct}%` }}
@@ -168,7 +169,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
                   onClick={() => navigate("/dashboard/rewards")}
                   onMouseEnter={() => setRewardsButtonHovered(true)}
                   onMouseLeave={() => setRewardsButtonHovered(false)}
-                  className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
+                  className="text-white/50 text-xs md:text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
                 >
                   See Rewards
                   <ArrowRight size={14} />
@@ -182,7 +183,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
   }
 
   return (
-    <div className="space-y-4 mb-8">
+    <div className="space-y-4 mb-4 md:mb-8">
       {/* Hero Banner */}
       <div
         className="rounded-2xl overflow-hidden"
@@ -192,43 +193,43 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
         }}
       >
         <div className="flex flex-col lg:flex-row">
-          <div className="flex-1 px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-7">
-            <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-3 py-1 mb-5">
-              <span className="w-2 h-2 rounded-full bg-green-400" />
-              <span className="text-white text-xs font-medium">Live Now</span>
+          <div className="flex-1 px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-7">
+            <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-2.5 py-0.5 md:px-3 md:py-1 mb-2 md:mb-5">
+              <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-green-400" />
+              <span className="text-white text-[11px] md:text-xs font-medium">Live Now</span>
             </div>
 
             <h1 className="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-2 leading-tight">
               {tokenApysLoaded && highestAvailableApy
                 ? `Earn Up to ${highestAvailableApy}% APY`
                 : !tokenApysLoaded
-                  ? <span className="inline-flex items-center gap-2">Earn Up to <Loader2 className="w-7 h-7 animate-spin opacity-60" /> APY</span>
+                  ? <span className="inline-flex items-center gap-2">Earn Up to <Loader2 className="w-5 h-5 md:w-7 md:h-7 animate-spin opacity-60" /> APY</span>
                   : "Start Earning Today"
               }
             </h1>
-            <p className="text-white/60 text-sm md:text-base mb-6">
+            <p className="text-white/60 text-xs md:text-base mb-3 md:mb-6 leading-snug">
               Plus 11,111 reward points daily, just for holding
             </p>
 
             <button
               onClick={() => variant === 1 ? redirectToLogin() : navigate("/dashboard/earn")}
-              className="inline-flex items-center gap-2 border border-white/30 text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-white/10 transition-colors"
+              className="inline-flex items-center gap-2 border border-white/30 text-white rounded-full px-4 py-2 text-xs md:text-sm font-medium hover:bg-white/10 transition-colors md:px-5 md:py-2.5"
             >
               Start Earning
-              <ArrowRight size={16} />
+              <ArrowRight size={14} className="md:w-4 md:h-4" />
             </button>
           </div>
 
-          <div className="lg:w-[360px] xl:w-[400px] px-4 py-5 md:px-6 md:py-6 bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col justify-center gap-2">
-            <div className="inline-flex items-center self-start border border-blue-400/50 rounded-full px-3 py-0.5 mb-2">
-              <span className="text-blue-400 text-xs font-medium">Preview</span>
+          <div className="lg:w-[360px] xl:w-[400px] px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6 bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col justify-center gap-1 md:gap-2 shrink-0">
+            <div className="inline-flex items-center self-start border border-blue-400/50 rounded-full px-2.5 py-0.5 md:px-3 mb-1 md:mb-2">
+              <span className="text-blue-400 text-[11px] md:text-xs font-medium">Preview</span>
             </div>
 
-            <h3 className="text-white font-bold text-xl mb-1">Your Daily Points</h3>
-            <p className="text-white/50 text-base mb-4">11,111 pts/day</p>
+            <h3 className="text-white font-bold text-base md:text-xl mb-0.5 md:mb-1">Your Daily Points</h3>
+            <p className="text-white/50 text-sm md:text-base mb-2 md:mb-4">11,111 pts/day</p>
 
             <div>
-              <div className="w-full h-2 bg-white/10 rounded-full mb-5">
+              <div className="w-full h-1.5 md:h-2 bg-white/10 rounded-full mb-2 md:mb-5">
                 <div
                   className="h-full bg-blue-500 rounded-full transition-[width] duration-[400ms]"
                   style={{ width: rewardsButtonHovered ? "100%" : "80%" }}
@@ -260,7 +261,8 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
         </div>
       </div>
 
-      {/* Feature Cards */}
+      {/* Feature Cards — guests only when showFeatureCards */}
+      {showFeatureCards && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Buy Tokenized Gold and Silver */}
         <div className="bg-card border border-border rounded-2xl p-6 flex flex-col justify-between min-h-[240px]">
@@ -382,6 +384,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

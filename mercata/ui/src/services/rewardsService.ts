@@ -1,6 +1,6 @@
 import { api } from "@/lib/axios";
 import { formatUnits } from "viem";
-import { safeBigInt } from "@/utils/numberUtils";
+import { safeBigInt, formatBalance } from "@/utils/numberUtils";
 
 export interface Activity {
   activityId: number;
@@ -266,6 +266,49 @@ export const calculateRealTimePendingRewards = (
 };
 
 /**
+ * Total claimable reward points (wei): on-chain unclaimed bucket + real-time pending across activities.
+ * Matches Rewards page "Total claimable" (UserRewardsSection).
+ */
+export const computeTotalClaimableRewards = (
+  userRewards: UserRewardsData | null | undefined,
+  nowSeconds: number = Math.floor(Date.now() / 1000)
+): bigint => {
+  if (!userRewards) return 0n;
+
+  const baseUnclaimed = safeBigInt(userRewards.unclaimedRewards || "0");
+  const activitiesWithStake = userRewards.activities.filter(
+    (a) =>
+      safeBigInt(a.userInfo?.stake || "0") > 0n &&
+      safeBigInt(a.activity?.emissionRate || "0") > 0n
+  );
+
+  let totalNewPending = 0n;
+  for (const { activity, userInfo } of activitiesWithStake) {
+    if (
+      userInfo?.stake &&
+      activity?.accRewardPerStake !== undefined &&
+      userInfo?.userIndex !== undefined &&
+      activity?.emissionRate !== undefined &&
+      activity?.totalStake !== undefined &&
+      activity?.lastUpdateTime !== undefined
+    ) {
+      const pending = calculateRealTimePendingRewards(
+        userInfo.stake,
+        activity.accRewardPerStake,
+        userInfo.userIndex || "0",
+        activity.emissionRate,
+        activity.totalStake,
+        activity.lastUpdateTime,
+        nowSeconds
+      );
+      totalNewPending += safeBigInt(pending);
+    }
+  }
+
+  return baseUnclaimed + totalNewPending;
+};
+
+/**
  * Calculate estimated rewards per day for a user
  */
 export const calculateEstimatedRewardsPerDay = (
@@ -483,6 +526,20 @@ export const formatEmissionRatePerWeek = (emissionRatePerSecond: string): string
  */
 export const formatRoundedWithCommas = (value: string): string => {
   return formatWithCommas(value);
+};
+
+/** Same string as Rewards page “Total claimable” headline. */
+export const formatTotalClaimablePointsDisplay = (totalClaimable: bigint): string => {
+  const totalClaimableDecimal =
+    totalClaimable >= 0n
+      ? formatBalance(totalClaimable.toString(), "points", 18, 18, 18)
+      : null;
+  const numericPart = totalClaimableDecimal
+    ? totalClaimableDecimal.replace(/\s*points?\s*$/i, "").trim()
+    : null;
+  return numericPart !== null
+    ? `${formatRoundedWithCommas(roundByMagnitude(numericPart))} points`
+    : "?";
 };
 
 /**

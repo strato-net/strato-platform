@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useNetwork } from '@/context/NetworkContext';
 import { useTheme } from 'next-themes';
@@ -18,11 +19,13 @@ import LiquidationNotification from '../ui/LiquidationNotification';
 interface DashboardHeaderProps {
   title: string;
   subtitle?: string;
+  /** Optional actions beside the title (e.g. Portfolio Deposit / Claim). */
+  headerActions?: ReactNode;
 }
 
 const GRADIENT_BUTTON_CLASS = "w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
 
-const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
+const DashboardHeader = ({ title, subtitle, headerActions }: DashboardHeaderProps) => {
   const { userAddress, userName, logout, isLoggedIn } = useUser();
   const { isTestnet } = useNetwork();
   const { resolvedTheme } = useTheme();
@@ -88,10 +91,15 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
             className="h-8" 
           />
         </button>
-        <div className="flex flex-col">
-          <h1 className="text-base md:text-xl font-bold whitespace-nowrap">{title}</h1>
+        <div className="flex flex-col min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+            <h1 className="text-base md:text-xl font-bold whitespace-nowrap">{title}</h1>
+            {headerActions && (
+              <div className="flex flex-wrap items-center gap-2">{headerActions}</div>
+            )}
+          </div>
           {subtitle && (
-            <p className="text-xs md:text-sm text-muted-foreground">{subtitle}</p>
+            <p className="text-xs md:text-sm text-muted-foreground mt-0.5 max-w-xl">{subtitle}</p>
           )}
         </div>
         {isTestnet && (

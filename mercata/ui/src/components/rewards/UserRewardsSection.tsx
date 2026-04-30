@@ -1,21 +1,16 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserRewardsData, claimRewards, safeBigInt } from "@/services/rewardsService";
 import {
-  calculateRealTimePendingRewards,
-  formatEmissionRatePerDay,
+  UserRewardsData,
+  safeBigInt,
   roundByMagnitude,
   formatRoundedWithCommas,
 } from "@/services/rewardsService";
-import { formatBalance, calculateTokenValue, safeParseUnits } from "@/utils/numberUtils";
-import { Loader2, Coins, TrendingUp, Info, Clock, Star, Gift } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { formatBalance } from "@/utils/numberUtils";
+import { TrendingUp, Info, Clock } from "lucide-react";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useUser } from "@/context/UserContext";
-import { useOracleContext } from "@/context/OracleContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
@@ -76,63 +71,9 @@ const InfoTooltip = ({ content }: { content: string }) => {
   );
 };
 
-export const UserRewardsSection = ({
-  userRewards,
-  loading,
-  onClaimSuccess,
-}: UserRewardsSectionProps) => {
-  const { toast } = useToast();
+export const UserRewardsSection = ({ userRewards, loading }: UserRewardsSectionProps) => {
   const { saveUsdstInfo } = useSaveUsdstContext();
   const { userAddress } = useUser();
-  const { getPrice } = useOracleContext();
-  const [claimingActivityIds, setClaimingActivityIds] = useState<number[]>([]);
-
-  const handleClaimActivity = async (activityIds: number[]) => {
-    if (!userAddress) {
-      toast({
-        title: "User Not Logged In",
-        description: "Please log in to claim rewards",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!userRewards) {
-      toast({
-        title: "No Rewards",
-        description: "You don't have any rewards to claim",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setClaimingActivityIds(activityIds);
-      
-      const result = await claimRewards(userAddress, activityIds);
-      
-      if (result.success) {
-        toast({
-          title: "Claim Successful",
-          description: result.txHash 
-            ? `Transaction hash: ${result.txHash.slice(0, 10)}...`
-            : "Rewards claimed successfully",
-        });
-        onClaimSuccess?.();
-      } else {
-        throw new Error("Claim failed");
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to claim rewards";
-      toast({
-        title: "Claim Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setClaimingActivityIds([]);
-    }
-  };
 
   if (loading) {
     return (
@@ -168,38 +109,11 @@ export const UserRewardsSection = ({
     );
   }
 
-  const unclaimedRewardsStr = userRewards.unclaimedRewards || "0";
-  const unclaimedFormatted = formatBalance(unclaimedRewardsStr, "points", 18, 2, 6);
   const activitiesWithStake = userRewards.activities.filter(
     (a) =>
       safeBigInt(a.userInfo?.stake || "0") > 0n &&
       safeBigInt(a.activity?.emissionRate || "0") > 0n
   );
-
-  // Pre-calculate pending for each activity using real-time calculation
-  const activityPendingMap = new Map<number, bigint>();
-  const currentTime = Math.floor(Date.now() / 1000);
-  activitiesWithStake.forEach(({ activity, userInfo }) => {
-    if (
-      userInfo?.stake &&
-      activity?.accRewardPerStake !== undefined &&
-      userInfo?.userIndex !== undefined &&
-      activity?.emissionRate !== undefined &&
-      activity?.totalStake !== undefined &&
-      activity?.lastUpdateTime !== undefined
-    ) {
-      const pending = calculateRealTimePendingRewards(
-        userInfo.stake,
-        activity.accRewardPerStake,
-        userInfo.userIndex || "0",
-        activity.emissionRate,
-        activity.totalStake,
-        activity.lastUpdateTime,
-        currentTime
-      );
-      activityPendingMap.set(activity.activityId, safeBigInt(pending));
-    }
-  });
 
   return (
     <div className="space-y-6">
