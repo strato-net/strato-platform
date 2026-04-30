@@ -2,8 +2,10 @@ import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record AdminRegistry is Ownable {
-    uint public constant MINIMUM_DELAY = 172800; // 2 days
+    uint public constant MINIMUM_DELAY = 86400; // 24 hours
     uint public constant GRACE_PERIOD = 1209600; // 14 days
+    uint public constant MIN_VOTING_THRESHOLD_BPS = 5000; // 50%
+    uint public constant MIN_ADMIN_COUNT = 3;
 
     struct Timelock {
         uint queuedAt;
@@ -236,7 +238,7 @@ contract record AdminRegistry is Ownable {
     }
 
     function _removeAdmin(address _admin) external onlyOwner {
-        require(admins.length > 1, "Cannot remove the last admin");
+        require(admins.length > MIN_ADMIN_COUNT, "Below min admin count");
         uint index = adminMap[_admin];
         require(index > 0, "Account is not an admin");
         address swap = admins[admins.length - 1];
@@ -290,13 +292,13 @@ contract record AdminRegistry is Ownable {
     }
 
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
-        require(_votingThresholdBps > 0, "Voting threshold must be greater than 0");
+        require(_votingThresholdBps >= MIN_VOTING_THRESHOLD_BPS, "Threshold too low");
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
     }
 
     function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) external onlyOwner {
-        require(_defaultVotingThresholdBps > 0, "Default voting threshold must be greater than 0");
+        require(_defaultVotingThresholdBps >= MIN_VOTING_THRESHOLD_BPS, "Threshold too low");
         require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
         defaultVotingThresholdBps = _defaultVotingThresholdBps;
     }
