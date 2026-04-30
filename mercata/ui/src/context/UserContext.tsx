@@ -58,7 +58,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const checkAuthenticationStatus = async (initialCheck = false) => {
     try {
       if (initialCheck) setLoading(true); // Only show loader on first load
-      const authenticated = await isAuthenticated();
+      const { authenticated, userData: probedUserData } = await isAuthenticated();
 
       if (authenticated !== isLoggedIn) {
         setIsLoggedIn(authenticated);
@@ -69,13 +69,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const storedUser = localStorage.getItem("user");
         if (!storedUser || !stratoAddress) {
           try {
-            const response = await api.get('/user/me');
-            const newUserAddress = response.data.userAddress;
-            const serverIsAdmin = response.data.isAdmin;
-            const userName = response.data.userName
+            // Reuse the body from isAuthenticated()'s probe so we don't issue a
+            // second /user/me — that would mask the transient isNewUser flag
+            // the backend only returns once, on the call that creates the key.
+            const data = probedUserData ?? (await api.get('/user/me')).data;
+            const newUserAddress = data.userAddress;
+            const serverIsAdmin = data.isAdmin;
+            const userName = data.userName
             setUserName(userName)
             if (newUserAddress !== stratoAddress) {
-              localStorage.setItem("user", JSON.stringify(response.data));
+              localStorage.setItem("user", JSON.stringify(data));
               setStratoAddress(newUserAddress);
             }
             if (serverIsAdmin !== isAdmin) {
@@ -87,7 +90,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
             const gtag = (window as any).gtag;
             if (gtag && newUserAddress) {
               gtag('set', { user_id: newUserAddress });
-              if (response.data.isNewUser) {
+              if (data.isNewUser) {
                 const attribution = readAttribution() ?? {};
                 gtag('event', 'signup_completed', {
                   utm_source: (attribution as any).utm_source ?? '(direct)',
