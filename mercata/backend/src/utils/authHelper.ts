@@ -113,20 +113,22 @@ async function createKey(token: string): Promise<string | null> {
  * Fetches an existing STRATO key, or creates one if none exists.
  *
  * @param token - Bearer token for authorization
- * @returns the address string
+ * @returns the address string and a flag indicating whether the key was just created
  */
-export async function createOrGetKey(token: string): Promise<string> {
+export async function createOrGetKey(token: string): Promise<{ address: string; isNew: boolean }> {
   let address = await getKey(token);
+  let isNew = false;
   if (!address) {
     console.info("No key found for the user, creating a new one…");
     address = await createKey(token);
+    isNew = !!address;
   }
 
   if (!address) {
     throw new Error("Key creation failed: no address returned after attempting to create a new key");
   }
 
-  return address;
+  return { address, isNew };
 }
 
 /**

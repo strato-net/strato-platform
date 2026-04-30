@@ -74,6 +74,7 @@ import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { initializeCsrfToken, csrfOnRequest } from "./lib/csrf";
+import { captureAttribution } from "./lib/attribution";
 
 
 const queryClient = new QueryClient();
@@ -91,6 +92,11 @@ const App = () => {
   // Initialize CSRF token on app startup
   useEffect(() => {
     initializeCsrfToken();
+  }, []);
+
+  // Capture inbound UTM params before any auth redirect (Keycloak strips query params).
+  useEffect(() => {
+    captureAttribution();
   }, []);
 
   useEffect(() => {

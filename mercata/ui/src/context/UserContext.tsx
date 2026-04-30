@@ -6,6 +6,7 @@ import { useAccount, useWalletClient } from "wagmi";
 import { api, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
+import { readAttribution, clearAttribution } from "@/lib/attribution";
 
 interface UserContextType {
   userAddress: string | null;
@@ -79,6 +80,26 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
             }
             if (serverIsAdmin !== isAdmin) {
               setIsAdmin(serverIsAdmin);
+            }
+
+            // GA4 attribution: tag all subsequent events with user_id, and fire
+            // signup_completed exactly once for brand-new users.
+            const gtag = (window as any).gtag;
+            if (gtag && newUserAddress) {
+              gtag('set', { user_id: newUserAddress });
+              if (response.data.isNewUser) {
+                const attribution = readAttribution() ?? {};
+                gtag('event', 'signup_completed', {
+                  utm_source: (attribution as any).utm_source ?? '(direct)',
+                  utm_medium: (attribution as any).utm_medium ?? '(none)',
+                  utm_campaign: (attribution as any).utm_campaign ?? '(none)',
+                  utm_content: (attribution as any).utm_content ?? '(none)',
+                  via: (attribution as any).via ?? '(none)',
+                  landing_url: (attribution as any).landing_url ?? null,
+                  referrer: (attribution as any).referrer ?? null,
+                });
+                clearAttribution();
+              }
             }
           } catch (error) {
             // If we can't fetch user details but auth check passed, 
