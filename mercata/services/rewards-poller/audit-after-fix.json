@@ -1,0 +1,68 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "elliptic": {
+      "name": "elliptic",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1112030,
+          "name": "elliptic",
+          "dependency": "elliptic",
+          "title": "Elliptic Uses a Cryptographic Primitive with a Risky Implementation",
+          "url": "https://github.com/advisories/GHSA-848j-6mx2-7j84",
+          "severity": "low",
+          "cwe": [
+            "CWE-1240"
+          ],
+          "cvss": {
+            "score": 5.6,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:L"
+          },
+          "range": "<=6.6.1"
+        }
+      ],
+      "effects": [
+        "jwk-to-pem"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/elliptic"
+      ],
+      "fixAvailable": false
+    },
+    "jwk-to-pem": {
+      "name": "jwk-to-pem",
+      "severity": "low",
+      "isDirect": true,
+      "via": [
+        "elliptic"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/jwk-to-pem"
+      ],
+      "fixAvailable": false
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 2,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 2
+    },
+    "dependencies": {
+      "prod": 152,
+      "dev": 51,
+      "optional": 1,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 202
+    }
+  }
+}
