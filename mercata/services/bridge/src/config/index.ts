@@ -35,9 +35,21 @@ const config = {
   },
   nativeBridge: {
     address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,
-    mintExecutorUrl: process.env.NATIVE_MINT_EXECUTOR_URL,
-    mintExecutorToken: process.env.NATIVE_MINT_EXECUTOR_TOKEN,
-    mintProposerUrl: process.env.NATIVE_MINT_PROPOSER_URL,
+    mintExecutorPrivateKey: process.env.NATIVE_MINT_EXECUTOR_PRIVATE_KEY,
+    mintAttestationSignerPrivateKey:
+      process.env.NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY,
+    mintAttestationThreshold: Number(
+      process.env.NATIVE_MINT_ATTESTATION_THRESHOLD || 1,
+    ),
+    mintAttestationTtlSeconds: Number(
+      process.env.NATIVE_MINT_ATTESTATION_TTL_SECONDS || 900,
+    ),
+    instantWithdrawalDelaySeconds: Number(
+      process.env.NATIVE_INSTANT_WITHDRAWAL_DELAY_SECONDS || 900,
+    ),
+    manualMintAttestationTtlSeconds: Number(
+      process.env.NATIVE_MANUAL_MINT_ATTESTATION_TTL_SECONDS || 604800,
+    ),
   },
   oracle: {
     address: process.env.PRICE_ORACLE_ADDRESS,

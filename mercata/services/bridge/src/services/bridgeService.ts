@@ -1,8 +1,6 @@
 import {
   config,
   getNativeRepresentationBridgeAddress,
-  ERC20_ABI,
-  ZERO_ADDRESS,
 } from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
@@ -10,9 +8,13 @@ import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, Nativ
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
-import { ensureHexPrefix } from "../utils/utils";
 import { eth } from "../utils/api";
-import axios from "axios";
+import {
+  buildNativeMintRequest,
+  executeNativeMint,
+  getNativeMintProposalExecution,
+  proposeNativeMint,
+} from "./nativeMintService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -32,9 +34,10 @@ const getStratoNetworkId = async (): Promise<bigint> => {
   return cachedStratoNetworkId;
 };
 
-const buildNativeMintRequest = (
+const getNativeMintRequest = (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
+  deadlineSeconds?: bigint,
 ) => {
   const bridgeAddress = getNativeRepresentationBridgeAddress(
     Number(withdrawal.externalChainId),
@@ -44,96 +47,97 @@ const buildNativeMintRequest = (
       `CHAIN_${Number(withdrawal.externalChainId)}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS is not configured`,
     );
   }
-
-  return {
-    idempotencyKey: [
-      sourceChainId,
-      ensureHexPrefix(config.nativeBridge.address!),
-      withdrawal.withdrawalId,
-    ].join(":"),
-    sourceChainId: sourceChainId.toString(),
-    sourceBridge: ensureHexPrefix(config.nativeBridge.address!),
-    sourceWithdrawalId: withdrawal.withdrawalId,
-    externalChainId: String(withdrawal.externalChainId),
-    representationBridge: ensureHexPrefix(bridgeAddress),
-    stratoToken: ensureHexPrefix(withdrawal.stratoToken),
-    recipient: ensureHexPrefix(withdrawal.externalRecipient),
-    amount: String(withdrawal.externalTokenAmount),
-  };
-};
-
-const nativeExecutorHeaders = () => ({
-  ...(config.nativeBridge.mintExecutorToken
-    ? { Authorization: `Bearer ${config.nativeBridge.mintExecutorToken}` }
-    : {}),
-});
-
-const getNativeMintExecutorUrl = (): string => {
-  const url = config.nativeBridge.mintExecutorUrl;
-  if (!url) {
-    throw new Error(
-      "NATIVE_MINT_EXECUTOR_URL is required for instant native outbound minting",
-    );
-  }
-  return url.replace(/\/$/, "");
+  return buildNativeMintRequest(
+    withdrawal,
+    sourceChainId,
+    bridgeAddress,
+    deadlineSeconds,
+  );
 };
 
 const submitNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
 ): Promise<string> => {
-  const payload = buildNativeMintRequest(withdrawal, sourceChainId);
-  const response = await axios.post(
-    `${getNativeMintExecutorUrl()}/native-mints/execute`,
-    payload,
-    {
-      headers: {
-        "Content-Type": "application/json",
-        ...nativeExecutorHeaders(),
-      },
-      timeout: config.api.defaults.timeout,
-    },
-  );
-
-  const txHash = response.data?.txHash;
-  if (!txHash || typeof txHash !== "string") {
-    throw new Error("Native mint executor response missing txHash");
-  }
-
-  return txHash;
+  const payload = getNativeMintRequest(withdrawal, sourceChainId);
+  return executeNativeMint(payload);
 };
 
 const proposeManualNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
-): Promise<string | null> => {
-  const payload = buildNativeMintRequest(withdrawal, sourceChainId);
-  const proposalUrl = config.nativeBridge.mintProposerUrl;
-  if (!proposalUrl) {
-    return null;
+): Promise<string> => {
+  const manualTtlSeconds = BigInt(
+    Math.ceil(config.nativeBridge.manualMintAttestationTtlSeconds),
+  );
+  const payload = getNativeMintRequest(
+    withdrawal,
+    sourceChainId,
+    BigInt(Math.floor(Date.now() / 1000)) + manualTtlSeconds,
+  );
+  return proposeNativeMint(payload);
+};
+
+const syncManualNativeMintProposal = async (
+  withdrawal: NativeWithdrawalInfo,
+  proposalReference: string | null,
+): Promise<boolean> => {
+  if (!proposalReference) {
+    return false;
   }
 
-  const response = await axios.post(
-    `${proposalUrl.replace(/\/$/, "")}/native-mints/propose`,
-    payload,
-    {
-      headers: {
-        "Content-Type": "application/json",
-        ...nativeExecutorHeaders(),
-      },
-      timeout: config.api.defaults.timeout,
-    },
+  const result = await getNativeMintProposalExecution(
+    proposalReference,
+    withdrawal.externalChainId,
   );
 
-  const proposalReference =
-    response.data?.proposalId ||
-    response.data?.reference ||
-    response.data?.url ||
-    null;
+  if (result.status === "pending") {
+    return true;
+  }
 
-  return proposalReference && typeof proposalReference === "string"
-    ? proposalReference
-    : null;
+  if (result.status === "rejected") {
+    await execute({
+      contractName: "StratoNativeBridge",
+      contractAddress: config.nativeBridge.address!,
+      method: "abortWithdrawal",
+      args: {
+        id: Number(withdrawal.withdrawalId),
+      },
+    });
+    announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
+    return true;
+  }
+
+  if (!result.txHash) {
+    return true;
+  }
+
+  await execute({
+    contractName: "StratoNativeBridge",
+    contractAddress: config.nativeBridge.address!,
+    method: "confirmWithdrawal",
+    args: {
+      id: Number(withdrawal.withdrawalId),
+      externalTxHash: result.txHash,
+    },
+  });
+  announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
+  return true;
+};
+
+const recordNativeWithdrawalProposal = async (
+  withdrawalId: string,
+  proposalReference: string,
+) => {
+  await execute({
+    contractName: "StratoNativeBridge",
+    contractAddress: config.nativeBridge.address!,
+    method: "recordWithdrawalProposal",
+    args: {
+      id: Number(withdrawalId),
+      nativeMintProposalHash: proposalReference,
+    },
+  });
 };
 
 export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
@@ -520,9 +524,9 @@ export const handleRejectedWithdrawalBatch = async (
 
 const ensureNativeWithdrawalPending = async (
   withdrawal: NativeWithdrawalInfo,
-) => {
+): Promise<bigint> => {
   if (String(withdrawal.bridgeStatus) === "2") {
-    return;
+    return BigInt(withdrawal.timestamp || withdrawal.requestedAt);
   }
 
   await execute({
@@ -533,6 +537,20 @@ const ensureNativeWithdrawalPending = async (
       id: Number(withdrawal.withdrawalId),
     },
   });
+  return BigInt(Math.floor(Date.now() / 1000));
+};
+
+const getNativeInstantWithdrawalDelayRemaining = (
+  pendingFrom: bigint,
+): number => {
+  const delaySeconds = config.nativeBridge.instantWithdrawalDelaySeconds;
+  if (!Number.isFinite(delaySeconds) || delaySeconds <= 0) {
+    return 0;
+  }
+
+  const readyAt = pendingFrom + BigInt(Math.ceil(delaySeconds));
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  return readyAt > now ? Number(readyAt - now) : 0;
 };
 
 export const confirmNativeWithdrawalBatch = async (
@@ -556,7 +574,16 @@ export const confirmNativeWithdrawalBatch = async (
     }
 
     try {
-      await ensureNativeWithdrawalPending(withdrawal);
+      const pendingFrom = await ensureNativeWithdrawalPending(withdrawal);
+      const delayRemaining = getNativeInstantWithdrawalDelayRemaining(pendingFrom);
+      if (delayRemaining > 0) {
+        logInfo(
+          "BridgeService",
+          `Native instant withdrawal ${withdrawal.withdrawalId} is pending review for ${delayRemaining}s before destination mint`,
+        );
+        continue;
+      }
+
       const externalTxHash = await submitNativeMint(withdrawal, sourceChainId);
 
       await execute({
@@ -623,7 +650,30 @@ export const queueManualNativeWithdrawalBatch = async (
       continue;
     }
 
-    if (announcedManualNativeWithdrawals.has(withdrawal.withdrawalId)) {
+    const existingProposalReference =
+      withdrawal.nativeMintProposalHash ||
+      announcedManualNativeWithdrawals.get(withdrawal.withdrawalId) ||
+      null;
+
+    if (existingProposalReference) {
+      try {
+        if (!withdrawal.nativeMintProposalHash) {
+          await recordNativeWithdrawalProposal(
+            withdrawal.withdrawalId,
+            existingProposalReference,
+          );
+        }
+        await syncManualNativeMintProposal(
+          withdrawal,
+          existingProposalReference,
+        );
+      } catch (error) {
+        logError("BridgeService", error as Error, {
+          operation: "syncManualNativeMintProposal",
+          withdrawalId: withdrawal.withdrawalId,
+          externalChainId: withdrawal.externalChainId,
+        });
+      }
       continue;
     }
 
@@ -637,6 +687,7 @@ export const queueManualNativeWithdrawalBatch = async (
         withdrawal.withdrawalId,
         proposalReference,
       );
+      await recordNativeWithdrawalProposal(withdrawal.withdrawalId, proposalReference);
 
       const baseMessage =
         `Native withdrawal ${withdrawal.withdrawalId} exceeds the instant threshold and remains pending manual approval/execution`;

@@ -6,11 +6,13 @@ export function validateRequestWithdrawal(args: any) {
     throw new Error("Invalid input: args must be an object.");
   }
 
+  const isNative = args.routeType === "native";
+
   // Step 1: Basic presence and types
   const baseSchema = Joi.object({
     routeType: Joi.string().valid("standard", "native").optional(),
     externalChainId: Joi.string().required(),
-    externalToken: Joi.string().required(),
+    externalToken: isNative ? Joi.forbidden() : Joi.string().required(),
     stratoToken: Joi.string().required(),
     stratoTokenAmount: Joi.string().required(),
     externalRecipient: Joi.string().required(),
@@ -32,8 +34,7 @@ export function validateRequestWithdrawal(args: any) {
     externalChainId: Joi.string()
       .required()
       .custom((value, helpers) => {
-        const chainId = parseInt(value);
-        if (isNaN(chainId) || chainId <= 0) {
+        if (!/^[0-9]+$/.test(value) || BigInt(value) <= 0n) {
           return helpers.error("any.invalid");
         }
         return value;
@@ -42,7 +43,11 @@ export function validateRequestWithdrawal(args: any) {
         "any.invalid": "externalChainId must be a positive integer.",
         "any.required": "externalChainId is required.",
       }),
-    externalToken: validateAddressField("externalToken"),
+    externalToken: isNative
+      ? Joi.forbidden().messages({
+          "any.unknown": "externalToken is not used for native withdrawals.",
+        })
+      : validateAddressField("externalToken"),
     stratoToken: validateAddressField("stratoToken"),
     stratoTokenAmount: numericStringField("stratoTokenAmount"),
     externalRecipient: validateAddressField("externalRecipient"),
@@ -69,8 +74,7 @@ export function validateDepositAction(args: any) {
     externalChainId: Joi.string()
       .required()
       .custom((value, helpers) => {
-        const chainId = parseInt(value);
-        if (isNaN(chainId) || chainId <= 0) {
+        if (!/^[0-9]+$/.test(value) || BigInt(value) <= 0n) {
           return helpers.error("any.invalid");
         }
         return value;

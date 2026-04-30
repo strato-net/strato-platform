@@ -263,7 +263,9 @@ cp .env.smoke-native-bridge.example .env.smoke-native-bridge
 - `CHAIN_<external-chain-id>_REPRESENTATION_TOKEN_ADDRESS` - External representation token proxy
 
 **Optional Environment Variables**:
-- `BRIDGE_OPERATOR` - Expected relayer/operator address; if set, the script verifies both STRATO and Sepolia runtime operator wiring
+- `BRIDGE_OPERATOR` - Expected STRATO relayer/operator address; if set, the script verifies STRATO runtime operator wiring
+- `NATIVE_MINT_ATTESTATION_SIGNERS` - Comma-separated expected external-chain attestation signer addresses
+- `NATIVE_MINT_ATTESTATION_THRESHOLD` - Expected external-chain attestation signature threshold
 - `GUARDIAN` - Expected guardian address; if set, the script verifies both STRATO contracts use it
 
 **What it checks**:

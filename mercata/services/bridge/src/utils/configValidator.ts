@@ -1,6 +1,12 @@
 import { logInfo, logError } from "./logger";
-import { getEnabledChains } from "../services/cirrusService";
+import {
+  getEnabledChains,
+  getEnabledNativeChainIds,
+} from "../services/cirrusService";
 import { config } from "../config";
+
+const isPrivateKey = (value: string): boolean =>
+  /^(0x)?[a-fA-F0-9]{64}$/.test(value);
 
 export async function validateBridgeConfig(): Promise<boolean> {
   const errors: string[] = [];
@@ -102,9 +108,9 @@ export async function validateBridgeConfig(): Promise<boolean> {
   }
 
   if (config.safe.safeProposerPrivateKey) {
-    if (!/^[a-fA-F0-9]{64}$/.test(config.safe.safeProposerPrivateKey)) {
+    if (!isPrivateKey(config.safe.safeProposerPrivateKey)) {
       errors.push(
-        `Invalid Safe proposer private key format: ${config.safe.safeProposerPrivateKey.substring(0, 10)}...`,
+        "Invalid Safe proposer private key format",
       );
     }
   }
@@ -118,27 +124,71 @@ export async function validateBridgeConfig(): Promise<boolean> {
   }
 
   if (config.nativeBridge.address) {
-    if (!config.nativeBridge.mintExecutorUrl) {
+    if (!config.nativeBridge.mintExecutorPrivateKey) {
       warnings.push(
-        "NATIVE_MINT_EXECUTOR_URL is not configured - instant native withdrawals will stay pending until an external executor is configured",
+        "No native mint executor is configured - set NATIVE_MINT_EXECUTOR_PRIVATE_KEY for instant native withdrawals",
+      );
+    }
+
+    if (!config.nativeBridge.mintAttestationSignerPrivateKey) {
+      warnings.push(
+        "No native mint attestation signer is configured - set NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY",
       );
     }
 
     if (
-      config.nativeBridge.mintExecutorUrl &&
-      !/^https?:\/\//.test(config.nativeBridge.mintExecutorUrl)
+      config.nativeBridge.mintAttestationSignerPrivateKey &&
+      !isPrivateKey(config.nativeBridge.mintAttestationSignerPrivateKey)
+    ) {
+      errors.push("Invalid native mint attestation signer private key format");
+    }
+
+    if (
+      !Number.isInteger(config.nativeBridge.mintAttestationThreshold) ||
+      config.nativeBridge.mintAttestationThreshold <= 0
     ) {
       errors.push(
-        `Invalid native mint executor URL format: ${config.nativeBridge.mintExecutorUrl}`,
+        "NATIVE_MINT_ATTESTATION_THRESHOLD must be a positive integer",
+      );
+    }
+
+    if (config.nativeBridge.mintAttestationThreshold !== 1) {
+      errors.push(
+        "NATIVE_MINT_ATTESTATION_THRESHOLD must be 1 when NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY is configured",
       );
     }
 
     if (
-      config.nativeBridge.mintProposerUrl &&
-      !/^https?:\/\//.test(config.nativeBridge.mintProposerUrl)
+      config.nativeBridge.mintExecutorPrivateKey &&
+      !isPrivateKey(config.nativeBridge.mintExecutorPrivateKey)
+    ) {
+      errors.push("Invalid native mint executor private key format");
+    }
+
+    if (
+      !Number.isFinite(config.nativeBridge.mintAttestationTtlSeconds) ||
+      config.nativeBridge.mintAttestationTtlSeconds <= 0
     ) {
       errors.push(
-        `Invalid native mint proposer URL format: ${config.nativeBridge.mintProposerUrl}`,
+        "NATIVE_MINT_ATTESTATION_TTL_SECONDS must be a positive number of seconds",
+      );
+    }
+
+    if (
+      !Number.isFinite(config.nativeBridge.instantWithdrawalDelaySeconds) ||
+      config.nativeBridge.instantWithdrawalDelaySeconds < 0
+    ) {
+      errors.push(
+        "NATIVE_INSTANT_WITHDRAWAL_DELAY_SECONDS must be a non-negative number of seconds",
+      );
+    }
+
+    if (
+      !Number.isFinite(config.nativeBridge.manualMintAttestationTtlSeconds) ||
+      config.nativeBridge.manualMintAttestationTtlSeconds <= 0
+    ) {
+      errors.push(
+        "NATIVE_MANUAL_MINT_ATTESTATION_TTL_SECONDS must be a positive number of seconds",
       );
     }
   }
@@ -234,6 +284,24 @@ export async function validateBridgeConfig(): Promise<boolean> {
         "ConfigValidator",
         `Found ${enabledChainsArr.length} enabled chains`,
       );
+
+      if (config.nativeBridge.address) {
+        const nativeChainIds = await getEnabledNativeChainIds();
+        const missingNativeBridgeAddresses = nativeChainIds
+          .map((chainId) => `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`)
+          .filter((envVarName) => !process.env[envVarName]);
+
+        if (missingNativeBridgeAddresses.length > 0) {
+          errors.push(
+            `Missing native representation bridge environment variables for enabled native routes: ${missingNativeBridgeAddresses.join(", ")}`,
+          );
+        }
+
+        logInfo(
+          "ConfigValidator",
+          `Found ${nativeChainIds.length} enabled native route chains`,
+        );
+      }
     } catch (error) {
       errors.push(
         `Failed to validate chain/asset configuration: ${(error as Error).message}`,

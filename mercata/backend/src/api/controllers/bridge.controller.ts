@@ -57,7 +57,7 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { accessToken, body, address: userAddress } = req;
-      validateRequestWithdrawal(body);
+      validateRequestWithdrawal({ ...body, routeType: "native" });
 
       const result: TransactionResponse = await requestNativeWithdrawalService(
         accessToken,

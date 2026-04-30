@@ -215,6 +215,28 @@ contract Describe_StratoNativeBridge is Authorizable {
         require(confirmedUseInstantPath, "Confirmed withdrawal should retain lane selection");
     }
 
+    function it_native_withdrawal_cannot_finalize_without_destination_tx_hash() {
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 withdrawalId = user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        );
+
+        relayer.do(nativeBridgeAddress, "markWithdrawalPending", withdrawalId);
+
+        bool reverted = false;
+        try relayer.do(nativeBridgeAddress, "finaliseWithdrawal", withdrawalId) {
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Withdrawal should not finalize before destination tx hash is recorded");
+    }
+
     function it_native_withdrawal_requires_vault_allowance_not_bridge_allowance() {
         require(true, "SolidVM harness smoke check");
     }

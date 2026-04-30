@@ -3,9 +3,10 @@ const { ethers, upgrades } = require("hardhat");
 
 describe("StratoNativeRepresentationBridge", function () {
   let admin;
-  let operator;
   let user;
   let stratoRecipient;
+  let attestationSigner;
+  let otherSigner;
   let bridge;
   let token;
   let stratoToken;
@@ -13,8 +14,63 @@ describe("StratoNativeRepresentationBridge", function () {
   const sourceWithdrawalId = 17n;
   let sourceBridge;
 
+  const attestationTypes = {
+    NativeMintAttestation: [
+      { name: "sourceChainId", type: "uint256" },
+      { name: "sourceBridge", type: "address" },
+      { name: "destinationChainId", type: "uint256" },
+      { name: "destinationBridge", type: "address" },
+      { name: "sourceWithdrawalId", type: "uint256" },
+      { name: "stratoToken", type: "address" },
+      { name: "representationToken", type: "address" },
+      { name: "recipient", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "deadline", type: "uint256" },
+    ],
+  };
+
+  async function buildAttestation(overrides = {}) {
+    const network = await ethers.provider.getNetwork();
+    const block = await ethers.provider.getBlock("latest");
+
+    return {
+      sourceChainId,
+      sourceBridge,
+      destinationChainId: network.chainId,
+      destinationBridge: await bridge.getAddress(),
+      sourceWithdrawalId,
+      stratoToken,
+      representationToken: await token.getAddress(),
+      recipient: user.address,
+      amount: 250n,
+      deadline: BigInt(block.timestamp + 3600),
+      ...overrides,
+    };
+  }
+
+  async function signAttestation(signer, attestation) {
+    const network = await ethers.provider.getNetwork();
+    return signer.signTypedData(
+      {
+        name: "StratoNativeRepresentationBridge",
+        version: "1",
+        chainId: network.chainId,
+        verifyingContract: await bridge.getAddress(),
+      },
+      attestationTypes,
+      attestation,
+    );
+  }
+
+  async function mintWithAttestation(overrides = {}) {
+    const attestation = await buildAttestation(overrides);
+    const signature = await signAttestation(attestationSigner, attestation);
+    await bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]);
+    return attestation;
+  }
+
   beforeEach(async function () {
-    [admin, operator, user, stratoRecipient] = await ethers.getSigners();
+    [admin, user, stratoRecipient, attestationSigner, otherSigner] = await ethers.getSigners();
 
     const Token = await ethers.getContractFactory("StratoNativeRepresentationToken");
     token = await upgrades.deployProxy(
@@ -31,28 +87,22 @@ describe("StratoNativeRepresentationBridge", function () {
     await bridge.waitForDeployment();
 
     const bridgeRole = await token.BRIDGE_ROLE();
-    const bridgeOperatorRole = await bridge.BRIDGE_OPERATOR_ROLE();
 
     await token.grantRole(bridgeRole, await bridge.getAddress());
-    await bridge.grantRole(bridgeOperatorRole, operator.address);
 
     stratoToken = ethers.Wallet.createRandom().address;
     sourceBridge = ethers.Wallet.createRandom().address;
     await bridge.setTokenMapping(stratoToken, await token.getAddress());
+    await bridge.setAttestationSigner(attestationSigner.address, true);
+    await bridge.setAttestationThreshold(1);
   });
 
-  it("mints representation tokens only through an operator on a mapped route", async function () {
+  it("mints representation tokens with a valid STRATO withdrawal attestation", async function () {
+    const attestation = await buildAttestation();
+    const signature = await signAttestation(attestationSigner, attestation);
+
     await expect(
-      bridge
-        .connect(operator)
-        .mintRepresentation(
-          sourceChainId,
-          sourceBridge,
-          sourceWithdrawalId,
-          stratoToken,
-          user.address,
-          250n,
-        ),
+      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
     )
       .to.emit(bridge, "RepresentationMinted")
       .withArgs(
@@ -74,43 +124,51 @@ describe("StratoNativeRepresentationBridge", function () {
     expect(await token.balanceOf(user.address)).to.equal(250n);
   });
 
-  it("rejects duplicate mints for the same STRATO withdrawal id", async function () {
-    await bridge
-      .connect(operator)
-      .mintRepresentation(
-        sourceChainId,
-        sourceBridge,
-        sourceWithdrawalId,
-        stratoToken,
-        user.address,
-        250n,
-      );
+  it("rejects attested mints from an untrusted signer", async function () {
+    const attestation = await buildAttestation();
+    const signature = await signAttestation(otherSigner, attestation);
 
     await expect(
-      bridge
-        .connect(operator)
-        .mintRepresentation(
-          sourceChainId,
-          sourceBridge,
-          sourceWithdrawalId,
-          stratoToken,
-          user.address,
-          250n,
-        ),
+      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+    ).to.be.revertedWithCustomError(bridge, "BadAttestationSignatures");
+  });
+
+  it("rejects expired native mint attestations", async function () {
+    const block = await ethers.provider.getBlock("latest");
+    const attestation = await buildAttestation({
+      deadline: BigInt(block.timestamp - 1),
+    });
+    const signature = await signAttestation(attestationSigner, attestation);
+
+    await expect(
+      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+    ).to.be.revertedWithCustomError(bridge, "AttestationExpired");
+  });
+
+  it("rejects native mint attestations bound to another destination bridge", async function () {
+    const attestation = await buildAttestation({
+      destinationBridge: ethers.Wallet.createRandom().address,
+    });
+    const signature = await signAttestation(attestationSigner, attestation);
+
+    await expect(
+      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+    ).to.be.revertedWithCustomError(bridge, "InvalidAttestation");
+  });
+
+  it("rejects duplicate attested mints for the same STRATO withdrawal id", async function () {
+    const attestation = await buildAttestation();
+    const signature = await signAttestation(attestationSigner, attestation);
+
+    await bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]);
+
+    await expect(
+      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
     ).to.be.revertedWithCustomError(bridge, "DuplicateMint");
   });
 
   it("redeems by pulling user tokens into the bridge, burning them, and emitting the redemption event", async function () {
-    await bridge
-      .connect(operator)
-      .mintRepresentation(
-        sourceChainId,
-        sourceBridge,
-        sourceWithdrawalId,
-        stratoToken,
-        user.address,
-        250n,
-      );
+    await mintWithAttestation();
     await token.connect(user).approve(await bridge.getAddress(), 200n);
 
     await expect(
@@ -130,19 +188,10 @@ describe("StratoNativeRepresentationBridge", function () {
   it("does not let a bridge-role holder burn another user's balance directly", async function () {
     const bridgeRole = await token.BRIDGE_ROLE();
 
-    await bridge
-      .connect(operator)
-      .mintRepresentation(
-        sourceChainId,
-        sourceBridge,
-        sourceWithdrawalId,
-        stratoToken,
-        user.address,
-        100n,
-      );
-    await token.grantRole(bridgeRole, operator.address);
+    await mintWithAttestation({ amount: 100n });
+    await token.grantRole(bridgeRole, otherSigner.address);
 
-    await expect(token.connect(operator).burn(100n)).to.be.reverted;
+    await expect(token.connect(otherSigner).burn(100n)).to.be.reverted;
     expect(await token.balanceOf(user.address)).to.equal(100n);
     expect(await token.totalSupply()).to.equal(100n);
   });
@@ -170,16 +219,7 @@ describe("StratoNativeRepresentationBridge", function () {
   });
 
   it("rejects redemptions when the route is disabled", async function () {
-    await bridge
-      .connect(operator)
-      .mintRepresentation(
-        sourceChainId,
-        sourceBridge,
-        sourceWithdrawalId,
-        stratoToken,
-        user.address,
-        100n,
-      );
+    await mintWithAttestation({ amount: 100n });
     await token.connect(user).approve(await bridge.getAddress(), 100n);
     await bridge.disableTokenMapping(stratoToken);
 
@@ -216,16 +256,7 @@ describe("StratoNativeRepresentationBridge", function () {
     );
     await replacementToken.waitForDeployment();
 
-    await bridge
-      .connect(operator)
-      .mintRepresentation(
-        sourceChainId,
-        sourceBridge,
-        sourceWithdrawalId,
-        stratoToken,
-        user.address,
-        1n,
-      );
+    await mintWithAttestation({ amount: 1n });
 
     await expect(
       bridge.migrateTokenMapping(stratoToken, await replacementToken.getAddress(), false),

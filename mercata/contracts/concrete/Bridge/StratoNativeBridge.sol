@@ -56,6 +56,7 @@ contract record StratoNativeBridge is Ownable {
         address stratoToken;
         uint256 stratoTokenAmount;
         uint256 timestamp;
+        string nativeMintProposalHash;
         bool useInstantPath;
     }
 
@@ -119,6 +120,7 @@ contract record StratoNativeBridge is Ownable {
         bool useInstantPath
     );
     event NativeWithdrawalPending(uint256 indexed withdrawalId, string externalTxHash);
+    event NativeWithdrawalProposalRecorded(uint256 indexed withdrawalId, string nativeMintProposalHash);
     event NativeWithdrawalCompleted(uint256 indexed withdrawalId);
     event NativeWithdrawalAborted(uint256 indexed withdrawalId);
 
@@ -409,6 +411,7 @@ contract record StratoNativeBridge is Ownable {
             stratoToken,
             actualLockedAmount,
             block.timestamp,
+            "",
             useInstantPath
         );
 
@@ -437,6 +440,21 @@ contract record StratoNativeBridge is Ownable {
         emit NativeWithdrawalPending(id, w.externalTxHash);
     }
 
+    function recordWithdrawalProposal(uint256 id, string nativeMintProposalHash) public onlyBridgeOperator whenWithdrawalsOpen {
+        require(id > 0, "SNB: invalid withdrawal id");
+        require(bytes(nativeMintProposalHash).length > 0, "SNB: invalid proposal hash");
+
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "SNB: bad state");
+        require(bytes(w.externalTxHash).length == 0, "SNB: tx hash already set");
+        require(bytes(w.nativeMintProposalHash).length == 0, "SNB: proposal already set");
+
+        w.nativeMintProposalHash = nativeMintProposalHash.normalizeHex();
+        w.timestamp = block.timestamp;
+
+        emit NativeWithdrawalProposalRecorded(id, w.nativeMintProposalHash);
+    }
+
     function confirmWithdrawal(uint256 id, string externalTxHash) public onlyBridgeOperator whenWithdrawalsOpen {
         require(id > 0, "SNB: invalid withdrawal id");
         require(bytes(externalTxHash).length > 0, "SNB: invalid external tx hash");
@@ -456,6 +474,7 @@ contract record StratoNativeBridge is Ownable {
 
         NativeWithdrawalInfo w = withdrawals[id];
         require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "SNB: bad state");
+        require(bytes(w.externalTxHash).length > 0, "SNB: missing external tx hash");
 
         w.bridgeStatus = BridgeStatus.COMPLETED;
         w.timestamp = block.timestamp;

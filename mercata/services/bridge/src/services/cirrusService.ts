@@ -77,6 +77,28 @@ export const getAssetInfo = async (
   );
 };
 
+export const getEnabledNativeChainIds = async (): Promise<number[]> => {
+  if (!nativeBridgeAddress) return [];
+
+  const data = await cirrus.get(`/${NATIVE_BRIDGE_URL}-assets`, {
+    params: {
+      "value->>enabled": "eq.true",
+      address: `eq.${nativeBridgeAddress}`,
+      select: "key2",
+    },
+  });
+
+  if (!Array.isArray(data) || !data.length) return [];
+
+  return Array.from(
+    new Set(
+      data
+        .map((item) => Number(item.key2))
+        .filter((chainId) => Number.isSafeInteger(chainId) && chainId > 0),
+    ),
+  );
+};
+
 // Get withdrawals by status (reusable function)
 export const getWithdrawalsByStatus = async (
   status: string

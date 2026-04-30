@@ -67,6 +67,15 @@ The service automatically validates that RPC URLs are configured for all enabled
 - `SAFE_PROPOSER_ADDRESS` - Safe Proposer address
 - `SAFE_PROPOSER_PRIVATE_KEY` - Safe Proposer private key
 
+#### Native Bridge Minting
+- `STRATO_NATIVE_BRIDGE_ADDRESS` - STRATO native bridge proxy address
+- `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS` - External representation bridge address for each native route chain
+- `NATIVE_MINT_EXECUTOR_PRIVATE_KEY` - Destination-chain gas key for instant mints
+- `NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY` - Attestation signer key for destination mint authorization
+- `NATIVE_INSTANT_WITHDRAWAL_DELAY_SECONDS` - Review delay before instant native destination minting
+- `NATIVE_MINT_ATTESTATION_THRESHOLD` - Must be `1` for the env-held native attestation signer key
+- `NATIVE_MANUAL_MINT_ATTESTATION_TTL_SECONDS` - Validity window for manually approved native mint proposals
+
 #### Optional
 - `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)
 - `TRANSACTION_APPROVER_EMAILS` - Comma-separated list of emails for transaction alerts

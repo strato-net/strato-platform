@@ -6,8 +6,10 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import "./StratoNativeRepresentationToken.sol";
 
@@ -20,23 +22,44 @@ contract StratoNativeRepresentationBridge is
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
+    EIP712Upgradeable,
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
+    using ECDSA for bytes32;
 
-    bytes32 public constant BRIDGE_OPERATOR_ROLE = keccak256("BRIDGE_OPERATOR");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant MAPPING_ADMIN_ROLE = keccak256("MAPPING_ADMIN_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UNPAUSER_ROLE = keccak256("UNPAUSER_ROLE");
+    bytes32 public constant ATTESTATION_ADMIN_ROLE = keccak256("ATTESTATION_ADMIN_ROLE");
+    bytes32 private constant NATIVE_MINT_ATTESTATION_TYPEHASH = keccak256(
+        "NativeMintAttestation(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 deadline)"
+    );
+
+    struct NativeMintAttestation {
+        uint256 sourceChainId;
+        address sourceBridge;
+        uint256 destinationChainId;
+        address destinationBridge;
+        uint256 sourceWithdrawalId;
+        address stratoToken;
+        address representationToken;
+        address recipient;
+        uint256 amount;
+        uint256 deadline;
+    }
 
     mapping(address => address) public stratoToRepresentation;
     mapping(address => address) public representationToStrato;
     mapping(address => bool) public routeActive;
     mapping(address => bool) public routeFrozen;
     mapping(bytes32 => bool) public processedMints;
+    mapping(address => bool) public attestationSigners;
 
     uint96 public redemptionId;
+    uint8 public attestationThreshold;
+    uint8 public attestationSignerCount;
     bool public mintsPaused;
     bool public redemptionsPaused;
 
@@ -78,9 +101,15 @@ contract StratoNativeRepresentationBridge is
     );
     event MintPauseUpdated(bool paused);
     event RedemptionPauseUpdated(bool paused);
+    event AttestationSignerUpdated(address indexed signer, bool enabled);
+    event AttestationThresholdUpdated(uint8 threshold);
 
     error InvalidAddress();
     error ZeroAmount();
+    error InvalidAttestation();
+    error InvalidAttestationThreshold();
+    error AttestationExpired();
+    error BadAttestationSignatures();
     error TokenNotMapped();
     error RouteDisabled();
     error RouteFrozen();
@@ -112,6 +141,7 @@ contract StratoNativeRepresentationBridge is
         __AccessControl_init();
         __ReentrancyGuard_init();
         __Pausable_init();
+        __EIP712_init("StratoNativeRepresentationBridge", "1");
         __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -119,43 +149,107 @@ contract StratoNativeRepresentationBridge is
         _grantRole(MAPPING_ADMIN_ROLE, admin);
         _grantRole(PAUSER_ROLE, admin);
         _grantRole(UNPAUSER_ROLE, admin);
+        _grantRole(ATTESTATION_ADMIN_ROLE, admin);
     }
 
-    function mintRepresentation(
-        uint256 sourceChainId,
-        address sourceBridge,
-        uint256 sourceWithdrawalId,
-        address stratoToken,
-        address recipient,
-        uint256 amount
-    ) external onlyRole(BRIDGE_OPERATOR_ROLE) whenNotPaused whenMintsNotPaused {
-        if (sourceChainId == 0) revert InvalidAddress();
-        if (sourceBridge == address(0)) revert InvalidAddress();
-        if (recipient == address(0)) revert InvalidAddress();
-        if (amount == 0) revert ZeroAmount();
+    function mintRepresentationWithAttestation(
+        NativeMintAttestation calldata attestation,
+        bytes[] calldata signatures
+    ) external whenNotPaused whenMintsNotPaused {
+        bytes32 mintId = _validateMintAttestation(attestation);
+        _verifyAttestationSignatures(attestationDigest(attestation), signatures);
 
-        address representationToken = stratoToRepresentation[stratoToken];
-        if (representationToken == address(0)) revert TokenNotMapped();
-        if (!routeActive[stratoToken]) revert RouteDisabled();
-
-        bytes32 mintId = keccak256(
-            abi.encode(sourceChainId, sourceBridge, sourceWithdrawalId)
-        );
         if (processedMints[mintId]) revert DuplicateMint();
         processedMints[mintId] = true;
 
-        StratoNativeRepresentationToken(representationToken).mint(recipient, amount);
+        StratoNativeRepresentationToken(attestation.representationToken).mint(
+            attestation.recipient,
+            attestation.amount
+        );
 
         emit RepresentationMinted(
-            sourceChainId,
-            sourceBridge,
-            sourceWithdrawalId,
-            stratoToken,
-            representationToken,
-            recipient,
-            amount,
+            attestation.sourceChainId,
+            attestation.sourceBridge,
+            attestation.sourceWithdrawalId,
+            attestation.stratoToken,
+            attestation.representationToken,
+            attestation.recipient,
+            attestation.amount,
             mintId
         );
+    }
+
+    function attestationDigest(
+        NativeMintAttestation calldata attestation
+    ) public view returns (bytes32) {
+        return _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    NATIVE_MINT_ATTESTATION_TYPEHASH,
+                    attestation.sourceChainId,
+                    attestation.sourceBridge,
+                    attestation.destinationChainId,
+                    attestation.destinationBridge,
+                    attestation.sourceWithdrawalId,
+                    attestation.stratoToken,
+                    attestation.representationToken,
+                    attestation.recipient,
+                    attestation.amount,
+                    attestation.deadline
+                )
+            )
+        );
+    }
+
+    function _validateMintAttestation(
+        NativeMintAttestation calldata attestation
+    ) internal view returns (bytes32 mintId) {
+        if (attestation.sourceChainId == 0) revert InvalidAttestation();
+        if (attestation.sourceBridge == address(0)) revert InvalidAttestation();
+        if (attestation.sourceWithdrawalId == 0) revert InvalidAttestation();
+        if (attestation.destinationChainId != block.chainid) revert InvalidAttestation();
+        if (attestation.destinationBridge != address(this)) revert InvalidAttestation();
+        if (attestation.recipient == address(0)) revert InvalidAddress();
+        if (attestation.amount == 0) revert ZeroAmount();
+        if (attestation.deadline < block.timestamp) revert AttestationExpired();
+
+        address representationToken = stratoToRepresentation[attestation.stratoToken];
+        if (representationToken == address(0)) revert TokenNotMapped();
+        if (representationToken != attestation.representationToken) revert InvalidAttestation();
+        if (!routeActive[attestation.stratoToken]) revert RouteDisabled();
+
+        mintId = keccak256(
+            abi.encode(
+                attestation.sourceChainId,
+                attestation.sourceBridge,
+                attestation.sourceWithdrawalId
+            )
+        );
+    }
+
+    function _verifyAttestationSignatures(
+        bytes32 digest,
+        bytes[] calldata signatures
+    ) internal view {
+        uint8 threshold = attestationThreshold;
+        if (threshold == 0 || signatures.length < threshold) {
+            revert InvalidAttestationThreshold();
+        }
+
+        address previousSigner = address(0);
+        uint8 validSignatures = 0;
+        for (uint256 i = 0; i < signatures.length; i++) {
+            address signer = digest.recover(signatures[i]);
+            if (!attestationSigners[signer] || signer <= previousSigner) {
+                revert BadAttestationSignatures();
+            }
+            previousSigner = signer;
+            unchecked {
+                ++validSignatures;
+            }
+        }
+
+        if (validSignatures < threshold) revert BadAttestationSignatures();
     }
 
     function requestRedemption(
@@ -250,6 +344,41 @@ contract StratoNativeRepresentationBridge is
             newRepresentationToken,
             freezeRoute
         );
+    }
+
+    function setAttestationSigner(
+        address signer,
+        bool enabled
+    ) external onlyRole(ATTESTATION_ADMIN_ROLE) {
+        if (signer == address(0)) revert InvalidAddress();
+        bool currentlyEnabled = attestationSigners[signer];
+        if (currentlyEnabled == enabled) {
+            return;
+        }
+
+        if (enabled) {
+            unchecked {
+                ++attestationSignerCount;
+            }
+        } else {
+            uint8 newSignerCount = attestationSignerCount - 1;
+            if (attestationThreshold > newSignerCount) revert InvalidAttestationThreshold();
+            attestationSignerCount = newSignerCount;
+        }
+
+        attestationSigners[signer] = enabled;
+        emit AttestationSignerUpdated(signer, enabled);
+    }
+
+    function setAttestationThreshold(
+        uint8 threshold
+    ) external onlyRole(ATTESTATION_ADMIN_ROLE) {
+        if (threshold == 0 || threshold > attestationSignerCount) {
+            revert InvalidAttestationThreshold();
+        }
+
+        attestationThreshold = threshold;
+        emit AttestationThresholdUpdated(threshold);
     }
 
     function setMintPaused(bool paused_) external {
