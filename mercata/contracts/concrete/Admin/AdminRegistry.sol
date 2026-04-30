@@ -12,7 +12,7 @@ contract record AdminRegistry is Ownable {
     }
 
     address[] public record admins;
-    
+
     mapping (address => uint) public record adminMap;
     
     mapping (string => address[]) public record votes; // votes[issueId] = [voter1, voter2, ...]
@@ -111,10 +111,6 @@ contract record AdminRegistry is Ownable {
             }
 
             if (_shouldExecute(issueId, _target, _func, _args)) {
-                if (admins.length == 1) {
-                    variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
-                    return (true, ret);
-                }
                 _queueIssue(sender, issueId, _target, _func, _args);
                 return (false, issueId);
             } else {
