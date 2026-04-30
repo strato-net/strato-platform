@@ -21,8 +21,6 @@ library
       Blockchain.Strato.Model.Class
       Blockchain.Strato.Model.Code
       Blockchain.Strato.Model.CodePtr
-      Blockchain.Strato.Model.Delta
-      Blockchain.Strato.Model.Event
       Blockchain.Strato.Model.ExtendedWord
       Blockchain.Strato.Model.Gas
       Blockchain.Strato.Model.Host

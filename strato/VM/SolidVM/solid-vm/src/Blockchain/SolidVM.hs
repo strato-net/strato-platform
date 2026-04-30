@@ -53,8 +53,8 @@ import SolidVM.Solidity.StaticAnalysis.Typechecker (showType)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.Delta
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Delta
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
@@ -975,13 +975,10 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value ->
-                        (T.unpack name, value, if isTypeArray idxType then "Array" else "Other"))
-                     (CC._eventLogs ev) expStrs
-                where
-                  isTypeArray :: SVMType.Type -> Bool
-                  isTypeArray (SVMType.Array _ _) = True
-                  isTypeArray _ = False
+          let evArgs = zipWith3
+                        (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value valStr ->
+                          (T.unpack name, value, valStr, idxType))
+                        (CC._eventLogs ev) expVals expStrs
 
           multilineLog "event/emit/versioning" $
             boringBox
