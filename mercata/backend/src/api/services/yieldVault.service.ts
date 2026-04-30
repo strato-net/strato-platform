@@ -3,7 +3,12 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
-import { yieldBenchmarks, compositeYieldMap } from "../../config/config";
+import {
+  yieldBenchmarks,
+  compositeYieldMap,
+  OFF_CHAIN_DISPLAY_FLOOR_USD,
+  OFF_CHAIN_EVENT_WINDOW_DAYS,
+} from "../../config/config";
 import { getServiceToken } from "../../utils/authHelper";
 import { getOraclePrices } from "./oracle.service";
 import {
@@ -13,14 +18,24 @@ import {
   mergeBackfillRows,
   computeExchangeRateAPY,
 } from "../helpers/earnYield.helper";
+import { toUTCTime } from "../helpers/cirrusHelpers";
 import { FunctionInput } from "../../types/types";
 
-const { YieldVault, Token, CDPEngine, CDPRegistry, cdpRegistry, priceOracle } = constants;
+const {
+  YieldVault,
+  Token,
+  CDPEngine,
+  CDPRegistry,
+  cdpRegistry,
+  priceOracle,
+  mercataBridge,
+} = constants;
 
 const WAD = 10n ** 18n;
 const RAY = 10n ** 27n;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SECONDS_PER_YEAR = 31_536_000n;
+const MAX_DISPLAYED_OUTFLOWS = 5;
 
 /**
  * Maker-style fixed-point exponent — same algorithm as CDPEngine._rpow.
@@ -148,6 +163,28 @@ export interface YieldVaultStrategyHolding {
    * yields for any held asset, etc.).
    */
   baseApyPct: number | null;
+  /**
+   * USD value (1e18 WAD) of capital currently bridged out via MercataBridge
+   * within the rolling lookback window (`OFF_CHAIN_EVENT_WINDOW_DAYS`).
+   * Computed as: pooled outbound − pooled inbound at current oracle prices,
+   * clamped to ≥ 0. Subtracted from equity in the Base APY calc so the
+   * displayed APY reflects "yield on actually-productive equity".
+   */
+  offChainUsdWad: string;
+  /**
+   * Recent `WithdrawalCompleted` bridge-outs from this strategy within the
+   * lookback window (most-recent first, capped). Display-only — populated for
+   * UX transparency, not used in Base APY math (which uses the pooled total).
+   */
+  recentOutflows: RecentBridgeOutflow[];
+}
+
+export interface RecentBridgeOutflow {
+  tokenAddress: string;
+  tokenSymbol: string;
+  decimals: number;
+  amount: string;
+  timestampMs: number;
 }
 
 interface StrategyTokenBalance {
@@ -662,15 +699,24 @@ const computeStrategyBaseApyPct = (
   deployedAssets: bigint,
   composition: StrategyAsset[],
   cdpPositions: StrategyCdpPosition[],
-  ctx: StrategyApyContext
+  ctx: StrategyApyContext,
+  offChainUsdWad: bigint = 0n
 ): number | null => {
   if (deployedAssets <= 0n) return null;
   if (ctx.vaultAssetPriceWad <= 0n) return null;
 
-  // equity in USD WAD = deployedAssets × ETH/USD / 10^vaultAssetDecimals
+  // equity in USD WAD = deployedAssets × ETH/USD / 10^vaultAssetDecimals.
+  // Subtract off-chain capital so the APY ratio reflects yield earned on the
+  // currently-productive equity. Implicitly assumes the off-chain portion will
+  // earn whatever rate the on-chain portion is currently earning (self-
+  // consistent: rebasing the denominator while leaving the numerator alone).
   const vaultAssetUnit = 10n ** BigInt(ctx.vaultAssetDecimals);
   if (vaultAssetUnit === 0n) return null;
-  const equityUsdWad = (deployedAssets * ctx.vaultAssetPriceWad) / vaultAssetUnit;
+  const grossEquityUsdWad = (deployedAssets * ctx.vaultAssetPriceWad) / vaultAssetUnit;
+  const equityUsdWad =
+    offChainUsdWad > 0n && grossEquityUsdWad > offChainUsdWad
+      ? grossEquityUsdWad - offChainUsdWad
+      : grossEquityUsdWad;
   if (equityUsdWad <= 0n) return null;
 
   // Sum gross asset yield in USD/yr.
@@ -771,7 +817,11 @@ const getStrategyHoldings = async (
   // Resolve CDPEngine once for all strategies; per-strategy CDP queries reuse it.
   const cdpEngineAddress = await getCdpEngineAddress(accessToken);
 
-  const [tokenBalanceLists, cdpPositionLists] = await Promise.all([
+  // Off-chain capital tracking needs the priceMap that lives on apyCtx; if the
+  // caller didn't provide it, we just degrade to empty (no off-chain data).
+  const offChainPriceMap = apyCtx?.priceMap;
+
+  const [tokenBalanceLists, cdpPositionLists, offChainCapitalList] = await Promise.all([
     Promise.all(
       baseHoldings.map((h: { strategyAddress: string }) =>
         getStrategyTokenHoldings(accessToken, h.strategyAddress).catch(
@@ -788,6 +838,15 @@ const getStrategyHoldings = async (
           : Promise.resolve([] as StrategyCdpPosition[])
       )
     ),
+    Promise.all(
+      baseHoldings.map((h: { strategyAddress: string }) =>
+        offChainPriceMap
+          ? getStrategyOffChainCapital(accessToken, h.strategyAddress, offChainPriceMap).catch(
+              () => ({ offChainUsdWad: "0", recentOutflows: [] as RecentBridgeOutflow[] })
+            )
+          : Promise.resolve({ offChainUsdWad: "0", recentOutflows: [] as RecentBridgeOutflow[] })
+      )
+    ),
   ]);
 
   return baseHoldings.map(
@@ -797,6 +856,7 @@ const getStrategyHoldings = async (
         cdpPositionLists[i]
       );
       const usdstDebt = sumUsdstDebt(cdpPositionLists[i]);
+      const { offChainUsdWad, recentOutflows } = offChainCapitalList[i];
 
       let baseApyPct: number | null = null;
       if (apyCtx) {
@@ -806,12 +866,19 @@ const getStrategyHoldings = async (
         } catch {
           deployed = 0n;
         }
+        let offChainBig = 0n;
+        try {
+          offChainBig = BigInt(offChainUsdWad || "0");
+        } catch {
+          offChainBig = 0n;
+        }
         try {
           baseApyPct = computeStrategyBaseApyPct(
             deployed,
             composition,
             cdpPositionLists[i],
-            apyCtx
+            apyCtx,
+            offChainBig
           );
         } catch {
           baseApyPct = null;
@@ -823,6 +890,8 @@ const getStrategyHoldings = async (
         composition,
         usdstDebt,
         baseApyPct,
+        offChainUsdWad,
+        recentOutflows,
       };
     }
   );
@@ -911,6 +980,222 @@ const sumUsdstDebt = (cdpPositions: StrategyCdpPosition[]): string => {
     }
   }
   return total.toString();
+};
+
+/**
+ * Pooled off-chain capital tracking via MercataBridge events.
+ *
+ * For each strategy address, sums `WithdrawalRequested` (assets that left the
+ * strategy's wallet on Strato — bridge takes custody at request-time, *before*
+ * the L1 leg completes) minus `DepositCompleted` (assets that arrived back),
+ * within the last `OFF_CHAIN_EVENT_WINDOW_DAYS` days. `WithdrawalAborted`
+ * events are subtracted so refunded withdrawals don't get counted as off-chain.
+ *
+ * Both sides priced at *current* oracle prices, so a clean ETH→wstETH
+ * round-trip nets to ~$0 (the wstETH/ETH peg is enforced by the oracle).
+ *
+ * The window does the heavy lifting: it caps slippage residual accumulation
+ * (otherwise dozens of round-trips would compound into a phantom off-chain
+ * balance) and ages out stale unfinished bridges. Display floor in
+ * `OFF_CHAIN_DISPLAY_FLOOR_USD` is the noise cutoff for sub-cent oracle drift.
+ *
+ * Returns `{ offChainUsdWad, recentOutflows }`. `recentOutflows` is the most
+ * recent N non-aborted WithdrawalRequested events, used by the UI to show
+ * users *what* has been bridged out (informational only — the math uses the
+ * pooled total).
+ *
+ * Note on event field names (mind the schema differences):
+ *   WithdrawalRequested → attributes.user, attributes.token, attributes.stratoTokenAmount, attributes.withdrawalId
+ *   WithdrawalAborted   → attributes.withdrawalId
+ *   DepositCompleted    → attributes.stratoRecipient, attributes.stratoToken, attributes.stratoTokenAmount
+ */
+const getStrategyOffChainCapital = async (
+  serviceToken: string,
+  strategyAddress: string,
+  priceMap: Map<string, string>
+): Promise<{ offChainUsdWad: string; recentOutflows: RecentBridgeOutflow[] }> => {
+  const empty = { offChainUsdWad: "0", recentOutflows: [] as RecentBridgeOutflow[] };
+  if (!mercataBridge || !strategyAddress) return empty;
+
+  const cutoffMs = Date.now() - OFF_CHAIN_EVENT_WINDOW_DAYS * DAY_MS;
+  const cutoffStr = toUTCTime(new Date(cutoffMs));
+
+  const [outflowsRes, inflowsRes, abortedRes] = await Promise.all([
+    cirrus
+      .get(serviceToken, "/event", {
+        params: {
+          address: `eq.${mercataBridge}`,
+          event_name: "eq.WithdrawalRequested",
+          "attributes->>user": `eq.${strategyAddress}`,
+          block_timestamp: `gte.${cutoffStr}`,
+          select: "attributes,block_timestamp",
+          order: "block_timestamp.desc",
+        },
+      })
+      .catch(() => ({ data: [] as Array<Record<string, any>> })),
+    cirrus
+      .get(serviceToken, "/event", {
+        params: {
+          address: `eq.${mercataBridge}`,
+          event_name: "eq.DepositCompleted",
+          "attributes->>stratoRecipient": `eq.${strategyAddress}`,
+          block_timestamp: `gte.${cutoffStr}`,
+          select: "attributes,block_timestamp",
+        },
+      })
+      .catch(() => ({ data: [] as Array<Record<string, any>> })),
+    cirrus
+      .get(serviceToken, "/event", {
+        params: {
+          address: `eq.${mercataBridge}`,
+          event_name: "eq.WithdrawalAborted",
+          block_timestamp: `gte.${cutoffStr}`,
+          select: "attributes",
+        },
+      })
+      .catch(() => ({ data: [] as Array<Record<string, any>> })),
+  ]);
+
+  const allOutflows = (outflowsRes.data || []) as Array<{
+    attributes: Record<string, any>;
+    block_timestamp?: string;
+  }>;
+  const inflows = (inflowsRes.data || []) as Array<{
+    attributes: Record<string, any>;
+    block_timestamp?: string;
+  }>;
+  const abortedRows = (abortedRes.data || []) as Array<{
+    attributes: Record<string, any>;
+  }>;
+
+  // Build set of aborted withdrawalIds (as strings — IDs are uint256, may exceed Number safety).
+  const abortedIds = new Set<string>();
+  for (const e of abortedRows) {
+    const id = String(e.attributes?.withdrawalId ?? "").trim();
+    if (id) abortedIds.add(id);
+  }
+
+  // Drop any WithdrawalRequested that has a matching WithdrawalAborted in the window
+  // — those funds were refunded to the strategy and never left for real.
+  const outflows = allOutflows.filter((e) => {
+    const id = String(e.attributes?.withdrawalId ?? "").trim();
+    return !id || !abortedIds.has(id);
+  });
+
+  if (outflows.length === 0 && inflows.length === 0) return empty;
+
+  const tokenAddresses = new Set<string>();
+  for (const e of outflows) {
+    const addr = String(e.attributes?.token || "").trim();
+    if (addr) tokenAddresses.add(addr);
+  }
+  for (const e of inflows) {
+    const addr = String(e.attributes?.stratoToken || "").trim();
+    if (addr) tokenAddresses.add(addr);
+  }
+
+  const validAddresses = Array.from(tokenAddresses).filter((a) => a.length > 0);
+  const metaMap = new Map<string, { symbol: string; decimals: number }>();
+  if (validAddresses.length > 0) {
+    try {
+      const { data: tokenRows } = await cirrus.get(serviceToken, `/${Token}`, {
+        params: {
+          address: `in.(${validAddresses.join(",")})`,
+          select: "address,_symbol,customDecimals",
+        },
+      });
+      for (const row of (tokenRows || []) as Array<Record<string, unknown>>) {
+        const addr = String(row.address || "");
+        if (!addr) continue;
+        metaMap.set(addr, {
+          symbol: String(row._symbol || ""),
+          decimals: Number(row.customDecimals ?? 18),
+        });
+      }
+    } catch {
+      // proceed with empty metaMap; events without symbol/decimals are skipped
+    }
+  }
+
+  const sumUsdWad = (
+    events: Array<{ attributes: Record<string, any> }>,
+    tokenAttr: "token" | "stratoToken"
+  ) => {
+    let total = 0n;
+    for (const e of events) {
+      const tokenAddr = String(e.attributes?.[tokenAttr] || "").trim();
+      const amountStr = String(e.attributes?.stratoTokenAmount || "0");
+      if (!tokenAddr) continue;
+      const meta = metaMap.get(tokenAddr);
+      if (!meta) continue;
+      const priceStr =
+        priceMap.get(tokenAddr) || priceMap.get(tokenAddr.toLowerCase()) || "0";
+      let priceWad = 0n;
+      let amount = 0n;
+      try {
+        priceWad = BigInt(priceStr);
+        amount = BigInt(amountStr);
+      } catch {
+        continue;
+      }
+      if (priceWad <= 0n || amount <= 0n) continue;
+      const unit = 10n ** BigInt(meta.decimals);
+      if (unit === 0n) continue;
+      total += (amount * priceWad) / unit;
+    }
+    return total;
+  };
+
+  const outflowsUsdWad = sumUsdWad(outflows, "token");
+  const inflowsUsdWad = sumUsdWad(inflows, "stratoToken");
+  const offChainUsdWad =
+    outflowsUsdWad > inflowsUsdWad ? outflowsUsdWad - inflowsUsdWad : 0n;
+
+  // For the display list: only show outflows newer than the most-recent inflow.
+  // The mental model is "since the last time something came back, here's what's
+  // been sent out". The pooled USD math above is unchanged — this filter is
+  // display-only. (Edge case: when bridges interleave out-of-order, an older
+  // unmatched outflow can be hidden while the headline still shows it; rare.)
+  let lastInflowMs = 0;
+  for (const e of inflows) {
+    if (!e.block_timestamp) continue;
+    const ts = new Date(e.block_timestamp).getTime();
+    if (Number.isFinite(ts) && ts > lastInflowMs) lastInflowMs = ts;
+  }
+  const outflowsForDisplay = lastInflowMs > 0
+    ? outflows.filter((e) => {
+        if (!e.block_timestamp) return false;
+        const ts = new Date(e.block_timestamp).getTime();
+        return Number.isFinite(ts) && ts > lastInflowMs;
+      })
+    : outflows;
+
+  const recentOutflows: RecentBridgeOutflow[] = [];
+  for (const e of outflowsForDisplay.slice(0, MAX_DISPLAYED_OUTFLOWS)) {
+    const tokenAddr = String(e.attributes?.token || "").trim();
+    if (!tokenAddr) continue;
+    const meta = metaMap.get(tokenAddr);
+    const amountStr = String(e.attributes?.stratoTokenAmount || "0");
+    let timestampMs = 0;
+    try {
+      const ts = e.block_timestamp ? new Date(e.block_timestamp).getTime() : 0;
+      if (Number.isFinite(ts)) timestampMs = ts;
+    } catch {
+      timestampMs = 0;
+    }
+    recentOutflows.push({
+      tokenAddress: normalizeAddress(tokenAddr),
+      tokenSymbol: meta?.symbol || "",
+      decimals: meta?.decimals ?? 18,
+      amount: amountStr,
+      timestampMs,
+    });
+  }
+
+  return {
+    offChainUsdWad: offChainUsdWad.toString(),
+    recentOutflows,
+  };
 };
 
 const getFirstDepositDate = async (

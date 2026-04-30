@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatUnits } from "ethers";
+import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucide-react";
+
+// Mirrors backend OFF_CHAIN_DISPLAY_FLOOR_USD: hide the off-chain section when
+// the pooled value is below this so transient slippage/oracle dust doesn't
+// noise up the strategy card.
+const OFF_CHAIN_DISPLAY_FLOOR_USD = 100;
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -777,6 +783,55 @@ const EarnYieldVault = () => {
                                 Total USDST borrowed by this strategy across all CDP positions, accrued at the latest indexed rate.
                               </p>
                             </div>
+
+                            {(() => {
+                              const offChainUsd = Number(formatUnits(holding.offChainUsdWad || "0", 18));
+                              if (!Number.isFinite(offChainUsd) || offChainUsd < OFF_CHAIN_DISPLAY_FLOOR_USD) {
+                                return null;
+                              }
+                              const outflows = holding.recentOutflows || [];
+                              return (
+                                <div className="space-y-2">
+                                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Off-Chain Capital</p>
+                                  <div className="rounded-md border border-border/60 px-3 py-2 text-sm flex items-center justify-between">
+                                    <span className="font-medium text-foreground">In transit</span>
+                                    <span className="font-mono text-foreground">
+                                      ~{formatUsdAmount(holding.offChainUsdWad || "0")}
+                                    </span>
+                                  </div>
+                                  {outflows.length > 0 && (
+                                    <div className="rounded-md border border-border/60 divide-y divide-border/60">
+                                      <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        Recent bridge-outs
+                                      </div>
+                                      {outflows.map((outflow, idx) => (
+                                        <div
+                                          key={`${outflow.tokenAddress}-${outflow.timestampMs}-${idx}`}
+                                          className="flex items-center justify-between px-3 py-2 text-sm"
+                                        >
+                                          <span className="font-medium text-foreground">
+                                            {outflow.tokenSymbol || formatAddress(outflow.tokenAddress)}
+                                          </span>
+                                          <div className="flex flex-col items-end">
+                                            <span className="font-mono text-foreground">
+                                              {formatTokenAmount(outflow.amount, outflow.decimals)}
+                                            </span>
+                                            <span className="text-[11px] text-muted-foreground">
+                                              {outflow.timestampMs > 0
+                                                ? `bridged ${formatDistanceToNow(outflow.timestampMs, { addSuffix: true })}`
+                                                : "bridged recently"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <p className="text-[11px] text-muted-foreground">
+                                    Capital recently bridged out via MercataBridge that hasn&apos;t returned yet. Excluded from the equity used in Base APY so the rate reflects yield on currently-productive capital.
+                                  </p>
+                                </div>
+                              );
+                            })()}
                           </CardContent>
                         </Card>
                       ))}

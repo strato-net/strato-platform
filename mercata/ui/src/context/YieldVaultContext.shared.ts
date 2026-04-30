@@ -33,6 +33,14 @@ export type YieldVaultInfo = {
     }[];
     usdstDebt: string;
     baseApyPct: number | null;
+    offChainUsdWad: string;
+    recentOutflows: {
+      tokenAddress: string;
+      tokenSymbol: string;
+      decimals: number;
+      amount: string;
+      timestampMs: number;
+    }[];
   }[];
   maxDeploy: string;
   minIdleRequirement: string;
