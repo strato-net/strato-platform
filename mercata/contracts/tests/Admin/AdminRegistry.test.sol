@@ -111,10 +111,13 @@ contract Describe_AdminRegistry is Authorizable {
         TestERC20 singleAdminToken = new TestERC20("Single Admin Token", "SAT", address(singleRegistry));
         string memory issueId = singleRegistry.getIssueId(address(singleAdminToken), "mint", admin3, 1000e18);
         (bool executed, variadic result) = singleRegistry.castVoteOnIssue(address(singleAdminToken), "mint", admin3, 1000e18);
-        require(executed, "Single admin issue should execute immediately");
-        require(ERC20(singleAdminToken).balanceOf(admin3) == 1000e18, "Single admin token should mint immediately");
+        require(!executed, "Single admin issue should queue");
+        require(ERC20(singleAdminToken).balanceOf(admin3) == 0, "Single admin token should not mint before delay");
         (, uint executableAt,) = singleRegistry.timelocks(issueId);
-        require(executableAt == 0, "Single admin issue should not be queued");
+        require(executableAt == block.timestamp + 172800, "Single admin issue should be queued");
+        fastForward(172800);
+        singleRegistry.executeIssue(address(singleAdminToken), "mint", admin3, 1000e18);
+        require(ERC20(singleAdminToken).balanceOf(admin3) == 1000e18, "Single admin token should mint after delay");
     }
 
     // ============ BASIC VOTING TESTS ============
@@ -562,9 +565,9 @@ contract Describe_AdminRegistry is Authorizable {
         require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin");
 
         // Step 3: Admin1 calls the same issue again (adding admin3)
-        // Now with only 1 admin, 1 vote = 100%, so it executes immediately
-        (bool executed, variadic result) = adminRegistry.castVoteOnIssue(address(adminRegistry), "_addAdmin", admin3);
-        require(executed, "Single admin issue should execute immediately");
+        // Now with only 1 admin, 1 vote = 100% (exceeds 67% threshold), so it queues
+        adminRegistry.addAdmin(admin3);
+        executeQueued(address(adminRegistry), "_addAdmin", admin3);
 
         // Verify admin3 was added
         require(adminRegistry.isAdminAddress(admin3), "Admin3 should now be an admin");
@@ -631,9 +634,11 @@ contract Describe_AdminRegistry is Authorizable {
         // Step 2: Try to remove the last admin (admin1) - this should revert
         bool reverted = false;
         try {
-            // Since we're now the only admin, our single vote executes immediately
-            // But the _removeAdmin function should revert during execution
+            // Since we're now the only admin, our single vote queues immediately
+            // But the _removeAdmin function should revert before execution
             adminRegistry.removeAdmin(admin1);
+            fastForward(172800);
+            adminRegistry.executeIssue(address(adminRegistry), "_removeAdmin", admin1);
         } catch {
             reverted = true;
         }
