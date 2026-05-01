@@ -153,16 +153,35 @@ initBestBlockContext = do
 resolveFunction :: VMBase m => BlockHeader -> Address -> Address -> B.ByteString -> m (Maybe (SolidString, CC.Func))
 resolveFunction blockHeader fromAddr addr selector = do
   lookupContract blockHeader fromAddr addr >>= \case
-    Nothing -> return Nothing
-    Just contract -> case matchSelector contract selector of
-      Just hit -> return $ Just hit
-      Nothing -> case matchStorageGetter contract selector of
+    Nothing -> do
+      $logInfoS "resolveFunction" . T.pack $ "lookupContract returned Nothing for " ++ show addr
+      return Nothing
+    Just contract -> do
+      $logInfoS "resolveFunction" . T.pack $
+        "contract " ++ show (contract ^. CC.contractName)
+        ++ " funcs=" ++ show (M.keys $ CC._functions contract)
+        ++ " storageDefs=" ++ show (M.keys $ contract ^. CC.storageDefs)
+      case matchSelector contract selector of
         Just hit -> return $ Just hit
-        Nothing -> followProxy blockHeader fromAddr addr contract >>= \case
-          Nothing -> return Nothing
-          Just implContract -> return $
-            matchSelector implContract selector
-            <|> matchStorageGetter implContract selector
+        Nothing -> case matchStorageGetter contract selector of
+          Just hit -> do
+            $logInfoS "resolveFunction" "matched storage getter on direct contract"
+            return $ Just hit
+          Nothing -> do
+            $logInfoS "resolveFunction" "no direct match, trying proxy"
+            followProxy blockHeader fromAddr addr contract >>= \case
+              Nothing -> do
+                $logInfoS "resolveFunction" "followProxy returned Nothing"
+                return Nothing
+              Just implContract -> do
+                let result = matchSelector implContract selector
+                             <|> matchStorageGetter implContract selector
+                $logInfoS "resolveFunction" . T.pack $
+                  "impl contract " ++ show (implContract ^. CC.contractName)
+                  ++ " funcs=" ++ show (M.keys $ CC._functions implContract)
+                  ++ " storageDefs=" ++ show (M.keys $ implContract ^. CC.storageDefs)
+                  ++ " resolved=" ++ show (fmap (labelToText . fst) result)
+                return result
 
 lookupContract :: VMBase m => BlockHeader -> Address -> Address -> m (Maybe CC.Contract)
 lookupContract blockHeader fromAddr addr =
@@ -193,9 +212,18 @@ lookupContract blockHeader fromAddr addr =
           cc <- codeCollectionFromHash isRunningTests True codeHash
           return $ M.lookup (stringToLabel contractName) (cc ^. CC.contracts)
         case result of
-          Right val -> return val
-          Left _ -> return Nothing
-      _ -> return Nothing
+          Right val -> do
+            $logInfoS "lookupContract" . T.pack $
+              "loaded " ++ contractName ++ " => " ++ show (fmap (^. CC.contractName) val)
+            return val
+          Left e -> do
+            $logInfoS "lookupContract" . T.pack $
+              "runSM failed for " ++ show addr ++ " (" ++ contractName ++ "): " ++ show e
+            return Nothing
+      _ -> do
+        $logInfoS "lookupContract" . T.pack $
+          "non-SolidVM code at " ++ show addr ++ ": " ++ show (addressStateCodeHash addrState)
+        return Nothing
 
 followProxy :: VMBase m => BlockHeader -> Address -> Address -> CC.Contract -> m (Maybe CC.Contract)
 followProxy blockHeader fromAddr proxyAddr contract

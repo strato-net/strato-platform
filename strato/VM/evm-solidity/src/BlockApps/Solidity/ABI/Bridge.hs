@@ -145,6 +145,9 @@ encodeSingleValue (SVMType.Int (Just True) _) (SInteger n) = encodeInt256 n
 encodeSingleValue (SVMType.Int _ _) (SInteger n) = encodeUint256 n
 encodeSingleValue SVMType.Bool (SBool b) = encodeUint256 (if b then 1 else 0)
 encodeSingleValue (SVMType.Address _) (SAddress a _) = padLeft32 $ addressToByteString a
+encodeSingleValue (SVMType.Address _) (SContract _ a) = padLeft32 $ addressToByteString a
+encodeSingleValue (SVMType.Contract _) (SContract _ a) = padLeft32 $ addressToByteString a
+encodeSingleValue (SVMType.Contract _) (SAddress a _) = padLeft32 $ addressToByteString a
 encodeSingleValue (SVMType.String _) (SString s) =
   let bs = BC.pack s
    in encodeUint256 32 <> encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
@@ -153,6 +156,8 @@ encodeSingleValue (SVMType.Bytes _ Nothing) (SBytes bs) =
 encodeSingleValue (SVMType.Bytes _ (Just n)) (SBytes bs) =
   padLeft32 $ B.take (fromIntegral n) bs
 encodeSingleValue (SVMType.Enum _ _ _) (SEnumVal _ _ v) = encodeUint256 (fromIntegral v)
+encodeSingleValue _ (SContract _ a) = padLeft32 $ addressToByteString a
+encodeSingleValue _ (SAddress a _) = padLeft32 $ addressToByteString a
 encodeSingleValue _ (SInteger n) = encodeUint256 n
 encodeSingleValue _ _ = B.empty
 
