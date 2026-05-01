@@ -516,10 +516,13 @@ contract Describe_AdminRegistry is Authorizable {
         guardianRegistry.initialize(initialAdmins);
         TestERC20 guardianToken = new TestERC20("Guardian Token", "GT", address(guardianRegistry));
 
-        user1.do(address(guardianRegistry), "castVoteOnIssue", address(guardianRegistry), "setInstantFunction", address(guardianToken), "mint", true);
-        user3.do(address(guardianRegistry), "castVoteOnIssue", address(guardianRegistry), "setInstantFunction", address(guardianToken), "mint", true);
+        user1.do(address(guardianRegistry), "castVoteOnIssue", address(guardianRegistry), "_setGuardianAllowed", address(guardianToken), "mint", true);
+        user3.do(address(guardianRegistry), "castVoteOnIssue", address(guardianRegistry), "_setGuardianAllowed", address(guardianToken), "mint", true);
         fastForward(86400);
-        guardianRegistry.executeIssue(address(guardianRegistry), "setInstantFunction", address(guardianToken), "mint", true);
+        guardianRegistry.executeIssue(address(guardianRegistry), "_setGuardianAllowed", address(guardianToken), "mint", true);
+
+        require(guardianRegistry.instantFunctions(address(guardianToken), "mint"), "setGuardianAllowed(true) should auto-enable instant");
+        require(guardianRegistry.guardianAllowlist(address(guardianToken), "mint"), "guardianAllowlist should be true");
 
         string memory issueId = guardianRegistry.getIssueId(address(guardianToken), "mint", admin3, 1000e18);
         guardianToken.mint(admin3, 1000e18);
@@ -539,10 +542,10 @@ contract Describe_AdminRegistry is Authorizable {
         guardianRegistry.initialize(initialAdmins);
         TestERC20 guardianToken = new TestERC20("Guardian Token", "GT", address(guardianRegistry));
 
-        user1.do(address(guardianRegistry), "castVoteOnIssue", address(guardianRegistry), "setInstantFunction", address(guardianToken), "mint", true);
-        user3.do(address(guardianRegistry), "castVoteOnIssue", address(guardianRegistry), "setInstantFunction", address(guardianToken), "mint", true);
+        user1.do(address(guardianRegistry), "castVoteOnIssue", address(guardianRegistry), "_setGuardianAllowed", address(guardianToken), "mint", true);
+        user3.do(address(guardianRegistry), "castVoteOnIssue", address(guardianRegistry), "_setGuardianAllowed", address(guardianToken), "mint", true);
         fastForward(86400);
-        guardianRegistry.executeIssue(address(guardianRegistry), "setInstantFunction", address(guardianToken), "mint", true);
+        guardianRegistry.executeIssue(address(guardianRegistry), "_setGuardianAllowed", address(guardianToken), "mint", true);
 
         string memory issueId = guardianRegistry.getIssueId(address(guardianToken), "mint", admin3, 1000e18);
         (bool executed, variadic result) = guardianRegistry.castVoteOnIssue(address(guardianToken), "mint", admin3, 1000e18);
@@ -1022,6 +1025,442 @@ contract Describe_AdminRegistry is Authorizable {
             reverted = true;
         }
         require(reverted, "Should revert when trying to dismiss non-existent issue");
+    }
+
+    // ============ GUARDIAN TESTS ============
+
+    function it_guardian_add_requires_quorum_and_timelock() {
+        adminRegistry.addGuardian(address(user2));
+        require(!adminRegistry.isGuardian(address(user2)), "Should not be guardian with one vote");
+        require(adminRegistry.guardianMap(address(user2)) == 0, "guardianMap should be 0");
+
+        user1.do(address(adminRegistry), "addGuardian", address(user2));
+        string memory issueId = adminRegistry.getIssueId(address(adminRegistry), "_addGuardian", address(user2));
+        require(issueExecutableAt(issueId) != 0, "Issue should be queued");
+        require(!adminRegistry.isGuardian(address(user2)), "Should not be guardian before timelock");
+
+        executeQueued(address(adminRegistry), "_addGuardian", address(user2));
+        require(adminRegistry.isGuardian(address(user2)), "Should be guardian after execution");
+        require(adminRegistry.guardianMap(address(user2)) > 0, "guardianMap should be set");
+        require(adminRegistry.guardians(0) == address(user2), "guardians array should include user2");
+    }
+
+    function it_guardian_remove_requires_quorum_and_timelock() {
+        adminRegistry.addGuardian(address(user2));
+        user1.do(address(adminRegistry), "addGuardian", address(user2));
+        executeQueued(address(adminRegistry), "_addGuardian", address(user2));
+        require(adminRegistry.isGuardian(address(user2)), "Precondition: guardian added");
+
+        adminRegistry.removeGuardian(address(user2));
+        require(adminRegistry.isGuardian(address(user2)), "Should remain guardian with one vote");
+        user1.do(address(adminRegistry), "removeGuardian", address(user2));
+        executeQueued(address(adminRegistry), "_removeGuardian", address(user2));
+        require(!adminRegistry.isGuardian(address(user2)), "Should not be guardian after execution");
+        require(adminRegistry.guardianMap(address(user2)) == 0, "guardianMap should be cleared");
+    }
+
+    function it_guardian_add_rejects_admin() {
+        adminRegistry.addGuardian(admin1);
+        user1.do(address(adminRegistry), "addGuardian", admin1);
+
+        bool reverted = false;
+        try {
+            fastForward(86400);
+            adminRegistry.executeIssue(address(adminRegistry), "_addGuardian", admin1);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject adding admin as guardian");
+        require(!adminRegistry.isGuardian(admin1), "Admin should not become guardian");
+    }
+
+    function it_admin_add_rejects_guardian() {
+        adminRegistry.addGuardian(address(user2));
+        user1.do(address(adminRegistry), "addGuardian", address(user2));
+        executeQueued(address(adminRegistry), "_addGuardian", address(user2));
+        require(adminRegistry.isGuardian(address(user2)), "Precondition: user2 is guardian");
+
+        adminRegistry.addAdmin(address(user2));
+        user1.do(address(adminRegistry), "addAdmin", address(user2));
+
+        bool reverted = false;
+        try {
+            fastForward(86400);
+            adminRegistry.executeIssue(address(adminRegistry), "_addAdmin", address(user2));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject adding guardian as admin");
+        require(!adminRegistry.isAdminAddress(address(user2)), "Guardian should not become admin");
+    }
+
+    function it_guardian_allowlist_cannot_target_adminregistry() {
+        adminRegistry.setGuardianAllowed(address(adminRegistry), "_addAdmin", true);
+        user1.do(address(adminRegistry), "setGuardianAllowed", address(adminRegistry), "_addAdmin", true);
+
+        bool reverted = false;
+        try {
+            fastForward(86400);
+            adminRegistry.executeIssue(address(adminRegistry), "_setGuardianAllowed", address(adminRegistry), "_addAdmin", true);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject self-targeting guardian allowlist");
+        require(!adminRegistry.guardianAllowlist(address(adminRegistry), "_addAdmin"), "Self-target allowlist should remain false");
+    }
+
+    function it_whitelist_forbidden_list_refuses_addGuardian() {
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(adminRegistry), "_addGuardian", address(user2));
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "addWhitelist", address(adminRegistry), "_addGuardian", address(user2));
+
+        bool reverted = false;
+        try {
+            fastForward(86400);
+            adminRegistry.executeIssue(address(adminRegistry), "addWhitelist", address(adminRegistry), "_addGuardian", address(user2));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject whitelisting _addGuardian");
+        require(!adminRegistry.whitelist(address(adminRegistry), "_addGuardian", address(user2)), "Whitelist should remain false");
+    }
+
+    function it_whitelist_forbidden_list_refuses_removeGuardian() {
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(adminRegistry), "_removeGuardian", address(user2));
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "addWhitelist", address(adminRegistry), "_removeGuardian", address(user2));
+
+        bool reverted = false;
+        try {
+            fastForward(86400);
+            adminRegistry.executeIssue(address(adminRegistry), "addWhitelist", address(adminRegistry), "_removeGuardian", address(user2));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject whitelisting _removeGuardian");
+        require(!adminRegistry.whitelist(address(adminRegistry), "_removeGuardian", address(user2)), "Whitelist should remain false");
+    }
+
+    function it_whitelist_forbidden_list_refuses_setGuardianAllowed() {
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(adminRegistry), "_setGuardianAllowed", address(user2));
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "addWhitelist", address(adminRegistry), "_setGuardianAllowed", address(user2));
+
+        bool reverted = false;
+        try {
+            fastForward(86400);
+            adminRegistry.executeIssue(address(adminRegistry), "addWhitelist", address(adminRegistry), "_setGuardianAllowed", address(user2));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject whitelisting _setGuardianAllowed");
+        require(!adminRegistry.whitelist(address(adminRegistry), "_setGuardianAllowed", address(user2)), "Whitelist should remain false");
+    }
+
+    function it_setGuardianAllowed_true_auto_enables_instant() {
+        require(!adminRegistry.instantFunctions(address(token), "mint"), "Precondition: instant off");
+        require(!adminRegistry.guardianAllowlist(address(token), "mint"), "Precondition: allowlist off");
+
+        adminRegistry.setGuardianAllowed(address(token), "mint", true);
+        user1.do(address(adminRegistry), "setGuardianAllowed", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "_setGuardianAllowed", address(token), "mint", true);
+
+        require(adminRegistry.instantFunctions(address(token), "mint"), "Instant should be auto-enabled");
+        require(adminRegistry.guardianAllowlist(address(token), "mint"), "Allowlist should be set");
+    }
+
+    function it_setGuardianAllowed_false_preserves_instant() {
+        adminRegistry.setGuardianAllowed(address(token), "mint", true);
+        user1.do(address(adminRegistry), "setGuardianAllowed", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "_setGuardianAllowed", address(token), "mint", true);
+
+        require(adminRegistry.instantFunctions(address(token), "mint"), "Precondition: instant on");
+        require(adminRegistry.guardianAllowlist(address(token), "mint"), "Precondition: allowlist on");
+
+        adminRegistry.setGuardianAllowed(address(token), "mint", false);
+        user1.do(address(adminRegistry), "setGuardianAllowed", address(token), "mint", false);
+        executeQueued(address(adminRegistry), "_setGuardianAllowed", address(token), "mint", false);
+
+        require(adminRegistry.instantFunctions(address(token), "mint"), "Instant should be preserved on demotion");
+        require(!adminRegistry.guardianAllowlist(address(token), "mint"), "Allowlist should be cleared");
+    }
+
+    function it_setInstantFunction_false_does_not_clear_guardianAllowlist() {
+        adminRegistry.setGuardianAllowed(address(token), "mint", true);
+        user1.do(address(adminRegistry), "setGuardianAllowed", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "_setGuardianAllowed", address(token), "mint", true);
+
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setInstantFunction", address(token), "mint", false);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setInstantFunction", address(token), "mint", false);
+        executeQueued(address(adminRegistry), "setInstantFunction", address(token), "mint", false);
+
+        require(!adminRegistry.instantFunctions(address(token), "mint"), "Instant should be off");
+        require(adminRegistry.guardianAllowlist(address(token), "mint"), "Allowlist should be preserved");
+    }
+
+    function it_admin_only_instant_excludes_guardian() {
+        // Enable instant only (no guardian allowlist)
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+
+        require(adminRegistry.instantFunctions(address(token), "mint"), "Precondition: instant on");
+        require(!adminRegistry.guardianAllowlist(address(token), "mint"), "Precondition: allowlist off");
+
+        // Add user2 as guardian
+        adminRegistry.addGuardian(address(user2));
+        user1.do(address(adminRegistry), "addGuardian", address(user2));
+        executeQueued(address(adminRegistry), "_addGuardian", address(user2));
+        require(adminRegistry.isGuardian(address(user2)), "Precondition: user2 is guardian");
+
+        // Admin executes instantly (1-of-N)
+        token.mint(admin3, 1000e18);
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Admin should execute admin-only instant");
+
+        // Guardian on a different issueId reverts
+        bool reverted = false;
+        try {
+            user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 500e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Guardian should not execute admin-only instant");
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Guardian mint should not have executed");
+    }
+
+    // ============ GUARDIAN AUTHORITY BOUNDARY TESTS ============
+
+    function addGuardianViaQuorum(address _guardian) internal {
+        adminRegistry.addGuardian(_guardian);
+        user1.do(address(adminRegistry), "addGuardian", _guardian);
+        executeQueued(address(adminRegistry), "_addGuardian", _guardian);
+        require(adminRegistry.isGuardian(_guardian), "Precondition: guardian added");
+    }
+
+    function it_guardian_cannot_propose_admin_management() {
+        addGuardianViaQuorum(address(user2));
+
+        bool addReverted = false;
+        try {
+            user2.do(address(adminRegistry), "addAdmin", admin3);
+        } catch {
+            addReverted = true;
+        }
+        require(addReverted, "Guardian must not propose addAdmin");
+
+        bool removeReverted = false;
+        try {
+            user2.do(address(adminRegistry), "removeAdmin", admin1);
+        } catch {
+            removeReverted = true;
+        }
+        require(removeReverted, "Guardian must not propose removeAdmin");
+
+        bool swapReverted = false;
+        try {
+            user2.do(address(adminRegistry), "swapAdmin", admin1, admin3);
+        } catch {
+            swapReverted = true;
+        }
+        require(swapReverted, "Guardian must not propose swapAdmin");
+
+        string memory addIssueId = adminRegistry.getIssueId(address(adminRegistry), "_addAdmin", admin3);
+        require(!adminRegistry.currentIssues(addIssueId), "Guardian should not create admin proposals");
+    }
+
+    function it_guardian_cannot_propose_guardian_management() {
+        addGuardianViaQuorum(address(user2));
+
+        bool addGuardianReverted = false;
+        try {
+            user2.do(address(adminRegistry), "addGuardian", address(user3));
+        } catch {
+            addGuardianReverted = true;
+        }
+        require(addGuardianReverted, "Guardian must not propose addGuardian");
+
+        bool removeGuardianReverted = false;
+        try {
+            user2.do(address(adminRegistry), "removeGuardian", address(user2));
+        } catch {
+            removeGuardianReverted = true;
+        }
+        require(removeGuardianReverted, "Guardian must not propose self-removal");
+
+        bool setAllowedReverted = false;
+        try {
+            user2.do(address(adminRegistry), "setGuardianAllowed", address(token), "mint", true);
+        } catch {
+            setAllowedReverted = true;
+        }
+        require(setAllowedReverted, "Guardian must not propose setGuardianAllowed");
+
+        string memory addIssueId = adminRegistry.getIssueId(address(adminRegistry), "_addGuardian", address(user3));
+        require(!adminRegistry.currentIssues(addIssueId), "Guardian should not create guardian proposals");
+    }
+
+    function it_guardian_cannot_propose_setInstantFunction() {
+        addGuardianViaQuorum(address(user2));
+
+        bool reverted = false;
+        try {
+            user2.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Guardian must not propose setInstantFunction");
+        require(!adminRegistry.instantFunctions(address(token), "mint"), "instantFunctions should remain false");
+    }
+
+    function it_guardian_cannot_vote_on_non_instant_issue() {
+        addGuardianViaQuorum(address(user2));
+
+        bool reverted = false;
+        try {
+            user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Guardian must not vote on non-instant function");
+
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+        require(!adminRegistry.currentIssues(issueId), "Issue should not be created by guardian");
+        require(adminRegistry.votesMap(issueId, address(user2)) == 0, "Guardian vote must not be recorded");
+    }
+
+    function it_addGuardian_rejects_zero_address() {
+        adminRegistry.addGuardian(zeroAddress);
+        user1.do(address(adminRegistry), "addGuardian", zeroAddress);
+
+        bool reverted = false;
+        try {
+            fastForward(86400);
+            adminRegistry.executeIssue(address(adminRegistry), "_addGuardian", zeroAddress);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject zero address guardian");
+        require(!adminRegistry.isGuardian(zeroAddress), "Zero address should not be guardian");
+    }
+
+    function it_addGuardian_rejects_duplicate() {
+        addGuardianViaQuorum(address(user2));
+
+        adminRegistry.addGuardian(address(user2));
+        user1.do(address(adminRegistry), "addGuardian", address(user2));
+
+        bool reverted = false;
+        try {
+            fastForward(86400);
+            adminRegistry.executeIssue(address(adminRegistry), "_addGuardian", address(user2));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject duplicate guardian");
+        require(adminRegistry.guardianMap(address(user2)) == 1, "guardianMap index should remain 1");
+        require(adminRegistry.guardians(1) == address(0), "guardians array length should remain 1");
+    }
+
+    function it_removeGuardian_rejects_non_guardian() {
+        adminRegistry.removeGuardian(address(user2));
+        user1.do(address(adminRegistry), "removeGuardian", address(user2));
+
+        bool reverted = false;
+        try {
+            fastForward(86400);
+            adminRegistry.executeIssue(address(adminRegistry), "_removeGuardian", address(user2));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject removing non-guardian");
+    }
+
+    function it_setGuardianAllowed_true_when_instant_already_enabled() {
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+
+        require(adminRegistry.instantFunctions(address(token), "mint"), "Precondition: instant on");
+        require(!adminRegistry.guardianAllowlist(address(token), "mint"), "Precondition: allowlist off");
+
+        adminRegistry.setGuardianAllowed(address(token), "mint", true);
+        user1.do(address(adminRegistry), "setGuardianAllowed", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "_setGuardianAllowed", address(token), "mint", true);
+
+        require(adminRegistry.instantFunctions(address(token), "mint"), "Instant should remain on");
+        require(adminRegistry.guardianAllowlist(address(token), "mint"), "Allowlist should be set");
+    }
+
+    function it_guardian_access_restored_after_instant_re_enabled() {
+        addGuardianViaQuorum(address(user2));
+
+        adminRegistry.setGuardianAllowed(address(token), "mint", true);
+        user1.do(address(adminRegistry), "setGuardianAllowed", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "_setGuardianAllowed", address(token), "mint", true);
+
+        // Guardian initially can execute
+        user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 100e18);
+        require(ERC20(token).balanceOf(admin3) == 100e18, "Guardian should mint after allowlist enabled");
+
+        // Admin disables instant (allowlist preserved)
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setInstantFunction", address(token), "mint", false);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setInstantFunction", address(token), "mint", false);
+        executeQueued(address(adminRegistry), "setInstantFunction", address(token), "mint", false);
+
+        require(!adminRegistry.instantFunctions(address(token), "mint"), "Instant disabled");
+        require(adminRegistry.guardianAllowlist(address(token), "mint"), "Allowlist preserved");
+
+        // Guardian access blocked while instant is off
+        bool blocked = false;
+        try {
+            user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 200e18);
+        } catch {
+            blocked = true;
+        }
+        require(blocked, "Guardian should be blocked while instant disabled");
+        require(ERC20(token).balanceOf(admin3) == 100e18, "Balance unchanged while blocked");
+
+        // Admin re-enables instant — guardian regains access without re-allowlisting
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "setInstantFunction", address(token), "mint", true);
+
+        user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 300e18);
+        require(ERC20(token).balanceOf(admin3) == 400e18, "Guardian should regain access");
+    }
+
+    function it_guardian_remove_blocks_subsequent_execution() {
+        addGuardianViaQuorum(address(user2));
+
+        adminRegistry.setGuardianAllowed(address(token), "mint", true);
+        user1.do(address(adminRegistry), "setGuardianAllowed", address(token), "mint", true);
+        executeQueued(address(adminRegistry), "_setGuardianAllowed", address(token), "mint", true);
+
+        user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Guardian should mint while authorized");
+
+        adminRegistry.removeGuardian(address(user2));
+        user1.do(address(adminRegistry), "removeGuardian", address(user2));
+        executeQueued(address(adminRegistry), "_removeGuardian", address(user2));
+        require(!adminRegistry.isGuardian(address(user2)), "Precondition: guardian removed");
+
+        bool reverted = false;
+        try {
+            user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Removed guardian must not execute");
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Removed guardian mint should not execute");
+    }
+
+    function it_setGuardianAllowed_false_when_already_false() {
+        require(!adminRegistry.guardianAllowlist(address(token), "mint"), "Precondition: allowlist off");
+        require(!adminRegistry.instantFunctions(address(token), "mint"), "Precondition: instant off");
+
+        adminRegistry.setGuardianAllowed(address(token), "mint", false);
+        user1.do(address(adminRegistry), "setGuardianAllowed", address(token), "mint", false);
+        executeQueued(address(adminRegistry), "_setGuardianAllowed", address(token), "mint", false);
+
+        require(!adminRegistry.guardianAllowlist(address(token), "mint"), "Allowlist should remain false");
+        require(!adminRegistry.instantFunctions(address(token), "mint"), "Instant should remain false (no auto-enable on disable)");
     }
 
 }
