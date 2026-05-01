@@ -22,6 +22,8 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.ExecResults (ExecResults (..))
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.HexData (HexData (..))
+import qualified Data.Binary as Bin
+import qualified Data.ByteString.Lazy as BL
 import qualified Blockchain.Sequencer.TxCallObject as TxCall
 import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromHash)
@@ -54,22 +56,22 @@ import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPie
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format (format)
 
-produceResponse :: HasKafka m => String -> B.ByteString -> m ()
-produceResponse id theData = void $ produceItems "jsonrpcresponse" [(id, theData)]
+produceResponse :: HasKafka m => JsonRpcResponse -> m ()
+produceResponse resp = void $ produceItems "jsonrpcresponse" [(responseId resp, BL.toStrict $ Bin.encode resp)]
 
 runJsonRpcCommand :: (VMBase m, HasKafka m) => JsonRpcCommand -> m ()
 runJsonRpcCommand =
-  uncurry produceResponse
+  produceResponse
     <=< runJsonRpcCommand'
 
-runJsonRpcCommand' :: VMBase m => JsonRpcCommand -> m (String, B.ByteString)
+runJsonRpcCommand' :: VMBase m => JsonRpcCommand -> m JsonRpcResponse
 runJsonRpcCommand' c@JRCGetBalance {jrcAddress = address, jrcId = id} = do
   $logInfoS "runJsonRpcCommand'.JRCGetBalance" . T.pack $ "running command: " ++ show c
   response <-
     show . addressStateBalance
       <$> A.lookupWithDefault (A.Proxy @AddressState) address
   $logInfoS "runJsonRpcCommand'.JRCGetBalance" $ T.pack response
-  return (id, BC.pack response)
+  return $ Success id (BC.pack response)
 runJsonRpcCommand' c@JRCGetCode {jrcAddress = address, jrcId = id} = do
   $logInfoS "runJsonRpcCommand'.JRCGetCode" . T.pack $ "running command: " ++ show c
   codeHash <-
@@ -79,19 +81,19 @@ runJsonRpcCommand' c@JRCGetCode {jrcAddress = address, jrcId = id} = do
     case codeHash of
       ExternallyOwned ch -> ch
       _ -> error "runJsonRpcCommand currently only supported for the EVM"
-  return (id, code)
+  return $ Success id code
 runJsonRpcCommand' c@JRCGetTransactionCount {jrcAddress = address, jrcId = id} = do
   $logInfoS "runJsonRpcCommand'.JRCGetTransactionCount" . T.pack $ "running command: " ++ show c
   response <-
     show . addressStateNonce
       <$> A.lookupWithDefault (A.Proxy @AddressState) address
   $logInfoS "runJsonRpcCommand'.JRCGetTransactionCount" $ T.pack response
-  return (id, BC.pack response)
+  return $ Success id (BC.pack response)
 runJsonRpcCommand' JRCGetStorageAt {} = error "unsupported RPC command call"
 runJsonRpcCommand' c@(JRCCall callObj id _blockTag) = do
   $logInfoS "JRCCall" . T.pack $ format c
   case TxCall.to callObj of
-    Nothing -> return (id, B.empty)
+    Nothing -> return $ Success id B.empty
     Just toAddr -> do
       initBestBlockContext
       ethCall id (TxCall.from callObj) toAddr (unHexData $ TxCall.data_ callObj)
@@ -100,7 +102,7 @@ runJsonRpcCommand' c@(JRCCall callObj id _blockTag) = do
 -- eth_call: resolve contract, match selector, invoke SolidVM, encode return
 --------------------------------------------------------------------------------
 
-ethCall :: VMBase m => String -> Address -> Address -> B.ByteString -> m (String, B.ByteString)
+ethCall :: VMBase m => String -> Address -> Address -> B.ByteString -> m JsonRpcResponse
 ethCall id fromAddr toAddr callData = do
   let selector = B.take 4 callData
       argsBytes = B.drop 4 callData
@@ -112,7 +114,7 @@ ethCall id fromAddr toAddr callData = do
   resolveFunction blockHeader fromAddr toAddr selector >>= \case
     Nothing -> do
       $logInfoS "ethCall" . T.pack $ "no function for selector " ++ BC.unpack (B16.encode selector)
-      return (id, B.empty)
+      return $ Error id ("no function for selector 0x" ++ BC.unpack (B16.encode selector))
     Just (funcName, func) -> do
       let argTypes = funcArgTypes func
           retTypes = funcRetTypes func
@@ -128,15 +130,15 @@ ethCall id fromAddr toAddr callData = do
       case erException result of
         Just ex -> do
           $logInfoS "ethCall" . T.pack $ prettyCall ++ " => EXCEPTION: " ++ show ex
-          return (id, B.empty)
+          return $ Error id (show ex)
         Nothing -> case erReturnVal result of
           Nothing -> do
             $logInfoS "ethCall" . T.pack $ prettyCall ++ " => (no return value)"
-            return (id, B.empty)
+            return $ Success id B.empty
           Just retVal -> do
             let encoded = encodeValueABI retTypes retVal
             $logInfoS "ethCall" . T.pack $ prettyCall ++ " => " ++ show retVal
-            return (id, encoded)
+            return $ Success id encoded
 
 initBestBlockContext :: VMBase m => m ()
 initBestBlockContext = do
