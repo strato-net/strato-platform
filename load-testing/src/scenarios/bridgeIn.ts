@@ -2,41 +2,24 @@ import { BaseScenario } from "./base";
 import { NodeClients } from "../api/client";
 import { runRateLimited } from "../concurrency";
 import { ScenarioResult, TxMetric } from "../types";
-
-/**
- * Minimal ABI for the Mercata DepositRouter contract deployed on Ethereum
- * Sepolia. See mercata/ethereum/contracts/bridge/DepositRouter.sol.
- *
- * DepositRouted event signature (topic0):
- *   0x55426533b384af6fcfee0e834a6407e3ffc370a0b1b53400c4e6ec92d7f1f750
- */
-const DEPOSIT_ROUTER_ABI = [
-  "function depositETH(address stratoAddress, address targetStratoToken) external payable",
-  "function deposit(address token, uint256 amount, address stratoAddress, address targetStratoToken, uint256 nonce, uint256 deadline, bytes calldata signature) external",
-  "event DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)",
-];
-
-function normalizeStratoAddress(addr: string): string {
-  const hex = addr.replace(/^0x/, "").toLowerCase();
-  if (hex.length !== 40) {
-    throw new Error(`Expected 40-hex-char STRATO address, got: ${addr}`);
-  }
-  return `0x${hex}`;
-}
+import {
+  SepoliaBroadcaster,
+  normalizeAddress0x,
+} from "../tx/sepoliaBroadcast";
 
 /**
  * Scenario 4 — Ethereum Sepolia → STRATO bridge-in.
  *
  * For each iteration:
- *   1. Sign and broadcast a DepositRouter.depositETH(...) (or .deposit(...))
- *      transaction on Sepolia.
+ *   1. Sign and broadcast a DepositRouter.depositETH(...) transaction on
+ *      Sepolia (sequential nonces from a single signer).
  *   2. Optionally await Sepolia confirmation.
- *   3. Optionally poll the STRATO backend for the corresponding mint / voucher
- *      credit that the bridge service applies after detecting DepositRouted.
+ *   3. The bridge service (mercata/services/bridge) detects DepositRouted
+ *      events via eth_getLogs and calls MercataBridge.depositBatch on STRATO
+ *      asynchronously — that side is monitored out of band.
  *
- * The flow mirrors mercata/services/bridge/src/polling/alchemyPolling.ts which
- * detects DepositRouted events via eth_getLogs and calls
- * MercataBridge.depositBatch on STRATO.
+ * The on-chain broadcast logic is shared with Scenario 1's `bridge` sub-config
+ * via `src/tx/sepoliaBroadcast.ts`.
  */
 export class BridgeInScenario extends BaseScenario {
   name(): string {
@@ -52,50 +35,37 @@ export class BridgeInScenario extends BaseScenario {
     if (!cfg.stratoRecipientAddress) throw new Error("bridgeIn: stratoRecipientAddress is required");
     if (!cfg.targetStratoToken) throw new Error("bridgeIn: targetStratoToken is required");
 
-    // Lazy import ethers so scenarios 1–3 don't require it at startup.
-    let ethers: any;
-    try {
-      ethers = require("ethers");
-    } catch (err: any) {
+    const mode = cfg.depositMode ?? "ETH";
+    if (mode !== "ETH") {
       throw new Error(
-        "bridgeIn: 'ethers' is not installed. Run `npm install` in load-testing/.",
+        `bridgeIn: depositMode=${mode} is not yet supported (ERC20 requires Permit2 signing). Use depositMode: ETH.`,
       );
     }
 
-    const provider = new ethers.JsonRpcProvider(cfg.sepoliaRpcUrl, cfg.sepoliaChainId);
-    const wallet = new ethers.Wallet(cfg.sepoliaPrivateKey, provider);
-    const router = new ethers.Contract(cfg.depositRouterAddress, DEPOSIT_ROUTER_ABI, wallet);
+    const broadcaster = new SepoliaBroadcaster({
+      rpcUrl: cfg.sepoliaRpcUrl,
+      privateKey: cfg.sepoliaPrivateKey,
+      depositRouterAddress: cfg.depositRouterAddress,
+      chainId: cfg.sepoliaChainId,
+      gasLimit: cfg.gasLimit,
+      maxFeePerGasGwei: cfg.maxFeePerGasGwei,
+      maxPriorityFeePerGasGwei: cfg.maxPriorityFeePerGasGwei,
+      startNonce: cfg.startNonce,
+    });
+    await broadcaster.init();
 
-    const stratoRecipient = normalizeStratoAddress(cfg.stratoRecipientAddress);
-    const targetStratoToken = normalizeStratoAddress(cfg.targetStratoToken);
-    const amount = BigInt(cfg.amountPerTx);
-    const gasLimit = BigInt(cfg.gasLimit ?? 250000);
-    const mode = cfg.depositMode ?? "ETH";
+    const stratoRecipient = normalizeAddress0x(cfg.stratoRecipientAddress);
+    const targetStratoToken = normalizeAddress0x(cfg.targetStratoToken);
+    const amount = cfg.amountPerTx;
 
     console.log(
-      `[bridgeIn] wallet=${wallet.address} mode=${mode} amount=${amount.toString()} wei ` +
+      `[bridgeIn] wallet=${broadcaster.walletAddress} mode=${mode} amount=${amount} wei ` +
         `-> strato=${stratoRecipient} token=${targetStratoToken}`,
     );
-
-    // Pre-fetch starting nonce so concurrent dispatches use sequential nonces
-    // instead of racing the provider's pending-nonce cache.
-    const startNonce =
-      cfg.startNonce !== undefined
-        ? cfg.startNonce
-        : await provider.getTransactionCount(wallet.address, "pending");
-
-    const feeData = await provider.getFeeData();
-    const maxFeePerGas =
-      cfg.maxFeePerGasGwei !== undefined
-        ? ethers.parseUnits(String(cfg.maxFeePerGasGwei), "gwei")
-        : feeData.maxFeePerGas ?? ethers.parseUnits("30", "gwei");
-    const maxPriorityFeePerGas =
-      cfg.maxPriorityFeePerGasGwei !== undefined
-        ? ethers.parseUnits(String(cfg.maxPriorityFeePerGasGwei), "gwei")
-        : feeData.maxPriorityFeePerGas ?? ethers.parseUnits("2", "gwei");
-
     console.log(
-      `[bridgeIn] nonce base=${startNonce}, maxFeePerGas=${maxFeePerGas.toString()}, priority=${maxPriorityFeePerGas.toString()}`,
+      `[bridgeIn] nonce base=${broadcaster.startNonce}, ` +
+        `maxFeePerGas=${broadcaster.maxFeePerGas.toString()}, ` +
+        `priority=${broadcaster.maxPriorityFeePerGas.toString()}`,
     );
 
     const nodeName = clients.nodeName;
@@ -108,72 +78,37 @@ export class BridgeInScenario extends BaseScenario {
       cfg.timeWindowMs,
       Math.min(cfg.totalBridgeIns, 20),
       async (i) => {
-        const nonce = startNonce + i;
         const submitTime = Date.now();
-        let txHash = `bridge:${i}`;
-        let submitDuration = 0;
-        let confirmDuration = 0;
-        let status: TxMetric["status"] = "submitted";
-        let error: string | undefined;
-
-        try {
-          const overrides: any = {
-            nonce,
-            gasLimit,
-            maxFeePerGas,
-            maxPriorityFeePerGas,
-          };
-
-          let tx;
-          if (mode === "ETH") {
-            overrides.value = amount;
-            tx = await router.depositETH(stratoRecipient, targetStratoToken, overrides);
-          } else {
-            // ERC20 mode requires a Permit2 signature for gasless approve+pull.
-            // For a load test we accept a pre-computed signature via a config
-            // extension (not implemented here) — fall through to error.
-            throw new Error(
-              "ERC20 deposit mode requires Permit2 signing (not yet implemented; use depositMode: ETH)",
-            );
-          }
-          txHash = tx.hash;
-          submitDuration = Date.now() - submitTime;
-
-          if (cfg.awaitSepoliaConfirmation) {
-            const confirmStart = Date.now();
-            const receipt = await tx.wait();
-            confirmDuration = Date.now() - confirmStart;
-            status = receipt && receipt.status === 1 ? "confirmed" : "failed";
-            if (status === "failed") error = `Sepolia receipt status=${receipt?.status}`;
-          } else {
-            status = "submitted";
-          }
-        } catch (err: any) {
-          submitDuration = Date.now() - submitTime;
-          status = "failed";
-          error = err.shortMessage || err.reason || err.message || String(err);
-        }
+        const result = await broadcaster.broadcastDepositETH({
+          nonceOffset: i,
+          stratoRecipient,
+          targetStratoToken,
+          amountWei: amount,
+          awaitConfirmation: cfg.awaitSepoliaConfirmation === true,
+        });
 
         const metric: TxMetric = {
-          txHash,
+          txHash: result.txHash,
           nodeName,
           scenario,
           batchIndex: Math.floor(i / 10),
           submitTime,
-          submitDuration,
-          confirmTime: submitTime + submitDuration + confirmDuration,
-          confirmDuration,
-          totalDuration: submitDuration + confirmDuration,
-          status,
-          error,
+          submitDuration: result.submitDurationMs,
+          confirmTime: submitTime + result.submitDurationMs + result.confirmDurationMs,
+          confirmDuration: result.confirmDurationMs,
+          totalDuration: result.submitDurationMs + result.confirmDurationMs,
+          status: result.status,
+          error: result.error,
         };
         this.collector.recordTx(metric);
         txMetrics.push(metric);
 
         if (this.verbose || i % 5 === 0) {
           console.log(
-            `[bridgeIn] #${i} nonce=${nonce} ${status} ${txHash.substring(0, 18)}... ` +
-              `submit=${submitDuration}ms confirm=${confirmDuration}ms ${error ?? ""}`,
+            `[bridgeIn] #${i} nonce=${broadcaster.startNonce + i} ${result.status} ` +
+              `${result.txHash.substring(0, 18)}... ` +
+              `submit=${result.submitDurationMs}ms confirm=${result.confirmDurationMs}ms ` +
+              `${result.error ?? ""}`,
           );
         }
       },

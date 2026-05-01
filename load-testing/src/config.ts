@@ -87,7 +87,7 @@ export function loadConfig(configPath: string): LoadTestConfig {
         // otherwise /api/bridge/requestDepositAction rejects). Skipped by
         // default; enable by setting skipBridgeRequest: false and providing
         // a valid externalTxHash that exists on externalChainId.
-        externalChainId: "1",
+        externalChainId: "11155111", // Ethereum Sepolia (testnet) — set to "1" for mainnet
         externalTxHash: "",
         action: 2,
         // Buy-metal phase (default: USDST -> GOLDST on helium testnet).
@@ -100,6 +100,7 @@ export function loadConfig(configPath: string): LoadTestConfig {
         skipBuyMetal: false,
         logBalances: "none",
         metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6", // helium testnet MetalForge
+        requestRetries: 3,
         ...raw.scenarios?.tokenSale,
       },
       jsonRpcStress: {

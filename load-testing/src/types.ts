@@ -86,6 +86,42 @@ export interface TokenSaleUser {
 export type BridgeDepositAction = 1 | 2; // 1=AUTO_SAVE (lend USDST), 2=AUTO_FORGE (buy metal)
 
 /**
+ * Inline Sepolia broadcaster config for the tokenSale scenario. When set,
+ * each iteration broadcasts a real `DepositRouter.depositETH(...)` on Sepolia
+ * with a sequential nonce, takes the resulting tx hash, and uses it as the
+ * `externalTxHash` of the per-iteration POST /api/bridge/requestDepositAction.
+ * This is functionally Scenario 4's flow run inline as the first leg of
+ * Scenario 1 — so every iteration represents a UNIQUE bridge entry.
+ */
+export interface TokenSaleBridgeConfig {
+  /** Sepolia (or any external EVM testnet) JSON-RPC URL. */
+  sepoliaRpcUrl: string;
+  /** Funded EOA private key (0x-prefixed). Needs N × amountPerTx + N × gas. */
+  sepoliaPrivateKey: string;
+  /** DepositRouter contract on the external chain (0x-prefixed). */
+  depositRouterAddress: string;
+  /** Recipient STRATO address (hex, with or without 0x). */
+  stratoRecipientAddress: string;
+  /** Corresponding STRATO-side token address (hex, with or without 0x). */
+  targetStratoToken: string;
+  /** Amount sent per bridge in wei (default 0.000001 ETH = "1000000000000"). */
+  amountPerTx?: string;
+  /** External chain ID. Defaults to 11155111 (Sepolia). */
+  chainId?: number;
+  /** If true, await Sepolia receipt before posting the bridge request.
+   *  Default false — Sepolia confirmation takes ~12 s, awaiting per iteration
+   *  blocks the loop. With false, the hash goes into the bridge request
+   *  immediately even though the tx is not yet mined. */
+  awaitConfirmation?: boolean;
+  /** Override the starting nonce (default: read from chain at init). */
+  startNonce?: number;
+  /** Gas-tx overrides. Defaults: 250000 / 30 / 2. */
+  gasLimit?: number;
+  maxFeePerGasGwei?: number;
+  maxPriorityFeePerGasGwei?: number;
+}
+
+/**
  * Granularity for token-balance logging during a tokenSale run.
  *  - "none"    – never read balances (max throughput)
  *  - "summary" – read once before and once after the run, log the deltas
@@ -112,10 +148,18 @@ export interface TokenSaleScenarioConfig {
   /* ---- Bridge-in phase (POST /api/bridge/requestDepositAction) ---- */
   /** External chain ID string the deposit originates on (e.g. "1" Ethereum, "11155111" Sepolia). */
   externalChainId?: string;
-  /** Reusable external tx hash. If empty, the bridge request step is skipped. */
+  /** Reusable external tx hash. If empty AND `bridge` is unset, the bridge
+   *  request leg is skipped. Used only when `bridge` is NOT configured —
+   *  when `bridge` is set, a fresh hash is broadcast per iteration. */
   externalTxHash?: string;
   /** Post-deposit action (2 = AUTO_FORGE metal). */
   action?: BridgeDepositAction;
+  /** Optional inline bridge-broadcast config — when set (and skipBridgeRequest
+   *  is false), each iteration first broadcasts a fresh DepositRouter.depositETH
+   *  on Sepolia (sequential nonce per iteration) before posting the bridge
+   *  request. This integrates Scenario 4's flow as a third leg of Scenario 1
+   *  so every iteration represents a UNIQUE bridge entry. */
+  bridge?: TokenSaleBridgeConfig;
 
   /* ---- Buy-metal phase (POST /api/metal-forge/buy) ---- */
   /** Metal token address on STRATO (hex, no 0x). E.g. GOLDST. */
@@ -134,6 +178,37 @@ export interface TokenSaleScenarioConfig {
   skipBridgeRequest?: boolean;
   /** If true, only perform the bridge-request step (skip /metal-forge/buy). */
   skipBuyMetal?: boolean;
+  /**
+   * If true, run the legs in a TWO-PHASE pipeline instead of the default
+   * per-worker-sequential mode:
+   *   Phase 1: broadcast all N Sepolia deposits in parallel (bounded by
+   *            sepoliaConcurrency, defaults to concurrentUsers).
+   *   Phase 2: for each successful broadcast, fire bridgeRequest + buyMetal
+   *            in parallel (bounded by backendConcurrency, defaults to
+   *            concurrentUsers).
+   * Wall-clock becomes max(slowest broadcast) + max(slowest backend round-
+   * trip) instead of N × per-iteration time.
+   * Note: pipelineMode disables per-iteration rate-limiting (timeWindowMs is
+   * ignored within phases — phases run as fast as the concurrency allows).
+   */
+  pipelineMode?: boolean;
+  /** Override concurrency for the broadcast phase under pipelineMode.
+   *  Default: cfg.concurrentUsers. */
+  sepoliaConcurrency?: number;
+  /** Override concurrency for the bridgeRequest+buyMetal phase under
+   *  pipelineMode. Default: cfg.concurrentUsers. */
+  backendConcurrency?: number;
+
+  /**
+   * Max retries for transient HTTP errors (429 + any 5xx) on the bridgeRequest
+   * and buyMetal legs. Default 3. Backoff between attempts is exponential with
+   * jitter: 1500*2^k + random(0..500) ms, so attempts are spaced
+   *   ~1.5s, ~3s, ~6s
+   * after the initial try (max ~10.5s of total retry-wait at the worst case).
+   * Retried iterations record a single metric whose `submitDuration` is the
+   * end-to-end wall clock including the wait windows.
+   */
+  requestRetries?: number;
 
   /* ---- Balance logging ---- */
   /** How aggressively to capture token-balance transitions. Default "none"

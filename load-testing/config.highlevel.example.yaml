@@ -84,11 +84,32 @@ scenarios:
     # chainId: 114784819836269              # default (STRATO helium testnet)
     # totalTxCount: 1000                    # default
     # timeWindowMs: 30000                   # default (paces rate to hit totalTxCount over this window)
-    # concurrentUsers: 50                   # default
+    # concurrentUsers: 50                   # default (The number of parallel sales to run, spread across the configured user accounts in a round-robin fashion)
     # --- bridge-in phase (POST /api/bridge/requestDepositAction) ---
-    # externalChainId: "1"                  # default ("1" Ethereum | "11155111" Sepolia | "8453" Base | ...)
-    # externalTxHash: ""                    # default (empty = skip bridge leg)
+    # externalChainId: "11155111"           # default Ethereum Sepolia ("1" Ethereum mainnet | "8453" Base | ...)
+    # externalTxHash: ""                    # default — STATIC fallback hash (used only when `bridge` is unset)
     # action: 2                             # default (1=AUTO_SAVE lend, 2=AUTO_FORGE metal)
+    # --- inline Sepolia broadcaster (Scenario 4 flow merged into Scenario 1) ---
+    # When `bridge` is set AND skipBridgeRequest is false, every iteration:
+    #   1. Broadcasts a fresh DepositRouter.depositETH on Sepolia (sequential nonce).
+    #   2. Posts /api/bridge/requestDepositAction with the resulting hash.
+    #   3. Posts /api/metal-forge/buy.
+    # All N iterations run in parallel across workers; the broadcaster signs
+    # them with nonces startNonce..startNonce+N-1 from a single funded EOA.
+    # NOTE: the EOA needs ~N × (amountPerTx + gas) Sepolia ETH funded up-front.
+    # bridge:
+    #   sepoliaRpcUrl:           "https://sepolia.infura.io/v3/REPLACE_INFURA_KEY"
+    #   sepoliaPrivateKey:       "0xREPLACE_FUNDED_PRIVATE_KEY"
+    #   depositRouterAddress:    "0xREPLACE_DEPOSIT_ROUTER_ADDRESS_ON_SEPOLIA"
+    #   stratoRecipientAddress:  "REPLACE_STRATO_RECIPIENT"          # hex, with or without 0x
+    #   targetStratoToken:       "93fb7295859b2d70199e0a4883b7c320cf874e6c"   # helium ETH token (or USDST etc.)
+    #   amountPerTx:             "1000000000000"                     # default 0.000001 ETH per bridge-in
+    #   chainId:                 11155111                             # default Sepolia
+    #   awaitConfirmation:       false                                # default — block on Sepolia receipt per iteration?
+    #   gasLimit:                250000                               # default
+    #   maxFeePerGasGwei:        30                                   # default
+    #   maxPriorityFeePerGasGwei: 2                                   # default
+    #   # startNonce: 0                                               # default: read from chain ("pending")
     # --- buy-metal phase (POST /api/metal-forge/buy) ---
     # payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"  # default (USDST helium testnet)
     # payAmount: "1000000000000000"         # default (0.001 USDST in 18-dec wei)
@@ -97,6 +118,24 @@ scenarios:
     # includePageLoad: true                 # default (4 Fund-page GETs once per user during warmup)
     # skipBridgeRequest: true               # default (set false + supply externalTxHash to include bridge leg)
     # skipBuyMetal: false                   # default
+    # --- pipeline mode (decouples broadcast / bridge / buy phases) ---
+    # When true the scenario runs in TWO PHASES with bounded concurrency:
+    #   Phase 1: broadcast all N Sepolia deposits in parallel (single signer,
+    #            sequential nonces; concurrency=sepoliaConcurrency).
+    #   Phase 2: for each successful broadcast, fire bridgeRequest+buyMetal
+    #            in parallel (concurrency=backendConcurrency).
+    # Wall clock collapses to ~max(slowest broadcast)+max(slowest backend rt)
+    # instead of the per-worker N×(broadcast+bridge+buy) sequence. timeWindowMs
+    # is ignored under pipelineMode — phases run as fast as concurrency allows.
+    # pipelineMode: false                   # default
+    # sepoliaConcurrency: 50                # default = concurrentUsers
+    # backendConcurrency: 50                # default = concurrentUsers
+    # --- transient-error retry (bridgeRequest + buyMetal legs) ---
+    # Retries on HTTP 429 + any 5xx (e.g. backend 503 when the bridge service
+    # is overloaded). Backoff between attempts is exponential with ±0..500 ms
+    # jitter — attempt 2 fires after ~1.5s, attempt 3 after ~3s, attempt 4
+    # after ~6s. Final post-retry failures still surface as `… FAILED:` lines.
+    # requestRetries: 3                     # default; 0 disables retry
     # --- balance logging ---
     # logBalances: "none"                   # default — "none" | "summary" | "perStep"
     #                                       # none:    no balance reads (max throughput, pre-feature behaviour)
