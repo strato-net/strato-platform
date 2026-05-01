@@ -98,6 +98,7 @@ tests:
     dependencies:
       - hspec
       - vm-tools
+      - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
       - blockDB

@@ -159,6 +159,7 @@ rpc_modules = flip (toMethod "rpc_modules") () $ do
           ("net", "1.0"),
           ("personal", "1.0"),
           ("rpc", "1.0"),
+          ("strato", "1.0"),
           ("txpool", "1.0"),
           ("web3", "1.0")
         ]

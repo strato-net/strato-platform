@@ -43,6 +43,8 @@ import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.Util (byteString2NibbleString)
 import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Class
+import qualified Data.Text as T
+import SQLM (ApiError (..))
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as B
 import Data.OpenApi (ToSchema)
@@ -146,7 +148,9 @@ instance Aeson.FromJSON ReceiptProofResponse where
 
 -- ============ Server ============
 
-server :: (Monad m, GetReceipts m) => ServerT API m
+server ::
+  (GetReceipts m, MonadIO m) =>
+  ServerT API m
 server =
   receiptsByHash
     :<|> receiptsByNumber
@@ -158,18 +162,27 @@ receiptsByHash bh = do
   rs <- getReceiptsForBlockHash bh
   pure $ ReceiptListResponse bh (map (toHex . receiptRefReceiptBytes) rs)
 
-receiptsByNumber :: (Monad m, GetReceipts m) => Integer -> m ReceiptListResponse
+receiptsByNumber ::
+  (GetReceipts m, MonadIO m) =>
+  Integer ->
+  m ReceiptListResponse
 receiptsByNumber n = do
-  bh <- resolveBlockHashByNumber n
-  receiptsByHash bh
+  mbh <- resolveBlockHashByNumber n
+  case mbh of
+    Nothing -> liftIO $ throwIO $ CouldNotFind $ T.pack $ "no block at number " ++ show n
+    Just bh -> receiptsByHash bh
 
-proofByHash :: (Monad m, GetReceipts m) => Keccak256 -> Int -> m ReceiptProofResponse
+proofByHash ::
+  (GetReceipts m, MonadIO m) =>
+  Keccak256 ->
+  Int ->
+  m ReceiptProofResponse
 proofByHash bh txIndex = do
   rs <- getReceiptsForBlockHash bh
   let bytesByIndex = [(receiptRefTxIndex r, receiptRefReceiptBytes r) | r <- rs]
       orderedBytes = map snd bytesByIndex -- already sorted by txIndex from receiptRefsForBlock
   case lookup txIndex bytesByIndex of
-    Nothing -> error $ "no receipt at txIndex " ++ show txIndex -- TODO: throwError 404
+    Nothing -> liftIO $ throwIO $ CouldNotFind $ T.pack $ "no receipt at txIndex " ++ show txIndex
     Just receiptBytes -> do
       let proof = computeReceiptInclusionProof orderedBytes txIndex
       pure $
@@ -180,10 +193,16 @@ proofByHash bh txIndex = do
             rprMptProof = map toHex proof
           }
 
-proofByNumber :: (Monad m, GetReceipts m) => Integer -> Int -> m ReceiptProofResponse
+proofByNumber ::
+  (GetReceipts m, MonadIO m) =>
+  Integer ->
+  Int ->
+  m ReceiptProofResponse
 proofByNumber n txIndex = do
-  bh <- resolveBlockHashByNumber n
-  proofByHash bh txIndex
+  mbh <- resolveBlockHashByNumber n
+  case mbh of
+    Nothing -> liftIO $ throwIO $ CouldNotFind $ T.pack $ "no block at number " ++ show n
+    Just bh -> proofByHash bh txIndex
 
 -- | Pure: build the receipts trie from per-tx receipt bytes and produce the
 -- MPT inclusion proof for @txIndex@. Mirrors the construction in
@@ -220,7 +239,9 @@ toHex bs = "0x" ++ BC.unpack (B16.encode bs)
 
 class GetReceipts m where
   getReceiptsForBlockHash :: Keccak256 -> m [ReceiptRef]
-  resolveBlockHashByNumber :: Integer -> m Keccak256
+  -- | Returns Nothing if no block exists at the given number; the handler
+  -- layer turns that into an HTTP 404.
+  resolveBlockHashByNumber :: Integer -> m (Maybe Keccak256)
 
 instance (Monad m, GetReceipts m, MonadTrans t) => GetReceipts (t m) where
   getReceiptsForBlockHash = lift . getReceiptsForBlockHash
@@ -236,6 +257,6 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => GetReceipts (SQLM m) where
           E.where_ $ b E.^. BlockDataRefNumber E.==. E.val n
           E.limit 1
           return (b E.^. BlockDataRefHash)
-    case rs of
-      (E.Value h : _) -> pure h
-      [] -> error $ "no block at number " ++ show n -- TODO: throwError 404
+    pure $ case rs of
+      (E.Value h : _) -> Just h
+      [] -> Nothing
