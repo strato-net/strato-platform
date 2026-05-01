@@ -1978,6 +1978,28 @@ function it_single_token_a_zap_matches_swap_then_add_with_fees() {
         require(pool.isDisabled() == true, "setDisabled(true) should set isDisabled");
     }
 
+    function it_pool_pause_shim_sets_true_only() {
+        require(pool.isPaused() == false, "Pool should start unpaused");
+
+        pool.pause();
+        require(pool.isPaused() == true, "pause() should set isPaused true");
+
+        // Idempotent: pausing an already-paused pool succeeds
+        pool.pause();
+        require(pool.isPaused() == true, "pause() should remain true on repeat");
+
+        // Cannot pause while disabled
+        pool.setPaused(false);
+        pool.setDisabled(true);
+        bool reverted = false;
+        try {
+            pool.pause();
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "pause() should revert when isDisabled");
+    }
+
     function it_pool_pause_state_persists_across_operations() {
         // Setup: add initial liquidity
         uint256 amountA = 1000e18;
