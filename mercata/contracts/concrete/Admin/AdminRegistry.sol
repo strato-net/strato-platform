@@ -33,12 +33,20 @@ contract record AdminRegistry is Ownable {
 
     uint public defaultVotingThresholdBps = 6000; // 3/5
 
+    address[] public record guardians;
+    mapping (address => uint) public record guardianMap;
+    mapping (address => mapping (string => bool)) public record guardianAllowlist;
+
     event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
     event IssueQueued(address sender, address queueExecutor, string issueId, address target, string func, uint executableAt, uint expiresAt, variadic args);
     event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
     event IssueVoteWithdrawn(address sender, address voter, string issueId);
     event IssueDismissed(address sender, string issueId);
+    event GuardianAdded(address guardian);
+    event GuardianRemoved(address guardian);
+    event GuardianAllowlistSet(address target, string func, bool allowed);
+    event InstantFunctionSet(address target, string func, bool enabled);
 
     bool public initialized = false;
 
@@ -72,7 +80,19 @@ contract record AdminRegistry is Ownable {
         castVoteOnIssue(this, "_swapAdmin", _adminToReplace, _newAdmin);
     }
 
-    function isAdminAddress(address _admin) external returns (bool) {
+    function addGuardian(address _guardian) external {
+        castVoteOnIssue(this, "_addGuardian", _guardian);
+    }
+
+    function removeGuardian(address _guardian) external {
+        castVoteOnIssue(this, "_removeGuardian", _guardian);
+    }
+
+    function setGuardianAllowed(address _target, string _func, bool _allowed) external {
+        castVoteOnIssue(this, "_setGuardianAllowed", _target, _func, _allowed);
+    }
+
+    function isAdminAddress(address _admin) public returns (bool) {
         return adminMap[_admin] > 0;
     }
 
@@ -144,12 +164,14 @@ contract record AdminRegistry is Ownable {
     }
 
     function isGuardian(address _account) public virtual returns (bool) {
-        // TODO for the agent that will add Guardian logic: remove this function prob and just replace its usage with whatever data path exposes guardian statuses
-        return false;
+        return guardianMap[_account] > 0;
     }
 
     function _shouldExecuteInstantly(address _sender, address _target, string _func) internal returns (bool) {
-        return instantFunctions[_target][_func] && (adminMap[_sender] != 0 || isGuardian(_sender));
+        if (!instantFunctions[_target][_func]) return false;
+        if (isAdminAddress(_sender)) return true;
+        if (isGuardian(_sender)) return guardianAllowlist[_target][_func];
+        return false;
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
@@ -252,6 +274,7 @@ contract record AdminRegistry is Ownable {
     function _addAdmin(address _admin) external onlyOwner {
         require(_admin != address(0), "Invalid admin address");
         require(adminMap[_admin] == 0, "Account is already an admin");
+        require(guardianMap[_admin] == 0, "Guardian cannot be an admin");
         admins.push(_admin);
         adminMap[_admin] = admins.length;
     }
@@ -279,19 +302,53 @@ contract record AdminRegistry is Ownable {
         adminMap[_adminToReplace] = 0;
     }
 
+    function _addGuardian(address _guardian) external onlyOwner {
+        require(_guardian != address(0), "Invalid guardian address");
+        require(guardianMap[_guardian] == 0, "Account is already a guardian");
+        require(adminMap[_guardian] == 0, "Admin cannot be a guardian");
+        guardians.push(_guardian);
+        guardianMap[_guardian] = guardians.length;
+        emit GuardianAdded(_guardian);
+    }
+
+    function _removeGuardian(address _guardian) external onlyOwner {
+        uint index = guardianMap[_guardian];
+        require(index > 0, "Account is not a guardian");
+        address swap = guardians[guardians.length - 1];
+        guardians[index - 1] = swap;
+        guardianMap[swap] = index;
+        guardianMap[_guardian] = 0;
+        guardians[guardians.length - 1] = address(0);
+        guardians.length -= 1;
+        emit GuardianRemoved(_guardian);
+    }
+
+    function _setGuardianAllowed(address _target, string _func, bool _allowed) external onlyOwner {
+        require(_target != address(this), "Cannot allowlist AdminRegistry self-calls");
+        if (_allowed && !instantFunctions[_target][_func]) {
+            instantFunctions[_target][_func] = true;
+            emit InstantFunctionSet(_target, _func, true);
+        }
+        guardianAllowlist[_target][_func] = _allowed;
+        emit GuardianAllowlistSet(_target, _func, _allowed);
+    }
+
     function addWhitelist(address _target, string _func, address _user) external onlyOwner {
         if (_target == address(this)) {
             require(
                 _func != "addWhitelist" &&
                 _func != "removeWhitelist" &&
                 _func != "_addAdmin" &&
+                _func != "_addGuardian" &&
                 _func != "_clearIssue" &&
                 _func != "_clearTimelock" &&
                 _func != "_createIssue" &&
                 _func != "_executeIssue" &&
                 _func != "_removeAdmin" &&
+                _func != "_removeGuardian" &&
                 _func != "_removeVote" &&
                 _func != "_queueIssue" &&
+                _func != "_setGuardianAllowed" &&
                 _func != "_shouldExecute" &&
                 _func != "_shouldExecuteInstantly" &&
                 _func != "_swapAdmin" &&
@@ -316,6 +373,7 @@ contract record AdminRegistry is Ownable {
     function setInstantFunction(address _target, string _func, bool _enabled) external onlyOwner {
         require(_target != address(this), "Cannot add governance functions for instant execution");
         instantFunctions[_target][_func] = _enabled;
+        emit InstantFunctionSet(_target, _func, _enabled);
     }
 
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
