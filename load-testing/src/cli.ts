@@ -9,9 +9,6 @@ import { ContractDeployScenario } from "./scenarios/contractDeploy";
 import { FunctionCallScenario } from "./scenarios/functionCall";
 import { MixedWorkloadScenario } from "./scenarios/mixedWorkload";
 import { TokenSaleScenario } from "./scenarios/tokenSale";
-import { JsonRpcStressScenario } from "./scenarios/jsonRpcStress";
-import { FullAppSimulationScenario } from "./scenarios/fullAppSimulation";
-import { BridgeInScenario } from "./scenarios/bridgeIn";
 import { BaseScenario } from "./scenarios/base";
 import { LoadTestConfig, LoadTestReport, ScenarioResult } from "./types";
 
@@ -23,16 +20,14 @@ program
   .option("-c, --config <path>", "Path to config YAML file", "config.yaml")
   .option(
     "-s, --scenario <name>",
-    "Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale | jsonRpcStress | fullApp | bridgeIn",
+    "Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale",
   )
   .option("--batch-size <n>", "Override batch size (low-level scenarios)", parseInt)
   .option("--batch-count <n>", "Override batch count (low-level scenarios)", parseInt)
-  .option("--concurrent-users <n>", "Override concurrent users for tokenSale/jsonRpcStress/fullApp", parseInt)
-  .option("--duration <ms>", "Override durationMs for jsonRpcStress/fullApp", parseInt)
-  .option("--total-tx <n>", "Override totalTxCount (tokenSale) or totalBridgeIns (bridgeIn)", parseInt)
-  .option("--time-window <ms>", "Override timeWindowMs for tokenSale/bridgeIn", parseInt)
-  .option("--backend-url <url>", "Override backend URL (tokenSale/fullApp)")
-  .option("--rpc-url <url>", "Override RPC URL (jsonRpcStress)")
+  .option("--concurrent-users <n>", "Override concurrent users for tokenSale", parseInt)
+  .option("--total-tx <n>", "Override totalTxCount (tokenSale)", parseInt)
+  .option("--time-window <ms>", "Override timeWindowMs (tokenSale)", parseInt)
+  .option("--backend-url <url>", "Override backend URL (tokenSale)")
   .option("--nodes <names>", "Comma-separated node names to target", (v) => v.split(","))
   .option("--report-dir <path>", "Output directory for reports")
   .option("--submit-mode <mode>", "Submit mode: sequential (default) or pipeline")
@@ -68,11 +63,9 @@ async function main(): Promise<void> {
       reportDir: opts.reportDir,
       submitMode: opts.submitMode,
       concurrentUsers: opts.concurrentUsers,
-      duration: opts.duration,
       totalTx: opts.totalTx,
       timeWindow: opts.timeWindow,
       backendUrl: opts.backendUrl,
-      rpcUrl: opts.rpcUrl,
     });
   } catch (err: any) {
     console.error(`Configuration error: ${err.message}`);
@@ -115,15 +108,6 @@ async function main(): Promise<void> {
   if (config.scenarios.tokenSale.enabled) {
     scenarios.push(new TokenSaleScenario(config, collector, opts.verbose));
   }
-  if (config.scenarios.jsonRpcStress.enabled) {
-    scenarios.push(new JsonRpcStressScenario(config, collector, opts.verbose));
-  }
-  if (config.scenarios.fullApp.enabled) {
-    scenarios.push(new FullAppSimulationScenario(config, collector, opts.verbose));
-  }
-  if (config.scenarios.bridgeIn.enabled) {
-    scenarios.push(new BridgeInScenario(config, collector, opts.verbose));
-  }
 
   if (scenarios.length === 0) {
     console.log("No scenarios enabled. Enable at least one scenario in config or use --scenario.");
@@ -144,10 +128,10 @@ async function main(): Promise<void> {
   }
 
   // Compute stats. Enumerate (scenario, node) pairs from the recorded TxMetrics
-  // themselves — scenarios may emit per-leg sub-scopes (e.g. "tokenSale:buyMetal",
-  // "jsonRpcStress:eth_blockNumber") which are NOT the same string as the parent
-  // ScenarioResult.scenario. Filtering by the parent name alone would yield 0
-  // hits and a blank summary table.
+  // themselves — scenarios may emit per-leg sub-scopes (e.g.
+  // "tokenSale:bridgeRequest", "tokenSale:sepoliaDeposit") which are NOT the
+  // same string as the parent ScenarioResult.scenario. Filtering by the
+  // parent name alone would yield 0 hits and a blank summary table.
   const allTxMetrics = collector.getAllTxMetrics();
   const scenarioNodePairs = new Set<string>();
   for (const m of allTxMetrics) {
@@ -170,8 +154,8 @@ async function main(): Promise<void> {
       );
     })
     // Drop empty rows — when a scenario only emits per-leg sub-scopes (e.g.
-    // tokenSale -> tokenSale:buyMetal), the parent name itself has 0 metrics
-    // and would otherwise show as a misleading "0/0 succeeded" row.
+    // tokenSale -> tokenSale:bridgeRequest), the parent name itself has 0
+    // metrics and would otherwise show as a misleading "0/0 succeeded" row.
     .filter((s) => s.totalTxCount > 0);
 
   const timeline = computeTimeline(collector.getAllTxMetrics());

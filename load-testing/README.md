@@ -4,11 +4,8 @@ A standalone tool for load testing STRATO blockchain nodes and the Mercata appli
 
 Two families of scenarios are supported:
 
-**Application-level scenarios** (recommended for full-stack testing):
-- `tokenSale` — token sale TPS via the Mercata backend (Scenario 1)
-- `jsonRpcStress` — JSON-RPC stress via the `/rpc/{chainId}` proxy (Scenario 2)
-- `fullApp` — multi-step user workflows against the full app stack (Scenario 3)
-- `bridgeIn` — Ethereum Sepolia → STRATO bridge-in via ethers.js (Scenario 4)
+**Application-level scenario** (recommended for full-stack testing):
+- `tokenSale` — replays the canonical Mercata UI bridge-in flow: Sepolia USDC → STRATO USDST → AUTO_FORGE → GOLDST. Each iteration signs a Permit2 typed-data on Sepolia, broadcasts `DepositRouter.deposit(...)`, then posts `/api/bridge/requestDepositAction` with `action: 2` (AUTO_FORGE).
 
 **Low-level scenarios** (direct node API testing, pre-existing):
 - `contractDeploy`, `functionCall`, `mixedWorkload` — submit batches of txs directly via `/strato/v2.3/transaction/parallel` and poll `/bloc/v2.2/transactions/results`.
@@ -24,7 +21,7 @@ npm install
 
 ## Configuration
 
-For the high-level application-layer scenarios (`tokenSale`, `jsonRpcStress`, `fullApp`, `bridgeIn`) that go through the Mercata backend / UI / external chains:
+For the high-level `tokenSale` scenario that goes through the Mercata backend / UI / Sepolia:
 
 ```bash
 cp config.highlevel.example.yaml config.highlevel.yaml
@@ -63,20 +60,16 @@ nodes:
 | `report.outputDir` | | `./reports` | Output directory for reports |
 | `report.formats` | | `["json", "html"]` | Report formats to generate |
 
-## Running the four Mercata scenarios
-
-Each scenario has a dedicated npm script. They all read the same YAML config and obey `--config`, `--verbose`, `--report-dir` and the overrides listed in `npm run test:token-sale -- --help`.
-
-### Scenario 1 — Token Sale TPS (1,000 sales / 30 s)
+## Running the Token Sale scenario
 
 ```bash
 npm run test:token-sale -- --config config.highlevel.yaml
 ```
 
-Replays the "Fund > Bridge-In (Ethereum → STRATO, USDC → GOLDST)" composition performed by `mercata/ui/src/components/bridge/BridgeIn.tsx`. Each "sale" is the pair of backend calls the UI triggers once the user confirms the deposit:
+Replays the "Fund > Bridge-In (Sepolia USDC → STRATO USDST → AUTO_FORGE → GOLDST)" composition performed by `mercata/ui/src/components/bridge/BridgeIn.tsx`. Each "sale" is the pair of operations the UI triggers once the user confirms the deposit:
 
-1. `POST /api/bridge/requestDepositAction` — queues the AUTO_FORGE post-deposit action (bridge.service.ts).
-2. `POST /api/metal-forge/buy` — approves USDST and calls `MetalForge.mintMetal(metalToken, payToken, payAmount, minMetalOut)` on STRATO (metalForge.service.ts).
+1. **Sepolia leg** — sign a Permit2 `PermitTransferFrom` typed-data (EIP-712), then broadcast `DepositRouter.deposit(USDC, amount, stratoAddress, USDST, nonce, deadline, signature)` on Sepolia. One funded EOA signs every iteration with sequential nonces.
+2. **Bridge-request leg** — `POST /api/bridge/requestDepositAction { externalChainId, externalTxHash, action: 2, targetToken: GOLDST }`. The bridge service (`mercata/services/bridge`) polls Sepolia, sees the `DepositRouted` event, mints USDST to the recipient and auto-forges USDST → GOLDST server-side.
 
 Optional per-user warm-up replays the GETs the Fund page fires on mount:
 
@@ -85,7 +78,7 @@ Optional per-user warm-up replays the GETs the Fund page fires on mount:
 - `GET /api/bridge/bridgeableTokens/{externalChainId}`
 - `GET /api/metal-forge/configs`
 
-The Ethereum-side `Permit2.approve` + `DepositRouter.deposit` are **not** replayed per iteration — they cost real gas and real block time. Either supply a previously-broadcast `externalTxHash` to include the bridge-request leg, or leave `skipBridgeRequest: true` (the default) to exercise only the on-STRATO `/metal-forge/buy` call.
+On first run with a given Sepolia EOA, the broadcaster submits a one-time `approve(MAX)` so Permit2 can spend the configured ERC20. After that every iteration only signs typed-data and calls `DepositRouter.deposit(...)`.
 
 Key config fields under `scenarios.tokenSale`:
 
@@ -95,115 +88,57 @@ Key config fields under `scenarios.tokenSale`:
 | `timeWindowMs` | Target window — the test paces itself to finish in this many ms (default 30000) |
 | `concurrentUsers` | Parallel virtual users (default 50) |
 | `externalChainId` | Source chain for the bridge leg (`"1"` Ethereum, `"11155111"` Sepolia, `"8453"` Base, …) |
-| `externalTxHash` | Real external tx hash to replay through `requestDepositAction`. Empty = skip. |
-| `action` | Post-deposit action (`2` AUTO_FORGE, `1` AUTO_SAVE lend) |
 | `metalTokenAddress` | Metal token on STRATO (fetch GOLDST from `/api/metal-forge/configs`) |
-| `payTokenAddress` | Pay token on STRATO (USDST = `937efa7e3a77e20bbdbd7c0d32b6514f368c1010`) |
-| `payAmount` | Pay amount in 18-dec wei |
-| `minMetalOut` | Slippage-protection floor on metal out |
+| `bridge.sepoliaRpcUrl` | Sepolia JSON-RPC URL (Alchemy/Infura/dRPC) |
+| `bridge.sepoliaPrivateKey` | Funded EOA private key (0x-prefixed) |
+| `bridge.depositRouterAddress` | DepositRouter contract address on Sepolia |
+| `bridge.sepoliaTokenAddress` | ERC20 to bridge (Sepolia USDC = `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`) |
+| `bridge.stratoRecipientAddress` | Recipient on STRATO |
+| `bridge.targetStratoToken` | STRATO-side intermediate token (USDST) |
+| `bridge.amountPerTx` | Per-bridge amount in the token's smallest unit (default `"1000"` = 0.001 USDC) |
+| `bridge.awaitConfirmation` | If true, await the Sepolia receipt before posting the bridge request |
+| `bridge.permit2Address` | Override the canonical Permit2 (rarely needed) |
+| `bridge.permitDeadlineSec` | Permit2 signature deadline window (default 1800s) |
+| `pipelineMode` | If true, run in two phases (broadcast all → bridgeRequest all) instead of per-worker sequential |
+| `sepoliaConcurrency` | Override Phase 1 concurrency (default = `concurrentUsers`) |
+| `backendConcurrency` | Override Phase 2 concurrency (default = `concurrentUsers`) |
+| `requestRetries` | Retries for transient HTTP 429/5xx on the bridgeRequest leg (default 3) |
+| `logBalances` | `"none"` or `"summary"` — read STRATO balances before/after the run |
 | `includePageLoad` | If true, do the 4 Fund-page GETs once per user during warm-up |
-| `skipBridgeRequest` | If true (default), skip the `/bridge/requestDepositAction` call |
-| `skipBuyMetal` | If true, skip the `/metal-forge/buy` call (e.g. to exercise only the bridge leg) |
 | `users` | Optional pool of credentials; cycles across concurrent users |
 
 Overrides: `--total-tx 500 --time-window 15000 --concurrent-users 100 --backend-url https://...`
 
-The summary table in the report breaks the metrics out per leg: `tokenSale:bridgeRequest`, `tokenSale:buyMetal`, and `tokenSale:pageLoad:<step>`. A terminal line at the end reports combined sales/s (pair rate) and call/s (individual request rate).
-
-### Scenario 2 — JSON-RPC stress (300 concurrent users)
-
-```bash
-npm run test:rpc -- --config config.highlevel.yaml
-```
-
-Hits `https://app.testnet.strato.nexus/rpc/{chainId}` (configurable). The default method rotation uses STRATO-implemented methods only — `eth_blockNumber`, `eth_chainId`, `eth_gasPrice`, `net_version`, `eth_getBalance`, `eth_getTransactionCount`, `eth_getCode`, `web3_sha3`. `eth_getLogs` and `eth_getTransactionReceipt` are intentionally excluded (unimplemented in `strato/api/ethereum-jsonrpc`).
-
-Key config fields under `scenarios.jsonRpcStress`:
-| Field | Meaning |
-|---|---|
-| `rpcUrl` | Full RPC URL (including `/rpc/<chainId>` suffix) |
-| `concurrentUsers` | Parallel virtual users (default 300) |
-| `durationMs` | Total test duration (default 60000) |
-| `thinkTimeMs` | Per-call delay per user (default 0) |
-| `authenticated` | If true, attach the node[0] bearer token (currently required by the mercata backend's `/rpc/:chainId` route) |
-| `methods` | Optional custom method rotation with `weight` and `params` |
-
-Overrides: `--concurrent-users 150 --duration 30000 --rpc-url https://...`
-
-### Scenario 3 — Full application simulation (300 concurrent users)
-
-```bash
-npm run test:full-app -- --config config.highlevel.yaml
-```
-
-Each virtual user walks through a multi-step workflow that mimics a real session. The built-in default workflow is: `GET /` → `GET /api/tokens` → `GET /api/tokens/balance` → `GET /api/config` → `GET /api/vouchers/balance` → `GET /api/events` → `POST /api/tokens/transfer`. Each step can have its own `thinkTimeMs`. Custom workflows may be specified in YAML with `{tokenAddress}`, `{recipientAddress}`, `{amountPerTx}` placeholders.
-
-Key config fields under `scenarios.fullApp`:
-| Field | Meaning |
-|---|---|
-| `baseUrl` | Base URL of the application (default `https://app.testnet.strato.nexus`) |
-| `concurrentUsers` | Parallel virtual users (default 300) |
-| `durationMs` | Total test duration (default 120000) |
-| `iterationsPerUser` | Optional — caps workflow loops per user |
-| `workflow` | Optional custom step list |
-| `users` | Optional pool of credentials |
-
-Overrides: `--concurrent-users 100 --duration 60000 --backend-url https://...`
-
-### Scenario 4 — Ethereum Sepolia → STRATO bridge-in (50 tx / 30 s)
-
-```bash
-npm run test:bridge-in -- --config config.highlevel.yaml
-```
-
-Uses `ethers.js` to broadcast `DepositRouter.depositETH(stratoAddress, targetStratoToken)` transactions on Sepolia from a single funded EOA, using sequential nonces for parallel submission. The Mercata bridge service polls `eth_getLogs` on Sepolia, detects each `DepositRouted` event, and credits the recipient on STRATO.
-
-Key config fields under `scenarios.bridgeIn`:
-| Field | Meaning |
-|---|---|
-| `totalBridgeIns` | Number of bridge-in txs (default 50) |
-| `timeWindowMs` | Target window (default 30000) |
-| `sepoliaChainId` | 11155111 |
-| `sepoliaRpcUrl` | Sepolia JSON-RPC (Infura/Alchemy/dRPC) |
-| `sepoliaPrivateKey` | Funded EOA private key |
-| `depositRouterAddress` | DepositRouter address on Sepolia |
-| `depositMode` | `ETH` (default — uses `depositETH`, no signatures) or `ERC20` (requires Permit2 signing — not yet supported here) |
-| `amountPerTx` | Wei per bridge-in |
-| `stratoRecipientAddress` | Recipient on STRATO (hex, no 0x) |
-| `targetStratoToken` | STRATO-side token address (hex, no 0x) |
-| `awaitSepoliaConfirmation` | If true, wait for each Sepolia receipt |
-| `gasLimit`, `maxFeePerGasGwei`, `maxPriorityFeePerGasGwei` | Tx overrides |
-| `startNonce` | Override starting nonce (default = `getTransactionCount("pending")`) |
-
-Overrides: `--total-tx 20 --time-window 15000`
+The summary table in the report breaks the metrics out per leg: `tokenSale:sepoliaDeposit`, `tokenSale:bridgeRequest`, and `tokenSale:pageLoad:<step>`. A terminal line at the end reports combined sales/s (pair rate) and call/s (individual request rate).
 
 ## Test-user and funding prerequisites
 
-### Keycloak users (scenarios 1, 2, 3)
+### Keycloak users
 
-Each scenario authenticates against Keycloak using password grant. You need at minimum one user under the `mercata` realm, with the `clientId` / `clientSecret` for the load-test OAuth client. To run Scenarios 1 and 3 at full parallelism you'll want a pool — create them via the Keycloak admin UI or REST API and list them under the scenario's `users:` array. If you provide fewer users than `concurrentUsers`, the framework cycles through what's given (multiple virtual users may share the same Keycloak account).
+The scenario authenticates against Keycloak using password grant. You need at minimum one user under the `mercata` realm, with the `clientId` / `clientSecret` for the load-test OAuth client. To run at full parallelism you'll want a pool — create them via the Keycloak admin UI or REST API and list them under the scenario's `users:` array. If you provide fewer users than `concurrentUsers`, the framework cycles through what's given (multiple virtual users may share the same Keycloak account).
 
-Each test user's STRATO address must hold:
-- Sufficient balance of the token being sold/transferred (`tokenContractAddress`).
-- Sufficient USDST or voucher balance to cover the **0.01 USDST per tx gas fee** — a 1000-tx run needs at least 10 USDST per funding user. Transfer USDST to the test users via the `/api/tokens/transfer` route from an already-funded account, or mint voucher balances through the governance path.
+Each test user's STRATO address must hold sufficient voucher or USDST balance to cover the gas fee for the on-STRATO portion of the bridge-request call. Transfer USDST to the test users via the `/api/tokens/transfer` route from an already-funded account, or mint voucher balances through the governance path.
 
-### Sepolia wallet funding (scenario 4)
+### Sepolia wallet funding
 
-Fund the `sepoliaPrivateKey` EOA with Sepolia ETH from any public faucet:
-- <https://sepoliafaucet.com>
-- <https://faucets.chain.link>
-- <https://www.alchemy.com/faucets/ethereum-sepolia>
+Fund the `bridge.sepoliaPrivateKey` EOA with:
 
-Rough sizing: each bridge-in sends `amountPerTx` plus ~150k gas at ~30 gwei ≈ 0.0000045 ETH in gas. For 50 bridge-ins at the default 0.000001 ETH amount, budget ~0.001 ETH (+ faucet minimums).
+- **Sepolia USDC** — Circle's faucet at <https://faucet.circle.com> dispenses `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`. Budget `totalTxCount × amountPerTx` of USDC (e.g. 1000 × 0.001 USDC = 1 USDC for a default run).
+- **Sepolia ETH for gas** — fund via faucets:
+  - <https://sepoliafaucet.com>
+  - <https://faucets.chain.link>
+  - <https://www.alchemy.com/faucets/ethereum-sepolia>
 
-### DepositRouter deployment (scenario 4)
+Rough sizing: each deposit consumes ~150k gas at ~30 gwei ≈ 0.0000045 ETH. For 1000 sales budget ~0.005 ETH (+ ~0.000005 ETH for the one-time Permit2 approve on first run + faucet minimums).
 
-`mercata/ethereum/.openzeppelin/` currently only has a Base Sepolia manifest. To run Scenario 4 against Ethereum Sepolia:
+### DepositRouter deployment
+
+The bridge service expects `DepositRouter.sol` deployed on Sepolia.
 
 1. Deploy `mercata/ethereum/contracts/bridge/DepositRouter.sol` to Sepolia via the hardhat project in `mercata/ethereum/`.
-2. Register the deployed address + supported token mappings in the on-chain `MercataBridge` contract on STRATO (see `mercata/services/bridge/README.md`).
+2. Register the deployed address + supported token mappings (USDC ↔ USDST) in the on-chain `MercataBridge` contract on STRATO (see `mercata/services/bridge/README.md`).
 3. Configure the bridge service's `CHAIN_11155111_RPC_URL` env var and ensure it is running.
-4. Paste the Sepolia DepositRouter address + matching `targetStratoToken` into `config.highlevel.yaml`.
+4. Paste the Sepolia DepositRouter address into `config.highlevel.yaml` under `scenarios.tokenSale.bridge.depositRouterAddress`.
 
 ## Reports
 
@@ -212,8 +147,6 @@ After any run, `./reports/report-<timestamp>.html` opens in a browser and shows:
 - **Transaction timeline chart** — submitted, confirmed, failed per second.
 - **Latency comparison chart** — bar chart of percentiles.
 - **Error listing** — first 100 errors.
-
-For RPC and full-app scenarios, each HTTP request is recorded as a "tx" with `submitDuration` = HTTP latency and `confirmDuration` = 0. Methods/steps appear as `jsonRpcStress:eth_blockNumber` and `fullApp:purchase` respectively in the summary table.
 
 ## Legacy scenarios (direct node API)
 
@@ -272,11 +205,8 @@ scenarios:
 # Run all enabled scenarios (per the config file)
 npm run test:all
 
-# Run a specific scenario
-npm run test:token-sale       # Scenario 1
-npm run test:rpc              # Scenario 2
-npm run test:full-app         # Scenario 3
-npm run test:bridge-in        # Scenario 4
+# High-level
+npm run test:token-sale
 
 # Low-level (direct node) scenarios
 npm run test:deploy
@@ -297,9 +227,13 @@ ts-node src/cli.ts [options]
 
 Options:
   -c, --config <path>       Path to config YAML file (default: "config.yaml")
-  -s, --scenario <name>     Run a specific scenario: contractDeploy, functionCall, mixedWorkload
-  --batch-size <n>          Override batch size for all scenarios
-  --batch-count <n>         Override batch count for all scenarios
+  -s, --scenario <name>     Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale
+  --batch-size <n>          Override batch size for low-level scenarios
+  --batch-count <n>         Override batch count for low-level scenarios
+  --concurrent-users <n>    Override concurrentUsers (tokenSale)
+  --total-tx <n>            Override totalTxCount (tokenSale)
+  --time-window <ms>        Override timeWindowMs (tokenSale)
+  --backend-url <url>       Override backend URL (tokenSale)
   --nodes <names>           Comma-separated node names to target
   --report-dir <path>       Output directory for reports
   -v, --verbose             Enable verbose per-batch logging

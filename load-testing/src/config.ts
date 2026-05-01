@@ -83,62 +83,19 @@ export function loadConfig(configPath: string): LoadTestConfig {
         concurrentUsers: 50,
         networkLabel: "helium",
         chainId: 114784819836269,
-        // Bridge-in phase (requires a real externalTxHash on the backend
-        // otherwise /api/bridge/requestDepositAction rejects). Skipped by
-        // default; enable by setting skipBridgeRequest: false and providing
-        // a valid externalTxHash that exists on externalChainId.
         externalChainId: "11155111", // Ethereum Sepolia (testnet) — set to "1" for mainnet
-        externalTxHash: "",
-        action: 2,
-        // Buy-metal phase (default: USDST -> GOLDST on helium testnet).
+        // `bridge` and `metalTokenAddress` MUST be supplied in user config —
+        // there is no sensible default for the funded EOA / DepositRouter / GOLDST.
+        bridge: undefined as any,
         metalTokenAddress: "",
-        payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
-        payAmount: "1000000000000000",
-        minMetalOut: "0",
+        payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010", // helium USDST
+        metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6", // helium MetalForge
         includePageLoad: true,
-        skipBridgeRequest: true,
-        skipBuyMetal: false,
         logBalances: "none",
-        metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6", // helium testnet MetalForge
         requestRetries: 3,
+        autoForgeWaitTimeoutSec: 300,
+        autoForgeWaitPollIntervalSec: 5,
         ...raw.scenarios?.tokenSale,
-      },
-      jsonRpcStress: {
-        enabled: false,
-        rpcUrl: "https://app.testnet.strato.nexus/rpc/114784819836269",
-        concurrentUsers: 300,
-        durationMs: 60000,
-        thinkTimeMs: 0,
-        authenticated: true,
-        methods: [],
-        ...raw.scenarios?.jsonRpcStress,
-      },
-      fullApp: {
-        enabled: false,
-        baseUrl: "https://app.testnet.strato.nexus",
-        concurrentUsers: 300,
-        durationMs: 120000,
-        workflow: [],
-        ...raw.scenarios?.fullApp,
-      },
-      bridgeIn: {
-        enabled: false,
-        totalBridgeIns: 50,
-        timeWindowMs: 30000,
-        sepoliaChainId: 11155111,
-        sepoliaRpcUrl: "",
-        sepoliaPrivateKey: "",
-        depositRouterAddress: "",
-        depositMode: "ETH",
-        amountPerTx: "1000000000000",
-        stratoRecipientAddress: "",
-        targetStratoToken: "",
-        awaitSepoliaConfirmation: false,
-        stratoConfirmTimeoutSec: 180,
-        gasLimit: 250000,
-        maxFeePerGasGwei: 30,
-        maxPriorityFeePerGasGwei: 2,
-        ...raw.scenarios?.bridgeIn,
       },
     },
     report: { ...DEFAULTS.report!, ...raw.report },
@@ -155,11 +112,9 @@ export interface CliOverrides {
   reportDir?: string;
   submitMode?: SubmitMode;
   concurrentUsers?: number;
-  duration?: number;
   totalTx?: number;
   timeWindow?: number;
   backendUrl?: string;
-  rpcUrl?: string;
 }
 
 const KNOWN_SCENARIOS = new Set([
@@ -167,9 +122,6 @@ const KNOWN_SCENARIOS = new Set([
   "functionCall",
   "mixedWorkload",
   "tokenSale",
-  "jsonRpcStress",
-  "fullApp",
-  "bridgeIn",
 ]);
 
 export function applyCliOverrides(
@@ -215,27 +167,15 @@ export function applyCliOverrides(
   }
   if (overrides.concurrentUsers !== undefined) {
     config.scenarios.tokenSale.concurrentUsers = overrides.concurrentUsers;
-    config.scenarios.jsonRpcStress.concurrentUsers = overrides.concurrentUsers;
-    config.scenarios.fullApp.concurrentUsers = overrides.concurrentUsers;
-  }
-  if (overrides.duration !== undefined) {
-    config.scenarios.jsonRpcStress.durationMs = overrides.duration;
-    config.scenarios.fullApp.durationMs = overrides.duration;
   }
   if (overrides.totalTx !== undefined) {
     config.scenarios.tokenSale.totalTxCount = overrides.totalTx;
-    config.scenarios.bridgeIn.totalBridgeIns = overrides.totalTx;
   }
   if (overrides.timeWindow !== undefined) {
     config.scenarios.tokenSale.timeWindowMs = overrides.timeWindow;
-    config.scenarios.bridgeIn.timeWindowMs = overrides.timeWindow;
   }
   if (overrides.backendUrl) {
     config.scenarios.tokenSale.backendUrl = overrides.backendUrl;
-    config.scenarios.fullApp.baseUrl = overrides.backendUrl;
-  }
-  if (overrides.rpcUrl) {
-    config.scenarios.jsonRpcStress.rpcUrl = overrides.rpcUrl;
   }
   return config;
 }

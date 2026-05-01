@@ -1,18 +1,16 @@
 # -----------------------------------------------------------------------------
-# STRATO Load Test Config — high-level (application-layer) scenarios
+# STRATO Load Test Config — high-level (application-layer) scenario
 # -----------------------------------------------------------------------------
-# This config wires up the four "high-level" scenarios that exercise the full
+# Wires up the canonical UI bridge-in flow scenario that exercises the full
 # Mercata application stack (ui + backend + STRATO + bridge):
-#   - tokenSale      (bridge-in + buy-metals composition)
-#   - jsonRpcStress  (JSON-RPC proxy load)
-#   - fullApp        (multi-step user workflow)
-#   - bridgeIn       (Sepolia -> STRATO bridge)
+#   - tokenSale  (Sepolia USDC -> USDST -> AUTO_FORGE -> GOLDST)
+#
 # For low-level direct-node scenarios (contractDeploy / functionCall /
 # mixedWorkload) see config.example.yaml instead.
 #
 # Defaults below target helium (STRATO chainId 114784819836269) but
 # nothing here is specific to helium — point the URLs and addresses at any
-# other STRATO network and the same scenarios will run.
+# other STRATO network and the same scenario will run.
 #
 # HOW TO USE THIS FILE
 # --------------------
@@ -24,11 +22,8 @@
 # uncommented with a REPLACE_* placeholder.
 #
 # Copy to config.highlevel.yaml and fill in the credentials + addresses for
-# your environment. Run one scenario at a time via:
+# your environment. Run via:
 #   npm run test:token-sale -- --config config.highlevel.yaml
-#   npm run test:rpc        -- --config config.highlevel.yaml
-#   npm run test:full-app   -- --config config.highlevel.yaml
-#   npm run test:bridge-in  -- --config config.highlevel.yaml
 # -----------------------------------------------------------------------------
 
 nodes:
@@ -56,92 +51,108 @@ nodes:
 
 scenarios:
   # ---------------------------------------------------------------------------
-  # Scenario 1 — Token Sale TPS (1000 sales / 30s)
+  # Token Sale TPS — canonical UI bridge-in flow (1000 sales / 30s)
   # ---------------------------------------------------------------------------
-  # Replays the "Fund > Bridge-In (Ethereum → STRATO, USDC → GOLDST)" flow
-  # performed by mercata/ui/src/components/bridge/BridgeIn.tsx. Each "sale"
-  # is the composition of:
-  #   1. POST /api/bridge/requestDepositAction   (AUTO_FORGE action)
-  #   2. POST /api/metal-forge/buy               (USDST → metal on STRATO)
+  # Replays the "Fund > Bridge-In (Sepolia USDC → STRATO USDST → AUTO_FORGE
+  # GOLDST)" composition performed by mercata/ui/src/components/bridge/BridgeIn.tsx.
+  # Each "sale" is the composition of:
+  #   1. Sign Permit2 typed-data (EIP-712) for USDC on Sepolia.
+  #   2. Broadcast DepositRouter.deposit(USDC, ..., signature) on Sepolia.
+  #   3. POST /api/bridge/requestDepositAction
+  #      { externalChainId, externalTxHash, action: 2 (AUTO_FORGE),
+  #        targetToken: GOLDST }.
+  # The bridge service polls Sepolia, sees the deposit, mints USDST to the
+  # recipient and auto-forges USDST → GOLDST server-side. The load test does
+  # NOT call /api/metal-forge/buy — AUTO_FORGE handles the metal mint.
+  #
   # An optional warm-up issues the same GETs the Fund page does on mount
   # (networkConfigs / depositActions / bridgeableTokens / metal-forge/configs).
   #
-  # The Ethereum-side Permit2 approve + DepositRouter.deposit are NOT replayed
-  # per iteration (they burn real gas / block time). Set externalTxHash to a
-  # real Ethereum tx hash to exercise the bridge request, or leave
-  # skipBridgeRequest=true (default) to exercise only the buy-metal leg.
-  #
-  # Each test user must hold enough USDST balance + voucher/USDST gas coverage
-  # (0.01 USDST per approve+mint pair).
+  # Prerequisites:
+  #   - Sepolia USDC in the broadcaster EOA (faucet at https://faucet.circle.com).
+  #   - Sepolia ETH in the same EOA for gas.
+  #   - On first run, init() submits a one-time approve(MAX) for Permit2 to
+  #     spend USDC from the EOA.
+  #   - Voucher or USDST gas coverage on the STRATO recipient (for the
+  #     bridgeRequest backend call's on-STRATO tx).
   tokenSale:
+    enabled: true
     # REQUIRED — GOLDST (or another metal token) address on STRATO.
     # Discover via `curl $BACKEND/api/metal-forge/configs`.
     metalTokenAddress: "REPLACE_GOLDST_ADDRESS"
+    # REQUIRED — Sepolia broadcaster (one funded EOA signs every iteration).
+    bridge:
+      sepoliaRpcUrl:           "https://eth-sepolia.g.alchemy.com/v2/REPLACE_KEY"
+      sepoliaPrivateKey:       "0xREPLACE_FUNDED_PRIVATE_KEY"
+      depositRouterAddress:    "0xREPLACE_DEPOSIT_ROUTER_ADDRESS_ON_SEPOLIA"
+      stratoRecipientAddress:  "REPLACE_STRATO_RECIPIENT"          # hex, with or without 0x
+      sepoliaTokenAddress:     "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"  # Sepolia USDC (Circle's)
+      targetStratoToken:       "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"     # USDST on STRATO
+      amountPerTx:             "1000"                              # 0.001 USDC (USDC has 6 decimals)
+      # On first run with this EOA, init() submits a one-time approve(MAX) for
+      # Permit2 on the configured ERC20. After that, every iteration only
+      # signs a Permit2 typed-data and calls DepositRouter.deposit(...).
+      # permit2Address:        "0x000000000022D473030F116dDEE9F6B43aC78BA3"   # default: canonical Permit2
+      # permitDeadlineSec:     1800                                  # default 30 min Permit2 deadline
+      # chainId:                 11155111                             # default Sepolia
+      # awaitConfirmation:       false                                # default — block on Sepolia receipt per iteration?
+      # gasLimit:                250000                               # default
+      # maxFeePerGasGwei:        30                                   # default
+      # maxPriorityFeePerGasGwei: 2                                   # default
+      # startNonce: 0                                                 # default: read from chain ("pending")
     # --- everything below has a code default; uncomment to override ---
-    # enabled: false                        # default
     # backendUrl: "https://app.testnet.strato.nexus"   # default: node[0].url
     # networkLabel: "helium"                # default (report metadata only)
     # chainId: 114784819836269              # default (STRATO helium testnet)
     # totalTxCount: 1000                    # default
     # timeWindowMs: 30000                   # default (paces rate to hit totalTxCount over this window)
-    # concurrentUsers: 50                   # default (The number of parallel sales to run, spread across the configured user accounts in a round-robin fashion)
-    # --- bridge-in phase (POST /api/bridge/requestDepositAction) ---
+    # concurrentUsers: 50                   # default — parallel sales, spread across the user pool round-robin
     # externalChainId: "11155111"           # default Ethereum Sepolia ("1" Ethereum mainnet | "8453" Base | ...)
-    # externalTxHash: ""                    # default — STATIC fallback hash (used only when `bridge` is unset)
-    # action: 2                             # default (1=AUTO_SAVE lend, 2=AUTO_FORGE metal)
-    # --- inline Sepolia broadcaster (Scenario 4 flow merged into Scenario 1) ---
-    # When `bridge` is set AND skipBridgeRequest is false, every iteration:
-    #   1. Broadcasts a fresh DepositRouter.depositETH on Sepolia (sequential nonce).
-    #   2. Posts /api/bridge/requestDepositAction with the resulting hash.
-    #   3. Posts /api/metal-forge/buy.
-    # All N iterations run in parallel across workers; the broadcaster signs
-    # them with nonces startNonce..startNonce+N-1 from a single funded EOA.
-    # NOTE: the EOA needs ~N × (amountPerTx + gas) Sepolia ETH funded up-front.
-    # bridge:
-    #   sepoliaRpcUrl:           "https://sepolia.infura.io/v3/REPLACE_INFURA_KEY"
-    #   sepoliaPrivateKey:       "0xREPLACE_FUNDED_PRIVATE_KEY"
-    #   depositRouterAddress:    "0xREPLACE_DEPOSIT_ROUTER_ADDRESS_ON_SEPOLIA"
-    #   stratoRecipientAddress:  "REPLACE_STRATO_RECIPIENT"          # hex, with or without 0x
-    #   targetStratoToken:       "93fb7295859b2d70199e0a4883b7c320cf874e6c"   # helium ETH token (or USDST etc.)
-    #   amountPerTx:             "1000000000000"                     # default 0.000001 ETH per bridge-in
-    #   chainId:                 11155111                             # default Sepolia
-    #   awaitConfirmation:       false                                # default — block on Sepolia receipt per iteration?
-    #   gasLimit:                250000                               # default
-    #   maxFeePerGasGwei:        30                                   # default
-    #   maxPriorityFeePerGasGwei: 2                                   # default
-    #   # startNonce: 0                                               # default: read from chain ("pending")
-    # --- buy-metal phase (POST /api/metal-forge/buy) ---
-    # payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"  # default (USDST helium testnet)
-    # payAmount: "1000000000000000"         # default (0.001 USDST in 18-dec wei)
-    # minMetalOut: "0"                      # default (slippage guard — compute from oracle in prod)
-    # --- behaviour toggles ---
+    # payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"  # default — helium USDST (intermediate token AUTO_FORGE consumes)
+    # metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6"   # default (helium MetalForge — used only for forge-side balance reads)
     # includePageLoad: true                 # default (4 Fund-page GETs once per user during warmup)
-    # skipBridgeRequest: true               # default (set false + supply externalTxHash to include bridge leg)
-    # skipBuyMetal: false                   # default
-    # --- pipeline mode (decouples broadcast / bridge / buy phases) ---
+    # --- pipeline mode (decouples Sepolia broadcast / bridge-request phases) ---
     # When true the scenario runs in TWO PHASES with bounded concurrency:
     #   Phase 1: broadcast all N Sepolia deposits in parallel (single signer,
     #            sequential nonces; concurrency=sepoliaConcurrency).
-    #   Phase 2: for each successful broadcast, fire bridgeRequest+buyMetal
-    #            in parallel (concurrency=backendConcurrency).
+    #   Phase 2: for each successful broadcast, fire the AUTO_FORGE bridge
+    #            request (concurrency=backendConcurrency).
     # Wall clock collapses to ~max(slowest broadcast)+max(slowest backend rt)
-    # instead of the per-worker N×(broadcast+bridge+buy) sequence. timeWindowMs
-    # is ignored under pipelineMode — phases run as fast as concurrency allows.
+    # instead of the per-worker N×(broadcast+bridgeRequest) sequence.
+    # timeWindowMs is ignored under pipelineMode — phases run as fast as
+    # concurrency allows.
     # pipelineMode: false                   # default
     # sepoliaConcurrency: 50                # default = concurrentUsers
     # backendConcurrency: 50                # default = concurrentUsers
-    # --- transient-error retry (bridgeRequest + buyMetal legs) ---
+    # --- transient-error retry (bridgeRequest leg) ---
     # Retries on HTTP 429 + any 5xx (e.g. backend 503 when the bridge service
     # is overloaded). Backoff between attempts is exponential with ±0..500 ms
     # jitter — attempt 2 fires after ~1.5s, attempt 3 after ~3s, attempt 4
     # after ~6s. Final post-retry failures still surface as `… FAILED:` lines.
     # requestRetries: 3                     # default; 0 disables retry
     # --- balance logging ---
-    # logBalances: "none"                   # default — "none" | "summary" | "perStep"
-    #                                       # none:    no balance reads (max throughput, pre-feature behaviour)
+    # logBalances: "none"                   # default — "none" | "summary"
     #                                       # summary: one snapshot before + one after the whole run
-    #                                       # perStep: snapshot before + after every iteration (adds ~6 GETs/sale)
-    # metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6"   # default (helium MetalForge — used for forge-side balance reads)
+    #                                       #          (auth-filtered; reports the calling user's balances,
+    #                                       #          not the recipient's — see autoForgeWait* below for the
+    #                                       #          end-to-end mint check on the recipient)
+    # --- end-to-end AUTO_FORGE verification ---
+    # After all bridge requests have been posted, the bridge service still
+    # has to (a) wait for Sepolia confirmations, (b) MercataBridge.completeDeposit
+    # mint USDST, (c) MetalForge.mintMetal mint GOLDST. The scenario polls the
+    # recipient's STRATO GOLDST balance in Cirrus (keyed by stratoRecipientAddress
+    # directly, NOT auth-filtered) until either:
+    #   - Number of distinct GOLDST balance increments == number of successful
+    #     Sepolia broadcasts (each AUTO_FORGE mint yields one increment), or
+    #   - Balance is stable for >=2 polls AND at least one mint was observed
+    #     (treated as "PARTIAL — some bridges may have failed silently"), or
+    #   - autoForgeWaitTimeoutSec elapses (treated as a hard "TIMEOUT" signal —
+    #     bridge service may still drain afterwards; check Cirrus manually).
+    # Final outcome tagged "[OK]" / "[PARTIAL]" / "[TIMEOUT]" in the run summary.
+    # autoForgeWaitTimeoutSec: 300          # default 300 s (5 min). Set to 0 to disable the wait
+    #                                       # entirely — useful when you only care about Sepolia/backend
+    #                                       # latency and not end-to-end correctness.
+    # autoForgeWaitPollIntervalSec: 5       # default 5 s (~60 polls over the default 5 min timeout)
     # --- optional user pool (cycles across concurrentUsers for more realistic auth load) ---
     # users:
     #   - { username: "loadtest1", password: "pw1" }
@@ -149,83 +160,6 @@ scenarios:
     # openIdDiscoveryUrl: ""                # default: node[0].auth.openIdDiscoveryUrl
     # clientId: ""                          # default: node[0].auth.clientId
     # clientSecret: ""                      # default: node[0].auth.clientSecret
-
-  # ---------------------------------------------------------------------------
-  # Scenario 2 — JSON-RPC stress (300 users)
-  # ---------------------------------------------------------------------------
-  # Targets https://app.testnet.strato.nexus/rpc/<chainId>. The mercata backend
-  # forwards this to the STRATO node's /strato-api/eth/v1.2 JSON-RPC endpoint.
-  # Methods known to be implemented by the STRATO node are used by default;
-  # eth_getLogs / eth_getTransactionReceipt are deliberately excluded.
-  jsonRpcStress:
-    # enabled: false                        # default
-    # rpcUrl: "https://app.testnet.strato.nexus/rpc/114784819836269"   # default
-    # concurrentUsers: 300                  # default
-    # durationMs: 60000                     # default
-    # thinkTimeMs: 0                        # default
-    # authenticated: true                   # default — /rpc/:chainId requires a bearer token
-    # methods: []                           # default — uses built-in rotation in src/scenarios/jsonRpcStress.ts
-    # methods:
-    #   - { method: "eth_blockNumber", weight: 4 }
-    #   - { method: "eth_getBalance",  weight: 3, params: ["0x0000000000000000000000000000000000000000", "latest"] }
-
-  # ---------------------------------------------------------------------------
-  # Scenario 3 — Full app simulation (300 users)
-  # ---------------------------------------------------------------------------
-  # Each virtual user walks through a realistic Mercata workflow (home ->
-  # browse -> balance -> Fund-page GETs -> purchase -> events). Uses the
-  # mercata backend via /api/*.
-  fullApp:
-    # enabled: false                        # default
-    # baseUrl: "https://app.testnet.strato.nexus"   # default
-    # concurrentUsers: 300                  # default
-    # durationMs: 120000                    # default
-    # iterationsPerUser: 3                  # optional cap; default = loop for durationMs
-    # workflow: []                          # default — uses built-in workflow in src/scenarios/fullAppSimulation.ts
-    # workflow:
-    #   - { name: home,       method: GET,  path: "/",                   thinkTimeMs: 300 }
-    #   - { name: listTokens, method: GET,  path: "/api/tokens",  auth: true, thinkTimeMs: 400 }
-    #   - { name: balance,    method: GET,  path: "/api/tokens/balance", auth: true }
-    #   - { name: purchase,   method: POST, path: "/api/metal-forge/buy", auth: true,
-    #       body: { metalToken: "{metalTokenAddress}", payToken: "{payTokenAddress}",
-    #               payAmount: "{payAmount}", minMetalOut: "{minMetalOut}" } }
-
-  # ---------------------------------------------------------------------------
-  # Scenario 4 — Ethereum Sepolia → STRATO bridge-in (50 / 30s)
-  # ---------------------------------------------------------------------------
-  # Uses ethers.js to broadcast DepositRouter.depositETH transactions from a
-  # funded Sepolia EOA. The bridge service (mercata/services/bridge) detects
-  # the DepositRouted event and credits the recipient on STRATO.
-  #
-  # Prerequisites:
-  #   - DepositRouter contract deployed on Sepolia (see README for deployment
-  #     steps using mercata/ethereum/hardhat). Register its address +
-  #     asset mappings in the on-chain MercataBridge contract on STRATO.
-  #   - Sepolia RPC URL (Infura/Alchemy/dRPC).
-  #   - Funded Sepolia account — fund via faucets.chain.link / sepoliafaucet.com.
-  #   - Bridge service running with CHAIN_11155111_RPC_URL pointing at Sepolia.
-  bridgeIn:
-    # --- REQUIRED for this scenario to start ---
-    sepoliaRpcUrl: "https://sepolia.infura.io/v3/REPLACE_INFURA_KEY"
-    sepoliaPrivateKey: "0xREPLACE_FUNDED_PRIVATE_KEY"
-    depositRouterAddress: "0xREPLACE_DEPOSIT_ROUTER_ADDRESS_ON_SEPOLIA"
-    stratoRecipientAddress: "REPLACE_STRATO_RECIPIENT"  # hex, no 0x
-    targetStratoToken: "93fb7295859b2d70199e0a4883b7c320cf874e6c"  # helium ETH token — override for other targets
-    # --- everything below has a code default ---
-    # enabled: false                        # default
-    # totalBridgeIns: 50                    # default
-    # timeWindowMs: 30000                   # default
-    # sepoliaChainId: 11155111              # default
-    # depositMode: "ETH"                    # default — "ERC20" requires Permit2 signing (not yet supported)
-    # sepoliaTokenAddress: ""               # optional, only used with depositMode="ERC20"
-    # amountPerTx: "1000000000000"          # default (0.000001 ETH per bridge-in)
-    # stratoBackendUrl: "https://app.testnet.strato.nexus"  # optional — only used for post-bridge verification messaging
-    # awaitSepoliaConfirmation: false       # default
-    # stratoConfirmTimeoutSec: 180          # default
-    # startNonce: 0                         # default: read from chain ("pending")
-    # gasLimit: 250000                      # default
-    # maxFeePerGasGwei: 30                  # default
-    # maxPriorityFeePerGasGwei: 2           # default
 
   # ---------------------------------------------------------------------------
   # Low-level legacy scenarios — use config.example.yaml for a richer setup.

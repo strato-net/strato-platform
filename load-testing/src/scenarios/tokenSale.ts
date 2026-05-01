@@ -12,36 +12,40 @@ import {
 } from "../types";
 import {
   takeBalanceSnapshot,
+  readCirrusBalance,
   formatSnapshot,
   formatDiff,
-  diffObject,
   SnapshotTargets,
   BalanceSnapshot,
 } from "../api/balanceSnapshot";
 import { SepoliaBroadcaster, normalizeAddress0x } from "../tx/sepoliaBroadcast";
 
 /**
- * Scenario 1 — Token Sale TPS.
+ * Scenario 1 — Token Sale TPS (canonical UI flow only).
  *
- * Replays the "Fund > Bridge-In USDC (Ethereum) → GOLDST (STRATO)" flow
- * performed by the Mercata UI in
+ * Replays the Mercata UI's "Fund > Bridge-In Ethereum Sepolia, Send USDC,
+ * Receive GOLDST" composition from
  * mercata/ui/src/pages/DepositsPage.tsx + components/bridge/BridgeIn.tsx.
  *
- * Per the UI trace (see BridgeIn.handleBridge + handleBuyMetals):
+ * Per UI trace (BridgeIn.handleBridge with AUTO_FORGE selected):
  *   Page-load GETs (once per user, gated by includePageLoad):
  *     - GET /api/bridge/networkConfigs
  *     - GET /api/bridge/depositActions
  *     - GET /api/bridge/bridgeableTokens/{externalChainId}
  *     - GET /api/metal-forge/configs
  *
- *   Per-iteration POSTs:
- *     - POST /api/bridge/requestDepositAction   (action=2, AUTO_FORGE)
- *     - POST /api/metal-forge/buy               (USDST -> metal on STRATO)
+ *   Per-iteration legs:
+ *     1. Sign Permit2 PermitTransferFrom typed-data (EIP-712) for USDC.
+ *     2. Submit DepositRouter.deposit(USDC, ..., signature) on Sepolia.
+ *     3. POST /api/bridge/requestDepositAction
+ *        { externalChainId, externalTxHash: <leg-1 hash>, action: 2,
+ *          targetToken: GOLDST }
  *
- * The Ethereum-side Permit2 approve + DepositRouter.deposit are not replayed
- * per iteration — they burn real gas and real block time. Point
- * externalTxHash at a previously-broadcast Sepolia/Ethereum tx hash, or leave
- * skipBridgeRequest=true to exercise only the /metal-forge/buy leg.
+ * The bridge service (mercata/services/bridge) polls Sepolia, sees the
+ * DepositRouted event, mints USDST to the recipient on STRATO and (because
+ * action=2 AUTO_FORGE was queued) auto-forges USDST → GOLDST server-side.
+ * The load test does NOT call /api/metal-forge/buy directly — AUTO_FORGE
+ * handles the metal mint.
  *
  * TPS is measured over both legs combined (what the UI treats as a single
  * "sale" from the user's perspective).
@@ -153,71 +157,35 @@ export class TokenSaleScenario extends BaseScenario {
     }
   }
 
-  private buildBridgeRequestBody(cfg: TokenSaleScenarioConfig) {
-    const body: Record<string, any> = {
-      externalChainId: cfg.externalChainId ?? "11155111",
-      externalTxHash: cfg.externalTxHash ?? "",
-      action: cfg.action ?? 2,
-    };
-    // action=2 (AUTO_FORGE) needs targetToken; action=1 (AUTO_SAVE) omits it.
-    if ((cfg.action ?? 2) === 2 && cfg.metalTokenAddress) {
-      body.targetToken = cfg.metalTokenAddress;
-    }
-    return body;
-  }
-
-  private buildBuyMetalBody(cfg: TokenSaleScenarioConfig) {
-    return {
-      metalToken: cfg.metalTokenAddress,
-      payToken: cfg.payTokenAddress,
-      payAmount: cfg.payAmount,
-      minMetalOut: cfg.minMetalOut ?? "0",
-    };
-  }
-
   async run(clients: NodeClients): Promise<ScenarioResult> {
     const cfg = this.config.scenarios.tokenSale;
     const node = this.config.nodes[0];
 
-    // Three legs may run per iteration. Their enablement is evaluated up-front:
-    //   - willBroadcast : broadcast a fresh Sepolia DepositRouter.depositETH
-    //                     per iteration (requires `bridge` sub-config)
-    //   - willBridge    : POST /api/bridge/requestDepositAction (uses either
-    //                     the per-iteration broadcast hash, or a static
-    //                     externalTxHash, or both — broadcast wins)
-    //   - willBuy       : POST /api/metal-forge/buy
-    const willBroadcast =
-      cfg.skipBridgeRequest !== true &&
-      cfg.bridge !== undefined &&
-      !!cfg.bridge.sepoliaRpcUrl;
-    const willBridge =
-      cfg.skipBridgeRequest !== true &&
-      (willBroadcast ||
-        (!!cfg.externalTxHash && cfg.externalTxHash.length > 0));
-    const willBuy = cfg.skipBuyMetal !== true;
-
-    if (!willBridge && !willBuy && !willBroadcast) {
+    // Required-field validation.
+    if (!cfg.bridge) {
       throw new Error(
-        "tokenSale: nothing to do — broadcast, bridge request, and buy-metal are all disabled",
+        "tokenSale: `bridge` config is required — supply sepoliaRpcUrl, " +
+          "sepoliaPrivateKey, depositRouterAddress, sepoliaTokenAddress, " +
+          "stratoRecipientAddress, targetStratoToken.",
       );
     }
-    if (willBuy && !cfg.metalTokenAddress) {
-      throw new Error("tokenSale: metalTokenAddress is required when skipBuyMetal is false");
-    }
-    if (willBuy && !cfg.payTokenAddress) {
-      throw new Error("tokenSale: payTokenAddress is required when skipBuyMetal is false");
-    }
-    if (willBridge && !cfg.metalTokenAddress && (cfg.action ?? 2) === 2) {
+    const b = cfg.bridge;
+    if (!b.sepoliaRpcUrl) throw new Error("tokenSale.bridge: sepoliaRpcUrl is required");
+    if (!b.sepoliaPrivateKey) throw new Error("tokenSale.bridge: sepoliaPrivateKey is required");
+    if (!b.depositRouterAddress) throw new Error("tokenSale.bridge: depositRouterAddress is required");
+    if (!b.stratoRecipientAddress) throw new Error("tokenSale.bridge: stratoRecipientAddress is required");
+    if (!b.targetStratoToken) throw new Error("tokenSale.bridge: targetStratoToken is required");
+    if (!b.sepoliaTokenAddress) {
       throw new Error(
-        "tokenSale: metalTokenAddress is required for action=2 (AUTO_FORGE) bridge requests",
+        "tokenSale.bridge: sepoliaTokenAddress is required (e.g. Sepolia " +
+          "USDC at 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238).",
       );
     }
-    if (willBroadcast && cfg.bridge) {
-      const b = cfg.bridge;
-      if (!b.sepoliaPrivateKey) throw new Error("tokenSale.bridge: sepoliaPrivateKey is required");
-      if (!b.depositRouterAddress) throw new Error("tokenSale.bridge: depositRouterAddress is required");
-      if (!b.stratoRecipientAddress) throw new Error("tokenSale.bridge: stratoRecipientAddress is required");
-      if (!b.targetStratoToken) throw new Error("tokenSale.bridge: targetStratoToken is required");
+    if (!cfg.metalTokenAddress) {
+      throw new Error(
+        "tokenSale: metalTokenAddress is required — the GOLDST (or other " +
+          "metal) target of the AUTO_FORGE post-deposit action.",
+      );
     }
 
     await this.initClientPool(cfg, { backendUrl: node.url, auth: node.auth });
@@ -248,57 +216,81 @@ export class TokenSaleScenario extends BaseScenario {
       );
     }
 
-    const baseBridgeBody = willBridge ? this.buildBridgeRequestBody(cfg) : null;
-    const buyBody = willBuy ? this.buildBuyMetalBody(cfg) : null;
+    const baseBridgeBody = {
+      externalChainId: cfg.externalChainId ?? "11155111",
+      externalTxHash: "" as string, // overridden per iteration with the broadcast hash
+      action: 2 as const, // AUTO_FORGE
+      targetToken: cfg.metalTokenAddress,
+    };
 
-    // ---- Bring up Sepolia broadcaster (lazy-imports ethers via the helper) ----
-    let broadcaster: SepoliaBroadcaster | null = null;
-    let broadcasterRecipient: string | null = null;
-    let broadcasterTarget: string | null = null;
-    let broadcasterAmount: string | null = null;
-    if (willBroadcast && cfg.bridge) {
-      const b = cfg.bridge;
-      broadcaster = new SepoliaBroadcaster({
-        rpcUrl: b.sepoliaRpcUrl,
-        privateKey: b.sepoliaPrivateKey,
-        depositRouterAddress: b.depositRouterAddress,
-        chainId: b.chainId,
-        gasLimit: b.gasLimit,
-        maxFeePerGasGwei: b.maxFeePerGasGwei,
-        maxPriorityFeePerGasGwei: b.maxPriorityFeePerGasGwei,
-        startNonce: b.startNonce,
-      });
-      await broadcaster.init();
-      broadcasterRecipient = normalizeAddress0x(b.stratoRecipientAddress);
-      broadcasterTarget = normalizeAddress0x(b.targetStratoToken);
-      broadcasterAmount = b.amountPerTx ?? "1000000000000";
+    // ---- Bring up Sepolia broadcaster (lazy-imports ethers) ----
+    const broadcaster = new SepoliaBroadcaster({
+      rpcUrl: b.sepoliaRpcUrl,
+      privateKey: b.sepoliaPrivateKey,
+      depositRouterAddress: b.depositRouterAddress,
+      tokenAddress: b.sepoliaTokenAddress,
+      permit2Address: b.permit2Address,
+      chainId: b.chainId,
+      gasLimit: b.gasLimit,
+      maxFeePerGasGwei: b.maxFeePerGasGwei,
+      maxPriorityFeePerGasGwei: b.maxPriorityFeePerGasGwei,
+      startNonce: b.startNonce,
+    });
+    await broadcaster.init();
+    const broadcasterRecipient = normalizeAddress0x(b.stratoRecipientAddress);
+    const broadcasterTarget = normalizeAddress0x(b.targetStratoToken);
+    const broadcasterAmount = b.amountPerTx ?? "1000"; // 0.001 USDC (USDC has 6 decimals)
+    console.log(
+      `[tokenSale] Sepolia broadcaster ready — wallet=${broadcaster.walletAddress} ` +
+        `startNonce=${broadcaster.startNonce} amount=${broadcasterAmount} ` +
+        `token=${b.sepoliaTokenAddress} -> strato=${broadcasterRecipient} ` +
+        `stratoToken=${broadcasterTarget} awaitConfirmation=${b.awaitConfirmation === true}`,
+    );
+
+    // ---- EOA balance sanity check (fail-fast diagnostic) ----
+    // If the broadcaster EOA lacks USDC or Sepolia ETH, every deposit will
+    // revert with "ERC20: insufficient balance" / "out of gas" — surface
+    // that up-front so the user doesn't wait 5 minutes for a TIMEOUT.
+    try {
+      const eoaBal = await broadcaster.getEoaBalances();
+      const requiredToken = BigInt(broadcasterAmount) * BigInt(cfg.totalTxCount);
+      const tokenStr = eoaBal.tokenUnits === null ? "?" : eoaBal.tokenUnits.toString();
       console.log(
-        `[tokenSale] Sepolia broadcaster ready — wallet=${broadcaster.walletAddress} ` +
-          `startNonce=${broadcaster.startNonce} amount=${broadcasterAmount} wei ` +
-          `-> strato=${broadcasterRecipient} token=${broadcasterTarget} ` +
-          `awaitConfirmation=${b.awaitConfirmation === true}`,
+        `[tokenSale] EOA ${broadcaster.walletAddress} balances: ` +
+          `ETH=${eoaBal.ethWei} wei, ` +
+          `${b.sepoliaTokenAddress.substring(0, 10)}…=${tokenStr} ` +
+          `(need ≥${requiredToken} for ${cfg.totalTxCount} bridge(s) of ${broadcasterAmount} each)`,
       );
+      if (eoaBal.tokenUnits !== null && eoaBal.tokenUnits < requiredToken) {
+        console.warn(
+          `[tokenSale] WARN: EOA token balance ${eoaBal.tokenUnits} < required ` +
+            `${requiredToken}. Deposits will revert on Permit2 transferFrom — ` +
+            `top up the EOA at https://faucet.circle.com (Sepolia USDC).`,
+        );
+      }
+      if (eoaBal.ethWei < BigInt("100000000000000")) {
+        // < 0.0001 ETH likely insufficient for even one tx
+        console.warn(
+          `[tokenSale] WARN: EOA ETH balance ${eoaBal.ethWei} wei is low — ` +
+            `deposits may run out of gas. Top up at https://www.alchemy.com/faucets/ethereum-sepolia.`,
+        );
+      }
+    } catch (err: any) {
+      console.warn(`[tokenSale] EOA balance check failed: ${err.message}`);
     }
 
-    // Resolve balance-snapshot configuration up-front. Snapshots are limited
-    // to the buy-metal leg — only that step actually moves tokens; the bridge
-    // request leg merely posts a hash for an already-broadcast Ethereum tx.
+    // Balance-snapshot configuration. Snapshots are useful for verifying the
+    // bridge service actually drained the deposits and AUTO_FORGE landed
+    // metal on the recipient. Note that the bridge service is asynchronous —
+    // the post-run snapshot taken immediately after the broadcast/bridge-
+    // request loop may understate the eventual deltas.
     const logBalances: BalanceLoggingMode = cfg.logBalances ?? "none";
     const snapshotTargets: SnapshotTargets = {
-      payTokenAddress: cfg.payTokenAddress,
+      payTokenAddress: cfg.payTokenAddress ?? "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
       metalTokenAddress: cfg.metalTokenAddress,
       metalForgeAddress: cfg.metalForgeAddress ?? "c5ed981b816a626981a5747d125e0e7296b2c7c6",
     };
-    const snapshotsEnabled = logBalances !== "none" && willBuy;
-    const perStepBalances = snapshotsEnabled && logBalances === "perStep";
-
-    if (perStepBalances) {
-      console.warn(
-        `[tokenSale] logBalances=perStep — adds ~6 GETs of overhead per sale ` +
-          `(payToken / metalToken / vouchers x buyer + payToken / metalToken x MetalForge ` +
-          `+ /metal-forge/configs). Set logBalances: "summary" or "none" for max throughput.`,
-      );
-    }
+    const snapshotsEnabled = logBalances !== "none";
 
     // Decide how often to print per-iteration progress so the user always
     // sees liveness without drowning the console at high totalTxCount.
@@ -318,8 +310,39 @@ export class TokenSaleScenario extends BaseScenario {
       }
     }
 
+    // ---- Pre-loop RECIPIENT balances (for end-to-end AUTO_FORGE verification).
+    // The bridge service mints USDST + AUTO_FORGE GOLDST to
+    // `bridge.stratoRecipientAddress`, which may differ from the Keycloak
+    // user driving the test — so we read it directly from Cirrus rather than
+    // through the auth-filtered /api/tokens/balance endpoint. ----
+    const recipientHex = b.stratoRecipientAddress.replace(/^0x/i, "").toLowerCase();
+    const payTokenHex = (cfg.payTokenAddress ?? "937efa7e3a77e20bbdbd7c0d32b6514f368c1010")
+      .replace(/^0x/i, "")
+      .toLowerCase();
+    const metalTokenHex = cfg.metalTokenAddress.replace(/^0x/i, "").toLowerCase();
+    const autoForgeWaitTimeoutSec = cfg.autoForgeWaitTimeoutSec ?? 300;
+    const autoForgeWaitPollSec = cfg.autoForgeWaitPollIntervalSec ?? 5;
+    let preLoopRecipientUsdst: bigint | null = null;
+    let preLoopRecipientGoldst: bigint | null = null;
+    if (autoForgeWaitTimeoutSec > 0 && this.backendClients[0]) {
+      preLoopRecipientUsdst = await readCirrusBalance(
+        this.backendClients[0],
+        payTokenHex,
+        recipientHex,
+      );
+      preLoopRecipientGoldst = await readCirrusBalance(
+        this.backendClients[0],
+        metalTokenHex,
+        recipientHex,
+      );
+      console.log(
+        `[tokenSale] pre-loop [recipient ${recipientHex}]: ` +
+          `USDST=${preLoopRecipientUsdst ?? "?"} GOLDST=${preLoopRecipientGoldst ?? "?"}`,
+      );
+    }
+
     console.log(
-      `[tokenSale] ${cfg.totalTxCount} sales (bridge=${willBridge} buy=${willBuy}) ` +
+      `[tokenSale] ${cfg.totalTxCount} sales (sepoliaDeposit + bridgeRequest) ` +
         `across ${cfg.concurrentUsers} users over ${cfg.timeWindowMs}ms ` +
         `-> ${node.url} (network=${cfg.networkLabel ?? "?"})`,
     );
@@ -341,12 +364,6 @@ export class TokenSaleScenario extends BaseScenario {
         broadcasterTarget,
         broadcasterAmount,
         baseBridgeBody,
-        buyBody,
-        willBroadcast,
-        willBridge,
-        willBuy,
-        perStepBalances,
-        snapshotTargets,
         sepoliaConcurrency,
         backendConcurrency,
         nodeName,
@@ -361,323 +378,19 @@ export class TokenSaleScenario extends BaseScenario {
       async (i: number) => {
         const client = this.backendClients[i % this.backendClients.length];
 
-        // --- Sepolia broadcast leg (only when bridge config is set) ---
-        // Each iteration broadcasts a fresh DepositRouter.depositETH with
-        // nonce = startNonce + i. The resulting tx hash overrides the static
-        // externalTxHash for this iteration's bridge-request body, so every
-        // iteration represents a UNIQUE on-chain bridge entry.
-        let perIterationTxHash: string | undefined;
-        if (
-          willBroadcast &&
-          broadcaster &&
-          broadcasterRecipient &&
-          broadcasterTarget &&
-          broadcasterAmount &&
-          cfg.bridge
-        ) {
-          const submitTime = Date.now();
-          const result = await broadcaster.broadcastDepositETH({
-            nonceOffset: i,
-            stratoRecipient: broadcasterRecipient,
-            targetStratoToken: broadcasterTarget,
-            amountWei: broadcasterAmount,
-            awaitConfirmation: cfg.bridge.awaitConfirmation === true,
-          });
-          perIterationTxHash = result.txHash;
-
-          const broadcastMetric: TxMetric = {
-            txHash: result.txHash,
-            nodeName,
-            scenario: `${scenario}:sepoliaDeposit`,
-            batchIndex: i,
-            submitTime,
-            submitDuration: result.submitDurationMs,
-            confirmTime: submitTime + result.submitDurationMs + result.confirmDurationMs,
-            confirmDuration: result.confirmDurationMs,
-            totalDuration: result.submitDurationMs + result.confirmDurationMs,
-            status: result.status,
-            error: result.error,
-          };
-          this.collector.recordTx(broadcastMetric);
-          txMetrics.push(broadcastMetric);
-
-          if (shouldLogProgress(i) || result.status === "failed") {
-            console.log(
-              `[tokenSale] sepolia #${i} nonce=${broadcaster.startNonce + i} ` +
-                `${result.status} ${result.txHash.substring(0, 18)}... ` +
-                `submit=${result.submitDurationMs}ms confirm=${result.confirmDurationMs}ms ` +
-                `${result.error ?? ""}`,
-            );
-          }
-
-          // If the broadcast itself failed, skip the rest of the per-iteration
-          // sequence — there's nothing meaningful to bridge or buy with.
-          if (result.status === "failed") return;
-        }
-
-        // --- bridge request step ---
-        if (willBridge && baseBridgeBody) {
-          // If we just broadcast a fresh tx, use its hash; otherwise fall back
-          // to the static externalTxHash already in baseBridgeBody.
-          const bridgeBody = perIterationTxHash
-            ? { ...baseBridgeBody, externalTxHash: perIterationTxHash }
-            : baseBridgeBody;
-          const submitTime = Date.now();
-          const res = await this.postWithRetry({
-            client,
-            path: "/api/bridge/requestDepositAction",
-            body: bridgeBody,
-            legName: "bridgeRequest",
-            iterationIdx: i,
-            maxRetries: cfg.requestRetries ?? 3,
-          });
-          const data = res.data ?? {};
-          const reported = data?.data?.status ?? data?.status;
-          const hash = data?.data?.hash ?? data?.hash ?? `bridgeReq:${i}`;
-          // Surface the response body when the bridge request fails — load
-          // tests are useless without knowing why an upstream call rejected.
-          // Common causes: bridge service down (Cloudflare 521 / 502),
-          // duplicate-deposit-action ("already processed"), invalid externalTxHash.
-          const bridgeOk =
-            res.status >= 200 &&
-            res.status < 300 &&
-            (reported === undefined || reported === "success" || reported === "Success");
-          if (!bridgeOk) {
-            console.warn(
-              `[tokenSale] bridgeRequest #${i} FAILED: httpStatus=${res.status} ` +
-                `respErr=${res.error ?? "?"} ` +
-                `body=${typeof res.data === "string" ? res.data.slice(0, 400) : JSON.stringify(res.data).slice(0, 400)}`,
-            );
-          } else if (shouldLogProgress(i)) {
-            console.log(
-              `[tokenSale] bridgeRequest #${i} ok ${res.durationMs}ms hash=${String(hash).substring(0, 18)}`,
-            );
-          }
-          this.recordRequestMetric({
-            txMetrics,
-            nodeName,
-            scenario: `${scenario}:bridgeRequest`,
-            userId: i,
-            iteration: 0,
-            submitTime,
-            res,
-            success: bridgeOk,
-            hashOverride: hash,
-          });
-        }
-
-        // --- buy-metal step (with optional per-step balance bracketing) ---
-        if (willBuy && buyBody) {
-          let stepBefore: BalanceSnapshot | null = null;
-          if (perStepBalances) {
-            try {
-              stepBefore = await takeBalanceSnapshot(client, snapshotTargets);
-            } catch (err: any) {
-              console.warn(`[tokenSale] sale #${i}: pre-step snapshot failed: ${err.message}`);
-            }
-          }
-
-          const submitTime = Date.now();
-          const res = await this.postWithRetry({
-            client,
-            path: "/api/metal-forge/buy",
-            body: buyBody,
-            legName: "buyMetal",
-            iterationIdx: i,
-            maxRetries: cfg.requestRetries ?? 3,
-          });
-          const data = res.data ?? {};
-          const hash = data?.hash ?? data?.data?.hash ?? `buyMetal:${i}`;
-          const txStatus: string | undefined = data?.status ?? data?.data?.status;
-          const ok =
-            res.status >= 200 &&
-            res.status < 300 &&
-            (txStatus === "Success" || txStatus === "success" || !!data?.hash);
-          // Always log buy-metal failures (load tests are useless without
-          // knowing why); sample successes via shouldLogProgress so the user
-          // sees liveness even with logBalances=none.
-          if (!ok) {
-            console.warn(
-              `[tokenSale] buyMetal #${i} FAILED: httpStatus=${res.status} ` +
-                `respErr=${res.error ?? "?"} ` +
-                `body=${typeof res.data === "string" ? res.data.slice(0, 400) : JSON.stringify(res.data).slice(0, 400)}`,
-            );
-          } else if (shouldLogProgress(i)) {
-            console.log(
-              `[tokenSale] buyMetal #${i} ok ${res.durationMs}ms hash=${String(hash).substring(0, 18)}`,
-            );
-          }
-          this.recordRequestMetric({
-            txMetrics,
-            nodeName,
-            scenario: `${scenario}:buyMetal`,
-            userId: i,
-            iteration: 0,
-            submitTime,
-            res,
-            success: ok,
-            hashOverride: hash,
-          });
-
-          if (perStepBalances && stepBefore) {
-            let stepAfter: BalanceSnapshot | null = null;
-            try {
-              stepAfter = await takeBalanceSnapshot(client, snapshotTargets);
-            } catch (err: any) {
-              console.warn(`[tokenSale] sale #${i}: post-step snapshot failed: ${err.message}`);
-            }
-            if (stepAfter) {
-              // Surface buy-metal error / response body when the call failed —
-              // load tests are useless without knowing why a request failed.
-              const failureLine = ok
-                ? ""
-                : `\n    httpStatus=${res.status} respErr=${res.error ?? "?"} ` +
-                  `respBody=${JSON.stringify(data).slice(0, 600)}`;
-              console.log(
-                `[tokenSale] sale #${i} user=${i % this.backendClients.length} status=${ok ? "ok" : "fail"}` +
-                  failureLine + "\n" +
-                  `    ${formatSnapshot("before", stepBefore)}\n` +
-                  `    ${formatSnapshot("after ", stepAfter)}\n` +
-                  `    ${formatDiff(stepBefore, stepAfter)}`,
-              );
-              // Attach diff to the buy-metal metric so it lands in the JSON report.
-              const lastMetric = txMetrics[txMetrics.length - 1];
-              if (lastMetric) {
-                (lastMetric as any).balanceDiff = diffObject(stepBefore, stepAfter);
-              }
-            }
-          }
-        }
-
-        if (this.verbose && i % 50 === 0 && !perStepBalances) {
-          const lastMetric = txMetrics[txMetrics.length - 1];
-          this.log(
-            `sale #${i}: ${lastMetric?.status} ${lastMetric?.submitDuration}ms ` +
-              `(last=${lastMetric?.scenario})`,
-          );
-        }
-      },
-    );
-    const runEnd = Date.now();
-
-    // ---- Post-run snapshot ----
-    if (snapshotsEnabled && this.backendClients[0]) {
-      try {
-        const postRunSnap = await takeBalanceSnapshot(
-          this.backendClients[0],
-          snapshotTargets,
-        );
-        console.log(`[tokenSale] ${formatSnapshot("post-run [user 0]", postRunSnap)}`);
-        if (preRunSnap) {
-          console.log(`[tokenSale] run-aggregate ${formatDiff(preRunSnap, postRunSnap)}`);
-        }
-      } catch (err: any) {
-        console.warn(`[tokenSale] post-run snapshot failed: ${err.message}`);
-      }
-    }
-
-    // Aggregate sale-level stats. A "sale" is the sum of legs that ran:
-    //   sepoliaDeposit (if willBroadcast) + bridgeRequest (if willBridge) +
-    //   buyMetal (if willBuy). Count successes across all legs.
-    const elapsedSec = (runEnd - runStart) / 1000;
-    const callsPerSale =
-      (willBroadcast ? 1 : 0) + (willBridge ? 1 : 0) + (willBuy ? 1 : 0);
-    const coreMetrics = txMetrics.filter(
-      (m) =>
-        m.scenario === `${scenario}:sepoliaDeposit` ||
-        m.scenario === `${scenario}:bridgeRequest` ||
-        m.scenario === `${scenario}:buyMetal`,
-    );
-    const confirmed = coreMetrics.filter(
-      (m) => m.status === "confirmed" || m.status === "submitted",
-    ).length;
-    const failed = coreMetrics.filter((m) => m.status === "failed").length;
-    const salesAttempted = Math.floor(coreMetrics.length / Math.max(callsPerSale, 1));
-    const salesTps = salesAttempted / Math.max(elapsedSec, 0.001);
-    const callTps = coreMetrics.length / Math.max(elapsedSec, 0.001);
-
-    console.log(
-      `[tokenSale] Done. calls: ${confirmed} confirmed, ${failed} failed in ` +
-        `${elapsedSec.toFixed(2)}s — ${salesTps.toFixed(2)} sales/s (${callTps.toFixed(2)} calls/s)`,
-    );
-
-    return {
-      scenario,
-      nodeName,
-      transactions: txMetrics,
-      batches: [],
-    };
-  }
-
-  /**
-   * Two-phase pipelined run, used when `pipelineMode: true`.
-   *
-   * Phase 1: broadcast all N Sepolia DepositRouter.depositETH txs in parallel
-   *          (bounded by `sepoliaConcurrency`). Captures successful tx hashes.
-   * Phase 2: for each successful broadcast (or for all i when willBroadcast
-   *          is false), fire bridgeRequest + buyMetal in series for that i,
-   *          with up to `backendConcurrency` such pairs in parallel.
-   *
-   * Wall clock = max(slowest single broadcast) + max(slowest single backend
-   * round-trip) instead of N × per-iteration latency.
-   */
-  private async runPipelined(args: {
-    cfg: TokenSaleScenarioConfig;
-    broadcaster: SepoliaBroadcaster | null;
-    broadcasterRecipient: string | null;
-    broadcasterTarget: string | null;
-    broadcasterAmount: string | null;
-    baseBridgeBody: any;
-    buyBody: any;
-    willBroadcast: boolean;
-    willBridge: boolean;
-    willBuy: boolean;
-    perStepBalances: boolean;
-    snapshotTargets: SnapshotTargets;
-    sepoliaConcurrency: number;
-    backendConcurrency: number;
-    nodeName: string;
-    scenario: string;
-    txMetrics: TxMetric[];
-    shouldLogProgress: (i: number) => boolean;
-  }): Promise<void> {
-    const {
-      cfg,
-      broadcaster,
-      broadcasterRecipient,
-      broadcasterTarget,
-      broadcasterAmount,
-      baseBridgeBody,
-      buyBody,
-      willBroadcast,
-      willBridge,
-      willBuy,
-      perStepBalances,
-      snapshotTargets,
-      sepoliaConcurrency,
-      backendConcurrency,
-      nodeName,
-      scenario,
-      txMetrics,
-      shouldLogProgress,
-    } = args;
-
-    // ---- Phase 1: broadcast all N concurrently ----
-    const successfulBroadcasts = new Map<number, string>();
-    if (willBroadcast && broadcaster && broadcasterRecipient && broadcasterTarget && broadcasterAmount && cfg.bridge) {
-      console.log(
-        `[tokenSale] Phase 1/2: broadcasting ${cfg.totalTxCount} Sepolia ` +
-          `deposit(s) (concurrency=${sepoliaConcurrency}, awaitConfirmation=${cfg.bridge.awaitConfirmation === true})...`,
-      );
-      const phase1Start = Date.now();
-      await runBoundedConcurrent(cfg.totalTxCount, sepoliaConcurrency, async (i: number) => {
+        // --- Sepolia broadcast leg ---
+        // Each iteration broadcasts a fresh DepositRouter.deposit(USDC, ...)
+        // with nonce = startNonce + i. The resulting tx hash is fed into the
+        // bridge-request body so every iteration represents a UNIQUE on-chain
+        // bridge entry.
         const submitTime = Date.now();
-        const result = await broadcaster.broadcastDepositETH({
+        const result = await broadcaster.broadcastDepositERC20({
           nonceOffset: i,
           stratoRecipient: broadcasterRecipient,
           targetStratoToken: broadcasterTarget,
           amountWei: broadcasterAmount,
-          awaitConfirmation: cfg.bridge!.awaitConfirmation === true,
+          awaitConfirmation: b.awaitConfirmation === true,
+          permitDeadlineSec: b.permitDeadlineSec,
         });
 
         const broadcastMetric: TxMetric = {
@@ -705,45 +418,13 @@ export class TokenSaleScenario extends BaseScenario {
           );
         }
 
-        if (result.status !== "failed") {
-          successfulBroadcasts.set(i, result.txHash);
-        }
-      });
-      const phase1Ms = Date.now() - phase1Start;
-      console.log(
-        `[tokenSale] Phase 1 done in ${(phase1Ms / 1000).toFixed(2)}s — ` +
-          `${successfulBroadcasts.size}/${cfg.totalTxCount} broadcasts succeeded`,
-      );
-    }
+        // If the broadcast itself failed there's nothing meaningful to
+        // bridge — the bridge service won't find a DepositRouted event.
+        if (result.status === "failed") return;
 
-    // ---- Phase 2: bridgeRequest + buyMetal pairs concurrently ----
-    // When willBroadcast=false, run all i in [0, totalTxCount). Otherwise only
-    // run the indices whose Sepolia broadcast succeeded.
-    const phase2Indices = willBroadcast
-      ? Array.from(successfulBroadcasts.keys()).sort((a, b) => a - b)
-      : Array.from({ length: cfg.totalTxCount }, (_, i) => i);
-
-    if (phase2Indices.length === 0) {
-      console.log(`[tokenSale] Phase 2/2: skipped (no successful broadcasts).`);
-      return;
-    }
-
-    console.log(
-      `[tokenSale] Phase 2/2: ${phase2Indices.length} bridgeRequest+buyMetal ` +
-        `pair(s) (concurrency=${backendConcurrency})...`,
-    );
-    const phase2Start = Date.now();
-    await runBoundedConcurrent(phase2Indices.length, backendConcurrency, async (idx) => {
-      const i = phase2Indices[idx];
-      const client = this.backendClients[i % this.backendClients.length];
-      const perIterationTxHash = successfulBroadcasts.get(i);
-
-      // bridge request
-      if (willBridge && baseBridgeBody) {
-        const bridgeBody = perIterationTxHash
-          ? { ...baseBridgeBody, externalTxHash: perIterationTxHash }
-          : baseBridgeBody;
-        const submitTime = Date.now();
+        // --- Bridge request leg (AUTO_FORGE) ---
+        const bridgeBody = { ...baseBridgeBody, externalTxHash: result.txHash };
+        const bridgeSubmitTime = Date.now();
         const res = await this.postWithRetry({
           client,
           path: "/api/bridge/requestDepositAction",
@@ -755,6 +436,8 @@ export class TokenSaleScenario extends BaseScenario {
         const data = res.data ?? {};
         const reported = data?.data?.status ?? data?.status;
         const hash = data?.data?.hash ?? data?.hash ?? `bridgeReq:${i}`;
+        // Surface the response body when the bridge request fails — load
+        // tests are useless without knowing why an upstream call rejected.
         const bridgeOk =
           res.status >= 200 &&
           res.status < 300 &&
@@ -776,74 +459,460 @@ export class TokenSaleScenario extends BaseScenario {
           scenario: `${scenario}:bridgeRequest`,
           userId: i,
           iteration: 0,
-          submitTime,
+          submitTime: bridgeSubmitTime,
           res,
           success: bridgeOk,
           hashOverride: hash,
         });
-      }
+      },
+    );
+    const runEnd = Date.now();
 
-      // buy metal (per-step balance snapshots intentionally skipped in
-      // pipelineMode — they'd serialise the phase by adding 6 GETs/iter and
-      // are usually not what you want at high concurrency)
-      if (willBuy && buyBody) {
-        const submitTime = Date.now();
-        const res = await this.postWithRetry({
-          client,
-          path: "/api/metal-forge/buy",
-          body: buyBody,
-          legName: "buyMetal",
-          iterationIdx: i,
-          maxRetries: cfg.requestRetries ?? 3,
+    // ---- Sepolia receipt sweep ----
+    // With awaitConfirmation: false the iteration loop records `submitted`
+    // the moment the tx hash returns from the JSON-RPC; we have no idea
+    // whether the tx confirmed or reverted. Before waiting for AUTO_FORGE,
+    // poll receipts for every successful broadcast so we can distinguish:
+    //   - "confirmed + DepositRouted ≥ 1": Sepolia side OK, blame bridge service
+    //   - "reverted": on-chain failure (Permit2 / token allowance / decimals)
+    //   - "pending": still unmined, AUTO_FORGE wait will likely time out
+    //   - "not_found": tx never made it into the mempool
+    const broadcastMetrics = txMetrics.filter(
+      (m) =>
+        m.scenario === `${scenario}:sepoliaDeposit` && m.status !== "failed",
+    );
+    let sweepSummary = {
+      confirmed: 0,
+      reverted: 0,
+      pending: 0,
+      notFound: 0,
+      depositRoutedTotal: 0,
+    };
+    if (broadcastMetrics.length > 0) {
+      console.log(
+        `[tokenSale] Sweeping ${broadcastMetrics.length} Sepolia receipt(s) ` +
+          `(timeout=60s/tx)...`,
+      );
+      for (const m of broadcastMetrics) {
+        const r = await broadcaster.inspectReceipt(m.txHash, {
+          timeoutMs: 60000,
+          pollMs: 3000,
         });
-        const data = res.data ?? {};
-        const hash = data?.hash ?? data?.data?.hash ?? `buyMetal:${i}`;
-        const txStatus: string | undefined = data?.status ?? data?.data?.status;
-        const ok =
-          res.status >= 200 &&
-          res.status < 300 &&
-          (txStatus === "Success" || txStatus === "success" || !!data?.hash);
-        if (!ok) {
-          console.warn(
-            `[tokenSale] buyMetal #${i} FAILED: httpStatus=${res.status} ` +
-              `respErr=${res.error ?? "?"} ` +
-              `body=${typeof res.data === "string" ? res.data.slice(0, 400) : JSON.stringify(res.data).slice(0, 400)}`,
-          );
-        } else if (shouldLogProgress(i)) {
+        if (r.status === "confirmed") sweepSummary.confirmed += 1;
+        else if (r.status === "reverted") sweepSummary.reverted += 1;
+        else if (r.status === "pending") sweepSummary.pending += 1;
+        else sweepSummary.notFound += 1;
+        sweepSummary.depositRoutedTotal += r.depositRoutedCount;
+        const blockStr = r.blockNumber !== undefined ? ` block=${r.blockNumber}` : "";
+        const gasStr = r.gasUsed !== undefined ? ` gasUsed=${r.gasUsed}` : "";
+        const reasonStr = r.errorReason ? ` reason="${r.errorReason}"` : "";
+        const tag =
+          r.status === "confirmed" && r.depositRoutedCount >= 1
+            ? "OK"
+            : r.status === "confirmed"
+              ? "CONFIRMED_NO_EVENT"
+              : r.status.toUpperCase();
+        console.log(
+          `[tokenSale] receipt ${m.txHash.substring(0, 18)}… [${tag}]${blockStr}${gasStr}` +
+            ` DepositRouted×${r.depositRoutedCount}${reasonStr}`,
+        );
+      }
+      console.log(
+        `[tokenSale] Sepolia sweep summary: ` +
+          `${sweepSummary.confirmed} confirmed, ` +
+          `${sweepSummary.reverted} reverted, ` +
+          `${sweepSummary.pending} pending, ` +
+          `${sweepSummary.notFound} not_found, ` +
+          `${sweepSummary.depositRoutedTotal} DepositRouted event(s) total.`,
+      );
+      if (sweepSummary.reverted > 0) {
+        console.warn(
+          `[tokenSale] ${sweepSummary.reverted} Sepolia tx(s) reverted. ` +
+            `These will NEVER be processed by the bridge service — ` +
+            `the bridge polls for DepositRouted events which only emit on success. ` +
+            `See receipt log for revert reasons.`,
+        );
+      }
+      if (
+        sweepSummary.confirmed > 0 &&
+        sweepSummary.depositRoutedTotal === 0
+      ) {
+        console.warn(
+          `[tokenSale] ${sweepSummary.confirmed} Sepolia tx(s) confirmed but ` +
+            `zero DepositRouted events emitted. The DepositRouter at ` +
+            `${b.depositRouterAddress} may be a different contract than expected, ` +
+            `or its event signature has changed.`,
+        );
+      }
+    }
+
+    // ---- AUTO_FORGE end-to-end verification ----
+    // The broadcast + bridgeRequest legs are now done, but the bridge
+    // service still has to (a) wait for Sepolia confirmations,
+    // (b) MercataBridge.completeDeposit -> mint USDST, (c) MetalForge.mintMetal
+    // -> mint GOLDST. Poll the recipient's STRATO GOLDST balance via Cirrus
+    // until we've seen `expectedMints` distinct increments OR the balance
+    // settles (>= 2 stable polls after at least one mint) OR the timeout
+    // elapses.
+    let autoForgeReport: {
+      expected: number;
+      observed: number;
+      goldstDelta: bigint;
+      usdstDelta: bigint;
+      timedOut: boolean;
+      durationSec: number;
+    } | null = null;
+    const successfulBroadcasts = txMetrics.filter(
+      (m) => m.scenario === `${scenario}:sepoliaDeposit` && m.status !== "failed",
+    ).length;
+    if (
+      autoForgeWaitTimeoutSec > 0 &&
+      successfulBroadcasts > 0 &&
+      this.backendClients[0]
+    ) {
+      const expectedMints = successfulBroadcasts;
+      console.log(
+        `[tokenSale] Polling recipient ${recipientHex} for AUTO_FORGE completion ` +
+          `(expecting ${expectedMints} mint(s), timeout=${autoForgeWaitTimeoutSec}s, ` +
+          `poll=${autoForgeWaitPollSec}s)...`,
+      );
+      const waitStart = Date.now();
+      const timeoutMs = autoForgeWaitTimeoutSec * 1000;
+      const pollMs = autoForgeWaitPollSec * 1000;
+      const baseGoldst = preLoopRecipientGoldst ?? 0n;
+      const baseUsdst = preLoopRecipientUsdst ?? 0n;
+      let lastGoldst: bigint | null = baseGoldst;
+      let mintsObserved = 0;
+      let stableCount = 0;
+      let pollIdx = 0;
+      let timedOut = true;
+      while (Date.now() - waitStart < timeoutMs) {
+        // Sleep first so we give the bridge service room to make progress
+        // before the first read (broadcasts may not even have been mined yet
+        // if awaitConfirmation: false).
+        await new Promise((r) => setTimeout(r, pollMs));
+        pollIdx += 1;
+        const elapsedSec = Math.round((Date.now() - waitStart) / 1000);
+        const curGoldst = await readCirrusBalance(
+          this.backendClients[0],
+          metalTokenHex,
+          recipientHex,
+        );
+        const curUsdst = await readCirrusBalance(
+          this.backendClients[0],
+          payTokenHex,
+          recipientHex,
+        );
+        const dGoldst = (curGoldst ?? 0n) - baseGoldst;
+        const dUsdst = (curUsdst ?? 0n) - baseUsdst;
+        const changed =
+          curGoldst !== null && lastGoldst !== null && curGoldst !== lastGoldst;
+        if (changed) {
+          mintsObserved += 1;
+          stableCount = 0;
+        } else {
+          stableCount += 1;
+        }
+        console.log(
+          `[tokenSale] autoForgeWait #${pollIdx} t=${elapsedSec}s ` +
+            `recipient.USDST=${curUsdst ?? "?"} (Δ${dUsdst >= 0n ? "+" : ""}${dUsdst}) ` +
+            `recipient.GOLDST=${curGoldst ?? "?"} (Δ${dGoldst >= 0n ? "+" : ""}${dGoldst}) ` +
+            `mints=${mintsObserved}/${expectedMints}` +
+            (stableCount > 0 ? ` [stable ×${stableCount}]` : ""),
+        );
+        if (curGoldst !== null) lastGoldst = curGoldst;
+
+        // Done: either we counted all expected mints, OR balance has been
+        // stable for >=2 polls after at least one mint (assume the bridge
+        // service has drained its queue for these deposits).
+        if (mintsObserved >= expectedMints) {
+          timedOut = false;
           console.log(
-            `[tokenSale] buyMetal #${i} ok ${res.durationMs}ms hash=${String(hash).substring(0, 18)}`,
+            `[tokenSale] AUTO_FORGE complete: ${mintsObserved}/${expectedMints} mints ` +
+              `landed in ${elapsedSec}s. recipient.GOLDST Δ=+${dGoldst}, recipient.USDST Δ=${dUsdst >= 0n ? "+" : ""}${dUsdst}.`,
           );
+          autoForgeReport = {
+            expected: expectedMints,
+            observed: mintsObserved,
+            goldstDelta: dGoldst,
+            usdstDelta: dUsdst,
+            timedOut: false,
+            durationSec: elapsedSec,
+          };
+          break;
         }
-        this.recordRequestMetric({
-          txMetrics,
-          nodeName,
-          scenario: `${scenario}:buyMetal`,
-          userId: i,
-          iteration: 0,
-          submitTime,
-          res,
-          success: ok,
-          hashOverride: hash,
-        });
-
-        // Silently note when perStepBalances was requested but suppressed.
-        if (perStepBalances && idx === 0) {
+        if (mintsObserved > 0 && stableCount >= 2) {
+          timedOut = false;
           console.warn(
-            `[tokenSale] pipelineMode + logBalances=perStep: per-step ` +
-              `snapshots are suppressed under pipelineMode (would serialise ` +
-              `the phase). Set logBalances=summary for run-level deltas.`,
+            `[tokenSale] AUTO_FORGE PARTIAL: ${mintsObserved}/${expectedMints} mints ` +
+              `landed in ${elapsedSec}s; recipient.GOLDST has been stable for ` +
+              `${stableCount} polls — stopping wait. ` +
+              `Some bridges may have failed silently or are still in flight.`,
           );
+          autoForgeReport = {
+            expected: expectedMints,
+            observed: mintsObserved,
+            goldstDelta: dGoldst,
+            usdstDelta: dUsdst,
+            timedOut: false,
+            durationSec: elapsedSec,
+          };
+          break;
         }
       }
+      if (timedOut) {
+        const elapsedSec = Math.round((Date.now() - waitStart) / 1000);
+        const finalGoldst = await readCirrusBalance(
+          this.backendClients[0],
+          metalTokenHex,
+          recipientHex,
+        );
+        const finalUsdst = await readCirrusBalance(
+          this.backendClients[0],
+          payTokenHex,
+          recipientHex,
+        );
+        const dGoldst = (finalGoldst ?? 0n) - baseGoldst;
+        const dUsdst = (finalUsdst ?? 0n) - baseUsdst;
+        console.warn(
+          `[tokenSale] AUTO_FORGE TIMEOUT after ${elapsedSec}s: ` +
+            `${mintsObserved}/${expectedMints} mints observed, ` +
+            `recipient.GOLDST Δ=${dGoldst >= 0n ? "+" : ""}${dGoldst}. ` +
+            `Bridge service may still be processing — re-check Cirrus manually after a few minutes.`,
+        );
+        autoForgeReport = {
+          expected: expectedMints,
+          observed: mintsObserved,
+          goldstDelta: dGoldst,
+          usdstDelta: dUsdst,
+          timedOut: true,
+          durationSec: elapsedSec,
+        };
+      }
+    } else if (autoForgeWaitTimeoutSec === 0) {
+      console.log(
+        `[tokenSale] AUTO_FORGE wait disabled (autoForgeWaitTimeoutSec=0). ` +
+          `End-to-end mint verification skipped — re-check recipient balance manually.`,
+      );
+    } else if (successfulBroadcasts === 0) {
+      console.warn(
+        `[tokenSale] No successful Sepolia broadcasts — skipping AUTO_FORGE wait.`,
+      );
+    }
+
+    // ---- Post-run snapshot ----
+    if (snapshotsEnabled && this.backendClients[0]) {
+      try {
+        const postRunSnap = await takeBalanceSnapshot(
+          this.backendClients[0],
+          snapshotTargets,
+        );
+        console.log(`[tokenSale] ${formatSnapshot("post-run [user 0]", postRunSnap)}`);
+        if (preRunSnap) {
+          console.log(`[tokenSale] run-aggregate ${formatDiff(preRunSnap, postRunSnap)}`);
+        }
+      } catch (err: any) {
+        console.warn(`[tokenSale] post-run snapshot failed: ${err.message}`);
+      }
+    }
+
+    // Aggregate sale-level stats. A "sale" is one sepoliaDeposit +
+    // one bridgeRequest. Count successes across both legs.
+    const elapsedSec = (runEnd - runStart) / 1000;
+    const callsPerSale = 2;
+    const coreMetrics = txMetrics.filter(
+      (m) =>
+        m.scenario === `${scenario}:sepoliaDeposit` ||
+        m.scenario === `${scenario}:bridgeRequest`,
+    );
+    const confirmed = coreMetrics.filter(
+      (m) => m.status === "confirmed" || m.status === "submitted",
+    ).length;
+    const failed = coreMetrics.filter((m) => m.status === "failed").length;
+    const salesAttempted = Math.floor(coreMetrics.length / callsPerSale);
+    const salesTps = salesAttempted / Math.max(elapsedSec, 0.001);
+    const callTps = coreMetrics.length / Math.max(elapsedSec, 0.001);
+
+    console.log(
+      `[tokenSale] Done. calls: ${confirmed} confirmed, ${failed} failed in ` +
+        `${elapsedSec.toFixed(2)}s — ${salesTps.toFixed(2)} sales/s (${callTps.toFixed(2)} calls/s)`,
+    );
+    if (autoForgeReport) {
+      const tag = autoForgeReport.timedOut
+        ? "TIMEOUT"
+        : autoForgeReport.observed >= autoForgeReport.expected
+          ? "OK"
+          : "PARTIAL";
+      console.log(
+        `[tokenSale] AUTO_FORGE [${tag}]: ${autoForgeReport.observed}/${autoForgeReport.expected} ` +
+          `mints landed on recipient in ${autoForgeReport.durationSec}s ` +
+          `(GOLDST Δ=+${autoForgeReport.goldstDelta}, USDST Δ=${autoForgeReport.usdstDelta >= 0n ? "+" : ""}${autoForgeReport.usdstDelta})`,
+      );
+    }
+
+    return {
+      scenario,
+      nodeName,
+      transactions: txMetrics,
+      batches: [],
+    };
+  }
+
+  /**
+   * Two-phase pipelined run, used when `pipelineMode: true`.
+   *
+   * Phase 1: broadcast all N Sepolia DepositRouter.deposit txs in parallel
+   *          (bounded by `sepoliaConcurrency`). Captures successful tx hashes.
+   * Phase 2: for each successful broadcast, fire the AUTO_FORGE bridge
+   *          request, with up to `backendConcurrency` such calls in parallel.
+   *
+   * Wall clock = max(slowest single broadcast) + max(slowest single backend
+   * round-trip) instead of N × per-iteration latency.
+   */
+  private async runPipelined(args: {
+    cfg: TokenSaleScenarioConfig;
+    broadcaster: SepoliaBroadcaster;
+    broadcasterRecipient: string;
+    broadcasterTarget: string;
+    broadcasterAmount: string;
+    baseBridgeBody: any;
+    sepoliaConcurrency: number;
+    backendConcurrency: number;
+    nodeName: string;
+    scenario: string;
+    txMetrics: TxMetric[];
+    shouldLogProgress: (i: number) => boolean;
+  }): Promise<void> {
+    const {
+      cfg,
+      broadcaster,
+      broadcasterRecipient,
+      broadcasterTarget,
+      broadcasterAmount,
+      baseBridgeBody,
+      sepoliaConcurrency,
+      backendConcurrency,
+      nodeName,
+      scenario,
+      txMetrics,
+      shouldLogProgress,
+    } = args;
+    const b = cfg.bridge;
+
+    // ---- Phase 1: broadcast all N concurrently ----
+    const successfulBroadcasts = new Map<number, string>();
+    console.log(
+      `[tokenSale] Phase 1/2: broadcasting ${cfg.totalTxCount} Sepolia ` +
+        `deposit(s) (concurrency=${sepoliaConcurrency}, awaitConfirmation=${b.awaitConfirmation === true})...`,
+    );
+    const phase1Start = Date.now();
+    await runBoundedConcurrent(cfg.totalTxCount, sepoliaConcurrency, async (i: number) => {
+      const submitTime = Date.now();
+      const result = await broadcaster.broadcastDepositERC20({
+        nonceOffset: i,
+        stratoRecipient: broadcasterRecipient,
+        targetStratoToken: broadcasterTarget,
+        amountWei: broadcasterAmount,
+        awaitConfirmation: b.awaitConfirmation === true,
+        permitDeadlineSec: b.permitDeadlineSec,
+      });
+
+      const broadcastMetric: TxMetric = {
+        txHash: result.txHash,
+        nodeName,
+        scenario: `${scenario}:sepoliaDeposit`,
+        batchIndex: i,
+        submitTime,
+        submitDuration: result.submitDurationMs,
+        confirmTime: submitTime + result.submitDurationMs + result.confirmDurationMs,
+        confirmDuration: result.confirmDurationMs,
+        totalDuration: result.submitDurationMs + result.confirmDurationMs,
+        status: result.status,
+        error: result.error,
+      };
+      this.collector.recordTx(broadcastMetric);
+      txMetrics.push(broadcastMetric);
+
+      if (shouldLogProgress(i) || result.status === "failed") {
+        console.log(
+          `[tokenSale] sepolia #${i} nonce=${broadcaster.startNonce + i} ` +
+            `${result.status} ${result.txHash.substring(0, 18)}... ` +
+            `submit=${result.submitDurationMs}ms confirm=${result.confirmDurationMs}ms ` +
+            `${result.error ?? ""}`,
+        );
+      }
+
+      if (result.status !== "failed") {
+        successfulBroadcasts.set(i, result.txHash);
+      }
+    });
+    const phase1Ms = Date.now() - phase1Start;
+    console.log(
+      `[tokenSale] Phase 1 done in ${(phase1Ms / 1000).toFixed(2)}s — ` +
+        `${successfulBroadcasts.size}/${cfg.totalTxCount} broadcasts succeeded`,
+    );
+
+    // ---- Phase 2: bridgeRequest concurrently ----
+    const phase2Indices = Array.from(successfulBroadcasts.keys()).sort((a, b) => a - b);
+    if (phase2Indices.length === 0) {
+      console.log(`[tokenSale] Phase 2/2: skipped (no successful broadcasts).`);
+      return;
+    }
+
+    console.log(
+      `[tokenSale] Phase 2/2: ${phase2Indices.length} bridgeRequest call(s) ` +
+        `(concurrency=${backendConcurrency})...`,
+    );
+    const phase2Start = Date.now();
+    await runBoundedConcurrent(phase2Indices.length, backendConcurrency, async (idx) => {
+      const i = phase2Indices[idx];
+      const client = this.backendClients[i % this.backendClients.length];
+      const externalTxHash = successfulBroadcasts.get(i)!;
+
+      const bridgeBody = { ...baseBridgeBody, externalTxHash };
+      const submitTime = Date.now();
+      const res = await this.postWithRetry({
+        client,
+        path: "/api/bridge/requestDepositAction",
+        body: bridgeBody,
+        legName: "bridgeRequest",
+        iterationIdx: i,
+        maxRetries: cfg.requestRetries ?? 3,
+      });
+      const data = res.data ?? {};
+      const reported = data?.data?.status ?? data?.status;
+      const hash = data?.data?.hash ?? data?.hash ?? `bridgeReq:${i}`;
+      const bridgeOk =
+        res.status >= 200 &&
+        res.status < 300 &&
+        (reported === undefined || reported === "success" || reported === "Success");
+      if (!bridgeOk) {
+        console.warn(
+          `[tokenSale] bridgeRequest #${i} FAILED: httpStatus=${res.status} ` +
+            `respErr=${res.error ?? "?"} ` +
+            `body=${typeof res.data === "string" ? res.data.slice(0, 400) : JSON.stringify(res.data).slice(0, 400)}`,
+        );
+      } else if (shouldLogProgress(i)) {
+        console.log(
+          `[tokenSale] bridgeRequest #${i} ok ${res.durationMs}ms hash=${String(hash).substring(0, 18)}`,
+        );
+      }
+      this.recordRequestMetric({
+        txMetrics,
+        nodeName,
+        scenario: `${scenario}:bridgeRequest`,
+        userId: i,
+        iteration: 0,
+        submitTime,
+        res,
+        success: bridgeOk,
+        hashOverride: hash,
+      });
     });
     const phase2Ms = Date.now() - phase2Start;
     console.log(
       `[tokenSale] Phase 2 done in ${(phase2Ms / 1000).toFixed(2)}s`,
     );
-
-    // Reference snapshotTargets to avoid TS6133 unused-parameter on the
-    // pipelined branch (perStepBalances is intentionally not used here).
-    void snapshotTargets;
   }
 
   /**
