@@ -505,7 +505,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
               "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
             let selector = B.take 4 callData
                 argsBytes = B.drop 4 callData
-            lift (resolveFunction toAddr selector) >>= \case
+            lift (resolveFunction b tAddr toAddr selector) >>= \case
               Nothing -> throwE $ TFCodeCollectionNotFound toAddr
                 ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
               Just (fName, func) -> do

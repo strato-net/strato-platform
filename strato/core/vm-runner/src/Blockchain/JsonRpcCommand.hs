@@ -15,6 +15,7 @@ where
 
 import BlockApps.Logging
 import BlockApps.Solidity.ABI
+import Blockchain.Data.BlockHeader (BlockHeader)
 import Blockchain.DB.CodeDB
 import Blockchain.DB.SolidStorageDB (getSolidStorageKeyVal')
 import Blockchain.Data.AddressStateDB
@@ -23,11 +24,15 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.HexData (HexData (..))
 import qualified Blockchain.Sequencer.TxCallObject as TxCall
 import qualified Blockchain.SolidVM as SolidVM
-import Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromHash, runMemCompilerT)
+import Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromHash)
+import qualified Blockchain.SolidVM.Environment as Env
+import Blockchain.SolidVM.GasInfo (GasInfo (..))
+import Blockchain.SolidVM.SM (runSM)
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.CodePtr ()
+import Blockchain.Strato.Model.Gas (Gas (..))
 import Blockchain.Strato.Model.Keccak256 (hash)
-import Blockchain.VMContext (ContextBestBlockInfo (..), CurrentBlockHash (..), VMBase, getContextBestBlockInfo)
+import Blockchain.VMContext (ContextBestBlockInfo (..), CurrentBlockHash (..), VMBase, getContextBestBlockInfo, checkIfRunningTests)
 import Control.Lens ((^.))
 import Control.Applicative ((<|>))
 import Control.Monad ((<=<), void)
@@ -100,7 +105,11 @@ ethCall id fromAddr toAddr callData = do
   let selector = B.take 4 callData
       argsBytes = B.drop 4 callData
 
-  resolveFunction toAddr selector >>= \case
+  blockHeader <- getContextBestBlockInfo >>= \case
+    ContextBestBlockInfo _ bh _ -> return bh
+    Unspecified -> error "no best block available"
+
+  resolveFunction blockHeader fromAddr toAddr selector >>= \case
     Nothing -> do
       $logInfoS "ethCall" . T.pack $ "no function for selector " ++ BC.unpack (B16.encode selector)
       return (id, B.empty)
@@ -113,9 +122,6 @@ ethCall id fromAddr toAddr callData = do
 
       $logInfoS "ethCall" . T.pack $ prettyCall ++ " on " ++ show toAddr
 
-      blockHeader <- getContextBestBlockInfo >>= \case
-        ContextBestBlockInfo _ bh _ -> return bh
-        Unspecified -> error "no best block available"
       result <- SolidVM.call blockHeader toAddr fromAddr fromAddr 1000000 fromAddr
         (hash callData) (labelToText funcName) argTexts Nothing
 
@@ -144,34 +150,55 @@ initBestBlockContext = do
 -- Contract resolution: address -> (funcName, func), following proxy if needed
 --------------------------------------------------------------------------------
 
-resolveFunction :: VMBase m => Address -> B.ByteString -> m (Maybe (SolidString, CC.Func))
-resolveFunction addr selector = do
-  lookupContract addr >>= \case
+resolveFunction :: VMBase m => BlockHeader -> Address -> Address -> B.ByteString -> m (Maybe (SolidString, CC.Func))
+resolveFunction blockHeader fromAddr addr selector = do
+  lookupContract blockHeader fromAddr addr >>= \case
     Nothing -> return Nothing
     Just contract -> case matchSelector contract selector of
       Just hit -> return $ Just hit
       Nothing -> case matchStorageGetter contract selector of
         Just hit -> return $ Just hit
-        Nothing -> followProxy addr contract >>= \case
+        Nothing -> followProxy blockHeader fromAddr addr contract >>= \case
           Nothing -> return Nothing
           Just implContract -> return $
             matchSelector implContract selector
             <|> matchStorageGetter implContract selector
 
-lookupContract :: VMBase m => Address -> m (Maybe CC.Contract)
-lookupContract addr =
+lookupContract :: VMBase m => BlockHeader -> Address -> Address -> m (Maybe CC.Contract)
+lookupContract blockHeader fromAddr addr =
   A.lookup (A.Proxy @AddressState) addr >>= \case
     Nothing -> do
       $logInfoS "lookupContract" . T.pack $ "address not found: " ++ show addr
       return Nothing
     Just addrState -> case addressStateCodeHash addrState of
       SolidVMCode contractName codeHash -> do
-        cc <- runMemCompilerT $ codeCollectionFromHash False True codeHash
-        return $ M.lookup (stringToLabel contractName) (cc ^. CC.contracts)
+        isRunningTests <- checkIfRunningTests
+        let env = Env.Environment
+              { Env.blockHeader = blockHeader
+              , Env.sender = fromAddr
+              , Env.origin = fromAddr
+              , Env.proposer = fromAddr
+              , Env.txHash = hash B.empty
+              , Env.src = Nothing
+              , Env.name = Nothing
+              , Env.runningTests = isRunningTests
+              }
+            gi = GasInfo
+              { _gasLeft = Gas 1000000
+              , _gasUsed = 0
+              , _gasInitialAllotment = Gas 1000000
+              , _gasMetadata = ""
+              }
+        (_, result) <- runSM Nothing env gi $ do
+          cc <- codeCollectionFromHash isRunningTests True codeHash
+          return $ M.lookup (stringToLabel contractName) (cc ^. CC.contracts)
+        case result of
+          Right val -> return val
+          Left _ -> return Nothing
       _ -> return Nothing
 
-followProxy :: VMBase m => Address -> CC.Contract -> m (Maybe CC.Contract)
-followProxy proxyAddr contract
+followProxy :: VMBase m => BlockHeader -> Address -> Address -> CC.Contract -> m (Maybe CC.Contract)
+followProxy blockHeader fromAddr proxyAddr contract
   | M.member "fallback" (CC._functions contract),
     M.member "logicContract" (contract ^. CC.storageDefs) = do
       storageVal <- getSolidStorageKeyVal' proxyAddr (StoragePath [Field "logicContract"])
@@ -179,7 +206,7 @@ followProxy proxyAddr contract
         Nothing -> return Nothing
         Just implAddr -> do
           $logInfoS "followProxy" . T.pack $ "delegates to " ++ show implAddr
-          lookupContract implAddr
+          lookupContract blockHeader fromAddr implAddr
   | otherwise = return Nothing
   where
     extractAddress (BContract _ a) = Just a
