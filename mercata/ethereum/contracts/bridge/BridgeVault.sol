@@ -173,21 +173,6 @@ contract BridgeVault is
 
     // ============ Withdrawal entry points ============
 
-    /// @notice Common payload submitted with a proof. Mirrors the structured
-    ///         args of the STRATO-side `Withdrawal` / `WithdrawalRequested`
-    ///         events (Phase 0 §7.1) so the vault can validate the proof
-    ///         decode against the values the caller is asserting.
-    struct WithdrawalPayload {
-        uint256 stratoNonce; // app-layer nonce (withdrawalCounter on STRATO)
-        uint256 externalChainId;
-        address externalToken;
-        address externalRecipient;
-        uint256 externalTokenAmount;
-        address stratoSender;
-        address stratoToken;
-        uint256 stratoTokenAmount;
-    }
-
     /**
      * @notice Claim a small (below threshold) withdrawal. Verifies the
      *         STRATO-side `Withdrawal` event proof and releases funds in one
@@ -199,46 +184,41 @@ contract BridgeVault is
      * @param mptProof MPT inclusion proof bytes (one entry per trie node
      *                 along the path from root to leaf).
      * @param receiptRLP RLP-encoded receipt at this transaction's slot.
-     * @param payload Asserted payload values; checked against the decoded
-     *                event during proof verification.
      */
     function claimWithdrawal(
         uint256 blockNumber,
         uint256 txIndex,
         uint256 logIndex,
         bytes[] calldata mptProof,
-        bytes calldata receiptRLP,
-        WithdrawalPayload calldata payload
+        bytes calldata receiptRLP
     ) external nonReentrant whenNotPaused {
         bytes32 nonce = _computeNonce(blockNumber, txIndex, logIndex);
         if (nonceState[nonce] != NonceState.Unused) revert NonceAlreadyConsumed();
 
-        _verifyEventProof(
+        STRATOEventDecoder.DecodedWithdrawal memory d = _verifyEventProof(
             blockNumber,
             txIndex,
-            logIndex,
             mptProof,
             receiptRLP,
-            payload,
+            logIndex,
             WITHDRAWAL_EVENT_HASH
         );
 
-        // Threshold gate: a `Withdrawal` event must be at-or-below threshold.
-        // If a STRATO bug or misconfig sends a too-large amount through the
-        // small-event path, we refuse here -- the vault's threshold is
-        // authoritative.
-        uint256 threshold = instantThreshold[payload.externalToken];
-        if (payload.externalTokenAmount >= threshold)
-            revert AmountAboveInstantThreshold();
+        // Threshold gate: a `Withdrawal` event must be strictly below
+        // threshold. If a STRATO bug or misconfig sends a too-large amount
+        // through the small-event path, we refuse here -- the vault's
+        // threshold is authoritative.
+        uint256 threshold = instantThreshold[d.externalToken];
+        if (d.externalTokenAmount >= threshold) revert AmountAboveInstantThreshold();
 
         nonceState[nonce] = NonceState.Claimed;
-        _release(payload.externalToken, payload.externalRecipient, payload.externalTokenAmount);
+        _release(d.externalToken, d.externalRecipient, d.externalTokenAmount);
 
         emit WithdrawalClaimed(
             nonce,
-            payload.externalToken,
-            payload.externalRecipient,
-            payload.externalTokenAmount
+            d.externalToken,
+            d.externalRecipient,
+            d.externalTokenAmount
         );
     }
 
@@ -252,38 +232,35 @@ contract BridgeVault is
         uint256 txIndex,
         uint256 logIndex,
         bytes[] calldata mptProof,
-        bytes calldata receiptRLP,
-        WithdrawalPayload calldata payload
+        bytes calldata receiptRLP
     ) external whenNotPaused {
         bytes32 nonce = _computeNonce(blockNumber, txIndex, logIndex);
         if (nonceState[nonce] != NonceState.Unused) revert NonceAlreadyConsumed();
 
-        _verifyEventProof(
+        STRATOEventDecoder.DecodedWithdrawal memory d = _verifyEventProof(
             blockNumber,
             txIndex,
-            logIndex,
             mptProof,
             receiptRLP,
-            payload,
+            logIndex,
             WITHDRAWAL_REQUESTED_EVENT_HASH
         );
 
-        uint256 threshold = instantThreshold[payload.externalToken];
-        if (payload.externalTokenAmount < threshold)
-            revert AmountBelowInstantThreshold();
+        uint256 threshold = instantThreshold[d.externalToken];
+        if (d.externalTokenAmount < threshold) revert AmountBelowInstantThreshold();
 
         nonceState[nonce] = NonceState.AwaitingApproval;
         pending[nonce] = PendingWithdrawal({
-            externalToken: payload.externalToken,
-            externalRecipient: payload.externalRecipient,
-            externalTokenAmount: payload.externalTokenAmount
+            externalToken: d.externalToken,
+            externalRecipient: d.externalRecipient,
+            externalTokenAmount: d.externalTokenAmount
         });
 
         emit WithdrawalAwaitingApproval(
             nonce,
-            payload.externalToken,
-            payload.externalRecipient,
-            payload.externalTokenAmount
+            d.externalToken,
+            d.externalRecipient,
+            d.externalTokenAmount
         );
     }
 
@@ -370,60 +347,50 @@ contract BridgeVault is
 
     /**
      * @dev Verify that a STRATO event was actually emitted at the given
-     *      location with the given payload. Reverts on any mismatch.
+     *      location, and return the decoded payload as the source of truth.
+     *      Reverts on any failure to verify or decode.
      *
      *      Steps:
-     *        1. Cheap chain-id check on the asserted payload.
-     *        2. Pull the receipts root that STRATOLightClient has stored for
+     *        1. Pull the receipts root that STRATOLightClient has stored for
      *           `blockNumber`; reverts if no header has been submitted.
-     *        3. MPT-verify `receiptRLP` is at key rlp(txIndex) under that root.
-     *        4. Decode the receipt and pull out log #logIndex with the
+     *        2. MPT-verify `receiptRLP` is at key rlp(txIndex) under that root.
+     *        3. Decode the receipt and pull out log #logIndex with the
      *           SolidVM-flavored shape (address, eventName, typed args).
-     *        5. Equality-check every authoritative field: source contract,
-     *           event name, and all eight payload fields. Anything left
-     *           un-asserted is a forgery vector.
+     *        4. Confirm the source contract, event-name discriminator, and
+     *           chain-id are what we expect.
+     *
+     *      The decoded struct is returned to the caller, so callers can drive
+     *      threshold checks, state transitions, and token transfers off the
+     *      authoritative on-chain values. Mirroring the receipt into a
+     *      caller-supplied payload would just be a chance to disagree with it.
      */
     function _verifyEventProof(
         uint256 blockNumber,
         uint256 txIndex,
-        uint256 logIndex,
         bytes[] memory mptProof,
         bytes memory receiptRLP,
-        WithdrawalPayload calldata payload,
+        uint256 logIndex,
         bytes32 expectedEventNameHash
-    ) internal view {
-        if (payload.externalChainId != externalChainId) revert WrongChainId();
-
+    ) internal view virtual returns (STRATOEventDecoder.DecodedWithdrawal memory d) {
         bytes32 receiptsRoot = lightClient.getReceiptsRoot(blockNumber);
 
         // Trie key is rlp(txIndex). For a positional integer key this is
         // either a single byte (0x00..0x7f for txIndex 0..127) or a short
-        // RLP string (0x81 + byte).
-        bytes memory triKey = _rlpEncodeTxIndex(txIndex);
+        // RLP string (0x81 + byte) for larger values.
+        bytes memory trieKey = _rlpEncodeTxIndex(txIndex);
 
-        if (!MerklePatricia.verifyInclusion(receiptsRoot, triKey, receiptRLP, mptProof)) {
+        if (!MerklePatricia.verifyInclusion(receiptsRoot, trieKey, receiptRLP, mptProof)) {
             revert ProofVerificationFailed();
         }
 
-        STRATOEventDecoder.DecodedWithdrawal memory d =
-            STRATOEventDecoder.decodeWithdrawalLog(receiptRLP, logIndex);
+        d = STRATOEventDecoder.decodeWithdrawalLog(receiptRLP, logIndex);
 
         // Source must be the canonical STRATO bridge contract.
         if (d.contractAddress != stratoVaultAddress) revert WrongStratoVault();
-
-        // Event name must match (small-tier vs large-tier dispatch).
+        // Event name discriminates the small vs. large flow.
         if (d.eventNameHash != expectedEventNameHash) revert UnknownEvent();
-
-        // Every payload field must match what the user asserted. Anything
-        // not checked here is a forgery vector.
-        if (d.externalChainId != payload.externalChainId) revert WrongChainId();
-        if (d.externalToken != payload.externalToken) revert ProofVerificationFailed();
-        if (d.externalRecipient != payload.externalRecipient) revert ProofVerificationFailed();
-        if (d.externalTokenAmount != payload.externalTokenAmount) revert ProofVerificationFailed();
-        if (d.stratoSender != payload.stratoSender) revert ProofVerificationFailed();
-        if (d.stratoToken != payload.stratoToken) revert ProofVerificationFailed();
-        if (d.stratoTokenAmount != payload.stratoTokenAmount) revert ProofVerificationFailed();
-        if (d.nonce != payload.stratoNonce) revert ProofVerificationFailed();
+        // Chain id must match the chain this vault represents.
+        if (d.externalChainId != externalChainId) revert WrongChainId();
     }
 
     /// @dev Minimal RLP encoder for the trie key. txIndex is a small uint and

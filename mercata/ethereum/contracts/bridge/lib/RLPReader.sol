@@ -55,6 +55,9 @@ library RLPReader {
         return _byteAt(item.memPtr, 0) >= 0xc0;
     }
 
+    /// @dev Convenience: type the RLP prefix as uint8 throughout the file.
+    ///      _byteAt returns uint8 directly so callers don't need cast noise.
+
     /// @notice Decode the item as a list of sub-items.
     ///
     /// Reverts if the item isn't a list. The returned array's length is the
@@ -171,7 +174,7 @@ library RLPReader {
         returns (uint256 headerLen, uint256 payloadLen)
     {
         if (item.len == 0) revert InvalidRLP();
-        uint8 prefix = uint8(_byteAt(item.memPtr, 0));
+        uint8 prefix = _byteAt(item.memPtr, 0);
 
         if (prefix < 0x80) {
             // Single byte that encodes itself.
@@ -204,7 +207,7 @@ library RLPReader {
     ///      claimed length doesn't exceed `available`.
     function _itemLen(uint256 ptr, uint256 available) private pure returns (uint256 total) {
         if (available == 0) revert InvalidRLP();
-        uint8 prefix = uint8(_byteAt(ptr, 0));
+        uint8 prefix = _byteAt(ptr, 0);
         if (prefix < 0x80) {
             total = 1;
         } else if (prefix < 0xb8) {
@@ -240,7 +243,7 @@ library RLPReader {
         if (cursor != endPtr) revert InvalidRLP();
     }
 
-    function _byteAt(uint256 ptr, uint256 offset) private pure returns (bytes1 b) {
+    function _byteAt(uint256 ptr, uint256 offset) private pure returns (uint8 b) {
         assembly {
             b := byte(0, mload(add(ptr, offset)))
         }

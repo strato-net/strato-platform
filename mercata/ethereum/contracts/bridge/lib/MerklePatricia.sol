@@ -8,7 +8,7 @@ import {RLPReader} from "./RLPReader.sol";
  * @notice Inclusion-proof verifier for Ethereum-style Merkle Patricia Tries.
  *
  *         Specifically targeted at the STRATO receipts trie (Phase 0 §6.1):
- *         keys are @rlp(txIndex)@, values are @rlp(Receipt)@, and the trie
+ *         keys are rlp(txIndex), values are rlp(Receipt), and the trie
  *         root is committed to in the V2 block header.
  *
  *         The algorithm follows the Yellow Paper. There are three node types,
