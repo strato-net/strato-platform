@@ -22,6 +22,7 @@ library
       Blockchain.Data.ExecResults
       Blockchain.DB.BlockSummaryDB
       Blockchain.DB.ModifyStateDB
+      Blockchain.Forks
       Blockchain.StateRootMismatch
       Blockchain.Stream.Action
       Blockchain.Stream.VMEvent
@@ -101,14 +102,18 @@ test-suite contextm-test
   main-is: Spec.hs
   other-modules:
       ReceiptSpec
+      TypedArgConversionSpec
       Paths_vm_tools
   hs-source-dirs:
       test/
   ghc-options: -Wall -O2 -dynamic
   build-depends:
       base
+    , blockDB
     , blockapps-data
+    , blockapps-datadefs
     , bytestring
+    , containers
     , ethereum-rlp
     , hflags
     , hspec

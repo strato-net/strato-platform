@@ -5,6 +5,7 @@ module Blockchain.Bagger.Transactions where
 
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.ExecResults
+import Blockchain.Data.Receipt
 import Blockchain.Data.TXOrigin
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
@@ -12,13 +13,16 @@ import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
 import SolidVM.Model.Delta
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq
 import Control.Lens.Setter (set)
+import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 import Data.Time.Clock
 import GHC.Generics
+import SolidVM.Model.TypedArg (valueToTypedArg)
 import Text.Format
 
 data TxRunResult = TxRunResult
@@ -233,3 +237,39 @@ getDeltasFromResults = foldr go mempty
           Right ExecResults{..} ->
             let vd' = toDelta erNewValidators erRemovedValidators
              in (vd' <> v)
+
+-- | Convert a 'TxRunResult' to its canonical 'Receipt' for inclusion in the
+-- receipts trie (Phase 0 spec §6.2). Mirrors the gas/status accounting in
+-- 'BlockChain.outputTransactionResult':
+--
+--   * Pre-execution failure (Left) and execution exception both consume the
+--     full transaction gas limit and produce 'ReceiptFailure'.
+--   * Successful execution produces 'ReceiptSuccess' and gas used =
+--     gasLimit - remaining.
+--
+-- Each emitted SolidVM 'Event' becomes a 'ReceiptLog' whose args are the
+-- canonical 'TypedArg' values. Args whose typed Value can't be canonicalized
+-- (e.g. aggregates with IORef-backed Variables) are dropped — see the comment
+-- on 'valueToTypedArg' in SolidVM.Model.TypedArg. Bridge events use only
+-- primitives, so this isn't lossy in practice for that flow.
+txRunResultToReceipt :: TxRunResult -> Receipt
+txRunResultToReceipt trr =
+  let txGasLim = TD.gasLimit (otBaseTx (trrTransaction trr))
+      (status, gasUsed, events) = case trrResult trr of
+        Left _ -> (ReceiptFailure, txGasLim, [])
+        Right er -> case erException er of
+          Just _ -> (ReceiptFailure, txGasLim, erEvents er)
+          Nothing -> (ReceiptSuccess, txGasLim - erRemainingTxGas er, erEvents er)
+   in Receipt
+        { receiptStatus = status,
+          receiptGasUsed = gasUsed,
+          receiptLogs = map eventToReceiptLog events
+        }
+
+eventToReceiptLog :: Event -> ReceiptLog
+eventToReceiptLog ev =
+  ReceiptLog
+    { rlogContractAddress = evContractAddress ev,
+      rlogEventName = evName ev,
+      rlogArgs = mapMaybe (\(_, val, _, _) -> valueToTypedArg val) (evArgs ev)
+    }

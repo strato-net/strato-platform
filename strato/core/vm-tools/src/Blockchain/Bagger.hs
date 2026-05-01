@@ -40,7 +40,9 @@ import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
+import Blockchain.Forks (isReceiptsRootForkActive)
 import qualified Blockchain.Verification as V
+import Blockchain.Data.Receipt (Receipt)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -297,7 +299,7 @@ makeNewBlock mineTransactions mSelfAddress = do
           let lastHead = B.bestBlockHeader cache
           let promoted = take ((fromInteger (Conf.maxTxsPerBlock (quarryConfig ethConf))) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
-          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty
+          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] [] time mempty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
           withBagger $ do
@@ -596,7 +598,8 @@ buildFromMiningCache = do
   let vDelt = getDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
   let time = B.startTimestamp cache
-  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt
+  let receipts = txRunResultToReceipt <$> B.lastExecutedTxs cache
+  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs receipts time vDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
   cacheRunResults rewardedBlockData (B.lastExecutedStateRoot cache, B.remainingGas cache, B.lastExecutedTxs cache)
@@ -613,11 +616,13 @@ buildNextBlockHeader ::
   Keccak256 ->
   StateRoot ->
   [OutputTx] ->
+  [Receipt] ->
   UTCTime ->
   ValidatorDelta ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash stateRoot txs time vd =
+buildNextBlockHeader parentHeader parentHash stateRoot txs receipts time vd =
   let parentNum = number parentHeader
+      blockNum = parentNum + 1
       (newV, remV) = fromDelta vd
       curValidators = case parentHeader of
         BlockHeaderV2{} -> S.toList $ S.difference
@@ -626,14 +631,18 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs time vd =
                                          (S.fromList $ newValidators parentHeader))
                                        (S.fromList $ removedValidators parentHeader)
         BlockHeader{} -> S.toList $ getValidatorSet parentHeader
+      -- Pre-fork: keep the empty-trie sentinel so existing chains' header
+      -- bytes don't change. Post-fork: compute the real root from the
+      -- per-tx receipts.
+      receiptsForRoot = if isReceiptsRootForkActive blockNum then receipts else []
    in BlockHeaderV2
         {
           parentHash = parentHash,
           stateRoot = stateRoot,
           transactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs),
-          receiptsRoot = V.receiptsVerificationValue [], -- TODO(PR4): wire in actual receipts post-fork
+          receiptsRoot = V.receiptsVerificationValue receiptsForRoot,
           logsBloom = "0000000000000000000000000000000000000000000000000000000000000000",
-          number = parentNum + 1,
+          number = blockNum,
           timestamp = time,
           extraData = txsLen2ExtraData (length txs),
           currentValidators = curValidators,

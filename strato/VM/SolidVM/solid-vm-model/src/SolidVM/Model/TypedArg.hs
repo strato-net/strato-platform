@@ -25,6 +25,7 @@
 -- known event signature.
 module SolidVM.Model.TypedArg
   ( TypedArg (..),
+    valueToTypedArg,
   )
 where
 
@@ -35,6 +36,7 @@ import qualified Data.ByteString as B
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import GHC.Generics (Generic)
+import SolidVM.Model.Value (Value (..))
 
 data TypedArg
   = -- | Signed or unsigned integer. Minimal big-endian via RLP integer encoding.
@@ -72,3 +74,23 @@ instance RLPSerializable TypedArg where
   rlpDecode (RLPScalar n) = TAInt (fromIntegral n)
   rlpDecode (RLPString bs) = TABytes bs
   rlpDecode (RLPArray xs) = TAArray (map rlpDecode xs)
+
+-- | Convert a SolidVM 'Value' to its canonical 'TypedArg'.
+--
+-- Only primitive types are supported. Aggregate types (SArray, SMap, SStruct,
+-- STuple) contain 'Variable's backed by IORefs, which can't be dereferenced
+-- in a pure context. The bridge 'Withdrawal' event uses only primitives, so
+-- this is sufficient for the receipts-trie use case. If aggregate event args
+-- become necessary, the conversion site (event emit) will need to freeze the
+-- aggregate inside MonadSM and store the frozen form alongside the live
+-- 'Value' on 'Event'.
+valueToTypedArg :: Value -> Maybe TypedArg
+valueToTypedArg v = case v of
+  SInteger i -> Just (TAInt i)
+  SBool b -> Just (TABool b)
+  SAddress a _ -> Just (TAAddress a)
+  SString s -> Just (TAString s)
+  SBytes b -> Just (TABytes b)
+  SEnumVal _ _ w32 -> Just (TAInt (fromIntegral w32))
+  -- Aggregates and reference-y values intentionally fall through.
+  _ -> Nothing

@@ -49,6 +49,8 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
+import Blockchain.Forks (isReceiptsRootForkActive)
+import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
@@ -268,9 +270,23 @@ verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
       validatorCheck = if eqDelta bVd vDelt
         then Nothing
         else Just . ValidatorMismatch $ BlockDelta (fromDelta bVd) (fromDelta vDelt)
+      -- Receipts-root check: post-fork, every node must arrive at the same
+      -- root from the executed transactions. Pre-fork, the header carries
+      -- the empty-trie sentinel and the check is skipped.
+      blockNum = number bh
+      receiptsForRoot =
+        if isReceiptsRootForkActive blockNum
+          then map txRunResultToReceipt trrs
+          else []
+      derivedReceiptsRoot = V.receiptsVerificationValue receiptsForRoot
+      receiptsRootCheck =
+        if derivedReceiptsRoot == receiptsRoot bh
+          then Nothing
+          else Just . ReceiptsRootMismatch $
+                 BlockDelta (receiptsRoot bh) derivedReceiptsRoot
    in return $ validity ++ case blockHeaderVersion bh of
         1 -> catMaybes [srCheck]
-        2 -> catMaybes [srCheck, validatorCheck]
+        2 -> catMaybes [srCheck, validatorCheck, receiptsRootCheck]
         v -> [VersionMismatch $ BlockDelta v 2]
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m [TxRunResult]

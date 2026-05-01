@@ -29,6 +29,7 @@ import Control.Monad
 import Executable.EVMFlags ()
 import HFlags
 import qualified ReceiptSpec
+import qualified TypedArgConversionSpec
 import Test.Hspec (Spec, describe, hspec)
 
 --import qualified LabeledError
@@ -61,3 +62,4 @@ spec :: Spec
 spec = do
   describe "VMContext" $ pure ()
   ReceiptSpec.spec
+  TypedArgConversionSpec.spec
