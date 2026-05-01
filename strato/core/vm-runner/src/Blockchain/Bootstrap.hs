@@ -208,7 +208,9 @@ bootstrapIndexer obGB = do
   putStrLn "About to bootstrap index events"
   res <-
     UEC.runKafkaMConfigured clientId $
-    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
+    -- Genesis block has no executable transactions, so it carries an empty
+    -- receipt list. Post-fork blocks pick up real receipts inside addBlock.
+    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
 
   print res
   putStrLn "bootstrapIndex genesis seed successful!"

@@ -29,6 +29,7 @@ library
       Blockchain.Data.LogDB
       Blockchain.Data.RawTransaction
       Blockchain.Data.Receipt
+      Blockchain.Data.ReceiptRef
       Blockchain.Data.Transaction
       Blockchain.Data.TransactionDef
       Blockchain.Data.TransactionResult

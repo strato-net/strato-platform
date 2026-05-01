@@ -39,6 +39,7 @@ import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
+import Blockchain.Data.RLP (rlpEncode, rlpSerialize)
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
@@ -147,8 +148,14 @@ instance (HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) where
 addBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . number . obBlockData) unfiltered
+      genesisOnly = filter ((== 0) . number . obBlockData) unfiltered
       timerToUse = Just vmBlockInsertionMined
-  unless (null unfiltered) $ yieldMany $ OutIndexEvent . RanBlock <$> unfiltered
+  -- Genesis blocks don't go through addBlock (they're filtered out below),
+  -- so emit them here with an empty receipt list. Non-genesis blocks emit
+  -- their RanBlock from inside addBlock's success path so that receipts can
+  -- be attached.
+  unless (null genesisOnly) $
+    yieldMany $ map (\b -> OutIndexEvent (RanBlock b [])) genesisOnly
   bbi <- getContextBestBlockInfo
   $logInfoS "addBlocks" $ T.pack ("Unfiltered count: " ++ show (length unfiltered))
   $logInfoS "addBlocks" $ T.pack ("Filtered count: " ++ show (length filtered))
@@ -248,6 +255,17 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
             $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (number $ obBlockData b) ++ " (" ++ format obh ++ ")."
+            -- Emit RanBlock with the per-tx receipt RLP bytes so the indexer
+            -- can persist them to receipt_ref. Pre-fork blocks carry empty
+            -- receipts (matching the empty-trie sentinel in the header);
+            -- post-fork blocks carry the real receipts that combine to give
+            -- the header's receiptsRoot.
+            let blockNum = number $ obBlockData b
+                receiptsBytes =
+                  if isReceiptsRootForkActive blockNum
+                    then map (rlpSerialize . rlpEncode . txRunResultToReceipt) trrs
+                    else []
+            yield . OutIndexEvent $ RanBlock b receiptsBytes
             pure []
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type

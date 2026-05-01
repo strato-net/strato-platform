@@ -17,6 +17,7 @@ import Blockchain.EthConf (runKafkaMConfigured, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
+import qualified Blockchain.Strato.Model.Class as Class
 import Blockchain.Data.BlockHeader (BlockHeader (..), clearBlockSignatures, getBlockSignatures)
 import Blockchain.Data.DataDefs (AddressStateRef (..), TransactionResult(..))
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
@@ -40,6 +41,7 @@ import qualified Handlers.AccountInfo as Accounts
 import qualified Handlers.Transaction as Tx
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Blocks
+import qualified Handlers.Receipts as Receipts
 import qualified Handlers.TransactionResult as TxResults
 import Network.Kafka (getLastOffset, KafkaTime(..))
 import Network.Kafka.Protocol (Offset(..))
@@ -738,14 +740,30 @@ strato_getReceiptProof =
   toMethod "strato_getReceiptProof" f (Required "blockNumber" :+: Required "txIndex" :+: ())
   where
     f :: String -> Int -> RpcResult Server (Maybe ReceiptProofResponse)
-    f blockNumber _txIndex = do
+    f blockNumber txIndex = do
       mBlk <- liftIO $ fetchBlockByNumber blockNumber
-      return $ case mBlk of
-        Just blk' ->
+      case mBlk of
+        Nothing -> return Nothing
+        Just blk' -> do
           let hdr = blockBlockData (bPrimeToB blk')
               (rlpHex, sigsHex) = headerBytesAndSigs hdr
-           in -- Receipts trie is empty until PR 4 lands the receipts-root
-              -- fork. Header bytes and signatures are already correct here so
-              -- relayers / Solidity tests can exercise the light client today.
-              Just $ ReceiptProofResponse rlpHex sigsHex Nothing []
-        Nothing -> Nothing
+          -- Delegate proof generation to the REST endpoint. The receipts trie
+          -- is rebuilt server-side from the receipt_ref table; pre-fork
+          -- blocks return an empty proof (because receipt_ref has nothing
+          -- for them and the rebuilt trie is empty), which the on-chain
+          -- verifier will reject -- as expected pre-fork.
+          let blkHash = Class.blockHash (bPrimeToB blk')
+          response <- liftIO $ runLocal $ Receipts.getReceiptProofByHashClient blkHash txIndex
+          case response of
+            Right pr ->
+              return $ Just $
+                ReceiptProofResponse
+                  rlpHex
+                  sigsHex
+                  (Just (Receipts.rprReceiptRLP pr))
+                  (Receipts.rprMptProof pr)
+            Left _ ->
+              -- Likely a 404 (no receipt at that index, or no block with
+              -- that hash). Fall back to header-only response so callers can
+              -- still drive the light client.
+              return $ Just $ ReceiptProofResponse rlpHex sigsHex Nothing []
