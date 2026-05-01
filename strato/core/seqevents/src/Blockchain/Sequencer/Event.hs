@@ -12,6 +12,7 @@ module Blockchain.Sequencer.Event (
   Timestamp,
   SeqLoopEvent(..),
   JsonRpcCommand(..),
+  JsonRpcResponse(..),
   ) where
 
 import qualified Blockchain.Blockstanbul as PBFT
@@ -117,6 +118,17 @@ instance Format JsonRpcCommand where
         toStr = maybe "none" format (to obj)
     in "JRCCall id=" ++ rid ++ " to=" ++ toStr ++ " data=" ++ dataHex ++ " block=" ++ blk
   
+data JsonRpcResponse
+  = Success { responseId :: String, returnData :: BS.ByteString }
+  | Error   { responseId :: String, errorMessage :: String }
+  deriving (Eq, Show, GHCG.Generic, Data)
+
+instance Binary JsonRpcResponse
+
+instance Format JsonRpcResponse where
+  format (Success rid _) = "JsonRpcResponse.Success id=" ++ rid
+  format (Error rid msg) = "JsonRpcResponse.Error id=" ++ rid ++ " msg=" ++ msg
+
 data P2pEvent
   = P2pTx OutputTx
   | P2pBlock OutputBlock
