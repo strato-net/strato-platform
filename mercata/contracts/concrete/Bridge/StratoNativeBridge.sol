@@ -57,6 +57,7 @@ contract record StratoNativeBridge is Ownable {
         uint256 stratoTokenAmount;
         uint256 timestamp;
         string nativeMintProposalHash;
+        uint256 nativeMintNotBefore;
         bool useInstantPath;
     }
 
@@ -123,8 +124,10 @@ contract record StratoNativeBridge is Ownable {
     event NativeWithdrawalProposalRecorded(uint256 indexed withdrawalId, string nativeMintProposalHash);
     event NativeWithdrawalCompleted(uint256 indexed withdrawalId);
     event NativeWithdrawalAborted(uint256 indexed withdrawalId);
+    event InstantWithdrawalDelayUpdated(uint256 previousDelaySeconds, uint256 newDelaySeconds);
 
     uint256 public WITHDRAWAL_ABORT_DELAY = 172800;
+    uint256 public INSTANT_WITHDRAWAL_DELAY_SECONDS = 900;
     bool public depositsPaused;
     bool public withdrawalsPaused;
     uint256 public withdrawalCounter;
@@ -168,6 +171,7 @@ contract record StratoNativeBridge is Ownable {
         address _guardian
     ) external onlyOwner {
         WITHDRAWAL_ABORT_DELAY = 172800;
+        INSTANT_WITHDRAWAL_DELAY_SECONDS = 900;
         require(_bridgeOperator != address(0), "SNB: zero operator");
         require(_guardian != address(0), "SNB: zero guardian");
 
@@ -185,6 +189,12 @@ contract record StratoNativeBridge is Ownable {
     function setGuardian(address newGuardian) external onlyOwner {
         require(newGuardian != address(0), "SNB: zero guardian");
         guardian = newGuardian;
+    }
+
+    function setInstantWithdrawalDelaySeconds(uint256 newDelaySeconds) external onlyOwner {
+        uint256 previousDelaySeconds = INSTANT_WITHDRAWAL_DELAY_SECONDS;
+        INSTANT_WITHDRAWAL_DELAY_SECONDS = newDelaySeconds;
+        emit InstantWithdrawalDelayUpdated(previousDelaySeconds, newDelaySeconds);
     }
 
     function setPause(bool _depositsPaused, bool _withdrawalsPaused) external {
@@ -249,6 +259,7 @@ contract record StratoNativeBridge is Ownable {
         address stratoSender,
         address stratoToken,
         uint256 stratoTokenAmount,
+        uint256 nativeMintNotBefore,
         bool useInstantPath
     ) {
         NativeWithdrawalInfo w = withdrawals[id];
@@ -263,6 +274,7 @@ contract record StratoNativeBridge is Ownable {
             w.stratoSender,
             w.stratoToken,
             w.stratoTokenAmount,
+            w.nativeMintNotBefore,
             w.useInstantPath
         );
     }
@@ -412,6 +424,7 @@ contract record StratoNativeBridge is Ownable {
             actualLockedAmount,
             block.timestamp,
             "",
+            0,
             useInstantPath
         );
 
@@ -436,6 +449,7 @@ contract record StratoNativeBridge is Ownable {
 
         w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
         w.timestamp = block.timestamp;
+        w.nativeMintNotBefore = block.timestamp + INSTANT_WITHDRAWAL_DELAY_SECONDS;
 
         emit NativeWithdrawalPending(id, w.externalTxHash);
     }

@@ -25,6 +25,7 @@ describe("StratoNativeRepresentationBridge", function () {
       { name: "representationToken", type: "address" },
       { name: "recipient", type: "address" },
       { name: "amount", type: "uint256" },
+      { name: "notBefore", type: "uint256" },
       { name: "deadline", type: "uint256" },
     ],
   };
@@ -43,6 +44,7 @@ describe("StratoNativeRepresentationBridge", function () {
       representationToken: await token.getAddress(),
       recipient: user.address,
       amount: 250n,
+      notBefore: BigInt(block.timestamp),
       deadline: BigInt(block.timestamp + 3600),
       ...overrides,
     };
@@ -143,6 +145,40 @@ describe("StratoNativeRepresentationBridge", function () {
     await expect(
       bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
     ).to.be.revertedWithCustomError(bridge, "AttestationExpired");
+  });
+
+  it("rejects native mint attestations before the STRATO review window ends", async function () {
+    const block = await ethers.provider.getBlock("latest");
+    const attestation = await buildAttestation({
+      notBefore: BigInt(block.timestamp + 3600),
+      deadline: BigInt(block.timestamp + 7200),
+    });
+    const signature = await signAttestation(attestationSigner, attestation);
+
+    await expect(
+      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+    ).to.be.revertedWithCustomError(bridge, "AttestationNotReady");
+  });
+
+  it("rejects native mint attestations with validity beyond the contract limit", async function () {
+    const block = await ethers.provider.getBlock("latest");
+    const attestation = await buildAttestation({
+      notBefore: BigInt(block.timestamp),
+      deadline: BigInt(block.timestamp) + 7n * 24n * 60n * 60n + 1n,
+    });
+    const signature = await signAttestation(attestationSigner, attestation);
+
+    await expect(
+      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+    ).to.be.revertedWithCustomError(bridge, "InvalidAttestation");
+  });
+
+  it("emits an event when max attestation validity changes", async function () {
+    await expect(bridge.setMaxAttestationValiditySeconds(3600n))
+      .to.emit(bridge, "MaxAttestationValidityUpdated")
+      .withArgs(7n * 24n * 60n * 60n, 3600n);
+
+    expect(await bridge.maxAttestationValiditySeconds()).to.equal(3600n);
   });
 
   it("rejects native mint attestations bound to another destination bridge", async function () {

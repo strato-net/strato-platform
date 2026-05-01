@@ -9,6 +9,7 @@ import { OperationType } from "@safe-global/types-kit";
 import {
   config,
   getChainRpcUrl,
+  getNativeBridgePrivateKeys,
 } from "../config";
 import { NativeWithdrawalInfo } from "../types";
 import {
@@ -30,6 +31,7 @@ export interface NativeMintAttestation {
   representationToken: string;
   recipient: string;
   amount: string;
+  notBefore: string;
   deadline: string;
 }
 
@@ -41,7 +43,8 @@ export interface NativeMintRequest extends NativeMintAttestation {
 }
 
 const NATIVE_MINT_ABI = [
-  "function mintRepresentationWithAttestation((uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 deadline) attestation, bytes[] signatures)",
+  "function mintRepresentationWithAttestation((uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline) attestation, bytes[] signatures)",
+  "function maxAttestationValiditySeconds() view returns (uint256)",
 ];
 
 const nativeMintInterface = new Interface(NATIVE_MINT_ABI);
@@ -57,6 +60,7 @@ const NATIVE_MINT_ATTESTATION_TYPES = {
     { name: "representationToken", type: "address" },
     { name: "recipient", type: "address" },
     { name: "amount", type: "uint256" },
+    { name: "notBefore", type: "uint256" },
     { name: "deadline", type: "uint256" },
   ],
 };
@@ -96,18 +100,48 @@ const normalizeAttestation = (
   representationToken: safeChecksum(attestation.representationToken),
   recipient: safeChecksum(attestation.recipient),
   amount: attestation.amount.toString(),
+  notBefore: attestation.notBefore.toString(),
   deadline: attestation.deadline.toString(),
 });
 
-export const buildNativeMintRequest = (
+const getMaxAttestationValiditySeconds = async (
+  destinationChainId: bigint,
+  destinationBridgeAddress: string,
+): Promise<bigint> => {
+  const provider = new JsonRpcProvider(getChainRpcUrl(destinationChainId));
+  const bridge = new Contract(
+    safeChecksum(destinationBridgeAddress),
+    NATIVE_MINT_ABI,
+    provider,
+  );
+  const validitySeconds = await bridge.maxAttestationValiditySeconds();
+  return BigInt(validitySeconds.toString());
+};
+
+export const buildNativeMintRequest = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
+  sourceBridgeAddress: string,
   destinationBridgeAddress: string,
-  deadlineSeconds?: bigint,
-): NativeMintRequest => {
+): Promise<NativeMintRequest> => {
   const destinationChainId = String(withdrawal.externalChainId);
   const destinationBridge = safeChecksum(destinationBridgeAddress);
-  const sourceBridge = safeChecksum(config.nativeBridge.address!);
+  const sourceBridge = safeChecksum(sourceBridgeAddress);
+  const notBefore = BigInt(withdrawal.nativeMintNotBefore || 0);
+  if (notBefore <= 0n) {
+    throw new Error(
+      `Native withdrawal ${withdrawal.withdrawalId} is missing nativeMintNotBefore`,
+    );
+  }
+  const validitySeconds = await getMaxAttestationValiditySeconds(
+    BigInt(destinationChainId),
+    destinationBridge,
+  );
+  if (validitySeconds <= 0n) {
+    throw new Error(
+      `Native destination bridge ${destinationBridge} has invalid maxAttestationValiditySeconds`,
+    );
+  }
   const attestation = normalizeAttestation({
     sourceChainId: sourceChainId.toString(),
     sourceBridge,
@@ -118,13 +152,8 @@ export const buildNativeMintRequest = (
     representationToken: ensureHexPrefix(withdrawal.representationToken),
     recipient: ensureHexPrefix(withdrawal.externalRecipient),
     amount: String(withdrawal.externalTokenAmount),
-    deadline: String(
-      deadlineSeconds ??
-        BigInt(
-          Math.floor(Date.now() / 1000) +
-            config.nativeBridge.mintAttestationTtlSeconds,
-        ),
-    ),
+    notBefore: notBefore.toString(),
+    deadline: (notBefore + validitySeconds).toString(),
   });
 
   return {
@@ -144,42 +173,52 @@ export const signNativeMintAttestation = async (
   attestation: NativeMintAttestation,
 ): Promise<string[]> => {
   const normalized = normalizeAttestation(attestation);
-  const threshold = config.nativeBridge.mintAttestationThreshold;
-  if (!Number.isInteger(threshold) || threshold <= 0) {
-    throw new Error("NATIVE_MINT_ATTESTATION_THRESHOLD must be positive");
-  }
-  if (threshold !== 1) {
+  const destinationChainId = BigInt(normalized.destinationChainId);
+  const bridgeKeys = getNativeBridgePrivateKeys(destinationChainId);
+  if (bridgeKeys.length === 0) {
     throw new Error(
-      "NATIVE_MINT_ATTESTATION_THRESHOLD must be 1 when using NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY",
+      `CHAIN_${destinationChainId}_NATIVE_BRIDGE_PRIVATE_KEY is not configured`,
     );
   }
-  const signerKey = config.nativeBridge.mintAttestationSignerPrivateKey;
-  if (!signerKey) {
-    throw new Error("NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY is not configured");
-  }
 
-  const signature = await new Wallet(normalizePrivateKey(signerKey)).signTypedData(
-    attestationDomain(normalized),
-    NATIVE_MINT_ATTESTATION_TYPES,
-    normalized,
+  const signatures = await Promise.all(
+    bridgeKeys.map(async ({ privateKey }) => {
+      const wallet = new Wallet(normalizePrivateKey(privateKey));
+      const signature = await wallet.signTypedData(
+        attestationDomain(normalized),
+        NATIVE_MINT_ATTESTATION_TYPES,
+        normalized,
+      );
+      return {
+        signer: wallet.address.toLowerCase(),
+        signature: Signature.from(signature).serialized,
+      };
+    }),
   );
-  return [Signature.from(signature).serialized];
+
+  return signatures
+    .sort((a, b) => a.signer.localeCompare(b.signer))
+    .map(({ signature }) => signature);
 };
 
 export const executeNativeMint = async (
   request: NativeMintRequest,
 ): Promise<string> => {
-  if (!config.nativeBridge.mintExecutorPrivateKey) {
-    throw new Error("NATIVE_MINT_EXECUTOR_PRIVATE_KEY is not configured");
+  const attestation = normalizeAttestation(request.attestation);
+  const destinationChainId = BigInt(attestation.destinationChainId);
+  const bridgeKey = getNativeBridgePrivateKeys(destinationChainId)[0]?.privateKey;
+  if (!bridgeKey) {
+    throw new Error(
+      `CHAIN_${destinationChainId}_NATIVE_BRIDGE_PRIVATE_KEY is not configured`,
+    );
   }
 
-  const attestation = normalizeAttestation(request.attestation);
   const signatures = await signNativeMintAttestation(attestation);
   const provider = new JsonRpcProvider(
-    getChainRpcUrl(BigInt(attestation.destinationChainId)),
+    getChainRpcUrl(destinationChainId),
   );
   const wallet = new Wallet(
-    normalizePrivateKey(config.nativeBridge.mintExecutorPrivateKey),
+    normalizePrivateKey(bridgeKey),
     provider,
   );
   const bridge = new Contract(

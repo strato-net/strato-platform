@@ -89,6 +89,7 @@ contract Describe_StratoNativeBridge is Authorizable {
         );
 
         require(nativeBridge.WITHDRAWAL_ABORT_DELAY() == 172800, "Proxy initialize should set default abort delay");
+        require(nativeBridge.INSTANT_WITHDRAWAL_DELAY_SECONDS() == 900, "Proxy initialize should set default instant delay");
         require(nativeBridge.tokenFactory() == address(tokenFactory), "Native bridge tokenFactory should initialize");
         require(nativeBridge.custodyVault() == address(custodyVault), "Native bridge custodyVault should initialize");
         require(custodyVault.bridge() == address(nativeBridge), "Custody vault bridge should initialize");
@@ -146,6 +147,7 @@ contract Describe_StratoNativeBridge is Authorizable {
             ,
             ,
             uint256 stratoTokenAmount,
+            ,
             bool useInstantPath
         ) = nativeBridge.getWithdrawalInfo(withdrawalId);
 
@@ -153,6 +155,12 @@ contract Describe_StratoNativeBridge is Authorizable {
         require(stratoTokenAmount == 50e18, "Locked amount should match request");
         require(useInstantPath, "Amount under threshold should use instant path");
         require(custodyVault.lockedBalance(nativeTokenAddress) == 50e18, "Vault should lock requested amount");
+    }
+
+    function it_owner_can_update_instant_withdrawal_delay() {
+        nativeBridge.setInstantWithdrawalDelaySeconds(1234);
+
+        require(nativeBridge.INSTANT_WITHDRAWAL_DELAY_SECONDS() == 1234, "Instant delay should update");
     }
 
     function it_native_withdrawal_pending_state_blocks_user_abort_before_external_mint() {
@@ -179,11 +187,13 @@ contract Describe_StratoNativeBridge is Authorizable {
             ,
             ,
             ,
+            uint256 nativeMintNotBefore,
             bool pendingUseInstantPath
         ) = nativeBridge.getWithdrawalInfo(withdrawalId);
 
         require(bridgeStatus == BridgeStatus.PENDING_REVIEW, "Withdrawal should be non-abortable pending");
         require(bytes(pendingTxHash).length == 0, "Pending state should not require destination tx hash");
+        require(nativeMintNotBefore > 0, "Pending state should set native mint not-before time");
         require(pendingUseInstantPath, "Pending withdrawal should retain lane selection");
 
         bool reverted = false;
@@ -199,6 +209,7 @@ contract Describe_StratoNativeBridge is Authorizable {
         (
             BridgeStatus confirmedStatus,
             string confirmedTxHash,
+            ,
             ,
             ,
             ,
@@ -311,6 +322,7 @@ contract Describe_StratoNativeBridge is Authorizable {
             ,
             ,
             uint256 stratoTokenAmount,
+            ,
             bool useInstantPath
         ) = nativeBridge.getWithdrawalInfo(withdrawalId);
 

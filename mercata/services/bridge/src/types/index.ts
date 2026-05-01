@@ -189,6 +189,7 @@ export interface NativeWithdrawalInfo {
   stratoTokenAmount: string;
   timestamp: string;
   nativeMintProposalHash?: string;
+  nativeMintNotBefore?: string;
   useInstantPath?: boolean;
 
   withdrawalId: string;

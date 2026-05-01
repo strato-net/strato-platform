@@ -265,7 +265,6 @@ cp .env.smoke-native-bridge.example .env.smoke-native-bridge
 **Optional Environment Variables**:
 - `BRIDGE_OPERATOR` - Expected STRATO relayer/operator address; if set, the script verifies STRATO runtime operator wiring
 - `NATIVE_MINT_ATTESTATION_SIGNERS` - Comma-separated expected external-chain attestation signer addresses
-- `NATIVE_MINT_ATTESTATION_THRESHOLD` - Expected external-chain attestation signature threshold
 - `GUARDIAN` - Expected guardian address; if set, the script verifies both STRATO contracts use it
 
 **What it checks**:

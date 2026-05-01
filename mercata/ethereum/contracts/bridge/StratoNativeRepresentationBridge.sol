@@ -34,7 +34,7 @@ contract StratoNativeRepresentationBridge is
     bytes32 public constant UNPAUSER_ROLE = keccak256("UNPAUSER_ROLE");
     bytes32 public constant ATTESTATION_ADMIN_ROLE = keccak256("ATTESTATION_ADMIN_ROLE");
     bytes32 private constant NATIVE_MINT_ATTESTATION_TYPEHASH = keccak256(
-        "NativeMintAttestation(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 deadline)"
+        "NativeMintAttestation(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline)"
     );
 
     struct NativeMintAttestation {
@@ -47,6 +47,7 @@ contract StratoNativeRepresentationBridge is
         address representationToken;
         address recipient;
         uint256 amount;
+        uint256 notBefore;
         uint256 deadline;
     }
 
@@ -60,6 +61,7 @@ contract StratoNativeRepresentationBridge is
     uint96 public redemptionId;
     uint8 public attestationThreshold;
     uint8 public attestationSignerCount;
+    uint256 public maxAttestationValiditySeconds;
     bool public mintsPaused;
     bool public redemptionsPaused;
 
@@ -103,11 +105,13 @@ contract StratoNativeRepresentationBridge is
     event RedemptionPauseUpdated(bool paused);
     event AttestationSignerUpdated(address indexed signer, bool enabled);
     event AttestationThresholdUpdated(uint8 threshold);
+    event MaxAttestationValidityUpdated(uint256 previousValiditySeconds, uint256 newValiditySeconds);
 
     error InvalidAddress();
     error ZeroAmount();
     error InvalidAttestation();
     error InvalidAttestationThreshold();
+    error AttestationNotReady();
     error AttestationExpired();
     error BadAttestationSignatures();
     error TokenNotMapped();
@@ -150,6 +154,7 @@ contract StratoNativeRepresentationBridge is
         _grantRole(PAUSER_ROLE, admin);
         _grantRole(UNPAUSER_ROLE, admin);
         _grantRole(ATTESTATION_ADMIN_ROLE, admin);
+        maxAttestationValiditySeconds = 7 days;
     }
 
     function mintRepresentationWithAttestation(
@@ -195,6 +200,7 @@ contract StratoNativeRepresentationBridge is
                     attestation.representationToken,
                     attestation.recipient,
                     attestation.amount,
+                    attestation.notBefore,
                     attestation.deadline
                 )
             )
@@ -211,7 +217,12 @@ contract StratoNativeRepresentationBridge is
         if (attestation.destinationBridge != address(this)) revert InvalidAttestation();
         if (attestation.recipient == address(0)) revert InvalidAddress();
         if (attestation.amount == 0) revert ZeroAmount();
+        if (attestation.notBefore > block.timestamp) revert AttestationNotReady();
         if (attestation.deadline < block.timestamp) revert AttestationExpired();
+        if (attestation.deadline < attestation.notBefore) revert InvalidAttestation();
+        if (attestation.deadline > attestation.notBefore + maxAttestationValiditySeconds) {
+            revert InvalidAttestation();
+        }
 
         address representationToken = stratoToRepresentation[attestation.stratoToken];
         if (representationToken == address(0)) revert TokenNotMapped();
@@ -379,6 +390,15 @@ contract StratoNativeRepresentationBridge is
 
         attestationThreshold = threshold;
         emit AttestationThresholdUpdated(threshold);
+    }
+
+    function setMaxAttestationValiditySeconds(
+        uint256 validitySeconds
+    ) external onlyRole(ATTESTATION_ADMIN_ROLE) {
+        if (validitySeconds == 0) revert InvalidAttestation();
+        uint256 previousValiditySeconds = maxAttestationValiditySeconds;
+        maxAttestationValiditySeconds = validitySeconds;
+        emit MaxAttestationValidityUpdated(previousValiditySeconds, validitySeconds);
     }
 
     function setMintPaused(bool paused_) external {

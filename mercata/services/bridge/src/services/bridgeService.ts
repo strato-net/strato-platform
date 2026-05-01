@@ -34,10 +34,9 @@ const getStratoNetworkId = async (): Promise<bigint> => {
   return cachedStratoNetworkId;
 };
 
-const getNativeMintRequest = (
+const getNativeMintRequest = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
-  deadlineSeconds?: bigint,
 ) => {
   const bridgeAddress = getNativeRepresentationBridgeAddress(
     Number(withdrawal.externalChainId),
@@ -50,8 +49,8 @@ const getNativeMintRequest = (
   return buildNativeMintRequest(
     withdrawal,
     sourceChainId,
+    config.nativeBridge.address!,
     bridgeAddress,
-    deadlineSeconds,
   );
 };
 
@@ -59,7 +58,7 @@ const submitNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
 ): Promise<string> => {
-  const payload = getNativeMintRequest(withdrawal, sourceChainId);
+  const payload = await getNativeMintRequest(withdrawal, sourceChainId);
   return executeNativeMint(payload);
 };
 
@@ -67,14 +66,7 @@ const proposeManualNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
 ): Promise<string> => {
-  const manualTtlSeconds = BigInt(
-    Math.ceil(config.nativeBridge.manualMintAttestationTtlSeconds),
-  );
-  const payload = getNativeMintRequest(
-    withdrawal,
-    sourceChainId,
-    BigInt(Math.floor(Date.now() / 1000)) + manualTtlSeconds,
-  );
+  const payload = await getNativeMintRequest(withdrawal, sourceChainId);
   return proposeNativeMint(payload);
 };
 
@@ -524,9 +516,9 @@ export const handleRejectedWithdrawalBatch = async (
 
 const ensureNativeWithdrawalPending = async (
   withdrawal: NativeWithdrawalInfo,
-): Promise<bigint> => {
+): Promise<boolean> => {
   if (String(withdrawal.bridgeStatus) === "2") {
-    return BigInt(withdrawal.timestamp || withdrawal.requestedAt);
+    return true;
   }
 
   await execute({
@@ -537,20 +529,19 @@ const ensureNativeWithdrawalPending = async (
       id: Number(withdrawal.withdrawalId),
     },
   });
-  return BigInt(Math.floor(Date.now() / 1000));
+  return false;
 };
 
 const getNativeInstantWithdrawalDelayRemaining = (
-  pendingFrom: bigint,
+  withdrawal: NativeWithdrawalInfo,
 ): number => {
-  const delaySeconds = config.nativeBridge.instantWithdrawalDelaySeconds;
-  if (!Number.isFinite(delaySeconds) || delaySeconds <= 0) {
+  const notBefore = BigInt(withdrawal.nativeMintNotBefore || 0);
+  if (notBefore <= 0n) {
     return 0;
   }
 
-  const readyAt = pendingFrom + BigInt(Math.ceil(delaySeconds));
   const now = BigInt(Math.floor(Date.now() / 1000));
-  return readyAt > now ? Number(readyAt - now) : 0;
+  return notBefore > now ? Number(notBefore - now) : 0;
 };
 
 export const confirmNativeWithdrawalBatch = async (
@@ -574,8 +565,16 @@ export const confirmNativeWithdrawalBatch = async (
     }
 
     try {
-      const pendingFrom = await ensureNativeWithdrawalPending(withdrawal);
-      const delayRemaining = getNativeInstantWithdrawalDelayRemaining(pendingFrom);
+      const alreadyPending = await ensureNativeWithdrawalPending(withdrawal);
+      if (!alreadyPending) {
+        logInfo(
+          "BridgeService",
+          `Native instant withdrawal ${withdrawal.withdrawalId} moved to pending review`,
+        );
+        continue;
+      }
+
+      const delayRemaining = getNativeInstantWithdrawalDelayRemaining(withdrawal);
       if (delayRemaining > 0) {
         logInfo(
           "BridgeService",
@@ -678,7 +677,14 @@ export const queueManualNativeWithdrawalBatch = async (
     }
 
     try {
-      await ensureNativeWithdrawalPending(withdrawal);
+      const alreadyPending = await ensureNativeWithdrawalPending(withdrawal);
+      if (!alreadyPending) {
+        logInfo(
+          "BridgeService",
+          `Native withdrawal ${withdrawal.withdrawalId} moved to pending review before manual proposal`,
+        );
+        continue;
+      }
       const proposalReference = await proposeManualNativeMint(
         withdrawal,
         sourceChainId,

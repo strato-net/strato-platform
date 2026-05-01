@@ -35,21 +35,6 @@ const config = {
   },
   nativeBridge: {
     address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,
-    mintExecutorPrivateKey: process.env.NATIVE_MINT_EXECUTOR_PRIVATE_KEY,
-    mintAttestationSignerPrivateKey:
-      process.env.NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY,
-    mintAttestationThreshold: Number(
-      process.env.NATIVE_MINT_ATTESTATION_THRESHOLD || 1,
-    ),
-    mintAttestationTtlSeconds: Number(
-      process.env.NATIVE_MINT_ATTESTATION_TTL_SECONDS || 900,
-    ),
-    instantWithdrawalDelaySeconds: Number(
-      process.env.NATIVE_INSTANT_WITHDRAWAL_DELAY_SECONDS || 900,
-    ),
-    manualMintAttestationTtlSeconds: Number(
-      process.env.NATIVE_MANUAL_MINT_ATTESTATION_TTL_SECONDS || 604800,
-    ),
   },
   oracle: {
     address: process.env.PRICE_ORACLE_ADDRESS,
@@ -128,6 +113,47 @@ export const getNativeRepresentationBridgeAddress = (
 ): string | undefined => {
   const chainIdStr = chainId.toString();
   return process.env[`CHAIN_${chainIdStr}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`];
+};
+
+export const getNativeBridgePrivateKey = (
+  chainId: number | bigint,
+): string | undefined => {
+  const chainIdStr = chainId.toString();
+  return process.env[`CHAIN_${chainIdStr}_NATIVE_BRIDGE_PRIVATE_KEY`];
+};
+
+export interface NativeBridgePrivateKeyConfig {
+  envVar: string;
+  privateKey: string;
+}
+
+export const getNativeBridgePrivateKeys = (
+  chainId: number | bigint,
+): NativeBridgePrivateKeyConfig[] => {
+  const chainIdStr = chainId.toString();
+  const baseEnv = `CHAIN_${chainIdStr}_NATIVE_BRIDGE_PRIVATE_KEY`;
+  const keys: NativeBridgePrivateKeyConfig[] = [];
+  const seen = new Set<string>();
+
+  const addKey = (envVar: string) => {
+    const privateKey = process.env[envVar]?.trim();
+    if (!privateKey || seen.has(privateKey)) {
+      return;
+    }
+    seen.add(privateKey);
+    keys.push({ envVar, privateKey });
+  };
+
+  addKey(baseEnv);
+  for (let index = 1; ; index += 1) {
+    const envVar = `${baseEnv}_${index}`;
+    if (!process.env[envVar]) {
+      break;
+    }
+    addKey(envVar);
+  }
+
+  return keys;
 };
 
 // Validate required environment variables

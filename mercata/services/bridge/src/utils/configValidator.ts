@@ -1,12 +1,25 @@
 import { logInfo, logError } from "./logger";
+import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import {
   getEnabledChains,
   getEnabledNativeChainIds,
 } from "../services/cirrusService";
-import { config } from "../config";
+import { config, getNativeBridgePrivateKeys } from "../config";
 
 const isPrivateKey = (value: string): boolean =>
   /^(0x)?[a-fA-F0-9]{64}$/.test(value);
+
+const REPRESENTATION_BRIDGE_ABI = [
+  "function attestationSigners(address) view returns (bool)",
+  "function attestationThreshold() view returns (uint8)",
+  "function maxAttestationValiditySeconds() view returns (uint256)",
+];
+
+const isAddress = (value: string): boolean =>
+  /^(0x)?[a-fA-F0-9]{40}$/.test(value);
+
+const normalizePrivateKey = (value: string): string =>
+  value.startsWith("0x") ? value : `0x${value}`;
 
 export async function validateBridgeConfig(): Promise<boolean> {
   const errors: string[] = [];
@@ -123,76 +136,6 @@ export async function validateBridgeConfig(): Promise<boolean> {
     }
   }
 
-  if (config.nativeBridge.address) {
-    if (!config.nativeBridge.mintExecutorPrivateKey) {
-      warnings.push(
-        "No native mint executor is configured - set NATIVE_MINT_EXECUTOR_PRIVATE_KEY for instant native withdrawals",
-      );
-    }
-
-    if (!config.nativeBridge.mintAttestationSignerPrivateKey) {
-      warnings.push(
-        "No native mint attestation signer is configured - set NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY",
-      );
-    }
-
-    if (
-      config.nativeBridge.mintAttestationSignerPrivateKey &&
-      !isPrivateKey(config.nativeBridge.mintAttestationSignerPrivateKey)
-    ) {
-      errors.push("Invalid native mint attestation signer private key format");
-    }
-
-    if (
-      !Number.isInteger(config.nativeBridge.mintAttestationThreshold) ||
-      config.nativeBridge.mintAttestationThreshold <= 0
-    ) {
-      errors.push(
-        "NATIVE_MINT_ATTESTATION_THRESHOLD must be a positive integer",
-      );
-    }
-
-    if (config.nativeBridge.mintAttestationThreshold !== 1) {
-      errors.push(
-        "NATIVE_MINT_ATTESTATION_THRESHOLD must be 1 when NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY is configured",
-      );
-    }
-
-    if (
-      config.nativeBridge.mintExecutorPrivateKey &&
-      !isPrivateKey(config.nativeBridge.mintExecutorPrivateKey)
-    ) {
-      errors.push("Invalid native mint executor private key format");
-    }
-
-    if (
-      !Number.isFinite(config.nativeBridge.mintAttestationTtlSeconds) ||
-      config.nativeBridge.mintAttestationTtlSeconds <= 0
-    ) {
-      errors.push(
-        "NATIVE_MINT_ATTESTATION_TTL_SECONDS must be a positive number of seconds",
-      );
-    }
-
-    if (
-      !Number.isFinite(config.nativeBridge.instantWithdrawalDelaySeconds) ||
-      config.nativeBridge.instantWithdrawalDelaySeconds < 0
-    ) {
-      errors.push(
-        "NATIVE_INSTANT_WITHDRAWAL_DELAY_SECONDS must be a non-negative number of seconds",
-      );
-    }
-
-    if (
-      !Number.isFinite(config.nativeBridge.manualMintAttestationTtlSeconds) ||
-      config.nativeBridge.manualMintAttestationTtlSeconds <= 0
-    ) {
-      errors.push(
-        "NATIVE_MANUAL_MINT_ATTESTATION_TTL_SECONDS must be a positive number of seconds",
-      );
-    }
-  }
-
   // Validate voucher contract address format
   if (config.voucher.contractAddress) {
     if (!/^(0x)?[a-fA-F0-9]{40}$/.test(config.voucher.contractAddress)) {
@@ -287,13 +230,108 @@ export async function validateBridgeConfig(): Promise<boolean> {
 
       if (config.nativeBridge.address) {
         const nativeChainIds = await getEnabledNativeChainIds();
-        const missingNativeBridgeAddresses = nativeChainIds
-          .map((chainId) => `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`)
-          .filter((envVarName) => !process.env[envVarName]);
+        const missingNativeBridgeEnvVars: string[] = [];
 
-        if (missingNativeBridgeAddresses.length > 0) {
+        for (const chainId of nativeChainIds) {
+          const representationBridgeEnv =
+            `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`;
+          const bridgeKeyEnv =
+            `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY`;
+          const rpcEnv = `CHAIN_${chainId}_RPC_URL`;
+          const representationBridgeAddress = process.env[representationBridgeEnv];
+          const bridgePrivateKeys = getNativeBridgePrivateKeys(chainId);
+
+          if (!representationBridgeAddress) {
+            missingNativeBridgeEnvVars.push(representationBridgeEnv);
+          } else if (!isAddress(representationBridgeAddress)) {
+            errors.push(`Invalid native representation bridge address format: ${representationBridgeEnv}`);
+          }
+
+          if (bridgePrivateKeys.length === 0) {
+            missingNativeBridgeEnvVars.push(bridgeKeyEnv);
+          }
+
+          const signerAddresses = new Map<string, string>();
+          for (const { envVar, privateKey } of bridgePrivateKeys) {
+            if (!isPrivateKey(privateKey)) {
+              errors.push(`Invalid native bridge private key format: ${envVar}`);
+              continue;
+            }
+
+            const signerAddress = new Wallet(normalizePrivateKey(privateKey)).address;
+            const existingEnv = signerAddresses.get(signerAddress.toLowerCase());
+            if (existingEnv) {
+              errors.push(`${envVar} resolves to same signer as ${existingEnv}: ${signerAddress}`);
+            } else {
+              signerAddresses.set(signerAddress.toLowerCase(), envVar);
+            }
+          }
+
+          if (
+            process.env[rpcEnv] &&
+            representationBridgeAddress &&
+            isAddress(representationBridgeAddress) &&
+            bridgePrivateKeys.length > 0 &&
+            bridgePrivateKeys.every(({ privateKey }) => isPrivateKey(privateKey))
+          ) {
+            try {
+              const provider = new JsonRpcProvider(process.env[rpcEnv]);
+              const nativeBridge = new Contract(
+                representationBridgeAddress,
+                REPRESENTATION_BRIDGE_ABI,
+                provider,
+              );
+              const [
+                threshold,
+                maxAttestationValiditySeconds,
+                signerStatuses,
+              ] = await Promise.all([
+                nativeBridge.attestationThreshold(),
+                nativeBridge.maxAttestationValiditySeconds(),
+                Promise.all(
+                  bridgePrivateKeys.map(({ privateKey }) =>
+                    nativeBridge.attestationSigners(
+                      new Wallet(normalizePrivateKey(privateKey)).address,
+                    ),
+                  ),
+                ),
+              ]);
+
+              const enabledConfiguredSignerCount = signerStatuses.filter(Boolean).length;
+              signerStatuses.forEach((enabled, index) => {
+                if (!enabled) {
+                  const keyConfig = bridgePrivateKeys[index];
+                  const signerAddress = new Wallet(normalizePrivateKey(keyConfig.privateKey)).address;
+                  errors.push(
+                    `${keyConfig.envVar} resolves to ${signerAddress}, which is not enabled on ${representationBridgeEnv}`,
+                  );
+                }
+              });
+              if (Number(threshold) <= 0) {
+                errors.push(
+                  `${representationBridgeEnv} attestationThreshold must be greater than zero`,
+                );
+              } else if (Number(threshold) > enabledConfiguredSignerCount) {
+                errors.push(
+                  `${representationBridgeEnv} attestationThreshold is ${String(threshold)}; bridge service has ${enabledConfiguredSignerCount} enabled configured native bridge signer(s)`,
+                );
+              }
+              if (BigInt(maxAttestationValiditySeconds.toString()) <= 0n) {
+                errors.push(
+                  `${representationBridgeEnv} maxAttestationValiditySeconds must be greater than zero`,
+                );
+              }
+            } catch (error) {
+              errors.push(
+                `Failed to validate native destination bridge policy for chain ${chainId}: ${(error as Error).message}`,
+              );
+            }
+          }
+        }
+
+        if (missingNativeBridgeEnvVars.length > 0) {
           errors.push(
-            `Missing native representation bridge environment variables for enabled native routes: ${missingNativeBridgeAddresses.join(", ")}`,
+            `Missing native bridge environment variables for enabled native routes: ${missingNativeBridgeEnvVars.join(", ")}`,
           );
         }
 
