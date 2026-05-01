@@ -3,8 +3,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record AdminRegistry is Ownable {
     uint public constant MINIMUM_DELAY = 86400; // 24 hours
-    uint public constant GRACE_PERIOD = 86400; // 24 hours
-    uint public constant MIN_VOTING_THRESHOLD_BPS = 5000; // 50%
+    uint public constant GRACE_PERIOD = 604800; // 7 days
     uint public constant MIN_ADMIN_COUNT = 3;
 
     struct Timelock {
@@ -377,13 +376,11 @@ contract record AdminRegistry is Ownable {
     }
 
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
-        require(_votingThresholdBps >= MIN_VOTING_THRESHOLD_BPS, "Threshold too low");
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
     }
 
     function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) external onlyOwner {
-        require(_defaultVotingThresholdBps >= MIN_VOTING_THRESHOLD_BPS, "Threshold too low");
         require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
         defaultVotingThresholdBps = _defaultVotingThresholdBps;
     }
