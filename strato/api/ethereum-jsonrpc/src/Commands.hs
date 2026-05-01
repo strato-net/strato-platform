@@ -55,7 +55,7 @@ import Data.Time.Clock (UTCTime(..))
 import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), withObject, (.:?), (.!=))
+import Data.Aeson (FromJSON(..), Value(..), withObject, (.:?), (.!=))
 import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)

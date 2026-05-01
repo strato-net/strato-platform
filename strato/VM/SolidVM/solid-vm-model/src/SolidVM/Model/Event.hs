@@ -111,6 +111,7 @@ instance NFData Event
 instance Arbitrary Event where
   arbitrary = do
     bh <- arbitrary
+    th <- arbitrary
     sender <- arbitrary
     cn <- arbitrary
     ca <- arbitrary
@@ -120,4 +121,4 @@ instance Arbitrary Event where
       s <- arbitrary
       t <- arbitrary
       pure (n, SInteger 0, s, t)
-    pure $ Event bh sender cn ca nm args
+    pure $ Event bh th sender cn ca nm args
