@@ -30,6 +30,7 @@ library
       SolidVM.Model.SolidString
       SolidVM.Model.Storable
       SolidVM.Model.Type
+      SolidVM.Model.TypedArg
       SolidVM.Model.Value
   other-modules:
       Paths_solid_vm_model

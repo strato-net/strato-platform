@@ -97,3 +97,9 @@ tests:
     dependencies:
       - hspec
       - vm-tools
+      - blockapps-data
+      - bytestring
+      - ethereum-rlp
+      - merkle-patricia-db
+      - solid-vm-model
+      - strato-model

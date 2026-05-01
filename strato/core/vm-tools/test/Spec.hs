@@ -28,6 +28,7 @@ import Blockchain.VMOptions ()
 import Control.Monad
 import Executable.EVMFlags ()
 import HFlags
+import qualified ReceiptSpec
 import Test.Hspec (Spec, describe, hspec)
 
 --import qualified LabeledError
@@ -57,4 +58,6 @@ main = do
 --senderAddress = fromPrivateKey private
 
 spec :: Spec
-spec = describe "VMContext" $ pure ()
+spec = do
+  describe "VMContext" $ pure ()
+  ReceiptSpec.spec
