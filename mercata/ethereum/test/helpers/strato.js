@@ -128,6 +128,210 @@ function quorumSigners(validators, signers, headerRLP) {
   return sortedSigners.map((w) => signCommit(w, headerRLP));
 }
 
+// ============ Receipts + single-tx trie ============
+
+/**
+ * Encode a STRATO receipt that contains exactly one Withdrawal- or
+ * WithdrawalRequested-shaped log (Phase 0 §6.2 / §6.3 / §7.1).
+ *
+ * The 8-arg payload is encoded positionally with typed RLP rules:
+ *   - addresses encode as 20-byte strings
+ *   - integers encode as minimal big-endian (RLP integer convention)
+ */
+function encodeWithdrawalReceipt(opts) {
+  const args = [
+    toRlpUint(opts.nonce),
+    toRlpUint(opts.externalChainId),
+    opts.externalToken,
+    opts.externalRecipient,
+    toRlpUint(opts.externalTokenAmount),
+    opts.stratoSender,
+    opts.stratoToken,
+    toRlpUint(opts.stratoTokenAmount),
+  ];
+  const log = [
+    opts.contractAddress,
+    ethers.hexlify(ethers.toUtf8Bytes(opts.eventName)),
+    args,
+  ];
+  const receipt = [
+    toRlpUint(opts.status ?? 1),
+    toRlpUint(opts.gasUsed ?? 21000),
+    [log], // logs is a list; we only need one log per receipt for these tests
+  ];
+  return ethers.encodeRlp(receipt);
+}
+
+/**
+ * Build a trie containing exactly one (txIndex=0, value) entry. Returns the
+ * root, the trie-key bytes the verifier expects, and the inclusion proof
+ * (which for a single-leaf trie is just `[leafRLP]`).
+ *
+ *   txIndex = 0  ->  rlp(0) = 0x80  ->  key bytes = 0x80
+ *   nibbles of 0x80                 = [0x8, 0x0]   (even-length, leaf)
+ *   HP-encoded leaf path             = 0x20 0x80
+ *   leaf node                        = rlp([0x2080, value])
+ *   root                             = keccak256(leaf node bytes)
+ */
+function singleTxReceiptsTrie(value) {
+  const hpPath = "0x2080";
+  const leafRLP = ethers.encodeRlp([hpPath, value]);
+  const root = ethers.keccak256(leafRLP);
+  return {
+    root,
+    trieKey: "0x80",
+    proof: [leafRLP],
+  };
+}
+
+/**
+ * Build a trie for a block with txIndex=0 AND txIndex=1, returning the root
+ * and per-index inclusion proofs. Exercises the branch-node path of the MPT
+ * verifier (vs the single-leaf-only case in `singleTxReceiptsTrie`).
+ *
+ *   key 0 = rlp(0) = 0x80, nibbles = [8, 0]
+ *   key 1 = rlp(1) = 0x01, nibbles = [0, 1]
+ *
+ * The two key paths share no common prefix, so the trie is a branch with
+ * two non-empty slots:
+ *
+ *   branch[0]  -> odd-leaf with remaining path [1] -> value1   (HP = 0x31)
+ *   branch[8]  -> odd-leaf with remaining path [0] -> value0   (HP = 0x30)
+ *
+ * Both leaves serialize to >=32 bytes for our Withdrawal receipts, so the
+ * branch references them by hash. Proof for index k:
+ *   [branchRLP, leafRLP_k]
+ */
+function twoTxReceiptsTrie(value0, value1) {
+  const leaf0RLP = ethers.encodeRlp(["0x30", value0]); // remaining path [0]
+  const leaf1RLP = ethers.encodeRlp(["0x31", value1]); // remaining path [1]
+
+  if (ethers.dataLength(leaf0RLP) < 32 || ethers.dataLength(leaf1RLP) < 32) {
+    throw new Error(
+      "twoTxReceiptsTrie expects both leaves to hash (>=32 bytes); use a Withdrawal-shaped value"
+    );
+  }
+
+  const hash0 = ethers.keccak256(leaf0RLP);
+  const hash1 = ethers.keccak256(leaf1RLP);
+
+  const empty = "0x"; // RLP empty-string slot
+  const branchSlots = [
+    hash1, // slot 0  -> child for txIndex=1
+    empty, empty, empty, empty, empty, empty, empty,
+    hash0, // slot 8  -> child for txIndex=0
+    empty, empty, empty, empty, empty, empty, empty,
+    empty, // slot 16 -> no value at the root
+  ];
+  const branchRLP = ethers.encodeRlp(branchSlots);
+  const root = ethers.keccak256(branchRLP);
+
+  return {
+    root,
+    proofs: {
+      0: { trieKey: "0x80", proof: [branchRLP, leaf0RLP] },
+      1: { trieKey: "0x01", proof: [branchRLP, leaf1RLP] },
+    },
+  };
+}
+
+/**
+ * Build a synthetic (key, value, root, proof) tuple for a trie whose leaf is
+ * inlined into a parent branch. Specifically: a branch where the leaf for
+ * one slot is short enough (<32 bytes serialized) to be embedded directly
+ * in the parent rather than referenced by hash.
+ *
+ *   keyA = 0x4f, nibbles [4, 15] -> leaf at branch[4] with path [15]
+ *   keyB = 0x80, nibbles [8, 0]  -> leaf at branch[8] with path [0]
+ *
+ * Tiny values keep the leaves below the 32-byte hash threshold.
+ */
+function inlinedChildTrie(valueShort) {
+  // valueShort is something tiny like "0x42"
+  const hpA = "0x3f"; // odd-leaf, last nibble = f
+  const hpB = "0x30"; // odd-leaf, last nibble = 0
+  const leafARLP = ethers.encodeRlp([hpA, valueShort]);
+  const leafBRLP = ethers.encodeRlp([hpB, valueShort]);
+
+  if (ethers.dataLength(leafARLP) >= 32 || ethers.dataLength(leafBRLP) >= 32) {
+    throw new Error("inlinedChildTrie requires tiny leaves; pick smaller values");
+  }
+
+  // Branch slots embed the leaves' RLP directly (parser sees a list, not a
+  // 32-byte hash). MerklePatricia._classifyChild flips into the Inlined
+  // branch and walks without consuming a proof entry.
+  const empty = "0x";
+  const branchSlots = [
+    empty, empty, empty, empty,
+    leafARLP, // slot 4: inlined leaf for keyA
+    empty, empty, empty,
+    leafBRLP, // slot 8: inlined leaf for keyB
+    empty, empty, empty, empty, empty, empty, empty,
+    empty, // slot 16
+  ];
+
+  // The slots above are raw RLP byte sequences. encodeRlp of an array of
+  // hex strings would re-wrap them as RLP byte strings, which isn't what we
+  // want. Build the branch list by direct concatenation: outer list header
+  // + each slot's bytes verbatim.
+  const branchRLP = encodeRlpListOfRawNodes(branchSlots);
+  const root = ethers.keccak256(branchRLP);
+
+  return {
+    root,
+    proofs: {
+      a: { trieKey: "0x4f", proof: [branchRLP] }, // no proof entry for inlined leaf
+      b: { trieKey: "0x80", proof: [branchRLP] },
+    },
+    valueShort,
+  };
+}
+
+/**
+ * RLP-encode a list whose elements are ALREADY RLP-encoded. ethers'
+ * `encodeRlp` would treat each hex string as a raw byte string and re-wrap
+ * it; we want the elements written verbatim.
+ */
+function encodeRlpListOfRawNodes(elements) {
+  // Concat element bytes (skipping their "0x" prefix), measure payload, emit
+  // the RLP list header, append payload.
+  let payloadBytes = new Uint8Array(0);
+  for (const e of elements) {
+    if (e === "0x") {
+      // Empty entry encodes as RLP empty-string: 0x80.
+      payloadBytes = concatBytes(payloadBytes, new Uint8Array([0x80]));
+    } else {
+      payloadBytes = concatBytes(payloadBytes, ethers.getBytes(e));
+    }
+  }
+  const len = payloadBytes.length;
+  let header;
+  if (len <= 55) {
+    header = new Uint8Array([0xc0 + len]);
+  } else {
+    // Long list: 0xf7 + lenOfLen, then big-endian length.
+    const lenBytes = bigEndian(len);
+    header = concatBytes(new Uint8Array([0xf7 + lenBytes.length]), lenBytes);
+  }
+  return ethers.hexlify(concatBytes(header, payloadBytes));
+}
+
+function concatBytes(a, b) {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
+}
+
+function bigEndian(n) {
+  const bytes = [];
+  while (n > 0) {
+    bytes.unshift(n & 0xff);
+    n = n >>> 8;
+  }
+  return new Uint8Array(bytes);
+}
+
 module.exports = {
   HEADER_VERSION,
   COMMIT_DOMAIN,
@@ -137,4 +341,8 @@ module.exports = {
   sortAddresses,
   quorumSigners,
   toRlpUint,
+  encodeWithdrawalReceipt,
+  singleTxReceiptsTrie,
+  twoTxReceiptsTrie,
+  inlinedChildTrie,
 };

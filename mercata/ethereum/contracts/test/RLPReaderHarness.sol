@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {RLPReader} from "../bridge/lib/RLPReader.sol";
+import {MerklePatricia} from "../bridge/lib/MerklePatricia.sol";
 
 contract RLPReaderHarness {
     using RLPReader for bytes;
@@ -21,5 +22,16 @@ contract RLPReaderHarness {
 
     function toUint(bytes memory b) external pure returns (uint256) {
         return b.toRLPItem().toUint();
+    }
+}
+
+contract MerklePatriciaHarness {
+    function verifyInclusion(
+        bytes32 root,
+        bytes memory key,
+        bytes memory expectedValue,
+        bytes[] memory proof
+    ) external pure returns (bool) {
+        return MerklePatricia.verifyInclusion(root, key, expectedValue, proof);
     }
 }
