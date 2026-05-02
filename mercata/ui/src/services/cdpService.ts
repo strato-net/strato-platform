@@ -1,4 +1,5 @@
 import { api } from "@/lib/axios";
+import type { WalletTxProgressHandler } from "@/lib/axios";
 import { parseUnitsWithTruncation } from "@/utils/numberUtils";
 import type {
   Vault,
@@ -23,6 +24,15 @@ export type {
 // Constants for better maintainability
 const USDST_DECIMALS = 18;
 const DEFAULT_DECIMALS = 18;
+
+interface CdpTxOptions {
+  walletTxProgress?: WalletTxProgressHandler;
+}
+
+const walletTxConfig = (options?: CdpTxOptions) =>
+  options?.walletTxProgress
+    ? ({ walletTxProgress: options.walletTxProgress } as any)
+    : undefined;
 
 // Helper function to get asset decimals with caching
 const assetDecimalsCache = new Map<string, number>();
@@ -66,7 +76,7 @@ export const cdpService = {
   },
 
   // Deposit collateral
-  async deposit(asset: string, amount: string, isWei: boolean = false): Promise<TransactionResponse> {
+  async deposit(asset: string, amount: string, isWei: boolean = false, options?: CdpTxOptions): Promise<TransactionResponse> {
     let amountWei: string;
     if (isWei) {
       // Amount is already in wei format
@@ -78,16 +88,16 @@ export const cdpService = {
       amountWei = parseUnitsWithTruncation(amount, decimals).toString();
       console.log('[cdpService.deposit] Converted decimal to wei:', { asset, decimalAmount: amount, amountWei, decimals });
     }
-    const response = await api.post("/cdp/deposit", { asset, amount: amountWei });
+    const response = await api.post("/cdp/deposit", { asset, amount: amountWei }, walletTxConfig(options));
     return response.data;
   },
 
   // Withdraw collateral
-  async withdraw(asset: string, amount: string): Promise<TransactionResponse> {
+  async withdraw(asset: string, amount: string, options?: CdpTxOptions): Promise<TransactionResponse> {
     const decimals = await getAssetDecimals(asset);
     // Use parseUnitsWithTruncation to handle amounts with too many decimal places
     const amountWei = parseUnitsWithTruncation(amount, decimals).toString();
-    const response = await api.post("/cdp/withdraw", { asset, amount: amountWei });
+    const response = await api.post("/cdp/withdraw", { asset, amount: amountWei }, walletTxConfig(options));
     return response.data;
   },
 
@@ -98,8 +108,8 @@ export const cdpService = {
   },
 
   // Withdraw maximum safe collateral
-  async withdrawMax(asset: string): Promise<TransactionResponse> {
-    const response = await api.post("/cdp/withdraw-max", { asset });
+  async withdrawMax(asset: string, options?: CdpTxOptions): Promise<TransactionResponse> {
+    const response = await api.post("/cdp/withdraw-max", { asset }, walletTxConfig(options));
     return response.data;
   },
 
@@ -110,7 +120,7 @@ export const cdpService = {
   },
 
   // Mint USDST
-  async mint(asset: string, amount: string, isWei: boolean = false): Promise<TransactionResponse> {
+  async mint(asset: string, amount: string, isWei: boolean = false, options?: CdpTxOptions): Promise<TransactionResponse> {
     let amountWei: string;
     if (isWei) {
       // Amount is already in wei format
@@ -121,27 +131,27 @@ export const cdpService = {
       amountWei = parseUnitsWithTruncation(amount, USDST_DECIMALS).toString();
       console.log('[cdpService.mint] Converted decimal to wei:', { asset, decimalAmount: amount, amountWei, decimals: USDST_DECIMALS });
     }
-    const response = await api.post("/cdp/mint", { asset, amount: amountWei });
+    const response = await api.post("/cdp/mint", { asset, amount: amountWei }, walletTxConfig(options));
     return response.data;
   },
 
   // Mint maximum safe USDST
-  async mintMax(asset: string): Promise<TransactionResponse> {
-    const response = await api.post("/cdp/mint-max", { asset });
+  async mintMax(asset: string, options?: CdpTxOptions): Promise<TransactionResponse> {
+    const response = await api.post("/cdp/mint-max", { asset }, walletTxConfig(options));
     return response.data;
   },
 
   // Repay USDST debt
-  async repay(asset: string, amount: string): Promise<TransactionResponse> {
+  async repay(asset: string, amount: string, options?: CdpTxOptions): Promise<TransactionResponse> {
     // Use parseUnitsWithTruncation to handle amounts with too many decimal places
     const amountWei = parseUnitsWithTruncation(amount, USDST_DECIMALS).toString();
-    const response = await api.post("/cdp/repay", { asset, amount: amountWei });
+    const response = await api.post("/cdp/repay", { asset, amount: amountWei }, walletTxConfig(options));
     return response.data;
   },
 
   // Repay all debt for an asset
-  async repayAll(asset: string): Promise<TransactionResponse> {
-    const response = await api.post("/cdp/repay-all", { asset });
+  async repayAll(asset: string, options?: CdpTxOptions): Promise<TransactionResponse> {
+    const response = await api.post("/cdp/repay-all", { asset }, walletTxConfig(options));
     return response.data;
   },
 

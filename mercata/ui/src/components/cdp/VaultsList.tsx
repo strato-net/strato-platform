@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MoreVertical, Loader2 } from "lucide-react";
-import { cdpService, Vault, TransactionResponse } from "@/services/cdpService";
+import { cdpService, Vault } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
@@ -14,6 +14,8 @@ import { useOracleContext } from "@/context/OracleContext";
 import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP, formatNumberWithCommas, parseCommaNumber } from "@/utils/numberUtils";
 import { getAssetColor } from "@/components/cdp/v2/cdpUtils";
 import { usdstAddress } from "@/lib/constants";
+import type { WalletTxProgressEvent } from "@/lib/axios";
+import VaultActionProgressModal, { type VaultActionProgressStep } from "./VaultActionProgressModal";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
 const calculateHealthFactor = (cr: number, lt: number): number => {
@@ -38,6 +40,125 @@ interface VaultsListProps {
   onVaultActionSuccess?: () => void; // Callback when vault actions succeed
 }
 
+type VaultAction = 'deposit' | 'withdraw' | 'mint' | 'repay';
+
+const getVaultActionLabel = (
+  action: VaultAction,
+  symbol: string,
+  useMaxEndpoint: boolean,
+  useRepayAll: boolean
+): string => {
+  if (action === 'deposit') return `Deposit ${symbol}`;
+  if (action === 'withdraw') return useMaxEndpoint ? `Withdraw Max ${symbol}` : `Withdraw ${symbol}`;
+  if (action === 'mint') return useMaxEndpoint ? "Mint Max USDST" : "Mint USDST";
+  if (action === 'repay') return useRepayAll ? "Repay All USDST" : "Repay USDST";
+  return "Vault Action";
+};
+
+const getStepLabel = (
+  functionName: string | undefined,
+  action: VaultAction,
+  symbol: string,
+  useMaxEndpoint: boolean,
+  useRepayAll: boolean
+): string => {
+  switch (functionName) {
+    case "approve":
+      return action === "repay" ? "Approve USDST" : `Approve ${symbol}`;
+    case "deposit":
+      return `Deposit ${symbol}`;
+    case "withdraw":
+      return `Withdraw ${symbol}`;
+    case "withdrawMax":
+      return `Withdraw Max ${symbol}`;
+    case "mint":
+      return "Mint USDST";
+    case "mintMax":
+      return "Mint Max USDST";
+    case "repay":
+      return "Repay USDST";
+    case "repayAll":
+      return "Repay All USDST";
+    default:
+      return getVaultActionLabel(action, symbol, useMaxEndpoint, useRepayAll);
+  }
+};
+
+const getStepDescription = (
+  functionName: string | undefined,
+  action: VaultAction,
+  symbol: string,
+  amount: string,
+  useMaxEndpoint: boolean,
+  useRepayAll: boolean
+): string => {
+  switch (functionName) {
+    case "approve":
+      return action === "repay"
+        ? `Approve ${amount} USDST for repayment.`
+        : `Approve ${amount} ${symbol} for this vault action.`;
+    case "deposit":
+      return `Deposit ${amount} ${symbol} into your vault.`;
+    case "withdraw":
+      return `Withdraw ${amount} ${symbol} from your vault.`;
+    case "withdrawMax":
+      return `Withdraw the maximum safe ${symbol} amount from your vault.`;
+    case "mint":
+      return `Mint ${amount} USDST against this vault.`;
+    case "mintMax":
+      return "Mint the maximum safe USDST amount against this vault.";
+    case "repay":
+      return `Repay ${amount} USDST against this vault.`;
+    case "repayAll":
+      return "Repay this vault's outstanding USDST debt.";
+    default:
+      return getVaultActionLabel(action, symbol, useMaxEndpoint, useRepayAll);
+  }
+};
+
+const buildProgressStep = (
+  index: number,
+  functionName: string | undefined,
+  action: VaultAction,
+  symbol: string,
+  amount: string,
+  useMaxEndpoint: boolean,
+  useRepayAll: boolean
+): VaultActionProgressStep => ({
+  id: `${functionName || action}-${index}`,
+  label: getStepLabel(functionName, action, symbol, useMaxEndpoint, useRepayAll),
+  description: getStepDescription(functionName, action, symbol, amount, useMaxEndpoint, useRepayAll),
+  status: "pending",
+});
+
+const buildInitialProgressSteps = (
+  action: VaultAction,
+  symbol: string,
+  amount: string,
+  useMaxEndpoint: boolean,
+  useRepayAll: boolean
+): VaultActionProgressStep[] => {
+  if (action === "deposit") {
+    return [
+      buildProgressStep(0, "approve", action, symbol, amount, useMaxEndpoint, useRepayAll),
+      buildProgressStep(1, "deposit", action, symbol, amount, useMaxEndpoint, useRepayAll),
+    ];
+  }
+
+  if (action === "repay") {
+    return [
+      buildProgressStep(0, "approve", action, symbol, amount, useMaxEndpoint, useRepayAll),
+      buildProgressStep(1, useRepayAll ? "repayAll" : "repay", action, symbol, amount, useMaxEndpoint, useRepayAll),
+    ];
+  }
+
+  if (action === "withdraw") {
+    return [buildProgressStep(0, useMaxEndpoint ? "withdrawMax" : "withdraw", action, symbol, amount, useMaxEndpoint, useRepayAll)];
+  }
+
+  return [buildProgressStep(0, useMaxEndpoint ? "mintMax" : "mint", action, symbol, amount, useMaxEndpoint, useRepayAll)];
+};
+
 /**
  * VaultsList component displays user's CDP vaults
  * Each vault represents a collateral position with corresponding debt
@@ -61,6 +182,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const [assetPauseStates, setAssetPauseStates] = useState<Record<string, boolean>>({});
   const [assetSupportedStates, setAssetSupportedStates] = useState<Record<string, boolean>>({});
   const [processingActions, setProcessingActions] = useState<Record<string, boolean>>({});
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [progressActionLabel, setProgressActionLabel] = useState("Vault Action");
+  const [progressSteps, setProgressSteps] = useState<VaultActionProgressStep[]>([]);
+  const [progressError, setProgressError] = useState<string | undefined>();
 
   // Fetch positions from backend
   useEffect(() => {
@@ -485,6 +610,85 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       }
     }
 
+    const position = positions.find(p => p.asset === asset);
+    if (!position) {
+      toast({
+        title: "Vault Not Found",
+        description: "Could not find the selected vault. Please refresh and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const useMaxEndpoint = !!maxStates[asset] && (action === 'withdraw' || action === 'mint');
+    let useRepayAll = false;
+    if (action === 'repay' && maxStates[asset]) {
+      const currentDebt = parseFloat(formatWeiToDecimalHP(position.debtAmount, 18));
+      const availableUSDST = parseFloat(formatWeiToDecimalHP(activeTokens.find(token =>
+        token.address.toLowerCase() === usdstAddress.toLowerCase()
+      )?.balance || "0", 18));
+      useRepayAll = availableUSDST >= currentDebt;
+    }
+
+    const actionLabel = getVaultActionLabel(action, position.symbol, useMaxEndpoint, useRepayAll);
+    setProgressActionLabel(actionLabel);
+    setProgressSteps(buildInitialProgressSteps(action, position.symbol, parsedAmount, useMaxEndpoint, useRepayAll));
+    setProgressError(undefined);
+    setProgressModalOpen(true);
+
+    const walletTxProgress = (event: WalletTxProgressEvent) => {
+      setProgressSteps(prev => {
+        const updated = [...prev];
+        while (updated.length < event.total) {
+          updated.push(buildProgressStep(updated.length, undefined, action, position.symbol, parsedAmount, useMaxEndpoint, useRepayAll));
+        }
+
+        const current = updated[event.index] || buildProgressStep(event.index, event.functionName, action, position.symbol, parsedAmount, useMaxEndpoint, useRepayAll);
+        const status =
+          event.status === "failed"
+            ? "error"
+            : event.status === "submitted" || event.status === "completed"
+              ? "completed"
+              : "processing";
+        const nextStatus = current.status === "completed" && status === "processing" ? "completed" : status;
+
+        updated[event.index] = {
+          ...current,
+          label: event.functionName
+            ? getStepLabel(event.functionName, action, position.symbol, useMaxEndpoint, useRepayAll)
+            : current.label,
+          description: event.functionName
+            ? getStepDescription(event.functionName, action, position.symbol, parsedAmount, useMaxEndpoint, useRepayAll)
+            : current.description,
+          status: nextStatus,
+          hash: event.hash || current.hash,
+          error: nextStatus === "error" ? event.error || current.error || "Transaction failed" : undefined,
+        };
+
+        for (let i = 0; i < event.index; i++) {
+          if (updated[i] && updated[i].status !== "completed" && updated[i].status !== "error") {
+            updated[i] = { ...updated[i], status: "completed" };
+          }
+        }
+
+        if (nextStatus === "error") {
+          for (let i = event.index + 1; i < updated.length; i++) {
+            if (updated[i].status === "pending") {
+              updated[i] = { ...updated[i], status: "error", error: "Skipped due to prior failure" };
+            }
+          }
+        }
+
+        return updated;
+      });
+
+      if (event.status === "failed" && event.error) {
+        setProgressError(event.error);
+      }
+    };
+
+    const txOptions = { walletTxProgress };
+
     // Set processing state
     const actionKey = `${asset}-${action}`;
     setProcessingActions(prev => ({ ...prev, [actionKey]: true }));
@@ -494,28 +698,27 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       
       switch (action) {
         case 'deposit':
-          result = await cdpService.deposit(asset, parsedAmount);
+          result = await cdpService.deposit(asset, parsedAmount, false, txOptions);
           break;
         case 'withdraw':
           // If user is in max state, use withdrawMax endpoint
           if (maxStates[asset]) {
-            result = await cdpService.withdrawMax(asset);
+            result = await cdpService.withdrawMax(asset, txOptions);
           } else {
-            result = await cdpService.withdraw(asset, parsedAmount);
+            result = await cdpService.withdraw(asset, parsedAmount, txOptions);
           }
           break;
         case 'mint':
           // If user is in max state, use mintMax endpoint
           if (maxStates[asset]) {
-            result = await cdpService.mintMax(asset);
+            result = await cdpService.mintMax(asset, txOptions);
           } else {
-            result = await cdpService.mint(asset, parsedAmount);
+            result = await cdpService.mint(asset, parsedAmount, false, txOptions);
           }
           break;
         case 'repay':
           // If user is in max state, check if they can repay all debt or just partial
           if (maxStates[asset]) {
-            const position = positions.find(p => p.asset === asset);
             if (position) {
               const currentDebt = parseFloat(formatWeiToDecimalHP(position.debtAmount, 18));
               const availableUSDST = parseFloat(formatWeiToDecimalHP(activeTokens.find(token => 
@@ -524,16 +727,16 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
               
               // Use repayAll only if user has enough USDST to cover full debt
               if (availableUSDST >= currentDebt) {
-                result = await cdpService.repayAll(asset);
+                result = await cdpService.repayAll(asset, txOptions);
               } else {
                 // Use regular repay with the limited amount they can afford
-                result = await cdpService.repay(asset, parsedAmount);
+                result = await cdpService.repay(asset, parsedAmount, txOptions);
               }
             } else {
-              result = await cdpService.repay(asset, parsedAmount);
+              result = await cdpService.repay(asset, parsedAmount, txOptions);
             }
           } else {
-            result = await cdpService.repay(asset, parsedAmount);
+            result = await cdpService.repay(asset, parsedAmount, txOptions);
           }
           break;
         default:
@@ -541,6 +744,13 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       }
 
       if (result.status.toLowerCase() === "success") {
+        setProgressSteps(prev => prev.map((step, index) => ({
+          ...step,
+          status: "completed",
+          hash: step.hash || (index === 0 ? result.hash : undefined),
+          error: undefined,
+        })));
+
         toast({
           title: "Success",
           description: `${action.charAt(0).toUpperCase() + action.slice(1)} completed successfully. Tx: ${result.hash}`,
@@ -594,6 +804,25 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           errorMessage = apiError.message;
         }
       }
+
+      setProgressError(errorMessage);
+      setProgressSteps(prev => {
+        const updated = [...prev];
+        const activeIndex = updated.findIndex(step => step.status === "processing");
+        const pendingIndex = updated.findIndex(step => step.status === "pending");
+        const failedIndex = activeIndex >= 0 ? activeIndex : pendingIndex;
+
+        if (failedIndex >= 0) {
+          updated[failedIndex] = { ...updated[failedIndex], status: "error", error: errorMessage };
+          for (let i = failedIndex + 1; i < updated.length; i++) {
+            if (updated[i].status === "pending") {
+              updated[i] = { ...updated[i], status: "error", error: "Skipped due to prior failure" };
+            }
+          }
+        }
+
+        return updated;
+      });
       
       toast({
         title: "Transaction Failed",
@@ -606,18 +835,35 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     }
   };
 
+  const progressModal = (
+    <VaultActionProgressModal
+      open={progressModalOpen}
+      actionLabel={progressActionLabel}
+      steps={progressSteps}
+      error={progressError}
+      onClose={() => {
+        setProgressModalOpen(false);
+        setProgressSteps([]);
+        setProgressError(undefined);
+      }}
+    />
+  );
+
   if (loading) {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Your Positions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Loading positions...</div>
-          </div>
-        </CardContent>
-      </Card>
+      <>
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Your Positions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">Loading positions...</div>
+            </div>
+          </CardContent>
+        </Card>
+        {progressModal}
+      </>
     );
   }
 
@@ -629,17 +875,20 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
   if (vaultsWithCollateral.length === 0) {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Your Vaults</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="text-muted-foreground mb-4">No positions found</div>
-            <div className="text-sm text-muted-foreground/70">Create your first position by depositing collateral and minting USDST above</div>
-          </div>
-        </CardContent>
-      </Card>
+      <>
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Your Vaults</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="text-muted-foreground mb-4">No positions found</div>
+              <div className="text-sm text-muted-foreground/70">Create your first position by depositing collateral and minting USDST above</div>
+            </div>
+          </CardContent>
+        </Card>
+        {progressModal}
+      </>
     );
   }
 
@@ -987,6 +1236,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         </div>
       </CardContent>
     </Card>
+    {progressModal}
     </TooltipProvider>
   );
 };

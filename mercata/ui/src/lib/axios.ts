@@ -21,6 +21,25 @@ export function setWalletSigner(fn: WalletSignFn | null) {
   _walletSignFn = fn;
 }
 
+export type WalletTxProgressStatus =
+  | "signing"
+  | "submitting"
+  | "submitted"
+  | "confirming"
+  | "completed"
+  | "failed";
+
+export interface WalletTxProgressEvent {
+  index: number;
+  total: number;
+  status: WalletTxProgressStatus;
+  functionName?: string;
+  hash?: string;
+  error?: string;
+}
+
+export type WalletTxProgressHandler = (event: WalletTxProgressEvent) => void;
+
 const WALLET_SIGNING_NETWORK = "STRATO";
 
 function normalizeUnsignedTxForWallet(unsignedTx: any): any {
@@ -57,10 +76,20 @@ function buildSignedTx(unsignedData: any, sig: { r: string; s: string; v: string
   };
 }
 
-async function pollTxResult(hashes: string[], timeout = 60000, interval = 3000): Promise<any[]> {
+async function pollTxResult(
+  hashes: string[],
+  timeout = 60000,
+  interval = 3000,
+  onProgress?: WalletTxProgressHandler
+): Promise<any[]> {
   const start = Date.now();
   while (true) {
     const { data: results } = await api.post("/rpc/results", hashes);
+    results.forEach((result: any, index: number) => {
+      if (result?.status === "Pending") {
+        onProgress?.({ index, total: hashes.length, status: "confirming", hash: hashes[index] });
+      }
+    });
     const allDone = results.every((r: any) => r?.status !== "Pending");
     if (allDone) return results;
     if (Date.now() - start >= timeout) return results;
@@ -68,24 +97,75 @@ async function pollTxResult(hashes: string[], timeout = 60000, interval = 3000):
   }
 }
 
-async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{ status: string; hash: string }> {
+async function signAndSubmitUnsignedTxs(
+  unsignedTxs: any[],
+  onProgress?: WalletTxProgressHandler
+): Promise<{ status: string; hash: string }> {
   if (!_walletSignFn) throw new Error("No wallet signer available");
 
   const hashes: string[] = [];
-  for (const tx of unsignedTxs) {
+  for (let index = 0; index < unsignedTxs.length; index++) {
+    const tx = unsignedTxs[index];
     const txForWallet = normalizeUnsignedTxForWallet(tx);
-    const signature = await _walletSignFn(txForWallet);
-    const sig = parseSignature(signature);
-    const signedTx = buildSignedTx(txForWallet.data, sig);
-    const submittedHash = await api.post("/rpc/submit", signedTx);
-    hashes.push(typeof submittedHash.data === "string" ? submittedHash.data : tx.hash);
+    const functionName = txForWallet.data?.functionName;
+
+    try {
+      onProgress?.({ index, total: unsignedTxs.length, status: "signing", functionName, hash: tx.hash });
+      const signature = await _walletSignFn(txForWallet);
+      const sig = parseSignature(signature);
+      const signedTx = buildSignedTx(txForWallet.data, sig);
+
+      onProgress?.({ index, total: unsignedTxs.length, status: "submitting", functionName, hash: tx.hash });
+      const submittedHash = await api.post("/rpc/submit", signedTx);
+      const hash = typeof submittedHash.data === "string" ? submittedHash.data : tx.hash;
+      hashes.push(hash);
+      onProgress?.({ index, total: unsignedTxs.length, status: "submitted", functionName, hash });
+    } catch (error) {
+      onProgress?.({
+        index,
+        total: unsignedTxs.length,
+        status: "failed",
+        functionName,
+        hash: tx.hash,
+        error: error instanceof Error ? error.message : "Transaction failed",
+      });
+      throw error;
+    }
   }
 
-  const results = await pollTxResult(hashes);
+  const results = await pollTxResult(hashes, 60000, 3000, onProgress);
   const failed = results.find((r: any) => r?.status === "Failure");
   if (failed) {
+    const failedIndex = results.indexOf(failed);
+    onProgress?.({
+      index: failedIndex,
+      total: hashes.length,
+      status: "failed",
+      hash: hashes[failedIndex],
+      error: failed.txResult?.message || failed.message || "Transaction failed",
+    });
     throw new Error(failed.txResult?.message || failed.message || "Transaction failed");
   }
+  const pendingIndex = results.findIndex((r: any) => r?.status === "Pending");
+  if (pendingIndex >= 0) {
+    onProgress?.({
+      index: pendingIndex,
+      total: hashes.length,
+      status: "failed",
+      hash: hashes[pendingIndex],
+      error: "Timed out waiting for transaction confirmation",
+    });
+    return { status: "Pending", hash: hashes[0] };
+  }
+  results.forEach((result: any, index: number) => {
+    onProgress?.({
+      index,
+      total: hashes.length,
+      status: "completed",
+      hash: hashes[index],
+      error: result?.status === "Failure" ? result.txResult?.message || result.message : undefined,
+    });
+  });
   return { status: results[0]?.status || "Success", hash: hashes[0] };
 }
 
@@ -151,7 +231,8 @@ function extractApiErrorMessage(error: any): string {
 api.interceptors.response.use(
   async (response) => {
     if (response.data?._unsigned && response.data?._unsignedTxs) {
-      const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs);
+      const onProgress = (response.config as any).walletTxProgress as WalletTxProgressHandler | undefined;
+      const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs, onProgress);
       response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
     }
     return response;
