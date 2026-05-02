@@ -547,6 +547,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
   useEffect(() => {
     const handleNetworkSwitch = async () => {
+      if (fundingMode !== "bridge") {
+        setNetworkError("");
+        return;
+      }
       if (!selectedNetwork || !isConnected || !expectedChainId) {
         setNetworkError("");
         return;
@@ -563,7 +567,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       }
     };
     handleNetworkSwitch();
-  }, [chainId, isConnected, selectedNetwork, expectedChainId, switchChain]);
+  }, [chainId, fundingMode, isConnected, selectedNetwork, expectedChainId, switchChain]);
 
   // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
