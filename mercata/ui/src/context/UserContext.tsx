@@ -6,6 +6,7 @@ import { useAccount, useWalletClient } from "wagmi";
 import { api, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
+import { getStratoChainId } from "@/lib/stratoChain";
 
 interface UserContextType {
   userAddress: string | null;
@@ -213,6 +214,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     const connected = account.isConnected && account.address;
     if (connected && walletClient) {
       setWalletSigner(async (unsignedTx: any) => {
+        const stratoChainId = getStratoChainId();
+        if (stratoChainId && walletClient.chain?.id !== stratoChainId) {
+          await walletClient.switchChain({ id: stratoChainId });
+        }
+
         const d = unsignedTx.data;
         return walletClient.signTypedData({
           domain: {

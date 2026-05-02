@@ -21,6 +21,18 @@ export function setWalletSigner(fn: WalletSignFn | null) {
   _walletSignFn = fn;
 }
 
+const WALLET_SIGNING_NETWORK = "STRATO";
+
+function normalizeUnsignedTxForWallet(unsignedTx: any): any {
+  return {
+    ...unsignedTx,
+    data: {
+      ...unsignedTx.data,
+      network: WALLET_SIGNING_NETWORK,
+    },
+  };
+}
+
 function parseSignature(sig: string): { r: string; s: string; v: string } {
   const raw = sig.replace(/^0x/, "");
   return {
@@ -61,9 +73,10 @@ async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{ status: s
 
   const hashes: string[] = [];
   for (const tx of unsignedTxs) {
-    const signature = await _walletSignFn(tx);
+    const txForWallet = normalizeUnsignedTxForWallet(tx);
+    const signature = await _walletSignFn(txForWallet);
     const sig = parseSignature(signature);
-    const signedTx = buildSignedTx(tx.data, sig);
+    const signedTx = buildSignedTx(txForWallet.data, sig);
     const submittedHash = await api.post("/rpc/submit", signedTx);
     hashes.push(typeof submittedHash.data === "string" ? submittedHash.data : tx.hash);
   }
