@@ -39,6 +39,18 @@ local authenticate_opts = {
 }
 
 local wallet_auth_routes = {
+  ["/api/cdp/asset-debt-info"] = true,
+  ["/api/cdp/deposit"] = true,
+  ["/api/cdp/get-max-mint"] = true,
+  ["/api/cdp/get-max-withdraw"] = true,
+  ["/api/cdp/liquidate"] = true,
+  ["/api/cdp/max-liquidatable"] = true,
+  ["/api/cdp/mint"] = true,
+  ["/api/cdp/mint-max"] = true,
+  ["/api/cdp/repay"] = true,
+  ["/api/cdp/repay-all"] = true,
+  ["/api/cdp/withdraw"] = true,
+  ["/api/cdp/withdraw-max"] = true,
   ["/api/swap"] = true,
   ["/api/swap/multi-token"] = true,
   ["/api/rpc/submit"] = true,
