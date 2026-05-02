@@ -1,6 +1,6 @@
 import { bloc, strato, extractErrorMessage } from "./api";
 import { config } from "../config";
-import { logInfo } from "./logger";
+import { logError, logInfo } from "./logger";
 import { FunctionInput, BuiltTx, TxResult, TxResponse } from "../types";
 
 // ============================================================================
@@ -23,6 +23,30 @@ export const buildFunctionTx = (
     gasLimit: config.strato.gas.limit,
     gasPrice: config.strato.gas.price,
   },
+});
+
+const getTxFailureMessage = (result: any): string => {
+  return (
+    result?.txResult?.status?.details ||
+    result?.txResult?.status?.type?.contents ||
+    result?.txResult?.message ||
+    result?.txResult?.response ||
+    result?.error ||
+    result?.message ||
+    "Transaction failed"
+  );
+};
+
+const getTxFailureDetails = (result: any) => ({
+  hash: result?.hash,
+  status: result?.status,
+  message: result?.message,
+  error: result?.error,
+  txResultMessage: result?.txResult?.message,
+  txResultResponse: result?.txResult?.response,
+  txResultStatus: result?.txResult?.status,
+  blockHash: result?.txResult?.blockHash,
+  transactionHash: result?.txResult?.transactionHash,
 });
 
 /**
@@ -60,11 +84,11 @@ const getImmediateResult = (
       return { status: "Success", hash: first.hash };
     case "Failed":
     case "Failure": {
-      const msg =
-        first.txResult?.message ||
-        first.error ||
-        first.message ||
-        "Transaction failed";
+      const msg = getTxFailureMessage(first);
+      logError("StratoHelper", new Error(extractErrorMessage(msg)), {
+        operation: "immediateTransactionFailure",
+        result: getTxFailureDetails(first),
+      });
       throw new Error(extractErrorMessage(msg));
     }
     case "Pending":
@@ -104,11 +128,12 @@ export const postAndWaitForTx = async (
     (res: TxResult[]) => {
       const failed = res.find((r) => r?.status === "Failure");
       if (failed) {
-        const msg =
-          failed.txResult?.message ||
-          failed.error ||
-          failed.message ||
-          "Transaction failed";
+        const msg = getTxFailureMessage(failed);
+        logError("StratoHelper", new Error(extractErrorMessage(msg)), {
+          operation: "polledTransactionFailure",
+          result: getTxFailureDetails(failed),
+          txHashes,
+        });
         throw new Error(extractErrorMessage(msg));
       }
       return res.every((r) => r?.status !== "Pending");

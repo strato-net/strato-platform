@@ -70,11 +70,10 @@ The service automatically validates that RPC URLs are configured for all enabled
 #### Native Bridge Minting
 - `STRATO_NATIVE_BRIDGE_ADDRESS` - STRATO native bridge proxy address
 - `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS` - External representation bridge address for each native route chain
-- `NATIVE_MINT_EXECUTOR_PRIVATE_KEY` - Destination-chain gas key for instant mints
-- `NATIVE_MINT_ATTESTATION_SIGNER_PRIVATE_KEY` - Attestation signer key for destination mint authorization
-- `NATIVE_INSTANT_WITHDRAWAL_DELAY_SECONDS` - Review delay before instant native destination minting
-- `NATIVE_MINT_ATTESTATION_THRESHOLD` - Must be `1` for the env-held native attestation signer key
-- `NATIVE_MANUAL_MINT_ATTESTATION_TTL_SECONDS` - Validity window for manually approved native mint proposals
+- `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY` - Destination-chain key used to pay gas and sign native mint attestations
+- `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY_2`, `_3`, ... - Optional additional destination-chain signer keys when the destination bridge attestation threshold is raised
+
+Native withdrawal review delay and attestation validity are enforced by the native bridge contracts, not bridge-service environment variables.
 
 #### Optional
 - `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)

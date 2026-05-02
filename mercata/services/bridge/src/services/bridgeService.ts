@@ -400,6 +400,10 @@ export const confirmWithdrawalBatch = async (
     const custodyTxHashes = transactionProposals.map((tx) => tx.safeTxHash);
 
     try {
+      logInfo("BridgeService", "Confirming non-native withdrawals on STRATO", {
+        withdrawalIds,
+        custodyTxHashes,
+      });
       await execute({
         contractName: "MercataBridge",
         contractAddress: config.bridge.address!,
