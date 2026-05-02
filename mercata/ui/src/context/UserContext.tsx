@@ -207,9 +207,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const userAddress = account.isConnected && account.address ? account.address : stratoAddress;
   const effectiveLoggedIn = isLoggedIn || (account.isConnected && !!account.address);
 
+  setConnectedWalletAddress(account.isConnected && account.address ? account.address : null);
+
   useEffect(() => {
     const connected = account.isConnected && account.address;
-    setConnectedWalletAddress(connected ? account.address : null);
     if (connected && walletClient) {
       setWalletSigner(async (unsignedTx: any) => {
         const d = unsignedTx.data;
