@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useOracleContext } from "@/context/OracleContext";
+import { useUser } from "@/context/UserContext";
+import { useAccount } from "wagmi";
 import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP, formatNumberWithCommas, parseCommaNumber } from "@/utils/numberUtils";
 import { getAssetColor } from "@/components/cdp/v2/cdpUtils";
 import { usdstAddress } from "@/lib/constants";
@@ -171,6 +173,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const { activeTokens, fetchTokens } = useUserTokens();
   const { fetchUsdstBalance, earningAssets, inactiveTokens } = useTokenContext();
   const { getPrice } = useOracleContext();
+  const { isConnected } = useAccount();
+  const { isAppAuthenticated } = useUser();
+  const useExternalWalletSigning = isConnected && !isAppAuthenticated;
   
   // State for active action and input amounts for each position
   const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'mint' | 'repay' | null>>({});
@@ -631,10 +636,15 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     }
 
     const actionLabel = getVaultActionLabel(action, position.symbol, useMaxEndpoint, useRepayAll);
-    setProgressActionLabel(actionLabel);
-    setProgressSteps(buildInitialProgressSteps(action, position.symbol, parsedAmount, useMaxEndpoint, useRepayAll));
     setProgressError(undefined);
-    setProgressModalOpen(true);
+    if (useExternalWalletSigning) {
+      setProgressActionLabel(actionLabel);
+      setProgressSteps(buildInitialProgressSteps(action, position.symbol, parsedAmount, useMaxEndpoint, useRepayAll));
+      setProgressModalOpen(true);
+    } else {
+      setProgressModalOpen(false);
+      setProgressSteps([]);
+    }
 
     const walletTxProgress = (event: WalletTxProgressEvent) => {
       setProgressSteps(prev => {
@@ -687,7 +697,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       }
     };
 
-    const txOptions = { walletTxProgress };
+    const txOptions = useExternalWalletSigning ? { walletTxProgress } : undefined;
 
     // Set processing state
     const actionKey = `${asset}-${action}`;
@@ -744,12 +754,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       }
 
       if (result.status.toLowerCase() === "success") {
-        setProgressSteps(prev => prev.map((step, index) => ({
-          ...step,
-          status: "completed",
-          hash: step.hash || (index === 0 ? result.hash : undefined),
-          error: undefined,
-        })));
+        if (useExternalWalletSigning) {
+          setProgressSteps(prev => prev.map((step, index) => ({
+            ...step,
+            status: "completed",
+            hash: step.hash || (index === 0 ? result.hash : undefined),
+            error: undefined,
+          })));
+        }
 
         toast({
           title: "Success",
@@ -806,23 +818,25 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       }
 
       setProgressError(errorMessage);
-      setProgressSteps(prev => {
-        const updated = [...prev];
-        const activeIndex = updated.findIndex(step => step.status === "processing");
-        const pendingIndex = updated.findIndex(step => step.status === "pending");
-        const failedIndex = activeIndex >= 0 ? activeIndex : pendingIndex;
+      if (useExternalWalletSigning) {
+        setProgressSteps(prev => {
+          const updated = [...prev];
+          const activeIndex = updated.findIndex(step => step.status === "processing");
+          const pendingIndex = updated.findIndex(step => step.status === "pending");
+          const failedIndex = activeIndex >= 0 ? activeIndex : pendingIndex;
 
-        if (failedIndex >= 0) {
-          updated[failedIndex] = { ...updated[failedIndex], status: "error", error: errorMessage };
-          for (let i = failedIndex + 1; i < updated.length; i++) {
-            if (updated[i].status === "pending") {
-              updated[i] = { ...updated[i], status: "error", error: "Skipped due to prior failure" };
+          if (failedIndex >= 0) {
+            updated[failedIndex] = { ...updated[failedIndex], status: "error", error: errorMessage };
+            for (let i = failedIndex + 1; i < updated.length; i++) {
+              if (updated[i].status === "pending") {
+                updated[i] = { ...updated[i], status: "error", error: "Skipped due to prior failure" };
+              }
             }
           }
-        }
 
-        return updated;
-      });
+          return updated;
+        });
+      }
       
       toast({
         title: "Transaction Failed",

@@ -293,7 +293,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const { signTypedDataAsync } = useSignTypedData();
   const { openConnectModal } = useConnectModal();
   const { toast } = useToast();
-  const { userAddress } = useUser();
+  const { userAddress, isAppAuthenticated } = useUser();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
   const {
@@ -445,6 +445,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
   const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
+  const useExternalWalletSigning = isConnected && !isAppAuthenticated;
 
   const {
     data: nativeBalance,
@@ -665,9 +666,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const paySymbol = selectedPayToken.symbol || "token";
       const metalSymbol = selectedMetal.symbol || "metal";
 
-      setMetalSteps(buildInitialMetalBuySteps(paySymbol, metalSymbol, amount));
       setMetalProgressError(undefined);
-      setMetalProgressOpen(true);
+      if (useExternalWalletSigning) {
+        setMetalSteps(buildInitialMetalBuySteps(paySymbol, metalSymbol, amount));
+        setMetalProgressOpen(true);
+      } else {
+        setMetalSteps([]);
+        setMetalProgressOpen(false);
+      }
 
       const walletTxProgress = (event: WalletTxProgressEvent) => {
         setMetalSteps(prev => {
@@ -723,18 +729,20 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         selectedPayToken.address,
         payAmountWei,
         minMetalOut,
-        { walletTxProgress }
+        useExternalWalletSigning ? { walletTxProgress } : undefined
       );
       if (result.status.toLowerCase() !== "success") {
         throw new Error(`Metal purchase failed: ${result.status}`);
       }
 
-      setMetalSteps(prev => prev.map((step, index) => ({
-        ...step,
-        status: "completed",
-        hash: step.hash || (index === 0 ? result.hash : undefined),
-        error: undefined,
-      })));
+      if (useExternalWalletSigning) {
+        setMetalSteps(prev => prev.map((step, index) => ({
+          ...step,
+          status: "completed",
+          hash: step.hash || (index === 0 ? result.hash : undefined),
+          error: undefined,
+        })));
+      }
       toast({ title: "Success", description: `Purchased ${selectedMetal.symbol}` });
       setAmount("");
       fetchTokens();
@@ -743,23 +751,25 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     } catch (error: any) {
       const errorMessage = error?.message || "Unknown error";
       setMetalProgressError(errorMessage);
-      setMetalSteps(prev => {
-        const updated = [...prev];
-        const activeIndex = updated.findIndex(step => step.status === "processing");
-        const pendingIndex = updated.findIndex(step => step.status === "pending");
-        const failedIndex = activeIndex >= 0 ? activeIndex : pendingIndex;
+      if (useExternalWalletSigning) {
+        setMetalSteps(prev => {
+          const updated = [...prev];
+          const activeIndex = updated.findIndex(step => step.status === "processing");
+          const pendingIndex = updated.findIndex(step => step.status === "pending");
+          const failedIndex = activeIndex >= 0 ? activeIndex : pendingIndex;
 
-        if (failedIndex >= 0) {
-          updated[failedIndex] = { ...updated[failedIndex], status: "error", error: errorMessage };
-          for (let i = failedIndex + 1; i < updated.length; i++) {
-            if (updated[i].status === "pending") {
-              updated[i] = { ...updated[i], status: "error", error: "Skipped due to prior failure" };
+          if (failedIndex >= 0) {
+            updated[failedIndex] = { ...updated[failedIndex], status: "error", error: errorMessage };
+            for (let i = failedIndex + 1; i < updated.length; i++) {
+              if (updated[i].status === "pending") {
+                updated[i] = { ...updated[i], status: "error", error: "Skipped due to prior failure" };
+              }
             }
           }
-        }
 
-        return updated;
-      });
+          return updated;
+        });
+      }
       toast({ title: "Transaction failed", description: errorMessage, variant: "destructive" });
     } finally {
       setIsLoading(false);

@@ -15,6 +15,11 @@ export function setConnectedWalletAddress(addr: string | null) {
   _walletAddress = addr;
 }
 
+let _appAuthenticated = false;
+export function setAppAuthenticated(authenticated: boolean) {
+  _appAuthenticated = authenticated;
+}
+
 type WalletSignFn = (unsignedTx: any) => Promise<string>;
 let _walletSignFn: WalletSignFn | null = null;
 export function setWalletSigner(fn: WalletSignFn | null) {
@@ -171,7 +176,11 @@ async function signAndSubmitUnsignedTxs(
 
 api.interceptors.request.use(
   (config) => {
-    if (_walletAddress) {
+    const walletAuth = (config as any).walletAuth;
+    const shouldSendWalletAddress =
+      walletAuth === true || (walletAuth !== false && !_appAuthenticated);
+
+    if (_walletAddress && shouldSendWalletAddress) {
       config.headers["X-Wallet-Address"] = _walletAddress;
     }
 
