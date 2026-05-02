@@ -395,6 +395,24 @@ contract record MercataBridge is Ownable {
     }
 
     /**
+     * @dev Pauses deposit operations. Guardian-safe no-arg shim.
+     * @notice Cannot be used to unpause. Use setPause(bool, bool) for that.
+     */
+    function pauseDeposits() external onlyOwner {
+        depositsPaused = true;
+        emit PauseToggled(true, withdrawalsPaused);
+    }
+
+    /**
+     * @dev Pauses withdrawal operations. Guardian-safe no-arg shim.
+     * @notice Cannot be used to unpause. Use setPause(bool, bool) for that.
+     */
+    function pauseWithdrawals() external onlyOwner {
+        withdrawalsPaused = true;
+        emit PauseToggled(depositsPaused, true);
+    }
+
+    /**
      * @dev Sets the token factory address
      * @notice Only the owner can update the token factory address
      * @param newFactory The new token factory address (must not be zero address)

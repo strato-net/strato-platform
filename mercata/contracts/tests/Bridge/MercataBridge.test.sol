@@ -343,6 +343,34 @@ contract Describe_MercataBridge is Authorizable {
         require(bridge.withdrawalsPaused(), "Withdrawals should be paused");
     }
 
+    function it_bridge_pause_shims_set_true_only() {
+        // Start clean
+        bridge.setPause(false, false);
+        require(!bridge.depositsPaused() && !bridge.withdrawalsPaused(), "Precondition: both unpaused");
+
+        // pauseDeposits sets only deposits
+        bridge.pauseDeposits();
+        require(bridge.depositsPaused(), "pauseDeposits should set depositsPaused true");
+        require(!bridge.withdrawalsPaused(), "pauseDeposits should not touch withdrawalsPaused");
+
+        // Idempotent
+        bridge.pauseDeposits();
+        require(bridge.depositsPaused(), "pauseDeposits should remain true on repeat");
+
+        // pauseWithdrawals sets only withdrawals
+        bridge.setPause(false, false);
+        bridge.pauseWithdrawals();
+        require(bridge.withdrawalsPaused(), "pauseWithdrawals should set withdrawalsPaused true");
+        require(!bridge.depositsPaused(), "pauseWithdrawals should not touch depositsPaused");
+
+        // Both shims combined
+        bridge.pauseDeposits();
+        require(bridge.depositsPaused() && bridge.withdrawalsPaused(), "Both shims together should pause both");
+
+        // Reset
+        bridge.setPause(false, false);
+    }
+
     function it_bridge_can_set_usdst_address() {
         address newUSDST = address(0xBBBB);
         bridge.setUSDSTAddress(newUSDST);
