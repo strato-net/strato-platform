@@ -217,6 +217,7 @@ local wallet_auth_routes = {
     ["/api/cdp/repay-all"] = true,
     ["/api/cdp/withdraw"] = true,
     ["/api/cdp/withdraw-max"] = true,
+    ["/api/metal-forge/buy"] = true,
     ["/api/swap"] = true,
     ["/api/swap/multi-token"] = true,
     ["/api/rpc/submit"] = true,

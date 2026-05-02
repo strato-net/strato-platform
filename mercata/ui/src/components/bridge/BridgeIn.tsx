@@ -53,10 +53,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import DepositProgressModal, { DepositStep } from "./DepositProgressModal";
+import MetalBuyProgressModal, { type MetalBuyStep } from "./MetalBuyProgressModal";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
+import type { WalletTxProgressEvent } from "@/lib/axios";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
 
@@ -128,6 +130,41 @@ const metalPriceRowLabels = (oracleWei: string | undefined, feeBps: string | und
   const eff = oracleWei && feeBps != null && feeBps !== "" ? effectiveDollarWei(oracleWei, feeBps) : null;
   return { spot: spot ?? "—", effective: eff ?? "—" };
 };
+
+const getMetalBuyStepLabel = (functionName: string | undefined, paySymbol: string, metalSymbol: string): string => {
+  if (functionName === "approve") return `Approve ${paySymbol}`;
+  if (functionName === "mintMetal") return `Mint ${metalSymbol}`;
+  return "Confirm Metal Purchase";
+};
+
+const getMetalBuyStepDescription = (
+  functionName: string | undefined,
+  paySymbol: string,
+  metalSymbol: string,
+  amount: string
+): string => {
+  if (functionName === "approve") return `Approve ${amount} ${paySymbol} for MetalForge.`;
+  if (functionName === "mintMetal") return `Buy ${metalSymbol} with ${amount} ${paySymbol}.`;
+  return `Buy ${metalSymbol} with ${amount} ${paySymbol}.`;
+};
+
+const buildMetalBuyStep = (
+  index: number,
+  functionName: string | undefined,
+  paySymbol: string,
+  metalSymbol: string,
+  amount: string
+): MetalBuyStep => ({
+  id: `${functionName || "metal-buy"}-${index}`,
+  label: getMetalBuyStepLabel(functionName, paySymbol, metalSymbol),
+  description: getMetalBuyStepDescription(functionName, paySymbol, metalSymbol, amount),
+  status: "pending",
+});
+
+const buildInitialMetalBuySteps = (paySymbol: string, metalSymbol: string, amount: string): MetalBuyStep[] => [
+  buildMetalBuyStep(0, "approve", paySymbol, metalSymbol, amount),
+  buildMetalBuyStep(1, "mintMetal", paySymbol, metalSymbol, amount),
+];
 
 const CrossfadePanel = ({ active, children }: { active: boolean; children: React.ReactNode }) => (
   <div className={`transition-opacity duration-300 ${active ? "opacity-100" : "opacity-0 absolute inset-0 pointer-events-none"}`}>
@@ -302,6 +339,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const [progressTxHash, setProgressTxHash] = useState<string>();
   const [progressError, setProgressError] = useState<string>();
   const [progressIsNative, setProgressIsNative] = useState(true);
+  const [metalProgressOpen, setMetalProgressOpen] = useState(false);
+  const [metalSteps, setMetalSteps] = useState<MetalBuyStep[]>([]);
+  const [metalProgressError, setMetalProgressError] = useState<string>();
   const [metalsFeeError, setMetalsFeeError] = useState("");
 
   const prevRouteCountRef = React.useRef<number>(1);
@@ -618,15 +658,105 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const payAmountWei = safeParseUnits(amount, 18).toString();
       const metalAmount = calcMetalAmount(amount, selectedMetal, selectedPayToken);
       const minMetalOut = (metalAmount * 9900n / 10000n).toString();
+      const paySymbol = selectedPayToken.symbol || "token";
+      const metalSymbol = selectedMetal.symbol || "metal";
 
-      await metalForgeService.buy(selectedMetal.address, selectedPayToken.address, payAmountWei, minMetalOut);
+      setMetalSteps(buildInitialMetalBuySteps(paySymbol, metalSymbol, amount));
+      setMetalProgressError(undefined);
+      setMetalProgressOpen(true);
+
+      const walletTxProgress = (event: WalletTxProgressEvent) => {
+        setMetalSteps(prev => {
+          const updated = [...prev];
+          while (updated.length < event.total) {
+            updated.push(buildMetalBuyStep(updated.length, undefined, paySymbol, metalSymbol, amount));
+          }
+
+          const current = updated[event.index] || buildMetalBuyStep(event.index, event.functionName, paySymbol, metalSymbol, amount);
+          const status =
+            event.status === "failed"
+              ? "error"
+              : event.status === "submitted" || event.status === "completed"
+                ? "completed"
+                : "processing";
+          const nextStatus = current.status === "completed" && status === "processing" ? "completed" : status;
+
+          updated[event.index] = {
+            ...current,
+            label: event.functionName ? getMetalBuyStepLabel(event.functionName, paySymbol, metalSymbol) : current.label,
+            description: event.functionName
+              ? getMetalBuyStepDescription(event.functionName, paySymbol, metalSymbol, amount)
+              : current.description,
+            status: nextStatus,
+            hash: event.hash || current.hash,
+            error: nextStatus === "error" ? event.error || current.error || "Transaction failed" : undefined,
+          };
+
+          for (let i = 0; i < event.index; i++) {
+            if (updated[i] && updated[i].status !== "completed" && updated[i].status !== "error") {
+              updated[i] = { ...updated[i], status: "completed" };
+            }
+          }
+
+          if (nextStatus === "error") {
+            for (let i = event.index + 1; i < updated.length; i++) {
+              if (updated[i].status === "pending") {
+                updated[i] = { ...updated[i], status: "error", error: "Skipped due to prior failure" };
+              }
+            }
+          }
+
+          return updated;
+        });
+
+        if (event.status === "failed" && event.error) {
+          setMetalProgressError(event.error);
+        }
+      };
+
+      const result = await metalForgeService.buy(
+        selectedMetal.address,
+        selectedPayToken.address,
+        payAmountWei,
+        minMetalOut,
+        { walletTxProgress }
+      );
+      if (result.status.toLowerCase() !== "success") {
+        throw new Error(`Metal purchase failed: ${result.status}`);
+      }
+
+      setMetalSteps(prev => prev.map((step, index) => ({
+        ...step,
+        status: "completed",
+        hash: step.hash || (index === 0 ? result.hash : undefined),
+        error: undefined,
+      })));
       toast({ title: "Success", description: `Purchased ${selectedMetal.symbol}` });
       setAmount("");
       fetchTokens();
       fetchUsdstBalance();
       onMetalPurchase?.();
     } catch (error: any) {
-      toast({ title: "Transaction failed", description: error?.message || "Unknown error", variant: "destructive" });
+      const errorMessage = error?.message || "Unknown error";
+      setMetalProgressError(errorMessage);
+      setMetalSteps(prev => {
+        const updated = [...prev];
+        const activeIndex = updated.findIndex(step => step.status === "processing");
+        const pendingIndex = updated.findIndex(step => step.status === "pending");
+        const failedIndex = activeIndex >= 0 ? activeIndex : pendingIndex;
+
+        if (failedIndex >= 0) {
+          updated[failedIndex] = { ...updated[failedIndex], status: "error", error: errorMessage };
+          for (let i = failedIndex + 1; i < updated.length; i++) {
+            if (updated[i].status === "pending") {
+              updated[i] = { ...updated[i], status: "error", error: "Skipped due to prior failure" };
+            }
+          }
+        }
+
+        return updated;
+      });
+      toast({ title: "Transaction failed", description: errorMessage, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -1216,6 +1346,16 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             setCurrentStep("confirm_tx");
             setProgressTxHash(undefined);
             setProgressError(undefined);
+          }}
+        />
+        <MetalBuyProgressModal
+          open={metalProgressOpen}
+          steps={metalSteps}
+          error={metalProgressError}
+          onClose={() => {
+            setMetalProgressOpen(false);
+            setMetalSteps([]);
+            setMetalProgressError(undefined);
           }}
         />
         {contactEnabled && (
