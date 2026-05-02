@@ -37,6 +37,29 @@ const extractErrorMessage = (errorData: string): string => {
   return errorData;
 };
 
+const withSequentialUnsignedNonces = (results: any[]): any[] => {
+  const firstNonce = results[0]?.data?.nonce;
+  if (firstNonce === undefined || firstNonce === null) return results;
+
+  const baseNonce = BigInt(firstNonce);
+  return results.map((result, index) => {
+    if (result?.data?.nonce === undefined || result?.data?.nonce === null) return result;
+
+    const nonce = baseNonce + BigInt(index);
+    const nextNonce = typeof firstNonce === "number" && nonce <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? Number(nonce)
+      : nonce.toString();
+
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        nonce: nextNonce,
+      },
+    };
+  });
+};
+
 export const postAndWaitForTx = async (
   accessToken: string,
   stratoPostFn: () => Promise<any>,
@@ -56,8 +79,9 @@ export const postAndWaitForTx = async (
 
     const store = requestContext.getStore();
     if (store?.externalSigning && results[0]?.data !== undefined && results[0]?.status === undefined) {
-      store.unsignedTxs = results;
-      return { status: "unsigned", hash: results[0].hash };
+      const unsignedTxs = withSequentialUnsignedNonces(results);
+      store.unsignedTxs = unsignedTxs;
+      return { status: "unsigned", hash: unsignedTxs[0].hash };
     }
 
     const txHashes = results.map(result => {

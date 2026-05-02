@@ -204,6 +204,34 @@ function _M.initialize_token()
     end
 end
 
+local wallet_auth_routes = {
+    ["/api/swap"] = true,
+    ["/api/swap/multi-token"] = true,
+    ["/api/rpc/submit"] = true,
+    ["/api/rpc/results"] = true
+}
+
+function _M.is_valid_wallet_address(addr)
+    if type(addr) ~= "string" then
+        return false
+    end
+
+    local normalized = addr:match("^0[xX](%x+)$") or addr
+    return #normalized == 40 and normalized:match("^%x+$") ~= nil
+end
+
+function _M.allow_wallet_auth_request()
+    if ngx.var.request_method ~= "POST" then
+        return false
+    end
+
+    if not wallet_auth_routes[ngx.var.uri] then
+        return false
+    end
+
+    return _M.is_valid_wallet_address(ngx.var.http_x_wallet_address)
+end
+
 function _M.protect_api()
     local method = ngx.var.request_method
     local session_id = _M.get_session_id()
@@ -229,6 +257,10 @@ function _M.protect_api()
     end
 
     if method == "POST" or method == "PUT" or method == "DELETE" or method == "PATCH" then
+        if _M.allow_wallet_auth_request() then
+            return
+        end
+
         local header_token = ngx.var.http_x_csrf_token
         local cookie_token = ngx.var.cookie_csrf_token or ngx.var["cookie_CSRF-TOKEN"]
 

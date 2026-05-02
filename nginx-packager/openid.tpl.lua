@@ -38,6 +38,34 @@ local authenticate_opts = {
   authorization_params = auth_params
 }
 
+local wallet_auth_routes = {
+  ["/api/swap"] = true,
+  ["/api/swap/multi-token"] = true,
+  ["/api/rpc/submit"] = true,
+  ["/api/rpc/results"] = true
+}
+
+local function is_valid_wallet_address(addr)
+  if type(addr) ~= "string" then
+    return false
+  end
+
+  local normalized = addr:match("^0[xX](%x+)$") or addr
+  return #normalized == 40 and normalized:match("^%x+$") ~= nil
+end
+
+local function allow_wallet_auth_request()
+  if ngx.req.get_method() ~= "POST" then
+    return false
+  end
+
+  if not wallet_auth_routes[ngx.var.uri] then
+    return false
+  end
+
+  return is_valid_wallet_address(ngx.req.get_headers()["X-Wallet-Address"])
+end
+
 -- Clear any x-user-access-token header coming from the client, for security reasons
 ngx.req.clear_header("X-USER-ACCESS-TOKEN")
 
@@ -62,6 +90,7 @@ else
   -- Allow anonymous access only for safe/read-only methods on endpoints that explicitly allow it
   local method = ngx.req.get_method()
   local allow_anonymous_request = ngx.var.allow_optional_anon_access == "true" and (method == "GET" or method == "HEAD" or method == "OPTIONS")
+  local allow_wallet_request = allow_wallet_auth_request()
   -- if requested_uri is the UI page (like SMD), else the API call
   if ngx.var.is_ui == "true" then
     -- authenticate with browser UI flow (Authorization Code grant, token exchange) - authenticate(opts) with no additional params will 302-Redirect if unauthorized
@@ -117,7 +146,7 @@ else
 
       -- Let client know in the response that client is not (or no longer) authenticated (so that the UI could notify user that he's been signed out)
       ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
-      if not allow_anonymous_request then
+      if not allow_anonymous_request and not allow_wallet_request then
         -- respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
         ngx.exit(ngx.HTTP_UNAUTHORIZED)
       end
@@ -128,7 +157,7 @@ else
     user_access_token = authenticate_res.access_token
   else
     -- not expected to get here if anonymous access is not allowed for this request
-    if not allow_anonymous_request then
+    if not allow_anonymous_request and not allow_wallet_request then
       ngx.status = 500
       ngx.log(ngx.ERR, 'Unexpected error: not expected to be here if the endpoint does not allow anonymous access')
       ngx.say('Unexpected server error occurred during authentication (#1010)')

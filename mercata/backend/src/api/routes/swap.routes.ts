@@ -477,7 +477,7 @@ router.delete("/swap-pools/:poolAddress/liquidity/multi-token/one-coin", authHan
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
+router.post("/swap", authHandler.authorizeRequest({ allowWalletAuth: true }), SwappingController.swap);
 
 /**
  * @openapi
@@ -521,7 +521,7 @@ router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap/multi-token", authHandler.authorizeRequest(), SwappingController.swapMultiToken);
+router.post("/swap/multi-token", authHandler.authorizeRequest({ allowWalletAuth: true }), SwappingController.swapMultiToken);
 
 /**
  * @openapi

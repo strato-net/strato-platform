@@ -21,9 +21,8 @@ const router = Router();
  *       200:
  *         description: The response from the RPC endpoint
  */
-router.post("/submit", authHandler.authorizeRequest(), RpcController.submitSignedTx);
-router.post("/results", authHandler.authorizeRequest(), RpcController.txResults);
+router.post("/submit", authHandler.authorizeRequest({ allowWalletAuth: true }), RpcController.submitSignedTx);
+router.post("/results", authHandler.authorizeRequest({ allowWalletAuth: true }), RpcController.txResults);
 router.post("/:chainId", authHandler.authorizeRequest(false), RpcController.proxy);
 
 export default router;
-

@@ -34,6 +34,11 @@ interface CustomJwtPayload extends JWTPayload {
   preferred_username: string;
 }
 
+type AuthOptions = {
+  allowAnonAccess?: boolean;
+  allowWalletAuth?: boolean;
+};
+
 // ————————————————————————————————————————————————————————————————
 // AuthHandler class
 // ————————————————————————————————————————————————————————————————
@@ -43,16 +48,19 @@ class AuthHandler {
    * Middleware that enforces OAuth on incoming requests.
    * @param allowAnonAccess true = always allow anonymous, false = always require auth,
    *   undefined (default) = allow anonymous for safe methods (GET/HEAD/OPTIONS), require auth for mutating methods.
+   * @param allowWalletAuth true = allow X-Wallet-Address to authenticate unsafe methods on routes that return unsigned txs.
    */
-  static authorizeRequest(allowAnonAccess?: boolean): RequestHandler {
+  static authorizeRequest(options?: boolean | AuthOptions): RequestHandler {
     return async (req, res, next) => {
       try {
+        const allowAnonAccess = typeof options === "boolean" ? options : options?.allowAnonAccess;
+        const allowWalletAuth = typeof options === "object" ? options.allowWalletAuth === true : false;
         let token = getTokenFromHeader(req);
         const walletAddress = req.headers["x-wallet-address"] as string | undefined;
 
         const isSafeMethod = ["GET", "HEAD", "OPTIONS"].includes(req.method);
         const effectiveAllowAnon = allowAnonAccess ?? isSafeMethod;
-        const walletAuthenticated = !!walletAddress && isSafeMethod;
+        const walletAuthenticated = !!walletAddress && (isSafeMethod || allowWalletAuth);
         const isServiceUser = !token && (effectiveAllowAnon || walletAuthenticated);
 
         if (isServiceUser) {
