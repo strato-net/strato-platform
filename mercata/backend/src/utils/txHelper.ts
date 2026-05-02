@@ -1,3 +1,5 @@
+import axios, { AxiosRequestConfig } from "axios";
+import { createHash } from "crypto";
 import { bloc, cirrus } from "./mercataApiHelper";
 import { StratoPaths } from "../config/constants";
 import { StratoError } from "../errors";
@@ -60,13 +62,144 @@ const withSequentialUnsignedNonces = (results: any[]): any[] => {
   });
 };
 
-export const postAndWaitForTx = async (
+const lowNonceExpected = (value: unknown): number | null => {
+  const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
+  const match = text.match(/low tx nonce\s*\(expected:\s*(\d+),\s*actual:\s*(\d+)\)/i);
+  if (!match) return null;
+
+  const nonce = Number(match[1]);
+  return Number.isSafeInteger(nonce) ? nonce : null;
+};
+
+const retryNonceFromResults = (results: any): number | null => {
+  if (!Array.isArray(results)) return null;
+
+  const hasAcceptedResult = results.some((result) =>
+    result?.status && result.status !== "Failure"
+  );
+  if (hasAcceptedResult) return null;
+
+  for (const result of results) {
+    const message = result?.txResult?.message || result?.error || result?.message || result;
+    const nonce = lowNonceExpected(message);
+    if (nonce !== null) return nonce;
+  }
+  return lowNonceExpected(results);
+};
+
+const requestConfigWithNonce = (
+  config: AxiosRequestConfig | undefined,
+  nonce: number
+): AxiosRequestConfig | null => {
+  if (!config) return null;
+
+  let data: any;
+  try {
+    data = typeof config.data === "string" ? JSON.parse(config.data) : config.data;
+  } catch {
+    return null;
+  }
+
+  if (!data || typeof data !== "object") return null;
+
+  const headers: Record<string, any> = { ...(config.headers as any) };
+  Object.keys(headers).forEach((key) => {
+    if (key.toLowerCase() === "content-length") {
+      delete headers[key];
+    }
+  });
+
+  return {
+    ...config,
+    headers,
+    data: {
+      ...data,
+      txParams: {
+        ...(data.txParams || {}),
+        nonce,
+      },
+    },
+  };
+};
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const submitWithLowNonceRetry = async (
+  stratoPostFn: () => Promise<any>,
+  allowRetry: boolean
+): Promise<any> => {
+  const maxRetries = allowRetry ? 2 : 0;
+  let retryConfig: AxiosRequestConfig | null = null;
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response: any = retryConfig ? await axios.request(retryConfig) : await stratoPostFn();
+      const retryNonce: number | null = attempt < maxRetries ? retryNonceFromResults(response.data) : null;
+      const nextConfig: AxiosRequestConfig | null = retryNonce !== null
+        ? requestConfigWithNonce(response.config, retryNonce)
+        : null;
+
+      if (nextConfig) {
+        retryConfig = nextConfig;
+        await wait(1000);
+        continue;
+      }
+
+      return response;
+    } catch (error: any) {
+      const retryNonce = attempt < maxRetries
+        ? lowNonceExpected(error?.response?.data ?? error?.message)
+        : null;
+      const nextConfig = retryNonce !== null
+        ? requestConfigWithNonce(error?.response?.config || error?.config, retryNonce)
+        : null;
+
+      if (nextConfig) {
+        retryConfig = nextConfig;
+        await wait(1000);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+};
+
+const txQueues = new Map<string, Promise<void>>();
+
+const withTxQueue = async <T>(key: string, action: () => Promise<T>): Promise<T> => {
+  const previous = txQueues.get(key) || Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.catch(() => undefined).then(() => current);
+  txQueues.set(key, tail);
+
+  await previous.catch(() => undefined);
+  try {
+    return await action();
+  } finally {
+    release();
+    tail.finally(() => {
+      if (txQueues.get(key) === tail) {
+        txQueues.delete(key);
+      }
+    });
+  }
+};
+
+const txQueueKey = (accessToken: string): string =>
+  createHash("sha256").update(accessToken).digest("hex");
+
+const postAndWaitForTxUnlocked = async (
   accessToken: string,
   stratoPostFn: () => Promise<any>,
   timeout: number = 60000
 ): Promise<{ status: string; hash: string }> => {
   try {
-    const response = await stratoPostFn();
+    const store = requestContext.getStore();
+    const response = await submitWithLowNonceRetry(stratoPostFn, !store?.externalSigning);
     
     if (response.status !== 200) {
       throw new StratoError(`Strato error: ${response.statusText}`, 500);
@@ -77,7 +210,6 @@ export const postAndWaitForTx = async (
       throw new StratoError("Invalid or empty transaction results", 400);
     }
 
-    const store = requestContext.getStore();
     if (store?.externalSigning && results[0]?.data !== undefined && results[0]?.status === undefined) {
       const unsignedTxs = withSequentialUnsignedNonces(results);
       store.unsignedTxs = unsignedTxs;
@@ -126,6 +258,21 @@ export const postAndWaitForTx = async (
     // Re-throw the original error if it doesn't match the expected format
     throw error;
   }
+};
+
+export const postAndWaitForTx = async (
+  accessToken: string,
+  stratoPostFn: () => Promise<any>,
+  timeout: number = 60000
+): Promise<{ status: string; hash: string }> => {
+  const store = requestContext.getStore();
+  if (store?.externalSigning) {
+    return postAndWaitForTxUnlocked(accessToken, stratoPostFn, timeout);
+  }
+
+  return withTxQueue(txQueueKey(accessToken), () =>
+    postAndWaitForTxUnlocked(accessToken, stratoPostFn, timeout)
+  );
 };
 
 // export const waitOnCirrus = async (
