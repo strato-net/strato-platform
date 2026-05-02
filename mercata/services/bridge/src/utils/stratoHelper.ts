@@ -7,6 +7,17 @@ import { FunctionInput, BuiltTx, TxResult, TxResponse } from "../types";
 // Core Transaction Functions
 // ============================================================================
 
+let stratoWriteQueue: Promise<void> = Promise.resolve();
+
+const enqueueStratoWrite = async <T>(task: () => Promise<T>): Promise<T> => {
+  const run = stratoWriteQueue.then(task, task);
+  stratoWriteQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+};
+
 /**
  * Build transaction from inputs (single or batch)
  */
@@ -159,19 +170,21 @@ export const execute = async (
   const { method = "unknown", contractName = "unknown" } = inputArray[0] || {};
   const context = `${method} on ${contractName}`;
 
-  logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx)`);
+  return enqueueStratoWrite(async () => {
+    logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx)`);
 
-  const result = await postAndWaitForTx(
-    () =>
-      strato.post(
-        "/transaction/parallel?resolve=true",
-        buildFunctionTx(inputs),
-      ),
-    timeout,
-  );
+    const result = await postAndWaitForTx(
+      () =>
+        strato.post(
+          "/transaction/parallel?resolve=true",
+          buildFunctionTx(inputs),
+        ),
+      timeout,
+    );
 
-  logInfo("StratoHelper", `${result.status}: ${context} (${result.hash})`);
-  return result;
+    logInfo("StratoHelper", `${result.status}: ${context} (${result.hash})`);
+    return result;
+  });
 };
 
 // ============================================================================

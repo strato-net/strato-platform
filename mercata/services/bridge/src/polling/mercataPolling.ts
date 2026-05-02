@@ -28,6 +28,34 @@ import { verifyDepositsBatch } from "../services/verificationService";
 import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationService";
 import { checkBalances } from "../utils/balanceCheck";
 
+const DEPOSIT_REVIEW_BATCH_SIZE = 10;
+
+const chunk = <T>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+const startNonOverlappingPolling = (
+  operation: string,
+  pollingInterval: number,
+  poll: () => Promise<void>,
+): void => {
+  const run = async () => {
+    try {
+      await poll();
+    } catch (e: any) {
+      logError("MercataPolling", e as Error, { operation });
+    } finally {
+      setTimeout(run, pollingInterval);
+    }
+  };
+
+  void run();
+};
+
 export const startWithdrawalRequestPolling = (): void => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
 
@@ -47,8 +75,11 @@ export const startWithdrawalRequestPolling = (): void => {
     }
   };
 
-  void poll();
-  setInterval(poll, pollingInterval);
+  startNonOverlappingPolling(
+    "startWithdrawalRequestPolling",
+    pollingInterval,
+    poll,
+  );
 };
 
 export const startDepositInitiatedPolling = (): void => {
@@ -94,9 +125,9 @@ export const startDepositInitiatedPolling = (): void => {
       }
 
       if (failedDeposits.length > 0) {
-        await reviewDepositBatch(
-          failedDeposits as NonEmptyArray<ConfirmDepositArgs>
-        );
+        for (const batch of chunk(failedDeposits, DEPOSIT_REVIEW_BATCH_SIZE)) {
+          await reviewDepositBatch(batch as NonEmptyArray<ConfirmDepositArgs>);
+        }
       }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
@@ -105,8 +136,11 @@ export const startDepositInitiatedPolling = (): void => {
     }
   };
 
-  void poll();
-  setInterval(poll, pollingInterval);
+  startNonOverlappingPolling(
+    "startDepositInitiatedPolling",
+    pollingInterval,
+    poll,
+  );
 };
 
 export const startNativeDepositInitiatedPolling = (): void => {
@@ -151,9 +185,11 @@ export const startNativeDepositInitiatedPolling = (): void => {
       }
 
       if (failedDeposits.length > 0) {
-        await reviewNativeDepositBatch(
-          failedDeposits as NonEmptyArray<ConfirmNativeDepositArgs>,
-        );
+        for (const batch of chunk(failedDeposits, DEPOSIT_REVIEW_BATCH_SIZE)) {
+          await reviewNativeDepositBatch(
+            batch as NonEmptyArray<ConfirmNativeDepositArgs>,
+          );
+        }
       }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
@@ -162,8 +198,11 @@ export const startNativeDepositInitiatedPolling = (): void => {
     }
   };
 
-  void poll();
-  setInterval(poll, pollingInterval);
+  startNonOverlappingPolling(
+    "startNativeDepositInitiatedPolling",
+    pollingInterval,
+    poll,
+  );
 };
 
 export const startWithdrawalTxPolling = (): void => {
@@ -217,8 +256,7 @@ export const startWithdrawalTxPolling = (): void => {
     }
   };
 
-  void poll();
-  setInterval(poll, pollingInterval);
+  startNonOverlappingPolling("startWithdrawalTxPolling", pollingInterval, poll);
 };
 
 export const startNativeWithdrawalRequestPolling = (): void => {
@@ -255,8 +293,11 @@ export const startNativeWithdrawalRequestPolling = (): void => {
     }
   };
 
-  void poll();
-  setInterval(poll, pollingInterval);
+  startNonOverlappingPolling(
+    "startNativeWithdrawalRequestPolling",
+    pollingInterval,
+    poll,
+  );
 };
 
 export const startNativeWithdrawalTxPolling = (): void => {
@@ -329,8 +370,11 @@ export const startNativeWithdrawalTxPolling = (): void => {
     }
   };
 
-  void poll();
-  setInterval(poll, pollingInterval);
+  startNonOverlappingPolling(
+    "startNativeWithdrawalTxPolling",
+    pollingInterval,
+    poll,
+  );
 };
 
 export const initializeMercataPolling = async () => {

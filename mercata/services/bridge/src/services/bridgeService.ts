@@ -18,6 +18,7 @@ import {
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
+const inFlightSafeProposalWithdrawals = new Set<string>();
 
 const getStratoNetworkId = async (): Promise<bigint> => {
   if (cachedStratoNetworkId != null) {
@@ -393,7 +394,36 @@ export const reviewNativeDepositBatch = async (
 export const confirmWithdrawalBatch = async (
   withdrawals: NonEmptyArray<WithdrawalInfo>,
 ) => {
-  const transactionProposals = await createSafeTransactions(withdrawals as NonEmptyArray<WithdrawalInfo>);
+  const eligibleWithdrawals = withdrawals.filter((withdrawal) => {
+    const withdrawalId = String(withdrawal.withdrawalId);
+    if (inFlightSafeProposalWithdrawals.has(withdrawalId)) {
+      logInfo(
+        "BridgeService",
+        `Skipping withdrawal ${withdrawalId}; Safe proposal is already in progress`,
+      );
+      return false;
+    }
+    inFlightSafeProposalWithdrawals.add(withdrawalId);
+    return true;
+  });
+
+  if (eligibleWithdrawals.length === 0) return;
+
+  try {
+    await confirmEligibleWithdrawalBatch(
+      eligibleWithdrawals as NonEmptyArray<WithdrawalInfo>,
+    );
+  } finally {
+    for (const withdrawal of eligibleWithdrawals) {
+      inFlightSafeProposalWithdrawals.delete(String(withdrawal.withdrawalId));
+    }
+  }
+};
+
+const confirmEligibleWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<WithdrawalInfo>,
+) => {
+  const transactionProposals = await createSafeTransactions(withdrawals);
 
   if (transactionProposals && transactionProposals.length > 0) {
     const withdrawalIds = withdrawals.map((w) => w.withdrawalId);
