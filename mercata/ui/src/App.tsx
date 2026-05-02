@@ -129,7 +129,7 @@ const App = () => {
 
   useEffect(() => {
     if (!loading) {
-      const appName = "Mercata";
+      const appName = "STRATO";
       const stratoChain = getStratoChain();
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
