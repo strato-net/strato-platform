@@ -578,7 +578,7 @@ router.post("/asset-debt-info", walletAuth, CDPController.getAssetDebtInfo);
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-collateral-config", authHandler.authorizeRequest(), CDPController.setCollateralConfig);
+router.post("/admin/set-collateral-config", walletAuth, CDPController.setCollateralConfig);
 
 /**
  * @openapi
@@ -609,7 +609,7 @@ router.post("/admin/set-collateral-config", authHandler.authorizeRequest(), CDPC
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-asset-paused", authHandler.authorizeRequest(), CDPController.setAssetPaused);
+router.post("/admin/set-asset-paused", walletAuth, CDPController.setAssetPaused);
 
 /**
  * @openapi
@@ -640,7 +640,7 @@ router.post("/admin/set-asset-paused", authHandler.authorizeRequest(), CDPContro
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-asset-supported", authHandler.authorizeRequest(), CDPController.setAssetSupported);
+router.post("/admin/set-asset-supported", walletAuth, CDPController.setAssetSupported);
 
 /**
  * @openapi
@@ -668,7 +668,7 @@ router.post("/admin/set-asset-supported", authHandler.authorizeRequest(), CDPCon
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-global-paused", authHandler.authorizeRequest(), CDPController.setGlobalPaused);
+router.post("/admin/set-global-paused", walletAuth, CDPController.setGlobalPaused);
 
 /**
  * @openapi
@@ -783,7 +783,7 @@ router.get("/bad-debt/juniors/:account", authHandler.authorizeRequest(), CDPCont
  *               type: object
  *               additionalProperties: true
  */
-router.post("/bad-debt/open-junior-note", authHandler.authorizeRequest(), CDPController.openJuniorNote);
+router.post("/bad-debt/open-junior-note", walletAuth, CDPController.openJuniorNote);
 
 /**
  * @openapi
@@ -812,7 +812,7 @@ router.post("/bad-debt/open-junior-note", authHandler.authorizeRequest(), CDPCon
  *               type: object
  *               additionalProperties: true
  */
-router.post("/bad-debt/top-up-junior-note", authHandler.authorizeRequest(), CDPController.topUpJuniorNote);
+router.post("/bad-debt/top-up-junior-note", walletAuth, CDPController.topUpJuniorNote);
 
 /**
  * @openapi
@@ -829,7 +829,7 @@ router.post("/bad-debt/top-up-junior-note", authHandler.authorizeRequest(), CDPC
  *               type: object
  *               additionalProperties: true
  */
-router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPController.claimJuniorNote);
+router.post("/bad-debt/claim-junior-note", walletAuth, CDPController.claimJuniorNote);
 
 /**
  * @openapi

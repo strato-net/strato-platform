@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { safeParseUnits, formatBalance } from "@/utils/numberUtils";
+import { isTxPending, isTxSubmitted } from "@/utils/transactionStatus";
 import { BulkTransferItem, BulkTransferResponse, BulkTransferResult } from "@/context/TokenContext";
 
 interface ParsedTransfer {
@@ -305,8 +306,7 @@ const BulkTransferModal = ({
         const response = await onConfirm(transfer.tokenAddress, [transferItem]);
         const result = response.results[0];
 
-        // Update status based on result (backend returns "Success" capitalized)
-        const isSuccess = result.status?.toLowerCase() === "success";
+        const isSuccess = isTxSubmitted(result.status);
         setProcessingTransfers(prev => prev.map((t, idx) =>
           idx === i ? {
             ...t,
@@ -750,10 +750,10 @@ const BulkTransferModal = ({
                       {formatBalance(result.value, undefined, 18, 0, 4)}
                     </TableCell>
                     <TableCell>
-                      {result.status?.toLowerCase() === "success" ? (
+                      {isTxSubmitted(result.status) ? (
                         <span className="flex items-center text-green-600 text-xs">
                           <CheckCircle2 className="h-4 w-4 mr-1" />
-                          Success
+                          {isTxPending(result.status) ? "Submitted" : "Success"}
                         </span>
                       ) : (
                         <span className="flex items-center text-red-600 text-xs" title={result.error}>

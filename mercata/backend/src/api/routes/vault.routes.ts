@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import VaultController from "../controllers/vault.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // USER ENDPOINTS
@@ -287,7 +288,7 @@ router.get("/transactions", authHandler.authorizeRequest(true), VaultController.
  *                 hash:
  *                   type: string
  */
-router.post("/deposit", authHandler.authorizeRequest(), VaultController.deposit);
+router.post("/deposit", walletAuth, VaultController.deposit);
 
 /**
  * @openapi
@@ -376,7 +377,7 @@ router.get("/withdraw/preview", authHandler.authorizeRequest(), VaultController.
  *                       amount:
  *                         type: string
  */
-router.post("/withdraw", authHandler.authorizeRequest(), VaultController.withdraw);
+router.post("/withdraw", walletAuth, VaultController.withdraw);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADMIN ENDPOINTS
@@ -403,7 +404,7 @@ router.post("/withdraw", authHandler.authorizeRequest(), VaultController.withdra
  *                 hash:
  *                   type: string
  */
-router.post("/admin/pause", authHandler.authorizeRequest(), VaultController.pause);
+router.post("/admin/pause", walletAuth, VaultController.pause);
 
 /**
  * @openapi
@@ -426,7 +427,7 @@ router.post("/admin/pause", authHandler.authorizeRequest(), VaultController.paus
  *                 hash:
  *                   type: string
  */
-router.post("/admin/unpause", authHandler.authorizeRequest(), VaultController.unpause);
+router.post("/admin/unpause", walletAuth, VaultController.unpause);
 
 /**
  * @openapi
@@ -465,7 +466,7 @@ router.post("/admin/unpause", authHandler.authorizeRequest(), VaultController.un
  *                 hash:
  *                   type: string
  */
-router.post("/admin/reserves", authHandler.authorizeRequest(), VaultController.setMinReserve);
+router.post("/admin/reserves", walletAuth, VaultController.setMinReserve);
 
 /**
  * @openapi
@@ -500,7 +501,7 @@ router.post("/admin/reserves", authHandler.authorizeRequest(), VaultController.s
  *                 hash:
  *                   type: string
  */
-router.post("/admin/executor", authHandler.authorizeRequest(), VaultController.setBotExecutor);
+router.post("/admin/executor", walletAuth, VaultController.setBotExecutor);
 
 /**
  * @openapi
@@ -535,7 +536,7 @@ router.post("/admin/executor", authHandler.authorizeRequest(), VaultController.s
  *                 hash:
  *                   type: string
  */
-router.post("/admin/assets", authHandler.authorizeRequest(), VaultController.addAsset);
+router.post("/admin/assets", walletAuth, VaultController.addAsset);
 
 /**
  * @openapi
@@ -570,6 +571,6 @@ router.post("/admin/assets", authHandler.authorizeRequest(), VaultController.add
  *                 hash:
  *                   type: string
  */
-router.delete("/admin/assets", authHandler.authorizeRequest(), VaultController.removeAsset);
+router.delete("/admin/assets", walletAuth, VaultController.removeAsset);
 
 export default router;
