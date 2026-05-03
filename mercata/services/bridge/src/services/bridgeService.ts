@@ -12,12 +12,14 @@ import { eth } from "../utils/api";
 import {
   buildNativeMintRequest,
   executeNativeMint,
+  getExistingNativeMintTxHash,
   getNativeMintProposalExecution,
   proposeNativeMint,
 } from "./nativeMintService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
+const pendingNativeInstantWithdrawalTxHashes = new Map<string, string>();
 const inFlightSafeProposalWithdrawals = new Set<string>();
 
 const getStratoNetworkId = async (): Promise<bigint> => {
@@ -63,6 +65,14 @@ const submitNativeMint = async (
   return executeNativeMint(payload);
 };
 
+const findExistingNativeMint = async (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+): Promise<string | null> => {
+  const payload = await getNativeMintRequest(withdrawal, sourceChainId);
+  return getExistingNativeMintTxHash(payload);
+};
+
 const proposeManualNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
@@ -105,7 +115,7 @@ const syncManualNativeMintProposal = async (
     return true;
   }
 
-  await execute({
+  const confirmResult = await execute({
     contractName: "StratoNativeBridge",
     contractAddress: config.nativeBridge.address!,
     method: "confirmWithdrawal",
@@ -114,6 +124,9 @@ const syncManualNativeMintProposal = async (
       externalTxHash: result.txHash,
     },
   });
+  if (confirmResult.status !== "Success") {
+    return true;
+  }
   announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
   return true;
 };
@@ -190,7 +203,7 @@ export const recordNativeDepositBatch = async (
   }
 
   try {
-    await execute(
+    const result = await execute(
       depositArgs.map((deposit) => ({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
@@ -207,6 +220,12 @@ export const recordNativeDepositBatch = async (
         },
       }))
     );
+
+    if (result.status !== "Success") {
+      throw new Error(
+        `Native deposit record still ${result.status}; will retry`,
+      );
+    }
 
     logInfo(
       "BridgeService",
@@ -633,9 +652,18 @@ export const confirmNativeWithdrawalBatch = async (
         continue;
       }
 
-      const externalTxHash = await submitNativeMint(withdrawal, sourceChainId);
+      let externalTxHash =
+        pendingNativeInstantWithdrawalTxHashes.get(withdrawal.withdrawalId) ||
+        await findExistingNativeMint(withdrawal, sourceChainId);
+      if (!externalTxHash) {
+        externalTxHash = await submitNativeMint(withdrawal, sourceChainId);
+      }
+      pendingNativeInstantWithdrawalTxHashes.set(
+        withdrawal.withdrawalId,
+        externalTxHash,
+      );
 
-      await execute({
+      const result = await execute({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
         method: "confirmWithdrawal",
@@ -645,11 +673,24 @@ export const confirmNativeWithdrawalBatch = async (
         },
       });
 
+      if (result.status !== "Success") {
+        logInfo(
+          "BridgeService",
+          `Native withdrawal ${withdrawal.withdrawalId} destination mint recorded but STRATO confirm is still ${result.status}`,
+        );
+        continue;
+      }
+
+      pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
       successful += 1;
     } catch (error) {
       const errorMessage = (error as Error).message;
 
-      if (errorMessage.includes("SNB: bad state")) {
+      if (
+        errorMessage.includes("SNB: bad state") ||
+        errorMessage.includes("SNB: tx hash already set")
+      ) {
+        pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
         logInfo(
           "BridgeService",
           `Native withdrawal already confirmed by another server: ${withdrawal.withdrawalId}`,
@@ -717,6 +758,14 @@ export const queueManualNativeWithdrawalBatch = async (
           existingProposalReference,
         );
       } catch (error) {
+        const errorMessage = (error as Error).message;
+        if (
+          errorMessage.includes("SNB: bad state") ||
+          errorMessage.includes("SNB: tx hash already set")
+        ) {
+          announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
+          continue;
+        }
         logError("BridgeService", error as Error, {
           operation: "syncManualNativeMintProposal",
           withdrawalId: withdrawal.withdrawalId,

@@ -45,6 +45,7 @@ export interface NativeMintRequest extends NativeMintAttestation {
 const NATIVE_MINT_ABI = [
   "function mintRepresentationWithAttestation((uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline) attestation, bytes[] signatures)",
   "function maxAttestationValiditySeconds() view returns (uint256)",
+  "event RepresentationMinted(uint256 sourceChainId,address indexed sourceBridge,uint256 indexed sourceWithdrawalId,address indexed stratoToken,address representationToken,address recipient,uint256 amount,bytes32 mintId)",
 ];
 
 const nativeMintInterface = new Interface(NATIVE_MINT_ABI);
@@ -236,6 +237,50 @@ export const executeNativeMint = async (
   }
 
   return receipt.hash;
+};
+
+export const getExistingNativeMintTxHash = async (
+  request: NativeMintRequest,
+): Promise<string | null> => {
+  const attestation = normalizeAttestation(request.attestation);
+  const provider = new JsonRpcProvider(
+    getChainRpcUrl(BigInt(attestation.destinationChainId)),
+  );
+  const topics = nativeMintInterface.encodeFilterTopics(
+    "RepresentationMinted",
+    [
+      null,
+      attestation.sourceBridge,
+      BigInt(attestation.sourceWithdrawalId),
+      attestation.stratoToken,
+      null,
+      null,
+      null,
+      null,
+    ],
+  );
+  const logs = await provider.getLogs({
+    address: safeChecksum(attestation.destinationBridge),
+    topics,
+    fromBlock: 0,
+    toBlock: "latest",
+  });
+
+  for (const log of logs.reverse()) {
+    const parsed = nativeMintInterface.parseLog(log);
+    if (!parsed) continue;
+    const args = parsed.args;
+    if (
+      BigInt(args.sourceChainId.toString()) === BigInt(attestation.sourceChainId) &&
+      safeChecksum(args.representationToken) === safeChecksum(attestation.representationToken) &&
+      safeChecksum(args.recipient) === safeChecksum(attestation.recipient) &&
+      BigInt(args.amount.toString()) === BigInt(attestation.amount)
+    ) {
+      return log.transactionHash;
+    }
+  }
+
+  return null;
 };
 
 export const proposeNativeMint = async (

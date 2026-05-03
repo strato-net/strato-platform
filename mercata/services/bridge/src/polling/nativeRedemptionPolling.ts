@@ -107,8 +107,12 @@ export const startNativeRedemptionPolling = () => {
     }
   };
 
-  poll();
-  setInterval(poll, config.polling.bridgeInInterval);
+  const run = async () => {
+    await poll();
+    setTimeout(run, config.polling.bridgeInInterval);
+  };
+
+  void run();
 
   logInfo("NativeRedemptionPolling", "Started native redemption polling");
 };

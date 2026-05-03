@@ -204,7 +204,7 @@ export const startNativeDepositInitiatedPolling = (): void => {
       if (failedDeposits.length > 0) {
         const initiatedFailedDeposits = failedDeposits.filter((deposit) => {
           const sourceDeposit = depositsById.get(deposit.depositId);
-          return sourceDeposit?.bridgeStatus === "1";
+          return String(sourceDeposit?.bridgeStatus) === "1";
         });
         for (const batch of chunk(initiatedFailedDeposits, POLLING_BATCH_SIZE)) {
           await reviewNativeDepositBatch(

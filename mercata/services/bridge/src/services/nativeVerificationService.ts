@@ -3,7 +3,8 @@ import { getNativeRepresentationBridgeAddress, NATIVE_REDEMPTION_EVENT_SIGNATURE
 import { NativeDepositInfo } from "../types";
 import { logError } from "../utils/logger";
 
-const normalizeAddress = (value: string) => value.toLowerCase();
+const normalizeAddress = (value: string) =>
+  value.toLowerCase().replace(/^0x/, "");
 
 const decodeNativeRedemptionData = (
   data: string,
@@ -81,9 +82,9 @@ export const verifyNativeRedemptionsBatch = async (
           continue;
         }
 
-        const representationToken = decodeIndexedAddress(matchingLog.topics[1]);
-        const externalSender = decodeIndexedAddress(matchingLog.topics[2]);
-        const stratoRecipient = decodeIndexedAddress(matchingLog.topics[3]);
+        const representationToken = normalizeAddress(decodeIndexedAddress(matchingLog.topics[1]));
+        const externalSender = normalizeAddress(decodeIndexedAddress(matchingLog.topics[2]));
+        const stratoRecipient = normalizeAddress(decodeIndexedAddress(matchingLog.topics[3]));
         const { amount, redemptionId } = decodeNativeRedemptionData(matchingLog.data);
 
         const verified =
