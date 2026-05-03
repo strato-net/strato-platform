@@ -156,9 +156,8 @@ async function signAndSubmitUnsignedTxs(
     onProgress?.({
       index: pendingIndex,
       total: hashes.length,
-      status: "failed",
+      status: "submitted",
       hash: hashes[pendingIndex],
-      error: "Timed out waiting for transaction confirmation",
     });
     return { status: "Pending", hash: hashes[0] };
   }

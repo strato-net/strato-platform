@@ -43,6 +43,7 @@ import {
 } from '@/components/cdp/v2/cdpUtils';
 import { buildNativeRewardsApyInfo, findVaultEarnApyInfo } from '@/utils/earnUtils';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
+import { isTxSubmitted } from '@/utils/transactionStatus';
 import { DECIMAL, ADDRESS, UNITS, USD } from '@/components/cdp/v2/cdpTypes';
 
 interface MintProps {
@@ -684,7 +685,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
 
         try {
           const result = await cdpService.deposit(tx.asset, tx.amount, true);
-          if (result.status.toLowerCase() !== 'success') {
+          if (!isTxSubmitted(result.status)) {
             throw new Error(`Deposit failed for ${tx.symbol}: ${result.status}`);
           }
 
@@ -728,7 +729,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
             ? await cdpService.mintMax(tx.asset)
             : await cdpService.mint(tx.asset, tx.amount, true);
             
-          if (result.status.toLowerCase() !== 'success') {
+          if (!isTxSubmitted(result.status)) {
             throw new Error(`Mint failed for ${tx.symbol}: ${result.status}`);
           }
 

@@ -8,8 +8,8 @@ import { requestContext } from "./requestContext";
 export const until = async (
   predicate: (res: any) => boolean,
   action: () => Promise<any>,
-  timeout = 60000, // default to 1 minute
-  interval = 5000 // check every 5 seconds
+  timeout = 35000,
+  interval = 1500
 ): Promise<any> => {
   const start = Date.now();
 
@@ -192,57 +192,80 @@ const withTxQueue = async <T>(key: string, action: () => Promise<T>): Promise<T>
 const txQueueKey = (accessToken: string): string =>
   createHash("sha256").update(accessToken).digest("hex");
 
+const failedTx = (results: any[]): any | undefined =>
+  results.find((result) => result?.status === "Failure");
+
+const txFailureMessage = (result: any): string => {
+  const errorMessage = result?.txResult?.message || result?.error || result?.message || "Transaction failed";
+  return extractErrorMessage(errorMessage);
+};
+
+const isTerminalResult = (results: any[]): boolean =>
+  !!failedTx(results) || results.every((result) => result?.status !== "Pending");
+
 const postAndWaitForTxUnlocked = async (
   accessToken: string,
   stratoPostFn: () => Promise<any>,
-  timeout: number = 60000
+  timeout: number = 35000
 ): Promise<{ status: string; hash: string }> => {
   try {
     const store = requestContext.getStore();
-    const response = await submitWithLowNonceRetry(stratoPostFn, !store?.externalSigning);
-    
-    if (response.status !== 200) {
-      throw new StratoError(`Strato error: ${response.statusText}`, 500);
-    }
+    const allowLowNonceRetry = !store?.externalSigning;
+    const maxResultRetries = allowLowNonceRetry ? 2 : 0;
+    let postFn = stratoPostFn;
 
-    const results = response.data;
-    if (!Array.isArray(results) || !results.length) {
-      throw new StratoError("Invalid or empty transaction results", 400);
-    }
+    for (let attempt = 0; ; attempt++) {
+      const response = await submitWithLowNonceRetry(postFn, allowLowNonceRetry);
 
-    if (store?.externalSigning && results[0]?.data !== undefined && results[0]?.status === undefined) {
-      const unsignedTxs = withSequentialUnsignedNonces(results);
-      store.unsignedTxs = unsignedTxs;
-      return { status: "unsigned", hash: unsignedTxs[0].hash };
-    }
-
-    const txHashes = results.map(result => {
-      if (!result?.hash) throw new StratoError("Invalid transaction result", 400);
-      return result.hash;
-    });
-
-    const done = (results: any[]) => {
-      const failedTx = results.find(r => r?.status === "Failure");
-      if (failedTx) {
-        // Extract the actual error message from the failed transaction
-        const errorMessage = failedTx.txResult?.message || failedTx.error || failedTx.message || "Transaction failed";
-        const extractedMessage = extractErrorMessage(errorMessage);
-        // Blockchain errors are typically client errors (400) since they're due to user input/state
-        throw new StratoError(extractedMessage, 400);
+      if (response.status !== 200) {
+        throw new StratoError(`Strato error: ${response.statusText}`, 500);
       }
-      return results.every(r => r?.status !== "Pending");
-    };
 
-    const finalResults = done(results) ? results : await until(
-      done,
-      async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,
-      timeout
-    );
+      const results = response.data;
+      if (!Array.isArray(results) || !results.length) {
+        throw new StratoError("Invalid or empty transaction results", 400);
+      }
 
-    return {
-      status: finalResults[0].status,
-      hash: finalResults[0].hash
-    };
+      if (store?.externalSigning && results[0]?.data !== undefined && results[0]?.status === undefined) {
+        const unsignedTxs = withSequentialUnsignedNonces(results);
+        store.unsignedTxs = unsignedTxs;
+        return { status: "unsigned", hash: unsignedTxs[0].hash };
+      }
+
+      const txHashes = results.map(result => {
+        if (!result?.hash) throw new StratoError("Invalid transaction result", 400);
+        return result.hash;
+      });
+
+      const finalResults = isTerminalResult(results) ? results : await until(
+        isTerminalResult,
+        async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,
+        timeout
+      );
+
+      const failed = failedTx(finalResults);
+      if (failed) {
+        const message = failed.txResult?.message || failed.error || failed.message || failed;
+        const retryNonce = attempt < maxResultRetries ? lowNonceExpected(message) : null;
+        const nextConfig = retryNonce !== null
+          ? requestConfigWithNonce(response.config, retryNonce)
+          : null;
+
+        if (nextConfig) {
+          console.warn(`Retrying STRATO transaction after low nonce result with nonce ${retryNonce}`);
+          postFn = () => axios.request(nextConfig);
+          await wait(1000);
+          continue;
+        }
+
+        throw new StratoError(txFailureMessage(failed), 400);
+      }
+
+      return {
+        status: finalResults[0].status,
+        hash: finalResults[0].hash
+      };
+    }
   } catch (error: any) {
     // If it's already a StratoError, re-throw it
     if (error instanceof StratoError) {
@@ -263,7 +286,7 @@ const postAndWaitForTxUnlocked = async (
 export const postAndWaitForTx = async (
   accessToken: string,
   stratoPostFn: () => Promise<any>,
-  timeout: number = 60000
+  timeout: number = 35000
 ): Promise<{ status: string; hash: string }> => {
   const store = requestContext.getStore();
   if (store?.externalSigning) {

@@ -18,6 +18,7 @@ import { getAssetColor } from "@/components/cdp/v2/cdpUtils";
 import { usdstAddress } from "@/lib/constants";
 import type { WalletTxProgressEvent } from "@/lib/axios";
 import VaultActionProgressModal, { type VaultActionProgressStep } from "./VaultActionProgressModal";
+import { isTxPending, isTxSubmitted } from "@/utils/transactionStatus";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
 const calculateHealthFactor = (cr: number, lt: number): number => {
@@ -753,7 +754,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           throw new Error(`Unknown action: ${action}`);
       }
 
-      if (result.status.toLowerCase() === "success") {
+      if (isTxSubmitted(result.status)) {
         if (useExternalWalletSigning) {
           setProgressSteps(prev => prev.map((step, index) => ({
             ...step,
@@ -764,23 +765,23 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         }
 
         toast({
-          title: "Success",
-          description: `${action.charAt(0).toUpperCase() + action.slice(1)} completed successfully. Tx: ${result.hash}`,
+          title: isTxPending(result.status) ? "Submitted" : "Success",
+          description: isTxPending(result.status)
+            ? `${action.charAt(0).toUpperCase() + action.slice(1)} submitted. Tx: ${result.hash}`
+            : `${action.charAt(0).toUpperCase() + action.slice(1)} completed successfully. Tx: ${result.hash}`,
         });
         
         // Clear the input and reset states after successful action
         setInputAmounts(prev => ({ ...prev, [asset]: "" }));
         setMaxStates(prev => ({ ...prev, [asset]: false }));
         setActiveActions(prev => ({ ...prev, [asset]: null }));
-        
-        // Refresh positions data and balances
-        const [updatedPositions] = await Promise.all([
-          cdpService.getVaults(),
-          fetchUsdstBalance(),
-          fetchTokens()
-        ]);
-        setPositions(updatedPositions);
-        
+
+        // Refresh positions data and balances in the background so the action button
+        // re-enables immediately instead of waiting on follow-up reads.
+        cdpService.getVaults().then(setPositions).catch(() => {});
+        fetchUsdstBalance();
+        fetchTokens();
+
         // Call the callback to refresh other components (like deposits)
         if (onVaultActionSuccess) {
           onVaultActionSuccess();

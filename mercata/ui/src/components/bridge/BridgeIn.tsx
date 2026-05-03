@@ -59,6 +59,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowDownToLine, Gem, CheckCircle2, ChevronLeft, ChevronRight, AlertTriangle, Mail } from "lucide-react";
 import { usdstAddress, WAD, METAL_BUY_FEE } from "@/lib/constants";
 import type { WalletTxProgressEvent } from "@/lib/axios";
+import { isTxPending, isTxSubmitted } from "@/utils/transactionStatus";
 
 const METAL_BUY_FEE_WEI = safeParseUnits(METAL_BUY_FEE).toString();
 
@@ -731,7 +732,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         minMetalOut,
         useExternalWalletSigning ? { walletTxProgress } : undefined
       );
-      if (result.status.toLowerCase() !== "success") {
+      if (!isTxSubmitted(result.status)) {
         throw new Error(`Metal purchase failed: ${result.status}`);
       }
 
@@ -743,7 +744,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           error: undefined,
         })));
       }
-      toast({ title: "Success", description: `Purchased ${selectedMetal.symbol}` });
+      toast({
+        title: isTxPending(result.status) ? "Submitted" : "Success",
+        description: isTxPending(result.status)
+          ? `Purchase submitted for ${selectedMetal.symbol}`
+          : `Purchased ${selectedMetal.symbol}`,
+      });
       setAmount("");
       fetchTokens();
       fetchUsdstBalance();
