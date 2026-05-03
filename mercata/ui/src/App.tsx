@@ -73,7 +73,8 @@ import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
-import { initializeCsrfToken, csrfOnRequest } from "./lib/csrf";
+import { initializeCsrfToken } from "./lib/csrf";
+import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/nodeHealth";
 
 
 const queryClient = new QueryClient();
@@ -87,6 +88,7 @@ const App = () => {
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
+  const [nodeHealth, setNodeHealth] = useState<NodeHealth | null>(null);
 
   // Initialize CSRF token on app startup
   useEffect(() => {
@@ -124,6 +126,24 @@ const App = () => {
     return () => {
       cancelled = true;
       clearTimeout(retryTimeout);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshNodeHealth = async () => {
+      const health = await getNodeHealth();
+      if (!cancelled) {
+        setNodeHealth(shouldShowNodeHealth(health) ? health : null);
+      }
+    };
+
+    refreshNodeHealth();
+    const interval = setInterval(refreshNodeHealth, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 
@@ -168,7 +188,11 @@ const App = () => {
   }
 
   if (configError) {
-    return <SyncingPage />;
+    return <SyncingPage nodeHealth={nodeHealth} />;
+  }
+
+  if (nodeHealth) {
+    return <SyncingPage nodeHealth={nodeHealth} />;
   }
 
   if (!wagmiConfig) {
