@@ -31,6 +31,17 @@ export interface WithdrawalProof {
     signatures: string[];
     receiptRLP: string;
     mptProof: string[];
+    /**
+     * The STRATO-side event the proof targets. Tells the frontend which
+     * vault method to invoke:
+     *   - "Withdrawal"             → hot path; call BridgeVault.claimWithdrawal
+     *                                to release funds atomically.
+     *   - "WithdrawalRequestedV2"  → cold path; the withdrawal awaits admin
+     *                                approval. UI typically displays a
+     *                                pending-approval message; submitting
+     *                                BridgeVault.submitProof is admin's job.
+     */
+    eventName: "Withdrawal" | "WithdrawalRequestedV2";
 }
 
 /**

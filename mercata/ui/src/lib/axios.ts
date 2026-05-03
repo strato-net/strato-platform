@@ -56,7 +56,15 @@ async function pollTxResult(hashes: string[], timeout = 60000, interval = 3000):
   }
 }
 
-async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{ status: string; hash: string }> {
+async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{
+  status: string;
+  hash: string;
+  /** All on-chain hashes for the batch, in submission order. Lets callers
+   *  pick the meaningful tx (e.g. the second in an approve+action pair). */
+  hashes: string[];
+  /** Per-tx status objects from /api/rpc/results, in the same order as `hashes`. */
+  results: any[];
+}> {
   if (!_walletSignFn) {
     // Most common cause: the user clicked submit before wagmi finished
     // resolving the wallet client (account.isConnected fired but
@@ -92,7 +100,16 @@ async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{ status: s
   if (failed) {
     throw new Error(failed.txResult?.message || failed.message || "Transaction failed");
   }
-  return { status: results[0]?.status || "Success", hash: hashes[0] };
+  // Return the LAST tx as the "primary" status/hash. For the approve+action
+  // pattern (e.g. approve then requestWithdrawalProof), the action is what
+  // the caller cares about; approve is just a setup step.
+  const lastIdx = hashes.length - 1;
+  return {
+    status: results[lastIdx]?.status || "Success",
+    hash: hashes[lastIdx],
+    hashes,
+    results,
+  };
 }
 
 api.interceptors.request.use(

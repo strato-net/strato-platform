@@ -182,6 +182,12 @@ export async function claimWithdrawalOnExternalChain({
   }
 
   onProgress?.({ phase: "claiming" });
+  // Pin gas explicitly. We've seen wallets reject the tx with "gas limit too
+  // high" when they try to estimate against a fresh receipts root: the
+  // estimator path through the proof verifier + RLP decoder occasionally
+  // returns nonsensically large values. claimWithdrawal's worst case is
+  // ~300k gas (MPT walk + receipt log iteration); 800k is a safe ceiling
+  // that still fits under any plausible block gas limit.
   const claimTxHash = await writeContract(wagmiConfig, {
     address: deployment.vault,
     abi: BRIDGE_VAULT_ABI,
@@ -194,6 +200,7 @@ export async function claimWithdrawalOnExternalChain({
       proof.receiptRLP as `0x${string}`,
     ],
     chainId: chainIdNum,
+    gas: 800_000n,
   });
   await waitForTransactionReceipt(wagmiConfig, { hash: claimTxHash, chainId: chainIdNum });
   onProgress?.({ phase: "claimed", txHash: claimTxHash });

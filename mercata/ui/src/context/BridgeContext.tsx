@@ -260,15 +260,71 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const requestWithdrawal = useCallback(
-    async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
+    async (
+      params: WithdrawalRequestParams,
+      onProgress?: (phase: "submit_strato" | "fetch_proof") => void,
+    ): Promise<BridgeResponse> => {
       setLoading(true);
+      onProgress?.("submit_strato");
       try {
-        // The backend wraps the result as { success, data: WithdrawalTransactionResponse }.
-        // Unwrap it here so callers can read tx fields (status / hash / proof) directly.
-        const { data: body } = await api.post<{ success: boolean; data: WithdrawalTransactionResponse }>(
-          `/bridge/requestWithdrawal`,
-          params,
-        );
+        // Two response shapes are possible here:
+        //
+        //   (sync / backend-signed)
+        //     { success, data: { status, hash, proof? } }
+        //
+        //   (external-signing -- backend returned unsigned envelopes, the
+        //    axios interceptor signed+submitted them and merged the result
+        //    onto the top level)
+        //     { success, data: { status: "unsigned", hash: <approveHash> },
+        //       status: "Success", hash: <lastHash>, hashes: [...] }
+        //
+        // In the external-signing case `data.proof` is missing because the
+        // backend returned early before the txs landed; fetch it now from
+        // the dedicated endpoint using the requestWithdrawalProof tx hash
+        // (always the last entry in `hashes`).
+        const { data: body } = await api.post<{
+          success: boolean;
+          data: WithdrawalTransactionResponse;
+          hashes?: string[];
+        }>(`/bridge/requestWithdrawal`, params);
+
+        if (Array.isArray(body?.hashes) && body.hashes.length > 0) {
+          const proofTxHash = body.hashes[body.hashes.length - 1];
+          onProgress?.("fetch_proof");
+          console.info(
+            `[bridge] external-signed batch landed; fetching proof for last tx ${proofTxHash}`,
+          );
+          let proof: WithdrawalTransactionResponse["proof"];
+          try {
+            const { data: proofResp } = await api.get<{
+              success: boolean;
+              data: NonNullable<WithdrawalTransactionResponse["proof"]>;
+            }>(`/bridge/withdrawalProof/${proofTxHash}`);
+            if (proofResp?.success) proof = proofResp.data;
+            console.info(
+              `[bridge] proof fetch ${proof ? "succeeded" : "returned no proof"}`,
+              proof
+                ? {
+                    eventName: proof.eventName,
+                    blockNumber: proof.blockNumber,
+                    txIndex: proof.txIndex,
+                    logIndex: proof.logIndex,
+                  }
+                : proofResp,
+            );
+          } catch (err: any) {
+            // Proof not ready yet -- block may still be propagating, or the
+            // tx didn't emit a Withdrawal event (large/cold-path). Either
+            // way, fall through with proof undefined and let the caller's
+            // pending-approval branch handle it.
+            console.warn("[bridge] proof fetch failed:", err?.message ?? err);
+          }
+          return {
+            success: !!body?.success,
+            data: { status: "Success", hash: proofTxHash, proof },
+          };
+        }
+
         return { success: !!body?.success, data: body?.data };
       } finally {
         setLoading(false);

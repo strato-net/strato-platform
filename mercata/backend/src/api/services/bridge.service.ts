@@ -129,6 +129,7 @@ export const getWithdrawalProof = async (
         wantedAddr.replace(/^0x/, "")
   );
   if (logIndex < 0) return undefined;
+  const eventName = logs[logIndex].eventName as "Withdrawal" | "WithdrawalRequestedV2";
 
   const blockNumber = typeof data.blockNumber === "number" ? data.blockNumber : Number(data.blockNumber || 0);
 
@@ -140,6 +141,7 @@ export const getWithdrawalProof = async (
     signatures: data.signatures || [],
     receiptRLP: data.receiptRLP,
     mptProof: data.mptProof || [],
+    eventName,
   };
 };
 

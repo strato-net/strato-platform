@@ -31,7 +31,10 @@ export type BridgeContextType = {
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
-  requestWithdrawal: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
+  requestWithdrawal: (
+    params: WithdrawalRequestParams,
+    onProgress?: (phase: "submit_strato" | "fetch_proof") => void,
+  ) => Promise<BridgeResponse>;
   requestDepositAction: (params: DepositActionRequestParams) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 

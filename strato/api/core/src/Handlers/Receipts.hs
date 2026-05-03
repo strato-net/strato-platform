@@ -289,14 +289,22 @@ computeReceiptInclusionProof receiptsBytes targetIdx =
         Nothing -> []
 
 -- A wrapper so we can put already-RLP-encoded receipt bytes into addAllKVs
--- without double-encoding them. The trie value at each leaf becomes
--- @RLPString receiptBytes@ -- exactly what the on-chain verifier expects.
+-- without rebuilding the @Receipt@ struct. Production builds the receipts
+-- trie via @addAllKVs ... [(i, receipt :: Receipt)]@, and @Receipt@'s
+-- 'rlpEncode' returns an 'RLPArray', so the leaf value stored in the trie
+-- is exactly the canonical receipt bytes (no extra @RLPString@ wrap).
+--
+-- The wrapper has to match that byte-for-byte, otherwise the proof's leaf
+-- value won't equal the @receiptRLP@ bytes the on-chain verifier compares
+-- against and inclusion check fails with @ProofVerificationFailed@. So
+-- @rlpEncode@ here deserializes the bytes back into the same 'RLPObject'
+-- shape 'Receipt'.'rlpEncode' would produce, and the round-trip
+-- @rlpSerialize . rlpDeserialize = id@ guarantees the leaf bytes match.
 newtype ReceiptBytesWrapper = ReceiptBytesWrapper B.ByteString
 
 instance RLPSerializable ReceiptBytesWrapper where
-  rlpEncode (ReceiptBytesWrapper bs) = RLPString bs
-  rlpDecode (RLPString bs) = ReceiptBytesWrapper bs
-  rlpDecode _ = error "ReceiptBytesWrapper.rlpDecode: expected RLPString"
+  rlpEncode (ReceiptBytesWrapper bs) = rlpDeserialize bs
+  rlpDecode obj = ReceiptBytesWrapper (rlpSerialize obj)
 
 toHex :: B.ByteString -> String
 toHex bs = "0x" ++ BC.unpack (B16.encode bs)
