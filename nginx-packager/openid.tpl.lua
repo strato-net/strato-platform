@@ -39,23 +39,42 @@ local authenticate_opts = {
 }
 
 local wallet_auth_routes = {
-  ["/api/cdp/asset-debt-info"] = true,
-  ["/api/cdp/deposit"] = true,
-  ["/api/cdp/get-max-mint"] = true,
-  ["/api/cdp/get-max-withdraw"] = true,
-  ["/api/cdp/liquidate"] = true,
-  ["/api/cdp/max-liquidatable"] = true,
-  ["/api/cdp/mint"] = true,
-  ["/api/cdp/mint-max"] = true,
-  ["/api/cdp/repay"] = true,
-  ["/api/cdp/repay-all"] = true,
-  ["/api/cdp/withdraw"] = true,
-  ["/api/cdp/withdraw-max"] = true,
+  ["/api/credit-card/add-card"] = true,
+  ["/api/credit-card/approve"] = true,
+  ["/api/credit-card/config"] = true,
+  ["/api/credit-card/manual-top-up"] = true,
+  ["/api/credit-card/remove-card"] = true,
+  ["/api/credit-card/update-card"] = true,
   ["/api/metal-forge/buy"] = true,
+  ["/api/oracle/price"] = true,
+  ["/api/rpc/results"] = true,
+  ["/api/rpc/submit"] = true,
   ["/api/swap"] = true,
   ["/api/swap/multi-token"] = true,
-  ["/api/rpc/submit"] = true,
-  ["/api/rpc/results"] = true
+  ["/api/swap-pools"] = true,
+  ["/api/tokens"] = true,
+  ["/api/user/admin"] = true
+}
+
+local wallet_auth_route_prefixes = {
+  "/api/cdp/",
+  "/api/credit-card/config/",
+  "/api/earn/",
+  "/api/lend/",
+  "/api/lending/",
+  "/api/refer/",
+  "/api/rewards/",
+  "/api/swap-pools/",
+  "/api/tokens/",
+  "/api/user/admin/",
+  "/api/vault/"
+}
+
+local wallet_auth_methods = {
+  DELETE = true,
+  PATCH = true,
+  POST = true,
+  PUT = true
 }
 
 local function is_valid_wallet_address(addr)
@@ -68,15 +87,22 @@ local function is_valid_wallet_address(addr)
 end
 
 local function allow_wallet_auth_request()
-  if ngx.req.get_method() ~= "POST" then
+  if not wallet_auth_methods[ngx.req.get_method()] then
     return false
   end
 
-  if not wallet_auth_routes[ngx.var.uri] then
-    return false
+  local uri = ngx.var.uri
+  local route_allowed = wallet_auth_routes[uri] == true
+  if not route_allowed then
+    for _, prefix in ipairs(wallet_auth_route_prefixes) do
+      if uri:sub(1, #prefix) == prefix then
+        route_allowed = true
+        break
+      end
+    end
   end
 
-  return is_valid_wallet_address(ngx.req.get_headers()["X-Wallet-Address"])
+  return route_allowed and is_valid_wallet_address(ngx.req.get_headers()["X-Wallet-Address"])
 end
 
 -- Clear any x-user-access-token header coming from the client, for security reasons
