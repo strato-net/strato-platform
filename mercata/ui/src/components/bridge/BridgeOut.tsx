@@ -41,7 +41,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
   const wagmiConfig = useConfig();
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
-  const { userAddress } = useUser();
+  const { userAddress, walletSignerReady } = useUser();
 
   const {
     requestWithdrawal: bridgeOutAPI,
@@ -147,6 +147,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       !selectedToken ||
       !isConnected ||
       !currentNetwork ||
+      !walletSignerReady ||
       isBalanceLoading,
     [
       guestMode,
@@ -155,6 +156,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       selectedToken,
       isConnected,
       currentNetwork,
+      walletSignerReady,
       isBalanceLoading,
     ]
   );
@@ -460,7 +462,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         disabled={isButtonDisabled}
         className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-        {isLoading ? "Processing..." : "Withdraw"}
+        {isLoading
+          ? "Processing..."
+          : isConnected && !walletSignerReady
+          ? "Connecting wallet..."
+          : "Withdraw"}
         </Button>
 
       <AdvancedOptionsDropdown

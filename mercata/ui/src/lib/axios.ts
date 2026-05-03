@@ -57,11 +57,30 @@ async function pollTxResult(hashes: string[], timeout = 60000, interval = 3000):
 }
 
 async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{ status: string; hash: string }> {
-  if (!_walletSignFn) throw new Error("No wallet signer available");
+  if (!_walletSignFn) {
+    // Most common cause: the user clicked submit before wagmi finished
+    // resolving the wallet client (account.isConnected fired but
+    // useWalletClient() hadn't returned yet). UserContext gates on
+    // walletSignerReady to prevent this; surface a clear error if we
+    // somehow get here anyway.
+    throw new Error(
+      "Wallet signer not ready. Reconnect your wallet and try again, " +
+        "or wait a moment for the wallet client to initialize.",
+    );
+  }
 
   const hashes: string[] = [];
-  for (const tx of unsignedTxs) {
-    const signature = await _walletSignFn(tx);
+  for (let i = 0; i < unsignedTxs.length; i++) {
+    const tx = unsignedTxs[i];
+    let signature: string;
+    try {
+      signature = await _walletSignFn(tx);
+    } catch (err: any) {
+      // User rejection is the typical case here -- give a focused message
+      // rather than the raw provider error.
+      const msg = err?.shortMessage || err?.message || String(err);
+      throw new Error(`Wallet signature failed for tx ${i + 1} of ${unsignedTxs.length}: ${msg}`);
+    }
     const sig = parseSignature(signature);
     const signedTx = buildSignedTx(tx.data, sig);
     const submittedHash = await api.post("/rpc/submit", signedTx);
@@ -138,8 +157,30 @@ function extractApiErrorMessage(error: any): string {
 api.interceptors.response.use(
   async (response) => {
     if (response.data?._unsigned && response.data?._unsignedTxs) {
-      const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs);
-      response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
+      // Visible breadcrumb so we can confirm the interceptor is reached;
+      // if you don't see this in the console for an external-signing
+      // response, the new axios.ts module isn't loaded (Vite cache).
+      console.info(
+        `[unsigned-tx] intercepted ${response.data._unsignedTxs.length} unsigned tx(s); ` +
+          `wallet signer ${_walletSignFn ? "ready" : "MISSING"}`,
+      );
+      try {
+        const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs);
+        response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
+      } catch (err: any) {
+        // signAndSubmitUnsignedTxs throws for: missing wallet signer, user
+        // rejection, /rpc/submit failure, or tx revert. Without this
+        // surface, the caller's promise just rejects silently and the page
+        // looks frozen. Toast + console log makes the failure visible.
+        const msg = err?.message || String(err) || "Unknown signing error";
+        console.error("[unsigned-tx] sign/submit failed:", err);
+        toast({
+          title: "Could not submit STRATO transaction",
+          description: msg,
+          variant: "destructive",
+        });
+        throw err;
+      }
     }
     return response;
   },

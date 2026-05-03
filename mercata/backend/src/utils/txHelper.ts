@@ -3,6 +3,34 @@ import { StratoPaths } from "../config/constants";
 import { StratoError } from "../errors";
 import { requestContext } from "./requestContext";
 
+/**
+ * STRATO's `/transaction/unsigned` endpoint returns the same nonce for every
+ * tx in a batch -- fine for the parallel-execution model where they share a
+ * slot, but wrong for the external-signing flow where each tx is signed and
+ * submitted as an independent single transaction. Walk the array and bump
+ * each subsequent tx's nonce so the wallet signs over distinct values and
+ * STRATO accepts them in sequence.
+ *
+ * The `hash` field on each entry is the keccak of the (now-stale) original
+ * unsigned tx; we don't recompute it because the UI replaces it with the
+ * actual on-chain hash returned by /rpc/submit. Mutates in place and returns
+ * the same array for chainability.
+ */
+function sequenceUnsignedTxNonces(txs: any[]): any[] {
+  if (!Array.isArray(txs) || txs.length < 2) return txs;
+  const baseNonceRaw = txs[0]?.data?.nonce;
+  const baseNonce = typeof baseNonceRaw === "number"
+    ? baseNonceRaw
+    : Number(baseNonceRaw);
+  if (!Number.isFinite(baseNonce)) return txs;
+  for (let i = 1; i < txs.length; i++) {
+    if (txs[i]?.data && typeof txs[i].data === "object") {
+      txs[i].data.nonce = baseNonce + i;
+    }
+  }
+  return txs;
+}
+
 export const until = async (
   predicate: (res: any) => boolean,
   action: () => Promise<any>,
@@ -56,6 +84,7 @@ export const postAndWaitForTx = async (
 
     const store = requestContext.getStore();
     if (store?.externalSigning && results[0]?.data !== undefined && results[0]?.status === undefined) {
+      sequenceUnsignedTxNonces(results);
       store.unsignedTxs = results;
       return { status: "unsigned", hash: results[0].hash };
     }
@@ -128,7 +157,9 @@ export const postAndWaitForAllTxs = async (
 
     const store = requestContext.getStore();
     if (store?.externalSigning && results[0]?.data !== undefined && results[0]?.status === undefined) {
-      // External-signing path -- return the unsigned-tx payloads as-is.
+      // External-signing path -- one signed submission per tx, so each needs
+      // its own sequential nonce (STRATO returns them all sharing one).
+      sequenceUnsignedTxNonces(results);
       store.unsignedTxs = results;
       return results;
     }
