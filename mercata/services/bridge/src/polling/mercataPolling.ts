@@ -28,7 +28,12 @@ import { verifyDepositsBatch } from "../services/verificationService";
 import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationService";
 import { checkBalances } from "../utils/balanceCheck";
 
-const DEPOSIT_REVIEW_BATCH_SIZE = 10;
+const POLLING_BATCH_SIZE = 10;
+
+const isUnsetHash = (value?: string | null): boolean => {
+  const normalized = String(value || "").toLowerCase().replace(/^0x/, "");
+  return normalized.length === 0 || /^0+$/.test(normalized);
+};
 
 const chunk = <T>(items: T[], size: number): T[][] => {
   const chunks: T[][] = [];
@@ -67,7 +72,9 @@ export const startWithdrawalRequestPolling = (): void => {
       const initiatedWithdrawals: WithdrawalInfo[] = await getWithdrawalsByStatus("1");
       if (initiatedWithdrawals.length === 0) return;
 
-      await confirmWithdrawalBatch(initiatedWithdrawals as NonEmptyArray<WithdrawalInfo>);
+      for (const batch of chunk(initiatedWithdrawals, POLLING_BATCH_SIZE)) {
+        await confirmWithdrawalBatch(batch as NonEmptyArray<WithdrawalInfo>);
+      }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
         operation: "startWithdrawalRequestPolling",
@@ -119,13 +126,13 @@ export const startDepositInitiatedPolling = (): void => {
       );
 
       if (verifiedDeposits.length > 0) {
-        await confirmDepositBatch(
-          verifiedDeposits as NonEmptyArray<ConfirmDepositArgs>
-        );
+        for (const batch of chunk(verifiedDeposits, POLLING_BATCH_SIZE)) {
+          await confirmDepositBatch(batch as NonEmptyArray<ConfirmDepositArgs>);
+        }
       }
 
       if (failedDeposits.length > 0) {
-        for (const batch of chunk(failedDeposits, DEPOSIT_REVIEW_BATCH_SIZE)) {
+        for (const batch of chunk(failedDeposits, POLLING_BATCH_SIZE)) {
           await reviewDepositBatch(batch as NonEmptyArray<ConfirmDepositArgs>);
         }
       }
@@ -179,13 +186,15 @@ export const startNativeDepositInitiatedPolling = (): void => {
       );
 
       if (verifiedDeposits.length > 0) {
-        await confirmNativeDepositBatch(
-          verifiedDeposits as NonEmptyArray<ConfirmNativeDepositArgs>,
-        );
+        for (const batch of chunk(verifiedDeposits, POLLING_BATCH_SIZE)) {
+          await confirmNativeDepositBatch(
+            batch as NonEmptyArray<ConfirmNativeDepositArgs>,
+          );
+        }
       }
 
       if (failedDeposits.length > 0) {
-        for (const batch of chunk(failedDeposits, DEPOSIT_REVIEW_BATCH_SIZE)) {
+        for (const batch of chunk(failedDeposits, POLLING_BATCH_SIZE)) {
           await reviewNativeDepositBatch(
             batch as NonEmptyArray<ConfirmNativeDepositArgs>,
           );
@@ -244,9 +253,13 @@ export const startWithdrawalTxPolling = (): void => {
       }
 
       if (toFinalize.length)
-        await finaliseWithdrawalBatch(toFinalize as NonEmptyArray<Number>);
+        for (const batch of chunk(toFinalize, POLLING_BATCH_SIZE)) {
+          await finaliseWithdrawalBatch(batch as NonEmptyArray<Number>);
+        }
       if (toReject.length)
-        await handleRejectedWithdrawalBatch(toReject as NonEmptyArray<Number>);
+        for (const batch of chunk(toReject, POLLING_BATCH_SIZE)) {
+          await handleRejectedWithdrawalBatch(batch as NonEmptyArray<Number>);
+        }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
         operation: "startWithdrawalTxPolling",
@@ -276,15 +289,19 @@ export const startNativeWithdrawalRequestPolling = (): void => {
       );
 
       if (instantWithdrawals.length > 0) {
-        await confirmNativeWithdrawalBatch(
-          instantWithdrawals as NonEmptyArray<NativeWithdrawalInfo>,
-        );
+        for (const batch of chunk(instantWithdrawals, POLLING_BATCH_SIZE)) {
+          await confirmNativeWithdrawalBatch(
+            batch as NonEmptyArray<NativeWithdrawalInfo>,
+          );
+        }
       }
 
       if (approvalWithdrawals.length > 0) {
-        await queueManualNativeWithdrawalBatch(
-          approvalWithdrawals as NonEmptyArray<NativeWithdrawalInfo>,
-        );
+        for (const batch of chunk(approvalWithdrawals, POLLING_BATCH_SIZE)) {
+          await queueManualNativeWithdrawalBatch(
+            batch as NonEmptyArray<NativeWithdrawalInfo>,
+          );
+        }
       }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
@@ -317,7 +334,7 @@ export const startNativeWithdrawalTxPolling = (): void => {
 
       for (const w of pending) {
         const id = Number(w.withdrawalId);
-        if (!w.externalTxHash) {
+        if (isUnsetHash(w.externalTxHash)) {
           if (w.useInstantPath) {
             pendingInstantExecution.push(w);
           } else {
@@ -346,20 +363,28 @@ export const startNativeWithdrawalTxPolling = (): void => {
       }
 
       if (pendingInstantExecution.length > 0) {
-        await confirmNativeWithdrawalBatch(
-          pendingInstantExecution as NonEmptyArray<NativeWithdrawalInfo>,
-        );
+        for (const batch of chunk(pendingInstantExecution, POLLING_BATCH_SIZE)) {
+          await confirmNativeWithdrawalBatch(
+            batch as NonEmptyArray<NativeWithdrawalInfo>,
+          );
+        }
       }
       if (pendingManualExecution.length > 0) {
-        await queueManualNativeWithdrawalBatch(
-          pendingManualExecution as NonEmptyArray<NativeWithdrawalInfo>,
-        );
+        for (const batch of chunk(pendingManualExecution, POLLING_BATCH_SIZE)) {
+          await queueManualNativeWithdrawalBatch(
+            batch as NonEmptyArray<NativeWithdrawalInfo>,
+          );
+        }
       }
       if (toFinalize.length) {
-        await finaliseNativeWithdrawalBatch(toFinalize as NonEmptyArray<Number>);
+        for (const batch of chunk(toFinalize, POLLING_BATCH_SIZE)) {
+          await finaliseNativeWithdrawalBatch(batch as NonEmptyArray<Number>);
+        }
       }
       if (toReject.length) {
-        await handleRejectedNativeWithdrawalBatch(toReject as NonEmptyArray<Number>);
+        for (const batch of chunk(toReject, POLLING_BATCH_SIZE)) {
+          await handleRejectedNativeWithdrawalBatch(batch as NonEmptyArray<Number>);
+        }
       }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {

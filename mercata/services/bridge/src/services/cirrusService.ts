@@ -12,8 +12,12 @@ import {
 } from "../types";
 
 const { bridge, nativeBridge, oracle } = config;
-const { address: bridgeAddress } = bridge;
-const { address: nativeBridgeAddress } = nativeBridge;
+const toCirrusAddress = (address?: string) =>
+  address ? address.toLowerCase().replace(/^0x/, "") : undefined;
+
+const bridgeAddress = toCirrusAddress(bridge.address);
+const nativeBridgeAddress = toCirrusAddress(nativeBridge.address);
+const oracleAddress = toCirrusAddress(oracle.address);
 const MERCATA_URL = "BlockApps-MercataBridge";
 const NATIVE_BRIDGE_URL = "BlockApps-StratoNativeBridge";
 const ORACLE_URL = "BlockApps-PriceOracle";
@@ -256,12 +260,12 @@ export const getRebaseFactors = async (
   stratoTokenAddresses: string[]
 ): Promise<Map<string, bigint>> => {
   const normalized = stratoTokenAddresses.map(a => a.toLowerCase().replace(/^0x/, ""));
-  if (!normalized.length || !oracle.address) return new Map();
+  if (!normalized.length || !oracleAddress) return new Map();
 
   const data = await cirrus.get(`/${ORACLE_URL}-rebaseFactors`, {
     params: {
       key: `in.(${normalized.join(",")})`,
-      address: `eq.${oracle.address}`,
+      address: `eq.${oracleAddress}`,
       select: "key,value::text",
     },
   }).catch(() => []);
