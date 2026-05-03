@@ -51,6 +51,7 @@ data MetadataResponse = MetadataResponse
     isVaultPasswordSet :: Bool,
     networkID :: String, -- cuz JSON can't rep integers > 2^53
     chainId :: String,
+    networkName :: String,
     urls :: UrlMap
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
@@ -82,6 +83,7 @@ exMetadataRespone =
     True
     "0"
     "0"
+    "helium"
     (fromList [("vault", "http://vault.com")])
 
 -- | The model's field modifiers will match the JSON instances
@@ -103,7 +105,7 @@ getMetaData =
     isSynced <- checkIsSynced
     urlMap <- access (Proxy @UrlMap)
     let nc = networkConfig ethConf
-    pure $ MetadataResponse validators isSynced True (show $ Conf.networkID nc) (show $ Conf.chainId nc) urlMap
+    pure $ MetadataResponse validators isSynced True (show $ Conf.networkID nc) (show $ Conf.chainId nc) (Conf.network nc) urlMap
 
 checkIsSynced :: MonadIO m => m Bool
 checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow
