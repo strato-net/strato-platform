@@ -22,13 +22,18 @@ export async function initStratoChain(): Promise<Chain | null> {
     _chainId = Number(result);
 
     const networkName: string = metaRes?.data?.networkName || "";
+    const isProduction = networkName === "upquark";
     const chainLabel = networkName ? `STRATO ${networkName}` : "STRATO";
+    const explorerUrl = isProduction
+      ? "https://stratoscan.strato.nexus"
+      : "https://stratoscan.testnet.stratomercata.com";
 
     _chain = defineChain({
       id: _chainId,
       name: chainLabel,
       nativeCurrency: { decimals: 18, name: "tUSDST", symbol: "tUSDST" },
       rpcUrls: { default: { http: [rpcUrl || "/rpc"] } },
+      blockExplorers: { default: { name: "Stratoscan", url: explorerUrl } },
     });
     return _chain;
   } catch {
