@@ -156,7 +156,15 @@ export const startNativeDepositInitiatedPolling = (): void => {
 
   const poll = async () => {
     try {
-      const deposits: NativeDepositInfo[] = await getNativeDepositsByStatus("1");
+      const [initiatedDeposits, pendingReviewDeposits] = await Promise.all([
+        getNativeDepositsByStatus("1"),
+        getNativeDepositsByStatus("2"),
+      ]);
+      const depositsById = new Map<string, NativeDepositInfo>();
+      for (const deposit of [...initiatedDeposits, ...pendingReviewDeposits]) {
+        depositsById.set(deposit.depositId, deposit);
+      }
+      const deposits = [...depositsById.values()];
       if (!Array.isArray(deposits) || deposits.length === 0) return;
 
       const verificationResults = await verifyNativeRedemptionsBatch(deposits);
@@ -194,7 +202,11 @@ export const startNativeDepositInitiatedPolling = (): void => {
       }
 
       if (failedDeposits.length > 0) {
-        for (const batch of chunk(failedDeposits, POLLING_BATCH_SIZE)) {
+        const initiatedFailedDeposits = failedDeposits.filter((deposit) => {
+          const sourceDeposit = depositsById.get(deposit.depositId);
+          return sourceDeposit?.bridgeStatus === "1";
+        });
+        for (const batch of chunk(initiatedFailedDeposits, POLLING_BATCH_SIZE)) {
           await reviewNativeDepositBatch(
             batch as NonEmptyArray<ConfirmNativeDepositArgs>,
           );

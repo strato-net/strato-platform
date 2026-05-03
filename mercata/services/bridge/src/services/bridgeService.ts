@@ -235,7 +235,7 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
-    await execute({
+    const result = await execute({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
       method: "confirmDepositBatch",
@@ -244,6 +244,14 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
         externalTxHashes,
       },
     });
+
+    if (result.status !== "Success") {
+      logInfo(
+        "BridgeService",
+        `Deposit confirmation still ${result.status}; skipping voucher mint for ${deposits.length} deposits`,
+      );
+      return;
+    }
 
     logInfo(
       "BridgeService",
@@ -279,7 +287,7 @@ export const confirmNativeDepositBatch = async (
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
-    await execute(
+    const result = await execute(
       deposits.map((deposit) => ({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
@@ -291,6 +299,14 @@ export const confirmNativeDepositBatch = async (
         },
       }))
     );
+
+    if (result.status !== "Success") {
+      logInfo(
+        "BridgeService",
+        `Native deposit confirmation still ${result.status}; skipping voucher mint for ${deposits.length} native deposits`,
+      );
+      return;
+    }
 
     logInfo(
       "BridgeService",
