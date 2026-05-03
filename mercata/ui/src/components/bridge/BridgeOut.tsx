@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import BridgeConfirmationModal from "./BridgeConfirmationModal";
-import { useAccount } from "wagmi";
+import { useAccount, useConfig } from "wagmi";
+import { claimWithdrawalOnExternalChain, deploymentFromChainInfo } from "@/lib/bridge/proofClaim";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { formatBalance, formatUnits, safeParseUnits } from "@/utils/numberUtils";
@@ -37,6 +38,7 @@ interface BridgeOutProps {
 const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = false }) => {
   // Hooks & Context
   const { address, isConnected } = useAccount();
+  const wagmiConfig = useConfig();
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const { userAddress } = useUser();
@@ -288,12 +290,63 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         throw new Error("Failed to request withdrawal");
       }
 
+      const proof = res.data?.proof;
+      if (proof) {
+        const deployment = deploymentFromChainInfo({
+          bridgeVault: currentNetwork.bridgeVault,
+          stratoLightClient: currentNetwork.stratoLightClient,
+        });
+        if (!deployment) {
+          // Backend produced a proof but MercataBridge has no vault /
+          // light-client wiring for this chain. The withdrawal is recorded
+          // on STRATO; the user can claim manually with the proof bytes
+          // until an admin re-runs setChain with bridgeVault + stratoLightClient set.
+          toast({
+            title: "Withdrawal recorded on STRATO",
+            description:
+              `No proof-bridge contracts configured on-chain for ${selectedNetwork || currentNetwork.chainId}. ` +
+              `Ask an admin to set bridgeVault / stratoLightClient via setChain to enable automatic claims.`,
+          });
+        } else {
+          try {
+            toast({
+              title: "Submitting STRATO header",
+              description: "Verifying the withdrawal proof on the external chain...",
+            });
+            await claimWithdrawalOnExternalChain({
+              wagmiConfig,
+              proof,
+              externalChainId: currentNetwork.chainId,
+              deployment,
+              onProgress: (p) => {
+                if (p.phase === "claiming") {
+                  toast({
+                    title: "Claiming withdrawal",
+                    description: `Submitting claim to chain ${currentNetwork.chainId}...`,
+                  });
+                }
+              },
+            });
+            toast({
+              title: "Withdrawal claimed",
+              description: `Tokens released on ${selectedNetwork}.`,
+            });
+          } catch (claimErr: any) {
+            toast({
+              title: "On-chain claim failed",
+              description: claimErr?.shortMessage || claimErr?.message || "Could not complete the claim.",
+              variant: "destructive",
+            });
+          }
+        }
+      } else {
         toast({
-        title: "Withdrawal requested",
+          title: "Withdrawal requested",
           description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${address}.`,
         });
+      }
 
-        setAmount("");
+      setAmount("");
 
       await Promise.all([
         fetchUsdstBalance(),

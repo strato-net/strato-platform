@@ -62,6 +62,26 @@ router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeControll
 
 /**
  * @openapi
+ * /bridge/withdrawalProof/{txHash}:
+ *   get:
+ *     summary: "Fetch the inclusion proof for a previously-submitted requestWithdrawalProof tx"
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: txHash
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: WithdrawalProof bytes ready to drive an external-chain claim
+ *       404:
+ *         description: No proof available (tx not finalized, no Withdrawal log, or pre-fork)
+ */
+router.get("/withdrawalProof/:txHash", authHandler.authorizeRequest(), BridgeController.getWithdrawalProof);
+
+/**
+ * @openapi
  * /bridge/requestDepositAction:
  *   post:
  *     summary: "Request a post-deposit action (auto-save to lending pool, auto-forge metal, etc.)"

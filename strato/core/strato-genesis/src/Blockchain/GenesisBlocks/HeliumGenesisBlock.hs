@@ -1381,6 +1381,33 @@ lithiumGenesisBlock =
       fundedValidator = NonContract lithiumValidatorAddress 1809251394333065553493296640760748560207343510400633813116524750123642650624
   in baseGenesis { addressInfo = fundedValidator : addressInfo baseGenesis }
 
+-- Beryllium network configuration
+berylliumValidatorAddress :: Address
+berylliumValidatorAddress = 0x3dc1e4bdb54f6cce80c92d5d494160545a78db35
+
+berylliumValidators :: [Validator]
+berylliumValidators = [Validator berylliumValidatorAddress]
+
+berylliumAdmins :: [Address]
+berylliumAdmins = [0x101a31a25295a5dd95187ea2b0725c91443db7b7]
+
+berylliumConfig :: HeliumGenesisBlockConfig
+berylliumConfig = HeliumGenesisBlockConfig
+  berylliumValidators
+  berylliumAdmins
+  0x101a31a25295a5dd95187ea2b0725c91443db7b7
+  [sepolia]
+  [eth, wbtc, paxg, usdc, usdt]
+  (bridgeRelayerAddress, 100_000 * oneE18)
+  ((,100_000 * oneE18) <$> [oracleAddress1, oracleAddress2])
+
+-- beryllium genesis block with funded validator account
+berylliumGenesisBlock :: GenesisInfo
+berylliumGenesisBlock = 
+  let baseGenesis = genesisBlockTemplate berylliumConfig
+      fundedValidator = NonContract berylliumValidatorAddress 1809251394333065553493296640760748560207343510400633813116524750123642650624
+  in baseGenesis { addressInfo = fundedValidator : addressInfo baseGenesis }
+
 descriptions :: M.Map Text Text
 descriptions = M.fromList
   [ ("PAXGST", "PAXGST is a digital asset on STRATO Mercata pegged 1:1 to PAX Gold (PAXG) on Ethereum, enabling holders to bridge their PAXG into Mercata, and access DeFi and staking opportunities."),

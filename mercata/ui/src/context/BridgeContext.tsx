@@ -15,7 +15,7 @@ import {
   NetworkSummary,
   BridgeContextType,
 } from "@/lib/bridge/types";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, WithdrawalTransactionResponse, DepositAction } from "@mercata/shared-types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
@@ -92,6 +92,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           chainName: cfg.chainInfo.chainName,
           enabled: cfg.chainInfo.enabled,
           depositRouter: cfg.chainInfo.depositRouter,
+          bridgeVault: cfg.chainInfo.bridgeVault,
+          stratoLightClient: cfg.chainInfo.stratoLightClient,
         }));
 
       networks.sort((a, b) => a.chainId.localeCompare(b.chainId));
@@ -261,8 +263,13 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
       setLoading(true);
       try {
-        const { data } = await api.post<TransactionResponse>(`/bridge/requestWithdrawal`, params);
-        return { success: true, data };
+        // The backend wraps the result as { success, data: WithdrawalTransactionResponse }.
+        // Unwrap it here so callers can read tx fields (status / hash / proof) directly.
+        const { data: body } = await api.post<{ success: boolean; data: WithdrawalTransactionResponse }>(
+          `/bridge/requestWithdrawal`,
+          params,
+        );
+        return { success: !!body?.success, data: body?.data };
       } finally {
         setLoading(false);
       }

@@ -104,6 +104,66 @@ export const postAndWaitForTx = async (
   }
 };
 
+/**
+ * Variant of {@link postAndWaitForTx} that returns the full per-tx result
+ * array (one entry per tx in the submitted batch), preserving submission
+ * order. Use this when the caller needs more than just the first tx's
+ * status/hash -- e.g. to read block info from the second tx in an
+ * approve+action batch.
+ */
+export const postAndWaitForAllTxs = async (
+  accessToken: string,
+  stratoPostFn: () => Promise<any>,
+  timeout: number = 60000
+): Promise<any[]> => {
+  try {
+    const response = await stratoPostFn();
+    if (response.status !== 200) {
+      throw new StratoError(`Strato error: ${response.statusText}`, 500);
+    }
+    const results = response.data;
+    if (!Array.isArray(results) || !results.length) {
+      throw new StratoError("Invalid or empty transaction results", 400);
+    }
+
+    const store = requestContext.getStore();
+    if (store?.externalSigning && results[0]?.data !== undefined && results[0]?.status === undefined) {
+      // External-signing path -- return the unsigned-tx payloads as-is.
+      store.unsignedTxs = results;
+      return results;
+    }
+
+    const txHashes = results.map((result: any) => {
+      if (!result?.hash) throw new StratoError("Invalid transaction result", 400);
+      return result.hash;
+    });
+
+    const done = (rs: any[]) => {
+      const failedTx = rs.find((r: any) => r?.status === "Failure");
+      if (failedTx) {
+        const errorMessage = failedTx.txResult?.message || failedTx.error || failedTx.message || "Transaction failed";
+        const extractedMessage = extractErrorMessage(errorMessage);
+        throw new StratoError(extractedMessage, 400);
+      }
+      return rs.every((r: any) => r?.status !== "Pending");
+    };
+
+    return done(results)
+      ? results
+      : await until(
+          done,
+          async () => (await bloc.post(accessToken, StratoPaths.result, txHashes)).data,
+          timeout
+        );
+  } catch (error: any) {
+    if (error instanceof StratoError) throw error;
+    if (error.response?.data && typeof error.response.data === "string") {
+      throw new StratoError(extractErrorMessage(error.response.data), 400);
+    }
+    throw error;
+  }
+};
+
 // export const waitOnCirrus = async (
 //   accessToken: string,
 //   tableName: string,

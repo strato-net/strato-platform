@@ -1,12 +1,13 @@
 import { Request, Response, NextFunction } from "express";
-import { 
+import {
   requestWithdrawal,
   requestDepositAction,
   getDepositActions,
   getBridgeableTokens,
   getNetworkConfigs,
   getBridgeTransactions,
-  getWithdrawalSummary
+  getWithdrawalSummary,
+  getWithdrawalProof,
 } from "../services/bridge.service";
 import { validateRequestWithdrawal, validateDepositAction, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
@@ -17,7 +18,8 @@ import {
   WithdrawalRequestParams,
   DepositActionRequestParams,
   TransactionResponse,
-  WithdrawalSummaryResponse
+  WithdrawalSummaryResponse,
+  WithdrawalTransactionResponse,
 } from "@mercata/shared-types";
 import { isUserAdmin } from "../services/user.service";
 
@@ -30,13 +32,46 @@ class BridgeController {
     try {
       const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
-      
-      const result: TransactionResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
+
+      const result: WithdrawalTransactionResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string);
 
       res.json({
         success: true,
         data: result,
       });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /bridge/withdrawalProof/:txHash
+   *
+   * Standalone proof lookup for a previously-submitted requestWithdrawalProof
+   * tx. Used by the external-signing path (where the backend doesn't see the
+   * finalized tx synchronously) and as a retry hook if the inline proof fetch
+   * in requestWithdrawal failed transiently.
+   */
+  static async getWithdrawalProof(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { txHash } = req.params;
+      if (!txHash) {
+        res.status(400).json({ error: "txHash parameter is required" });
+        return;
+      }
+
+      const proof = await getWithdrawalProof(accessToken, txHash);
+      if (!proof) {
+        res.status(404).json({ error: "No withdrawal proof available for that tx" });
+        return;
+      }
+
+      res.json({ success: true, data: proof });
     } catch (error: any) {
       next(error);
     }

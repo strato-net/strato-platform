@@ -142,7 +142,7 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(mUSDST), "burn", address(mercata.liquidityPool()));
 
         // Set up chain
-        bridge.setChain(chainName, custody, custodyHotWallet, true, externalChainId, 1000, depositRouter);
+        bridge.setChain(chainName, custody, custodyHotWallet, true, externalChainId, 1000, depositRouter, address(0), address(0));
 
         // Set USDST address to our test token
         bridge.setUSDSTAddress(address(usdstToken));
@@ -238,10 +238,10 @@ contract Describe_MercataBridge is Authorizable {
         uint256 lastBlock = 2000;
         string memory newChainName = "Polygon";
 
-        bridge.setChain(newChainName, newCustody, newCustodyHotWallet, true, chainId, lastBlock, newRouter);
+        bridge.setChain(newChainName, newCustody, newCustodyHotWallet, true, chainId, lastBlock, newRouter, address(0), address(0));
 
         // Check chain was set correctly
-        (string chainName, address custody, address custodyHotWallet, address depositRouter, bool enabled, uint lastProcessedBlock) = bridge.chains(chainId);
+        (string chainName, address custody, address custodyHotWallet, address depositRouter, bool enabled, uint lastProcessedBlock,,) = bridge.chains(chainId);
         require(custody == newCustody, "Custody not set correctly");
         require(custodyHotWallet == newCustodyHotWallet, "Custody not set correctly");
         require(depositRouter == newRouter, "Router not set correctly");
@@ -254,7 +254,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 newBlock = 1500;
         relayer.do(address(bridge), "setLastProcessedBlock", externalChainId, newBlock);
 
-        (,,,,, uint lastProcessedBlock) = bridge.chains(externalChainId);
+        (,,,,, uint lastProcessedBlock,,) = bridge.chains(externalChainId);
         uint256 setLastBlock = lastProcessedBlock;
         require(setLastBlock == newBlock, "Last processed block not updated");
     }
@@ -282,7 +282,7 @@ contract Describe_MercataBridge is Authorizable {
         uint8 permissions = 1; // WRAP only
 
         // First set up the chain
-        bridge.setChain("BSC", address(0x6666), address(0x6667), true, newChainId, 2000, address(0x7777));
+        bridge.setChain("BSC", address(0x6666), address(0x6667), true, newChainId, 2000, address(0x7777), address(0), address(0));
 
         bridge.setAsset(true, newChainId, decimals, name, symbol, externalToken, maxPerWithdrawal, newToken);
 
@@ -539,7 +539,7 @@ contract Describe_MercataBridge is Authorizable {
     }
 
     function it_bridge_reverts_deposit_with_disabled_chain() {
-        bridge.setChain(chainName, custody, custodyHotWallet, false, externalChainId, 1000, depositRouter);
+        bridge.setChain(chainName, custody, custodyHotWallet, false, externalChainId, 1000, depositRouter, address(0), address(0));
 
         bool reverted = false;
         try {
@@ -808,7 +808,7 @@ contract Describe_MercataBridge is Authorizable {
     }
 
     function it_bridge_reverts_withdrawal_with_disabled_chain() {
-        bridge.setChain(chainName, custody, custodyHotWallet, false, externalChainId, 1000, depositRouter);
+        bridge.setChain(chainName, custody, custodyHotWallet, false, externalChainId, 1000, depositRouter, address(0), address(0));
 
         testToken.mint(address(user1), 1000e18);
         user1.do(address(testToken), "approve", address(bridge), 1000e18);
@@ -858,7 +858,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 chainId2 = 137; // Polygon
 
         // Set up second chain
-        bridge.setChain("Polygon", address(0x6666), address(0x6667), true, chainId2, 2000, address(0x7777));
+        bridge.setChain("Polygon", address(0x6666), address(0x6667), true, chainId2, 2000, address(0x7777), address(0), address(0));
         bridge.setAsset(true, chainId2, 18, "Polygon Test", "PTEST", address(0x8888), 1000000e18, address(testToken));
 
         // Test deposits on both chains
@@ -1172,7 +1172,7 @@ contract Describe_MercataBridge is Authorizable {
         // Should succeed - monotonic increase
         relayer.do(address(bridge), "setLastProcessedBlock", externalChainId, 1500);
 
-        (,,,,, uint256 currentBlock) = bridge.chains(externalChainId);
+        (,,,,, uint256 currentBlock,,) = bridge.chains(externalChainId);
         require(currentBlock == 1500, "Block should be updated");
     }
 
@@ -1183,7 +1183,7 @@ contract Describe_MercataBridge is Authorizable {
         // Should succeed - same block (no-op)
         bridge.setLastProcessedBlock(externalChainId, 1000);
 
-        (,,,,, uint256 currentBlock) = bridge.chains(externalChainId);
+        (,,,,, uint256 currentBlock,,) = bridge.chains(externalChainId);
         require(currentBlock == 1000, "Block should remain the same");
     }
 
@@ -1194,7 +1194,7 @@ contract Describe_MercataBridge is Authorizable {
         // Emergency override should allow rollback
         bridge.emergencySetLastProcessedBlock(externalChainId, 500);
 
-        (,,,,, uint256 currentBlock) = bridge.chains(externalChainId);
+        (,,,,, uint256 currentBlock,,) = bridge.chains(externalChainId);
         require(currentBlock == 500, "Emergency rollback should succeed");
     }
 

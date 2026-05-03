@@ -1,19 +1,19 @@
 import { buildFunctionTx } from "../../utils/txBuilder";
-import { postAndWaitForTx } from "../../utils/txHelper";
-import { strato, cirrus, bridge } from "../../utils/mercataApiHelper";
+import { postAndWaitForAllTxs } from "../../utils/txHelper";
+import { strato, cirrus, bridge, eth } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import { getTokenMetadata } from "../helpers/cirrusHelpers";
-import { 
-  buildQueryParams, 
+import {
+  buildQueryParams,
   BridgeMappingRow,
-  enrichTransactionData, 
+  enrichTransactionData,
   enrichAssetsWithTokenData,
   executeParallelQueries,
   parseBridgeRouteMappings,
-  QUERY_CONFIGS 
+  QUERY_CONFIGS
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@mercata/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, DepositActionRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction, WithdrawalProof, WithdrawalTransactionResponse } from "@mercata/shared-types";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices, getRebaseFactors } from "./oracle.service";
 import { toUTCTime } from "../helpers/cirrusHelpers";
@@ -30,7 +30,7 @@ export const requestWithdrawal = async (
     stratoTokenAmount,
   }: WithdrawalRequestParams,
   userAddress: string
-): Promise<TransactionResponse> => {
+): Promise<WithdrawalTransactionResponse> => {
   const tx = await buildFunctionTx(
     [
       {
@@ -42,7 +42,7 @@ export const requestWithdrawal = async (
       {
         contractName: extractContractName(MercataBridge),
         contractAddress: constants.mercataBridge,
-        method: "requestWithdrawal",
+        method: "requestWithdrawalProof",
         args: {
           externalChainId,
           externalRecipient,
@@ -56,9 +56,123 @@ export const requestWithdrawal = async (
     accessToken
   );
 
-  return await postAndWaitForTx(accessToken, () =>
+  const allResults = await postAndWaitForAllTxs(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
   );
+
+  // External-signing path: txs aren't on-chain yet, so we can't fetch a
+  // proof. Frontend will sign + submit, then call /bridge/withdrawalProof to
+  // pick up the proof once the requestWithdrawalProof tx is finalized.
+  const externalSigning = allResults.length > 0 && allResults[0]?.status === undefined && allResults[0]?.data !== undefined;
+  if (externalSigning) {
+    return { status: "unsigned", hash: allResults[0]?.hash };
+  }
+
+  // The requestWithdrawalProof tx is the second (and final) entry in the batch.
+  const proofTx = allResults[allResults.length - 1];
+  const baseResponse: WithdrawalTransactionResponse = {
+    status: proofTx?.status,
+    hash: proofTx?.hash,
+  };
+
+  // Best-effort proof fetch -- a failure here doesn't break the withdrawal
+  // submission. The frontend can retry via getWithdrawalProof if needed.
+  try {
+    const proof = await getWithdrawalProof(accessToken, proofTx);
+    if (proof) baseResponse.proof = proof;
+  } catch (err: any) {
+    console.warn(`Failed to fetch withdrawal proof for tx ${proofTx?.hash}: ${err?.message ?? err}`);
+  }
+
+  return baseResponse;
+};
+
+/**
+ * Fetch the inclusion proof for the Withdrawal (or WithdrawalRequestedV2)
+ * event emitted by a `requestWithdrawalProof` tx. The frontend feeds the
+ * returned bytes into `BridgeVault.claimWithdrawal` (or `submitProof`) on
+ * the external chain.
+ *
+ * Pass either a tx-hash string or a bloc result entry that already includes
+ * the block hash; the latter avoids a round-trip.
+ */
+export const getWithdrawalProof = async (
+  accessToken: string,
+  txOrHash: string | { hash?: string; blockHash?: string; txResult?: { blockHash?: string } }
+): Promise<WithdrawalProof | undefined> => {
+  const hash = typeof txOrHash === "string" ? txOrHash : txOrHash?.hash;
+  if (!hash) return undefined;
+  const inlineBlockHash =
+    typeof txOrHash === "string"
+      ? undefined
+      : txOrHash?.blockHash || txOrHash?.txResult?.blockHash;
+
+  const blockHash = inlineBlockHash || (await fetchBlockHashForTx(accessToken, hash));
+  if (!blockHash) return undefined;
+
+  const txIndex = await fetchTxIndexInBlock(accessToken, blockHash, hash);
+  if (txIndex < 0) return undefined;
+
+  const proofResp = await eth.get<any>(
+    accessToken,
+    `/receipts/hash/${blockHash}/proof/${txIndex}`
+  );
+  const data = proofResp?.data;
+  if (!data || !data.receiptRLP) return undefined;
+
+  const logs: Array<{ contractAddress: string; eventName: string }> = data.logs || [];
+  const wantedAddr = mercataBridge.toLowerCase();
+  const logIndex = logs.findIndex(
+    (l) =>
+      (l.eventName === "Withdrawal" || l.eventName === "WithdrawalRequestedV2") &&
+      (l.contractAddress || "").toLowerCase().replace(/^0x/, "") ===
+        wantedAddr.replace(/^0x/, "")
+  );
+  if (logIndex < 0) return undefined;
+
+  const blockNumber = typeof data.blockNumber === "number" ? data.blockNumber : Number(data.blockNumber || 0);
+
+  return {
+    blockNumber,
+    txIndex,
+    logIndex,
+    headerRLP: data.headerRLP,
+    signatures: data.signatures || [],
+    receiptRLP: data.receiptRLP,
+    mptProof: data.mptProof || [],
+  };
+};
+
+const fetchBlockHashForTx = async (
+  accessToken: string,
+  txHash: string
+): Promise<string | undefined> => {
+  const cleanHash = txHash.startsWith("0x") ? txHash.slice(2) : txHash;
+  const resp = await eth.get<any[]>(accessToken, `/transactionResult/${cleanHash}`);
+  const rows = resp?.data;
+  if (!Array.isArray(rows) || rows.length === 0) return undefined;
+  const bh = rows[0]?.blockHash;
+  if (!bh) return undefined;
+  return typeof bh === "string" ? bh : String(bh);
+};
+
+const fetchTxIndexInBlock = async (
+  accessToken: string,
+  blockHash: string,
+  txHash: string
+): Promise<number> => {
+  const resp = await eth.get<any[]>(accessToken, `/block`, {
+    params: { hash: blockHash },
+  });
+  const blocks = resp?.data;
+  if (!Array.isArray(blocks) || blocks.length === 0) return -1;
+  const block = blocks[0];
+  const txs: any[] = block?.receiptTransactions || [];
+  const wanted = txHash.startsWith("0x") ? txHash.slice(2).toLowerCase() : txHash.toLowerCase();
+  return txs.findIndex((t: any) => {
+    const h = (t?.hash || "").toLowerCase();
+    return h === wanted || h === `0x${wanted}` || h.replace(/^0x/, "") === wanted;
+  });
 };
 
 export const requestDepositAction = async (
@@ -155,6 +269,8 @@ export const getNetworkConfigs = async (accessToken: string): Promise<NetworkCon
   });
   return data.map((c: any) => {
     if (c.ChainInfo.depositRouter) c.ChainInfo.depositRouter = ensureHexPrefix(c.ChainInfo.depositRouter);
+    if (c.ChainInfo.bridgeVault) c.ChainInfo.bridgeVault = ensureHexPrefix(c.ChainInfo.bridgeVault);
+    if (c.ChainInfo.stratoLightClient) c.ChainInfo.stratoLightClient = ensureHexPrefix(c.ChainInfo.stratoLightClient);
     return { externalChainId: c.externalChainId, chainInfo: c.ChainInfo };
   });
 };

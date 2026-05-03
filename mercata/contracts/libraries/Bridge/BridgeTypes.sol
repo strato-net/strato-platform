@@ -42,6 +42,8 @@ library BridgeTypes {
         address depositRouter;      // contract users interact with on L1/L2
         bool    enabled;            // quick toggle
         uint256 lastProcessedBlock; // last processed block on the chain for polling
+        address bridgeVault;        // BridgeVault contract on the external chain (proof-based withdrawals)
+        address stratoLightClient;  // STRATOLightClient contract on the external chain (header verification)
     }
 
     struct AssetInfo {

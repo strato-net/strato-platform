@@ -120,7 +120,7 @@ contract record MercataBridge is Ownable {
 
     // ───────────── Registry related events ─────────────
     /// @notice Emitted when chain configuration is updated
-    event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address hotWallet);
+    event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address hotWallet, address bridgeVault, address stratoLightClient);
 
     /// @notice Emitted when the last processed block is updated for a chain
     event LastProcessedBlockUpdated(uint256 externalChainId, uint256 lastProcessedBlock);
@@ -371,23 +371,29 @@ contract record MercataBridge is Ownable {
 
     /**
      * @dev Sets chain configuration for bridge operations
-     * @notice Configures external chain parameters including custody and router addresses
+     * @notice Configures external chain parameters including custody, router, and
+     *         proof-bridge contract addresses (BridgeVault + STRATOLightClient).
      * @param chainName The human-readable name of the external chain
      * @param custody The custody contract address on the external chain
      * @param enabled Whether the chain is enabled for bridge operations
      * @param externalChainId The unique identifier for the external chain
      * @param lastProcessedBlock The last processed block number for this chain
      * @param router The router contract address for deposits
+     * @param bridgeVault BridgeVault contract on the external chain (proof-based withdrawals); pass 0 to leave unconfigured
+     * @param stratoLightClient STRATOLightClient on the external chain (header verification); pass 0 to leave unconfigured
      */
     function setChain(
-        string chainName, address custody, address hotWallet, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router
+        string chainName, address custody, address hotWallet, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address bridgeVault, address stratoLightClient
     ) external onlyOwner {
         require(chainName.length > 0, "MB: invalid chain name");
         require(custody != address(0), "MB: zero custody address");
         require(externalChainId > 0, "MB: invalid external chain id");
         require(router != address(0), "MB: zero router address");
-        chains[externalChainId] = ChainInfo(chainName, custody, hotWallet, router, enabled, lastProcessedBlock);
-        emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, router, hotWallet);
+        chains[externalChainId] = ChainInfo(
+            chainName, custody, hotWallet, router, enabled, lastProcessedBlock,
+            bridgeVault, stratoLightClient
+        );
+        emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, router, hotWallet, bridgeVault, stratoLightClient);
     }
 
     /**

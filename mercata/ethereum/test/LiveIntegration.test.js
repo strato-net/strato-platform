@@ -24,7 +24,7 @@ const { ethers, upgrades } = require("hardhat");
  * ============================================================================
  *
  * 1. STRATO node running with the changes from PR1-PR4 plus the receipts
- *    endpoint work. lithium network ID, your node as sole validator.
+ *    endpoint work. beryllium network ID, your node as sole validator.
  *
  * 2. Receipts-root fork is active for the block under test (or your node
  *    has receiptsRootForkBlock set to a small value so test blocks are

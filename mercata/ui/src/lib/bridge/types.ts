@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, WithdrawalTransactionResponse, DepositAction } from "@mercata/shared-types";
 
 export interface BalanceResponse {
   balance: string;
@@ -6,7 +6,7 @@ export interface BalanceResponse {
 
 export interface BridgeResponse {
   success: boolean;
-  data?: TransactionResponse;
+  data?: WithdrawalTransactionResponse;
 }
 
 export type NetworkSummary = {
@@ -14,6 +14,10 @@ export type NetworkSummary = {
   chainName: string;
   enabled: boolean;
   depositRouter: string;
+  /** Proof-bridge contract addresses on the external chain. Zero address
+   *  when the chain hasn't been configured for proof-based withdrawals yet. */
+  bridgeVault: string;
+  stratoLightClient: string;
 };
 
 export type BridgeContextType = {

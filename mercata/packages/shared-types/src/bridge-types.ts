@@ -15,6 +15,10 @@ export interface NetworkConfig {
     chainName: string;
     depositRouter: string;
     lastProcessedBlock: string;
+    /** BridgeVault contract on the external chain. Zero address until configured via setChain. */
+    bridgeVault: string;
+    /** STRATOLightClient contract on the external chain. Paired with bridgeVault. */
+    stratoLightClient: string;
   };
 }
 
