@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, castVoteOnIssueById, dismissIssue, getOpenIssues,
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, addGuardian, removeGuardian, castVoteOnIssue, castVoteOnIssueById, dismissIssue, getOpenIssues,
          getExecutedIssues, contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
@@ -76,6 +76,54 @@ class UserController {
       const result = await removeAdmin(accessToken, actorAddress as string, userAddress);
       res.status(RestStatus.OK).json({ 
         message: "Admin removed successfully", 
+        userAddress,
+        status: result.status,
+        hash: result.hash
+      });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async addGuardian(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: actorAddress } = req;
+      const { userAddress } = req.body;
+
+      validateUserAddress(userAddress);
+
+      const result = await addGuardian(accessToken, actorAddress as string, userAddress);
+      res.status(RestStatus.CREATED).json({
+        message: "Guardian added successfully",
+        userAddress,
+        status: result.status,
+        hash: result.hash
+      });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async removeGuardian(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: actorAddress } = req;
+      const { userAddress } = req.body;
+
+      validateUserAddress(userAddress);
+
+      const result = await removeGuardian(accessToken, actorAddress as string, userAddress);
+      res.status(RestStatus.OK).json({
+        message: "Guardian removed successfully",
         userAddress,
         status: result.status,
         hash: result.hash

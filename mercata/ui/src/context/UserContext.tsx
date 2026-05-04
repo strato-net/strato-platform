@@ -33,6 +33,8 @@ interface UserContextType {
   dismissIssue: (issueId: string) => Promise<void>;
   addAdmin: (userAddress: string) => Promise<void>;
   removeAdmin: (userAddress: string) => Promise<void>;
+  addGuardian: (userAddress: string) => Promise<void>;
+  removeGuardian: (userAddress: string) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -199,6 +201,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     await getOpenIssues();
   };
 
+  const addGuardian = async (userAddress: string) => {
+    await api.post('/user/admin/guardian', { userAddress });
+    await getOpenIssues();
+  };
+
+  const removeGuardian = async (userAddress: string) => {
+    await api.delete('/user/admin/guardian', { data: { userAddress } });
+    await getOpenIssues();
+  };
+
   const dismissIssue = async (issueId: string) => {
     await api.post('/user/admin/dismiss', { issueId });
     await getOpenIssues();
@@ -282,6 +294,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     dismissIssue,
     addAdmin,
     removeAdmin,
+    addGuardian,
+    removeGuardian,
     contractSearch,
     contractSearchResults,
     contractSearchResultsLoading,
@@ -290,7 +304,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     contractDetailsResultsLoading,
   }), [userAddress, effectiveLoggedIn, isAdmin, loading, userName,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
-    castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
+    castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin, addGuardian, removeGuardian,
     contractSearch, contractSearchResults, contractSearchResultsLoading,
     getContractDetails, contractDetailsResults, contractDetailsResultsLoading,
   ]);
