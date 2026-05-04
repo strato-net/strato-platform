@@ -9,6 +9,7 @@ import React, {
 import { api } from '@/lib/axios';
 import { useUser } from "@/context/UserContext";
 import { CollateralData } from '@/interface';
+import { isTxSubmitted } from '@/utils/transactionStatus';
 
 
 export interface LiquidationEntry {
@@ -99,7 +100,7 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
       }
       
       // Only refresh data if the transaction was successful
-      if (response.data && response.data.status && response.data.status.toLowerCase() === 'success') {
+      if (response.data && isTxSubmitted(response.data.status)) {
         await refreshData();
       }
       

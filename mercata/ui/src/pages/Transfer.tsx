@@ -176,17 +176,15 @@ const Transfer = () => {
       });
       setFromAmount("");
       setRecipient("");
-      const updatedTokens = await fetchUserTokens();
-      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
-      if (updatedToken) {
-        setFromAsset(updatedToken);
-      } else {
-        setFromAsset(null)
-      }
-      await fetchUsdstBalance();
+      setSwapLoading(false);
+
+      fetchUserTokens().then((updatedTokens) => {
+        const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
+        setFromAsset(updatedToken || null);
+      }).catch(() => {});
+      fetchUsdstBalance();
     } catch (error) {
       console.error("Transfer error:", error);
-    } finally {
       setSwapLoading(false);
     }
   };

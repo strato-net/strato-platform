@@ -4,6 +4,7 @@ import LendingController from "../controllers/lending.controller";
 import SafetyController from "../controllers/safety.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -64,7 +65,7 @@ router.get("/pools", authHandler.authorizeRequest(true), LendingController.get);
  *               type: object
  *               additionalProperties: true
  */
-router.post("/loans/borrow-max", authHandler.authorizeRequest(), LendingController.borrowMax);
+router.post("/loans/borrow-max", walletAuth, LendingController.borrowMax);
 
 /**
  * @openapi
@@ -93,7 +94,7 @@ router.post("/loans/borrow-max", authHandler.authorizeRequest(), LendingControll
  *               type: object
  *               additionalProperties: true
  */
-router.post("/collateral/withdraw-max", authHandler.authorizeRequest(), LendingController.withdrawCollateralMax);
+router.post("/collateral/withdraw-max", walletAuth, LendingController.withdrawCollateralMax);
 
 /**
  * @openapi
@@ -164,8 +165,8 @@ router.post("/collateral/withdraw-max", authHandler.authorizeRequest(), LendingC
  */
 router.get("/collateral", authHandler.authorizeRequest(), LendingController.getCollateralAndBalance);
 router.get("/collateral/public", authHandler.authorizeRequest(true), LendingController.getPublicCollateralInfo);
-router.post("/collateral", authHandler.authorizeRequest(), LendingController.supplyCollateral);
-router.delete("/collateral", authHandler.authorizeRequest(), LendingController.withdrawCollateral);
+router.post("/collateral", walletAuth, LendingController.supplyCollateral);
+router.delete("/collateral", walletAuth, LendingController.withdrawCollateral);
 
 /**
  * @openapi
@@ -249,8 +250,8 @@ router.get("/liquidity/public", authHandler.authorizeRequest(true), LendingContr
  *               additionalProperties: true
  */
 router.get("/loans", authHandler.authorizeRequest(), LendingController.getLoans);
-router.post("/loans", authHandler.authorizeRequest(), LendingController.borrow);
-router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
+router.post("/loans", walletAuth, LendingController.borrow);
+router.patch("/loans", walletAuth, LendingController.repay);
 
 /**
  * @openapi
@@ -302,8 +303,8 @@ router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
  *               type: object
  *               additionalProperties: true
  */
-router.post("/pools/liquidity", authHandler.authorizeRequest(), LendingController.depositLiquidity);
-router.delete("/pools/liquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
+router.post("/pools/liquidity", walletAuth, LendingController.depositLiquidity);
+router.delete("/pools/liquidity", walletAuth, LendingController.withdrawLiquidity);
 
 /**
  * @openapi
@@ -320,7 +321,7 @@ router.delete("/pools/liquidity", authHandler.authorizeRequest(), LendingControl
  *               type: object
  *               additionalProperties: true
  */
-router.post("/pools/withdraw-all", authHandler.authorizeRequest(), LendingController.withdrawLiquidityAll);
+router.post("/pools/withdraw-all", walletAuth, LendingController.withdrawLiquidityAll);
 
 /**
  * @openapi
@@ -337,7 +338,7 @@ router.post("/pools/withdraw-all", authHandler.authorizeRequest(), LendingContro
  *               type: object
  *               additionalProperties: true
  */
-router.post("/loans/repay-all", authHandler.authorizeRequest(), LendingController.repayAll);
+router.post("/loans/repay-all", walletAuth, LendingController.repayAll);
 
 /**
  * @openapi
@@ -428,7 +429,7 @@ router.get("/liquidate/near-unhealthy", authHandler.authorizeRequest(), LendingC
  *               type: object
  *               additionalProperties: true
  */
-router.post("/liquidate/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
+router.post("/liquidate/:id", walletAuth, LendingController.executeLiquidation);
 
 /**
  * @openapi
@@ -473,7 +474,7 @@ router.post("/liquidate/:id", authHandler.authorizeRequest(), LendingController.
  *               type: object
  *               additionalProperties: true
  */
-router.post("/liquidations/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
+router.post("/liquidations/:id", walletAuth, LendingController.executeLiquidation);
 
 /**
  * @openapi
@@ -520,7 +521,7 @@ router.post("/liquidations/:id", authHandler.authorizeRequest(), LendingControll
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/configure-asset", authHandler.authorizeRequest(), LendingController.configureAsset);
+router.post("/admin/configure-asset", walletAuth, LendingController.configureAsset);
 
 /**
  * @openapi
@@ -549,7 +550,7 @@ router.post("/admin/configure-asset", authHandler.authorizeRequest(), LendingCon
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/sweep-reserves", authHandler.authorizeRequest(), LendingController.sweepReserves);
+router.post("/admin/sweep-reserves", walletAuth, LendingController.sweepReserves);
 
 /**
  * @openapi
@@ -582,7 +583,7 @@ router.post("/admin/sweep-reserves", authHandler.authorizeRequest(), LendingCont
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-debt-ceilings", authHandler.authorizeRequest(), LendingController.setDebtCeilings);
+router.post("/admin/set-debt-ceilings", walletAuth, LendingController.setDebtCeilings);
 
 /**
  * @openapi
@@ -599,7 +600,7 @@ router.post("/admin/set-debt-ceilings", authHandler.authorizeRequest(), LendingC
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/pause", authHandler.authorizeRequest(), LendingController.pausePool);
+router.post("/admin/pause", walletAuth, LendingController.pausePool);
 
 /**
  * @openapi
@@ -616,7 +617,7 @@ router.post("/admin/pause", authHandler.authorizeRequest(), LendingController.pa
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/unpause", authHandler.authorizeRequest(), LendingController.unpausePool);
+router.post("/admin/unpause", walletAuth, LendingController.unpausePool);
 
 /**
  * @openapi
@@ -663,7 +664,7 @@ router.get("/safety/info/public", authHandler.authorizeRequest(true), SafetyCont
  *               type: object
  *               additionalProperties: true
  */
-router.post("/safety/stake", authHandler.authorizeRequest(), SafetyController.stake);
+router.post("/safety/stake", walletAuth, SafetyController.stake);
 
 /**
  * @openapi
@@ -680,7 +681,7 @@ router.post("/safety/stake", authHandler.authorizeRequest(), SafetyController.st
  *               type: object
  *               additionalProperties: true
  */
-router.post("/safety/cooldown", authHandler.authorizeRequest(), SafetyController.startCooldown);
+router.post("/safety/cooldown", walletAuth, SafetyController.startCooldown);
 
 /**
  * @openapi
@@ -709,7 +710,7 @@ router.post("/safety/cooldown", authHandler.authorizeRequest(), SafetyController
  *               type: object
  *               additionalProperties: true
  */
-router.post("/safety/redeem", authHandler.authorizeRequest(), SafetyController.redeem);
+router.post("/safety/redeem", walletAuth, SafetyController.redeem);
 
 /**
  * @openapi
@@ -726,7 +727,7 @@ router.post("/safety/redeem", authHandler.authorizeRequest(), SafetyController.r
  *               type: object
  *               additionalProperties: true
  */
-router.post("/safety/redeem-all", authHandler.authorizeRequest(), SafetyController.redeemAll);
+router.post("/safety/redeem-all", walletAuth, SafetyController.redeemAll);
 
 /**
  * @openapi

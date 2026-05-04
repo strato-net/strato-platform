@@ -56,6 +56,7 @@ packages:
 - libs/composable-monads/sql-monad
 - libs/composable-monads/notification-monad
 - libs/composable-monads/vault-monad
+- libs/composable-monads/codedb-monad
 - libs/ethereum-rlp
 - libs/format
 - libs/json-rpc-server

@@ -8,6 +8,7 @@ import { LiquidationEntry } from '@/context/LiquidationContext';
 import TokenIcon from '@/components/ui/TokenIcon';
 import PercentageButtons from '@/components/ui/PercentageButtons';
 import { useLiquidationContext } from '@/context/LiquidationContext';
+import { isTxSubmitted } from '@/utils/transactionStatus';
 import { parseUnits, formatUnits } from 'ethers';
 
 interface LiquidateModalProps {
@@ -172,7 +173,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
     try {
       const result = await executeLiquidation(loan.id, collateral.asset, repayWeiOrAll, minCollateralOutWei);
       // Check the actual transaction status, not just that the API call succeeded
-      if (result && result.status && result.status.toLowerCase() === 'success') {
+      if (result && isTxSubmitted(result.status)) {
         toast({ title: "Liquidation submitted", variant: "success" });
         onSuccess();
         onOpenChange(false);

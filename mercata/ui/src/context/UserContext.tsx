@@ -3,14 +3,16 @@
 // context/UserContext.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useAccount, useWalletClient } from "wagmi";
-import { api, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
+import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
+import { getStratoChainId } from "@/lib/stratoChain";
 
 interface UserContextType {
   userAddress: string | null;
   setUserAddress: (address: string | null) => void;
   isLoggedIn: boolean;
+  isAppAuthenticated: boolean;
   isAdmin: boolean;
   userName: string;
   logout: () => void;
@@ -207,11 +209,21 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const userAddress = account.isConnected && account.address ? account.address : stratoAddress;
   const effectiveLoggedIn = isLoggedIn || (account.isConnected && !!account.address);
 
+  setConnectedWalletAddress(account.isConnected && account.address ? account.address : null);
+
+  useEffect(() => {
+    setAppAuthenticated(isLoggedIn);
+  }, [isLoggedIn]);
+
   useEffect(() => {
     const connected = account.isConnected && account.address;
-    setConnectedWalletAddress(connected ? account.address : null);
     if (connected && walletClient) {
       setWalletSigner(async (unsignedTx: any) => {
+        const stratoChainId = getStratoChainId();
+        if (stratoChainId && walletClient.chain?.id !== stratoChainId) {
+          await walletClient.switchChain({ id: stratoChainId });
+        }
+
         const d = unsignedTx.data;
         return walletClient.signTypedData({
           domain: {
@@ -267,6 +279,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     setUserAddress,
     userName,
     isLoggedIn: effectiveLoggedIn,
+    isAppAuthenticated: isLoggedIn,
     isAdmin,
     logout,
     refreshAuth,
@@ -288,7 +301,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getContractDetails,
     contractDetailsResults,
     contractDetailsResultsLoading,
-  }), [userAddress, effectiveLoggedIn, isAdmin, loading, userName,
+  }), [userAddress, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,

@@ -1,6 +1,7 @@
 import { api } from "@/lib/axios";
 import { formatUnits } from "viem";
 import { safeBigInt } from "@/utils/numberUtils";
+import { isTxSubmitted } from "@/utils/transactionStatus";
 
 export interface Activity {
   activityId: number;
@@ -485,14 +486,27 @@ export const formatRoundedWithCommas = (value: string): string => {
   return formatWithCommas(value);
 };
 
+type RewardClaimResult = {
+  success: boolean;
+  txHash?: string;
+  status?: string;
+  hash?: string;
+};
+
+const normalizeRewardClaimResult = (data: RewardClaimResult): RewardClaimResult => ({
+  ...data,
+  success: data.success || isTxSubmitted(data.status),
+  txHash: data.txHash || data.hash,
+});
+
 /**
  * Claim all rewards for a user
  * Backend will handle the contract interaction
  */
-export const claimAllRewards = async (userAddress: string): Promise<{ success: boolean; txHash?: string }> => {
+export const claimAllRewards = async (userAddress: string): Promise<RewardClaimResult> => {
   try {
     const response = await api.post("/rewards/claim-all");
-    return response.data;
+    return normalizeRewardClaimResult(response.data);
   } catch (error: unknown) {
     // Extract error message from response if available
     const errorMessage = (error as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error 
@@ -506,7 +520,7 @@ export const claimAllRewards = async (userAddress: string): Promise<{ success: b
  * Claim rewards for specific activities
  * Backend will handle the contract interaction
  */
-export const claimRewards = async (userAddress: string, activityIds: number[]): Promise<{ success: boolean; txHash?: string }> => {
+export const claimRewards = async (userAddress: string, activityIds: number[]): Promise<RewardClaimResult> => {
   // Use the first activityId for the claim endpoint (since it's /claim/:activityId)
   // TODO: Update backend to accept multiple activityIds or call multiple times
   if (activityIds.length === 0) {
@@ -515,7 +529,7 @@ export const claimRewards = async (userAddress: string, activityIds: number[]): 
   
   try {
     const response = await api.post(`/rewards/claim/${activityIds[0]}`);
-    return response.data;
+    return normalizeRewardClaimResult(response.data);
   } catch (error: unknown) {
     // Extract error message from response if available
     const errorMessage = (error as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error 
@@ -547,5 +561,3 @@ export const fetchLeaderboard = async (
   const response = await api.get<LeaderboardResponse>("/rewards/leaderboard", { params });
   return response.data;
 };
-
-

@@ -10,6 +10,7 @@ import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
+import { isTxPending, isTxSubmitted } from "@/utils/transactionStatus";
 
 interface LiquidationsViewProps {
   guestMode?: boolean;
@@ -399,9 +400,9 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
       
       const result = await cdpService.liquidate(vault.asset, borrowerAddress, liquidationAmount);
       
-      if (result.status.toLowerCase() === "success") {
+      if (isTxSubmitted(result.status)) {
         toast({
-          title: "Liquidation Successful",
+          title: isTxPending(result.status) ? "Liquidation Submitted" : "Liquidation Successful",
           description: `Liquidated ${liquidationAmount} USDST. Tx: ${result.hash}`,
         });
         

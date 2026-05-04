@@ -104,24 +104,43 @@ instance TransactionLike Transaction where
 
   txChainId = chainId
 
+  txGasPrice MessageTX {} = 0
+  txGasPrice ContractCreationTX {} = 0
+  txGasPrice EthereumTX {..} = gasPrice
+
+  txValue MessageTX {} = 0
+  txValue ContractCreationTX {} = 0
+  txValue EthereumTX {..} = value
+
+  txTxData MessageTX {} = Nothing
+  txTxData ContractCreationTX {} = Nothing
+  txTxData EthereumTX {..} = Just txData
+
+  txTxVersion MessageTX {..} = Just txVersion
+  txTxVersion ContractCreationTX {..} = Just txVersion
+  txTxVersion EthereumTX {} = Nothing
+
   morphTx t = case txType t of
     Message
       | Just fn <- txFuncName t ->
-          MessageTX n gl (fromJust $ txDestination t) fn args network cid r s v 0
+          MessageTX n gl (fromJust $ txDestination t) fn args network cid r s v ver
       | otherwise ->
-          EthereumTX n 0 gl (txDestination t) 0 B.empty cid r s v
+          EthereumTX n gp gl (txDestination t) val (fromJust $ txTxData t) cid r s v
     ContractCreation
       | Just cn <- txContractName t ->
-          ContractCreationTX n gl cn args network (fromJust $ txCode t) cid r s v 0
+          ContractCreationTX n gl cn args network (fromJust $ txCode t) cid r s v ver
       | otherwise ->
-          EthereumTX n 0 gl Nothing 0 B.empty cid r s v
+          EthereumTX n gp gl Nothing val (fromJust $ txTxData t) cid r s v
     where
       n = txNonce t
+      gp = txGasPrice t
       gl = txGasLimit t
+      val = txValue t
       args = txArgs t
       network = txNetwork t
       cid = txChainId t
       (r, s, v) = txSignature t
+      ver = fromMaybe 0 $ txTxVersion t
 
 codePtrHash :: CodePtr -> Maybe Keccak256
 codePtrHash (ExternallyOwned k) = Just k
