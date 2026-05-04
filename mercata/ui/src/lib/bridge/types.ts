@@ -1,4 +1,5 @@
 import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, WithdrawalTransactionResponse, WithdrawalProof, DepositAction } from "@mercata/shared-types";
+import type { WalletTxProgressHandler } from "@/lib/axios";
 
 export interface BalanceResponse {
   balance: string;
@@ -7,6 +8,17 @@ export interface BalanceResponse {
 export interface BridgeResponse {
   success: boolean;
   data?: WithdrawalTransactionResponse;
+}
+
+export interface WithdrawalRequestOptions {
+  walletAuth?: boolean;
+  walletTxProgress?: WalletTxProgressHandler;
+  /**
+   * Coarse-grained progress for the proof-based bridge-out flow:
+   * fires when the STRATO request is submitted and again when the
+   * BridgeContext starts fetching the inclusion proof.
+   */
+  onProgress?: (phase: "submit_strato" | "fetch_proof") => void;
 }
 
 export type NetworkSummary = {
@@ -33,7 +45,7 @@ export type BridgeContextType = {
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
   requestWithdrawal: (
     params: WithdrawalRequestParams,
-    onProgress?: (phase: "submit_strato" | "fetch_proof") => void,
+    options?: WithdrawalRequestOptions,
   ) => Promise<BridgeResponse>;
   /**
    * Lookup proof for a specific predecessor seq when the user's own claim

@@ -14,6 +14,7 @@ import {
   BridgeResponse,
   NetworkSummary,
   BridgeContextType,
+  WithdrawalRequestOptions,
 } from "@/lib/bridge/types";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, WithdrawalTransactionResponse, WithdrawalProof, DepositAction } from "@mercata/shared-types";
 
@@ -286,9 +287,17 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const requestWithdrawal = useCallback(
     async (
       params: WithdrawalRequestParams,
-      onProgress?: (phase: "submit_strato" | "fetch_proof") => void,
+      options?: WithdrawalRequestOptions,
     ): Promise<BridgeResponse> => {
       setLoading(true);
+      const { walletAuth, walletTxProgress, onProgress } = options ?? {};
+      // Forward the wallet-signing fields onto the axios request config so
+      // the request-level interceptor can pick them up; strip onProgress,
+      // which is for *us* (coarse phase events for the bridge-out flow).
+      const axiosConfig =
+        walletAuth !== undefined || walletTxProgress !== undefined
+          ? ({ walletAuth, walletTxProgress } as any)
+          : undefined;
       onProgress?.("submit_strato");
       try {
         // Two response shapes are possible here:
@@ -310,7 +319,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           success: boolean;
           data: WithdrawalTransactionResponse;
           hashes?: string[];
-        }>(`/bridge/requestWithdrawal`, params);
+        }>(`/bridge/requestWithdrawal`, params, axiosConfig);
 
         if (Array.isArray(body?.hashes) && body.hashes.length > 0) {
           const proofTxHash = body.hashes[body.hashes.length - 1];
