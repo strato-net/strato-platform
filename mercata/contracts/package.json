@@ -6,7 +6,12 @@
     "scripts": {
         "configure:native-route": "node deploy/configure-native-route.js",
         "deploy": "node deploy/deploy.js",
+        "happy:eth-deposit": "node deploy/happy-eth-deposit.js",
+        "happy:eth-withdrawal": "node deploy/happy-eth-withdrawal.js",
+        "happy:native-redemption": "node deploy/happy-native-redemption.js",
+        "happy:native-withdrawal": "node deploy/happy-native-withdrawal.js",
         "initialize:native-bridge": "node deploy/initialize-native-bridge.js",
+        "smoke:native-bridge": "node deploy/smoke-native-bridge.js",
         "upgrade": "node deploy/upgrade.js",
         "bridge:ops": "node deploy/bridge-usdc-route-migration.js",
         "bridge:ops:testnet": "node deploy/bridge-usdc-route-migration.js --env testnet",

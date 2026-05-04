@@ -1,13 +1,22 @@
 # Native Bridge Deployment
 
-Simple deployment steps for the native bridge split across:
+This is the end-to-end install guide for a new native bridge deployment. Follow the numbered sections in order:
+1. `Naming`
+2. `STRATO`
+3. `Ethereum Sepolia`
+4. `Fresh Deployment Sequence`
+5. `Command Runbook`
+
+The `STRATO` and `Ethereum Sepolia` sections are the canonical fresh-deploy flow. The `Command Runbook` repeats the same operations with placeholder commands and includes upgrade/recovery commands for existing deployments.
+
+The native bridge is split across:
 - STRATO: `StratoNativeBridge` and `StratoNativeCustodyVault`
 - Ethereum Sepolia: `StratoNativeRepresentationBridge` and `StratoNativeRepresentationToken`
 
 ## Naming
 
 This guide uses different admin names on each side on purpose:
-- `ADMIN_REGISTRY` = STRATO owner/governance address (`0x000000000000000000000000000000000000100c`)
+- `ADMIN_REGISTRY` = STRATO owner/governance address
 - `SEPOLIA_ADMIN_SAFE` = Safe address passed into the Sepolia contracts as `admin`
 
 On STRATO in this guide:
@@ -36,7 +45,7 @@ Recommended meaning on STRATO:
 - `GUARDIAN` = pause address; this can also be `ADMIN_REGISTRY` if you do not want a separate guardian
 
 And have these contract addresses ready:
-- `ADMIN_REGISTRY` = `0x000000000000000000000000000000000000100c`
+- `ADMIN_REGISTRY`
 - `TOKEN_FACTORY`
 
 ### Step 1: Deploy a `Proxy` for `StratoNativeBridge`
@@ -57,8 +66,8 @@ Run from `mercata/contracts`:
 npm run upgrade -- \
   --proxy-address <STRATO_NATIVE_BRIDGE_PROXY> \
   --contract-name StratoNativeBridge \
-  --contract-file Bridge/StratoNativeBridge.sol \
-  --constructor-args '{"initialOwner":"000000000000000000000000000000000000100c"}' \
+  --contract-file BaseCodeCollection.sol \
+  --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' \
   +OVERRIDE-CHECKS
 ```
 
@@ -78,8 +87,8 @@ Run from `mercata/contracts`:
 npm run upgrade -- \
   --proxy-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> \
   --contract-name StratoNativeCustodyVault \
-  --contract-file Bridge/StratoNativeCustodyVault.sol \
-  --constructor-args '{"initialOwner":"000000000000000000000000000000000000100c"}' \
+  --contract-file BaseCodeCollection.sol \
+  --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' \
   +OVERRIDE-CHECKS
 ```
 
@@ -99,9 +108,11 @@ npm run initialize:native-bridge -- \
 For the simplest governance-driven STRATO setup, this is valid:
 
 ```text
-BRIDGE_OPERATOR = <testnet relayer address>
-GUARDIAN = 0x000000000000000000000000000000000000100c
+BRIDGE_OPERATOR = <bridge service STRATO address for BA_USERNAME>
+GUARDIAN = <ADMIN_REGISTRY>
 ```
+
+`BRIDGE_OPERATOR` is the STRATO account that the bridge service uses for runtime STRATO writes. It must match the address for the deployed service's `BA_USERNAME` credentials. If this is set to a deployer, test relayer, or stale service account, native withdrawals will be picked up by the service but fail with `SNB: not bridge operator`.
 
 This calls:
 - `StratoNativeBridge.initialize(_tokenFactory, _custodyVault, _bridgeOperator, _guardian)`
@@ -112,6 +123,8 @@ Important:
 - if `owner = ADMIN_REGISTRY`, the STRATO helper scripts are expected to work through owner/governance semantics
 
 ### Step 6: Configure the STRATO native route
+
+Run this after the Sepolia representation token and bridge proxies exist, because this route points at those Sepolia addresses.
 
 Run from `mercata/contracts`:
 
@@ -133,6 +146,39 @@ Notes:
 - `external-bridge` must be the Sepolia `StratoNativeRepresentationBridge` proxy
 - `representation-token` must be the Sepolia `StratoNativeRepresentationToken` proxy
 
+### Step 7: Whitelist the custody vault for paused STRATO token moves
+
+For native bridge-out, `StratoNativeBridge.requestWithdrawal(...)` calls the custody vault, and the vault calls `Token.transferFrom(...)` to pull the STRATO token from the withdrawer.
+
+For native bridge-in, `StratoNativeBridge.confirmDeposit(...)` calls the custody vault, and the vault calls `Token.transfer(...)` to unlock the STRATO token to the recipient.
+
+If the STRATO token is paused, both token moves require the custody vault to be whitelisted in `AdminRegistry`.
+
+Execute these STRATO governance actions:
+
+```text
+AdminRegistry.addWhitelist(<STRATO_NATIVE_TOKEN>, "transferFrom", <STRATO_NATIVE_CUSTODY_VAULT_PROXY>)
+AdminRegistry.addWhitelist(<STRATO_NATIVE_TOKEN>, "transfer", <STRATO_NATIVE_CUSTODY_VAULT_PROXY>)
+```
+
+Transaction-builder template:
+
+```text
+target: <ADMIN_REGISTRY>
+method: addWhitelist(address _target, string _func, address _user)
+args:
+  _target: <STRATO_NATIVE_TOKEN>
+  _func: transferFrom
+  _user: <STRATO_NATIVE_CUSTODY_VAULT_PROXY>
+
+target: <ADMIN_REGISTRY>
+method: addWhitelist(address _target, string _func, address _user)
+args:
+  _target: <STRATO_NATIVE_TOKEN>
+  _func: transfer
+  _user: <STRATO_NATIVE_CUSTODY_VAULT_PROXY>
+```
+
 ## Ethereum Sepolia
 
 ### Prereqs
@@ -149,11 +195,12 @@ Note:
 
 Also decide:
 - `SEPOLIA_ADMIN_SAFE`
-- `BRIDGE_OPERATOR`
+- `STRATO_VAULT_BACKED_SIGNER` address(es)
+- native mint attestation threshold
 
 Recommended meaning on Sepolia:
 - `SEPOLIA_ADMIN_SAFE` = Safe address
-- `BRIDGE_OPERATOR` = relayer/operator address that will mint representations after verified STRATO withdrawals
+- `STRATO_VAULT_BACKED_SIGNER` = address recovered from STRATO vault-backed native mint attestations
 
 And have ready:
 - `STRATO_TOKEN` (the STRATO-side native token address this route represents)
@@ -212,10 +259,12 @@ Saved batch file:
 
 This batch does:
 - on `StratoNativeRepresentationToken`, `grantRole(BRIDGE_ROLE, <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)`
-- on `StratoNativeRepresentationBridge`, `grantRole(BRIDGE_OPERATOR_ROLE, <BRIDGE_OPERATOR>)`
+- on `StratoNativeRepresentationBridge`, `setAttestationSigner(<STRATO_VAULT_BACKED_SIGNER>, true)` for each native mint attestation signer
+- on `StratoNativeRepresentationBridge`, `setAttestationThreshold(<native mint attestation threshold>)`
+- on `StratoNativeRepresentationBridge`, optionally `setMaxAttestationValiditySeconds(<seconds>)` if the default 7 day maximum validity should change
 - on `StratoNativeRepresentationBridge`, `registerTokenMapping(<STRATO_TOKEN>, <SEPOLIA_REPRESENTATION_TOKEN_PROXY>, false)`
 
-`BRIDGE_OPERATOR` here is the Sepolia-side relayer/operator address.
+Normal instant mint execution submits vault-signed `NativeMintAttestation` payloads through `mintRepresentationWithAttestation`. The Sepolia representation bridge does not need a hot mint operator role.
 
 ### Step 5: Optional verify
 
@@ -234,7 +283,9 @@ Verification is optional for bridge setup. It is not required to continue if:
 Fastest checks:
 - Safe shows the full batch executed successfully
 - on the token proxy, `hasRole(BRIDGE_ROLE, <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)` returns `true`
-- on the bridge proxy, `hasRole(BRIDGE_OPERATOR_ROLE, <BRIDGE_OPERATOR>)` returns `true`
+- on the bridge proxy, `attestationSigners(<STRATO_VAULT_BACKED_SIGNER>)` returns `true`
+- on the bridge proxy, `attestationThreshold()` returns the configured native mint attestation threshold
+- on the bridge proxy, `maxAttestationValiditySeconds()` returns the configured maximum attestation validity
 - on the bridge proxy, `stratoToRepresentation(<STRATO_TOKEN>)` returns `<SEPOLIA_REPRESENTATION_TOKEN_PROXY>`
 
 ### Step 7: Update bridge service config
@@ -243,11 +294,22 @@ Before running the native flow end to end, update the bridge service environment
 - `STRATO_NATIVE_BRIDGE_ADDRESS=<STRATO_NATIVE_BRIDGE_PROXY>`
 - `CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>`
 - `CHAIN_11155111_RPC_URL=<sepolia-rpc-url>` if it is not already configured
-- ensure the relayer/operator address used on STRATO and Sepolia is the same `BRIDGE_OPERATOR` address
+- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY=<destination-native-bridge-key>` for paying gas and signing native mint attestations
+- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2=<additional-signer-key>` and higher numbered keys if the destination bridge attestation threshold is greater than `1`
+
+Confirm that `StratoNativeBridge` has the bridge service STRATO address configured as its bridge operator before starting native withdrawals. The operator must be the STRATO address for the same `BA_USERNAME` account running the service.
+
+The instant withdrawal review window is configured on `StratoNativeBridge` with `setInstantWithdrawalDelaySeconds`. The attestation maximum validity window is configured on `StratoNativeRepresentationBridge` with `setMaxAttestationValiditySeconds`.
 
 If the bridge service is deployed through `docker-compose.bridge.tpl.yml`, these values must be present in the runtime env file used by Compose as well. The template now forwards:
 - `STRATO_NATIVE_BRIDGE_ADDRESS`
 - `CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`
+- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY`
+- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2` through `_5`
+
+The bridge service now has a native mint path:
+- instant withdrawals move to `PENDING_REVIEW`, wait until the STRATO contract-provided `nativeMintNotBefore`, sign the EIP-712 `NativeMintAttestation`, submit `mintRepresentationWithAttestation(attestation, signatures)` with the chain-specific native bridge key, wait for a successful destination receipt, then record the destination tx hash on STRATO
+- approval-lane withdrawals sign the same attestation, propose `mintRepresentationWithAttestation(attestation, signatures)` to the configured Safe, persist the Safe tx hash on STRATO, and later record the destination tx hash after Safe execution
 
 The existing bridge service still also requires its normal Safe envs:
 - `SAFE_ADDRESS`
@@ -261,20 +323,325 @@ After env/config changes, restart the bridge service so it picks up:
 - the Sepolia native representation bridge address
 - the relayer/operator credentials and RPC settings
 
-## Recommended Order
+## Fresh Deployment Sequence
 
-1. Deploy STRATO bridge proxy
-2. Upgrade STRATO bridge proxy
-3. Deploy STRATO vault proxy
-4. Upgrade STRATO vault proxy
-5. Deploy Sepolia token proxy
-6. Deploy Sepolia bridge proxy
-7. Initialize STRATO bridge + vault
-8. Execute the Sepolia Safe batch
-9. Confirm the Safe batch worked
-10. Configure the STRATO route to point at Sepolia
-11. Update bridge service config/env
-12. Restart or redeploy the bridge service
+For a new deployment, run these in order. Each item is covered by the detailed sections above and by concrete commands in the runbook below.
+
+1. Collect STRATO and Sepolia admin addresses from `Naming`.
+2. Prepare the STRATO `.env` in `mercata/contracts`.
+3. Deploy the STRATO `StratoNativeBridge` proxy.
+4. Upgrade the STRATO bridge proxy to `StratoNativeBridge`.
+5. Deploy the STRATO `StratoNativeCustodyVault` proxy.
+6. Upgrade the STRATO vault proxy to `StratoNativeCustodyVault`.
+7. Initialize the STRATO bridge and vault.
+8. Prepare the Sepolia `.env` in `mercata/ethereum`.
+9. Run `npm ci` and `npm run compile` in `mercata/ethereum`.
+10. Deploy the Sepolia `StratoNativeRepresentationToken` proxy.
+11. Deploy the Sepolia `StratoNativeRepresentationBridge` proxy.
+12. Verify the Sepolia bridge proxy EIP-712 domain returns `StratoNativeRepresentationBridge` and version `1`.
+13. Execute the Sepolia Safe admin batch: token bridge role, attestation signer, threshold, optional attestation validity, and token mapping.
+14. Confirm the Sepolia Safe batch worked.
+15. Configure the STRATO native route to point at the Sepolia representation bridge and token proxies.
+16. Whitelist the STRATO custody vault for paused-token `transferFrom` and `transfer`.
+17. Update bridge service config/env.
+18. Restart or redeploy the bridge service.
+19. Run the native bridge smoke check.
+
+## Command Runbook
+
+The examples below are templates. Keep environment-specific addresses, amounts, Safe payloads, and saved deployment outputs in local deployment notes outside this committed runbook.
+
+### STRATO: Deploy or Update Native Bridge Contracts
+
+Run from `mercata/contracts`.
+
+If the native bridge and custody vault proxies already exist, upgrade them to the current implementations:
+
+```bash
+npm run upgrade -- \
+  --proxy-address <STRATO_NATIVE_BRIDGE_PROXY> \
+  --contract-name StratoNativeBridge \
+  --contract-file BaseCodeCollection.sol \
+  --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' \
+  +OVERRIDE-CHECKS
+```
+
+```bash
+npm run upgrade -- \
+  --proxy-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> \
+  --contract-name StratoNativeCustodyVault \
+  --contract-file BaseCodeCollection.sol \
+  --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' \
+  +OVERRIDE-CHECKS
+```
+
+For a fresh proxy deployment, deploy the proxies first, record their addresses, then run the same upgrade commands with the new proxy addresses.
+
+### STRATO: Initialize Bridge and Vault
+
+Run once after fresh proxy deployment or after deploying replacement proxies:
+
+```bash
+npm run initialize:native-bridge -- \
+  --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> \
+  --vault-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> \
+  --token-factory <TOKEN_FACTORY> \
+  --bridge-operator <BRIDGE_OPERATOR> \
+  --guardian <GUARDIAN>
+```
+
+### STRATO: Configure or Update Native Route
+
+Run this after the external-chain representation bridge and token proxies are known:
+
+```bash
+npm run configure:native-route -- \
+  --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> \
+  --external-chain-id 11155111 \
+  --external-bridge <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY> \
+  --representation-token <SEPOLIA_REPRESENTATION_TOKEN_PROXY> \
+  --external-name "<EXTERNAL_NAME>" \
+  --external-symbol <EXTERNAL_SYMBOL> \
+  --max-per-withdrawal <MAX_PER_WITHDRAWAL> \
+  --instant-withdrawal-threshold <INSTANT_WITHDRAWAL_THRESHOLD> \
+  --strato-token <STRATO_NATIVE_TOKEN> \
+  --enabled true
+```
+
+Use `--enabled false` to disable the STRATO-side route without changing the rest of the route metadata.
+
+### STRATO: Whitelist Custody Vault for Paused Tokens
+
+Native bridge-out pulls the STRATO token into `StratoNativeCustodyVault` using `Token.transferFrom(...)`. Native bridge-in unlocks the STRATO token from custody using `Token.transfer(...)`. If the STRATO token is paused, the token contract requires the custody vault caller to be whitelisted in `AdminRegistry` for both functions.
+
+Execute these STRATO governance actions before native bridge testing:
+
+```text
+target: <ADMIN_REGISTRY>
+method: addWhitelist(address _target, string _func, address _user)
+args:
+  _target: <STRATO_NATIVE_TOKEN>
+  _func: transferFrom
+  _user: <STRATO_NATIVE_CUSTODY_VAULT_PROXY>
+
+target: <ADMIN_REGISTRY>
+method: addWhitelist(address _target, string _func, address _user)
+args:
+  _target: <STRATO_NATIVE_TOKEN>
+  _func: transfer
+  _user: <STRATO_NATIVE_CUSTODY_VAULT_PROXY>
+```
+
+Meaning:
+- `_target` = STRATO token being bridged
+- `_func` = `transferFrom` for bridge-out lock, `transfer` for bridge-in unlock
+- `_user` = `StratoNativeCustodyVault` proxy
+
+### STRATO: Update Runtime Config
+
+These are owner-governed STRATO calls. If you need to change them after deployment, execute the corresponding transaction through the STRATO owner/governance path:
+
+```text
+StratoNativeBridge.setInstantWithdrawalDelaySeconds(<seconds>)
+StratoNativeBridge.setBridgeOperator(<new-bridge-operator>)
+StratoNativeBridge.setGuardian(<new-guardian>)
+StratoNativeBridge.setPause(<depositsPaused>, <withdrawalsPaused>)
+StratoNativeBridge.setTokenFactory(<new-token-factory>)
+StratoNativeBridge.setCustodyVault(<new-custody-vault>)
+StratoNativeCustodyVault.setBridge(<new-bridge>)
+StratoNativeCustodyVault.setGuardian(<new-guardian>)
+StratoNativeCustodyVault.setPause(<paused>)
+```
+
+Use `setBridgeOperator(<bridge-service-strato-address>)` when rotating or correcting the service runtime account. This is a security-sensitive role and should remain owner/governance controlled for production; do not make it an instant admin action by default.
+
+A typical instant review delay update would target:
+
+```text
+to: <STRATO_NATIVE_BRIDGE_PROXY>
+method: setInstantWithdrawalDelaySeconds(uint256)
+args: <INSTANT_WITHDRAWAL_DELAY_SECONDS>
+```
+
+### Sepolia: Deploy New Representation Contracts
+
+Run from `mercata/ethereum`.
+
+Deploy the representation token proxy:
+
+```bash
+CONTRACT_NAME=StratoNativeRepresentationToken \
+INIT_PARAMS='["<EXTERNAL_NAME>","<EXTERNAL_SYMBOL>","<SEPOLIA_ADMIN_SAFE>"]' \
+npm run deployWithProxy:sepolia
+```
+
+Deploy the representation bridge proxy:
+
+```bash
+CONTRACT_NAME=StratoNativeRepresentationBridge \
+INIT_PARAMS='["<SEPOLIA_ADMIN_SAFE>"]' \
+npm run deployWithProxy:sepolia
+```
+
+Record both proxy and implementation addresses printed by the scripts.
+
+### Sepolia: Deploy New Implementations for Upgrades
+
+When proxies already exist and you only need new implementations:
+
+```bash
+CONTRACT_NAME=StratoNativeRepresentationToken npm run deployImpl:sepolia
+```
+
+```bash
+CONTRACT_NAME=StratoNativeRepresentationBridge npm run deployImpl:sepolia
+```
+
+Then execute the UUPS upgrade from the Safe admin:
+
+```text
+target: <SEPOLIA_REPRESENTATION_TOKEN_PROXY or SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: upgradeToAndCall(address newImplementation, bytes data)
+args:
+  newImplementation: <NEW_IMPLEMENTATION_ADDRESS>
+  data: 0x
+```
+
+After deploying or upgrading `StratoNativeRepresentationBridge`, verify the EIP-712 domain on the proxy before testing native withdrawals:
+
+```text
+target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: eip712Domain()
+expected:
+  name: StratoNativeRepresentationBridge
+  version: 1
+  chainId: 11155111
+  verifyingContract: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+```
+
+If `name` or `version` are empty on an existing proxy, native withdrawal minting will fail with `BadAttestationSignatures()` even when the attestation signer is enabled. Fix the proxy by temporarily deploying an implementation that exposes an admin-only reinitializer:
+
+```solidity
+/// @custom:oz-upgrades-validate-as-initializer
+function initializeEIP712Domain() external onlyRole(DEFAULT_ADMIN_ROLE) reinitializer(2) {
+    __EIP712_init("StratoNativeRepresentationBridge", "1");
+}
+```
+
+Then upgrade from the Safe admin and call the reinitializer in the same UUPS transaction:
+
+```text
+target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: upgradeToAndCall(address newImplementation, bytes data)
+args:
+  newImplementation: <TEMP_EIP712_REINITIALIZER_IMPLEMENTATION>
+  data: 0xf37e869c
+```
+
+`0xf37e869c` is `initializeEIP712Domain()`. After the proxy domain is correct, remove the temporary reinitializer from source before the next normal implementation deployment.
+
+### Sepolia: Safe Admin Config Calls
+
+Execute these from `SEPOLIA_ADMIN_SAFE` after fresh deploy or whenever config changes.
+
+Token grants bridge mint/burn permission:
+
+```text
+target: <SEPOLIA_REPRESENTATION_TOKEN_PROXY>
+method: grantRole(bytes32 role, address account)
+args:
+  role: <BRIDGE_ROLE>
+  account: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+```
+
+Representation bridge signer and threshold config:
+
+```text
+target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: setAttestationSigner(address signer, bool enabled)
+args:
+  signer: <native-bridge-signer-address>
+  enabled: true
+```
+
+`signer` must be the address recovered from the bridge service's `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY`. If multiple numbered signer keys are configured (`CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2`, etc.), each signer needed to satisfy the threshold must be enabled. If the service signs with a key that is not enabled here, native withdrawal minting fails on Sepolia with `BadAttestationSignatures()`.
+
+```text
+target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: setAttestationThreshold(uint8 threshold)
+args:
+  threshold: <required-signature-count>
+```
+
+```text
+target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: setMaxAttestationValiditySeconds(uint256 validitySeconds)
+args:
+  validitySeconds: <MAX_ATTESTATION_VALIDITY_SECONDS>
+```
+
+Representation mapping:
+
+```text
+target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: registerTokenMapping(address stratoToken, address representationToken, bool freezeRoute)
+args:
+  stratoToken: <STRATO_NATIVE_TOKEN>
+  representationToken: <SEPOLIA_REPRESENTATION_TOKEN_PROXY>
+  freezeRoute: <FREEZE_ROUTE>
+```
+
+Other useful Safe admin calls:
+
+```text
+StratoNativeRepresentationBridge.disableTokenMapping(<STRATO_TOKEN>)
+StratoNativeRepresentationBridge.freezeTokenMapping(<STRATO_TOKEN>)
+StratoNativeRepresentationBridge.pause()
+StratoNativeRepresentationBridge.unpause()
+StratoNativeRepresentationBridge.setMintPaused(<paused>)
+StratoNativeRepresentationBridge.setRedemptionsPaused(<paused>)
+StratoNativeRepresentationBridge.migrateTokenMapping(<STRATO_TOKEN>, <NEW_REPRESENTATION_TOKEN>, <freezeRoute>)
+StratoNativeRepresentationToken.grantRole(<role>, <account>)
+StratoNativeRepresentationToken.revokeRole(<role>, <account>)
+```
+
+### Sepolia: Safe Transaction Builder JSON
+
+Use Safe Transaction Builder if the UI cannot build the batch directly. Keep address-filled JSON payloads in local deployment notes, not in this committed runbook.
+
+### Bridge Service Env
+
+Set:
+
+```bash
+STRATO_NATIVE_BRIDGE_ADDRESS=<STRATO_NATIVE_BRIDGE_PROXY>
+CHAIN_11155111_RPC_URL=<sepolia-rpc-url>
+CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY=<key-for-signer-and-gas>
+```
+
+If `attestationThreshold()` is greater than `1`, add enough enabled signer keys:
+
+```bash
+CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2=<second-signer-key>
+CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_3=<third-signer-key>
+```
+
+Each configured private key must recover to a signer enabled through `setAttestationSigner`. The bridge service validates at startup that all configured keys are enabled on the destination bridge and that enough enabled keys exist to satisfy `attestationThreshold()`.
+
+### Validation Commands
+
+Run the read-only smoke check:
+
+```bash
+npm run smoke:native-bridge -- --external-chain-id 11155111
+```
+
+Run the native redemption happy path script after both sides and the bridge service are configured:
+
+```bash
+npm run happy:native-redemption
+```
 
 ## Known Script Behavior
 
@@ -283,14 +650,14 @@ After env/config changes, restart the bridge service so it picks up:
 
 ## Addresses To Save
 
-Keep these in your deployment notes or `.env`:
-- `STRATO_NATIVE_BRIDGE_PROXY`  0x49f69252b00235030a4dcd4c7ef17a64ef346258
-- `STRATO_NATIVE_CUSTODY_VAULT_PROXY`  0x8cfe7b576f69260673e9a1a9517137f12a49ed93
-- `SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY` 0x80f6497E8F8700c89B3A0B030C3e71aa874f6CF7
-- `SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_IMPL` 0x13037f8793ac6bFf3a9764e70Ec3650a16A5E525
-- `SEPOLIA_REPRESENTATION_TOKEN_PROXY` 0x9Cd7eeF7c43d1c00f4ebb5619D60101eede94087 (for STRATO)
-- `SEPOLIA_REPRESENTATION_TOKEN_IMPL` 0x47Fb6e8B371B25A06dDa608F1bC79fA2a135096E (for STRATO)
-- `BRIDGE_OPERATOR` 0x8F7915BA636668542b48C6652868313b15A59496
-- `SEPOLIA_ADMIN_SAFE` 0x8713850E9fF0fd0200ce87C32E3cdB24eD021631
-- `GUARDIAN` 0x000000000000000000000000000000000000100c (can be a different address as well)
-- `STRATO_TOKEN_ADDRESS` 0x2680dc6693021cd3fefb84351570874fbef8332a (for STRATO)
+Keep these in local deployment notes or environment-specific secret/config storage:
+- `STRATO_NATIVE_BRIDGE_PROXY`
+- `STRATO_NATIVE_CUSTODY_VAULT_PROXY`
+- `SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY`
+- `SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_IMPL`
+- `SEPOLIA_REPRESENTATION_TOKEN_PROXY`
+- `SEPOLIA_REPRESENTATION_TOKEN_IMPL`
+- `BRIDGE_OPERATOR` (runtime operator for `StratoNativeBridge`)
+- `SEPOLIA_ADMIN_SAFE`
+- `GUARDIAN`
+- `STRATO_TOKEN_ADDRESS`
