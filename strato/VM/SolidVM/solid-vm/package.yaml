@@ -39,6 +39,7 @@ library:
   - galois-field
   - labeled-error
   - lens
+  - memory
   - merkle-patricia-db
   - monad-alter
   - nibblestring

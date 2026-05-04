@@ -28,19 +28,15 @@
 -- end-to-end test against §J.9.1 reference vectors is what catches
 -- any remaining typos.
 --
--- == Verification status
+-- == Verification
 --
--- Tested byte-exact against RFC 9380 §J.9.1 vector for @msg = ""@: the
--- per-stage Q0/Q1 outputs and the final hash_to_curve P all match. This
--- is strong evidence the algorithm and all 53 isogeny coefficients are
--- correct (a single transcription error in any constant would have
--- produced a different result).
---
--- Vectors for the other §J.9.1 messages (@"abc"@, @"abcdef0123456789"@,
--- and the two long messages) need to be cross-checked. The remaining
--- vectors require the @hash_to_field@ machinery (XMD:SHA-256 +
--- expand_message) to derive their u values; once that lands those tests
--- become trivial. Until then, ship + monitor.
+-- Cross-checked byte-exact against RFC 9380 §J.9.1 reference vectors
+-- (msgs @""@, @"abc"@, @"abcdef0123456789"@) end-to-end: the test
+-- suite drives hash_to_curve from each message string via
+-- 'Blockchain.SolidVM.BLS12381.HashToCurve.HashToField.hashToFieldFp'
+-- and compares the final P to the RFC's published value. Matching at
+-- this level means every isogeny coefficient, the simplified-SWU
+-- formula, and the cofactor multiplication are all correct.
 module Blockchain.SolidVM.BLS12381.HashToCurve.G1
   ( -- * Public entry point
     mapFpToG1Pt,

@@ -11,6 +11,17 @@
 -- regression in the byte layout is caught immediately.
 module BLS12381Spec (spec) where
 
+import Blockchain.SolidVM.BLS12381.HashToCurve.G1
+  ( clearCofactorG1,
+    isoMapG1,
+    simplifiedSwuG1Iso,
+  )
+import Blockchain.SolidVM.BLS12381.HashToCurve.G2
+  ( clearCofactorG2,
+    isoMapG2,
+    simplifiedSwuG2Iso,
+  )
+import Blockchain.SolidVM.BLS12381.HashToCurve.HashToField (hashToFieldFp, hashToFieldFp2)
 import Blockchain.SolidVM.Builtins
   ( bls12381G1Add,
     bls12381G1AddInts,
@@ -24,6 +35,8 @@ import Blockchain.SolidVM.Builtins
     bls12381PairingInts,
     mapFpToG1,
   )
+import qualified Data.ByteString.Char8 as BC
+import Data.Curve.Weierstrass (add, dbl)
 
 import Data.Bits (shiftR)
 import qualified Data.ByteString as B
@@ -32,7 +45,7 @@ import qualified Data.Curve.Weierstrass.BLS12381 as G1Curve
 import Data.Curve.Weierstrass.BLS12381T () -- instance imports for Fq2 / G2 typeclasses
 import Data.Curve.Weierstrass (Point (..), gen, mul)
 import Data.Pairing.BLS12381 (Fq2)
-import GHC.Exts (IsList (toList))
+import GHC.Exts (IsList (fromList, toList))
 import Test.Hspec
 
 -- Local alias so the tests below can reference the byte-form map_to_curve
@@ -320,6 +333,79 @@ spec = do
             Nothing -> error ("map failed for u = " ++ show u)
         )
         [1, 2, 7, 0xdeadbeef, 0x123456789abcdef0]
+
+  -- Full hash_to_curve driven from message strings via expand_message_xmd
+  -- + hash_to_field. RFC 9380 §J.9.1 publishes the final P for several
+  -- messages; we reproduce them here byte-exact, which exercises every
+  -- stage end-to-end (XMD, hash_to_field, simplified-SWU, 11-isogeny,
+  -- cofactor clear, group addition).
+  describe "hash_to_curve(BLS12381G1_XMD:SHA-256_SSWU_RO_) RFC 9380 §J.9.1" $ do
+    let dst = BC.pack "QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_"
+        pInt = 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab
+        safeAdd a b = if a == b then dbl a else add a b
+        mapPt u = isoMapG1 (simplifiedSwuG1Iso (fromInteger u :: G1Curve.Fq))
+        hashToCurve msg =
+          let [u0, u1] = hashToFieldFp (BC.pack msg) dst 2 64 pInt
+              q0 = mapPt u0
+              q1 = mapPt u1
+           in clearCofactorG1 (safeAdd q0 q1)
+        check msg expX expY =
+          case hashToCurve msg of
+            O -> error (msg ++ ": got point at infinity")
+            A x y ->
+              (toInteger x, toInteger y) `shouldBe` (expX, expY)
+
+    it "msg = \"\"" $
+      check
+        ""
+        0x052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a1
+        0x08ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265
+
+    it "msg = \"abc\"" $
+      check
+        "abc"
+        0x03567bc5ef9c690c2ab2ecdf6a96ef1c139cc0b2f284dca0a9a7943388a49a3aee664ba5379a7655d3c68900be2f6903
+        0x0b9c15f3fe6e5cf4211f346271d7b01c8f3b28be689c8429c85b67af215533311f0b8dfaaa154fa6b88176c229f2885d
+
+    it "msg = \"abcdef0123456789\"" $
+      check
+        "abcdef0123456789"
+        0x11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d98
+        0x03a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709
+
+  -- Same end-to-end shape as the G1 tests, but for the G2 suite
+  -- (BLS12381G2_XMD:SHA-256_SSWU_RO_). Drives the full pipeline from
+  -- a message string: hash_to_field → simplified-SWU on E'_iso2 →
+  -- 3-isogeny → cofactor clear → group-add of two map outputs.
+  describe "hash_to_curve(BLS12381G2_XMD:SHA-256_SSWU_RO_) RFC 9380 §J.10.1" $ do
+    let dst = BC.pack "QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_"
+        pInt = 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab
+        safeAdd a b = if a == b then dbl a else add a b
+        mkFp2' :: Integer -> Integer -> Fq2
+        mkFp2' c0 c1 = fromList [fromInteger c0, fromInteger c1]
+        mapPt (c0, c1) = isoMapG2 (simplifiedSwuG2Iso (mkFp2' c0 c1))
+        toPair e = case toList e of
+          [] -> (0, 0)
+          [a] -> (toInteger a, 0)
+          (a : b : _) -> (toInteger a, toInteger b)
+        hashToCurve msg =
+          let [u0, u1] = hashToFieldFp2 (BC.pack msg) dst 2 64 pInt
+              q0 = mapPt u0
+              q1 = mapPt u1
+           in clearCofactorG2 (safeAdd q0 q1)
+        check msg expXc0 expXc1 expYc0 expYc1 =
+          case hashToCurve msg of
+            O -> error (msg ++ ": got point at infinity")
+            A x y ->
+              (toPair x, toPair y) `shouldBe` ((expXc0, expXc1), (expYc0, expYc1))
+
+    it "msg = \"\"" $
+      check
+        ""
+        0x0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a
+        0x05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d
+        0x0503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92
+        0x12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d6
 
 isLeft :: Either a b -> Bool
 isLeft (Left _) = True
