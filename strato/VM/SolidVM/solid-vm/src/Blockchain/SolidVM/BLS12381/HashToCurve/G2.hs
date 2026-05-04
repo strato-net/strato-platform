@@ -35,6 +35,12 @@ module Blockchain.SolidVM.BLS12381.HashToCurve.G2
     -- * Useful constants for verification
     g2IsoA,
     g2IsoB,
+
+    -- * F_p^2 primitives (used by the compression / decompression module)
+    mkFp2,
+    fp2Pair,
+    sqrtFp2,
+    isSquareFp2,
   )
 where
 

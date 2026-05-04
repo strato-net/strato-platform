@@ -57,6 +57,16 @@ module Blockchain.SolidVM.Builtins
     --   @"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"@ as @dst@.
     hashToCurveG1,
     hashToCurveG2,
+
+    -- * Point compression / decompression (IETF / ZCash format)
+    --
+    --   Beacon-chain APIs return BLS points in their compressed form
+    --   (G1: 48 bytes, G2: 96 bytes). EIP-2537 / SolidVM precompiles
+    --   consume the uncompressed forms (G1: 128 bytes, G2: 256 bytes).
+    --   These bridge the two so contracts can take what the wire
+    --   provides and feed it into 'bls12381Pairing' directly.
+    decompressG1,
+    decompressG2,
   )
 where
 
@@ -71,6 +81,10 @@ import Blockchain.SolidVM.BLS12381
     bls12381G2MsmInts,
     bls12381Pairing,
     bls12381PairingInts,
+  )
+import Blockchain.SolidVM.BLS12381.Compress
+  ( decompressG1,
+    decompressG2,
   )
 import Blockchain.SolidVM.BLS12381.HashToCurve
   ( hashToCurveG1,

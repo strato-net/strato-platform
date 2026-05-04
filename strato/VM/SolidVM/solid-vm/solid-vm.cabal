@@ -18,6 +18,7 @@ library
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
       Blockchain.SolidVM.BLS12381
+      Blockchain.SolidVM.BLS12381.Compress
       Blockchain.SolidVM.BLS12381.HashToCurve
       Blockchain.SolidVM.BLS12381.HashToCurve.G1
       Blockchain.SolidVM.BLS12381.HashToCurve.G2
@@ -113,6 +114,7 @@ test-suite solid-vm-spec
     , aeson
     , async
     , base
+    , base16-bytestring
     , blockDB
     , blockapps-data
     , blockapps-datadefs

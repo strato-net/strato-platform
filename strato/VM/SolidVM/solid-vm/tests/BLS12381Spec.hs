@@ -34,10 +34,13 @@ import Blockchain.SolidVM.Builtins
     bls12381G2MsmInts,
     bls12381Pairing,
     bls12381PairingInts,
+    decompressG1,
+    decompressG2,
     hashToCurveG1,
     hashToCurveG2,
     mapFpToG1,
   )
+import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BC
 import Data.Curve.Weierstrass (add, dbl)
 import qualified Data.Word as W
@@ -451,6 +454,70 @@ spec = do
           , 0x12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d6
           )
         )
+
+  -- Compression / decompression covers the wire format Ethereum uses
+  -- (IETF / ZCash; same format the beacon-chain APIs return). These
+  -- vectors were captured from a live Sepolia beacon node so the test
+  -- doubles as a real-world interop check.
+  describe "bls12381DecompressG1" $ do
+    let unhex h = case Base16.decode (BC.pack h) of
+          Right r -> r
+          Left _ -> error ("bad hex: " ++ h)
+
+    it "rejects wrong-length input" $
+      decompressG1 (B.replicate 47 0) `shouldSatisfy` isLeft
+
+    it "rejects compression flag clear (uncompressed-format input)" $
+      decompressG1 (B.cons 0x40 (B.replicate 47 0)) `shouldSatisfy` isLeft
+
+    it "rejects infinity-flag + sign-flag combination" $
+      -- 0xe0 = bits 7,6,5 all set
+      decompressG1 (B.cons 0xe0 (B.replicate 47 0)) `shouldSatisfy` isLeft
+
+    it "decodes the point at infinity to the all-zero EIP-2537 G1" $
+      -- 0xc0 = bits 7,6 set, bit 5 clear
+      decompressG1 (B.cons 0xc0 (B.replicate 47 0)) `shouldBe` Right (B.replicate g1Size 0)
+
+    it "decompresses a real Sepolia sync-committee pubkey to a 128-byte EIP-2537 G1" $ do
+      -- Sync committee #0 pubkey from period 1242 on Sepolia (2026-05-04)
+      let pk = unhex "9203acd34ebb3ff76268f9fe68f066a48a3f518686ae0f2230b322e19435ccfc4f208e5ba5a39cb2a409292c48a37c22"
+      decompressG1 pk `shouldBe`
+        Right (unhex "000000000000000000000000000000001203acd34ebb3ff76268f9fe68f066a48a3f518686ae0f2230b322e19435ccfc4f208e5ba5a39cb2a409292c48a37c22000000000000000000000000000000000ba4b975d5aecfccaa3cd9afb41614047d5136bbabffb4fab2d9be11bab8599c88553bbd5e5b4482d4a0547da52b2454")
+
+    it "decompressed pubkey is on the curve (round-trips through bls12381G1Add)" $ do
+      let pk = unhex "9203acd34ebb3ff76268f9fe68f066a48a3f518686ae0f2230b322e19435ccfc4f208e5ba5a39cb2a409292c48a37c22"
+      let p = eitherRight (decompressG1 pk)
+      bls12381G1Add (p <> p) `shouldSatisfy` isRight
+
+  describe "bls12381DecompressG2" $ do
+    let unhex h = case Base16.decode (BC.pack h) of
+          Right r -> r
+          Left _ -> error ("bad hex: " ++ h)
+
+    it "rejects wrong-length input" $
+      decompressG2 (B.replicate 95 0) `shouldSatisfy` isLeft
+
+    it "rejects compression flag clear" $
+      decompressG2 (B.cons 0x40 (B.replicate 95 0)) `shouldSatisfy` isLeft
+
+    it "decodes the point at infinity to the all-zero EIP-2537 G2" $
+      decompressG2 (B.cons 0xc0 (B.replicate 95 0)) `shouldBe` Right (B.replicate g2Size 0)
+
+    it "decompresses a real Sepolia sync-committee aggregate signature" $ do
+      -- Aggregate signature from /eth/v1/beacon/light_client/finality_update on Sepolia 2026-05-04
+      let sig = unhex "a68a6426fb3b654cf90f0d36f071a7edc93b8af9af7a1f8eb8f356d5e68876e8162492bfa9e8d0ec92bdc204f9a6ea4715bab09c09f4759ca276d521cfe56d184041b2c3c0d3f2903f5cec2bd2c7a5fbacc0248cdc5f64513bc0cfb4ad47b607"
+      decompressG2 sig `shouldSatisfy` \r -> case r of
+        Right p -> B.length p == g2Size
+        Left _ -> False
+
+    it "decompressed signature is on the twist (round-trips through bls12381G2Add)" $ do
+      let sig = unhex "a68a6426fb3b654cf90f0d36f071a7edc93b8af9af7a1f8eb8f356d5e68876e8162492bfa9e8d0ec92bdc204f9a6ea4715bab09c09f4759ca276d521cfe56d184041b2c3c0d3f2903f5cec2bd2c7a5fbacc0248cdc5f64513bc0cfb4ad47b607"
+      let p = eitherRight (decompressG2 sig)
+      bls12381G2Add (p <> p) `shouldSatisfy` isRight
+
+isRight :: Either a b -> Bool
+isRight (Right _) = True
+isRight _ = False
 
 isLeft :: Either a b -> Bool
 isLeft (Left _) = True

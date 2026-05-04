@@ -48,8 +48,14 @@ module Blockchain.SolidVM.BLS12381.HashToCurve.G1
 
     -- * Constants useful for verification tests
     fieldPrime,
+    fieldPrimeMinus1Div2,
     g1IsoA,
     g1IsoB,
+
+    -- * Field primitives (used by the compression / decompression module)
+    Fp,
+    sqrtFp,
+    isSquareFp,
   )
 where
 

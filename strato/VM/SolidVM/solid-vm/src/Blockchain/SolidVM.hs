@@ -2556,6 +2556,18 @@ callBuiltin "bls12381HashToCurveG2" [SBytes msg, SBytes dst] =
   case Builtins.hashToCurveG2 msg dst of
     Left e -> invalidArguments ("bls12381HashToCurveG2: " ++ e) [SBytes msg, SBytes dst]
     Right out -> pure (SBytes out)
+
+-- BLS12-381 point decompression (IETF / ZCash format used by Ethereum's
+-- beacon chain). Bridges between the wire format (compressed: G1=48,
+-- G2=96 bytes) and EIP-2537 uncompressed (G1=128, G2=256 bytes).
+callBuiltin "bls12381DecompressG1" [SBytes b] =
+  case Builtins.decompressG1 b of
+    Left e -> invalidArguments ("bls12381DecompressG1: " ++ e) b
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381DecompressG2" [SBytes b] =
+  case Builtins.decompressG2 b of
+    Left e -> invalidArguments ("bls12381DecompressG2: " ++ e) b
+    Right out -> pure (SBytes out)
 callBuiltin "poseidon" [SVariadic xs] = case length xs of
   n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs
   _ -> typeError "invalid args passed to poseidon" $ show xs

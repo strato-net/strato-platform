@@ -18,6 +18,7 @@ library:
     # stages directly. Stable public API for bridge contracts is via the
     # byte builtins re-exported from Builtins.
     - Blockchain.SolidVM.BLS12381
+    - Blockchain.SolidVM.BLS12381.Compress
     - Blockchain.SolidVM.BLS12381.HashToCurve
     - Blockchain.SolidVM.BLS12381.HashToCurve.G1
     - Blockchain.SolidVM.BLS12381.HashToCurve.G2
@@ -97,6 +98,7 @@ tests:
       - QuickCheck
       - aeson
       - async
+      - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
