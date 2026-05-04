@@ -42,6 +42,20 @@ export interface WithdrawalProof {
      *                                BridgeVault.submitProof is admin's job.
      */
     eventName: "Withdrawal" | "WithdrawalRequestedV2";
+    /**
+     * Per-chain monotonically-increasing sequence number for hot
+     * Withdrawal events. The BridgeVault releases funds strictly in this
+     * order. Undefined for cold-path WithdrawalRequestedV2 events
+     * (admin approval gates them, not on-chain ordering).
+     */
+    seq?: number;
+    /**
+     * STRATO block of the previous hot Withdrawal event for this
+     * external chain (0 if this is the first one). Lets the UI walk
+     * predecessors backwards when the user's seq is ahead of the
+     * vault's nextSeqToProcess and earlier proofs need catching up.
+     */
+    prevWithdrawalBlock?: number;
 }
 
 /**

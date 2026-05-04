@@ -1,4 +1,4 @@
-import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, WithdrawalTransactionResponse, DepositAction } from "@mercata/shared-types";
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, DepositActionRequestParams, TransactionResponse, WithdrawalSummaryResponse, WithdrawalTransactionResponse, WithdrawalProof, DepositAction } from "@mercata/shared-types";
 
 export interface BalanceResponse {
   balance: string;
@@ -35,6 +35,16 @@ export type BridgeContextType = {
     params: WithdrawalRequestParams,
     onProgress?: (phase: "submit_strato" | "fetch_proof") => void,
   ) => Promise<BridgeResponse>;
+  /**
+   * Lookup proof for a specific predecessor seq when the user's own claim
+   * needs to catch up to the vault's nextSeqToProcess. Wired through to the
+   * backend's /bridge/withdrawalProof/byBlock/:chainId/:blockNumber/:seq endpoint.
+   */
+  fetchWithdrawalProofForSeq: (
+    chainId: number,
+    blockNumber: number,
+    seq: number,
+  ) => Promise<WithdrawalProof | undefined>;
   requestDepositAction: (params: DepositActionRequestParams) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 

@@ -106,8 +106,16 @@ library STRATOEventDecoder {
 
     /// @dev Withdrawal / WithdrawalRequested args layout (Phase 0 §7.1).
     ///      Position is consensus -- the verifier must use the same order
-    ///      the STRATO bridge contract emits with.
-    uint256 private constant WITHDRAWAL_ARG_COUNT = 8;
+    ///      the STRATO bridge contract emits with. The trailing
+    ///      `prevWithdrawalBlock` and `seq` fields are appended on the
+    ///      hot-path `Withdrawal` event (10-arg layout) to drive the
+    ///      BridgeVault's sequence-ordered queue. Cold-path
+    ///      `WithdrawalRequestedV2` keeps the legacy 8-arg layout (no
+    ///      sequencing -- admin approval is the gate). The decoder accepts
+    ///      both shapes; cold logs decode with `prevWithdrawalBlock = 0`
+    ///      and `seq = 0`.
+    uint256 private constant WITHDRAWAL_ARG_COUNT_LEGACY = 8;
+    uint256 private constant WITHDRAWAL_ARG_COUNT_SEQUENCED = 10;
     uint256 private constant ARG_NONCE = 0;
     uint256 private constant ARG_EXTERNAL_CHAIN_ID = 1;
     uint256 private constant ARG_EXTERNAL_TOKEN = 2;
@@ -116,6 +124,8 @@ library STRATOEventDecoder {
     uint256 private constant ARG_STRATO_SENDER = 5;
     uint256 private constant ARG_STRATO_TOKEN = 6;
     uint256 private constant ARG_STRATO_TOKEN_AMOUNT = 7;
+    uint256 private constant ARG_PREV_WITHDRAWAL_BLOCK = 8;
+    uint256 private constant ARG_SEQ = 9;
 
     struct DecodedWithdrawal {
         address contractAddress;
@@ -128,6 +138,13 @@ library STRATOEventDecoder {
         address stratoSender;
         address stratoToken;
         uint256 stratoTokenAmount;
+        /// @dev STRATO block of the previous Withdrawal event for this
+        ///      external chain; 0 if this is the first hot withdrawal.
+        ///      Used by the catch-up flow to walk predecessors.
+        uint256 prevWithdrawalBlock;
+        /// @dev Per-chain monotonically-increasing sequence number; the
+        ///      BridgeVault releases funds strictly in this order.
+        uint256 seq;
     }
 
     /**
@@ -162,7 +179,10 @@ library STRATOEventDecoder {
         // ---- Decode the args list ----
         if (!logFields[2].isList()) revert MalformedLog();
         RLPReader.RLPItem[] memory args = logFields[2].toList();
-        if (args.length != WITHDRAWAL_ARG_COUNT) revert UnexpectedArgCount();
+        if (
+            args.length != WITHDRAWAL_ARG_COUNT_LEGACY &&
+            args.length != WITHDRAWAL_ARG_COUNT_SEQUENCED
+        ) revert UnexpectedArgCount();
 
         w.nonce = args[ARG_NONCE].toUint();
         w.externalChainId = args[ARG_EXTERNAL_CHAIN_ID].toUint();
@@ -172,5 +192,13 @@ library STRATOEventDecoder {
         w.stratoSender = args[ARG_STRATO_SENDER].toAddress();
         w.stratoToken = args[ARG_STRATO_TOKEN].toAddress();
         w.stratoTokenAmount = args[ARG_STRATO_TOKEN_AMOUNT].toUint();
+        if (args.length == WITHDRAWAL_ARG_COUNT_SEQUENCED) {
+            w.prevWithdrawalBlock = args[ARG_PREV_WITHDRAWAL_BLOCK].toUint();
+            w.seq = args[ARG_SEQ].toUint();
+        }
+        // For legacy 8-arg logs (cold-path WithdrawalRequestedV2),
+        // prevWithdrawalBlock and seq stay at the struct's zero defaults.
+        // The vault's submitProof flow doesn't consult them; cold-path
+        // sequencing is admin-driven, not on-chain-queued.
     }
 }

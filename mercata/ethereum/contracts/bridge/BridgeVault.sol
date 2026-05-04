@@ -55,6 +55,18 @@ contract BridgeVault is
     error EthTransferFailed();
     error ProofVerificationFailed();
     error UnknownEvent();
+    /// @dev Hot-path event arrived without a non-zero seq (legacy 8-arg log).
+    ///      Sequenced claims require the post-fork 10-arg event layout.
+    error UnsequencedHotEvent();
+    /// @dev Submitted seq is below the vault's nextSeqToProcess. The earlier
+    ///      seq was already drained, so this proof is either a replay or a
+    ///      forgery -- either way, reject.
+    error SequenceAlreadyProcessed();
+    /// @dev Caller asked processQueue to do work but the queue isn't ready
+    ///      to advance (next slot is empty). Returns gracefully via revert
+    ///      so wallet callers aren't surprised by a "succeeded but did
+    ///      nothing" tx.
+    error QueueEmpty();
 
     // ============ State machine ============
 
@@ -62,7 +74,8 @@ contract BridgeVault is
         Unused, // 0: never seen
         Claimed, // 1: terminal -- funds released
         AwaitingApproval, // 2: large-withdrawal proof submitted, admin must decide
-        Rejected // 3: terminal -- admin rejected
+        Rejected, // 3: terminal -- admin rejected
+        Queued // 4: hot-path proof verified but blocked behind earlier sequences
     }
 
     /// @notice Status of each (blockNumber, txIndex, logIndex)-derived nonce.
@@ -76,6 +89,36 @@ contract BridgeVault is
         uint256 externalTokenAmount;
     }
     mapping(bytes32 => PendingWithdrawal) public pending;
+
+    /// @notice Snapshot of a hot-path claim that arrived out of order. Stored
+    ///         keyed by `seq` so the drain loop can pop them by incrementing
+    ///         `nextSeqToProcess`. The nonce is included so we can flip
+    ///         `nonceState[nonce]` from Queued to Claimed atomically when
+    ///         the slot is drained.
+    struct QueuedClaim {
+        bytes32 nonce;
+        address externalToken;
+        address externalRecipient;
+        uint256 externalTokenAmount;
+    }
+
+    /// @notice Hot-path claims indexed by their STRATO sequence number.
+    ///         Filled by claimWithdrawal when the proof's seq is greater
+    ///         than `nextSeqToProcess`; drained by claimWithdrawal when the
+    ///         missing predecessors arrive, or by `processQueue` when a
+    ///         caller wants to pay gas to clear backlog.
+    mapping(uint256 => QueuedClaim) public queuedClaims;
+
+    /// @notice The next hot-withdrawal sequence number expected by this
+    ///         vault. Starts at 0 (matches `nextWithdrawalSeq[chainId]` on
+    ///         STRATO), advances by 1 each time a claim is released.
+    uint256 public nextSeqToProcess;
+
+    /// @notice Bound on how many queued claims a single claimWithdrawal call
+    ///         will drain after processing its own seq. Caps the worst-case
+    ///         gas cost of a "lucky" claim that catches up a long backlog
+    ///         in one go. Backlog beyond this is drained by `processQueue`.
+    uint256 public constant MAX_DRAIN_PER_CLAIM = 16;
 
     // ============ Configuration ============
 
@@ -126,6 +169,21 @@ contract BridgeVault is
 
     event WithdrawalApproved(bytes32 indexed nonce);
     event WithdrawalRejected(bytes32 indexed nonce, string reason);
+
+    /// @notice A hot-path claim was verified but is blocked behind earlier
+    ///         sequence numbers. Funds remain in the vault until predecessors
+    ///         arrive and the queue drains forward.
+    event WithdrawalQueued(
+        bytes32 indexed nonce,
+        uint256 indexed seq,
+        address indexed externalToken,
+        address externalRecipient,
+        uint256 externalTokenAmount
+    );
+
+    /// @notice Emitted whenever `nextSeqToProcess` advances, regardless of
+    ///         whether the claim came in fresh or was popped from the queue.
+    event SequenceAdvanced(uint256 indexed newNextSeq);
 
     event InstantThresholdUpdated(address indexed externalToken, uint256 newThreshold);
     event AdminMultisigUpdated(address indexed oldAdmin, address indexed newAdmin);
@@ -211,15 +269,69 @@ contract BridgeVault is
         uint256 threshold = instantThreshold[d.externalToken];
         if (d.externalTokenAmount >= threshold) revert AmountAboveInstantThreshold();
 
-        nonceState[nonce] = NonceState.Claimed;
-        _release(d.externalToken, d.externalRecipient, d.externalTokenAmount);
+        // Seq < cursor means a duplicate of an already-drained slot. Reject
+        // distinctly from NonceAlreadyConsumed to make accidental replays
+        // diagnosable.
+        if (d.seq < nextSeqToProcess) revert SequenceAlreadyProcessed();
 
-        emit WithdrawalClaimed(
-            nonce,
-            d.externalToken,
-            d.externalRecipient,
-            d.externalTokenAmount
-        );
+        if (d.seq == nextSeqToProcess) {
+            // Aligned with the cursor -- process this one immediately, then
+            // opportunistically pop any predecessors that the queue had been
+            // waiting for. Cap the drain so a "lucky" claimant that catches
+            // up a long backlog can't blow the block gas limit.
+            nonceState[nonce] = NonceState.Claimed;
+            _release(d.externalToken, d.externalRecipient, d.externalTokenAmount);
+            emit WithdrawalClaimed(
+                nonce,
+                d.externalToken,
+                d.externalRecipient,
+                d.externalTokenAmount
+            );
+            unchecked {
+                ++nextSeqToProcess;
+            }
+            emit SequenceAdvanced(nextSeqToProcess);
+            _drainQueue(MAX_DRAIN_PER_CLAIM);
+        } else {
+            // Out of order -- park the proven payload until predecessors
+            // arrive. The proof itself has already been verified, so the
+            // queue is trusted to release without re-checking.
+            nonceState[nonce] = NonceState.Queued;
+            queuedClaims[d.seq] = QueuedClaim({
+                nonce: nonce,
+                externalToken: d.externalToken,
+                externalRecipient: d.externalRecipient,
+                externalTokenAmount: d.externalTokenAmount
+            });
+            emit WithdrawalQueued(
+                nonce,
+                d.seq,
+                d.externalToken,
+                d.externalRecipient,
+                d.externalTokenAmount
+            );
+        }
+    }
+
+    /**
+     * @notice Drain up to `maxIters` queued claims starting from
+     *         `nextSeqToProcess`. Anyone may call. Reverts with QueueEmpty
+     *         if the next slot is already empty -- avoids gas waste from a
+     *         caller who didn't realize the queue had nothing to do.
+     *
+     *         The MAX_DRAIN_PER_CLAIM cap on `claimWithdrawal` exists to
+     *         keep the worst-case cost of an organic claim bounded; this
+     *         function exists for callers who want to deliberately spend
+     *         more gas to clear a long backlog.
+     */
+    function processQueue(uint256 maxIters)
+        external
+        nonReentrant
+        whenNotPaused
+        returns (uint256 drained)
+    {
+        if (queuedClaims[nextSeqToProcess].nonce == bytes32(0)) revert QueueEmpty();
+        drained = _drainQueue(maxIters);
     }
 
     /**
@@ -433,6 +545,45 @@ contract BridgeVault is
         } else {
             IERC20(token).safeTransfer(recipient, amount);
         }
+    }
+
+    /**
+     * @dev Pop and release queued claims while the slot at
+     *      `nextSeqToProcess` is filled, capped at `maxIters`. Returns the
+     *      number actually drained. Each iteration:
+     *        1. read the queued snapshot,
+     *        2. clear the storage (refunds gas),
+     *        3. flip nonceState Queued -> Claimed,
+     *        4. release funds,
+     *        5. advance the cursor.
+     *
+     *      Loop body is constant work, so total cost is O(maxIters * release).
+     *      Caller is responsible for picking a maxIters that fits the block
+     *      gas limit; a sane default for batched UI usage is 8-32.
+     */
+    function _drainQueue(uint256 maxIters) internal returns (uint256 drained) {
+        for (uint256 i; i < maxIters; ++i) {
+            QueuedClaim memory q = queuedClaims[nextSeqToProcess];
+            if (q.nonce == bytes32(0)) break;
+            // Atomic snapshot then clear so reentrancy from the release call
+            // can't see this slot in a half-applied state. (release() is
+            // already nonReentrant-protected via the wrapping external
+            // function, but defense-in-depth.)
+            delete queuedClaims[nextSeqToProcess];
+            nonceState[q.nonce] = NonceState.Claimed;
+            _release(q.externalToken, q.externalRecipient, q.externalTokenAmount);
+            emit WithdrawalClaimed(
+                q.nonce,
+                q.externalToken,
+                q.externalRecipient,
+                q.externalTokenAmount
+            );
+            unchecked {
+                ++nextSeqToProcess;
+                ++drained;
+            }
+        }
+        if (drained > 0) emit SequenceAdvanced(nextSeqToProcess);
     }
 
     // ============ ETH support ============

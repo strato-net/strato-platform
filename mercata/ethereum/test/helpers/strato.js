@@ -134,9 +134,14 @@ function quorumSigners(validators, signers, headerRLP) {
  * Encode a STRATO receipt that contains exactly one Withdrawal- or
  * WithdrawalRequested-shaped log (Phase 0 §6.2 / §6.3 / §7.1).
  *
- * The 8-arg payload is encoded positionally with typed RLP rules:
+ * The base 8-arg payload is encoded positionally with typed RLP rules:
  *   - addresses encode as 20-byte strings
  *   - integers encode as minimal big-endian (RLP integer convention)
+ *
+ * Hot-path Withdrawal events also append `prevWithdrawalBlock` and `seq`
+ * (10-arg layout) so the BridgeVault's sequence-ordered queue can drive
+ * release ordering. Pass `seq` (and optionally `prevWithdrawalBlock`) to
+ * opt into the new layout; omit both for the cold-path 8-arg encoding.
  */
 function encodeWithdrawalReceipt(opts) {
   const args = [
@@ -149,6 +154,10 @@ function encodeWithdrawalReceipt(opts) {
     opts.stratoToken,
     toRlpUint(opts.stratoTokenAmount),
   ];
+  if (opts.seq !== undefined) {
+    args.push(toRlpUint(opts.prevWithdrawalBlock ?? 0));
+    args.push(toRlpUint(opts.seq));
+  }
   const log = [
     opts.contractAddress,
     ethers.hexlify(ethers.toUtf8Bytes(opts.eventName)),

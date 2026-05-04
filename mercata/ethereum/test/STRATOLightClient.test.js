@@ -250,17 +250,65 @@ describe("STRATOLightClient", function () {
   });
 
   describe("submitHeader: adversarial", function () {
-    it("rejects a header that is not in order (number <= tip)", async function () {
+    it("re-anchoring an already-stored block reverts (consensus-split protection)", async function () {
+      // Historical anchoring is allowed for any block whose commitment is
+      // known, BUT the same block can only be anchored once -- a second
+      // anchor at the same height would either be a duplicate of the
+      // original (no value) or evidence of a fork (must reject loudly).
       const validators = makeValidators(4);
       const { client, sortedValidators } = await deploy(100, validators);
 
-      const header = encodeHeader({
-        number: 100, // not strictly greater than tip
+      const header101 = encodeHeader({
+        number: 101,
         currentValidators: sortedValidators,
+        receiptsRoot: ethers.zeroPadValue("0xab", 32),
+      });
+      await client.submitHeader(
+        header101,
+        quorumSigners(sortedValidators, validators, header101)
+      );
+
+      // Re-submitting the same header at the same block number must revert.
+      await expect(
+        client.submitHeader(header101, quorumSigners(sortedValidators, validators, header101))
+      ).to.be.reverted;
+    });
+
+    it("anchors a non-tip-advancing header for a previously-unanchored block", async function () {
+      // The new historical-anchor path: a user with a withdrawal in an old
+      // block must be able to anchor that block even if tip has moved past
+      // it. Required because tip-advancing is a race -- the first claimant
+      // shouldn't lock out everyone behind them.
+      const validators = makeValidators(4);
+      const { client, sortedValidators } = await deploy(100, validators);
+
+      // Advance tip to 105.
+      const header105 = encodeHeader({
+        number: 105,
+        currentValidators: sortedValidators,
+        receiptsRoot: ethers.zeroPadValue("0xaa", 32),
+      });
+      await client.submitHeader(
+        header105,
+        quorumSigners(sortedValidators, validators, header105)
+      );
+      expect(await client.tip()).to.equal(105n);
+
+      // Now anchor block 102 (below tip, not previously anchored).
+      const header102 = encodeHeader({
+        number: 102,
+        currentValidators: sortedValidators,
+        receiptsRoot: ethers.zeroPadValue("0xbb", 32),
       });
       await expect(
-        client.submitHeader(header, quorumSigners(sortedValidators, validators, header))
-      ).to.be.reverted;
+        client.submitHeader(header102, quorumSigners(sortedValidators, validators, header102))
+      ).to.emit(client, "HeaderSubmitted");
+
+      // Tip stays at 105 (historical anchor doesn't advance), but block 102
+      // now has a receipts root.
+      expect(await client.tip()).to.equal(105n);
+      expect(await client.hasReceiptsRoot(102)).to.equal(true);
+      expect(await client.getReceiptsRoot(102)).to.equal(ethers.zeroPadValue("0xbb", 32));
     });
 
     it("rejects insufficient signatures (below quorum)", async function () {

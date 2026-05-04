@@ -353,15 +353,21 @@ describe("End-to-end proof flow", function () {
       stratoTokenAmount: 70,
     };
 
+    // Hot-path Withdrawal events are sequenced. Two same-block withdrawals
+    // get consecutive seqs; the vault releases them strictly in order.
     const receipt0 = encodeWithdrawalReceipt({
       contractAddress: STRATO_VAULT,
       eventName: "Withdrawal",
       ...payload0,
+      prevWithdrawalBlock: 0,
+      seq: 0,
     });
     const receipt1 = encodeWithdrawalReceipt({
       contractAddress: STRATO_VAULT,
       eventName: "Withdrawal",
       ...payload1,
+      prevWithdrawalBlock: 101, // same block as receipt0
+      seq: 1,
     });
 
     const trie = twoTxReceiptsTrie(receipt0, receipt1);

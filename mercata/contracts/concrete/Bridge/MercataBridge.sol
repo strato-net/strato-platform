@@ -104,7 +104,12 @@ contract record MercataBridge is Ownable {
     /// @param stratoSender The STRATO address that initiated
     /// @param stratoToken STRATO token that was burned
     /// @param stratoTokenAmount STRATO-token amount burned
-    event Withdrawal(uint256 nonce, uint256 externalChainId, address externalToken, address externalRecipient, uint256 externalTokenAmount, address stratoSender, address stratoToken, uint256 stratoTokenAmount);
+    /// @param prevWithdrawalBlock STRATO block number that contained the previous Withdrawal event
+    ///        for this externalChainId (0 if this is the first hot withdrawal on the chain).
+    ///        Lets the BridgeVault catch up missing predecessors by walking the chain backwards.
+    /// @param seq Per-chain monotonically-increasing hot-withdrawal sequence number.
+    ///        BridgeVault releases funds in seq order; out-of-order proofs queue without reverting.
+    event Withdrawal(uint256 nonce, uint256 externalChainId, address externalToken, address externalRecipient, uint256 externalTokenAmount, address stratoSender, address stratoToken, uint256 stratoTokenAmount, uint256 prevWithdrawalBlock, uint256 seq);
 
     /// @notice Emitted for large withdrawals -- tokens are escrowed (locked
     ///         in this contract, NOT yet burned) pending admin approval on
@@ -209,6 +214,22 @@ contract record MercataBridge is Ownable {
     /// @notice Auto-incrementing counter for withdrawal IDs
     /// @dev Ensures unique withdrawal identifiers for each request
     uint256 public withdrawalCounter;
+
+    /// @notice Per-external-chain monotonically-increasing sequence number for hot
+    ///         (instant) Withdrawal events. The BridgeVault on the external chain
+    ///         consumes claims strictly in this order; gaps in submission are
+    ///         tolerated (the vault queues out-of-order proofs) but the
+    ///         on-chain sequence space itself is gap-free.
+    /// @dev Key: externalChainId (uint256) -> Value: next seq to assign (starts at 0)
+    mapping(uint256 => uint256) public nextWithdrawalSeq;
+
+    /// @notice Per-external-chain block number that contained the most recent
+    ///         hot Withdrawal event. Emitted on the next Withdrawal as
+    ///         `prevWithdrawalBlock` so off-chain tooling (and the vault's
+    ///         catch-up flow) can walk the chain of events backwards to
+    ///         locate any predecessor proofs that haven't been submitted yet.
+    /// @dev Key: externalChainId (uint256) -> Value: STRATO block number (0 if none yet)
+    mapping(uint256 => uint256) public lastWithdrawalBlock;
 
     // ───────────── Registry related state variables ─────────────
     /// @notice Registry of external chains and their configuration
@@ -1243,9 +1264,17 @@ contract record MercataBridge is Ownable {
                 block.timestamp, true
             );
 
+            // Snapshot the linked-list metadata BEFORE incrementing -- the
+            // emitted event records its predecessor and its own seq number.
+            uint256 prevBlock = lastWithdrawalBlock[externalChainId];
+            uint256 seq = nextWithdrawalSeq[externalChainId];
+            nextWithdrawalSeq[externalChainId] = seq + 1;
+            lastWithdrawalBlock[externalChainId] = block.number;
+
             emit Withdrawal(
                 id, externalChainId, externalToken, externalRecipient,
-                externalTokenAmount, msg.sender, stratoToken, stratoTokenAmount
+                externalTokenAmount, msg.sender, stratoToken, stratoTokenAmount,
+                prevBlock, seq
             );
         } else {
             // Large: keep escrow, status INITIATED.

@@ -14,6 +14,7 @@ export type WithdrawalStep =
   | "submit_strato"     // Signing + submitting the approve + requestWithdrawalProof batch on STRATO
   | "fetch_proof"       // Backend fetches inclusion proof for the requestWithdrawalProof tx
   | "switch_chain"      // Wallet network switch to the external chain
+  | "catch_up"          // User's seq is ahead of the vault; submitting predecessor proofs first
   | "submit_header"     // Submit STRATO header to STRATOLightClient (skipped if tip already covers the block)
   | "claim_external"    // Call BridgeVault.claimWithdrawal
   | "complete"          // Hot path success
@@ -32,6 +33,13 @@ interface WithdrawalProgressModalProps {
   headerTxHash?: string;
   /** True once the light-client tip already covered the proof block, so the submit_header step was skipped. */
   headerAlreadyKnown?: boolean;
+  /**
+   * Per-iteration progress for the catch-up step. `index` is 0 while
+   * walking predecessors backwards (still planning), then 1..total while
+   * submitting them oldest-first. Driven by claimWithdrawalOnExternalChain's
+   * onProgress callback.
+   */
+  catchUpInfo?: { index: number; total: number; seq: number };
   error?: string;
   onClose?: () => void;
 }
@@ -44,6 +52,7 @@ const WithdrawalProgressModal: React.FC<WithdrawalProgressModalProps> = ({
   claimTxHash,
   headerTxHash,
   headerAlreadyKnown = false,
+  catchUpInfo,
   error,
   onClose,
 }) => {
@@ -68,6 +77,15 @@ const WithdrawalProgressModal: React.FC<WithdrawalProgressModalProps> = ({
       key: "switch_chain",
       label: `Switch to ${networkLabel}`,
       description: `Switch your wallet's network to ${networkLabel} to complete the claim.`,
+    },
+    {
+      key: "catch_up",
+      label: "Catch Up Earlier Withdrawals",
+      description: catchUpInfo
+        ? catchUpInfo.index === 0
+          ? `Found ${catchUpInfo.total} earlier withdrawal${catchUpInfo.total === 1 ? "" : "s"} that must be submitted first. Fetching proofs...`
+          : `Submitting predecessor ${catchUpInfo.index} of ${catchUpInfo.total} (seq ${catchUpInfo.seq}). Each one needs a wallet signature.`
+        : "Submitting earlier queued withdrawals so yours can release.",
     },
     {
       key: "submit_header",

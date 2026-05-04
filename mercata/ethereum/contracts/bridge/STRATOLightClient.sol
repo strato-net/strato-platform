@@ -42,6 +42,14 @@ contract STRATOLightClient is
     error UnsupportedHeaderVersion();
     error ValidatorAlreadyPresent();
     error ValidatorNotPresent();
+    /// @dev Caller tried to anchor a header for a block that already has a
+    ///      stored receipts root. Prevents conflicting anchors of the same
+    ///      block height (consensus split).
+    error AlreadyAnchored();
+    /// @dev Header's `currentValidators` doesn't match any commitment we've
+    ///      ever recorded. Either the header is forged or the rotation that
+    ///      produced this set was never observed by this contract.
+    error UnknownValidatorSet();
 
     // ============ State Variables ============
 
@@ -70,6 +78,20 @@ contract STRATOLightClient is
     ///         "block was submitted with the empty-trie sentinel". Without
     ///         this, a Receipt root of bytes32(0) would be ambiguous.
     mapping(uint256 => bool) private _hasReceiptsRoot;
+
+    /// @notice Set of every validator-set commitment this client has ever
+    ///         recognized -- the genesis commitment plus the post-state of
+    ///         every applied rotation. Lets a caller anchor a *historical*
+    ///         header (one for a block <= current tip) by proving its
+    ///         signers were authorized at some point.
+    /// @dev    Without this, once tip moves past block N a user with a
+    ///         valid withdrawal at N could never get its receipts root
+    ///         on-chain. The trade-off: if 2/3 of a *retired* validator set
+    ///         later collude, they could anchor a fake historical header at
+    ///         a block that hadn't already been anchored. Mitigation is to
+    ///         anchor blocks proactively (`_hasReceiptsRoot` blocks
+    ///         conflicting re-anchoring) and to keep validator sets stable.
+    mapping(bytes32 => bool) public knownCommitments;
 
     // ============ Events ============
 
@@ -131,6 +153,7 @@ contract STRATOLightClient is
         }
         validatorCount = genesisValidators.length;
         validatorSetCommitment = _commitToSortedSet(genesisValidators);
+        knownCommitments[validatorSetCommitment] = true;
         tip = genesisBlockNumber;
     }
 
@@ -153,41 +176,54 @@ contract STRATOLightClient is
         external
     {
         STRATOEventDecoder.DecodedHeader memory h = STRATOEventDecoder.decodeHeader(headerRLP);
-        if (h.number <= tip) revert HeaderNotInOrder();
-
-        // Skip-safety check: header's currentValidators must hash to the same
-        // commitment we currently track. If a rotation happened between tip
-        // and h.number that the caller didn't walk through, this fails and
-        // the caller has to submit the rotation header(s) first.
-        if (
-            keccak256(abi.encodePacked(h.currentValidators)) !=
-            validatorSetCommitment
-        ) revert ValidatorSetMismatch();
-
+        bytes32 currentCommit = keccak256(abi.encodePacked(h.currentValidators));
         bytes32 blockHash = keccak256(headerRLP);
         bytes32 commitMsg = keccak256(abi.encodePacked(blockHash, COMMIT_DOMAIN));
 
-        _verifyQuorum(commitMsg, signatures);
+        if (h.number > tip) {
+            // ---- Tip-advancing path ----
+            // Header must be signed by the CURRENT set, and may carry a
+            // rotation diff that we apply afterward.
+            if (currentCommit != validatorSetCommitment) revert ValidatorSetMismatch();
 
-        // Record the receipts root before applying the validator-set diff so
-        // that `getReceiptsRoot(h.number)` works even for the rotation block.
-        _receiptsRootByBlock[h.number] = h.receiptsRoot;
-        _hasReceiptsRoot[h.number] = true;
+            _verifyQuorumAgainstCurrentSet(commitMsg, signatures);
 
-        if (h.newValidators.length != 0 || h.removedValidators.length != 0) {
-            // We have the sorted pre-diff list right here in h.currentValidators
-            // (it's what we just commitment-checked), so we can compute the
-            // new commitment exactly without an off-chain witness.
-            _applyValidatorDiff(
-                h.number,
-                h.currentValidators,
-                h.newValidators,
-                h.removedValidators
-            );
+            // Record the receipts root before applying the validator-set diff
+            // so that getReceiptsRoot(h.number) works even for the rotation block.
+            _receiptsRootByBlock[h.number] = h.receiptsRoot;
+            _hasReceiptsRoot[h.number] = true;
+
+            if (h.newValidators.length != 0 || h.removedValidators.length != 0) {
+                _applyValidatorDiff(
+                    h.number,
+                    h.currentValidators,
+                    h.newValidators,
+                    h.removedValidators
+                );
+            }
+
+            tip = h.number;
+            emit HeaderSubmitted(h.number, blockHash, h.receiptsRoot, h.number);
+        } else {
+            // ---- Historical anchor path ----
+            // Block is at or below current tip. We accept the header (storing
+            // its receipts root) iff its currentValidators commitment was
+            // EVER known to this client. We do NOT advance tip and do NOT
+            // apply any rotation -- those must come through the tip-advancing
+            // path in chronological order. Conflicting anchors at the same
+            // height are rejected to prevent fake-history attacks.
+            if (_hasReceiptsRoot[h.number]) revert AlreadyAnchored();
+            if (!knownCommitments[currentCommit]) revert UnknownValidatorSet();
+
+            // Verify against the header's own currentValidators (which may
+            // differ from our current set if a rotation happened in between).
+            _verifyQuorumAgainstSet(commitMsg, signatures, h.currentValidators);
+
+            _receiptsRootByBlock[h.number] = h.receiptsRoot;
+            _hasReceiptsRoot[h.number] = true;
+
+            emit HeaderSubmitted(h.number, blockHash, h.receiptsRoot, tip);
         }
-
-        tip = h.number;
-        emit HeaderSubmitted(h.number, blockHash, h.receiptsRoot, h.number);
     }
 
     // ============ External: views ============
@@ -213,11 +249,13 @@ contract STRATOLightClient is
 
     // ============ Internal: signature verification ============
 
-    /// @dev Recovers each signer, requires distinctness and quorum membership.
-    function _verifyQuorum(bytes32 commitMsg, bytes[] calldata signatures)
-        internal
-        view
-    {
+    /// @dev Recovers each signer, requires distinctness and quorum membership
+    ///      against the *currently tracked* validator set. Used by the
+    ///      tip-advancing submitHeader path.
+    function _verifyQuorumAgainstCurrentSet(
+        bytes32 commitMsg,
+        bytes[] calldata signatures
+    ) internal view {
         uint256 q = quorumSize();
         if (signatures.length < q) revert InsufficientQuorum();
 
@@ -235,6 +273,44 @@ contract STRATOLightClient is
             if (isValidator[signer]) {
                 unchecked {
                     ++distinctValid;
+                }
+            }
+        }
+        if (distinctValid < q) revert InsufficientQuorum();
+    }
+
+    /// @dev Verifies a quorum of signatures against an arbitrary validator
+    ///      set (the header's own `currentValidators`). Used by the
+    ///      historical-anchor submitHeader path: at block N the active set
+    ///      may have differed from the current `isValidator` map, so we
+    ///      check membership against the set the header itself attests to.
+    ///      The caller has already verified that `validatorSet`'s commitment
+    ///      was previously known to this client, so trusting it for the
+    ///      membership check is equivalent to trusting it for rotation.
+    function _verifyQuorumAgainstSet(
+        bytes32 commitMsg,
+        bytes[] calldata signatures,
+        address[] memory validatorSet
+    ) internal pure {
+        // BFT quorum is computed from the size of the active set at that
+        // block, NOT from the client's current count.
+        uint256 q = (2 * validatorSet.length) / 3 + 1;
+        if (signatures.length < q) revert InsufficientQuorum();
+
+        address prev = address(0);
+        uint256 distinctValid;
+        for (uint256 i; i < signatures.length; ++i) {
+            address signer = _recover(commitMsg, signatures[i]);
+            if (signer == address(0)) revert InvalidSignature();
+            if (signer <= prev) revert DuplicateSigner();
+            prev = signer;
+            // Linear scan over validatorSet; stays small (~14) in practice.
+            for (uint256 j; j < validatorSet.length; ++j) {
+                if (validatorSet[j] == signer) {
+                    unchecked {
+                        ++distinctValid;
+                    }
+                    break;
                 }
             }
         }
@@ -289,6 +365,7 @@ contract STRATOLightClient is
         // membership-map updates we just did, so we can emit the new
         // commitment from the same data.
         validatorSetCommitment = _commitWithDiff(currentSorted, added, removed);
+        knownCommitments[validatorSetCommitment] = true;
 
         emit ValidatorSetRotated(
             atBlockNumber,

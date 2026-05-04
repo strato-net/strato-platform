@@ -8,6 +8,7 @@ import {
   getBridgeTransactions,
   getWithdrawalSummary,
   getWithdrawalProof,
+  getWithdrawalProofForSeq,
 } from "../services/bridge.service";
 import { validateRequestWithdrawal, validateDepositAction, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
@@ -68,6 +69,45 @@ class BridgeController {
       const proof = await getWithdrawalProof(accessToken, txHash);
       if (!proof) {
         res.status(404).json({ error: "No withdrawal proof available for that tx" });
+        return;
+      }
+
+      res.json({ success: true, data: proof });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /bridge/withdrawalProof/byBlock/:chainId/:blockNumber/:seq
+   *
+   * Lookup a Withdrawal proof by its (chainId, blockNumber, seq) tuple,
+   * scanning the block for a matching hot-path log. Used by the UI's
+   * catch-up flow: when the user's own seq is ahead of the vault's
+   * nextSeqToProcess, the UI walks the prevWithdrawalBlock chain backwards
+   * and uses this endpoint to fetch each predecessor's proof.
+   */
+  static async getWithdrawalProofForSeq(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { chainId, blockNumber, seq } = req.params;
+      const cid = Number(chainId);
+      const bn = Number(blockNumber);
+      const s = Number(seq);
+      if (!Number.isFinite(cid) || !Number.isFinite(bn) || !Number.isFinite(s)) {
+        res.status(400).json({ error: "chainId, blockNumber, and seq must all be numeric" });
+        return;
+      }
+
+      const proof = await getWithdrawalProofForSeq(accessToken, cid, bn, s);
+      if (!proof) {
+        res.status(404).json({
+          error: `No Withdrawal proof for chain ${cid} seq ${s} in block ${bn}`,
+        });
         return;
       }
 

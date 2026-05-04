@@ -143,9 +143,9 @@ data ReceiptProofResponse = ReceiptProofResponse
     rprReceiptRLP :: String,
     rprMptProof :: [String],
     -- | Parsed metadata for each log in the receipt, in order. Lets clients
-    --   find the right @logIndex@ by name without re-parsing the RLP. We
-    --   intentionally don't surface arg values here -- callers that need
-    --   them can decode the relevant log from @rprReceiptRLP@ themselves.
+    --   find the right @logIndex@ by name without re-parsing the RLP, and
+    --   read the typed args (e.g. the BridgeVault sequence number) without
+    --   pulling in an RLP decoder.
     rprLogs :: [LogSummary]
   }
   deriving (Show, Eq, GHC.Generics.Generic)
@@ -154,7 +154,13 @@ instance ToSchema ReceiptProofResponse
 
 data LogSummary = LogSummary
   { lsContractAddress :: Address,
-    lsEventName :: String
+    lsEventName :: String,
+    -- | Hex-encoded raw bytes of each arg, in emission order. Each entry is
+    --   the canonical RLP encoding of the SolidVM-typed value (uint =
+    --   minimal big-endian, address = 20 bytes, etc.). Off-chain consumers
+    --   read positionally per the contract's emit signature; we don't
+    --   guess the schema here because the same decoder serves every event.
+    lsArgs :: [String]
   }
   deriving (Show, Eq, GHC.Generics.Generic)
 
@@ -164,7 +170,8 @@ instance Aeson.ToJSON LogSummary where
   toJSON l =
     Aeson.object
       [ "contractAddress" Aeson..= lsContractAddress l,
-        "eventName" Aeson..= lsEventName l
+        "eventName" Aeson..= lsEventName l,
+        "args" Aeson..= lsArgs l
       ]
 
 instance Aeson.FromJSON LogSummary where
@@ -172,6 +179,7 @@ instance Aeson.FromJSON LogSummary where
     LogSummary
       <$> o Aeson..: "contractAddress"
       <*> o Aeson..: "eventName"
+      <*> o Aeson..:? "args" Aeson..!= []
 
 instance Aeson.ToJSON ReceiptProofResponse where
   toJSON r =
@@ -310,23 +318,29 @@ toHex :: B.ByteString -> String
 toHex bs = "0x" ++ BC.unpack (B16.encode bs)
 
 -- | Decode @[address, eventName, args]@ for each log in a receipt, returning
--- only the contract-address and event-name pair. Mirrors the Receipt RLP
--- shape used by 'Blockchain.Data.Receipt.Receipt' on the producer side: a
--- 3-element list @[status, gasUsed, [Log]]@ where each @Log@ is a 3-element
--- list. Returns @[]@ on any decode mismatch -- callers degrade to
--- empty-logs gracefully and parse the receipt RLP themselves if needed.
+-- the contract-address, event-name, and per-arg canonical RLP bytes.
+-- Mirrors the Receipt RLP shape used by 'Blockchain.Data.Receipt.Receipt'
+-- on the producer side: a 3-element list @[status, gasUsed, [Log]]@ where
+-- each @Log@ is a 3-element list. Returns @[]@ on any decode mismatch --
+-- callers degrade to empty-logs gracefully and parse the receipt RLP
+-- themselves if needed.
+--
+-- Args are surfaced as their RLP bytes (hex-encoded by the JSON layer)
+-- rather than typed values because the schema is event-specific; the
+-- caller knows the contract's emit signature and decodes positionally.
 decodeLogSummaries :: B.ByteString -> [LogSummary]
 decodeLogSummaries receiptBytes =
   case rlpDeserialize receiptBytes of
     RLPArray [_status, _gasUsed, RLPArray logs] -> map decodeOne logs
     _ -> []
   where
-    decodeOne (RLPArray [addr, nameField, _args]) =
+    decodeOne (RLPArray [addr, nameField, RLPArray args]) =
       LogSummary
         { lsContractAddress = rlpDecode addr,
-          lsEventName = T.unpack . TE.decodeUtf8 . rlpDecode $ nameField
+          lsEventName = T.unpack . TE.decodeUtf8 . rlpDecode $ nameField,
+          lsArgs = map (toHex . rlpSerialize) args
         }
-    decodeOne _ = LogSummary {lsContractAddress = 0, lsEventName = ""}
+    decodeOne _ = LogSummary {lsContractAddress = 0, lsEventName = "", lsArgs = []}
 
 -- ============ Data-access class ============
 

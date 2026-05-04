@@ -82,6 +82,37 @@ router.get("/withdrawalProof/:txHash", authHandler.authorizeRequest(), BridgeCon
 
 /**
  * @openapi
+ * /bridge/withdrawalProof/byBlock/{chainId}/{blockNumber}/{seq}:
+ *   get:
+ *     summary: "Lookup a Withdrawal proof by (chainId, block, seq) for the catch-up flow"
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: blockNumber
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: seq
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: WithdrawalProof for the requested seq
+ *       404:
+ *         description: No matching Withdrawal log in that block
+ */
+router.get(
+  "/withdrawalProof/byBlock/:chainId/:blockNumber/:seq",
+  authHandler.authorizeRequest(),
+  BridgeController.getWithdrawalProofForSeq,
+);
+
+/**
+ * @openapi
  * /bridge/requestDepositAction:
  *   post:
  *     summary: "Request a post-deposit action (auto-save to lending pool, auto-forge metal, etc.)"

@@ -120,7 +120,7 @@ export const getWithdrawalProof = async (
   const data = proofResp?.data;
   if (!data || !data.receiptRLP) return undefined;
 
-  const logs: Array<{ contractAddress: string; eventName: string }> = data.logs || [];
+  const logs: Array<{ contractAddress: string; eventName: string; args?: string[] }> = data.logs || [];
   const wantedAddr = mercataBridge.toLowerCase();
   const logIndex = logs.findIndex(
     (l) =>
@@ -129,9 +129,19 @@ export const getWithdrawalProof = async (
         wantedAddr.replace(/^0x/, "")
   );
   if (logIndex < 0) return undefined;
-  const eventName = logs[logIndex].eventName as "Withdrawal" | "WithdrawalRequestedV2";
+  const matchedLog = logs[logIndex];
+  const eventName = matchedLog.eventName as "Withdrawal" | "WithdrawalRequestedV2";
 
   const blockNumber = typeof data.blockNumber === "number" ? data.blockNumber : Number(data.blockNumber || 0);
+
+  // Hot-path Withdrawal events emit 10 args; the trailing pair is
+  // (prevWithdrawalBlock, seq) -- the BridgeVault uses these to enforce
+  // sequence-ordered fund release. Cold-path WithdrawalRequestedV2 stays
+  // at 8 args and doesn't use sequencing (admin gates release).
+  const args = matchedLog.args || [];
+  const sequenced = eventName === "Withdrawal" && args.length === 10;
+  const seq = sequenced ? rlpUintToNumber(args[9]) : undefined;
+  const prevWithdrawalBlock = sequenced ? rlpUintToNumber(args[8]) : undefined;
 
   return {
     blockNumber,
@@ -142,8 +152,98 @@ export const getWithdrawalProof = async (
     receiptRLP: data.receiptRLP,
     mptProof: data.mptProof || [],
     eventName,
+    seq,
+    prevWithdrawalBlock,
   };
 };
+
+/**
+ * Find the proof for a specific (chainId, seq) Withdrawal event known to be
+ * in `blockNumber`. Used by the UI's catch-up flow when walking the
+ * `prevWithdrawalBlock` chain backwards: the user has their own seq=K and
+ * needs the predecessors seq=T..seq=K-1 (where T is the vault's
+ * `nextSeqToProcess`) before their own claim can release.
+ *
+ * Scans every tx receipt in the block looking for a hot-path Withdrawal log
+ * whose externalChainId arg matches and whose seq arg equals `targetSeq`.
+ * Returns the same shape as the txHash-keyed `getWithdrawalProof` so callers
+ * can drop it into the same on-chain claim path.
+ */
+export const getWithdrawalProofForSeq = async (
+  accessToken: string,
+  chainId: number,
+  blockNumber: number,
+  targetSeq: number,
+): Promise<WithdrawalProof | undefined> => {
+  // Look up the canonical block hash so we can hit the receipts endpoint by
+  // hash (the by-number variant exists too but redirects through hash; one
+  // less round trip to do it ourselves).
+  const blockResp = await eth.get<any[]>(accessToken, `/block`, {
+    params: { number: blockNumber },
+  });
+  const block = blockResp?.data?.[0];
+  if (!block) return undefined;
+  const blockHash: string | undefined = block.blockHash;
+  if (!blockHash) return undefined;
+  const txs: any[] = block.receiptTransactions || [];
+
+  const wantedAddr = mercataBridge.toLowerCase().replace(/^0x/, "");
+  for (let txIndex = 0; txIndex < txs.length; txIndex++) {
+    const proofResp = await eth.get<any>(accessToken, `/receipts/hash/${blockHash}/proof/${txIndex}`);
+    const data = proofResp?.data;
+    if (!data || !data.receiptRLP) continue;
+    const logs: Array<{ contractAddress: string; eventName: string; args?: string[] }> = data.logs || [];
+    for (let logIndex = 0; logIndex < logs.length; logIndex++) {
+      const l = logs[logIndex];
+      if (l.eventName !== "Withdrawal") continue;
+      if ((l.contractAddress || "").toLowerCase().replace(/^0x/, "") !== wantedAddr) continue;
+      const args = l.args || [];
+      if (args.length !== 10) continue;
+      const eventChainId = rlpUintToNumber(args[1]);
+      const seq = rlpUintToNumber(args[9]);
+      if (eventChainId !== chainId || seq !== targetSeq) continue;
+      // Match -- assemble the same WithdrawalProof shape as getWithdrawalProof.
+      return {
+        blockNumber: typeof data.blockNumber === "number" ? data.blockNumber : Number(data.blockNumber || 0),
+        txIndex,
+        logIndex,
+        headerRLP: data.headerRLP,
+        signatures: data.signatures || [],
+        receiptRLP: data.receiptRLP,
+        mptProof: data.mptProof || [],
+        eventName: "Withdrawal",
+        seq,
+        prevWithdrawalBlock: rlpUintToNumber(args[8]),
+      };
+    }
+  }
+  return undefined;
+};
+
+/**
+ * Decode a STRATO log arg (canonical RLP-encoded uint, hex-prefixed) into
+ * a JS number. Args are emitted as minimal big-endian by the producer,
+ * with `0` represented as the empty string (`0x80`). Returns 0 for
+ * malformed input so missing-field bugs surface as zeroes rather than
+ * NaN/throws.
+ */
+function rlpUintToNumber(hex: string | undefined): number {
+  if (!hex) return 0;
+  const stripped = hex.startsWith("0x") ? hex.slice(2) : hex;
+  if (stripped.length === 0) return 0;
+  // Empty string sentinel: 0x80 = list-of-length-0 in RLP, encoded value 0.
+  if (stripped === "80") return 0;
+  // Single byte 0x00..0x7f encodes itself.
+  if (stripped.length === 2 && parseInt(stripped, 16) < 0x80) {
+    return parseInt(stripped, 16);
+  }
+  // Otherwise: 0x80 + length prefix, followed by big-endian bytes.
+  const lenByte = parseInt(stripped.slice(0, 2), 16);
+  if (lenByte < 0x81 || lenByte > 0x88) return 0; // outside uint64-ish range
+  const payloadHex = stripped.slice(2);
+  if (payloadHex.length === 0) return 0;
+  return Number(BigInt("0x" + payloadHex));
+}
 
 const fetchBlockHashForTx = async (
   accessToken: string,
