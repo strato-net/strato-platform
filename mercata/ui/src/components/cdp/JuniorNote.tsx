@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
 import { redirectToLogin } from "@/lib/auth";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
+import { isTxPending, isTxSubmitted } from "@/utils/transactionStatus";
 import CopyableHash from "../common/CopyableHash";
 
 
@@ -107,12 +108,12 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
       // Call the backend to claim junior note rewards
       const result = await cdpService.claimJuniorNote();
       
-      if (result.status === "success") {
+      if (isTxSubmitted(result.status)) {
         toast({
-          title: "Claim Successful",
+          title: isTxPending(result.status) ? "Claim Submitted" : "Claim Successful",
           description: (
             <div className="space-y-2">
-              <p>Transaction completed successfully</p>
+              <p>{isTxPending(result.status) ? "Transaction submitted" : "Transaction completed successfully"}</p>
               <CopyableHash 
                 hash={result.hash}
                 truncate={true}

@@ -204,6 +204,73 @@ function _M.initialize_token()
     end
 end
 
+local wallet_auth_routes = {
+    ["/api/credit-card/add-card"] = true,
+    ["/api/credit-card/approve"] = true,
+    ["/api/credit-card/config"] = true,
+    ["/api/credit-card/manual-top-up"] = true,
+    ["/api/credit-card/remove-card"] = true,
+    ["/api/credit-card/update-card"] = true,
+    ["/api/metal-forge/buy"] = true,
+    ["/api/oracle/price"] = true,
+    ["/api/rpc/results"] = true,
+    ["/api/rpc/submit"] = true,
+    ["/api/swap"] = true,
+    ["/api/swap/multi-token"] = true,
+    ["/api/swap-pools"] = true,
+    ["/api/tokens"] = true,
+    ["/api/user/admin"] = true
+}
+
+local wallet_auth_route_prefixes = {
+    "/api/cdp/",
+    "/api/credit-card/config/",
+    "/api/earn/",
+    "/api/lend/",
+    "/api/lending/",
+    "/api/refer/",
+    "/api/rewards/",
+    "/api/swap-pools/",
+    "/api/tokens/",
+    "/api/user/admin/",
+    "/api/vault/"
+}
+
+local wallet_auth_methods = {
+    DELETE = true,
+    PATCH = true,
+    POST = true,
+    PUT = true
+}
+
+function _M.is_valid_wallet_address(addr)
+    if type(addr) ~= "string" then
+        return false
+    end
+
+    local normalized = addr:match("^0[xX](%x+)$") or addr
+    return #normalized == 40 and normalized:match("^%x+$") ~= nil
+end
+
+function _M.allow_wallet_auth_request()
+    if not wallet_auth_methods[ngx.var.request_method] then
+        return false
+    end
+
+    local uri = ngx.var.uri
+    local route_allowed = wallet_auth_routes[uri] == true
+    if not route_allowed then
+        for _, prefix in ipairs(wallet_auth_route_prefixes) do
+            if uri:sub(1, #prefix) == prefix then
+                route_allowed = true
+                break
+            end
+        end
+    end
+
+    return route_allowed and _M.is_valid_wallet_address(ngx.var.http_x_wallet_address)
+end
+
 function _M.protect_api()
     local method = ngx.var.request_method
     local session_id = _M.get_session_id()
@@ -229,6 +296,10 @@ function _M.protect_api()
     end
 
     if method == "POST" or method == "PUT" or method == "DELETE" or method == "PATCH" then
+        if _M.allow_wallet_auth_request() then
+            return
+        end
+
         local header_token = ngx.var.http_x_csrf_token
         local cookie_token = ngx.var.cookie_csrf_token or ngx.var["cookie_CSRF-TOKEN"]
 

@@ -15,10 +15,46 @@ export function setConnectedWalletAddress(addr: string | null) {
   _walletAddress = addr;
 }
 
+let _appAuthenticated = false;
+export function setAppAuthenticated(authenticated: boolean) {
+  _appAuthenticated = authenticated;
+}
+
 type WalletSignFn = (unsignedTx: any) => Promise<string>;
 let _walletSignFn: WalletSignFn | null = null;
 export function setWalletSigner(fn: WalletSignFn | null) {
   _walletSignFn = fn;
+}
+
+export type WalletTxProgressStatus =
+  | "signing"
+  | "submitting"
+  | "submitted"
+  | "confirming"
+  | "completed"
+  | "failed";
+
+export interface WalletTxProgressEvent {
+  index: number;
+  total: number;
+  status: WalletTxProgressStatus;
+  functionName?: string;
+  hash?: string;
+  error?: string;
+}
+
+export type WalletTxProgressHandler = (event: WalletTxProgressEvent) => void;
+
+const WALLET_SIGNING_NETWORK = "STRATO";
+
+function normalizeUnsignedTxForWallet(unsignedTx: any): any {
+  return {
+    ...unsignedTx,
+    data: {
+      ...unsignedTx.data,
+      network: WALLET_SIGNING_NETWORK,
+    },
+  };
 }
 
 function parseSignature(sig: string): { r: string; s: string; v: string } {
@@ -45,10 +81,20 @@ function buildSignedTx(unsignedData: any, sig: { r: string; s: string; v: string
   };
 }
 
-async function pollTxResult(hashes: string[], timeout = 60000, interval = 3000): Promise<any[]> {
+async function pollTxResult(
+  hashes: string[],
+  timeout = 60000,
+  interval = 3000,
+  onProgress?: WalletTxProgressHandler
+): Promise<any[]> {
   const start = Date.now();
   while (true) {
     const { data: results } = await api.post("/rpc/results", hashes);
+    results.forEach((result: any, index: number) => {
+      if (result?.status === "Pending") {
+        onProgress?.({ index, total: hashes.length, status: "confirming", hash: hashes[index] });
+      }
+    });
     const allDone = results.every((r: any) => r?.status !== "Pending");
     if (allDone) return results;
     if (Date.now() - start >= timeout) return results;
@@ -56,7 +102,10 @@ async function pollTxResult(hashes: string[], timeout = 60000, interval = 3000):
   }
 }
 
-async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{
+async function signAndSubmitUnsignedTxs(
+  unsignedTxs: any[],
+  onProgress?: WalletTxProgressHandler
+): Promise<{
   status: string;
   hash: string;
   /** All on-chain hashes for the batch, in submission order. Lets callers
@@ -78,31 +127,76 @@ async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{
   }
 
   const hashes: string[] = [];
-  for (let i = 0; i < unsignedTxs.length; i++) {
-    const tx = unsignedTxs[i];
-    let signature: string;
+  for (let index = 0; index < unsignedTxs.length; index++) {
+    const tx = unsignedTxs[index];
+    const txForWallet = normalizeUnsignedTxForWallet(tx);
+    const functionName = txForWallet.data?.functionName;
+
     try {
-      signature = await _walletSignFn(tx);
-    } catch (err: any) {
-      // User rejection is the typical case here -- give a focused message
-      // rather than the raw provider error.
-      const msg = err?.shortMessage || err?.message || String(err);
-      throw new Error(`Wallet signature failed for tx ${i + 1} of ${unsignedTxs.length}: ${msg}`);
+      onProgress?.({ index, total: unsignedTxs.length, status: "signing", functionName, hash: tx.hash });
+      const signature = await _walletSignFn(txForWallet);
+      const sig = parseSignature(signature);
+      const signedTx = buildSignedTx(txForWallet.data, sig);
+
+      onProgress?.({ index, total: unsignedTxs.length, status: "submitting", functionName, hash: tx.hash });
+      const submittedHash = await api.post("/rpc/submit", signedTx);
+      const hash = typeof submittedHash.data === "string" ? submittedHash.data : tx.hash;
+      hashes.push(hash);
+      onProgress?.({ index, total: unsignedTxs.length, status: "submitted", functionName, hash });
+    } catch (error: any) {
+      onProgress?.({
+        index,
+        total: unsignedTxs.length,
+        status: "failed",
+        functionName,
+        hash: tx.hash,
+        error: error instanceof Error ? error.message : "Transaction failed",
+      });
+      // User rejection is the typical case here -- give focused per-tx
+      // context (which tx in the batch failed, and why) so the visible
+      // toast/log surfaces useful diagnostics.
+      const msg = error?.shortMessage || error?.message || String(error);
+      throw new Error(`Wallet signature failed for tx ${index + 1} of ${unsignedTxs.length}: ${msg}`);
     }
-    const sig = parseSignature(signature);
-    const signedTx = buildSignedTx(tx.data, sig);
-    const submittedHash = await api.post("/rpc/submit", signedTx);
-    hashes.push(typeof submittedHash.data === "string" ? submittedHash.data : tx.hash);
   }
 
-  const results = await pollTxResult(hashes);
+  const results = await pollTxResult(hashes, 60000, 3000, onProgress);
   const failed = results.find((r: any) => r?.status === "Failure");
   if (failed) {
+    const failedIndex = results.indexOf(failed);
+    onProgress?.({
+      index: failedIndex,
+      total: hashes.length,
+      status: "failed",
+      hash: hashes[failedIndex],
+      error: failed.txResult?.message || failed.message || "Transaction failed",
+    });
     throw new Error(failed.txResult?.message || failed.message || "Transaction failed");
   }
+  const pendingIndex = results.findIndex((r: any) => r?.status === "Pending");
+  if (pendingIndex >= 0) {
+    onProgress?.({
+      index: pendingIndex,
+      total: hashes.length,
+      status: "submitted",
+      hash: hashes[pendingIndex],
+    });
+    return { status: "Pending", hash: hashes[0], hashes, results };
+  }
+  results.forEach((result: any, index: number) => {
+    onProgress?.({
+      index,
+      total: hashes.length,
+      status: "completed",
+      hash: hashes[index],
+      error: result?.status === "Failure" ? result.txResult?.message || result.message : undefined,
+    });
+  });
   // Return the LAST tx as the "primary" status/hash. For the approve+action
   // pattern (e.g. approve then requestWithdrawalProof), the action is what
-  // the caller cares about; approve is just a setup step.
+  // the caller cares about; approve is just a setup step. Callers who
+  // need every hash (e.g. the bridge withdrawal flow walking the batch
+  // for a proof lookup) read `hashes` directly.
   const lastIdx = hashes.length - 1;
   return {
     status: results[lastIdx]?.status || "Success",
@@ -114,7 +208,11 @@ async function signAndSubmitUnsignedTxs(unsignedTxs: any[]): Promise<{
 
 api.interceptors.request.use(
   (config) => {
-    if (_walletAddress) {
+    const walletAuth = (config as any).walletAuth;
+    const shouldSendWalletAddress =
+      walletAuth === true || (walletAuth !== false && !_appAuthenticated);
+
+    if (_walletAddress && shouldSendWalletAddress) {
       config.headers["X-Wallet-Address"] = _walletAddress;
     }
 
@@ -181,8 +279,9 @@ api.interceptors.response.use(
         `[unsigned-tx] intercepted ${response.data._unsignedTxs.length} unsigned tx(s); ` +
           `wallet signer ${_walletSignFn ? "ready" : "MISSING"}`,
       );
+      const onProgress = (response.config as any).walletTxProgress as WalletTxProgressHandler | undefined;
       try {
-        const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs);
+        const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs, onProgress);
         response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
       } catch (err: any) {
         // signAndSubmitUnsignedTxs throws for: missing wallet signer, user

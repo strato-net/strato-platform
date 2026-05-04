@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import SwappingController from "../controllers/swapping.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -74,7 +75,7 @@ const router = Router();
  *               additionalProperties: true
  */
 router.get("/swap-pools", authHandler.authorizeRequest(true), SwappingController.getAll);
-router.post("/swap-pools", authHandler.authorizeRequest(), SwappingController.create);
+router.post("/swap-pools", walletAuth, SwappingController.create);
 
 /**
  * @openapi
@@ -265,8 +266,8 @@ router.get("/swap-pools/:poolAddress", authHandler.authorizeRequest(true), Swapp
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap-pools/:poolAddress/liquidity", authHandler.authorizeRequest(), SwappingController.addLiquidityDualToken);
-router.delete("/swap-pools/:poolAddress/liquidity", authHandler.authorizeRequest(), SwappingController.removeLiquidity);
+router.post("/swap-pools/:poolAddress/liquidity", walletAuth, SwappingController.addLiquidityDualToken);
+router.delete("/swap-pools/:poolAddress/liquidity", walletAuth, SwappingController.removeLiquidity);
 
 /**
  * @openapi
@@ -306,7 +307,7 @@ router.delete("/swap-pools/:poolAddress/liquidity", authHandler.authorizeRequest
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap-pools/:poolAddress/liquidity/single", authHandler.authorizeRequest(), SwappingController.addLiquiditySingleToken);
+router.post("/swap-pools/:poolAddress/liquidity/single", walletAuth, SwappingController.addLiquiditySingleToken);
 
 /**
  * @openapi
@@ -390,8 +391,8 @@ router.post("/swap-pools/:poolAddress/liquidity/single", authHandler.authorizeRe
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap-pools/:poolAddress/liquidity/multi-token", authHandler.authorizeRequest(), SwappingController.addLiquidityMultiToken);
-router.delete("/swap-pools/:poolAddress/liquidity/multi-token", authHandler.authorizeRequest(), SwappingController.removeLiquidityMultiToken);
+router.post("/swap-pools/:poolAddress/liquidity/multi-token", walletAuth, SwappingController.addLiquidityMultiToken);
+router.delete("/swap-pools/:poolAddress/liquidity/multi-token", walletAuth, SwappingController.removeLiquidityMultiToken);
 
 /**
  * @openapi
@@ -438,7 +439,7 @@ router.delete("/swap-pools/:poolAddress/liquidity/multi-token", authHandler.auth
  *               type: object
  *               additionalProperties: true
  */
-router.delete("/swap-pools/:poolAddress/liquidity/multi-token/one-coin", authHandler.authorizeRequest(), SwappingController.removeLiquidityMultiTokenOneCoin);
+router.delete("/swap-pools/:poolAddress/liquidity/multi-token/one-coin", walletAuth, SwappingController.removeLiquidityMultiTokenOneCoin);
 
 /**
  * @openapi
@@ -477,7 +478,7 @@ router.delete("/swap-pools/:poolAddress/liquidity/multi-token/one-coin", authHan
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
+router.post("/swap", walletAuth, SwappingController.swap);
 
 /**
  * @openapi
@@ -521,7 +522,7 @@ router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap/multi-token", authHandler.authorizeRequest(), SwappingController.swapMultiToken);
+router.post("/swap/multi-token", walletAuth, SwappingController.swapMultiToken);
 
 /**
  * @openapi
@@ -606,7 +607,7 @@ router.get("/swap-history/:poolAddress", authHandler.authorizeRequest(true), Swa
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap-pools/set-rates", authHandler.authorizeRequest(), SwappingController.setPoolRates);
+router.post("/swap-pools/set-rates", walletAuth, SwappingController.setPoolRates);
 
 /**
  * @openapi
@@ -638,7 +639,7 @@ router.post("/swap-pools/set-rates", authHandler.authorizeRequest(), SwappingCon
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap-pools/toggle-pause", authHandler.authorizeRequest(), SwappingController.togglePause);
+router.post("/swap-pools/toggle-pause", walletAuth, SwappingController.togglePause);
 
 /**
  * @openapi
@@ -670,6 +671,6 @@ router.post("/swap-pools/toggle-pause", authHandler.authorizeRequest(), Swapping
  *               type: object
  *               additionalProperties: true
  */
-router.post("/swap-pools/toggle-disable", authHandler.authorizeRequest(), SwappingController.toggleDisable);
+router.post("/swap-pools/toggle-disable", walletAuth, SwappingController.toggleDisable);
 
 export default router;
