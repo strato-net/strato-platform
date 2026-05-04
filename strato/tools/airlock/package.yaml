@@ -11,7 +11,12 @@ description: |
 license: Apache-2.0
 
 data-files:
-  - circuits/01x02/*
+  - circuits/01x02/circuit.wasm
+  - circuits/01x02/vkey.json
+  - circuits/01x02/vkey_check.json
+  - circuits/01x02/wasm.br
+  - circuits/01x02/zkey
+  - circuits/01x02/zkey.br
   - data/english.txt
 
 dependencies:
