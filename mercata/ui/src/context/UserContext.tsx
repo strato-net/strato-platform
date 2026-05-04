@@ -1,15 +1,18 @@
 "use client";
 
 // context/UserContext.tsx
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { useAccount, useWalletClient } from "wagmi";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
-import { isAuthenticated, logout } from "@/lib/auth";
+import { isAuthenticated, logout as authLogout } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 import { getStratoChainId } from "@/lib/stratoChain";
 
 interface UserContextType {
   userAddress: string | null;
+  stratoAddress: string | null;
+  externalWalletAddress: string | null;
+  isExternalWalletConnected: boolean;
   setUserAddress: (address: string | null) => void;
   isLoggedIn: boolean;
   isAppAuthenticated: boolean;
@@ -41,6 +44,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const account = useAccount();
+  const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
   const [stratoAddress, setStratoAddress] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -206,10 +210,14 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     await getOpenIssues();
   };
 
-  const userAddress = account.isConnected && account.address ? account.address : stratoAddress;
-  const effectiveLoggedIn = isLoggedIn || (account.isConnected && !!account.address);
+  const externalWalletAddress = account.isConnected && account.address ? account.address : null;
+  const isExternalWalletConnected = !!externalWalletAddress;
+  const userAddress = isLoggedIn ? stratoAddress : externalWalletAddress;
+  const effectiveLoggedIn = isLoggedIn || isExternalWalletConnected;
 
-  setConnectedWalletAddress(account.isConnected && account.address ? account.address : null);
+  useEffect(() => {
+    setConnectedWalletAddress(externalWalletAddress);
+  }, [externalWalletAddress]);
 
   useEffect(() => {
     setAppAuthenticated(isLoggedIn);
@@ -262,6 +270,23 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     checkAuthenticationStatus();
   };
 
+  const handleLogout = useCallback(() => {
+    try {
+      disconnect();
+    } catch {
+      // Continue STRATO logout even if wallet disconnect fails.
+    }
+    setConnectedWalletAddress(null);
+    setWalletSigner(null);
+    setAppAuthenticated(false);
+    setStratoAddress(null);
+    setIsLoggedIn(false);
+    setIsAdmin(false);
+    setUserName(null);
+    localStorage.removeItem("user");
+    authLogout();
+  }, [disconnect]);
+
   useEffect(() => {
     checkAuthenticationStatus(true);
 
@@ -276,12 +301,15 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const contextValue = useMemo(() => ({
     userAddress,
+    stratoAddress,
+    externalWalletAddress,
+    isExternalWalletConnected,
     setUserAddress,
     userName,
     isLoggedIn: effectiveLoggedIn,
     isAppAuthenticated: isLoggedIn,
     isAdmin,
-    logout,
+    logout: handleLogout,
     refreshAuth,
     loading,
     openIssuesLoading,
@@ -301,7 +329,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getContractDetails,
     contractDetailsResults,
     contractDetailsResultsLoading,
-  }), [userAddress, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
+  }), [userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
+    handleLogout,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,

@@ -287,14 +287,14 @@ interface BridgeInProps {
 
 const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: externalFundingMode, onFundingModeChange, onMetalPurchase }) => {
   // Hooks & Context
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
   const { switchChain } = useSwitchChain();
   const { signTypedDataAsync } = useSignTypedData();
   const { openConnectModal } = useConnectModal();
   const { toast } = useToast();
-  const { userAddress, isAppAuthenticated } = useUser();
+  const { userAddress, externalWalletAddress, isExternalWalletConnected, isAppAuthenticated } = useUser();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
   const {
@@ -444,19 +444,23 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [bridgeableTokens]);
 
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
-  const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
+  const externalSender = externalWalletAddress;
+  const externalSenderHex = externalSender ? (externalSender as `0x${string}`) : undefined;
+  const stratoRecipient = userAddress;
+  const hasExternalWallet = isConnected && isExternalWalletConnected && !!externalSenderHex;
+  const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
   const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
-  const useExternalWalletSigning = isConnected && !isAppAuthenticated;
+  const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
 
   const {
     data: nativeBalance,
     refetch: refetchNative,
     isLoading: nativeLoading,
   } = useBalance({
-    address,
+    address: externalSenderHex,
     chainId: expectedChainId || undefined,
     query: {
-      enabled: isConnected && !!address && !!expectedChainId && isNativeToken,
+      enabled: hasExternalWallet && !!expectedChainId && isNativeToken,
       refetchInterval: 15000,
     },
   });
@@ -469,12 +473,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     address: ensureHexPrefix(selectedToken?.externalToken) as `0x${string}`,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
-    args: address ? [address] : undefined,
+    args: externalSenderHex ? [externalSenderHex] : undefined,
     chainId: expectedChainId || undefined,
     query: {
       enabled:
-        isConnected &&
-        !!address &&
+        hasExternalWallet &&
         !!expectedChainId &&
         !!selectedToken &&
         !isNativeToken,
@@ -482,7 +485,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     },
   });
 
-  const isBalanceLoading = isConnected && !!address && !!expectedChainId && (nativeLoading || tokenLoading);
+  const isBalanceLoading = hasExternalWallet && !!expectedChainId && (nativeLoading || tokenLoading);
 
   const maxAmount = useMemo(() => {
     if (isNativeToken) {
@@ -507,7 +510,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   );
 
   const isButtonDisabled = guestMode || isLoading || !amount || !!amountError
-    || !selectedToken || !isConnected || !currentNetwork || !isCorrectNetwork
+    || !selectedToken || !hasExternalWallet || !currentNetwork || !isCorrectNetwork
     || isBalanceLoading || !isTokenPermitted;
 
   // Effects
@@ -553,7 +556,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         setNetworkError("");
         return;
       }
-      if (!selectedNetwork || !isConnected || !expectedChainId) {
+      if (!selectedNetwork || !hasExternalWallet || !expectedChainId) {
         setNetworkError("");
         return;
       }
@@ -569,7 +572,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       }
     };
     handleNetworkSwitch();
-  }, [chainId, fundingMode, isConnected, selectedNetwork, expectedChainId, switchChain]);
+  }, [chainId, fundingMode, hasExternalWallet, selectedNetwork, expectedChainId, switchChain]);
 
   // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
@@ -785,7 +788,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const handleBridge = async () => {
     if (isLoading) return;
 
-    if (!selectedToken || !amount || !isConnected || !isCorrectNetwork || !address || !userAddress || !currentNetwork) {
+    if (!selectedToken || !amount || !hasExternalWallet || !isCorrectNetwork || !externalSender || !externalSenderHex || !stratoRecipient || !currentNetwork) {
       toast({
         title: "Invalid configuration",
         description: "Please check your network, wallet connection, and token selection.",
@@ -842,7 +845,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         
         const approval = await checkPermit2Approval({
           token: selectedToken.externalToken,
-          owner: address,
+          owner: externalSender,
           amount: depositAmount,
           chainId: activeChainId,
         });
@@ -859,7 +862,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             functionName: "approve",
             args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
             chain: await resolveViemChain(activeChainId),
-            account: address as `0x${string}`,
+            account: externalSenderHex,
           });
 
           await waitForTransaction(approveTx, activeChainId);
@@ -879,7 +882,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           amount: depositAmount,
           spender: depositRouter,
           chainId: activeChainId,
-          owner: address,
+          owner: externalSender,
         });
         
         // Move to confirm_tx step after permit is signed
@@ -891,9 +894,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         isNative,
         tokenAddress: isNative ? undefined : selectedToken.externalToken,
         amount: depositAmount,
-        userAddress,
+        userAddress: stratoRecipient,
         targetStratoToken,
-        account: address,
+        account: externalSender,
         chainId: activeChainId,
         permitData,
       });
@@ -910,10 +913,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           address: depositRouter as `0x${string}`,
           abi: DEPOSIT_ROUTER_ABI,
           functionName: "depositETH",
-          args: [ensureHexPrefix(userAddress), targetStratoToken],
+          args: [ensureHexPrefix(stratoRecipient), targetStratoToken],
           value: depositAmount,
           chain,
-          account: address as `0x${string}`,
+          account: externalSenderHex,
         });
       } else {
         if (!permitData) {
@@ -926,14 +929,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           args: [
             ensureHexPrefix(selectedToken.externalToken),
             depositAmount,
-            ensureHexPrefix(userAddress),
+            ensureHexPrefix(stratoRecipient),
             targetStratoToken,
             permitData.nonce,
             permitData.deadline,
             permitData.signature as `0x${string}`,
           ],
           chain,
-          account: address as `0x${string}`,
+          account: externalSenderHex,
         });
       }
 
@@ -960,8 +963,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         type: action === 1 ? 'saving' : action === 2 ? 'forge' : 'bridge',
         finalTokenSymbol: selectedAction?.stratoTokenSymbol,
         DepositInfo: {
-          externalSender: address,
-          stratoRecipient: userAddress,
+          externalSender,
+          stratoRecipient,
           stratoToken: selectedToken.stratoToken,
           stratoTokenAmount: adjustedAmount,
           bridgeStatus: "1",
@@ -1099,18 +1102,23 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
               <div className="flex items-center gap-2">
                 <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
                   <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
-                  <BridgeWalletStatus guestMode={guestMode} />
+                  <BridgeWalletStatus
+                    guestMode={guestMode}
+                    connectedLabel="External Wallet"
+                    connectLabel="Connect External"
+                    copiedDescription="External wallet address copied to clipboard"
+                  />
                 </div>
-                {isConnected && address && (
+                {hasExternalWallet && externalSender && (
                   <button
                     type="button"
                     className="text-[11px] text-muted-foreground font-mono hover:text-foreground transition-colors"
                     onClick={() => {
-                      navigator.clipboard.writeText(address);
+                      navigator.clipboard.writeText(externalSender);
                       toast({ title: "Copied", description: "Address copied to clipboard", duration: 1500 });
                     }}
                   >
-                    {address.slice(0, 6)}...{address.slice(-4)}
+                    {externalSender.slice(0, 6)}...{externalSender.slice(-4)}
                   </button>
                 )}
               </div>
@@ -1176,7 +1184,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   <Input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" placeholder="0.00"
                     className={`flex-1 h-10 text-right text-xl font-bold text-foreground border-0 focus-visible:ring-0 p-0 ${amountError ? "!text-red-500" : ""}`}
                     value={amount} onChange={(e) => handleAmountChange(e.target.value)}
-                    disabled={guestMode || !isConnected || isLoading} />
+                    disabled={guestMode || !hasExternalWallet || isLoading} />
                 </div>
                 {amountError && <p className="text-xs text-red-500">{amountError}</p>}
                 <div className="flex items-center justify-between pt-1">
@@ -1186,7 +1194,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   <div className="flex items-center gap-1">
                     <PercentageButtons value={amount} maxValue={maxAmount} onChange={handleAmountChange}
                       decimals={parseInt(selectedToken?.externalDecimals || "18")}
-                      disabled={guestMode || !isConnected || isLoading}
+                      disabled={guestMode || !hasExternalWallet || isLoading}
                       className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
                   </div>
                 </div>
