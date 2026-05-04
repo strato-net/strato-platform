@@ -228,10 +228,13 @@ seedDatabases genesisBlock = do
 
   _ <- withRedisBlockDB $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators'
 
-  void . withRedisBlockDB $ do
+  bestBlockResult <- withRedisBlockDB $
     forceBestBlockInfo
       genesisHash'
       (number . blockBlockData $ genesisBlock)
+  case bestBlockResult of
+    Right _ -> pure ()
+    Left err -> error $ "Failed to seed best block in Redis: " ++ show err
 
   void . withRedisBlockDB $
     putBlock OutputBlock
