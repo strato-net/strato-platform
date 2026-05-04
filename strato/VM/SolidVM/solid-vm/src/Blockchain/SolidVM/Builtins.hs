@@ -17,8 +17,50 @@ module Blockchain.SolidVM.Builtins
     ecMul,
     ecPairing,
     poseidonHash,
+
+    -- * BLS12-381 (EIP-2537 parity)
+    --
+    --   Two parallel APIs: the @bytes@-shaped builtins below match
+    --   EIP-2537's input layout exactly so callers porting EVM code can
+    --   feed precompile bytes through verbatim. The @*Ints@ siblings
+    --   take field elements as raw integers/tuples for SolidVM-native
+    --   ergonomics.
+    bls12381G1Add,
+    bls12381G1Msm,
+    bls12381G2Add,
+    bls12381G2Msm,
+    bls12381Pairing,
+    bls12381G1AddInts,
+    bls12381G1MsmInts,
+    bls12381G2AddInts,
+    bls12381G2MsmInts,
+    bls12381PairingInts,
+
+    -- * Map-to-curve (EIP-2537 §BLS12_MAP_FP_TO_G1, §BLS12_MAP_FP2_TO_G2)
+    --
+    --   Currently surfaces a "not yet implemented" error -- the
+    --   builtins are wired into the dispatcher so the API surface is
+    --   stable, but the underlying RFC 9380 simplified-SWU pipeline
+    --   isn't done. See 'Blockchain.SolidVM.BLS12381.HashToCurve' for
+    --   the concrete TODO.
+    mapFpToG1,
+    mapFp2ToG2,
   )
 where
+
+import Blockchain.SolidVM.BLS12381
+  ( bls12381G1Add,
+    bls12381G1AddInts,
+    bls12381G1Msm,
+    bls12381G1MsmInts,
+    bls12381G2Add,
+    bls12381G2AddInts,
+    bls12381G2Msm,
+    bls12381G2MsmInts,
+    bls12381Pairing,
+    bls12381PairingInts,
+  )
+import Blockchain.SolidVM.BLS12381.HashToCurve (mapFp2ToG2, mapFpToG1)
 
 import BlockApps.Solidity.ABI.Codec
 import Blockchain.SolidVM.SM

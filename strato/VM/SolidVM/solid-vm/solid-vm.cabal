@@ -18,6 +18,9 @@ library
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
   other-modules:
+      Blockchain.SolidVM.BLS12381
+      Blockchain.SolidVM.BLS12381.HashToCurve
+      Blockchain.SolidVM.BLS12381.HashToCurve.G1
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
       Paths_solid_vm
@@ -92,6 +95,7 @@ test-suite solid-vm-spec
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      BLS12381Spec
       OptimizerSpec
       SolidVMSpec
       Spec
@@ -115,6 +119,7 @@ test-suite solid-vm-spec
     , composable-monads-base
     , containers
     , crypto-api
+    , elliptic-curve
     , ethereum-rlp
     , extra
     , hflags
@@ -125,6 +130,7 @@ test-suite solid-vm-spec
     , merkle-patricia-db
     , monad-alter
     , ordered-containers
+    , pairing
     , raw-strings-qq
     , seqevents
     , solid-vm
