@@ -1104,6 +1104,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                   <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
                   <BridgeWalletStatus
                     guestMode={guestMode}
+                    externalOnly
                     connectedLabel="External Wallet"
                     connectLabel="Connect External"
                     copiedDescription="External wallet address copied to clipboard"

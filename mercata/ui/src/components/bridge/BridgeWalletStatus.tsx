@@ -1,26 +1,72 @@
 import React from 'react';
 import { useAccount, useDisconnect } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { ConnectButton, useConnectModal } from '@rainbow-me/rainbowkit';
 import { Copy } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 
 interface BridgeWalletStatusProps {
   guestMode?: boolean;
+  externalOnly?: boolean;
   connectedLabel?: string;
   connectLabel?: string;
   copiedDescription?: string;
 }
 
+const CONNECT_BUTTON_CLASS =
+  'w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white px-4 py-2 rounded-xl font-semibold transition-all flex items-center justify-center hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed';
+
+const isStratoConnector = (connector: { id: string; name: string }) =>
+  connector.id === 'stratoWallet' || connector.name === 'STRATO Wallet';
+
 const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
   guestMode = false,
+  externalOnly = false,
   connectedLabel = 'Wallet Connected',
   connectLabel = 'Connect Wallet',
   copiedDescription = 'Wallet address copied to clipboard',
 }) => {
-  const { address, isConnected } = useAccount();
+  const { address, connector, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
+  const { connectModalOpen, openConnectModal } = useConnectModal();
   const { toast } = useToast();
+  const hasConnectedWallet =
+    isConnected && (!externalOnly || (connector ? !isStratoConnector(connector) : false));
+
+  const hideStratoWalletOption = React.useCallback(() => {
+    const stratoOption = document.querySelector<HTMLElement>(
+      '[data-testid="rk-wallet-option-stratoWallet"]'
+    );
+    if (!stratoOption) return;
+
+    stratoOption.style.display = 'none';
+
+    const stratoRow = stratoOption.parentElement as HTMLElement | null;
+    if (stratoRow) {
+      stratoRow.style.display = 'none';
+    }
+
+    const walletList = stratoRow?.parentElement;
+    const onlyStratoInList =
+      walletList?.querySelectorAll('[data-testid^="rk-wallet-option-"]').length === 1;
+    if (!walletList || !onlyStratoInList) return;
+
+    walletList.style.display = 'none';
+    const groupHeader = walletList.previousElementSibling as HTMLElement | null;
+    if (groupHeader?.textContent?.trim() === 'STRATO') {
+      groupHeader.style.display = 'none';
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!externalOnly || !connectModalOpen) return;
+
+    hideStratoWalletOption();
+    const observer = new MutationObserver(hideStratoWalletOption);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [connectModalOpen, externalOnly, hideStratoWalletOption]);
 
   const copyToClipboard = async () => {
     if (address) {
@@ -33,9 +79,22 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
     }
   };
 
+  const connectControl = externalOnly ? (
+    <button
+      type="button"
+      disabled={guestMode}
+      className={CONNECT_BUTTON_CLASS}
+      onClick={() => openConnectModal?.()}
+    >
+      {connectLabel}
+    </button>
+  ) : (
+    <ConnectButton label={connectLabel} />
+  );
+
   return (
     <div className="w-full mb-4">
-      {isConnected ? (
+      {hasConnectedWallet ? (
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full">
           <div
             onClick={() => disconnect()}
@@ -74,7 +133,7 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
         </div>
       ) : (
         <div className={`w-full [&_button]:!w-full [&_button]:bg-gradient-to-r [&_button]:from-[#1f1f5f] [&_button]:via-[#293b7d] [&_button]:to-[#16737d] [&_button]:text-white [&_button]:px-4 [&_button]:py-2 [&_button]:rounded-xl [&_button]:font-semibold [&_button]:transition-all [&_button]:flex [&_button]:items-center [&_button]:justify-center ${guestMode ? '[&_button]:opacity-50 [&_button]:cursor-not-allowed pointer-events-none' : '[&_button]:hover:opacity-90'}`}>
-          <ConnectButton label={connectLabel} />
+          {connectControl}
         </div>
       )}
     </div>

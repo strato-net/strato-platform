@@ -320,6 +320,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       <div className="w-full">
         <BridgeWalletStatus
           guestMode={guestMode}
+          externalOnly
           connectedLabel="External Wallet Connected"
           connectLabel="Connect External Wallet"
           copiedDescription="External wallet address copied to clipboard"
