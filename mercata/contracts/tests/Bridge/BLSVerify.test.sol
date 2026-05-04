@@ -1,16 +1,16 @@
 import "../../libraries/Bridge/BLSVerify.sol";
+import "../../libraries/Bridge/SSZHashTree.sol";
 
 /**
  * @title Describe_BLSVerify
- * @notice Sanity tests for the BLSVerify primitives.
+ * @notice Tests for the BLSVerify primitives.
  *
- *         End-to-end signature verification against a real Sepolia
- *         sync-committee aggregate is deferred until SSZHashTree is in
- *         place — that's what computes the signing root from the
- *         attested header. These tests cover the parts that don't
- *         depend on it: the DST constant, point-decompression
- *         round-trips through G1Add, the participation aggregator, and
- *         popcount.
+ *         The acid test is the final block: an end-to-end
+ *         verification of a real Sepolia sync-committee aggregate
+ *         signature. If that passes, every primitive in the chain
+ *         (decompression, hash-to-curve, pairing, plus the
+ *         SSZHashTree pipeline driving the signing root) is wired
+ *         correctly.
  */
 contract Describe_BLSVerify {
     using BLSVerify for *;
@@ -182,5 +182,106 @@ contract Describe_BLSVerify {
         }
         b[42] = 0x3f; // 0b00111111 = 6 bits
         require(BLSVerify.popcount(b) == 342, "should be 342");
+    }
+
+    // ============ End-to-end Sepolia signature verification ============
+
+    // Real Sepolia LightClientFinalityUpdate, period 1242, captured 2026-05-04.
+    // The aggregate pubkey here is precomputed offline (sum of the 470
+    // participating sync-committee members per the bitfield) and the
+    // signing root is the on-chain result of feeding the attested header
+    // + fork version + genesis_validators_root through SSZHashTree.
+
+    function _sepoliaAggPubkey() internal pure returns (bytes) {
+        // sum-then-compress of 470 of 512 sync-committee pubkeys for
+        // the signing-slot's period. Pre-computed via /tmp/gen-sepolia-vector.hs.
+        return hex"9335746c5e693cee9f751fadf029ea18f9d53f3d0f76877d0f64b5324f0b69aa3e8c52865f647d1bb4d41df0cfae8b5e";
+    }
+
+    function _sepoliaSignature() internal pure returns (bytes) {
+        // sync_aggregate.sync_committee_signature from finality_update.json.
+        return hex"a68a6426fb3b654cf90f0d36f071a7edc93b8af9af7a1f8eb8f356d5e68876e8162492bfa9e8d0ec92bdc204f9a6ea4715bab09c09f4759ca276d521cfe56d184041b2c3c0d3f2903f5cec2bd2c7a5fbacc0248cdc5f64513bc0cfb4ad47b607";
+    }
+
+    function _sepoliaSigningRootPrecomputed() internal pure returns (bytes32) {
+        // sha256(hash_tree_root(attested_header) || domain)
+        // where domain = compute_domain(0x07000000, 0x90000075, gvr).
+        return bytes32(hex"04592400173a6686ef494b0eb872e48cf36f2079737cde0a88da4550d82ce764");
+    }
+
+    function _sepoliaAttestedSlot() internal pure returns (uint64) { return 10182912; }
+    function _sepoliaAttestedProposer() internal pure returns (uint64) { return 1446; }
+    function _sepoliaAttestedParentRoot() internal pure returns (bytes32) {
+        return bytes32(hex"900fee03dc258712f7da869abffcd8a6858a2e1f38cd304243bfab9ec90e4d5f");
+    }
+    function _sepoliaAttestedStateRoot() internal pure returns (bytes32) {
+        return bytes32(hex"527ab66077a6ed693c0612242a1b2ea42bfefde4bccc9c561e29b326c17e0066");
+    }
+    function _sepoliaAttestedBodyRoot() internal pure returns (bytes32) {
+        return bytes32(hex"29f9342b67f92ba2fe69832cafe1a5d384cbd0f68a4808c863a0d47636e23d49");
+    }
+    function _sepoliaForkVersion() internal pure returns (bytes4) { return bytes4(0x90000075); } // Fulu
+    function _sepoliaGenesisValidatorsRoot() internal pure returns (bytes32) {
+        return bytes32(hex"d8ea171f3c94aea21ebc42a1ed61052acf3f9209c00e4efbaaddac09ed9b8078");
+    }
+
+    /**
+     * @notice The ACID TEST. Drives the full pipeline:
+     *
+     *         attested header → SSZHashTree.hashTreeRootBeaconHeader
+     *                         → SSZHashTree.computeDomain
+     *                         → SSZHashTree.computeSigningRoot
+     *                         → BLSVerify.verifySyncCommitteeAggregate
+     *
+     *         If this returns true, every primitive on both libraries
+     *         is byte-correct against a real Ethereum mainnet-spec
+     *         sync committee signature.
+     */
+    function it_verifies_real_sepolia_sync_committee_signature_end_to_end() {
+        // Step 1: hash_tree_root(attested header).
+        bytes32 headerRoot = SSZHashTree.hashTreeRootBeaconHeader(
+            _sepoliaAttestedSlot(),
+            _sepoliaAttestedProposer(),
+            _sepoliaAttestedParentRoot(),
+            _sepoliaAttestedStateRoot(),
+            _sepoliaAttestedBodyRoot()
+        );
+
+        // Step 2: compute_domain(DOMAIN_SYNC_COMMITTEE, fork_version, gvr).
+        bytes32 domain = SSZHashTree.computeDomain(
+            bytes4(0x07000000),               // DOMAIN_SYNC_COMMITTEE
+            _sepoliaForkVersion(),
+            _sepoliaGenesisValidatorsRoot()
+        );
+
+        // Step 3: compute_signing_root.
+        bytes32 signingRoot = SSZHashTree.computeSigningRoot(headerRoot, domain);
+
+        // Sanity: matches the precomputed signing root from the offline tool.
+        require(
+            signingRoot == _sepoliaSigningRootPrecomputed(),
+            "signing root pipeline disagrees with offline computation"
+        );
+
+        // Step 4: BLS pairing check.
+        bool ok = BLSVerify.verifySyncCommitteeAggregate(
+            _sepoliaAggPubkey(),
+            signingRoot,
+            _sepoliaSignature()
+        );
+        require(ok, "Sepolia sync-committee signature should verify");
+    }
+
+    function it_rejects_signature_with_wrong_signing_root() {
+        // Sanity: flip a bit in the signing root and the verify must
+        // return false (not revert — we want a clean false return for
+        // bad signatures so EthLightClient can decide what to do).
+        bytes32 badRoot = bytes32(uint256(_sepoliaSigningRootPrecomputed()) ^ uint256(1));
+        bool ok = BLSVerify.verifySyncCommitteeAggregate(
+            _sepoliaAggPubkey(),
+            badRoot,
+            _sepoliaSignature()
+        );
+        require(!ok, "must not accept signature against wrong signing root");
     }
 }
