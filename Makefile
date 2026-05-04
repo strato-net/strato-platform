@@ -50,7 +50,7 @@ $(info )
 
 # Compute content hash for a directory (truncated to 12 chars)
 # Usage: $(call dir_hash,directory_path)
-dir_hash = $(shell git ls-files $(1) 2>/dev/null | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
+dir_hash = $(shell git ls-files $(1) 2>/dev/null | LC_ALL=C sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
 
 # Image content hashes - used for docker tags
 HASH_STRATO := $(call dir_hash,strato)
