@@ -684,6 +684,19 @@ contract record CDPEngine is Ownable {
         emit PausedGlobal(isPaused);
     }
 
+    /** Owner-only: pause a specific asset (guardian-safe no-arg shim) */
+    function pauseAsset(address asset) external onlyOwner {
+        require(isSupportedAsset[asset], "CDPEngine: unsupported asset");
+        collateralConfigs[asset].isPaused = true;
+        emit Paused(asset, true);
+    }
+
+    /** Owner-only: pause the entire CDP engine (guardian-safe no-arg shim) */
+    function pauseGlobal() external onlyOwner {
+        globalPaused = true;
+        emit PausedGlobal(true);
+    }
+
     /** Owner-only: toggle support for a collateral asset (pseudo-remove/add) */
     /// @param asset The asset to toggle support for.
     /// @param supported Whether the asset should be supported.

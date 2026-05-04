@@ -402,6 +402,28 @@ contract Describe_StablePool is Authorizable {
         require(pool.isDisabled() == true, "setDisabled(true) should set isDisabled");
     }
 
+    function it_pool_pause_shim_sets_true_only() {
+        require(pool.isPaused() == false, "Pool should start unpaused");
+
+        pool.pause();
+        require(pool.isPaused() == true, "pause() should set isPaused true");
+
+        // Idempotent
+        pool.pause();
+        require(pool.isPaused() == true, "pause() should remain true on repeat");
+
+        // Cannot pause while disabled
+        pool.setPaused(false);
+        pool.setDisabled(true);
+        bool reverted = false;
+        try {
+            pool.pause();
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "pause() should revert when isDisabled");
+    }
+
     function it_pool_pause_state_persists_across_operations() {
         uint256 amountA = 2000e18;
         uint256 amountB = 2000e18;
