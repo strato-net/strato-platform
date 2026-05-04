@@ -2214,7 +2214,12 @@ tcExpr (NumberLiteral x n _) = if n < 0
 tcExpr (DecimalLiteral x _) = pure $ decimalType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (AddressLiteral x _) = pure $ addressType' x
-tcExpr (HexaLiteral x _) = pure $ stringType' x
+-- | Hex string literals (@hex"..."@) are evaluated to 'SBytes' at
+--   runtime (see 'expToVar'' in @Blockchain.SolidVM@). Reporting them
+--   as 'string' here causes a type mismatch any time a contract
+--   assigns one to a 'bytes' variable, even though the value really is
+--   bytes. Align the static type with the runtime so the two agree.
+tcExpr (HexaLiteral x _) = pure $ bytesType' x
 tcExpr (InlineBoundsCheck x _ _ a) = intType' x ~> tcExpr a
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es
