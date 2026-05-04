@@ -9,6 +9,7 @@ import { ContractDeployScenario } from "./scenarios/contractDeploy";
 import { FunctionCallScenario } from "./scenarios/functionCall";
 import { MixedWorkloadScenario } from "./scenarios/mixedWorkload";
 import { TokenSaleScenario } from "./scenarios/tokenSale";
+import { ForgeBuyScenario } from "./scenarios/forgeBuy";
 import { BaseScenario } from "./scenarios/base";
 import { LoadTestConfig, LoadTestReport, ScenarioResult } from "./types";
 
@@ -20,14 +21,14 @@ program
   .option("-c, --config <path>", "Path to config YAML file", "config.yaml")
   .option(
     "-s, --scenario <name>",
-    "Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale",
+    "Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale | forgeBuy",
   )
   .option("--batch-size <n>", "Override batch size (low-level scenarios)", parseInt)
   .option("--batch-count <n>", "Override batch count (low-level scenarios)", parseInt)
-  .option("--concurrent-users <n>", "Override concurrent users for tokenSale", parseInt)
-  .option("--total-tx <n>", "Override totalTxCount (tokenSale)", parseInt)
-  .option("--time-window <ms>", "Override timeWindowMs (tokenSale)", parseInt)
-  .option("--backend-url <url>", "Override backend URL (tokenSale)")
+  .option("--concurrent-users <n>", "Override concurrent users (tokenSale, forgeBuy)", parseInt)
+  .option("--total-tx <n>", "Override totalTxCount (tokenSale, forgeBuy)", parseInt)
+  .option("--time-window <ms>", "Override timeWindowMs (tokenSale, forgeBuy)", parseInt)
+  .option("--backend-url <url>", "Override backend URL (tokenSale, forgeBuy)")
   .option("--nodes <names>", "Comma-separated node names to target", (v) => v.split(","))
   .option("--report-dir <path>", "Output directory for reports")
   .option("--submit-mode <mode>", "Submit mode: sequential (default) or pipeline")
@@ -107,6 +108,9 @@ async function main(): Promise<void> {
   }
   if (config.scenarios.tokenSale.enabled) {
     scenarios.push(new TokenSaleScenario(config, collector, opts.verbose));
+  }
+  if (config.scenarios.forgeBuy.enabled) {
+    scenarios.push(new ForgeBuyScenario(config, collector, opts.verbose));
   }
 
   if (scenarios.length === 0) {

@@ -76,25 +76,28 @@ function pickFirstNumeric(rows: any[], field: string): string | undefined {
 }
 
 /**
- * Read every balance involved in one buy-metal iteration.
+ * Read only the AUTH-FILTERED user-side balances (3 GETs):
+ *   - buyerPayToken (USDST balance of the calling Keycloak user)
+ *   - buyerMetalToken (GOLDST balance of the calling Keycloak user)
+ *   - buyerVoucher (voucher gas balance of the calling Keycloak user)
  *
- * Failures are collected in `snapshot.errors` rather than thrown so a partial
- * snapshot still surfaces in the test output (the load test's primary signal
- * is throughput, not balance correctness).
+ * Use this when you have N user accounts and want a per-user snapshot —
+ * call once per BackendClient, with each client mapped to its user's bearer.
+ * Combine with `takeForgeBalanceSnapshot` (called once total) to get the
+ * full set of fields without redundantly re-reading the shared forge state.
+ *
+ * Failures are collected in `snapshot.errors` rather than thrown so a
+ * partial snapshot still surfaces in the test output.
  */
-export async function takeBalanceSnapshot(
+export async function takeUserBalanceSnapshot(
   client: BackendClient,
-  targets: SnapshotTargets,
+  targets: Pick<SnapshotTargets, "payTokenAddress" | "metalTokenAddress">,
 ): Promise<BalanceSnapshot> {
   const snap: BalanceSnapshot = { ts: Date.now(), errors: [] };
   const payTok = targets.payTokenAddress.replace(/^0x/i, "");
   const metalTok = targets.metalTokenAddress.replace(/^0x/i, "");
-  const forge = targets.metalForgeAddress.replace(/^0x/i, "");
 
-  // Buyer payToken balance.
-  // The backend endpoint `/api/tokens/balance?address=eq.<token>` always
-  // filters Cirrus by the authenticated user. The Cirrus row schema is:
-  //   { address, user (alias of `key`), balance (alias of `value::text`), token: {...} }
+  // Buyer payToken balance (auth-filtered to calling user).
   try {
     const res = await client.request("GET", "/api/tokens/balance", {
       auth: true,
@@ -140,6 +143,29 @@ export async function takeBalanceSnapshot(
   } catch (err: any) {
     snap.errors.push(`buyerVoucher: ${err.message}`);
   }
+
+  return snap;
+}
+
+/**
+ * Read only the SHARED (non-user-scoped) balances (3 GETs):
+ *   - metalForgePayToken (USDST sitting in the MetalForge contract)
+ *   - metalForgeMetalToken (GOLDST in MetalForge — typically 0)
+ *   - metalTotalMinted (cumulative metalToken mint counter, global)
+ *
+ * Identical for every Keycloak user, so call once per snapshot pass and
+ * reuse the result alongside per-user snapshots from `takeUserBalanceSnapshot`.
+ * Any authenticated client works (the Cirrus + /api/metal-forge/configs reads
+ * don't filter by user).
+ */
+export async function takeForgeBalanceSnapshot(
+  client: BackendClient,
+  targets: SnapshotTargets,
+): Promise<BalanceSnapshot> {
+  const snap: BalanceSnapshot = { ts: Date.now(), errors: [] };
+  const payTok = targets.payTokenAddress.replace(/^0x/i, "");
+  const metalTok = targets.metalTokenAddress.replace(/^0x/i, "");
+  const forge = targets.metalForgeAddress.replace(/^0x/i, "");
 
   // MetalForge payToken holdings (direct Cirrus query — the backend's
   // /api/tokens/balance route only returns the authenticated user's row).
@@ -213,6 +239,70 @@ export async function takeBalanceSnapshot(
   return snap;
 }
 
+/**
+ * Combined user + forge snapshot. Backwards-compatible single-shot reader
+ * (6 GETs sequentially). Prefer the split form (`takeUserBalanceSnapshot`
+ * + `takeForgeBalanceSnapshot`) when you want per-user accuracy across N
+ * users — that way the 3 forge reads are issued once instead of N times.
+ */
+export async function takeBalanceSnapshot(
+  client: BackendClient,
+  targets: SnapshotTargets,
+): Promise<BalanceSnapshot> {
+  const userSnap = await takeUserBalanceSnapshot(client, targets);
+  const forgeSnap = await takeForgeBalanceSnapshot(client, targets);
+  return mergeSnapshots(userSnap, forgeSnap);
+}
+
+/**
+ * Combine a per-user snapshot and a shared forge snapshot into a single
+ * BalanceSnapshot view. The latest `ts` wins; errors are concatenated;
+ * fields are taken from whichever side populated them.
+ */
+export function mergeSnapshots(
+  user: BalanceSnapshot,
+  forge: BalanceSnapshot,
+): BalanceSnapshot {
+  return {
+    ts: Math.max(user.ts, forge.ts),
+    buyerPayToken: user.buyerPayToken,
+    buyerMetalToken: user.buyerMetalToken,
+    buyerVoucher: user.buyerVoucher,
+    metalForgePayToken: forge.metalForgePayToken,
+    metalForgeMetalToken: forge.metalForgeMetalToken,
+    metalTotalMinted: forge.metalTotalMinted,
+    errors: [...user.errors, ...forge.errors],
+  };
+}
+
+/**
+ * Sum two per-user balance snapshots field-wise (buyer.* only — the forge.*
+ * and metal.totalMinted fields are global and not meaningful to sum across
+ * users). Used to compute aggregate spend / receive across the whole pool
+ * for the run-summary line.
+ */
+export function sumUserSnapshots(
+  snaps: BalanceSnapshot[],
+): { buyerPayToken?: string; buyerMetalToken?: string; buyerVoucher?: string } {
+  const sumField = (key: "buyerPayToken" | "buyerMetalToken" | "buyerVoucher"): string | undefined => {
+    let acc = 0n;
+    let hadValue = false;
+    for (const s of snaps) {
+      const v = safeBigInt(s[key]);
+      if (v !== null) {
+        acc += v;
+        hadValue = true;
+      }
+    }
+    return hadValue ? acc.toString() : undefined;
+  };
+  return {
+    buyerPayToken: sumField("buyerPayToken"),
+    buyerMetalToken: sumField("buyerMetalToken"),
+    buyerVoucher: sumField("buyerVoucher"),
+  };
+}
+
 /* ----------------------------------------------------------------------- */
 /* Pretty-printing helpers                                                 */
 /* ----------------------------------------------------------------------- */
@@ -256,16 +346,26 @@ export function formatSnapshot(label: string, s: BalanceSnapshot): string {
   return `${label}: ${parts.join(" ")}${trailer}`;
 }
 
-/** Diff between two snapshots, formatted as a one-liner. */
+/** Diff between two snapshots, formatted as a one-liner. Fields that are
+ *  absent from BOTH `before` and `after` are skipped — so a per-user-only
+ *  snapshot prints just `buyer.*` deltas, and a forge-only snapshot prints
+ *  just the forge.* + metal.totalMinted deltas. */
 export function formatDiff(before: BalanceSnapshot, after: BalanceSnapshot): string {
-  const parts = [
-    `buyer.pay=${diffStr(before.buyerPayToken, after.buyerPayToken)}`,
-    `buyer.metal=${diffStr(before.buyerMetalToken, after.buyerMetalToken)}`,
-    `buyer.voucher=${diffStr(before.buyerVoucher, after.buyerVoucher)}`,
-    `forge.pay=${diffStr(before.metalForgePayToken, after.metalForgePayToken)}`,
-    `forge.metal=${diffStr(before.metalForgeMetalToken, after.metalForgeMetalToken)}`,
-    `metal.totalMinted=${diffStr(before.metalTotalMinted, after.metalTotalMinted)}`,
+  const fields: Array<[string, keyof BalanceSnapshot]> = [
+    ["buyer.pay", "buyerPayToken"],
+    ["buyer.metal", "buyerMetalToken"],
+    ["buyer.voucher", "buyerVoucher"],
+    ["forge.pay", "metalForgePayToken"],
+    ["forge.metal", "metalForgeMetalToken"],
+    ["metal.totalMinted", "metalTotalMinted"],
   ];
+  const parts: string[] = [];
+  for (const [label, key] of fields) {
+    const bv = before[key] as string | undefined;
+    const av = after[key] as string | undefined;
+    if (bv === undefined && av === undefined) continue;
+    parts.push(`${label}=${diffStr(bv, av)}`);
+  }
   return `Δ: ${parts.join(" ")}`;
 }
 

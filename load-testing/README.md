@@ -4,8 +4,9 @@ A standalone tool for load testing STRATO blockchain nodes and the Mercata appli
 
 Two families of scenarios are supported:
 
-**Application-level scenario** (recommended for full-stack testing):
+**Application-level scenarios** (recommended for full-stack testing):
 - `tokenSale` — replays the canonical Mercata UI bridge-in flow: Sepolia USDC → STRATO USDST → AUTO_FORGE → GOLDST. Each iteration signs a Permit2 typed-data on Sepolia, broadcasts `DepositRouter.deposit(...)`, then posts `/api/bridge/requestDepositAction` with `action: 2` (AUTO_FORGE).
+- `forgeBuy` — direct `/api/metal-forge/buy` stress (skips Sepolia + bridge service entirely). Each iteration POSTs `/api/metal-forge/buy { metalToken, payToken, payAmount, minMetalOut }` against the calling user's existing USDST balance on STRATO, executing `MetalForge.mintMetal` in a single on-STRATO tx (USDST → GOLDST). Useful for stressing the metal-forge backend route in isolation, or when no Sepolia funding is available.
 
 **Low-level scenarios** (direct node API testing, pre-existing):
 - `contractDeploy`, `functionCall`, `mixedWorkload` — submit batches of txs directly via `/strato/v2.3/transaction/parallel` and poll `/bloc/v2.2/transactions/results`.
@@ -80,6 +81,18 @@ Optional per-user warm-up replays the GETs the Fund page fires on mount:
 
 On first run with a given Sepolia EOA, the broadcaster submits a one-time `approve(MAX)` so Permit2 can spend the configured ERC20. After that every iteration only signs typed-data and calls `DepositRouter.deposit(...)`.
 
+**Pre-run diagnostics** (run before the iteration loop starts):
+
+- **EOA balance check** — reads the broadcaster EOA's Sepolia ETH and ERC20 balances; warns if either is below the per-iteration requirement so a misconfigured run fails fast instead of spending 5 minutes on AUTO_FORGE timeouts.
+- **Per-user STRATO snapshot** (when `logBalances: "summary"`) — one auth-filtered snapshot per unique Keycloak user in the pool plus one shared forge/global snapshot.
+- **Recipient pre-loop snapshot** — reads the recipient's USDST + GOLDST directly from Cirrus (keyed by `bridge.stratoRecipientAddress`, NOT auth-filtered). Used as the baseline for the AUTO_FORGE wait.
+
+**Post-run diagnostics** (run after the iteration loop):
+
+- **Sepolia receipt sweep** — fetches `getTransactionReceipt` for every successful broadcast; tags each as `[OK]` (mined + DepositRouted event), `[REVERTED]` (with the EVM revert reason), `[PENDING]`, or `[NOT_FOUND]`. Promotes the per-tx metric status from `submitted` to `confirmed` / `failed` so the summary table is accurate.
+- **AUTO_FORGE wait** — polls the recipient's GOLDST balance via Cirrus until either the expected number of mint events lands, the balance settles after some movement (mints may coalesce into one Cirrus update if they land in the same block), or `autoForgeWaitTimeoutSec` elapses. Final outcome tagged `[OK]` / `[PARTIAL]` / `[TIMEOUT]`.
+- **Per-user STRATO snapshot delta** + forge delta + pool-aggregate (multi-user runs only).
+
 Key config fields under `scenarios.tokenSale`:
 
 | Field | Meaning |
@@ -88,28 +101,62 @@ Key config fields under `scenarios.tokenSale`:
 | `timeWindowMs` | Target window — the test paces itself to finish in this many ms (default 30000) |
 | `concurrentUsers` | Parallel virtual users (default 50) |
 | `externalChainId` | Source chain for the bridge leg (`"1"` Ethereum, `"11155111"` Sepolia, `"8453"` Base, …) |
-| `metalTokenAddress` | Metal token on STRATO (fetch GOLDST from `/api/metal-forge/configs`) |
+| `metalTokenAddress` | **REQUIRED.** Metal token on STRATO (fetch GOLDST from `/api/metal-forge/configs`) |
+| `payTokenAddress` | Intermediate STRATO-side token (USDST) — used for balance snapshots only. Defaults to helium USDST. |
+| `metalForgeAddress` | Helium MetalForge contract — used only for forge-side balance reads when `logBalances` ≠ `"none"`. |
 | `bridge.sepoliaRpcUrl` | Sepolia JSON-RPC URL (Alchemy/Infura/dRPC) |
 | `bridge.sepoliaPrivateKey` | Funded EOA private key (0x-prefixed) |
 | `bridge.depositRouterAddress` | DepositRouter contract address on Sepolia |
 | `bridge.sepoliaTokenAddress` | ERC20 to bridge (Sepolia USDC = `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`) |
-| `bridge.stratoRecipientAddress` | Recipient on STRATO |
+| `bridge.stratoRecipientAddress` | Recipient on STRATO (where USDST and AUTO_FORGE GOLDST land) |
 | `bridge.targetStratoToken` | STRATO-side intermediate token (USDST) |
 | `bridge.amountPerTx` | Per-bridge amount in the token's smallest unit (default `"1000"` = 0.001 USDC) |
-| `bridge.awaitConfirmation` | If true, await the Sepolia receipt before posting the bridge request |
+| `bridge.awaitConfirmation` | If true, await each Sepolia receipt during the iteration loop. Default false (recommended; the post-loop receipt sweep covers correctness). |
 | `bridge.permit2Address` | Override the canonical Permit2 (rarely needed) |
 | `bridge.permitDeadlineSec` | Permit2 signature deadline window (default 1800s) |
-| `pipelineMode` | If true, run in two phases (broadcast all → bridgeRequest all) instead of per-worker sequential |
-| `sepoliaConcurrency` | Override Phase 1 concurrency (default = `concurrentUsers`) |
-| `backendConcurrency` | Override Phase 2 concurrency (default = `concurrentUsers`) |
 | `requestRetries` | Retries for transient HTTP 429/5xx on the bridgeRequest leg (default 3) |
-| `logBalances` | `"none"` or `"summary"` — read STRATO balances before/after the run |
+| `logBalances` | `"summary"` (default) or `"none"`. `summary` produces per-user STRATO balance snapshots before/after the run, a shared forge snapshot, and a pool-aggregate line when `users:` has > 1 entry. `none` skips all balance reads for max throughput. |
+| `autoForgeWaitTimeoutSec` | Max seconds to poll the recipient's GOLDST balance after the loop, waiting for the bridge service + AUTO_FORGE to land mints. Default 300. Set to 0 to skip the wait (faster runs but no end-to-end correctness check). |
+| `autoForgeWaitPollIntervalSec` | Polling interval during the AUTO_FORGE wait (default 5s). |
 | `includePageLoad` | If true, do the 4 Fund-page GETs once per user during warm-up |
-| `users` | Optional pool of credentials; cycles across concurrent users |
+| `users` | Optional pool of Keycloak credentials; round-robin'd across `concurrentUsers` BackendClients. Each unique user gets its own auth-filtered balance snapshot. |
 
 Overrides: `--total-tx 500 --time-window 15000 --concurrent-users 100 --backend-url https://...`
 
 The summary table in the report breaks the metrics out per leg: `tokenSale:sepoliaDeposit`, `tokenSale:bridgeRequest`, and `tokenSale:pageLoad:<step>`. A terminal line at the end reports combined sales/s (pair rate) and call/s (individual request rate).
+
+## Running the Forge Buy scenario
+
+```bash
+npm run test:forge-buy -- --config config.highlevel.yaml
+```
+
+Replays the simpler "user already holds USDST on STRATO; clicks Buy Gold" flow. Per iteration POSTs `/api/metal-forge/buy { metalToken, payToken, payAmount, minMetalOut }`; the backend executes `MetalForge.mintMetal` on STRATO in a single tx (USDST → GOLDST). No Sepolia, no bridge service, no asynchronous wait — the on-STRATO tx hash is in the response body the moment the POST returns.
+
+Optional warmup: 2 GETs (`/api/metal-forge/configs`, `/api/tokens/balance`) once per user.
+
+Key config fields under `scenarios.forgeBuy`:
+
+| Field | Meaning |
+|---|---|
+| `metalTokenAddress` | **REQUIRED.** GOLDST address on STRATO. |
+| `payTokenAddress` | USDST on STRATO. Defaults to helium USDST. |
+| `payAmount` | USDST spent per iteration in 18-decimal wei. Default `"1000000000000000"` (= 0.001 USDST). |
+| `minMetalOut` | Slippage guard. Default `"0"` (accept any output). |
+| `totalTxCount` | Number of buys to execute (default 1000). |
+| `timeWindowMs` | Target window — the test paces itself to finish in this many ms (default 30000). |
+| `concurrentUsers` | Parallel virtual users (default 50). |
+| `metalForgeAddress` | Helium MetalForge — used only for forge-side balance reads when `logBalances` ≠ `"none"`. |
+| `includePageLoad` | If true (default), do the 2 page-load GETs once per user during warm-up. |
+| `requestRetries` | Retries on 429 / 5xx for `/api/metal-forge/buy`. Default 3. |
+| `logBalances` | `"summary"` (default) or `"none"`. `summary` produces per-user STRATO balance snapshots before/after the run, a shared forge snapshot, and a pool-aggregate Δ line for multi-user pools. `none` skips all balance reads for max throughput. |
+| `users` | Optional pool of Keycloak credentials. Each user must hold sufficient USDST (≥ `totalTxCount × payAmount ÷ concurrentUsers`) plus voucher gas headroom. Round-robin'd across `concurrentUsers` BackendClients. |
+
+Overrides: `--total-tx 500 --time-window 15000 --concurrent-users 100 --backend-url https://...`
+
+The summary table breaks the metrics out as `forgeBuy:buyMetal` and `forgeBuy:pageLoad:<step>`. Latency reflects the full backend round-trip including the on-STRATO MetalForge.mintMetal tx submission.
+
+**Difference vs. tokenSale:** tokenSale exercises the full bridge pipeline including Sepolia, Permit2, the MercataBridge contract, the bridge service, and AUTO_FORGE. forgeBuy is a focused stress of just the metal-forge backend route + on-STRATO MetalForge contract — no external chains, no daemon polling, much shorter end-to-end latency. Use tokenSale to validate the production flow; use forgeBuy to find saturation points on the metal-forge code path in isolation.
 
 ## Test-user and funding prerequisites
 
@@ -117,7 +164,12 @@ The summary table in the report breaks the metrics out per leg: `tokenSale:sepol
 
 The scenario authenticates against Keycloak using password grant. You need at minimum one user under the `mercata` realm, with the `clientId` / `clientSecret` for the load-test OAuth client. To run at full parallelism you'll want a pool — create them via the Keycloak admin UI or REST API and list them under the scenario's `users:` array. If you provide fewer users than `concurrentUsers`, the framework cycles through what's given (multiple virtual users may share the same Keycloak account).
 
-Each test user's STRATO address must hold sufficient voucher or USDST balance to cover the gas fee for the on-STRATO portion of the bridge-request call. Transfer USDST to the test users via the `/api/tokens/transfer` route from an already-funded account, or mint voucher balances through the governance path.
+Voucher / USDST funding requirements differ by scenario:
+
+- **`tokenSale`** — the bridge service GRANTS vouchers to the recipient as part of completing each deposit (~2500 vouchers per bridge in observed runs), so steady-state voucher balance grows during the run. The recipient still needs an initial voucher balance to cover the on-STRATO bridgeRequest tx fee on the first iterations before the bridge service has caught up.
+- **`forgeBuy`** — the calling user SPENDS vouchers per iteration (~200 vouchers per `MetalForge.mintMetal` call) plus `payAmount` of USDST. Each user in the pool must hold ≥ `totalTxCount × payAmount ÷ concurrentUsers` of USDST and ~`200 × totalTxCount ÷ concurrentUsers × 1.5` (50% safety) of voucher headroom.
+
+Transfer USDST between users via the `/api/tokens/transfer` route from an already-funded account, or mint voucher balances through the governance path.
 
 ### Sepolia wallet funding
 
@@ -205,8 +257,9 @@ scenarios:
 # Run all enabled scenarios (per the config file)
 npm run test:all
 
-# High-level
-npm run test:token-sale
+# High-level (application stack)
+npm run test:token-sale       # Sepolia USDC -> USDST -> AUTO_FORGE -> GOLDST
+npm run test:forge-buy        # direct USDST -> GOLDST (no Sepolia, no bridge service)
 
 # Low-level (direct node) scenarios
 npm run test:deploy
@@ -227,16 +280,17 @@ ts-node src/cli.ts [options]
 
 Options:
   -c, --config <path>       Path to config YAML file (default: "config.yaml")
-  -s, --scenario <name>     Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale
-  --batch-size <n>          Override batch size for low-level scenarios
-  --batch-count <n>         Override batch count for low-level scenarios
-  --concurrent-users <n>    Override concurrentUsers (tokenSale)
-  --total-tx <n>            Override totalTxCount (tokenSale)
-  --time-window <ms>        Override timeWindowMs (tokenSale)
-  --backend-url <url>       Override backend URL (tokenSale)
+  -s, --scenario <name>     Run a specific scenario: contractDeploy | functionCall | mixedWorkload | tokenSale | forgeBuy
+  --batch-size <n>          Override batch size (low-level scenarios)
+  --batch-count <n>         Override batch count (low-level scenarios)
+  --concurrent-users <n>    Override concurrentUsers (tokenSale, forgeBuy)
+  --total-tx <n>            Override totalTxCount (tokenSale, forgeBuy)
+  --time-window <ms>        Override timeWindowMs (tokenSale, forgeBuy)
+  --backend-url <url>       Override backend URL (tokenSale, forgeBuy)
+  --submit-mode <mode>      Submit mode for low-level scenarios: sequential (default) or pipeline
   --nodes <names>           Comma-separated node names to target
   --report-dir <path>       Output directory for reports
-  -v, --verbose             Enable verbose per-batch logging
+  -v, --verbose             Enable verbose per-iteration logging
 ```
 
 ### Examples
@@ -274,14 +328,16 @@ Reports are written to `./reports/` (configurable) in two formats:
 
 ## Metrics Collected
 
-For each transaction:
+Each scenario records one or more `TxMetric` entries per iteration, scoped under
+a sub-scenario name (e.g. `tokenSale:sepoliaDeposit`, `tokenSale:bridgeRequest`,
+`forgeBuy:buyMetal`, `tokenSale:pageLoad:metalForgeConfigs`). Per-tx fields:
 
 | Metric | Description |
 |--------|-------------|
-| `submitDuration` | Time to POST the batch to `/transaction/parallel` |
-| `confirmDuration` | Time spent polling `/transactions/results` until terminal status |
-| `totalDuration` | `submitDuration + confirmDuration` (end-to-end) |
-| `status` | `confirmed`, `failed`, or `timeout` |
+| `submitDuration` | The wall-clock from the start of the relevant operation to its first observable terminal signal: HTTP response time for backend POSTs (`bridgeRequest`, `buyMetal`, `pageLoad:*`); `eth_sendRawTransaction` round-trip for Sepolia broadcasts; full submit-and-poll for low-level scenarios (`contractDeploy`, `functionCall`, `mixedWorkload`). |
+| `confirmDuration` | Only meaningful for low-level scenarios (time spent polling `/bloc/v2.2/transactions/results`). 0 for application-level scenarios — those treat the backend response as the terminal signal. The Sepolia receipt sweep (tokenSale) updates the `status` post-loop without rewriting this field. |
+| `totalDuration` | `submitDuration + confirmDuration` (end-to-end). For application-level scenarios this equals `submitDuration`. |
+| `status` | `confirmed`, `failed`, `submitted`, or `timeout`. The Sepolia receipt sweep promotes `submitted` → `confirmed` / `failed` after the iteration loop ends. |
 
 Aggregate stats computed per scenario per node:
 

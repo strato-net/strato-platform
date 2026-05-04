@@ -64,24 +64,24 @@ export interface MultiNodeConfig {
 }
 
 // ----------------------------------------------------------------------------
-// Token Sale TPS scenario (Scenario 1) — canonical UI flow only.
+// Application-layer scenario building blocks
 // ----------------------------------------------------------------------------
-// Replays the exact composition the Mercata UI performs at /dashboard/deposits
-// when a user picks "Bridge-In > Ethereum Sepolia > Send USDC > Receive GOLDST"
-// (see mercata/ui/src/components/bridge/BridgeIn.tsx + DepositsPage.tsx).
-//
-// Each iteration:
-//   1. Sign Permit2 typed-data (EIP-712) for USDC on Sepolia.
-//   2. Broadcast DepositRouter.deposit(USDC, ..., signature) on Sepolia.
-//   3. POST /api/bridge/requestDepositAction { action: 2 (AUTO_FORGE),
-//      targetToken: GOLDST }.
-//
-// The bridge service polls Sepolia, sees the deposit, mints USDST to the
-// recipient and auto-forges USDST → GOLDST server-side. We do NOT call
-// /api/metal-forge/buy directly — AUTO_FORGE handles the metal mint.
+// Two scenarios share these:
+//   - tokenSale  (Scenario 1): canonical Mercata Bridge-In flow.
+//                Sign Permit2 + broadcast DepositRouter.deposit on Sepolia,
+//                then POST /api/bridge/requestDepositAction (action=2
+//                AUTO_FORGE). The bridge service finishes the pipeline
+//                server-side (USDST -> GOLDST mint).
+//   - forgeBuy   (Scenario 2): direct MetalForge mint. The calling user
+//                already holds USDST on STRATO; per iteration POSTs
+//                /api/metal-forge/buy (USDST -> GOLDST). No Sepolia, no
+//                bridge service.
 // ----------------------------------------------------------------------------
 
-export interface TokenSaleUser {
+/** Pre-provisioned Keycloak credential used to drive a virtual user.
+ *  Multiple scenarios may share a pool; OAuthClients are deduped by
+ *  (clientId, username). */
+export interface LoadTestUser {
   username: string;
   password: string;
 }
@@ -149,11 +149,15 @@ export interface TokenSaleBridgeConfig {
  */
 export type BalanceLoggingMode = "none" | "summary";
 
+// ----------------------------------------------------------------------------
+// Token Sale (canonical bridge-in flow) — Scenario 1
+// ----------------------------------------------------------------------------
+
 export interface TokenSaleScenarioConfig {
   enabled: boolean;
   /** Backend URL (e.g. https://app.testnet.strato.nexus). Defaults to node[0].url. */
   backendUrl?: string;
-  /** Total number of bridge-in + AUTO_FORGE pairs to execute. */
+  /** Total number of bridge-in + AUTO_FORGE iterations to execute. */
   totalTxCount: number;
   /** Target time window in milliseconds (1000 sales / 30s = 30000). */
   timeWindowMs: number;
@@ -174,7 +178,7 @@ export interface TokenSaleScenarioConfig {
   metalTokenAddress: string;
   /** Pay token address on STRATO (hex, with or without 0x). E.g. USDST. The
    *  intermediate token AUTO_FORGE consumes when minting metal. Defaults to
-   *  helium USDST. */
+   *  helium USDST. Used only for the post-run balance snapshot. */
   payTokenAddress?: string;
   /** MetalForge contract address on STRATO (hex, with or without 0x). Used to
    *  read counterparty balances via Cirrus when `logBalances` != "none".
@@ -184,40 +188,16 @@ export interface TokenSaleScenarioConfig {
   /* ---- Behaviour toggles ---- */
   /** If true, do the Fund-page warm-up GETs once per user before hitting the POSTs. */
   includePageLoad?: boolean;
-  /**
-   * If true, run the legs in a TWO-PHASE pipeline instead of the default
-   * per-worker-sequential mode:
-   *   Phase 1: broadcast all N Sepolia deposits in parallel (bounded by
-   *            sepoliaConcurrency, defaults to concurrentUsers).
-   *   Phase 2: for each successful broadcast, fire the AUTO_FORGE bridge
-   *            request in parallel (bounded by backendConcurrency, defaults
-   *            to concurrentUsers).
-   * Wall-clock becomes max(slowest broadcast) + max(slowest backend round-
-   * trip) instead of N × per-iteration time.
-   * Note: pipelineMode disables per-iteration rate-limiting (timeWindowMs is
-   * ignored within phases — phases run as fast as the concurrency allows).
-   */
-  pipelineMode?: boolean;
-  /** Override concurrency for the broadcast phase under pipelineMode.
-   *  Default: cfg.concurrentUsers. */
-  sepoliaConcurrency?: number;
-  /** Override concurrency for the bridgeRequest phase under pipelineMode.
-   *  Default: cfg.concurrentUsers. */
-  backendConcurrency?: number;
 
   /**
    * Max retries for transient HTTP errors (429 + any 5xx) on the
    * /api/bridge/requestDepositAction call. Default 3. Backoff between
-   * attempts is exponential with jitter: 1500*2^k + random(0..500) ms, so
-   * attempts are spaced ~1.5s, ~3s, ~6s after the initial try (max ~10.5s
-   * of total retry-wait at the worst case). Retried iterations record a
-   * single metric whose `submitDuration` is the end-to-end wall clock
-   * including the wait windows.
+   * attempts is exponential with jitter: 1500*2^k + random(0..500) ms.
    */
   requestRetries?: number;
 
   /** Granularity of STRATO-side token-balance snapshotting around the run.
-   *  Default "none". See BalanceLoggingMode for semantics. */
+   *  Default "summary". See BalanceLoggingMode for semantics. */
   logBalances?: BalanceLoggingMode;
 
   /**
@@ -233,13 +213,12 @@ export interface TokenSaleScenarioConfig {
    *   - The number of observed GOLDST balance increments equals the number
    *     of successful Sepolia broadcasts (each AUTO_FORGE produces one mint);
    *   - The balance has been stable for ≥ 2 polls AND at least one mint
-   *     was observed (assume the rest failed silently); or
-   *   - `autoForgeWaitTimeoutSec` elapses (treated as a hard test failure
-   *     signal — bridge service may still be processing afterwards).
+   *     was observed (treated as [OK] — mints may have coalesced into one
+   *     Cirrus update); or
+   *   - `autoForgeWaitTimeoutSec` elapses (tagged [TIMEOUT] if 0 movement,
+   *     [PARTIAL] if some movement seen but not settled).
    *
-   * Default 300 (5 min). Set to 0 to disable the wait entirely (the post-run
-   * snapshot will then almost certainly show all-zero deltas at small wall-
-   * clock runs).
+   * Default 300 (5 min). Set to 0 to disable the wait entirely.
    */
   autoForgeWaitTimeoutSec?: number;
   /** Polling interval in seconds while waiting for AUTO_FORGE mints to land.
@@ -248,10 +227,73 @@ export interface TokenSaleScenarioConfig {
 
   /* ---- Auth ---- */
   /** Optional list of pre-provisioned user credentials. Falls back to node[0] auth. */
-  users?: TokenSaleUser[];
+  users?: LoadTestUser[];
   /** Optional OpenID discovery URL for user auth (falls back to node[0].auth). */
   openIdDiscoveryUrl?: string;
   /** Optional OAuth client id / secret for user auth. */
+  clientId?: string;
+  clientSecret?: string;
+}
+
+// ----------------------------------------------------------------------------
+// Forge Buy (direct metal-forge POST) — Scenario 2
+// ----------------------------------------------------------------------------
+// The calling Keycloak user already holds USDST on STRATO. Per iteration the
+// scenario POSTs /api/metal-forge/buy { metalToken, payToken, payAmount,
+// minMetalOut } which executes MetalForge.mintMetal in a single on-STRATO
+// tx (USDST -> GOLDST). No Sepolia, no bridge service, no asynchronous wait.
+//
+// Useful for stressing the metal-forge backend route + on-STRATO MetalForge
+// contract in isolation, or when the funded Sepolia EOA has no USDC.
+// ----------------------------------------------------------------------------
+
+export interface ForgeBuyScenarioConfig {
+  enabled: boolean;
+  /** Backend URL (e.g. https://app.testnet.strato.nexus). Defaults to node[0].url. */
+  backendUrl?: string;
+  /** Total number of metal-forge buy iterations to execute. */
+  totalTxCount: number;
+  /** Target time window in milliseconds. */
+  timeWindowMs: number;
+  /** Number of concurrent virtual users submitting buys. */
+  concurrentUsers: number;
+  /** Network identifier label, e.g. "helium". Report metadata only. */
+  networkLabel?: string;
+  /** STRATO chain ID. Report metadata only. */
+  chainId?: string | number;
+
+  /** Metal token address on STRATO (hex, with or without 0x). E.g. GOLDST.
+   *  Required — `metalToken` field of the POST body. */
+  metalTokenAddress: string;
+  /** Pay token address on STRATO. E.g. USDST. Required — `payToken` field
+   *  of the POST body. Defaults to helium USDST. */
+  payTokenAddress?: string;
+  /** Pay amount per iteration in 18-decimal wei. Required — `payAmount`
+   *  field of the POST body. Default `"1000000000000000"` = 0.001 USDST. */
+  payAmount?: string;
+  /** Slippage guard. `minMetalOut` field of the POST body. Default `"0"`
+   *  (accept any output). In production set this from an oracle reading. */
+  minMetalOut?: string;
+  /** MetalForge contract address on STRATO. Used to read counterparty
+   *  balances via Cirrus when `logBalances` != "none". Defaults to the
+   *  helium testnet MetalForge. */
+  metalForgeAddress?: string;
+
+  /* ---- Behaviour toggles ---- */
+  /** If true, do a small page-load warm-up (GETs that the relevant UI page
+   *  fires on mount) once per user before hitting the POSTs. Default true. */
+  includePageLoad?: boolean;
+  /** Max retries on HTTP 429 + 5xx for /api/metal-forge/buy. Default 3. */
+  requestRetries?: number;
+  /** STRATO-side balance snapshotting around the run. Default "summary". */
+  logBalances?: BalanceLoggingMode;
+
+  /* ---- Auth ---- */
+  /** Optional list of pre-provisioned user credentials. Falls back to node[0] auth.
+   *  Each user must hold sufficient USDST on STRATO (≥ totalTxCount × payAmount
+   *  ÷ concurrentUsers, plus voucher gas headroom for the on-STRATO tx). */
+  users?: LoadTestUser[];
+  openIdDiscoveryUrl?: string;
   clientId?: string;
   clientSecret?: string;
 }
@@ -262,6 +304,7 @@ export interface ScenariosConfig {
   mixedWorkload: MixedWorkloadScenarioConfig;
   multiNode: MultiNodeConfig;
   tokenSale: TokenSaleScenarioConfig;
+  forgeBuy: ForgeBuyScenarioConfig;
 }
 
 export interface ReportConfig {

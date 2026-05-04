@@ -111,31 +111,22 @@ scenarios:
     # payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"  # default — helium USDST (intermediate token AUTO_FORGE consumes)
     # metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6"   # default (helium MetalForge — used only for forge-side balance reads)
     # includePageLoad: true                 # default (4 Fund-page GETs once per user during warmup)
-    # --- pipeline mode (decouples Sepolia broadcast / bridge-request phases) ---
-    # When true the scenario runs in TWO PHASES with bounded concurrency:
-    #   Phase 1: broadcast all N Sepolia deposits in parallel (single signer,
-    #            sequential nonces; concurrency=sepoliaConcurrency).
-    #   Phase 2: for each successful broadcast, fire the AUTO_FORGE bridge
-    #            request (concurrency=backendConcurrency).
-    # Wall clock collapses to ~max(slowest broadcast)+max(slowest backend rt)
-    # instead of the per-worker N×(broadcast+bridgeRequest) sequence.
-    # timeWindowMs is ignored under pipelineMode — phases run as fast as
-    # concurrency allows.
-    # pipelineMode: false                   # default
-    # sepoliaConcurrency: 50                # default = concurrentUsers
-    # backendConcurrency: 50                # default = concurrentUsers
-    # --- transient-error retry (bridgeRequest leg) ---
+    # --- transient-error retry (per-iteration backend POST) ---
     # Retries on HTTP 429 + any 5xx (e.g. backend 503 when the bridge service
     # is overloaded). Backoff between attempts is exponential with ±0..500 ms
     # jitter — attempt 2 fires after ~1.5s, attempt 3 after ~3s, attempt 4
     # after ~6s. Final post-retry failures still surface as `… FAILED:` lines.
     # requestRetries: 3                     # default; 0 disables retry
     # --- balance logging ---
-    # logBalances: "none"                   # default — "none" | "summary"
-    #                                       # summary: one snapshot before + one after the whole run
-    #                                       #          (auth-filtered; reports the calling user's balances,
-    #                                       #          not the recipient's — see autoForgeWait* below for the
-    #                                       #          end-to-end mint check on the recipient)
+    # logBalances: "summary"                # default — "summary" | "none"
+    #                                       # summary: per-user STRATO snapshot before + after the run
+    #                                       #          (auth-filtered to each entry of `users:`), plus a
+    #                                       #          shared forge/global snapshot and a pool-aggregate
+    #                                       #          Δ line when N>1. Reports the CALLING user's
+    #                                       #          balances, not the bridge recipient's — see the
+    #                                       #          autoForgeWait* settings below for the end-to-end
+    #                                       #          mint check on the recipient.
+    #                                       # none:    no balance reads (max throughput).
     # --- end-to-end AUTO_FORGE verification ---
     # After all bridge requests have been posted, the bridge service still
     # has to (a) wait for Sepolia confirmations, (b) MercataBridge.completeDeposit
@@ -154,6 +145,53 @@ scenarios:
     #                                       # latency and not end-to-end correctness.
     # autoForgeWaitPollIntervalSec: 5       # default 5 s (~60 polls over the default 5 min timeout)
     # --- optional user pool (cycles across concurrentUsers for more realistic auth load) ---
+    # users:
+    #   - { username: "loadtest1", password: "pw1" }
+    #   - { username: "loadtest2", password: "pw2" }
+    # openIdDiscoveryUrl: ""                # default: node[0].auth.openIdDiscoveryUrl
+    # clientId: ""                          # default: node[0].auth.clientId
+    # clientSecret: ""                      # default: node[0].auth.clientSecret
+
+  # ---------------------------------------------------------------------------
+  # Forge Buy — direct /api/metal-forge/buy stress (no bridge service involved)
+  # ---------------------------------------------------------------------------
+  # Replays the simpler "user already holds USDST on STRATO; clicks Buy Gold"
+  # flow. Per iteration POSTs /api/metal-forge/buy { metalToken, payToken,
+  # payAmount, minMetalOut }; the backend executes MetalForge.mintMetal on
+  # STRATO in a single tx (USDST → GOLDST). No Sepolia, no bridge service,
+  # no asynchronous wait — the on-STRATO tx hash is in the response body.
+  #
+  # Useful for:
+  #   - Stressing the metal-forge backend route + on-STRATO MetalForge contract
+  #     in isolation (without the Sepolia + bridge-service dependency).
+  #   - Testing on networks where the bridge service isn't deployed.
+  #   - Quick smoke tests when you don't want to deal with Sepolia funding.
+  #
+  # Prerequisites:
+  #   - The calling Keycloak user (or every entry of `users:` below) must hold
+  #     ≥ totalTxCount × payAmount ÷ concurrentUsers of USDST on STRATO, plus
+  #     voucher gas headroom for the on-STRATO mintMetal tx.
+  forgeBuy:
+    # enabled: false                        # default — set true to run this scenario
+    # REQUIRED — GOLDST address on STRATO. Discover via /api/metal-forge/configs.
+    metalTokenAddress: "REPLACE_GOLDST_ADDRESS"
+    # --- everything below has a code default; uncomment to override ---
+    # backendUrl: "https://app.testnet.strato.nexus"   # default: node[0].url
+    # networkLabel: "helium"                # default (report metadata only)
+    # chainId: 114784819836269              # default (helium testnet)
+    # totalTxCount: 1000                    # default
+    # timeWindowMs: 30000                   # default
+    # concurrentUsers: 50                   # default
+    # payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"  # default — helium USDST
+    # payAmount: "1000000000000000"         # default — 0.001 USDST per iteration (18-dec wei)
+    # minMetalOut: "0"                      # default — slippage guard (set from oracle in production)
+    # metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6"   # default — helium MetalForge
+    # includePageLoad: true                 # default — 2 GETs per user during warmup
+    # requestRetries: 3                     # default
+    # logBalances: "summary"                # default — "summary" | "none". summary: per-user
+    #                                       # STRATO snapshot before + after the run (auth-filtered
+    #                                       # to each entry of `users:`), plus a shared forge/global
+    #                                       # snapshot and a pool-aggregate Δ line when N>1.
     # users:
     #   - { username: "loadtest1", password: "pw1" }
     #   - { username: "loadtest2", password: "pw2" }
