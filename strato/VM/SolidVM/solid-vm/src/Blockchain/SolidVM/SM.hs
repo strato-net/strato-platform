@@ -608,6 +608,8 @@ getVariableOfName name = do
                        "bls12381Pairing",
                        "bls12381MapFpToG1",
                        "bls12381MapFp2ToG2",
+                       "bls12381HashToCurveG1",
+                       "bls12381HashToCurveG2",
                        "poseidon",
                        "payable",
                        "require",

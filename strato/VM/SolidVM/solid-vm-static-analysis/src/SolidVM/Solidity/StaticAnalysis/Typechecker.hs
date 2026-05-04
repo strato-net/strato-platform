@@ -1573,6 +1573,13 @@ bls12381G2AddArgs x =
         x
     )
 
+-- | (msg, dst) -> hash_to_curve output. Both args are raw byte strings;
+--   the message is whatever the application is hashing (signing root,
+--   IBE identity, etc.) and the DST is the RFC 9380 §3.1 domain
+--   separation tag.
+bls12381HashToCurveArgs :: SourceAnnotation Text -> Type'
+bls12381HashToCurveArgs x = Product (bytesType' x, bytesType' x, []) x
+
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
 stringConcatArgs x = MultiVariate (stringType' x) x
@@ -1699,6 +1706,8 @@ getVarType' "bls12381G2Msm" ctx = pure $ Function (blsBytesOrIntList ctx) (bytes
 getVarType' "bls12381Pairing" ctx = pure $ Function (blsBytesOrIntList ctx) (boolType' ctx) ctx [] [] False
 getVarType' "bls12381MapFpToG1" ctx = pure $ Function (bytesType' ctx) (bytesType' ctx) ctx [] [] False
 getVarType' "bls12381MapFp2ToG2" ctx = pure $ Function (bytesType' ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381HashToCurveG1" ctx = pure $ Function (bls12381HashToCurveArgs ctx) (bytesType' ctx) ctx [] [] False
+getVarType' "bls12381HashToCurveG2" ctx = pure $ Function (bls12381HashToCurveArgs ctx) (bytesType' ctx) ctx [] [] False
 getVarType' "poseidon" ctx = pure $ Function (poseidonArgs ctx) (intType' ctx) ctx [] [] False
 getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' "require" ctx = pure $ Function (requireArgs ctx) (Unit ctx) ctx [] [] False

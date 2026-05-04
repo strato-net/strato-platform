@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -33,10 +34,13 @@ import Blockchain.SolidVM.Builtins
     bls12381G2MsmInts,
     bls12381Pairing,
     bls12381PairingInts,
+    hashToCurveG1,
+    hashToCurveG2,
     mapFpToG1,
   )
 import qualified Data.ByteString.Char8 as BC
 import Data.Curve.Weierstrass (add, dbl)
+import qualified Data.Word as W
 
 import Data.Bits (shiftR)
 import qualified Data.ByteString as B
@@ -128,8 +132,8 @@ spec = do
       bls12381G1Add (z <> z) `shouldBe` Right z
 
     it "matches scalar mul: gen + gen = 2*gen" $ do
-      let dbl = mul g1Gen (2 :: G1Curve.Fr)
-      bls12381G1Add (encodeG1 g1Gen <> encodeG1 g1Gen) `shouldBe` Right (encodeG1 dbl)
+      let twoG = mul g1Gen (2 :: G1Curve.Fr)
+      bls12381G1Add (encodeG1 g1Gen <> encodeG1 g1Gen) `shouldBe` Right (encodeG1 twoG)
 
   describe "bls12381G1Msm" $ do
     it "rejects empty input" $
@@ -171,8 +175,8 @@ spec = do
       bls12381G2Add (z <> z) `shouldBe` Right z
 
     it "gen + gen = 2*gen" $ do
-      let dbl = mul g2Gen (2 :: G1Curve.Fr)
-      bls12381G2Add (encodeG2 g2Gen <> encodeG2 g2Gen) `shouldBe` Right (encodeG2 dbl)
+      let twoG = mul g2Gen (2 :: G1Curve.Fr)
+      bls12381G2Add (encodeG2 g2Gen <> encodeG2 g2Gen) `shouldBe` Right (encodeG2 twoG)
 
   describe "bls12381G2Msm" $ do
     it "rejects empty input" $
@@ -263,13 +267,10 @@ spec = do
   -- Tested via the byte-form builtin since that's what the SolidVM
   -- dispatcher (and EIP-2537 callers) actually invoke.
   describe "bls12381MapFpToG1 (RFC 9380)" $ do
-    let -- BLS12-381 subgroup order r. Used to check that the output
-        -- of the full pipeline lies in r·G1 (subgroup-cleared).
-        r :: Integer
-        r = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
-        encodeFp48 :: Integer -> B.ByteString
+    let encodeFp48 :: Integer -> B.ByteString
         encodeFp48 i =
-          let go 0 _ = []
+          let go :: Int -> Integer -> [W.Word8]
+              go 0 _ = []
               go k v = go (k - 1) (v `quot` 256) ++ [fromIntegral (v `rem` 256)]
            in B.pack (go 64 i)
         runMap :: Integer -> Maybe (Integer, Integer)
@@ -345,10 +346,12 @@ spec = do
         safeAdd a b = if a == b then dbl a else add a b
         mapPt u = isoMapG1 (simplifiedSwuG1Iso (fromInteger u :: G1Curve.Fq))
         hashToCurve msg =
-          let [u0, u1] = hashToFieldFp (BC.pack msg) dst 2 64 pInt
-              q0 = mapPt u0
-              q1 = mapPt u1
-           in clearCofactorG1 (safeAdd q0 q1)
+          case hashToFieldFp (BC.pack msg) dst 2 64 pInt of
+            [u0, u1] ->
+              let q0 = mapPt u0
+                  q1 = mapPt u1
+               in clearCofactorG1 (safeAdd q0 q1)
+            _ -> error "hashToFieldFp returned wrong number of elements"
         check msg expX expY =
           case hashToCurve msg of
             O -> error (msg ++ ": got point at infinity")
@@ -389,10 +392,12 @@ spec = do
           [a] -> (toInteger a, 0)
           (a : b : _) -> (toInteger a, toInteger b)
         hashToCurve msg =
-          let [u0, u1] = hashToFieldFp2 (BC.pack msg) dst 2 64 pInt
-              q0 = mapPt u0
-              q1 = mapPt u1
-           in clearCofactorG2 (safeAdd q0 q1)
+          case hashToFieldFp2 (BC.pack msg) dst 2 64 pInt of
+            [u0, u1] ->
+              let q0 = mapPt u0
+                  q1 = mapPt u1
+               in clearCofactorG2 (safeAdd q0 q1)
+            _ -> error "hashToFieldFp2 returned wrong number of elements"
         check msg expXc0 expXc1 expYc0 expYc1 =
           case hashToCurve msg of
             O -> error (msg ++ ": got point at infinity")
@@ -406,6 +411,46 @@ spec = do
         0x05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d
         0x0503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92
         0x12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d6
+
+  -- Same RFC §J.9.1 / §J.10.1 vectors, but exercising the public byte
+  -- builtin (msg, dst -> EIP-2537 G_i bytes). This is the API a
+  -- Solidity contract sees, so the round-trip through the byte codec
+  -- must agree with the in-process pipeline above.
+  describe "bls12381HashToCurveG1 (byte builtin)" $ do
+    let dst = BC.pack "QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_"
+        run msg = decodeG1Bytes . eitherRight $ hashToCurveG1 (BC.pack msg) dst
+
+    it "msg = \"\" matches RFC 9380 §J.9.1" $
+      run "" `shouldBe`
+        ( 0x052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a1
+        , 0x08ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265
+        )
+
+    it "msg = \"abc\" matches RFC 9380 §J.9.1" $
+      run "abc" `shouldBe`
+        ( 0x03567bc5ef9c690c2ab2ecdf6a96ef1c139cc0b2f284dca0a9a7943388a49a3aee664ba5379a7655d3c68900be2f6903
+        , 0x0b9c15f3fe6e5cf4211f346271d7b01c8f3b28be689c8429c85b67af215533311f0b8dfaaa154fa6b88176c229f2885d
+        )
+
+    it "msg = \"abcdef0123456789\" matches RFC 9380 §J.9.1" $
+      run "abcdef0123456789" `shouldBe`
+        ( 0x11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d98
+        , 0x03a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709
+        )
+
+  describe "bls12381HashToCurveG2 (byte builtin)" $ do
+    let dst = BC.pack "QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_"
+        run msg = decodeG2Bytes . eitherRight $ hashToCurveG2 (BC.pack msg) dst
+
+    it "msg = \"\" matches RFC 9380 §J.10.1" $
+      run "" `shouldBe`
+        ( ( 0x0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a
+          , 0x05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d
+          )
+        , ( 0x0503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92
+          , 0x12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d6
+          )
+        )
 
 isLeft :: Either a b -> Bool
 isLeft (Left _) = True

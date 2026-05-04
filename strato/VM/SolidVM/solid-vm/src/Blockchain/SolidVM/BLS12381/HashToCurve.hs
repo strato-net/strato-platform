@@ -11,18 +11,35 @@
 module Blockchain.SolidVM.BLS12381.HashToCurve
   ( mapFpToG1,
     mapFp2ToG2,
+    hashToCurveG1,
+    hashToCurveG2,
   )
 where
 
-import Blockchain.SolidVM.BLS12381.HashToCurve.G1 (clearCofactorG1, mapFpToG1Pt)
-import Blockchain.SolidVM.BLS12381.HashToCurve.G2 (mapFp2ToG2Pt)
+import Blockchain.SolidVM.BLS12381.HashToCurve.G1
+  ( clearCofactorG1,
+    fieldPrime,
+    isoMapG1,
+    mapFpToG1Pt,
+    simplifiedSwuG1Iso,
+  )
+import Blockchain.SolidVM.BLS12381.HashToCurve.G2
+  ( clearCofactorG2,
+    isoMapG2,
+    mapFp2ToG2Pt,
+    simplifiedSwuG2Iso,
+  )
+import Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
+  ( hashToFieldFp,
+    hashToFieldFp2,
+  )
 import qualified Data.ByteString as B
 import qualified Data.Word as W
 import Data.Bits (shiftL)
+import Data.Curve.Weierstrass (Point (..), add, dbl)
 import Data.Foldable (foldl')
-import Data.Curve.Weierstrass (Point (..))
 import Data.Pairing.BLS12381 (Fq2)
-import GHC.Exts (IsList (toList))
+import GHC.Exts (IsList (fromList, toList))
 
 -- ---- EIP-2537 byte codecs (mirror those in 'Blockchain.SolidVM.BLS12381') ----
 
@@ -103,3 +120,81 @@ mapFp2ToG2 input = do
   pure $ case pt of
     O -> B.replicate g2Size 0
     A x y -> encodeFp2Pair (fp2ToInts x) <> encodeFp2Pair (fp2ToInts y)
+
+-- ============================================================================
+-- Full hash_to_curve composition (RFC 9380 §3 / §6.6.3)
+-- ============================================================================
+--
+-- The map_to_curve builtins above take pre-derived F_p / F_p^2 inputs --
+-- which means a Solidity contract using them for BLS signature
+-- verification has to implement 'expand_message_xmd' and 'hash_to_field'
+-- itself, in user-space, before each map call. That's a lot of SHA-256
+-- work in contract bytecode for something the host can do natively.
+--
+-- These two functions wire the full pipeline from a raw message + DST,
+-- so a sync-committee verify (or any BLS_SIG_BLS12381*_XMD:SHA-256_*_*
+-- scheme) becomes a single builtin call.
+--
+-- Suite mapping:
+--   hash_to_curve(G1) = BLS12381G1_XMD:SHA-256_SSWU_RO_ (RFC 9380 §J.9)
+--   hash_to_curve(G2) = BLS12381G2_XMD:SHA-256_SSWU_RO_ (RFC 9380 §J.10)
+--
+-- Both produce points in the prime-order subgroup r·G_i.
+
+-- | hash_to_curve to BLS12-381 G1, instantiated as
+--   @BLS12381G1_XMD:SHA-256_SSWU_RO_@. Caller supplies the DST so the
+--   same builtin works for any BLS-on-G1 application; for Ethereum
+--   sync-committee-style schemes the DST is application-specific.
+--
+--   @msg@ is the bytes to hash (e.g. a signing root). @dst@ is the
+--   Domain Separation Tag (RFC 9380 §3.1; max 255 bytes, application-
+--   chosen). Output: 128-byte EIP-2537 G1 encoding (x || y).
+--
+--   Verified byte-exact against RFC 9380 §J.9.1 reference vectors.
+hashToCurveG1 :: B.ByteString -> B.ByteString -> Either String B.ByteString
+hashToCurveG1 msg dst =
+  case hashToFieldFp msg dst 2 64 fieldPrime of
+    [u0, u1] ->
+      let q0 = isoMapG1 (simplifiedSwuG1Iso (fromInteger u0))
+          q1 = isoMapG1 (simplifiedSwuG1Iso (fromInteger u1))
+          r = safeAdd q0 q1
+          p = clearCofactorG1 r
+       in Right $ case p of
+            O -> B.replicate g1Size 0
+            A x y -> encodeFp (toInteger x) <> encodeFp (toInteger y)
+    _ -> Left "hashToCurveG1: hash_to_field returned wrong number of elements"
+  where
+    -- The Weierstrass library's 'add' is incomplete on equal inputs
+    -- (returns the identity instead of the doubled point). We rarely
+    -- hit q0 == q1 in practice, but compose defensively because the
+    -- input pair comes from arbitrary message bytes.
+    safeAdd a b = if a == b then dbl a else add a b
+
+-- | hash_to_curve to BLS12-381 G2, instantiated as
+--   @BLS12381G2_XMD:SHA-256_SSWU_RO_@. This is the curve target used
+--   by Ethereum's BLS signature scheme (sync committee aggregates,
+--   validator BLS signatures): the message hashes to G2, the pubkey
+--   sits in G1, and verification is a single pairing check.
+--
+--   @msg@ is the bytes to hash (typically a signing root). @dst@ is
+--   the Domain Separation Tag -- for Ethereum sync committee, that is
+--   @"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"@. Output: 256-byte
+--   EIP-2537 G2 encoding (x.c0 || x.c1 || y.c0 || y.c1).
+--
+--   Verified byte-exact against RFC 9380 §J.10.1 reference vectors.
+hashToCurveG2 :: B.ByteString -> B.ByteString -> Either String B.ByteString
+hashToCurveG2 msg dst =
+  case hashToFieldFp2 msg dst 2 64 fieldPrime of
+    [u0, u1] ->
+      let q0 = isoMapG2 (simplifiedSwuG2Iso (mkFp2 u0))
+          q1 = isoMapG2 (simplifiedSwuG2Iso (mkFp2 u1))
+          r = safeAdd q0 q1
+          p = clearCofactorG2 r
+       in Right $ case p of
+            O -> B.replicate g2Size 0
+            A x y -> encodeFp2Pair (fp2ToInts x) <> encodeFp2Pair (fp2ToInts y)
+    _ -> Left "hashToCurveG2: hash_to_field returned wrong number of elements"
+  where
+    mkFp2 :: (Integer, Integer) -> Fq2
+    mkFp2 (c0, c1) = fromList [fromInteger c0, fromInteger c1]
+    safeAdd a b = if a == b then dbl a else add a b

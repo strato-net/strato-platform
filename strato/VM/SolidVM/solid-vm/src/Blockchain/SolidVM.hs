@@ -2531,9 +2531,8 @@ callBuiltin "bls12381Pairing" [SArray xs] = bls12381PairingFromInts =<< traverse
 callBuiltin "bls12381Pairing" xs = bls12381PairingFromInts xs
 
 -- Map-to-curve precompiles (EIP-2537 §BLS12_MAP_FP_TO_G1 and
--- §BLS12_MAP_FP2_TO_G2). These currently surface a "not yet implemented"
--- error from the underlying helper -- the API surface is stable so
--- contracts can compile, but the RFC 9380 pipeline isn't done.
+-- §BLS12_MAP_FP2_TO_G2). Take pre-derived F_p / F_p^2 inputs; useful
+-- when the contract already has the field elements.
 callBuiltin "bls12381MapFpToG1" [SBytes b] =
   case Builtins.mapFpToG1 b of
     Left e -> invalidArguments ("bls12381MapFpToG1: " ++ e) b
@@ -2541,6 +2540,21 @@ callBuiltin "bls12381MapFpToG1" [SBytes b] =
 callBuiltin "bls12381MapFp2ToG2" [SBytes b] =
   case Builtins.mapFp2ToG2 b of
     Left e -> invalidArguments ("bls12381MapFp2ToG2: " ++ e) b
+    Right out -> pure (SBytes out)
+
+-- Full hash_to_curve (RFC 9380 §3): expand_message_xmd + hash_to_field
+-- + map-to-curve + cofactor clearing in a single call. Saves contracts
+-- from re-implementing expand_message_xmd in user-space SHA-256 loops.
+-- DST is caller-supplied so the same builtin works for any
+-- BLS_SIG_BLS12381*_XMD:SHA-256_*_*_* scheme (Ethereum sync committee,
+-- IBE, BLS aggregate, etc.).
+callBuiltin "bls12381HashToCurveG1" [SBytes msg, SBytes dst] =
+  case Builtins.hashToCurveG1 msg dst of
+    Left e -> invalidArguments ("bls12381HashToCurveG1: " ++ e) [SBytes msg, SBytes dst]
+    Right out -> pure (SBytes out)
+callBuiltin "bls12381HashToCurveG2" [SBytes msg, SBytes dst] =
+  case Builtins.hashToCurveG2 msg dst of
+    Left e -> invalidArguments ("bls12381HashToCurveG2: " ++ e) [SBytes msg, SBytes dst]
     Right out -> pure (SBytes out)
 callBuiltin "poseidon" [SVariadic xs] = case length xs of
   n | n > 0 && n <= 8 -> SInteger . Builtins.poseidonHash <$> traverse int xs

@@ -38,13 +38,25 @@ module Blockchain.SolidVM.Builtins
 
     -- * Map-to-curve (EIP-2537 §BLS12_MAP_FP_TO_G1, §BLS12_MAP_FP2_TO_G2)
     --
-    --   Currently surfaces a "not yet implemented" error -- the
-    --   builtins are wired into the dispatcher so the API surface is
-    --   stable, but the underlying RFC 9380 simplified-SWU pipeline
-    --   isn't done. See 'Blockchain.SolidVM.BLS12381.HashToCurve' for
-    --   the concrete TODO.
+    --   Take pre-derived F_p / F_p^2 inputs. Useful when the contract
+    --   already has the field elements and just needs the map step.
     mapFpToG1,
     mapFp2ToG2,
+
+    -- * Full hash-to-curve (RFC 9380 §3 / §6.6.3)
+    --
+    --   These compose 'expand_message_xmd' (SHA-256) +
+    --   'hash_to_field' + map-to-curve + cofactor clearing into a
+    --   single call. Suite mappings:
+    --
+    --     hashToCurveG1 = BLS12381G1_XMD:SHA-256_SSWU_RO_
+    --     hashToCurveG2 = BLS12381G2_XMD:SHA-256_SSWU_RO_
+    --
+    --   For Ethereum sync-committee BLS verification, callers pass
+    --   the signing root as @msg@ and
+    --   @"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"@ as @dst@.
+    hashToCurveG1,
+    hashToCurveG2,
   )
 where
 
@@ -60,7 +72,12 @@ import Blockchain.SolidVM.BLS12381
     bls12381Pairing,
     bls12381PairingInts,
   )
-import Blockchain.SolidVM.BLS12381.HashToCurve (mapFp2ToG2, mapFpToG1)
+import Blockchain.SolidVM.BLS12381.HashToCurve
+  ( hashToCurveG1,
+    hashToCurveG2,
+    mapFp2ToG2,
+    mapFpToG1,
+  )
 
 import BlockApps.Solidity.ABI.Codec
 import Blockchain.SolidVM.SM

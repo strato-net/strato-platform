@@ -17,12 +17,12 @@ library
       Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
-  other-modules:
       Blockchain.SolidVM.BLS12381
       Blockchain.SolidVM.BLS12381.HashToCurve
       Blockchain.SolidVM.BLS12381.HashToCurve.G1
       Blockchain.SolidVM.BLS12381.HashToCurve.G2
       Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
+  other-modules:
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
       Paths_solid_vm
