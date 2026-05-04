@@ -45,6 +45,7 @@ local wallet_auth_routes = {
   ["/api/credit-card/manual-top-up"] = true,
   ["/api/credit-card/remove-card"] = true,
   ["/api/credit-card/update-card"] = true,
+  ["/api/bridge/requestWithdrawal"] = true,
   ["/api/metal-forge/buy"] = true,
   ["/api/oracle/price"] = true,
   ["/api/rpc/results"] = true,

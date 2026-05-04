@@ -39,7 +39,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
   const { isConnected } = useAccount();
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
-  const { externalWalletAddress, isExternalWalletConnected } = useUser();
+  const { externalWalletAddress, isExternalWalletConnected, isAppAuthenticated } = useUser();
 
   const {
     requestWithdrawal: bridgeOutAPI,
@@ -278,13 +278,17 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         ? NATIVE_TOKEN_ADDRESS
         : selectedToken.externalToken;
 
-      const res = await bridgeOutAPI({
-        externalChainId: currentNetwork.chainId,
-        externalRecipient,
-        externalToken,
-        stratoToken: selectedToken.stratoToken,
-        stratoTokenAmount,
-      });
+      const useExternalWalletSigning = isExternalWalletConnected && !isAppAuthenticated;
+      const res = await bridgeOutAPI(
+        {
+          externalChainId: currentNetwork.chainId,
+          externalRecipient,
+          externalToken,
+          stratoToken: selectedToken.stratoToken,
+          stratoTokenAmount,
+        },
+        useExternalWalletSigning ? { walletAuth: true } : undefined
+      );
 
       if (!res?.success) {
         throw new Error("Failed to request withdrawal");
