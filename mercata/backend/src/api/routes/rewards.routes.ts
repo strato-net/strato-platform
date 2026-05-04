@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import RewardsController from "../controllers/rewards.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 // ═════════════════════════════════════════════════════════════════════════
 // REWARDS CONTRACT ENDPOINTS
@@ -170,7 +171,7 @@ router.get("/activities/:userAddress", authHandler.authorizeRequest(), RewardsCo
  *       401:
  *         description: Unauthorized
  */
-router.post("/claim-all", authHandler.authorizeRequest(), RewardsController.claimAllRewards);
+router.post("/claim-all", walletAuth, RewardsController.claimAllRewards);
 
 /**
  * @openapi
@@ -203,7 +204,7 @@ router.post("/claim-all", authHandler.authorizeRequest(), RewardsController.clai
  *       401:
  *         description: Unauthorized
  */
-router.post("/claim/:activityId", authHandler.authorizeRequest(), RewardsController.claimActivityRewards);
+router.post("/claim/:activityId", walletAuth, RewardsController.claimActivityRewards);
 
 /**
  * @openapi

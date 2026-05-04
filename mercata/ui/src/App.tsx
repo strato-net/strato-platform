@@ -75,6 +75,7 @@ import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { initializeCsrfToken, csrfOnRequest } from "./lib/csrf";
 import { captureAttribution } from "./lib/attribution";
+import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/nodeHealth";
 
 
 const queryClient = new QueryClient();
@@ -88,6 +89,7 @@ const App = () => {
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
+  const [nodeHealth, setNodeHealth] = useState<NodeHealth | null>(null);
 
   // Initialize CSRF token on app startup
   useEffect(() => {
@@ -134,8 +136,26 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const refreshNodeHealth = async () => {
+      const health = await getNodeHealth();
+      if (!cancelled) {
+        setNodeHealth(shouldShowNodeHealth(health) ? health : null);
+      }
+    };
+
+    refreshNodeHealth();
+    const interval = setInterval(refreshNodeHealth, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!loading) {
-      const appName = "Mercata";
+      const appName = "STRATO";
       const stratoChain = getStratoChain();
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
@@ -174,7 +194,11 @@ const App = () => {
   }
 
   if (configError) {
-    return <SyncingPage />;
+    return <SyncingPage nodeHealth={nodeHealth} />;
+  }
+
+  if (nodeHealth) {
+    return <SyncingPage nodeHealth={nodeHealth} />;
   }
 
   if (!wagmiConfig) {

@@ -3,6 +3,7 @@
 
 module TransactionReceipt
   ( TransactionReceipt(..)
+  , EthHex(..)
   , mkTransactionReceipt
   ) where
 

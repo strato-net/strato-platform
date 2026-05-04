@@ -82,7 +82,7 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
     resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
-  yieldMany $! uncurry OutJSONRPC <$> rpcResps
+  yieldMany $! OutJSONRPC <$> rpcResps
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   processBlocks blocks

@@ -140,6 +140,7 @@ export const defaultWbtcCarryVaultFor: Record<string, string> = {
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
+export let networkName: string | undefined;
 export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
@@ -230,6 +231,7 @@ export async function initNetworkConfig() {
   const accessToken = await getServiceToken();
   const { data } = await eth.get(accessToken, `/metadata`);
   networkId = data.networkID;
+  networkName = data.networkName;
   if (!networkId) {
     throw new Error("Network ID not found in metadata");
   }
