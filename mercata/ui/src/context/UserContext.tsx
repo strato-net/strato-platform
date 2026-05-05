@@ -12,6 +12,8 @@ interface UserContextType {
   stratoAddress: string | null;
   externalWalletAddress: string | null;
   isExternalWalletConnected: boolean;
+  externalEvmWalletAddress: string | null;
+  isExternalEvmWalletConnected: boolean;
   setUserAddress: (address: string | null) => void;
   isLoggedIn: boolean;
   isAppAuthenticated: boolean;
@@ -40,6 +42,9 @@ interface UserContextType {
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
+
+const isStratoConnector = (connector?: { id?: string; name?: string } | null) =>
+  connector?.id === "stratoWallet" || connector?.name === "STRATO Wallet";
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const account = useAccount();
@@ -211,6 +216,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const externalWalletAddress = account.isConnected && account.address ? account.address : null;
   const isExternalWalletConnected = !!externalWalletAddress;
+  const externalEvmWalletAddress = !isStratoConnector(account.connector) ? externalWalletAddress : null;
+  const isExternalEvmWalletConnected = !!externalEvmWalletAddress;
   const shouldUseExternalWallet = !loading && !isLoggedIn && isExternalWalletConnected;
   const userAddress = isLoggedIn ? stratoAddress : shouldUseExternalWallet ? externalWalletAddress : null;
   const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
@@ -299,6 +306,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     stratoAddress,
     externalWalletAddress,
     isExternalWalletConnected,
+    externalEvmWalletAddress,
+    isExternalEvmWalletConnected,
     setUserAddress,
     userName,
     isLoggedIn: effectiveLoggedIn,
@@ -324,7 +333,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getContractDetails,
     contractDetailsResults,
     contractDetailsResultsLoading,
-  }), [userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
+  }), [userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected, externalEvmWalletAddress, isExternalEvmWalletConnected, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
     handleLogout,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,
