@@ -74,7 +74,7 @@ import Blockchain.SolidVM.GasInfo
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
@@ -601,6 +601,17 @@ getVariableOfName name = do
                        "ecAdd",
                        "ecMul",
                        "ecPairing",
+                       "bls12381G1Add",
+                       "bls12381G1Msm",
+                       "bls12381G2Add",
+                       "bls12381G2Msm",
+                       "bls12381Pairing",
+                       "bls12381MapFpToG1",
+                       "bls12381MapFp2ToG2",
+                       "bls12381HashToCurveG1",
+                       "bls12381HashToCurveG2",
+                       "bls12381DecompressG1",
+                       "bls12381DecompressG2",
                        "poseidon",
                        "payable",
                        "require",

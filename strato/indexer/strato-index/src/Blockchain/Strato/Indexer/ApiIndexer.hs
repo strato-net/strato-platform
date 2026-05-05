@@ -16,6 +16,8 @@ where
 import BlockApps.Logging
 import Blockchain.Data.AddressStateDB (AddressState(..))
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
+import Blockchain.Data.DataDefs (ReceiptRef (..))
+import Blockchain.Data.ReceiptRef (putReceiptRefs)
 import Blockchain.DB.MemAddressStateDB (AddressStateModification(..))
 import Blockchain.DB.SQLDB
 import Blockchain.Model.WrappedBlock
@@ -55,7 +57,7 @@ indexAPI ::
   [IndexEvent] ->
   m ()
 indexAPI idxEvents = do
-  let (txs, blocks, stateDiffs, asmUpdates) = filterHelper idxEvents
+  let (txs, blocks, receiptRefs, stateDiffs, asmUpdates) = filterHelper idxEvents
       insertCount = length blocks
 
   A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
@@ -65,6 +67,11 @@ indexAPI idxEvents = do
     $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
     A.insertMany (A.Proxy @(API OutputBlock)) . M.fromList $ (blockHash &&& API) <$> blocks
 
+  when (not $ null receiptRefs) $ do
+    $logInfoS "apiIndexer" . T.pack $
+      "Processing " ++ show (length receiptRefs) ++ " receipt rows"
+    putReceiptRefs receiptRefs
+
   when (not $ null stateDiffs) $ do
     $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length stateDiffs) ++ " state diffs"
     mapM_ commitSqlDiffs stateDiffs
@@ -73,17 +80,30 @@ indexAPI idxEvents = do
     $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length asmUpdates) ++ " address state updates"
     mapM_ handleAddressStateUpdates asmUpdates
   where
-    filterHelper :: [IndexEvent] -> ([OutputTx], [OutputBlock], [StateDiff], [M.Map Address AddressStateModification])
+    filterHelper ::
+      [IndexEvent] ->
+      ( [OutputTx],
+        [OutputBlock],
+        [ReceiptRef],
+        [StateDiff],
+        [M.Map Address AddressStateModification]
+      )
     filterHelper (indxEv : xs) =
-      let (indexTransactions, ranBlocksLs, diffs, asms) = filterHelper xs
+      let (indexTransactions, ranBlocksLs, recRefs, diffs, asms) = filterHelper xs
       in
         case indxEv of
-          IndexTransaction _ tx -> (tx : indexTransactions, ranBlocksLs, diffs, asms)
-          RanBlock b -> (indexTransactions, b : ranBlocksLs, diffs, asms)
-          StateDiffEntry d -> (indexTransactions, ranBlocksLs, d : diffs, asms)
-          AddressStateUpdates m -> (indexTransactions, ranBlocksLs, diffs, m : asms)
-          _ -> (indexTransactions, ranBlocksLs, diffs, asms)
-    filterHelper [] = ([], [], [], [])
+          IndexTransaction _ tx -> (tx : indexTransactions, ranBlocksLs, recRefs, diffs, asms)
+          RanBlock b receiptsBytes ->
+            let bh = blockHash b
+                newRefs =
+                  [ ReceiptRef bh i bytes
+                  | (i, bytes) <- zip [0 ..] receiptsBytes
+                  ]
+             in (indexTransactions, b : ranBlocksLs, newRefs ++ recRefs, diffs, asms)
+          StateDiffEntry d -> (indexTransactions, ranBlocksLs, recRefs, d : diffs, asms)
+          AddressStateUpdates m -> (indexTransactions, ranBlocksLs, recRefs, diffs, m : asms)
+          _ -> (indexTransactions, ranBlocksLs, recRefs, diffs, asms)
+    filterHelper [] = ([], [], [], [], [])
 
     handleAddressStateUpdates :: HasSQLDB m => M.Map Address AddressStateModification -> m ()
     handleAddressStateUpdates asmMap =

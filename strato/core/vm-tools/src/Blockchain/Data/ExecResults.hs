@@ -12,7 +12,7 @@ where
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.Validator
 import Blockchain.Stream.Action (Action)
 import Blockchain.VM.SolidException

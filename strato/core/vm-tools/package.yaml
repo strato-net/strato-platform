@@ -21,6 +21,7 @@ library:
     - Blockchain.Data.ExecResults
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
+    - Blockchain.Forks
     - Blockchain.StateRootMismatch
     - Blockchain.Stream.Action
     - Blockchain.Stream.VMEvent
@@ -97,3 +98,14 @@ tests:
     dependencies:
       - hspec
       - vm-tools
+      - base16-bytestring
+      - blockapps-data
+      - blockapps-datadefs
+      - blockDB
+      - bytestring
+      - containers
+      - ethereum-rlp
+      - merkle-patricia-db
+      - solid-vm-model
+      - strato-model
+      - vector

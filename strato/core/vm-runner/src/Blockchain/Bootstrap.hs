@@ -29,7 +29,7 @@ import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Event
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
@@ -208,7 +208,9 @@ bootstrapIndexer obGB = do
   putStrLn "About to bootstrap index events"
   res <-
     UEC.runKafkaMConfigured clientId $
-    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
+    -- Genesis block has no executable transactions, so it carries an empty
+    -- receipt list. Post-fork blocks pick up real receipts inside addBlock.
+    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
 
   print res
   putStrLn "bootstrapIndex genesis seed successful!"

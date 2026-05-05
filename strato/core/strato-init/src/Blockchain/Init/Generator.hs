@@ -73,6 +73,7 @@ createGenesisInfo network =
               , (0x523fef378674d39363aa8b6ac5122e301c528432, 100_000 * HELIUM.oneE18)
               ]
     "lithium" -> HELIUM.lithiumGenesisBlock
+    "beryllium" -> HELIUM.berylliumGenesisBlock
     _ -> HELIUM.genesisBlock
 
 createCommandsFile :: IO ()

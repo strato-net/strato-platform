@@ -13,6 +13,16 @@ library:
     - Blockchain.SolidVM.GasInfo
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
+    # BLS12-381 internal modules. Exposed so the test target (and anyone
+    # cross-checking against RFC 9380 vectors) can drive the pipeline
+    # stages directly. Stable public API for bridge contracts is via the
+    # byte builtins re-exported from Builtins.
+    - Blockchain.SolidVM.BLS12381
+    - Blockchain.SolidVM.BLS12381.Compress
+    - Blockchain.SolidVM.BLS12381.HashToCurve
+    - Blockchain.SolidVM.BLS12381.HashToCurve.G1
+    - Blockchain.SolidVM.BLS12381.HashToCurve.G2
+    - Blockchain.SolidVM.BLS12381.HashToCurve.HashToField
   ghc-options: -Wall -O2
   dependencies:
   - base16-bytestring
@@ -39,6 +49,7 @@ library:
   - galois-field
   - labeled-error
   - lens
+  - memory
   - merkle-patricia-db
   - monad-alter
   - nibblestring
@@ -87,6 +98,7 @@ tests:
       - QuickCheck
       - aeson
       - async
+      - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
@@ -96,6 +108,7 @@ tests:
       - composable-monads-base
       - containers
       - crypto-api
+      - elliptic-curve
       - ethereum-rlp
       - extra
       - hflags
@@ -105,6 +118,7 @@ tests:
       - lens
       - merkle-patricia-db
       - monad-alter
+      - pairing
       - raw-strings-qq
       - seqevents
       - solid-vm

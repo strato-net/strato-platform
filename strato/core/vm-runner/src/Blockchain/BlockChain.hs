@@ -39,6 +39,7 @@ import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
+import Blockchain.Data.RLP (rlpEncode, rlpSerialize)
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
@@ -49,6 +50,8 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
+import Blockchain.Forks (isReceiptsRootForkActive)
+import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
@@ -56,8 +59,8 @@ import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Delta
-import Blockchain.Strato.Model.Event
+import SolidVM.Model.Delta
+import SolidVM.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
@@ -145,8 +148,14 @@ instance (HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) where
 addBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . number . obBlockData) unfiltered
+      genesisOnly = filter ((== 0) . number . obBlockData) unfiltered
       timerToUse = Just vmBlockInsertionMined
-  unless (null unfiltered) $ yieldMany $ OutIndexEvent . RanBlock <$> unfiltered
+  -- Genesis blocks don't go through addBlock (they're filtered out below),
+  -- so emit them here with an empty receipt list. Non-genesis blocks emit
+  -- their RanBlock from inside addBlock's success path so that receipts can
+  -- be attached.
+  unless (null genesisOnly) $
+    yieldMany $ map (\b -> OutIndexEvent (RanBlock b [])) genesisOnly
   bbi <- getContextBestBlockInfo
   $logInfoS "addBlocks" $ T.pack ("Unfiltered count: " ++ show (length unfiltered))
   $logInfoS "addBlocks" $ T.pack ("Filtered count: " ++ show (length filtered))
@@ -246,11 +255,22 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
             $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (number $ obBlockData b) ++ " (" ++ format obh ++ ")."
+            -- Emit RanBlock with the per-tx receipt RLP bytes so the indexer
+            -- can persist them to receipt_ref. Pre-fork blocks carry empty
+            -- receipts (matching the empty-trie sentinel in the header);
+            -- post-fork blocks carry the real receipts that combine to give
+            -- the header's receiptsRoot.
+            let blockNum = number $ obBlockData b
+            receiptsBytes <-
+              if isReceiptsRootForkActive blockNum
+                then traverse (fmap (rlpSerialize . rlpEncode) . txRunResultToReceipt) trrs
+                else pure []
+            yield . OutIndexEvent $ RanBlock b receiptsBytes
             pure []
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
 verifyBlock ::
-  HasStateDB m =>
+  (HasStateDB m, MonadIO m) =>
   Block ->
   ([TxRunResult], Maybe MP.StateRoot) ->
   BlockSummary ->
@@ -268,10 +288,24 @@ verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
       validatorCheck = if eqDelta bVd vDelt
         then Nothing
         else Just . ValidatorMismatch $ BlockDelta (fromDelta bVd) (fromDelta vDelt)
-   in return $ validity ++ case blockHeaderVersion bh of
-        1 -> catMaybes [srCheck]
-        2 -> catMaybes [srCheck, validatorCheck]
-        v -> [VersionMismatch $ BlockDelta v 2]
+      -- Receipts-root check: post-fork, every node must arrive at the same
+      -- root from the executed transactions. Pre-fork, the header carries
+      -- the empty-trie sentinel and the check is skipped.
+      blockNum = number bh
+  receiptsForRoot <-
+    if isReceiptsRootForkActive blockNum
+      then traverse txRunResultToReceipt trrs
+      else pure []
+  let derivedReceiptsRoot = V.receiptsVerificationValue receiptsForRoot
+      receiptsRootCheck =
+        if derivedReceiptsRoot == receiptsRoot bh
+          then Nothing
+          else Just . ReceiptsRootMismatch $
+                 BlockDelta (receiptsRoot bh) derivedReceiptsRoot
+  return $ validity ++ case blockHeaderVersion bh of
+    1 -> catMaybes [srCheck]
+    2 -> catMaybes [srCheck, validatorCheck, receiptsRootCheck]
+    v -> [VersionMismatch $ BlockDelta v 2]
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m [TxRunResult]
 addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
@@ -649,7 +683,7 @@ mkLogEntry :: Keccak256 -> Keccak256 -> Log -> LogDB
 mkLogEntry bHash tHash Log {..} = LogDB bHash tHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
 mkEventEntry :: Event -> EventDB
-mkEventEntry Event {..} = EventDB evBlockHash evTxHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
+mkEventEntry Event {..} = EventDB evBlockHash evTxHash evContractAddress evName $ map eventArgValueString evArgs -- drop everything but the rendered value string; only slipstream needs the rest
 
 outputTransactionResult ::
   VMBase m =>

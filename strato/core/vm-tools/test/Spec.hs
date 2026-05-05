@@ -28,6 +28,9 @@ import Blockchain.VMOptions ()
 import Control.Monad
 import Executable.EVMFlags ()
 import HFlags
+import qualified CrossLangFixtureSpec
+import qualified ReceiptSpec
+import qualified TypedArgConversionSpec
 import Test.Hspec (Spec, describe, hspec)
 
 --import qualified LabeledError
@@ -57,4 +60,8 @@ main = do
 --senderAddress = fromPrivateKey private
 
 spec :: Spec
-spec = describe "VMContext" $ pure ()
+spec = do
+  describe "VMContext" $ pure ()
+  ReceiptSpec.spec
+  TypedArgConversionSpec.spec
+  CrossLangFixtureSpec.spec

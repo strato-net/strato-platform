@@ -28,6 +28,8 @@ import Control.Applicative ((<|>))
 import Control.DeepSeq (NFData, rnf)
 import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), (.:?), (.!=))
 import qualified Data.Aeson as Aeson
+import qualified Data.Binary as Binary
+import qualified Data.ByteString.Lazy as BSL
 import Text.Format
 import Control.Lens ((^.))
 import Control.Monad (forM, when)
@@ -422,3 +424,16 @@ instance FromJSON Value where
           Left err -> fail $ "Invalid hex in bytes: " ++ err
       _ -> fail $ "Unknown Value tag: " ++ t
   parseJSON _ = pure SNULL
+
+-- Binary instance for Value goes through the Aeson encoding so we don't have
+-- to duplicate the (already non-trivial) variant logic. Lossy in the same
+-- ways that the JSON instance is — IORef-backed aggregates serialize as
+-- their resolved snapshots, which is what we want for receipts and Kafka
+-- payloads anyway.
+instance Binary.Binary Value where
+  put = Binary.put . Aeson.encode
+  get = do
+    bs <- Binary.get :: Binary.Get BSL.ByteString
+    case Aeson.eitherDecode bs of
+      Left err -> fail err
+      Right v -> return v
