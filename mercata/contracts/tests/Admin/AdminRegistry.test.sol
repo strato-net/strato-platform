@@ -249,36 +249,20 @@ contract Describe_AdminRegistry is Authorizable {
         require(threshold == 0, "Initial voting threshold should be 0");
     }
 
-    function it_admin_registry_rejects_voting_threshold_below_floor() {
+    function it_admin_registry_allows_voting_threshold_below_half() {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 4999);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(token), "mint", 4999);
 
-        bool reverted = false;
-        try {
-            fastForward(86400);
-            adminRegistry.executeIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 4999);
-        } catch {
-            reverted = true;
-        }
-
-        require(reverted, "Should reject voting threshold below floor");
-        require(adminRegistry.votingThresholds(address(token), "mint") == 0, "Threshold should not update");
+        executeQueued(address(adminRegistry), "setVotingThreshold", address(token), "mint", 4999);
+        require(adminRegistry.votingThresholds(address(token), "mint") == 4999, "Threshold should update");
     }
 
-    function it_admin_registry_rejects_default_voting_threshold_below_floor() {
+    function it_admin_registry_allows_default_voting_threshold_below_half() {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "setDefaultVotingThresholdBps", 4999);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setDefaultVotingThresholdBps", 4999);
 
-        bool reverted = false;
-        try {
-            fastForward(86400);
-            adminRegistry.executeIssue(address(adminRegistry), "setDefaultVotingThresholdBps", 4999);
-        } catch {
-            reverted = true;
-        }
-
-        require(reverted, "Should reject default voting threshold below floor");
-        require(adminRegistry.defaultVotingThresholdBps() == 6000, "Default threshold should not update");
+        executeQueued(address(adminRegistry), "setDefaultVotingThresholdBps", 4999);
+        require(adminRegistry.defaultVotingThresholdBps() == 4999, "Default threshold should update");
     }
 
     // ============ WHITELIST TESTS ============
@@ -902,6 +886,25 @@ contract Describe_AdminRegistry is Authorizable {
         require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted before delay");
     }
 
+    function it_admin_registry_cannot_execute_after_timelock_grace_period_expires() {
+        string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
+        (uint queuedAt, uint executableAt, uint expiresAt) = adminRegistry.timelocks(issueId);
+        require(executableAt == queuedAt + 86400, "Executable timestamp should include delay");
+        require(expiresAt == executableAt + 604800, "Expiration timestamp should include grace period");
+
+        fastForward(86400 + 604800 + 1);
+
+        bool reverted = false;
+        try {
+            adminRegistry.executeIssue(address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should not execute after timelock grace period expires");
+        require(ERC20(token).balanceOf(admin3) == 0, "Token should not be minted after expiration");
+        assertTimelock(issueId, queuedAt, executableAt, expiresAt);
+    }
+
     function it_admin_registry_timelock_struct_defaults_to_zero() {
         string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         assertTimelock(issueId, 0, 0, 0);
@@ -913,7 +916,7 @@ contract Describe_AdminRegistry is Authorizable {
     function it_admin_registry_timelock_struct_records_queue_window() {
         string memory issueId = voteToQueue(address(token), "mint", admin3, 1000e18);
         uint queuedAt = block.timestamp;
-        assertTimelock(issueId, queuedAt, queuedAt + 86400, queuedAt + 86400 + 86400);
+        assertTimelock(issueId, queuedAt, queuedAt + 86400, queuedAt + 86400 + 604800);
 
         string memory otherIssueId = adminRegistry.getIssueId(address(token), "mint", admin3, 2000e18);
         assertTimelock(otherIssueId, 0, 0, 0);
@@ -966,7 +969,7 @@ contract Describe_AdminRegistry is Authorizable {
         adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
 
         uint requeuedAt = block.timestamp;
-        assertTimelock(issueId, requeuedAt, requeuedAt + 86400, requeuedAt + 86400 + 86400);
+        assertTimelock(issueId, requeuedAt, requeuedAt + 86400, requeuedAt + 86400 + 604800);
         require(issueExecutableAt(issueId) > firstExecutableAt, "Requeued issue should restart delay");
     }
 
