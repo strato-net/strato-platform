@@ -2468,20 +2468,6 @@ callBuiltin "ecPairing" [SArray xs] =
   SBool . Builtins.ecPairing <$> traverse getInt (V.toList xs)
 callBuiltin "ecPairing" xs = do
   SBool . Builtins.ecPairing <$> traverse int xs
--- ============================================================================
--- BLS12-381 dispatch
--- ============================================================================
---
--- Each builtin has two argument shapes:
---   1. A single 'bytes' value, encoding inputs in EIP-2537 byte layout.
---   2. A flat list of integers/tuples (G1Add: [x1,y1,x2,y2]; G1Msm:
---      variadic [x1,y1,k1, ..., xN,yN,kN]; pairing: variadic
---      [x,y, x2c0,x2c1,y2c0,y2c1, ...]; etc.).
--- The bytes form is matched first via a single 'SBytes' pattern; the
--- multi-arg form falls through to a dedicated handler that converts via
--- 'int' and packs the result into an 'STuple' (mirroring how 'ecAdd' and
--- friends already work).
-
 callBuiltin "bls12381G1Add" [SBytes b] =
   case Builtins.bls12381G1Add b of
     Left e -> invalidArguments ("bls12381G1Add: " ++ e) b
@@ -2529,10 +2515,6 @@ callBuiltin "bls12381Pairing" [SBytes b] =
 callBuiltin "bls12381Pairing" [SVariadic xs] = bls12381PairingFromInts xs
 callBuiltin "bls12381Pairing" [SArray xs] = bls12381PairingFromInts =<< traverse weakGetVar (V.toList xs)
 callBuiltin "bls12381Pairing" xs = bls12381PairingFromInts xs
-
--- Map-to-curve precompiles (EIP-2537 §BLS12_MAP_FP_TO_G1 and
--- §BLS12_MAP_FP2_TO_G2). Take pre-derived F_p / F_p^2 inputs; useful
--- when the contract already has the field elements.
 callBuiltin "bls12381MapFpToG1" [SBytes b] =
   case Builtins.mapFpToG1 b of
     Left e -> invalidArguments ("bls12381MapFpToG1: " ++ e) b
@@ -2541,13 +2523,6 @@ callBuiltin "bls12381MapFp2ToG2" [SBytes b] =
   case Builtins.mapFp2ToG2 b of
     Left e -> invalidArguments ("bls12381MapFp2ToG2: " ++ e) b
     Right out -> pure (SBytes out)
-
--- Full hash_to_curve (RFC 9380 §3): expand_message_xmd + hash_to_field
--- + map-to-curve + cofactor clearing in a single call. Saves contracts
--- from re-implementing expand_message_xmd in user-space SHA-256 loops.
--- DST is caller-supplied so the same builtin works for any
--- BLS_SIG_BLS12381*_XMD:SHA-256_*_*_* scheme (Ethereum sync committee,
--- IBE, BLS aggregate, etc.).
 callBuiltin "bls12381HashToCurveG1" [SBytes msg, SBytes dst] =
   case Builtins.hashToCurveG1 msg dst of
     Left e -> invalidArguments ("bls12381HashToCurveG1: " ++ e) [SBytes msg, SBytes dst]
@@ -2556,10 +2531,6 @@ callBuiltin "bls12381HashToCurveG2" [SBytes msg, SBytes dst] =
   case Builtins.hashToCurveG2 msg dst of
     Left e -> invalidArguments ("bls12381HashToCurveG2: " ++ e) [SBytes msg, SBytes dst]
     Right out -> pure (SBytes out)
-
--- BLS12-381 point decompression (IETF / ZCash format used by Ethereum's
--- beacon chain). Bridges between the wire format (compressed: G1=48,
--- G2=96 bytes) and EIP-2537 uncompressed (G1=128, G2=256 bytes).
 callBuiltin "bls12381DecompressG1" [SBytes b] =
   case Builtins.decompressG1 b of
     Left e -> invalidArguments ("bls12381DecompressG1: " ++ e) b
