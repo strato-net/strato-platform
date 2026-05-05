@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Copy, CopyCheck, Loader2, CheckCircle2, XCircle, AlertCircle, Wallet, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "@/utils/numberUtils";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/axios";
 import { requestWalletConnection } from "@/lib/auth";
 import { useTokenContext } from "@/context/TokenContext";
@@ -369,10 +369,8 @@ export function RecipientClaim(props: Props) {
     });
   };
 
-  const location = useLocation();
-  
   const handleSignUp = () => {
-    requestWalletConnection(location.pathname + location.search);
+    requestWalletConnection();
   };
 
   // Format all amounts (normalize to array first)

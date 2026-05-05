@@ -43,8 +43,6 @@ export const redirectToLogin = (returnTo?: string): void => {
   window.location.href = `/login?${params.toString()}`;
 };
 
-export const requestWalletConnection = (returnTo?: string): void => {
-  window.dispatchEvent(new CustomEvent(WALLET_CONNECT_REQUEST_EVENT, {
-    detail: { returnTo },
-  }));
+export const requestWalletConnection = (): void => {
+  window.dispatchEvent(new CustomEvent(WALLET_CONNECT_REQUEST_EVENT));
 };
