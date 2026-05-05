@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatUnits } from "ethers";
+import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucide-react";
+
+// Mirrors backend OFF_CHAIN_DISPLAY_FLOOR_USD: hide the off-chain section when
+// the pooled value is below this so transient slippage/oracle dust doesn't
+// noise up the strategy card.
+const OFF_CHAIN_DISPLAY_FLOOR_USD = 100;
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -694,20 +700,136 @@ const EarnYieldVault = () => {
                     <div className="grid grid-cols-1 gap-3">
                       {strategyHoldings.map((holding) => (
                         <Card key={holding.strategyAddress} className="border border-border/70">
-                          <CardContent className="pt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Strategy Address</p>
-                              <div className="flex items-center gap-1">
-                                <p className="text-sm font-medium break-all">{formatAddress(holding.strategyAddress)}</p>
-                                <CopyButton address={holding.strategyAddress} />
+                          <CardContent className="pt-4 space-y-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">Strategy Address</p>
+                                <div className="flex items-center gap-1">
+                                  <p className="text-sm font-medium break-all">{formatAddress(holding.strategyAddress)}</p>
+                                  <CopyButton address={holding.strategyAddress} />
+                                </div>
+                              </div>
+                              <div className="space-y-1 sm:text-right">
+                                <p className="text-xs text-muted-foreground">Deployed Capital</p>
+                                <p className="text-lg font-semibold">
+                                  {formatTokenAmount(holding.deployedAssets, decimals)} {assetSymbol}
+                                </p>
+                              </div>
+                              <div className="space-y-1 sm:text-right">
+                                <p className="text-xs text-muted-foreground">Base APY</p>
+                                {(() => {
+                                  const apy = holding.baseApyPct;
+                                  if (apy === null || apy === undefined || !Number.isFinite(apy)) {
+                                    return (
+                                      <p className="text-lg font-semibold text-muted-foreground">—</p>
+                                    );
+                                  }
+                                  const sign = apy > 0 ? "+" : apy < 0 ? "" : "";
+                                  const tone =
+                                    apy > 0
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : apy < 0
+                                        ? "text-red-600 dark:text-red-400"
+                                        : "text-foreground";
+                                  return (
+                                    <p className={`text-lg font-semibold ${tone}`}>
+                                      {`${sign}${apy.toFixed(2)}%`}
+                                    </p>
+                                  );
+                                })()}
+                                <p className="text-[11px] text-muted-foreground">
+                                  Forward yield in {assetSymbol}
+                                </p>
                               </div>
                             </div>
-                            <div className="space-y-1 sm:text-right">
-                              <p className="text-xs text-muted-foreground">Deployed Capital</p>
-                              <p className="text-lg font-semibold">
-                                {formatTokenAmount(holding.deployedAssets, decimals)} {assetSymbol}
+
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Composition</p>
+                              {holding.composition && holding.composition.length > 0 ? (
+                                <div className="rounded-md border border-border/60 divide-y divide-border/60">
+                                  {holding.composition.map((asset) => (
+                                    <div
+                                      key={asset.tokenAddress}
+                                      className="flex items-center justify-between px-3 py-2 text-sm"
+                                    >
+                                      <span className="font-medium text-foreground">
+                                        {asset.tokenSymbol || formatAddress(asset.tokenAddress)}
+                                      </span>
+                                      <span className="font-mono text-foreground">
+                                        {formatTokenAmount(asset.amount, asset.decimals)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">
+                                  No assets detected for this strategy.
+                                </p>
+                              )}
+                              <p className="text-[11px] text-muted-foreground">
+                                Total assets controlled by this strategy. Includes ERC-20 wallet balances and collateral locked in CDP.
                               </p>
                             </div>
+
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">USDST Debt</p>
+                              <div className="rounded-md border border-border/60 px-3 py-2 text-sm flex items-center justify-between">
+                                <span className="font-medium text-foreground">USDST</span>
+                                <span className="font-mono text-foreground">
+                                  {formatTokenAmount(holding.usdstDebt || "0", 18)}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Total USDST borrowed by this strategy across all CDP positions, accrued at the latest indexed rate.
+                              </p>
+                            </div>
+
+                            {(() => {
+                              const offChainUsd = Number(formatUnits(holding.offChainUsdWad || "0", 18));
+                              if (!Number.isFinite(offChainUsd) || offChainUsd < OFF_CHAIN_DISPLAY_FLOOR_USD) {
+                                return null;
+                              }
+                              const outflows = holding.recentOutflows || [];
+                              return (
+                                <div className="space-y-2">
+                                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Off-Chain Capital</p>
+                                  <div className="rounded-md border border-border/60 px-3 py-2 text-sm flex items-center justify-between">
+                                    <span className="font-medium text-foreground">In transit</span>
+                                    <span className="font-mono text-foreground">
+                                      ~{formatUsdAmount(holding.offChainUsdWad || "0")}
+                                    </span>
+                                  </div>
+                                  {outflows.length > 0 && (
+                                    <div className="rounded-md border border-border/60 divide-y divide-border/60">
+                                      <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        Recent bridge-outs
+                                      </div>
+                                      {outflows.map((outflow, idx) => (
+                                        <div
+                                          key={`${outflow.tokenAddress}-${outflow.timestampMs}-${idx}`}
+                                          className="flex items-center justify-between px-3 py-2 text-sm"
+                                        >
+                                          <span className="font-medium text-foreground">
+                                            {outflow.tokenSymbol || formatAddress(outflow.tokenAddress)}
+                                          </span>
+                                          <div className="flex flex-col items-end">
+                                            <span className="font-mono text-foreground">
+                                              {formatTokenAmount(outflow.amount, outflow.decimals)}
+                                            </span>
+                                            <span className="text-[11px] text-muted-foreground">
+                                              {outflow.timestampMs > 0
+                                                ? `bridged ${formatDistanceToNow(outflow.timestampMs, { addSuffix: true })}`
+                                                : "bridged recently"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                </div>
+                              );
+                            })()}
                           </CardContent>
                         </Card>
                       ))}
