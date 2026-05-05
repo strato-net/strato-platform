@@ -22,25 +22,16 @@ import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.EthConf.Model (networkConfig)
 
--- | Helium (Mercata) mainnet network identifier.
 heliumNetworkID :: Integer
 heliumNetworkID = 114784819836269
 
--- | Block height at which the receipts-trie root becomes consensus-critical
--- on Helium. Before this height the header carries the empty-trie sentinel
--- (legacy behavior); at and after it the root is computed from the actual
--- receipts of the executed transactions.
---
--- TODO: pick the real fork block once validator coordination is scheduled.
--- The current value is a far-future placeholder.
-receiptsRootForkBlock :: Integer
-receiptsRootForkBlock = 1000000
+upquarkNetworkID :: Integer
+upquarkNetworkID = 33056204878082667
 
--- | Is the receipts-root fork active for the given block number?
---
--- Helium nodes follow the legacy behavior up to but not including the fork
--- block, then switch to the new behavior. All other networks use the new
--- behavior unconditionally — there's no legacy data to preserve there.
+receiptsRootForkBlock :: Integer
+receiptsRootForkBlock = 100000
+
 isReceiptsRootForkActive :: Integer -> Bool
 isReceiptsRootForkActive blockNum =
-  not (Conf.networkID (networkConfig ethConf) == heliumNetworkID && blockNum < receiptsRootForkBlock)
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net `elem` [upquarkNetworkID, heliumNetworkID]) && blockNum < receiptsRootForkBlock
