@@ -2,6 +2,15 @@
 
 set -e
 
+# --patch-app was removed - inform the user. To be removed soon.
+for arg in "$@"; do
+    if [[ "$arg" == "--patch-app" ]]; then
+        echo "Error: the --patch-app flag has been removed from strato-up."
+        echo "Use 'strato-patch-app' instead (see README for details)."
+        exit 1
+    fi
+done
+
 strato-setup "$@"
 NODE_DIR="$1"
 
