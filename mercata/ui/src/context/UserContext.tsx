@@ -211,8 +211,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const externalWalletAddress = account.isConnected && account.address ? account.address : null;
   const isExternalWalletConnected = !!externalWalletAddress;
-  const userAddress = isLoggedIn ? stratoAddress : externalWalletAddress;
-  const effectiveLoggedIn = isLoggedIn || isExternalWalletConnected;
+  const shouldUseExternalWallet = !loading && !isLoggedIn && isExternalWalletConnected;
+  const userAddress = isLoggedIn ? stratoAddress : shouldUseExternalWallet ? externalWalletAddress : null;
+  const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
 
   useEffect(() => {
     setConnectedWalletAddress(externalWalletAddress);
