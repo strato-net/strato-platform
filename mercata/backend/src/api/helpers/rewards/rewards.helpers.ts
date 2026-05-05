@@ -294,7 +294,7 @@ export const fetchClaimedRewards = async (
           : event.attributes || {};
         
         if (attrs.user && attrs.amount) {
-          const user = attrs.user.toLowerCase();
+          const user = normalizeUserAddress(attrs.user);
           map.set(user, (map.get(user) || 0n) + BigInt(attrs.amount));
         }
       } catch {
@@ -402,10 +402,17 @@ export const fetchAllUsersLeaderboard = async (
   const claimedRewardsMap = await fetchClaimedRewards(accessToken, rewardsAddress);
   const currentTime = Math.floor(Date.now() / 1000);
   const userSet = new Set<string>();
+  const normalizedUnclaimedRewards = new Map<string, bigint>(
+    Object.entries(unclaimedRewards).map(([userAddress, amount]) => [
+      normalizeUserAddress(userAddress),
+      BigInt(String(amount || "0")),
+    ])
+  );
 
   // Process users with stake positions
   const usersWithStake = Object.entries(userInfo)
     .map(([userAddress, userActivities]) => {
+      const normalizedUserAddress = normalizeUserAddress(userAddress);
       const totalPending = Object.entries(userActivities || {})
         .reduce((sum, [activityIdStr, userActivityInfo]) => {
           const activityId = parseInt(activityIdStr, 10);
@@ -430,26 +437,33 @@ export const fetchAllUsersLeaderboard = async (
           return sum + BigInt(pending);
         }, 0n);
 
-      const unclaimed = BigInt(unclaimedRewards[userAddress] || "0");
-      const claimed = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
+      const unclaimed = normalizedUnclaimedRewards.get(normalizedUserAddress) || 0n;
+      const claimed = claimedRewardsMap.get(normalizedUserAddress) || 0n;
       const totalRewardsEarned = unclaimed + totalPending + claimed;
 
       if (totalRewardsEarned > 0n) {
-        userSet.add(userAddress.toLowerCase());
-        return { address: userAddress, totalRewardsEarned };
+        userSet.add(normalizedUserAddress);
+        return { address: normalizedUserAddress, totalRewardsEarned };
       }
       return null;
     })
     .filter((user): user is { address: string; totalRewardsEarned: bigint } => user !== null);
 
-  // Add users with only claimed rewards (no current stake)
-  const usersWithOnlyClaimed = Array.from(claimedRewardsMap.entries())
-    .filter(([userAddress, claimed]) => 
-      claimed > 0n && !userSet.has(userAddress.toLowerCase())
-    )
-    .map(([userAddress, claimed]) => ({ address: userAddress, totalRewardsEarned: claimed }));
+  // Add users with only settled rewards (no current stake).
+  const settledRewardUsers = new Set([
+    ...Array.from(normalizedUnclaimedRewards.keys()),
+    ...Array.from(claimedRewardsMap.keys()),
+  ]);
+  const usersWithOnlySettledRewards = Array.from(settledRewardUsers)
+    .map((userAddress) => ({
+      address: userAddress,
+      totalRewardsEarned:
+        (normalizedUnclaimedRewards.get(userAddress) || 0n) +
+        (claimedRewardsMap.get(userAddress) || 0n),
+    }))
+    .filter((user) => user.totalRewardsEarned > 0n && !userSet.has(user.address));
 
-  return [...usersWithStake, ...usersWithOnlyClaimed].map(user => ({
+  return [...usersWithStake, ...usersWithOnlySettledRewards].map(user => ({
     address: user.address,
     totalRewardsEarned: user.totalRewardsEarned.toString(),
   }));
