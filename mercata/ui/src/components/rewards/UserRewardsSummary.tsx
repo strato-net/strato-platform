@@ -18,6 +18,7 @@ import { useUser } from "@/context/UserContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 import CopyButton from "@/components/ui/copy";
+import { isTxPending } from "@/utils/transactionStatus";
 
 interface UserRewardsSummaryProps {
   userRewards: UserRewardsData | null;
@@ -110,7 +111,7 @@ export const UserRewardsSummary = ({
 
       if (result.success) {
         toast({
-          title: "Claim Successful",
+          title: isTxPending(result.status) ? "Claim Submitted" : "Claim Successful",
           description: result.txHash
             ? `Transaction hash: ${result.txHash.slice(0, 10)}...`
             : "Rewards claimed successfully",

@@ -6,16 +6,25 @@ module BlockApps.Solidity.ABI.Bridge
     valueToArgText,
     encodeReturnABI,
     encodeValueABI,
+    encodeEventToLog,
+    findEventDef,
   )
 where
 
 import BlockApps.Solidity.ABI.Codec
 import BlockApps.Solidity.ABI.Selector (svmTypeToCanonical)
 import Blockchain.Strato.Model.Address (addressToByteString, formatAddressWithoutColor)
+import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import Data.List (intercalate, partition)
+import qualified Data.Map as M
 import qualified Data.Text as T
+import qualified SolidVM.Model.CodeCollection as CC
+import SolidVM.Model.CodeCollection.Event (EventF (..), EventLog (..))
+import SolidVM.Model.CodeCollection.VarDef (IndexedType (..))
+import SolidVM.Model.SolidString (SolidString, labelToText)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value (Value (..))
 
@@ -136,6 +145,9 @@ encodeSingleValue (SVMType.Int (Just True) _) (SInteger n) = encodeInt256 n
 encodeSingleValue (SVMType.Int _ _) (SInteger n) = encodeUint256 n
 encodeSingleValue SVMType.Bool (SBool b) = encodeUint256 (if b then 1 else 0)
 encodeSingleValue (SVMType.Address _) (SAddress a _) = padLeft32 $ addressToByteString a
+encodeSingleValue (SVMType.Address _) (SContract _ a) = padLeft32 $ addressToByteString a
+encodeSingleValue (SVMType.Contract _) (SContract _ a) = padLeft32 $ addressToByteString a
+encodeSingleValue (SVMType.Contract _) (SAddress a _) = padLeft32 $ addressToByteString a
 encodeSingleValue (SVMType.String _) (SString s) =
   let bs = BC.pack s
    in encodeUint256 32 <> encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
@@ -144,5 +156,37 @@ encodeSingleValue (SVMType.Bytes _ Nothing) (SBytes bs) =
 encodeSingleValue (SVMType.Bytes _ (Just n)) (SBytes bs) =
   padLeft32 $ B.take (fromIntegral n) bs
 encodeSingleValue (SVMType.Enum _ _ _) (SEnumVal _ _ v) = encodeUint256 (fromIntegral v)
+encodeSingleValue _ (SContract _ a) = padLeft32 $ addressToByteString a
+encodeSingleValue _ (SAddress a _) = padLeft32 $ addressToByteString a
 encodeSingleValue _ (SInteger n) = encodeUint256 n
 encodeSingleValue _ _ = B.empty
+
+--------------------------------------------------------------------------------
+-- Event log encoding: decoded Cirrus attributes -> EVM topics + data
+--------------------------------------------------------------------------------
+
+encodeEventToLog :: SolidString -> EventF a -> M.Map T.Text T.Text -> ([B.ByteString], B.ByteString)
+encodeEventToLog evName eventDef attrs =
+  let logs = _eventLogs eventDef
+      allTypes = map (indexedTypeType . _eventLogType) logs
+      topic0 = if _eventAnonymous eventDef then []
+               else let sig = T.unpack (labelToText evName)
+                            ++ "(" ++ intercalate "," (map svmTypeToCanonical allTypes) ++ ")"
+                    in [keccak256ToByteString $ hash $ BC.pack sig]
+      (indexedLogs, nonIndexedLogs) = partition _eventLogIndexed logs
+      indexedTopics = map (encodeLogParam attrs) indexedLogs
+      nonIndexedData = B.concat $ map (encodeLogParam attrs) nonIndexedLogs
+  in (topic0 ++ indexedTopics, nonIndexedData)
+
+encodeLogParam :: M.Map T.Text T.Text -> EventLog -> B.ByteString
+encodeLogParam attrs (EventLog name _ idxType) =
+  let typ = indexedTypeType idxType
+  in case M.lookup name attrs of
+    Just s  -> encodeSingleReturn typ (T.unpack s)
+    Nothing -> encodeUint256 0
+
+findEventDef :: CC.CodeCollection -> SolidString -> Maybe (CC.Event)
+findEventDef cc evName =
+  case concatMap (\(_, c) -> maybe [] (:[]) $ M.lookup evName (CC._events c)) (M.toList $ CC._contracts cc) of
+    (ev : _) -> Just ev
+    []       -> Nothing

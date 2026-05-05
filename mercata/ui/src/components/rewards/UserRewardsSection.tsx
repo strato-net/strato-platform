@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
 import { useUser } from "@/context/UserContext";
 import { useOracleContext } from "@/context/OracleContext";
+import { isTxPending } from "@/utils/transactionStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
@@ -113,7 +114,7 @@ export const UserRewardsSection = ({
       
       if (result.success) {
         toast({
-          title: "Claim Successful",
+          title: isTxPending(result.status) ? "Claim Submitted" : "Claim Successful",
           description: result.txHash 
             ? `Transaction hash: ${result.txHash.slice(0, 10)}...`
             : "Rewards claimed successfully",
@@ -346,4 +347,3 @@ export const UserRewardsSection = ({
     </div>
   );
 };
-

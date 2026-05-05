@@ -17,6 +17,8 @@ import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { redirectToLogin } from '@/lib/auth';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { useAccount } from 'wagmi';
 import EarnApyTooltip from '@/components/earn/EarnApyTooltip';
 import { BestApyInfoTooltip } from '@/components/earn/BestApyInfoTooltip';
 import MintProgressModal, { type ProgressStep } from '../../../MintProgressModal';
@@ -41,6 +43,7 @@ import {
 } from '@/components/cdp/v2/cdpUtils';
 import { buildNativeRewardsApyInfo, findVaultEarnApyInfo } from '@/utils/earnUtils';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
+import { isTxSubmitted } from '@/utils/transactionStatus';
 import { DECIMAL, ADDRESS, UNITS, USD } from '@/components/cdp/v2/cdpTypes';
 
 interface MintProps {
@@ -62,6 +65,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   const { vaultState } = useVaultContext();
   const { activities: rewardsActivities } = useRewardsActivities();
   const { userRewards } = useRewardsUserInfo();
+  const { openConnectModal } = useConnectModal();
+  const { isConnected } = useAccount();
 
 
 
@@ -494,6 +499,15 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
     }
   }, [totalMaxMint, isMaxMode]);
 
+  const handleGuestMintClick = useCallback(() => {
+    if (!isConnected && openConnectModal) {
+      openConnectModal();
+      return;
+    }
+
+    redirectToLogin();
+  }, [isConnected, openConnectModal]);
+
   const handleAutoAllocateChange = useCallback((checked: boolean) => {
     // When switching to manual mode, snapshot current optimal allocations
     if (!checked && optimalAllocationsRef.current.length > 0) {
@@ -671,7 +685,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
 
         try {
           const result = await cdpService.deposit(tx.asset, tx.amount, true);
-          if (result.status.toLowerCase() !== 'success') {
+          if (!isTxSubmitted(result.status)) {
             throw new Error(`Deposit failed for ${tx.symbol}: ${result.status}`);
           }
 
@@ -715,7 +729,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
             ? await cdpService.mintMax(tx.asset)
             : await cdpService.mint(tx.asset, tx.amount, true);
             
-          if (result.status.toLowerCase() !== 'success') {
+          if (!isTxSubmitted(result.status)) {
             throw new Error(`Mint failed for ${tx.symbol}: ${result.status}`);
           }
 
@@ -856,10 +870,10 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
           {/* Confirm Button / Sign In Button */}
           {guestMode ? (
             <Button
-              onClick={() => redirectToLogin()}
+              onClick={handleGuestMintClick}
               className="w-full"
             >
-              Sign in to mint USDST
+              {isConnected ? 'Sign in to mint USDST' : 'Connect Wallet to Mint USDST'}
             </Button>
           ) : (
             <Button

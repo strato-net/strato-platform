@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import ReferController from "../controllers/refer.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -59,7 +60,7 @@ const router = Router();
  *                     hash:
  *                       type: string
  */
-router.post("/deposit", authHandler.authorizeRequest(), ReferController.deposit);
+router.post("/deposit", walletAuth, ReferController.deposit);
 
 /**
  * @openapi
@@ -159,7 +160,7 @@ router.get("/deposit", authHandler.authorizeRequest(false), ReferController.getD
  *       500:
  *         description: Redemption server error or misconfiguration
  */
-router.post("/redeem", authHandler.authorizeRequest(), ReferController.redeem);
+router.post("/redeem", walletAuth, ReferController.redeem);
 
 /**
  * @openapi
@@ -239,7 +240,7 @@ router.get("/referrals", authHandler.authorizeRequest(), ReferController.getRefe
  *       403:
  *         description: Deposit not eligible for cancellation (not expired or not owned by user)
  */
-router.post("/cancel", authHandler.authorizeRequest(), ReferController.cancel);
+router.post("/cancel", walletAuth, ReferController.cancel);
 
 /**
  * @openapi
@@ -331,4 +332,3 @@ router.get("/history", authHandler.authorizeRequest(), ReferController.getHistor
 router.get("/status", authHandler.authorizeRequest(), ReferController.getStatus);
 
 export default router;
-

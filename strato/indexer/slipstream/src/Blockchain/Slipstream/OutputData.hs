@@ -513,6 +513,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     collection_name :: Text,
     collection_type ::Text,
     blockHash :: Keccak256,
+    transactionHash :: Keccak256,
     blockTimestamp :: UTCTime,
     blockNumber :: Integer,
     collectionDataKeys :: [V.Value],
@@ -571,6 +572,7 @@ baseEventColumns :: TableColumns
 baseEventColumns =
   [ ("address", SqlText)
   , ("block_hash", SqlText)
+  , ("transaction_hash", SqlText)
   , ("block_timestamp", SqlText)
   , ("block_number", SqlText)
   , ("transaction_sender", SqlText)
@@ -774,6 +776,7 @@ eventBaseColumnsQuery =
   [
     ("address", SqlText),
     ("block_hash", SqlText),
+    ("transaction_hash", SqlText),
     ("block_timestamp", SqlText),
     ("block_number", SqlText),
     ("transaction_sender", SqlText),
@@ -908,6 +911,7 @@ insertEventArrayTableQuery ms =
                 baseVals =
                   [ ValueAddress . address,
                     ValueString . T.pack . keccak256ToHex . blockHash,
+                    ValueString . T.pack . keccak256ToHex . transactionHash,
                     ValueString . tshow . blockTimestamp,
                     ValueInt False Nothing . blockNumber,
                     const $ ValueString "",
@@ -990,6 +994,7 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collection_name = arrayName,
       collection_type = "Event Array",
       blockHash = eventBlockHash ae,
+      transactionHash = Action.evTxHash ev,
       blockTimestamp = eventBlockTimestamp ae,
       blockNumber = eventBlockNumber ae,
       collectionDataKeys = [index],
@@ -1032,6 +1037,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
   let eventName = T.pack $ Action.evName ev
       address = Action.evContractAddress ev
       blockHash = T.pack . keccak256ToHex $ eventBlockHash agEv
+      txHash = T.pack . keccak256ToHex $ Action.evTxHash ev
       blockTimestamp = tshow $ eventBlockTimestamp agEv
       blockNumber = eventBlockNumber agEv
       transactionSender = Action.evTxSender ev
@@ -1049,6 +1055,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       values = Just <$>
         [ SimpleValue $ ValueAddress address
         , SimpleValue $ ValueString blockHash
+        , SimpleValue $ ValueString txHash
         , SimpleValue $ ValueString blockTimestamp
         , SimpleValue $ ValueInt False Nothing blockNumber
         , SimpleValue $ ValueAddress transactionSender
@@ -1234,6 +1241,7 @@ initialSlipstreamQueries =
       [ ("id", SqlSerial)
       , ("address", SqlText)
       , ("block_hash", SqlText)
+      , ("transaction_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
       , ("transaction_sender", SqlText)
@@ -1248,6 +1256,7 @@ initialSlipstreamQueries =
       eventArrayTableName
       [ ("address", SqlText)
       , ("block_hash", SqlText)
+      , ("transaction_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
       , ("transaction_sender", SqlText)
