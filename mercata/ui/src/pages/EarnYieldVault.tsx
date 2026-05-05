@@ -826,9 +826,7 @@ const EarnYieldVault = () => {
                                       ))}
                                     </div>
                                   )}
-                                  <p className="text-[11px] text-muted-foreground">
-                                    Capital recently bridged out via MercataBridge that hasn&apos;t returned yet. Excluded from the equity used in Base APY so the rate reflects yield on currently-productive capital.
-                                  </p>
+
                                 </div>
                               );
                             })()}
