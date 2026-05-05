@@ -12,9 +12,7 @@
 -- their use sites. New consensus forks should be added here so they're easy to
 -- find and audit.
 module Blockchain.Forks
-  ( heliumNetworkID,
-    receiptsRootForkBlock,
-    isReceiptsRootForkActive,
+  ( isReceiptsRootForkActive
   )
 where
 
