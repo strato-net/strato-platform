@@ -7,7 +7,7 @@ import { useUser } from '@/context/UserContext';
 import BridgeIn from '@/components/bridge/BridgeIn';
 import RecentTransactions from '@/components/bridge/RecentTransactions';
 import { useBridgeContext } from '@/context/BridgeContext';
-import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
+import EarnWalletConnectBanner from '@/components/earn/EarnWalletConnectBanner';
 
 const DepositsPage = () => {
   const { isLoggedIn } = useUser();
@@ -40,7 +40,7 @@ const DepositsPage = () => {
         <DashboardHeader title="Fund" />
         <main className="flex-1 p-4 md:p-6 pb-16 md:pb-6 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
           {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to deposit and start earning" />
+            <EarnWalletConnectBanner message="Connect your wallet to deposit funds, buy metals, and view your recent activity." />
           )}
           <div className="mb-8 grid grid-cols-1 xl:grid-cols-12 gap-6">
             <div className="xl:col-span-7">

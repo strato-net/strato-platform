@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import JuniorNoteView from "./JuniorNoteView";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 interface BadDebtViewProps {
   guestMode?: boolean;
@@ -89,10 +88,7 @@ const BadDebtView: React.FC<BadDebtViewProps> = ({ guestMode = false }) => {
 
   return (
     <div className="space-y-4">
-      {/* Guest mode: Sign in banner, Logged in: Total Bad Debt Display */}
-      {guestMode ? (
-        <GuestSignInBanner message="Sign in to view bad debt information" />
-      ) : (
+      {!guestMode && (
         <Card>
           <CardHeader className="px-4 md:px-6 pb-2 md:pb-4">
             <CardTitle className="flex items-center justify-between gap-2">

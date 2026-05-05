@@ -7,11 +7,11 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import VaultWithdrawModal from "@/components/vault/VaultWithdrawModal";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useVaultContext } from "@/context/VaultContext";
 import { useUser } from "@/context/UserContext";
+import EarnWalletConnectBanner from "@/components/earn/EarnWalletConnectBanner";
 
 const formatUsd = (value: string): string => {
   try {
@@ -134,7 +134,7 @@ const EarnVault = () => {
 
         <main className="pb-16 md:pb-6">
           {guestMode && (
-            <GuestSignInBanner message="Sign in to deposit or withdraw from the vault" />
+            <EarnWalletConnectBanner message="Connect your wallet to view your vault position and manage deposits or withdrawals." />
           )}
 
           <div className="w-full">

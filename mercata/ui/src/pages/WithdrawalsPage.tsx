@@ -11,7 +11,8 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import { Loader2, ArrowRight } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 import { useUser } from "@/context/UserContext";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { requestWalletConnection } from "@/lib/auth";
+import EarnWalletConnectBanner from "@/components/earn/EarnWalletConnectBanner";
 
 const WithdrawalsPage = () => {
   const { isLoggedIn } = useUser();
@@ -85,7 +86,7 @@ const WithdrawalsPage = () => {
 
         <main className="flex-1 p-4 md:p-6 pb-10 md:pb-6 overflow-y-auto">
           {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to withdraw assets and bridge tokens" />
+            <EarnWalletConnectBanner message="Connect your wallet to withdraw assets, bridge tokens, and view withdrawal transactions." />
           )}
           <div className="mb-8 flex flex-col lg:flex-row gap-6 items-stretch">
             <div className="w-full lg:w-[50%] flex">
@@ -98,6 +99,7 @@ const WithdrawalsPage = () => {
                       onClick={(e) => {
                         if (!isLoggedIn) {
                           e.preventDefault();
+                          requestWalletConnection();
                           return;
                         }
                         setTargetTransactionTab('WithdrawalInitiated');
@@ -105,7 +107,7 @@ const WithdrawalsPage = () => {
                       className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${
                         isLoggedIn 
                           ? "text-blue-600 hover:text-blue-800 cursor-pointer" 
-                          : "text-muted-foreground cursor-not-allowed opacity-50 pointer-events-none"
+                          : "text-muted-foreground hover:text-foreground cursor-pointer"
                       }`}
                     >
                       <ArrowRight size={14} className="md:w-4 md:h-4" />

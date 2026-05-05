@@ -11,7 +11,7 @@ import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
 import { useUser } from '@/context/UserContext';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
-import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
+import EarnWalletConnectBanner from '@/components/earn/EarnWalletConnectBanner';
 import { safeParseUnits } from "@/utils/numberUtils";
 import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
@@ -212,7 +212,7 @@ const Advanced = () => {
                 </TabsList>
                 <TabsContent value="borrow">
                   {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to borrow USDST" />
+                    <EarnWalletConnectBanner message="Connect your wallet to borrow, repay, and manage collateral." />
                   )}
                   {isLoggedIn && <LiquidationAlertBanner />}
 
@@ -296,25 +296,25 @@ const Advanced = () => {
                 </TabsContent>
                 <TabsContent value="lending">
                   {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to deposit liquidity and start earning" />
+                    <EarnWalletConnectBanner message="Connect your wallet to deposit liquidity and start earning." />
                   )}
                   <LendingPoolSection />
                 </TabsContent>
                 <TabsContent value="swap">
                   {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to add liquidity to swap pools and earn rewards" />
+                    <EarnWalletConnectBanner message="Connect your wallet to add liquidity to swap pools and earn rewards." />
                   )}
                   <SwapPoolsSection />
                 </TabsContent>
                 <TabsContent value="safety">
                   {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to stake USDST in the Safety Module" />
+                    <EarnWalletConnectBanner message="Connect your wallet to stake USDST in the Safety Module." />
                   )}
                   <SafetyModuleSection />
                 </TabsContent>
                 <TabsContent value="liquidations">
                   {!isLoggedIn && (
-                    <GuestSignInBanner message="Sign in to view and liquidate unhealthy positions" />
+                    <EarnWalletConnectBanner message="Connect your wallet to view and liquidate unhealthy positions." />
                   )}
                   <LiquidationsSection />
                 </TabsContent>

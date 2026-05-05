@@ -259,7 +259,7 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0 }: Rec
         </div>
 
         {!isLoggedIn
-          ? <p className="text-sm text-muted-foreground px-4 py-4">Sign in to view your recent activity.</p>
+          ? <p className="text-sm text-muted-foreground px-4 py-4">Connect a wallet to view your recent activity.</p>
           : activeLoading
             ? skeleton
             : !activeTxs.length

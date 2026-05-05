@@ -55,7 +55,7 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-4">
-            Sign in to view your vault position and manage deposits or withdrawals.
+            Connect a wallet to view your vault position and manage deposits or withdrawals.
           </p>
         </CardContent>
       </Card>

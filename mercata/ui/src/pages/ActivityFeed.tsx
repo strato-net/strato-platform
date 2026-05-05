@@ -4,11 +4,10 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import ActivityFeedList from "../components/dashboard/ActivityFeedList";
 import ActivityFeedCards from "../components/dashboard/ActivityFeedCards";
-import { Activity, LogIn } from "lucide-react";
+import { Activity, Wallet } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { useUser } from "@/context/UserContext";
-import { redirectToLogin } from "@/lib/auth";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { requestWalletConnection } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -21,7 +20,7 @@ const ActivityFeed = () => {
   }, []);
 
   const handleLogin = () => {
-    redirectToLogin();
+    requestWalletConnection();
   };
 
   const GuestLoginPrompt = () => (
@@ -29,13 +28,13 @@ const ActivityFeed = () => {
       <CardHeader className="text-center pb-2">
         <CardTitle className="text-xl">View Your Activity</CardTitle>
         <CardDescription className="text-base">
-          Sign in to see your personal activity and filter events.
+          Connect a wallet to see your personal activity and filter events.
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center space-y-4">
         <Button onClick={handleLogin} className="gap-2" size="lg">
-          <LogIn className="w-4 h-4" />
-          Sign In to Continue
+          <Wallet className="w-4 h-4" />
+          Connect Wallet to View Activity
         </Button>
       </CardContent>
     </Card>
@@ -49,9 +48,6 @@ const ActivityFeed = () => {
         <DashboardHeader title="Activity Feed" />
 
         <main className="p-4 md:p-6 overflow-x-hidden">
-          {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to view detailed activity feed and filter events" />
-          )}
           <div className="mb-6 md:mb-8">
             <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
               <Activity className="h-5 w-5 md:h-6 md:w-6 text-blue-600 dark:text-blue-400" />

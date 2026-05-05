@@ -30,6 +30,7 @@ import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transfe
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { UserRewardsData } from "@/services/rewardsService";
+import { requestWalletConnection } from "@/lib/auth";
 
 // ============================================================================
 // CONSTANTS
@@ -1081,10 +1082,10 @@ const SwapWidget = ({ userRewards, rewardsLoading, guestMode = false }: SwapWidg
 
       <Button
         className="w-full bg-strato-blue hover:bg-strato-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
-        onClick={() => setIsDialogOpen(true)}
-        disabled={guestMode || isSwapDisabled() || !!pool?.isDisabled || !!pool?.isPaused}
+        onClick={() => guestMode ? requestWalletConnection() : setIsDialogOpen(true)}
+        disabled={!guestMode && (isSwapDisabled() || !!pool?.isDisabled || !!pool?.isPaused)}
       >
-        {pool?.isDisabled ? "This pool is disabled" : pool?.isPaused ? "Pool is paused by admin at this time" : "Swap Assets"}
+        {guestMode ? "Connect Wallet to Swap" : pool?.isDisabled ? "This pool is disabled" : pool?.isPaused ? "Pool is paused by admin at this time" : "Swap Assets"}
       </Button>
 
       <SwapDialog

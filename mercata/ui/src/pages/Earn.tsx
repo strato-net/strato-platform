@@ -27,7 +27,6 @@ import { useUser } from "@/context/UserContext";
 import { useEarnContext } from "@/context/EarnContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
 import { useToast } from "@/hooks/use-toast";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidityDepositModal from "@/components/dashboard/LiquidityDepositModal";
 import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModal";
 import VaultDepositModal from "@/components/vault/VaultDepositModal";
@@ -45,6 +44,7 @@ import {
   LENDING_DEPOSIT_FEE,
   rewardsEnabled,
 } from "@/lib/constants";
+import EarnWalletConnectBanner from "@/components/earn/EarnWalletConnectBanner";
 
 const WAD = BigInt(10) ** BigInt(18);
 const TOP_OPPORTUNITY_MIN_POOL_TVL = 100000n * WAD;
@@ -878,7 +878,7 @@ const Earn = () => {
 
         <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-8">
           {guestMode && (
-            <GuestSignInBanner message="Sign in to view your positions and manage pool deposits or withdrawals" />
+            <EarnWalletConnectBanner />
           )}
 
           <section>

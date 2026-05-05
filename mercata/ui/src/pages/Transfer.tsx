@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Token } from "@/interface";
 import { useWalletClient, useWriteContract } from "wagmi";
-import { ensureStratoChainInWallet, getStratoChainId } from "@/lib/stratoChain";
+import { ensureStratoChainInWallet, getStratoChain, getStratoChainId } from "@/lib/stratoChain";
 
 import { useUser } from "@/context/UserContext";
 import { useTokenContext, BulkTransferItem, BulkTransferResponse } from "@/context/TokenContext";
@@ -17,8 +17,8 @@ import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
 import BulkTransferModal from "../components/BulkTransferModal";
 import { safeParseUnits, roundToDecimals, addCommasToInput, formatBalance, formatUnits } from "@/utils/numberUtils";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
+import { requestWalletConnection } from "@/lib/auth";
 
 import {
   Popover,
@@ -50,6 +50,7 @@ const Transfer = () => {
   const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
   const { writeContractAsync } = useWriteContract();
   const { data: walletClient } = useWalletClient();
+  const stratoChain = getStratoChain();
   const stratoChainId = getStratoChainId();
   const { toast } = useToast();
   const isVaultUser = !!userName;
@@ -155,7 +156,9 @@ const Transfer = () => {
         }).then((r) => r.json());
         const nonce = Number(nonceRes.result);
         await writeContractAsync({
+          chain: stratoChain,
           chainId: stratoChainId || undefined,
+          account: ensureHexPrefix(userAddress),
           address: ensureHexPrefix(fromAsset.address),
           abi: erc20TransferAbi,
           functionName: "transfer",
@@ -219,9 +222,6 @@ const Transfer = () => {
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Transfer" />
         <main className="p-4 md:p-6">
-          {guestMode && (
-            <GuestSignInBanner message="Sign in to transfer tokens to other addresses" />
-          )}
           <div className="max-w-2xl mx-auto bg-card shadow-md rounded-lg p-6 space-y-6 border border-border">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold">Transfer your tokens</h2>
@@ -447,20 +447,27 @@ const Transfer = () => {
 
             <Button
               className="w-full"
-              onClick={() => setShowConfirmModal(true)}
+              onClick={() => {
+                if (guestMode) {
+                  requestWalletConnection();
+                  return;
+                }
+                setShowConfirmModal(true);
+              }}
               disabled={
-                guestMode ||
-                !fromAsset ||
-                !recipient ||
-                !fromAmount ||
-                !!amountError ||
-                !!recipientError ||
-                !!feeError ||
-                swapLoading ||
-                (nonceWarning && !nonceOverride)
+                !guestMode && (
+                  !fromAsset ||
+                  !recipient ||
+                  !fromAmount ||
+                  !!amountError ||
+                  !!recipientError ||
+                  !!feeError ||
+                  swapLoading ||
+                  (nonceWarning && !nonceOverride)
+                )
               }
             >
-              {swapLoading ? <span>Processing…</span> : "Transfer"}
+              {guestMode ? "Connect Wallet to Transfer" : swapLoading ? <span>Processing…</span> : "Transfer"}
             </Button>
           </div>
 

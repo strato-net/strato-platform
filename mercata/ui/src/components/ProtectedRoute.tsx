@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useUser } from '@/context/UserContext';
-import { redirectToLogin } from '@/lib/auth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -8,16 +8,22 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { isLoggedIn, loading } = useUser();
+  const { openConnectModal } = useConnectModal();
+  const hasOpenedConnectModal = React.useRef(false);
 
   useEffect(() => {
-    // Only redirect if not loading and not authenticated
-    if (!loading && !isLoggedIn) {
-      // Redirect to login page if not authenticated
-      redirectToLogin();
+    if (isLoggedIn) {
+      hasOpenedConnectModal.current = false;
+      return;
     }
-  }, [isLoggedIn, loading]);
 
-  // Don't render anything if not authenticated (will redirect)
+    if (!loading && !hasOpenedConnectModal.current && openConnectModal) {
+      hasOpenedConnectModal.current = true;
+      openConnectModal();
+    }
+  }, [isLoggedIn, loading, openConnectModal]);
+
+  // Don't render protected content until a wallet or app session is connected.
   if (!loading && !isLoggedIn) {
     return null;
   }

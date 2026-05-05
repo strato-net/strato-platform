@@ -652,7 +652,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ guestMode = false }
                             {/* Guest mode message */}
                             {guestMode && (
                               <span className="text-xs text-muted-foreground text-center sm:text-left">
-                                Sign in to liquidate
+                                Connect a wallet to liquidate.
                               </span>
                             )}
                           </div>

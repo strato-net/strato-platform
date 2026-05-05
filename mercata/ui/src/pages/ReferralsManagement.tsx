@@ -13,7 +13,7 @@ import { api } from "@/lib/axios";
 import { useNavigate } from "react-router-dom";
 import { formatUnits } from "@/utils/numberUtils";
 import { useTokenContext } from "@/context/TokenContext";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { requestWalletConnection } from "@/lib/auth";
 
 // Guest View Component - Static informational page for non-logged-in users
 const GuestReferralsView = () => {
@@ -25,7 +25,6 @@ const GuestReferralsView = () => {
         <DashboardHeader title="My Referrals" />
         <main className="p-4 md:p-6">
           <div className="max-w-4xl mx-auto space-y-6">
-            <GuestSignInBanner message="Sign in to create referral deposits and gift tokens to friends" />
             {/* Hero Section */}
             <Card className="border-2 border-dashed bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-950/20 dark:to-purple-950/20">
               <CardHeader className="text-center pb-2">
@@ -57,6 +56,10 @@ const GuestReferralsView = () => {
                     <span className="text-sm text-muted-foreground">Set expiration dates</span>
                   </div>
                 </div>
+                <Button onClick={() => requestWalletConnection()} className="gap-2">
+                  <Gift className="w-4 h-4" />
+                  Connect Wallet to Create Referral
+                </Button>
               </CardContent>
             </Card>
 

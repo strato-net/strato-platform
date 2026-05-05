@@ -30,8 +30,25 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
   const { disconnect } = useDisconnect();
   const { connectModalOpen, openConnectModal } = useConnectModal();
   const { toast } = useToast();
+  const externalModalActiveRef = React.useRef(false);
+  const hiddenElementsRef = React.useRef<Array<{ element: HTMLElement; display: string }>>([]);
   const hasConnectedWallet =
     isConnected && (!externalOnly || (connector ? !isStratoConnector(connector) : false));
+
+  const restoreHiddenStratoWalletOption = React.useCallback(() => {
+    hiddenElementsRef.current.forEach(({ element, display }) => {
+      element.style.display = display;
+    });
+    hiddenElementsRef.current = [];
+  }, []);
+
+  const hideElement = React.useCallback((element: HTMLElement) => {
+    if (hiddenElementsRef.current.some(({ element: hiddenElement }) => hiddenElement === element)) {
+      return;
+    }
+    hiddenElementsRef.current.push({ element, display: element.style.display });
+    element.style.display = 'none';
+  }, []);
 
   const hideStratoWalletOption = React.useCallback(() => {
     const stratoOption = document.querySelector<HTMLElement>(
@@ -39,34 +56,41 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
     );
     if (!stratoOption) return;
 
-    stratoOption.style.display = 'none';
-
     const stratoRow = stratoOption.parentElement as HTMLElement | null;
-    if (stratoRow) {
-      stratoRow.style.display = 'none';
-    }
-
-    const walletList = stratoRow?.parentElement;
+    const walletList = stratoRow?.parentElement as HTMLElement | null;
     const onlyStratoInList =
       walletList?.querySelectorAll('[data-testid^="rk-wallet-option-"]').length === 1;
-    if (!walletList || !onlyStratoInList) return;
 
-    walletList.style.display = 'none';
+    hideElement(stratoOption);
+    if (stratoRow) hideElement(stratoRow);
+
+    if (!walletList || !onlyStratoInList) return;
+    hideElement(walletList);
+
     const groupHeader = walletList.previousElementSibling as HTMLElement | null;
     if (groupHeader?.textContent?.trim() === 'STRATO') {
-      groupHeader.style.display = 'none';
+      hideElement(groupHeader);
     }
-  }, []);
+  }, [hideElement]);
 
   React.useEffect(() => {
-    if (!externalOnly || !connectModalOpen) return;
+    if (!connectModalOpen) {
+      externalModalActiveRef.current = false;
+      restoreHiddenStratoWalletOption();
+      return;
+    }
+
+    if (!externalOnly || !externalModalActiveRef.current) return;
 
     hideStratoWalletOption();
     const observer = new MutationObserver(hideStratoWalletOption);
     observer.observe(document.body, { childList: true, subtree: true });
 
-    return () => observer.disconnect();
-  }, [connectModalOpen, externalOnly, hideStratoWalletOption]);
+    return () => {
+      observer.disconnect();
+      restoreHiddenStratoWalletOption();
+    };
+  }, [connectModalOpen, externalOnly, hideStratoWalletOption, restoreHiddenStratoWalletOption]);
 
   const copyToClipboard = async () => {
     if (address) {
@@ -84,7 +108,10 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
       type="button"
       disabled={guestMode}
       className={CONNECT_BUTTON_CLASS}
-      onClick={() => openConnectModal?.()}
+      onClick={() => {
+        externalModalActiveRef.current = true;
+        openConnectModal?.();
+      }}
     >
       {connectLabel}
     </button>

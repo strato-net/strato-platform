@@ -5,7 +5,6 @@ import { ArrowLeft, CircleDollarSign, PiggyBank, Sparkles, Wallet } from "lucide
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,6 +34,7 @@ import {
   roundByMagnitude,
 } from "@/services/rewardsService";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
+import EarnWalletConnectBanner from "@/components/earn/EarnWalletConnectBanner";
 
 const formatTokenAmount = (value: string, maxFractionDigits: number = 4): string => {
   try {
@@ -290,11 +290,6 @@ const EarnSave = () => {
 
   const handleActionRequest = (mode: Exclude<ActionMode, null>) => {
     if (!isLoggedIn) {
-      toast({
-        title: "Sign in required",
-        description: "Connect your account to deposit or redeem saveUSDST.",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -381,7 +376,7 @@ const EarnSave = () => {
 
         <main className="pb-16 md:pb-6">
           {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to view your USDST and saveUSDST balances." />
+            <EarnWalletConnectBanner message="Connect your wallet to view your USDST balance and manage saveUSDST." />
           )}
 
           <div className="w-full">

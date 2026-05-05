@@ -152,8 +152,13 @@ const App = () => {
       const appName = "STRATO";
       const stratoChain = getStratoChain();
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
+      const stratoTransportUrl =
+        stratoChain?.rpcUrls?.default?.http?.[0] ?? `/rpc`;
       const transports: Record<number, Transport> = Object.fromEntries(
-        chains.map((chain) => [chain.id, chain === stratoChain ? http(`/rpc`) : http()])
+        chains.map((chain) => [
+          chain.id,
+          chain === stratoChain ? http(stratoTransportUrl) : http(),
+        ])
       );
 
       const connectors = connectorsForWallets(

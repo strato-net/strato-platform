@@ -1,6 +1,6 @@
 import { defineChain, type Chain } from "viem";
 
-export const rpcUrl =
+export let rpcUrl =
   typeof window !== "undefined" ? `${window.location.origin}/rpc` : "";
 
 let _chainId: number | null = null;
@@ -10,7 +10,7 @@ type WalletLike = {
   chain?: { id?: number };
   switchChain?: (args: { id: number }) => Promise<unknown>;
   addChain?: (args: { chain: Chain }) => Promise<unknown>;
-  request?: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  request?: (args: { method: unknown; params: unknown }) => Promise<unknown>;
 };
 
 type AddEthereumChainParameter = {
@@ -61,7 +61,7 @@ function getAddEthereumChainParameter(chain: Chain): AddEthereumChainParameter {
     chainId: toChainIdHex(chain.id),
     chainName: chain.name,
     nativeCurrency: chain.nativeCurrency,
-    rpcUrls: chain.rpcUrls.default.http,
+    rpcUrls: [...chain.rpcUrls.default.http],
     ...(blockExplorerUrl ? { blockExplorerUrls: [blockExplorerUrl] } : {}),
   };
 }
@@ -118,12 +118,17 @@ export async function initStratoChain(): Promise<Chain | null> {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
-      }),
+      }).catch(() => null),
       fetch("/api/config").then(r => r.json()).catch(() => null),
     ]);
-    const { result } = await rpcRes.json();
-    if (!result) return null;
-    _chainId = Number(result);
+    const rpcJson = rpcRes?.ok ? await rpcRes.json().catch(() => null) : null;
+    const chainIdValue = rpcJson?.result ?? metaRes?.data?.networkId;
+    if (!chainIdValue) return null;
+    _chainId = Number(chainIdValue);
+    if (!Number.isSafeInteger(_chainId)) return null;
+    rpcUrl = typeof window !== "undefined"
+      ? `${window.location.origin}/api/rpc/${_chainId}`
+      : `/api/rpc/${_chainId}`;
 
     const networkName: string = metaRes?.data?.networkName || "";
     const isProduction = networkName === "upquark";

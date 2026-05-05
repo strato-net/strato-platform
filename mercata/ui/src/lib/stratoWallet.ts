@@ -1,7 +1,7 @@
 import { createConnector } from "wagmi";
 import { type WalletDetailsParams } from "@rainbow-me/rainbowkit";
 import { type Wallet } from "@rainbow-me/rainbowkit";
-import { redirectToLogin } from "@/lib/auth";
+import { redirectToOAuthLogin } from "@/lib/auth";
 import { type Address, type EIP1193Provider, type Hex, keccak256, toRlp } from "viem";
 import { getStratoChainId, rpcUrl } from "@/lib/stratoChain";
 
@@ -129,12 +129,12 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
         if (!res.ok) throw new Error();
         data = await res.json();
       } catch {
-        redirectToLogin();
+        redirectToOAuthLogin();
         throw new Error("Authentication required");
       }
       const addr = data.userAddress as Address;
       if (!addr) {
-        redirectToLogin();
+        redirectToOAuthLogin();
         throw new Error("Authentication required");
       }
       currentAddress = addr;

@@ -5,7 +5,6 @@ import SwapWidget from "@/components/swap/SwapWidget";
 import SwapHistory from "@/components/swap/SwapHistory";
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useUser } from "@/context/UserContext";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const SwapAsset = () => {
   const { isLoggedIn } = useUser();
@@ -18,9 +17,6 @@ const SwapAsset = () => {
       <div className="transition-all duration-300" style={{ paddingLeft: 'var(--sidebar-width, 0px)' }}>
         <DashboardHeader title="Swap" />
         <main className="p-4 md:p-6">
-          {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to swap tokens and exchange digital assets" />
-          )}
           <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
             {/* Main Swap Widget */}
             <div className="bg-card shadow-sm rounded-xl p-4 md:p-6 border border-border">

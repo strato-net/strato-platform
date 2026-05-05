@@ -8,10 +8,10 @@ import OnrampProgressModal from "../components/onramp/OnrampProgressModal";
 import PurchaseHistory from "../components/onramp/PurchaseHistory";
 import { useUser } from "@/context/UserContext";
 import { useNetwork } from "@/context/NetworkContext";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
 import { getConfig } from "@/lib/config";
 import { Loader2, AlertCircle, Info, CreditCard, ArrowDown, Wallet, ExternalLink } from "lucide-react";
+import { requestWalletConnection } from "@/lib/auth";
 
 const ONRAMP_NODES: Record<string, string[]> = {
   testnet: ["https://buildtest.testnet.strato.nexus"],
@@ -148,10 +148,6 @@ const OnrampPage = () => {
         <DashboardHeader title="Buy Crypto" />
 
         <main className="flex-1 p-4 md:p-6 pb-10 md:pb-6 overflow-y-auto">
-          {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to purchase crypto with card, ACH, or Apple Pay" />
-          )}
-
           <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Left Column — Stripe Widget or Redirect */}
             <div className="space-y-4 max-w-lg w-full mx-auto lg:mx-0">
@@ -173,6 +169,23 @@ const OnrampPage = () => {
                     Go to {isTestnet ? "Testnet" : ""} Onramp
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
+                </div>
+              ) : !isLoggedIn ? (
+                <div className="rounded-xl border bg-card p-6 text-center space-y-4">
+                  <Wallet className="h-10 w-10 text-muted-foreground mx-auto" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Connect a wallet to buy crypto</p>
+                    <p className="text-xs text-muted-foreground">
+                      Your connected wallet tells STRATO where to credit the purchased tokens.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => requestWalletConnection()}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                  >
+                    Connect Wallet to Buy Crypto
+                  </button>
                 </div>
               ) : (
                 <>

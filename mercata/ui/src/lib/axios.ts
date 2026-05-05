@@ -266,15 +266,13 @@ api.interceptors.response.use(
       }
     }
     
-    // For 401 errors, redirect to login (session expired)
+    // For 401 errors, prompt for wallet connection instead of OAuth login.
     if (error.response?.status === 401) {
       toast({
-        title: "Session Expired",
-        description: "Reauthenticating the user...",
+        title: "Wallet Connection Required",
+        description: "Connect your wallet to continue.",
       });
-      setTimeout(() => {
-        redirectToLogin();
-      }, 1500);
+      redirectToLogin();
       return Promise.reject(error);
     }
     

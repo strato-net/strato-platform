@@ -1,5 +1,6 @@
-import { api } from './axios';
 import { clearDismissedForUser, LAST_USER_ADDRESS_KEY } from '@/hooks/useLiquidationDismiss';
+
+export const WALLET_CONNECT_REQUEST_EVENT = 'mercata:wallet-connect-request';
 
 // Check authentication status via server API call (works with HttpOnly cookies).
 // Uses fetch directly to bypass the Axios 401 interceptor — this is a probe,
@@ -11,6 +12,19 @@ export const isAuthenticated = async (): Promise<boolean> => {
   } catch {
     return false;
   }
+};
+
+/** OIDC session at `/login`. Required for STRATO vault signer (`/vault/signature`), which is unrelated to RainbowKit wallets. */
+export const redirectToOAuthLogin = (returnTo?: string): void => {
+  const theme = localStorage.getItem('theme') || 'light';
+  const params = new URLSearchParams({ theme });
+
+  const path = returnTo ?? (window.location.pathname + window.location.search);
+  if (path && path !== '/' && path !== '/dashboard') {
+    params.set('returnTo', path);
+  }
+
+  window.location.href = `/login?${params.toString()}`;
 };
 
 // Logout function that redirects to external logout endpoint
@@ -27,16 +41,11 @@ export const logout = (): void => {
   window.location.href = '/auth/logout';
 };
 
-// Redirect to login, preserving the current page path so that nginx can
-// redirect back after successful OIDC authentication.
-export const redirectToLogin = (returnTo?: string): void => {
-  const theme = localStorage.getItem('theme') || 'light';
-  const params = new URLSearchParams({ theme });
-
-  const path = returnTo ?? (window.location.pathname + window.location.search);
-  if (path && path !== '/' && path !== '/dashboard') {
-    params.set('returnTo', path);
-  }
-
-  window.location.href = `/login?${params.toString()}`;
+export const requestWalletConnection = (returnTo?: string): void => {
+  window.dispatchEvent(new CustomEvent(WALLET_CONNECT_REQUEST_EVENT, {
+    detail: { returnTo },
+  }));
 };
+
+// Preserve the old call site name, but auth prompts now use wallet connect.
+export const redirectToLogin = requestWalletConnection;

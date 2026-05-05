@@ -2,9 +2,10 @@
 
 // context/UserContext.tsx
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
-import { isAuthenticated, logout as authLogout } from "@/lib/auth";
+import { isAuthenticated, logout as authLogout, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 
@@ -44,6 +45,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const account = useAccount();
+  const { openConnectModal } = useConnectModal();
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
   const [stratoAddress, setStratoAddress] = useState<string | null>(null);
@@ -224,6 +226,15 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   }, [isLoggedIn]);
 
   useEffect(() => {
+    const openWalletConnect = () => {
+      if (!account.isConnected) openConnectModal?.();
+    };
+
+    window.addEventListener(WALLET_CONNECT_REQUEST_EVENT, openWalletConnect);
+    return () => window.removeEventListener(WALLET_CONNECT_REQUEST_EVENT, openWalletConnect);
+  }, [account.isConnected, openConnectModal]);
+
+  useEffect(() => {
     const connected = account.isConnected && account.address;
     if (connected && walletClient) {
       setWalletSigner(async (unsignedTx: any) => {
@@ -231,6 +242,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
         const d = unsignedTx.data;
         return walletClient.signTypedData({
+          account: account.address as `0x${string}`,
           domain: {
             name: "STRATO",
             version: "1",

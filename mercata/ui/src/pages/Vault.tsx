@@ -11,7 +11,7 @@ import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import VaultWithdrawModal from "@/components/vault/VaultWithdrawModal";
 import { useVaultContext } from "@/context/VaultContext";
 import { useUser } from "@/context/UserContext";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import EarnWalletConnectBanner from "@/components/earn/EarnWalletConnectBanner";
 
 const Vault = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -54,7 +54,7 @@ const Vault = () => {
 
         <main className="p-4 md:p-6 pb-16 md:pb-6 space-y-8">
           {guestMode && (
-            <GuestSignInBanner message="Sign in to deposit or withdraw from the vault" />
+            <EarnWalletConnectBanner message="Connect your wallet to view your vault position and manage deposits or withdrawals." />
           )}
           {/* Global Metrics */}
           <VaultOverview />

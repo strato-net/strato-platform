@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +23,7 @@ import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
+import EarnWalletConnectBanner from "@/components/earn/EarnWalletConnectBanner";
 
 const EarnLending = () => {
   const navigate = useNavigate();
@@ -161,7 +161,7 @@ const EarnLending = () => {
 
         <main className="pb-16 md:pb-6 p-4 md:p-6">
           {guestMode && (
-            <GuestSignInBanner message="Sign in to deposit or withdraw from the lending pool" />
+            <EarnWalletConnectBanner message="Connect your wallet to view your USDST balance and manage lending pool deposits or withdrawals." />
           )}
 
           <div className="mb-4">

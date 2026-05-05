@@ -241,7 +241,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
                   onMouseLeave={() => setRewardsButtonHovered(false)}
                   className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
                 >
-                  Sign in to start earning
+                  Connect wallet to start earning
                   <ArrowRight size={14} />
                 </button>
               ) : (

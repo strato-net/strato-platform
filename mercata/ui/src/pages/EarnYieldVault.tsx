@@ -5,7 +5,6 @@ import { ArrowLeft, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucid
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +35,7 @@ import { useEarnContext } from "@/context/EarnContext";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
+import EarnWalletConnectBanner from "@/components/earn/EarnWalletConnectBanner";
 
 const VAULT_META: Record<string, {
   title: string;
@@ -330,11 +330,6 @@ const EarnYieldVault = () => {
 
   const handleActionRequest = (mode: Exclude<ActionMode, null>) => {
     if (!isLoggedIn) {
-      toast({
-        title: "Sign in required",
-        description: `Connect your account to deposit or redeem ${shareSymbol}.`,
-        variant: "destructive",
-      });
       return;
     }
     setActionMode(mode);
@@ -512,8 +507,8 @@ const EarnYieldVault = () => {
 
         <main className="pb-16 md:pb-6">
           {!isLoggedIn && (
-            <GuestSignInBanner
-              message={`Sign in to view your ${assetSymbol} balance and vault position.`}
+            <EarnWalletConnectBanner
+              message={`Connect your wallet to view your ${assetSymbol} balance and vault position.`}
             />
           )}
 
@@ -736,7 +731,7 @@ const EarnYieldVault = () => {
                         <p className="text-xs text-muted-foreground">
                           {isLoggedIn
                             ? `${formatTokenAmount(maxRedeemShares, decimals)} ${shareSymbol} can exit right now`
-                            : "Sign in to view your instant exit capacity"}
+                            : "Connect a wallet to view your instant exit capacity"}
                         </p>
                       </CardContent>
                     </Card>

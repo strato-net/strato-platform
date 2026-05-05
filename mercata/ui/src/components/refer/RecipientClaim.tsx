@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, CopyCheck, Loader2, CheckCircle2, XCircle, AlertCircle, LogIn, ArrowLeft } from "lucide-react";
+import { Copy, CopyCheck, Loader2, CheckCircle2, XCircle, AlertCircle, Wallet, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "@/utils/numberUtils";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -665,15 +665,15 @@ export function RecipientClaim(props: Props) {
                     ) : (
                       <div className="space-y-4">
                         <p className="text-sm text-muted-foreground">
-                          You need to sign up for STRATO to claim your tokens.
+                          Connect a wallet to claim your tokens.
                         </p>
                         <Button
                           onClick={handleSignUp}
                           className="w-full"
                           size="lg"
                         >
-                          <LogIn className="h-4 w-4 mr-2" />
-                          Sign Up for STRATO
+                          <Wallet className="h-4 w-4 mr-2" />
+                          Connect Wallet to Claim
                         </Button>
                       </div>
                     )}

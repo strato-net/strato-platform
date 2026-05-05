@@ -13,7 +13,7 @@ import DebtPosition from '@/components/cdp/v2/components/DebtPosition';
 import VaultsList from '@/components/cdp/VaultsList';
 import BadDebtView from '@/components/cdp/BadDebtView';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
-import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
+import EarnWalletConnectBanner from '@/components/earn/EarnWalletConnectBanner';
 
 const Borrow = () => {
   const { isLoggedIn } = useUser();
@@ -62,6 +62,10 @@ const Borrow = () => {
         <DashboardHeader title="Borrow" />
 
         <main className="p-4 md:p-6">
+          {!isLoggedIn && (
+            <EarnWalletConnectBanner message="Connect your wallet to create vaults, mint USDST, and manage borrow positions." />
+          )}
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-3 md:mb-4 h-auto">
               <TabsTrigger value="vaults" className="text-xs md:text-sm py-2 px-1 md:px-3">
@@ -75,9 +79,6 @@ const Borrow = () => {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="vaults">
-              {!isLoggedIn && (
-                <GuestSignInBanner message="Sign in to create vaults and mint USDST" />
-              )}
               <div className="flex flex-col lg:flex-row gap-6">
                 <div className={isLoggedIn ? "w-full lg:w-[60%]" : "w-full"}>
                   <Mint
@@ -101,9 +102,6 @@ const Borrow = () => {
               <BadDebtView guestMode={!isLoggedIn} />
             </TabsContent>
             <TabsContent value="liquidations">
-              {!isLoggedIn && (
-                <GuestSignInBanner message="Sign in to view and liquidate CDP positions" />
-              )}
               <LiquidationsView guestMode={!isLoggedIn} />
             </TabsContent>
           </Tabs>

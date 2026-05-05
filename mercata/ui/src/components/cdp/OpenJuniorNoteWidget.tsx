@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
-import { redirectToLogin } from "@/lib/auth";
 
 
 interface OpenJuniorNoteWidgetProps {
@@ -437,34 +436,26 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
           </div>
         )}
 
-        {guestMode ? (
-          <Button
-            className="w-full"
-            onClick={() => redirectToLogin()}
-          >
-            Sign In to Cover Bad Debt
-          </Button>
-        ) : (
-          <Button 
-            className="w-full" 
-            onClick={handleOpenJuniorNote}
-            disabled={
-              loading || 
-              !selectedAsset || 
-              parseFloat(burnAmount || "0") <= 0 || 
-              isAmountAboveMax()
-            }
-          >
-            {(() => {
-              if (loading) return "Processing...";
-              if (isAmountAboveMax()) return "Amount exceeds limit";
-              if (!selectedAsset) return "Select asset with bad debt";
-              if (calculateMaxBurnAmount() === "0") return "Selected asset has no bad debt";
-              if (parseFloat(burnAmount || "0") <= 0) return "Enter amount to burn";
-              return "Cover Bad Debt";
-            })()}
-          </Button>
-        )}
+        <Button 
+          className="w-full" 
+          onClick={handleOpenJuniorNote}
+          disabled={
+            guestMode ||
+            loading ||
+            !selectedAsset ||
+            parseFloat(burnAmount || "0") <= 0 ||
+            isAmountAboveMax()
+          }
+        >
+          {(() => {
+            if (loading) return "Processing...";
+            if (isAmountAboveMax()) return "Amount exceeds limit";
+            if (!selectedAsset) return "Select asset with bad debt";
+            if (calculateMaxBurnAmount() === "0") return "Selected asset has no bad debt";
+            if (parseFloat(burnAmount || "0") <= 0) return "Enter amount to burn";
+            return "Cover Bad Debt";
+          })()}
+        </Button>
       </CardContent>
     </Card>
   );

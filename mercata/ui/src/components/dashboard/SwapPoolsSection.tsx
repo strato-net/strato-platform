@@ -266,7 +266,7 @@ const SwapPoolsSection = () => {
                         className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-400/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-auto disabled:border-muted disabled:text-muted-foreground disabled:hover:bg-transparent disabled:dark:border-muted disabled:dark:text-muted-foreground"
                         onClick={() => handleOpenWithdrawModal(pool)}
                         disabled={!isLoggedIn || BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
-                        title={!isLoggedIn ? "Sign in to withdraw" : BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
+                        title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
                       >
                         <CircleArrowUp className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Withdraw</span>

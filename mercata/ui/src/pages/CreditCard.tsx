@@ -16,9 +16,9 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import { useNetwork } from "@/context/NetworkContext";
 import { useUser } from "@/context/UserContext";
 import { api } from "@/lib/axios";
+import { requestWalletConnection } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import type { BridgeToken } from "@mercata/shared-types";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Loader2, CreditCard, DollarSign, Plus, Settings, ChevronDown, ChevronUp, Clock, Info } from "lucide-react";
 import { safeParseUnits } from "@/utils/numberUtils";
 import {
@@ -46,6 +46,8 @@ export type OnChainCardConfig = {
   thresholdAmount?: string;
   cooldownMinutes?: string;
   topUpAmount?: string;
+  lastTopUpAt?: string;
+  lastError?: string;
   lastTopUpTimestamp?: string;
 };
 
@@ -104,7 +106,10 @@ export default function CreditCardPage() {
   const [loadingCards, setLoadingCards] = useState(true);
 
   const loadCards = useCallback(async () => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) {
+      setLoadingCards(false);
+      return;
+    }
     setLoadingCards(true);
     try {
       const { data } = await api.get<OnChainCardConfig[]>("/credit-card");
@@ -492,10 +497,6 @@ export default function CreditCardPage() {
       >
         <DashboardHeader title="Card" />
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
-          {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to link your card wallet and set up automatic top-ups" />
-          )}
-
           <div className="mb-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-4">
             <div className="flex gap-3">
               <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
@@ -519,14 +520,16 @@ export default function CreditCardPage() {
             <div className="flex justify-center items-center min-h-[280px]">
               <button
                 type="button"
-                onClick={() => openModal(null)}
+                onClick={() => isLoggedIn ? openModal(null) : requestWalletConnection()}
                 className={cardShapeClass + " w-full max-w-[320px] cursor-pointer hover:from-slate-700 hover:to-slate-800 transition-colors"}
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full border-2 border-dashed border-white/50 flex items-center justify-center">
                     <Plus className="h-6 w-6" />
                   </div>
-                  <span className="text-lg font-medium">Connect Card</span>
+                  <span className="text-lg font-medium">
+                    {isLoggedIn ? "Connect Card" : "Connect Wallet to Link Card"}
+                  </span>
                 </div>
               </button>
             </div>
@@ -607,14 +610,16 @@ export default function CreditCardPage() {
               ))}
               <button
                 type="button"
-                onClick={() => openModal(null)}
+                onClick={() => isLoggedIn ? openModal(null) : requestWalletConnection()}
                 className={cardShapeClass + " border-dashed border-2 border-slate-600 cursor-pointer hover:border-slate-500 hover:from-slate-800/80 hover:to-slate-900/80 transition-colors"}
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full border-2 border-dashed border-white/50 flex items-center justify-center">
                     <Plus className="h-6 w-6" />
                   </div>
-                  <span className="text-lg font-medium">Connect Card</span>
+                  <span className="text-lg font-medium">
+                    {isLoggedIn ? "Connect Card" : "Connect Wallet to Link Card"}
+                  </span>
                 </div>
               </button>
             </div>

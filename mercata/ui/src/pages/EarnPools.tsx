@@ -7,7 +7,6 @@ import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidityDepositModal from "@/components/dashboard/LiquidityDepositModal";
 import LiquidityWithdrawModal from "@/components/dashboard/LiquidityWithdrawModal";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
@@ -19,6 +18,7 @@ import { useUser } from "@/context/UserContext";
 import type { Pool } from "@/interface";
 import { formatUnits } from "ethers";
 import { findPoolEarnApyInfo } from "@/utils/earnUtils";
+import EarnWalletConnectBanner from "@/components/earn/EarnWalletConnectBanner";
 
 const WAD = BigInt("1000000000000000000");
 
@@ -181,7 +181,9 @@ const EarnPools = () => {
       <div className="transition-all duration-300 md:pl-64" style={{ paddingLeft: "var(--sidebar-width, 0rem)" }}>
         <DashboardHeader title="Swap Pools" />
         <main className="pb-16 md:pb-6 p-4 md:p-6 space-y-5">
-          {!isLoggedIn && <GuestSignInBanner message="Sign in to deposit or withdraw liquidity from pools" />}
+          {!isLoggedIn && (
+            <EarnWalletConnectBanner message="Connect your wallet to view your LP balance and manage pool deposits or withdrawals." />
+          )}
 
           <button
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -254,7 +256,11 @@ const EarnPools = () => {
                     </p>
                     <div className="flex items-center justify-end">
                       <Button
-                        onClick={() => highlightedPoolData && handlePoolDeposit(highlightedPoolData)}
+                        onClick={() => {
+                          if (highlightedPoolData) {
+                            handlePoolDeposit(highlightedPoolData);
+                          }
+                        }}
                         className="h-11 sm:w-36"
                         disabled={!isLoggedIn || pageLoading || !highlightedPoolData}
                       >
@@ -282,7 +288,11 @@ const EarnPools = () => {
                     </div>
                     <div className="flex items-center justify-end">
                       <Button
-                        onClick={() => highlightedPoolData && handlePoolWithdraw(highlightedPoolData)}
+                        onClick={() => {
+                          if (highlightedPoolData) {
+                            handlePoolWithdraw(highlightedPoolData);
+                          }
+                        }}
                         variant="outline"
                         className="h-11 sm:w-36"
                         disabled={!isLoggedIn || pageLoading || !highlightedPoolData || safeBigInt(highlightedPoolData.lpToken?.totalBalance) === 0n}
