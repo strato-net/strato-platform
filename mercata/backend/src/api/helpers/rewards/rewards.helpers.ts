@@ -8,6 +8,7 @@ import { constants } from "../../../config/constants";
 let contractStateCache: { address: string; state: any; timestamp: number } | null = null;
 let pendingRequest: Promise<any> | null = null;
 const CACHE_TTL = 5000; // 5 seconds cache
+const normalizeUserAddress = (address: string): string => address.replace(/^0x/i, "").toLowerCase();
 
 /**
  * Clear the contract state cache
@@ -239,7 +240,8 @@ export const fetchUserInfo = async (
   forceRefresh: boolean = false
 ): Promise<Map<number, { stake: string; userIndex: string }>> => {
   const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
-  const userInfo = state?.userInfo?.[userAddress.toLowerCase()] || {};
+  const normalizedUserAddress = normalizeUserAddress(userAddress);
+  const userInfo = state?.userInfo?.[normalizedUserAddress] || {};
   
   const userInfoMap = new Map<number, { stake: string; userIndex: string }>();
   
@@ -266,7 +268,7 @@ export const fetchUnclaimedRewards = async (
   const state = await fetchContractState(accessToken, rewardsAddress, forceRefresh);
   const unclaimedRewards = state?.unclaimedRewards || {};
   
-  return unclaimedRewards[userAddress.toLowerCase()] || "0";
+  return unclaimedRewards[normalizeUserAddress(userAddress)] || "0";
 };
 
 /**
@@ -316,11 +318,12 @@ export const fetchBonusRewards = async (
   userAddress: string
 ): Promise<{ total: bigint; byActivity: Map<string, bigint> }> => {
   try {
+    const normalizedUserAddress = normalizeUserAddress(userAddress);
     const { data: events = [] } = await cirrus.get(accessToken, "/event", {
       params: {
         address: `eq.${rewardsAddress}`,
         event_name: `eq.DirectPayoutApplied`,
-        "attributes->>user": `eq.${userAddress}`,
+        "attributes->>user": `eq.${normalizedUserAddress}`,
         select: "attributes",
       },
     });

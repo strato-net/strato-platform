@@ -67,6 +67,9 @@ export interface LeaderboardResponse {
   limit: number;
 }
 
+export const normalizeRewardsAddress = (address: string | null | undefined): string =>
+  (address || "").toLowerCase().replace(/^0x/, "");
+
 
 /**
  * Fetch global Rewards contract state
@@ -135,9 +138,9 @@ export const fetchActivity = async (activityId: number): Promise<Activity> => {
  * Fetch user's rewards data
  * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  */
-export const fetchUserRewards = async (userAddress: string, forceRefresh: boolean = false): Promise<UserRewardsData> => {
+export const fetchUserRewards = async (forceRefresh: boolean = false): Promise<UserRewardsData> => {
   const params = forceRefresh ? { refresh: "true" } : {};
-  const response = await api.get(`/rewards/activities/${userAddress}`, { params });
+  const response = await api.get(`/rewards/activities/me`, { params });
   const data = response.data;
   
   const unclaimedRewards = data.unclaimedRewards || "0";
