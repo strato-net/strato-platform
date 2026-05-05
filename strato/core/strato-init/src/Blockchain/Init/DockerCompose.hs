@@ -48,28 +48,28 @@ generateDockerCompose = do
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , environment = Just $ Map.fromList
-            [ ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
-            , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
-            , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA}")
-            , ("RPC_URL_SEPOLIA_FALLBACK", "${RPC_URL_SEPOLIA_FALLBACK}")
-            , ("RPC_URL_BASE", "${RPC_URL_BASE}")
-            , ("RPC_URL_BASE_FALLBACK", "${RPC_URL_BASE_FALLBACK}")
-            , ("RPC_URL_BASE_SEPOLIA", "${RPC_URL_BASE_SEPOLIA}")
-            , ("RPC_URL_BASE_SEPOLIA_FALLBACK", "${RPC_URL_BASE_SEPOLIA_FALLBACK}")
-            , ("POOL_FACTORY", "${POOL_FACTORY}")
-            , ("LENDING_REGISTRY", "${LENDING_REGISTRY}")
-            , ("TOKEN_FACTORY", "${TOKEN_FACTORY}")
-            , ("ADMIN_REGISTRY", "${ADMIN_REGISTRY}")
-            , ("MERCATA_BRIDGE", "${MERCATA_BRIDGE}")
-            , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID}")
-            , ("STRIPE_SECRET_KEY", "${STRIPE_SECRET_KEY}")
-            , ("STRIPE_PUBLISHABLE_KEY", "${STRIPE_PUBLISHABLE_KEY}")
-            , ("STRIPE_WEBHOOK_SECRET", "${STRIPE_WEBHOOK_SECRET}")
-            , ("ONRAMP_HOT_WALLET_ADDRESS", "${ONRAMP_HOT_WALLET_ADDRESS}")
-            , ("BA_USERNAME", "${BA_USERNAME}")
-            , ("BA_PASSWORD", "${BA_PASSWORD}")
-            , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
-            , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY}")
+            [ ("RPC_URL_MAINNET", "${RPC_URL_MAINNET:-}")
+            , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK:-}")
+            , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA:-}")
+            , ("RPC_URL_SEPOLIA_FALLBACK", "${RPC_URL_SEPOLIA_FALLBACK:-}")
+            , ("RPC_URL_BASE", "${RPC_URL_BASE:-}")
+            , ("RPC_URL_BASE_FALLBACK", "${RPC_URL_BASE_FALLBACK:-}")
+            , ("RPC_URL_BASE_SEPOLIA", "${RPC_URL_BASE_SEPOLIA:-}")
+            , ("RPC_URL_BASE_SEPOLIA_FALLBACK", "${RPC_URL_BASE_SEPOLIA_FALLBACK:-}")
+            , ("POOL_FACTORY", "${POOL_FACTORY:-}")
+            , ("LENDING_REGISTRY", "${LENDING_REGISTRY:-}")
+            , ("TOKEN_FACTORY", "${TOKEN_FACTORY:-}")
+            , ("ADMIN_REGISTRY", "${ADMIN_REGISTRY:-}")
+            , ("MERCATA_BRIDGE", "${MERCATA_BRIDGE:-}")
+            , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")
+            , ("STRIPE_SECRET_KEY", "${STRIPE_SECRET_KEY:-}")
+            , ("STRIPE_PUBLISHABLE_KEY", "${STRIPE_PUBLISHABLE_KEY:-}")
+            , ("STRIPE_WEBHOOK_SECRET", "${STRIPE_WEBHOOK_SECRET:-}")
+            , ("ONRAMP_HOT_WALLET_ADDRESS", "${ONRAMP_HOT_WALLET_ADDRESS:-}")
+            , ("BA_USERNAME", "${BA_USERNAME:-}")
+            , ("BA_PASSWORD", "${BA_PASSWORD:-}")
+            , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT:-}")
+            , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
@@ -82,8 +82,8 @@ generateDockerCompose = do
         , depends_on = Just $ DependsOnList ["mercata-backend"]
         , volumes = Just ["./logs:/logs"]
         , environment = Just $ Map.fromList
-            [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID}")
-            , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID}")
+            [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID:-}")
+            , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-ui.log 2>&1"]
