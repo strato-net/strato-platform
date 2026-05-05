@@ -859,7 +859,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
               onClick={handleGuestMintClick}
               className="w-full"
             >
-              {isConnected ? 'Sign in to mint USDST' : 'Connect Wallet to Mint USDST'}
+              Connect Wallet to Mint USDST
             </Button>
           ) : (
             <Button

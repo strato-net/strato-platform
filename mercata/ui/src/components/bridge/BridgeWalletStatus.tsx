@@ -30,6 +30,7 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
   const { disconnect } = useDisconnect();
   const { connectModalOpen, openConnectModal } = useConnectModal();
   const { toast } = useToast();
+  const externalModalActiveRef = React.useRef(false);
   const hasConnectedWallet =
     isConnected && (!externalOnly || (connector ? !isStratoConnector(connector) : false));
 
@@ -82,7 +83,13 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
   }, []);
 
   React.useEffect(() => {
-    if (!externalOnly || !connectModalOpen) return;
+    if (!connectModalOpen) {
+      externalModalActiveRef.current = false;
+      restoreStratoWalletOption();
+      return;
+    }
+
+    if (!externalOnly || !externalModalActiveRef.current) return;
 
     hideStratoWalletOption();
     const observer = new MutationObserver(hideStratoWalletOption);
@@ -110,7 +117,10 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
       type="button"
       disabled={guestMode}
       className={CONNECT_BUTTON_CLASS}
-      onClick={() => openConnectModal?.()}
+      onClick={() => {
+        externalModalActiveRef.current = true;
+        openConnectModal?.();
+      }}
     >
       {connectLabel}
     </button>
