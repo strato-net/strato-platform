@@ -1,3 +1,4 @@
+import "../../libraries/Bridge/IBridgeMintTarget.sol";
 import "../../libraries/Bridge/MPTProof.sol";
 import "../../libraries/Bridge/RLPDecode.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
@@ -87,6 +88,15 @@ contract EthBridgeIn is Ownable {
     /// Once true, the same deposit can never be re-claimed.
     mapping(bytes32 => bool) public processed;
 
+    /// Optional mint callback. If non-zero, claim() invokes
+    /// {IBridgeMintTarget.creditTrustlessDeposit} on this address
+    /// after dedup. With address(0) the contract just emits
+    /// ClaimVerified and an off-chain process performs the credit.
+    /// The flag mode is the safest production posture; integration
+    /// mode is what the tokenization layer wants once trust is in
+    /// place.
+    address public mintTarget;
+
     // ─────────────────────────────────────────────────────────────────
     // Events
     // ─────────────────────────────────────────────────────────────────
@@ -107,6 +117,7 @@ contract EthBridgeIn is Ownable {
     event LightClientUpdated(address oldClient, address newClient);
     event RouterUpdated(address oldRouter, address newRouter);
     event EventSigUpdated(bytes32 oldSig, bytes32 newSig);
+    event MintTargetUpdated(address oldTarget, address newTarget);
 
     // ─────────────────────────────────────────────────────────────────
     // Construction & admin
@@ -147,6 +158,15 @@ contract EthBridgeIn is Ownable {
         bytes32 old = depositRoutedSig;
         depositRoutedSig = newSig;
         emit EventSigUpdated(old, newSig);
+    }
+
+    /// Set the mint callback target (or address(0) to disable
+    /// auto-mint and operate in observer mode where downstream
+    /// systems consume the ClaimVerified event).
+    function setMintTarget(address newTarget) external onlyOwner {
+        address old = mintTarget;
+        mintTarget = newTarget;
+        emit MintTargetUpdated(old, newTarget);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -224,6 +244,23 @@ contract EthBridgeIn is Ownable {
         depositKey = keccak256(abi.encode(srcChainId, blockNumber, txIndex, logIndex));
         require(!processed[depositKey], "EthBridgeIn: already processed");
         processed[depositKey] = true;
+
+        // 6. Optional mint callback. If the mint target reverts, our
+        //    storage write to `processed` is rolled back with the
+        //    transaction, so the user can re-claim once the
+        //    integration is fixed (e.g., admin enables the route on
+        //    the mint-target's allowlist).
+        if (mintTarget != address(0)) {
+            IBridgeMintTarget(mintTarget).creditTrustlessDeposit(
+                depositKey,
+                srcChainId,
+                dep.ethToken,
+                dep.ethSender,
+                dep.stratoRecipient,
+                dep.targetStratoToken,
+                dep.amount
+            );
+        }
 
         emit ClaimVerified(depositKey, srcChainId, blockNumber, txIndex, logIndex, dep);
         return depositKey;

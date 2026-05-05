@@ -5,6 +5,7 @@ import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 import "../Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
+import "../../libraries/Bridge/IBridgeMintTarget.sol";
 import "../Lending/LendingRegistry.sol";
 import "../Metals/MetalForge.sol";
 
@@ -15,7 +16,7 @@ import "../Metals/MetalForge.sol";
  * @notice Implements the core logic for cross-chain token bridging
  * @notice Supports multiple external chains and token configurations
  */
-contract record MercataBridge is Ownable {
+contract record MercataBridge is Ownable, IBridgeMintTarget {
     /// @notice Enables BridgeTypes library functions for all types
     /// @dev Allows direct access to BridgeTypes utility functions without explicit library calls
     using BridgeTypes for *;
@@ -59,6 +60,23 @@ contract record MercataBridge is Ownable {
     /// @param stratoToken The STRATO token address that was minted
     /// @param stratoTokenAmount The amount of STRATO tokens that were minted
     event DepositCompleted(uint256 externalChainId, address externalSender, string externalTxHash, address stratoRecipient, address stratoToken, uint256 stratoTokenAmount);
+
+    /// @notice Emitted when EthBridgeIn invokes creditTrustlessDeposit and
+    ///         the credit succeeds. Mirrors {DepositCompleted} but
+    ///         carries the bridge-in's depositKey instead of a Eth-side
+    ///         tx hash, since the trustless path doesn't carry one.
+    event TrustlessDepositCredited(
+        bytes32 indexed depositKey,
+        uint256 srcChainId,
+        address ethToken,
+        address ethSender,
+        address indexed stratoRecipient,
+        address indexed stratoToken,
+        uint256 amount
+    );
+
+    /// @notice EthBridgeIn caller updated.
+    event EthBridgeInUpdated(address oldBridge, address newBridge);
 
     /// @notice Emitted when a deposit is initiated
     /// @param externalChainId The external chain identifier where the deposit occurred
@@ -186,6 +204,20 @@ contract record MercataBridge is Ownable {
     /// @notice Circuit breaker for withdrawal operations
     /// @dev When true, all withdrawal operations are paused
     bool public withdrawalsPaused;
+
+    /// @notice Trustless deposit verifier address. Only this caller is
+    ///         allowed to invoke {creditTrustlessDeposit}. Setting it
+    ///         to address(0) disables the trustless path entirely.
+    /// @dev    Currently always EthBridgeIn; the field is just an
+    ///         address rather than a typed reference so MercataBridge
+    ///         doesn't have a build-time dependency on the
+    ///         bridge-in contract.
+    address public ethBridgeIn;
+
+    /// @notice Per-deposit dedup for trustless claims. Keyed on the
+    ///         same depositKey EthBridgeIn dedups on, so even if one
+    ///         side is swapped out the other still rejects double-credits.
+    mapping(bytes32 => bool) public processedTrustlessDeposits;
 
     /// @notice Time delay before users can abort stuck withdrawals
     /// @dev Default: 172800 seconds (48 hours)
@@ -490,6 +522,61 @@ contract record MercataBridge is Ownable {
         require(newUSDSTAddress != address(0), "MB: zero USDST address");
         emit USDSTAddressUpdated(newUSDSTAddress, USDST_ADDRESS);
         USDST_ADDRESS = newUSDSTAddress;
+    }
+
+    /**
+     * @dev Authorize the EthBridgeIn caller for the trustless deposit
+     *      path. Only this address may invoke {creditTrustlessDeposit}.
+     *      Setting it to address(0) disables the trustless path
+     *      entirely (deposits then have to flow through the legacy
+     *      relayer-attested {confirmDeposit}).
+     */
+    function setEthBridgeIn(address newBridge) external onlyOwner {
+        address old = ethBridgeIn;
+        ethBridgeIn = newBridge;
+        emit EthBridgeInUpdated(old, newBridge);
+    }
+
+    /**
+     * @notice IBridgeMintTarget hook called by EthBridgeIn after a
+     *         successfully verified deposit claim. Mints `amount` of
+     *         `stratoToken` to `stratoRecipient`.
+     *
+     *         Authorization: only the configured ethBridgeIn caller.
+     *         Idempotency: dedups on `depositKey` (the same key
+     *         EthBridgeIn dedups on; double-keyed for defense-in-depth).
+     *         Route allowlist: reuses {_requireRouteEnabled} so the
+     *         existing per-asset route configuration also gates
+     *         trustless deposits.
+     */
+    function creditTrustlessDeposit(
+        bytes32 depositKey,
+        uint256 srcChainId,
+        address ethToken,
+        address ethSender,
+        address stratoRecipient,
+        address stratoToken,
+        uint256 amount
+    ) external override whenDepositsOpen {
+        require(ethBridgeIn != address(0), "MB: trustless path disabled");
+        require(msg.sender == ethBridgeIn, "MB: caller not ethBridgeIn");
+        require(stratoRecipient != address(0), "MB: zero recipient");
+        require(stratoToken != address(0), "MB: zero strato token");
+        require(amount > 0, "MB: zero amount");
+
+        require(!processedTrustlessDeposits[depositKey], "MB: already credited");
+        processedTrustlessDeposits[depositKey] = true;
+
+        // Reuse the existing route allowlist. Trustless claims still
+        // need an admin-enabled (chainId, ethToken, stratoToken) route.
+        _requireRouteEnabled(ethToken, srcChainId, stratoToken);
+
+        uint256 actualMinted = _mintFunds(stratoToken, stratoRecipient, amount);
+        require(actualMinted > 0, "MB: no tokens minted");
+
+        emit TrustlessDepositCredited(
+            depositKey, srcChainId, ethToken, ethSender, stratoRecipient, stratoToken, amount
+        );
     }
 
     /**

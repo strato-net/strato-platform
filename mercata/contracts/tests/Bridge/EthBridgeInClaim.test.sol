@@ -1,5 +1,6 @@
 import "../../concrete/Bridge/EthBridgeIn.sol";
 import "../../concrete/Bridge/EthLightClient.sol";
+import "../../libraries/Bridge/IBridgeMintTarget.sol";
 
 /**
  * @title  TestableEthLightClient
@@ -29,6 +30,46 @@ contract TestableEthLightClient is EthLightClient {
             beaconSlot: beaconSlot,
             timestamp: timestamp
         });
+    }
+}
+
+/**
+ * @title  MockBridgeMintTarget
+ * @notice Records the most recent creditTrustlessDeposit() call so
+ *         tests can assert that EthBridgeIn invoked the callback with
+ *         the expected arguments. No actual minting happens here.
+ */
+contract MockBridgeMintTarget is IBridgeMintTarget {
+    bytes32 public lastDepositKey;
+    uint256 public lastSrcChainId;
+    address public lastEthToken;
+    address public lastEthSender;
+    address public lastStratoRecipient;
+    address public lastStratoToken;
+    uint256 public lastAmount;
+    uint256 public callCount;
+    bool    public shouldRevert;
+
+    function setShouldRevert(bool v) external { shouldRevert = v; }
+
+    function creditTrustlessDeposit(
+        bytes32 depositKey,
+        uint256 srcChainId,
+        address ethToken,
+        address ethSender,
+        address stratoRecipient,
+        address stratoToken,
+        uint256 amount
+    ) external override {
+        require(!shouldRevert, "MockBridgeMintTarget: forced revert");
+        lastDepositKey      = depositKey;
+        lastSrcChainId      = srcChainId;
+        lastEthToken        = ethToken;
+        lastEthSender       = ethSender;
+        lastStratoRecipient = stratoRecipient;
+        lastStratoToken     = stratoToken;
+        lastAmount          = amount;
+        callCount           = callCount + 1;
     }
 }
 
@@ -140,5 +181,60 @@ contract Describe_EthBridgeInClaim {
             reverted = true;
         }
         require(reverted, "should revert when event sig doesn't match");
+    }
+
+    // ============ Mint-target callback ============
+
+    function it_claim_invokes_mint_target_callback() {
+        MockBridgeMintTarget mock = new MockBridgeMintTarget();
+        bridge.setMintTarget(address(mock));
+
+        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+
+        require(mock.callCount() == 1, "callback should fire once");
+        require(mock.lastSrcChainId() == 11155111, "srcChainId mismatch");
+        require(mock.lastEthToken() == ETH_TOKEN, "ethToken mismatch");
+        require(mock.lastEthSender() == ETH_SENDER, "ethSender mismatch");
+        require(mock.lastStratoRecipient() == STRATO_RECIPIENT, "recipient mismatch");
+        require(mock.lastStratoToken() == TARGET_STRATO_TOK, "stratoToken mismatch");
+        require(mock.lastAmount() == AMOUNT, "amount mismatch");
+    }
+
+    function it_claim_rolls_back_dedup_when_mint_target_reverts() {
+        // Wire a mint target that reverts. The whole tx should revert,
+        // including our processed[] write — so the user can re-claim
+        // once the integration is fixed.
+        MockBridgeMintTarget mock = new MockBridgeMintTarget();
+        mock.setShouldRevert(true);
+        bridge.setMintTarget(address(mock));
+
+        bool reverted = false;
+        try {
+            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "should revert when mint target reverts");
+
+        // Retry path: clear the revert, repeat the claim — should succeed.
+        mock.setShouldRevert(false);
+        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+        require(mock.callCount() == 1, "callback should fire on retry");
+    }
+
+    function it_claim_with_zero_mint_target_skips_callback_and_succeeds() {
+        // Default state: mintTarget = address(0). Claim should still
+        // succeed and just emit ClaimVerified without invoking any
+        // mint hook.
+        require(bridge.mintTarget() == address(0), "default mintTarget should be zero");
+        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+        // Dedup is the proof of success: a second attempt must revert.
+        bool reverted = false;
+        try {
+            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "second claim should revert (dedup)");
     }
 }
