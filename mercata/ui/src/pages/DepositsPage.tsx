@@ -10,7 +10,7 @@ import { useBridgeContext } from '@/context/BridgeContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 const DepositsPage = () => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, loading, isAppAuthenticated, externalWalletAddress } = useUser();
   const { loadNetworksAndTokens } = useBridgeContext();
   const [searchParams] = useSearchParams();
   const tab = searchParams.get('tab');
@@ -25,12 +25,13 @@ const DepositsPage = () => {
   const handleMetalPurchase = useCallback(() => setMetalRefreshKey(k => k + 1), []);
 
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (loading || !isLoggedIn) return;
+    if (!isAppAuthenticated && !externalWalletAddress) return;
     loadNetworksAndTokens().catch((error) => {
       console.error('Failed to load networks and tokens:', error);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoggedIn]);
+  }, [loading, isLoggedIn, isAppAuthenticated, externalWalletAddress]);
 
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
