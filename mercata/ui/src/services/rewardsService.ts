@@ -134,13 +134,17 @@ export const fetchActivity = async (activityId: number): Promise<Activity> => {
   return response.data;
 };
 
+type RewardRequestOptions = {
+  walletAuth?: boolean;
+};
+
 /**
  * Fetch user's rewards data
  * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  */
-export const fetchUserRewards = async (forceRefresh: boolean = false): Promise<UserRewardsData> => {
+export const fetchUserRewards = async (forceRefresh: boolean = false, options?: RewardRequestOptions): Promise<UserRewardsData> => {
   const params = forceRefresh ? { refresh: "true" } : {};
-  const response = await api.get(`/rewards/activities/me`, { params });
+  const response = await api.get(`/rewards/activities/me`, { params, ...options } as any);
   const data = response.data;
   
   const unclaimedRewards = data.unclaimedRewards || "0";
@@ -496,9 +500,7 @@ type RewardClaimResult = {
   hash?: string;
 };
 
-type RewardClaimOptions = {
-  walletAuth?: boolean;
-};
+type RewardClaimOptions = RewardRequestOptions;
 
 const normalizeRewardClaimResult = (data: RewardClaimResult): RewardClaimResult => ({
   ...data,

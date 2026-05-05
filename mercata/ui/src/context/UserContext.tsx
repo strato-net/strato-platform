@@ -7,6 +7,7 @@ import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
 import { isAuthenticated, logout as authLogout, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
+import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 
 interface UserContextType {
   userAddress: string | null;
@@ -80,7 +81,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const storedUser = localStorage.getItem("user");
         if (!storedUser || !stratoAddress) {
           try {
-            const response = await api.get('/user/me');
+            const response = await api.get('/user/me', { walletAuth: false } as any);
             const newUserAddress = response.data.userAddress;
             const serverIsAdmin = response.data.isAdmin;
             const userName = response.data.userName
@@ -245,6 +246,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     const connected = account.isConnected && account.address;
     if (connected && walletClient) {
       setWalletSigner(async (unsignedTx: any) => {
+        await ensureStratoChainInWallet(walletClient);
+
         const d = unsignedTx.data;
         return walletClient.signTypedData({
           domain: {
