@@ -2,68 +2,8 @@
 
 set -e
 
-# Parse --patch-app flag (handled here since strato-setup doesn't know about it)
-# Usage: strato-up <node-dir> --patch-app <mercata-backend-image:tag> <mercata-ui-image:tag>
-PATCH_APP=false
-SETUP_ARGS=()
-BACKEND_IMAGE=""
-UI_IMAGE=""
-
-i=1
-while [[ $i -le $# ]]; do
-    arg="${!i}"
-    if [[ "$arg" == "--patch-app" ]]; then
-        PATCH_APP=true
-        # Consume exactly 2 arguments
-        i=$((i + 1))
-        if [[ $i -gt $# ]]; then
-            echo "Error: --patch-app requires exactly 2 arguments: <mercata-backend-image:tag> <mercata-ui-image:tag>"
-            exit 1
-        fi
-        BACKEND_IMAGE="${!i}"
-        i=$((i + 1))
-        if [[ $i -gt $# ]]; then
-            echo "Error: --patch-app requires exactly 2 arguments: <mercata-backend-image:tag> <mercata-ui-image:tag>"
-            exit 1
-        fi
-        UI_IMAGE="${!i}"
-    else
-        SETUP_ARGS+=("$arg")
-    fi
-    i=$((i + 1))
-done
-
-if [[ "$PATCH_APP" == "true" ]]; then
-    # --patch-app: validate arguments and node directory, defer compose update until after pid check
-    NODE_DIR="${SETUP_ARGS[0]}"
-
-    if [[ -z "$NODE_DIR" ]]; then
-        echo "Error: node directory required"
-        echo "Usage: strato-up <node-directory> --patch-app <mercata-backend-image:tag> <mercata-ui-image:tag>"
-        exit 1
-    fi
-    if [[ ! -d "$NODE_DIR" ]]; then
-        echo "Error: node directory '$NODE_DIR' does not exist"
-        exit 1
-    fi
-    if [[ ! -f "$NODE_DIR/docker-compose.yml" ]]; then
-        echo "Error: docker-compose.yml not found in '$NODE_DIR'"
-        exit 1
-    fi
-
-    if [[ "$BACKEND_IMAGE" != *"mercata-backend:"* ]]; then
-        echo "Error: first --patch-app argument must be a mercata-backend image (got '$BACKEND_IMAGE')"
-        exit 1
-    fi
-    if [[ "$UI_IMAGE" != *"mercata-ui:"* ]]; then
-        echo "Error: second --patch-app argument must be a mercata-ui image (got '$UI_IMAGE')"
-        exit 1
-    fi
-else
-    # Normal flow: setup node (creates if needed, warns if exists with flags)
-    strato-setup "${SETUP_ARGS[@]}"
-    NODE_DIR="${SETUP_ARGS[0]}"
-fi
+strato-setup "$@"
+NODE_DIR="$1"
 
 cd "$NODE_DIR"
 
@@ -77,17 +17,6 @@ if [[ -f .strato.pid ]]; then
     fi
     # Stale pidfile from a previous crashed run — clean it up
     rm -f .strato.pid
-fi
-
-# Apply --patch-app image replacements after confirming node is stopped
-if [[ "$PATCH_APP" == "true" ]]; then
-    echo "Updating mercata-backend image to: $BACKEND_IMAGE"
-    sed "s|image:.*mercata-backend:.*|image: ${BACKEND_IMAGE}|" docker-compose.yml > docker-compose.yml.tmp \
-        && mv docker-compose.yml.tmp docker-compose.yml
-
-    echo "Updating mercata-ui image to: $UI_IMAGE"
-    sed "s|image:.*mercata-ui:.*|image: ${UI_IMAGE}|" docker-compose.yml > docker-compose.yml.tmp \
-        && mv docker-compose.yml.tmp docker-compose.yml
 fi
 
 echo "Starting convoke..."
