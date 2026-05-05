@@ -75,8 +75,10 @@ const getFullAmount = (val: string | number): string => {
 /**
  * Check if an address belongs to the user
  */
+const normalizeAddress = (addr?: string | null): string => (addr || "").toLowerCase().replace(/^0x/, "");
+
 const isUserAddress = (addr: string, userAddress?: string | null): boolean => {
-  return !!(userAddress && addr && addr.toLowerCase() === userAddress.toLowerCase());
+  return !!(userAddress && addr && normalizeAddress(addr) === normalizeAddress(userAddress));
 };
 
 /**

@@ -32,6 +32,8 @@ interface ParsedTransfer {
   lineNumber: number; // CSV line number (1-indexed, including header if present)
 }
 
+const normalizeAddress = (addr?: string | null): string => (addr || "").toLowerCase().replace(/^0x/, "");
+
 interface ProcessingTransfer {
   tokenAddress: string;
   to: string;
@@ -115,7 +117,7 @@ const BulkTransferModal = ({
       errors.push("Missing recipient address");
     } else if (!isValidAddress(normalizedTo)) {
       errors.push("Invalid recipient address format");
-    } else if (userAddress && normalizedTo === userAddress.toLowerCase()) {
+    } else if (userAddress && normalizeAddress(normalizedTo) === normalizeAddress(userAddress)) {
       errors.push("Cannot transfer to self");
     }
 
