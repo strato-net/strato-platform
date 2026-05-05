@@ -190,7 +190,7 @@ build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd
 app: mercata-backend mercata-ui
 	@echo ""
 	@echo "Both app images built. To patch a running node:"
-	@echo "  strato-up <node-dir> --patch-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
+	@echo "  strato-patch-app <node-dir> $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
 
 # Force rebuild targets (unconditional)
 apex-force:
