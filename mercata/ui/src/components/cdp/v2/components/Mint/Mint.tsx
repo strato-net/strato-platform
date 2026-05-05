@@ -15,9 +15,7 @@ import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
-import { redirectToLogin } from '@/lib/auth';
-import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
+import { requestWalletConnection } from '@/lib/auth';
 import EarnApyTooltip from '@/components/earn/EarnApyTooltip';
 import { BestApyInfoTooltip } from '@/components/earn/BestApyInfoTooltip';
 import MintProgressModal, { type ProgressStep } from '../../../MintProgressModal';
@@ -63,11 +61,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   const { vaultState } = useVaultContext();
   const { activities: rewardsActivities } = useRewardsActivities();
   const { userRewards } = useRewardsUserInfo();
-  const { openConnectModal } = useConnectModal();
-  const { isConnected } = useAccount();
-
-
-
   // ============================================================================
   // State - UI Controls
   // ============================================================================
@@ -498,13 +491,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   }, [totalMaxMint, isMaxMode]);
 
   const handleGuestMintClick = useCallback(() => {
-    if (!isConnected && openConnectModal) {
-      openConnectModal();
-      return;
-    }
-
-    redirectToLogin();
-  }, [isConnected, openConnectModal]);
+    requestWalletConnection();
+  }, []);
 
   const handleAutoAllocateChange = useCallback((checked: boolean) => {
     // When switching to manual mode, snapshot current optimal allocations
