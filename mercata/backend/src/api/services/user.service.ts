@@ -7,6 +7,57 @@ import { extractContractName } from "../../utils/utils";
 import JSONBig from "json-bigint";
 const { AdminRegistry, adminRegistry } = constants;
 
+const normalizeIssueArg = (arg: any, typeInfo: any): any => {
+  const tag = typeInfo?.tag?.toLowerCase();
+
+  if (tag === "address" && typeof arg === "string" && /^[0-9a-fA-F]{40}$/.test(arg)) {
+    return `0x${arg}`;
+  }
+
+  if (tag === "array" && Array.isArray(arg)) {
+    return arg.map((entry) => normalizeIssueArg(entry, typeInfo?.entry));
+  }
+
+  return arg;
+};
+
+const normalizeIssueArgs = async (
+  accessToken: string,
+  target: string,
+  func: string,
+  args: any[],
+): Promise<any[]> => {
+  if (!Array.isArray(args)) {
+    console.log("[AdminVoteDebug] issue args were not an array", { target, func, args });
+    return args;
+  }
+
+  const contractDetails = await getContractDetails(accessToken, target);
+  const functionInfo = (contractDetails as any)?._functions?.[func];
+  const funcArgs = functionInfo?._funcArgs as Array<[string, { type?: any }]> | undefined;
+
+  if (!Array.isArray(funcArgs)) {
+    console.log("[AdminVoteDebug] missing function metadata for issue args", {
+      target,
+      func,
+      args,
+      functionNames: Object.keys((contractDetails as any)?._functions || {}),
+    });
+    return args;
+  }
+
+  const normalizedArgs = args.map((arg, index) => normalizeIssueArg(arg, funcArgs[index]?.[1]?.type));
+  console.log("[AdminVoteDebug] normalized issue args", {
+    target,
+    func,
+    args,
+    normalizedArgs,
+    funcArgs: funcArgs.map(([name, metadata]) => ({ name, type: metadata?.type })),
+  });
+
+  return normalizedArgs;
+};
+
 export const isUserAdmin = async (
   accessToken: string,
   userAddress: string
@@ -223,6 +274,9 @@ export const executeIssue = async (
   func: string,
   args: any[],
 ): Promise<{ status: string; hash: string }> => {
+  console.log("[AdminVoteDebug] executeIssue service input", { userAddress, target, func, args });
+  const normalizedArgs = await normalizeIssueArgs(accessToken, target, func, args);
+
   const tx = await buildFunctionTx({
     contractName: extractContractName(AdminRegistry),
     contractAddress: adminRegistry,
@@ -230,9 +284,10 @@ export const executeIssue = async (
     args: {
       _target: target,
       _func: func,
-      _args: args,
+      _args: normalizedArgs,
     },
   }, userAddress, accessToken);
+  console.log("[AdminVoteDebug] executeIssue tx args", tx.txs?.[0]?.payload?.args);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -248,6 +303,9 @@ export const withdrawVote = async (
   func: string,
   args: any[],
 ): Promise<{ status: string; hash: string }> => {
+  console.log("[AdminVoteDebug] withdrawVote service input", { userAddress, target, func, args });
+  const normalizedArgs = await normalizeIssueArgs(accessToken, target, func, args);
+
   const tx = await buildFunctionTx({
     contractName: extractContractName(AdminRegistry),
     contractAddress: adminRegistry,
@@ -255,9 +313,10 @@ export const withdrawVote = async (
     args: {
       _target: target,
       _func: func,
-      _args: args,
+      _args: normalizedArgs,
     },
   }, userAddress, accessToken);
+  console.log("[AdminVoteDebug] withdrawVote tx args", tx.txs?.[0]?.payload?.args);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)

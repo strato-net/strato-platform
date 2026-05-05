@@ -28,7 +28,7 @@ interface UserContextType {
   contractDetailsResults: object;
   contractDetailsResultsLoading: boolean;
   getContractDetails: (address: string) => Promise<void>;
-  castVoteOnIssue: (target: string, func: string, args: string[]) => Promise<void>;
+  castVoteOnIssue: (target: string, func: string, args: unknown[]) => Promise<void>;
   castVoteOnIssueById: (issueId: string) => Promise<void>;
   executeIssue: (target: string, func: string, args: unknown[]) => Promise<void>;
   withdrawVote: (target: string, func: string, args: unknown[]) => Promise<void>;
@@ -49,6 +49,22 @@ type UnsignedWalletTx = {
     network: string;
   };
 };
+
+const serializeAdminIssueArg = (arg: unknown): unknown => {
+  if (typeof arg === "bigint") return arg.toString();
+  if (Array.isArray(arg)) return arg.map(serializeAdminIssueArg);
+  if (arg && typeof arg === "object") {
+    return Object.fromEntries(
+      Object.entries(arg as Record<string, unknown>).map(([key, value]) => [
+        key,
+        serializeAdminIssueArg(value),
+      ])
+    );
+  }
+  return arg;
+};
+
+const serializeAdminIssueArgs = (args: unknown[]) => args.map(serializeAdminIssueArg);
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
@@ -125,7 +141,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const castVoteOnIssue = async (target: string, func: string, args: unknown[]) => {
     try {
-      await api.post('/user/admin/vote', { target, func, args });
+      await api.post('/user/admin/vote', { target, func, args: serializeAdminIssueArgs(args) });
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
@@ -149,7 +165,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const executeIssue = async (target: string, func: string, args: unknown[]) => {
     try {
-      await api.post('/user/admin/issues/execute', { target, func, args });
+      await api.post('/user/admin/issues/execute', { target, func, args: serializeAdminIssueArgs(args) });
       await getOpenIssues();
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
     } catch (error) {
@@ -160,7 +176,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const withdrawVote = async (target: string, func: string, args: unknown[]) => {
     try {
-      await api.post('/user/admin/vote/withdraw', { target, func, args });
+      await api.post('/user/admin/vote/withdraw', { target, func, args: serializeAdminIssueArgs(args) });
       await getOpenIssues();
     } catch (error) {
       await getOpenIssues();
