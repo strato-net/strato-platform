@@ -12,6 +12,8 @@ interface UserContextType {
   stratoAddress: string | null;
   externalWalletAddress: string | null;
   isExternalWalletConnected: boolean;
+  externalEvmWalletAddress: string | null;
+  isExternalEvmWalletConnected: boolean;
   setUserAddress: (address: string | null) => void;
   isLoggedIn: boolean;
   isAppAuthenticated: boolean;
@@ -40,6 +42,9 @@ interface UserContextType {
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
+
+const isStratoConnector = (connector?: { id?: string; name?: string } | null) =>
+  connector?.id === "stratoWallet" || connector?.name === "STRATO Wallet";
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const account = useAccount();
@@ -115,7 +120,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const castVoteOnIssue = async (target: string, func: string, args: any[]) => {
     try {
-      await api.post('/user/admin/vote', { target, func, args });
+      await api.post('/user/admin/vote', { target, func, args }, { walletAuth: false } as any);
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
@@ -127,7 +132,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const castVoteOnIssueById = async (issueId: string) => {
     try {
-      await api.post('/user/admin/vote/by-id', { issueId });
+      await api.post('/user/admin/vote/by-id', { issueId }, { walletAuth: false } as any);
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
@@ -195,22 +200,24 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const addAdmin = async (userAddress: string) => {
-    await api.post('/user/admin', { userAddress });
+    await api.post('/user/admin', { userAddress }, { walletAuth: false } as any);
     await getOpenIssues();
   };
 
   const removeAdmin = async (userAddress: string) => {
-    await api.delete('/user/admin', { data: { userAddress } });
+    await api.delete('/user/admin', { data: { userAddress }, walletAuth: false } as any);
     await getOpenIssues();
   };
 
   const dismissIssue = async (issueId: string) => {
-    await api.post('/user/admin/dismiss', { issueId });
+    await api.post('/user/admin/dismiss', { issueId }, { walletAuth: false } as any);
     await getOpenIssues();
   };
 
   const externalWalletAddress = account.isConnected && account.address ? account.address : null;
   const isExternalWalletConnected = !!externalWalletAddress;
+  const externalEvmWalletAddress = !isStratoConnector(account.connector) ? externalWalletAddress : null;
+  const isExternalEvmWalletConnected = !!externalEvmWalletAddress;
   const shouldUseExternalWallet = !loading && !isLoggedIn && isExternalWalletConnected;
   const userAddress = isLoggedIn ? stratoAddress : shouldUseExternalWallet ? externalWalletAddress : null;
   const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
@@ -299,6 +306,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     stratoAddress,
     externalWalletAddress,
     isExternalWalletConnected,
+    externalEvmWalletAddress,
+    isExternalEvmWalletConnected,
     setUserAddress,
     userName,
     isLoggedIn: effectiveLoggedIn,
@@ -324,7 +333,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getContractDetails,
     contractDetailsResults,
     contractDetailsResultsLoading,
-  }), [userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
+  }), [userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected, externalEvmWalletAddress, isExternalEvmWalletConnected, effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName,
     handleLogout,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
     castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin,

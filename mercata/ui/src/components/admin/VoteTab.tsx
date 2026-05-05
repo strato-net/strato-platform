@@ -20,6 +20,8 @@ import RemoveAdminModal from './RemoveAdminModal';
 import { parseJsonBigInt } from '@/utils/numberUtils';
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from '@/lib/constants';
 
+const normalizeAddress = (addr?: string | null): string => (addr || '').toLowerCase().replace(/^0x/, '');
+
 const VoteTab = () => {
   const { userAddress, openIssuesLoading, openIssues, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues, castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
@@ -170,7 +172,7 @@ const VoteTab = () => {
                       <CopyButton address={admin.address} />
                     )}
                   </div>
-                  {admin.address === userAddress && (
+                  {normalizeAddress(admin.address) === normalizeAddress(userAddress) && (
                     <span className="text-[10px] md:text-xs bg-strato-blue text-white px-1.5 md:px-2 py-0.5 md:py-1 rounded shrink-0">You</span>
                   )}
                 </div>
@@ -236,7 +238,7 @@ const VoteTab = () => {
                     const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as any[];
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || globalThreshold)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
-                    const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
+                    const hasUserVoted = votes.some((v) => v.issueId === issueId && normalizeAddress(v.voter) === normalizeAddress(userAddress));
 
                     return (
                       <TableRow key={`${issueId}-${index}`} className={`border-border hover:bg-muted/50 ${hasUserVoted ? 'bg-green-500/10' : ''}`}>
