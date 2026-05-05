@@ -1,5 +1,6 @@
 import "../../concrete/Bridge/EthBridgeIn.sol";
 import "../../concrete/Bridge/EthLightClient.sol";
+import "../../libraries/Bridge/ILightClient.sol";
 
 /**
  * @title Describe_EthBridgeIn
@@ -33,9 +34,12 @@ contract Describe_EthBridgeIn {
     function beforeEach() {
         admin = address(this);
         lc = new EthLightClient(admin);
+        // SolidVM doesn't auto-upcast EthLightClient → ILightClient,
+        // so wrap via address+cast wherever a constructor takes the
+        // interface type.
         bridge = new EthBridgeIn(
             admin,
-            lc,
+            ILightClient(address(lc)),
             uint256(11155111),       // Sepolia
             _depositRouter(),
             _eventSig()
@@ -54,7 +58,7 @@ contract Describe_EthBridgeIn {
     function it_constructor_rejects_zero_lightclient() {
         bool reverted = false;
         try {
-            new EthBridgeIn(admin, EthLightClient(address(0)), uint256(1), _depositRouter(), _eventSig());
+            new EthBridgeIn(admin, ILightClient(address(0)), uint256(1), _depositRouter(), _eventSig());
         } catch {
             reverted = true;
         }
@@ -64,7 +68,7 @@ contract Describe_EthBridgeIn {
     function it_constructor_rejects_zero_router() {
         bool reverted = false;
         try {
-            new EthBridgeIn(admin, lc, uint256(1), address(0), _eventSig());
+            new EthBridgeIn(admin, ILightClient(address(lc)), uint256(1), address(0), _eventSig());
         } catch {
             reverted = true;
         }
@@ -74,7 +78,7 @@ contract Describe_EthBridgeIn {
     function it_constructor_rejects_zero_sig() {
         bool reverted = false;
         try {
-            new EthBridgeIn(admin, lc, uint256(1), _depositRouter(), bytes32(0));
+            new EthBridgeIn(admin, ILightClient(address(lc)), uint256(1), _depositRouter(), bytes32(0));
         } catch {
             reverted = true;
         }
@@ -97,7 +101,7 @@ contract Describe_EthBridgeIn {
 
     function it_only_owner_can_change_admin_settings() {
         EthBridgeIn unowned = new EthBridgeIn(
-            address(0xdead), lc, uint256(1), _depositRouter(), _eventSig()
+            address(0xdead), ILightClient(address(lc)), uint256(1), _depositRouter(), _eventSig()
         );
         bool reverted = false;
         try {

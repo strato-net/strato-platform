@@ -1,8 +1,8 @@
 import "../../libraries/Bridge/IBridgeMintTarget.sol";
+import "../../libraries/Bridge/ILightClient.sol";
 import "../../libraries/Bridge/MPTProof.sol";
 import "../../libraries/Bridge/RLPDecode.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
-import "./EthLightClient.sol";
 
 /**
  * @notice Decoded contents of a `DepositRouted` log emitted by the
@@ -122,8 +122,11 @@ contract EthBridgeIn is Ownable {
     // State
     // ─────────────────────────────────────────────────────────────────
 
-    /// The EthLightClient providing verified receiptsRoots.
-    EthLightClient public lightClient;
+    /// The light client providing verified receiptsRoots for the
+    /// configured `srcChainId`. Concretely an EthLightClient when
+    /// srcChainId is mainnet/Sepolia, a BaseLightClient when srcChainId
+    /// is Base, etc. — anything implementing {ILightClient}.
+    ILightClient public lightClient;
 
     /// Source chain identifier (e.g. 11155111 for Sepolia, 1 for mainnet).
     /// Used in the dedup key so claims from different chains don't collide.
@@ -190,7 +193,7 @@ contract EthBridgeIn is Ownable {
 
     constructor(
         address owner_,
-        EthLightClient lightClient_,
+        ILightClient lightClient_,
         uint256 srcChainId_,
         address depositRouter_,
         bytes32 depositRoutedSig_
@@ -204,7 +207,7 @@ contract EthBridgeIn is Ownable {
         depositRoutedSig = depositRoutedSig_;
     }
 
-    function setLightClient(EthLightClient newClient) external onlyOwner {
+    function setLightClient(ILightClient newClient) external onlyOwner {
         require(address(newClient) != address(0), "EthBridgeIn: lightClient zero");
         address old = address(lightClient);
         lightClient = newClient;

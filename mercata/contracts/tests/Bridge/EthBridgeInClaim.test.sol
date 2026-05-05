@@ -1,6 +1,7 @@
 import "../../concrete/Bridge/EthBridgeIn.sol";
 import "../../concrete/Bridge/EthLightClient.sol";
 import "../../libraries/Bridge/IBridgeMintTarget.sol";
+import "../../libraries/Bridge/ILightClient.sol";
 
 /**
  * @title  TestableEthLightClient
@@ -138,10 +139,10 @@ contract Describe_EthBridgeInClaim {
     function beforeEach() {
         lc = new TestableEthLightClient(address(this));
         // SolidVM doesn't auto-upcast from the derived class reference;
-        // pass via address+cast so the constructor sees EthLightClient.
+        // pass via address+cast so the constructor sees ILightClient.
         bridge = new EthBridgeIn(
             address(this),
-            EthLightClient(address(lc)),
+            ILightClient(address(lc)),
             uint256(11155111),
             ROUTER,
             _eventSig()

@@ -1,6 +1,7 @@
 import "../../concrete/Bridge/EthBridgeIn.sol";
 import "../../concrete/Bridge/EthLightClient.sol";
 import "../../libraries/Bridge/IBridgeMintTarget.sol";
+import "../../libraries/Bridge/ILightClient.sol";
 
 /**
  * @title  TestableEthLightClient2
@@ -150,7 +151,7 @@ contract Describe_EthBridgeInAssignment {
         lc = new TestableEthLightClient2(address(this));
         bridge = new EthBridgeIn(
             address(this),
-            EthLightClient(address(lc)),
+            ILightClient(address(lc)),
             uint256(11155111),
             ROUTER,
             _eventSig()

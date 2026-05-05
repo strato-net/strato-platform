@@ -1,4 +1,5 @@
 import "../../libraries/Bridge/BLSVerify.sol";
+import "../../libraries/Bridge/ILightClient.sol";
 import "../../libraries/Bridge/SSZHashTree.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
@@ -119,7 +120,7 @@ struct PeriodTransition {
  *         identical to a one-time-bootstrapped Helios light client
  *         once that's the case.
  */
-contract EthLightClient is Ownable {
+contract EthLightClient is Ownable, ILightClient {
 
     // ─────────────────────────────────────────────────────────────────
     // Constants
@@ -522,14 +523,14 @@ contract EthLightClient is Ownable {
     /// because mapping struct defaults can compare unexpectedly to
     /// bytes32(0) in SolidVM; the uint256 default of 0 is reliably
     /// distinguishable from any real anchored block number ≥ 1.
-    function isAnchored(uint256 blockNumber) external view returns (bool) {
+    function isAnchored(uint256 blockNumber) external view override returns (bool) {
         return anchored[blockNumber].blockNumber != 0;
     }
 
     /// Read the verified receipts root for a block. Returns bytes32(0)
     /// for un-anchored block numbers; callers should check isAnchored
     /// first or treat the zero return as "not yet verified".
-    function getReceiptsRoot(uint256 blockNumber) external view returns (bytes32) {
+    function getReceiptsRoot(uint256 blockNumber) external view override returns (bytes32) {
         return anchored[blockNumber].receiptsRoot;
     }
 
