@@ -28,10 +28,14 @@ heliumNetworkID = 114784819836269
 upquarkNetworkID :: Integer
 upquarkNetworkID = 33056204878082667
 
-receiptsRootForkBlock :: Integer
-receiptsRootForkBlock = 100000
+heliumReceiptsRootForkBlock :: Integer
+heliumReceiptsRootForkBlock = 70000
+
+upquarkReceiptsRootForkBlock :: Integer
+upquarkReceiptsRootForkBlock = 100000
 
 isReceiptsRootForkActive :: Integer -> Bool
 isReceiptsRootForkActive blockNum =
   let net = Conf.networkID $ networkConfig ethConf
-   in not $ (net `elem` [upquarkNetworkID, heliumNetworkID]) && blockNum < receiptsRootForkBlock
+   in not $ (net == upquarkNetworkID && blockNum < upquarkReceiptsRootForkBlock)
+         || (net == heliumNetworkID  && blockNum < heliumReceiptsRootForkBlock)
