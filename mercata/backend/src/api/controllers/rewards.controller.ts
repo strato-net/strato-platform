@@ -50,18 +50,17 @@ class RewardsController {
   /**
    * Get all activities with user-specific data for the specified user
    */
-  static async getUserActivities(
+  static async getMyActivities(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
-      const { userAddress } = req.params;
+      const { accessToken, address: userAddress } = req;
       const forceRefresh = req.query.refresh === "true";
 
       if (!userAddress) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "User address is required" });
+        res.status(RestStatus.UNAUTHORIZED).json({ error: "User address is required" });
         return;
       }
 

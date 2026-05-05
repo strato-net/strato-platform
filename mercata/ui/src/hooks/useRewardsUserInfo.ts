@@ -17,7 +17,7 @@ export const useRewardsUserInfo = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await fetchUserRewards(userAddress);
+        const data = await fetchUserRewards();
         setUserRewards(data);
         setError(null);
       } catch (err) {
@@ -36,7 +36,7 @@ export const useRewardsUserInfo = () => {
     }
     try {
       setLoading(true);
-      const data = await fetchUserRewards(userAddress, true); // Force refresh to bypass cache
+      const data = await fetchUserRewards(true); // Force refresh to bypass cache
       setUserRewards(data);
       setError(null);
     } catch (err) {
