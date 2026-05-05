@@ -129,8 +129,10 @@ contract Describe_EthLightClient {
 
     function it_admin_can_set_indices() {
         lc.bootstrap(_signaturePeriod(), _stubCommittee(), _gvr(), _forkVersion());
-        lc.setIndices(uint256(105), uint256(9));   // pre-Electra finalized index
+        // 3-arg form: finalizedRootIndex, nextSyncCommitteeIndex, executionPayloadIndex.
+        lc.setIndices(uint256(105), uint256(55), uint256(9));   // pre-Electra indices
         require(lc.finalizedRootIndex() == 105, "finalizedRootIndex didn't update");
+        require(lc.nextSyncCommitteeIndex() == 55, "nextSyncCommitteeIndex didn't update");
     }
 
     // ============ Read accessors ============
@@ -138,5 +140,152 @@ contract Describe_EthLightClient {
     function it_unanchored_block_returns_zero_root() {
         require(lc.getReceiptsRoot(99999) == bytes32(0), "should be zero for unknown block");
         require(!lc.isAnchored(99999), "should not be anchored");
+    }
+
+    // ============ advanceCommittee preconditions ============
+
+    function _stubTransition(uint64 attestedSlot) internal pure returns (PeriodTransition) {
+        bytes[] dummyPks = new bytes[](512);
+        for (uint i = 0; i < 512; i = i + 1) {
+            dummyPks[i] = _samplePubkey0();
+        }
+        bytes32[] branch = new bytes32[](6);
+        return PeriodTransition({
+            attestedSlot:          attestedSlot,
+            attestedProposerIndex: uint64(0),
+            attestedParentRoot:    bytes32(0),
+            attestedStateRoot:     bytes32(0),
+            attestedBodyRoot:      bytes32(0),
+            participationBits:     new bytes(64),
+            signature:             new bytes(96),
+            signatureSlot:         attestedSlot,
+            nextPubkeys:           dummyPks,
+            nextAggregatePubkey:   _samplePubkey0(),
+            nextBranch:            branch
+        });
+    }
+
+    function it_advance_reverts_when_signature_period_mismatches_attested() {
+        lc.bootstrap(_signaturePeriod(), _stubCommittee(), _gvr(), _forkVersion());
+        // attestedSlot is in period 1242, signatureSlot in period 1243.
+        bytes[] dummyPks = new bytes[](512);
+        for (uint i = 0; i < 512; i = i + 1) {
+            dummyPks[i] = _samplePubkey0();
+        }
+        PeriodTransition u = PeriodTransition({
+            attestedSlot:          uint64(1242 * 8192 + 100),
+            attestedProposerIndex: uint64(0),
+            attestedParentRoot:    bytes32(0),
+            attestedStateRoot:     bytes32(0),
+            attestedBodyRoot:      bytes32(0),
+            participationBits:     new bytes(64),
+            signature:             new bytes(96),
+            signatureSlot:         uint64(1243 * 8192 + 0),
+            nextPubkeys:           dummyPks,
+            nextAggregatePubkey:   _samplePubkey0(),
+            nextBranch:            new bytes32[](6)
+        });
+        bool reverted = false;
+        try {
+            lc.advanceCommittee(u);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "should revert on cross-period sig");
+    }
+
+    function it_advance_reverts_when_no_committee_for_signing_period() {
+        // Bootstrap puts a committee at period 1242. attestedSlot is in
+        // period 1500, so there's no committee.
+        lc.bootstrap(_signaturePeriod(), _stubCommittee(), _gvr(), _forkVersion());
+        PeriodTransition u = _stubTransition(uint64(1500 * 8192 + 100));
+        bool reverted = false;
+        try {
+            lc.advanceCommittee(u);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "should revert when committee absent");
+    }
+
+    // ============ anchorBlockHeader: parent-chain shape checks ============
+    //
+    // The parent-walk logic itself is verified end-to-end against the
+    // existing-finalized-as-target case in EthLightClientAnchor.test.sol
+    // (the empty-parentChain regression). The cases here cover the
+    // shape-level invariants that don't require fresh fixture data.
+
+    function _stubAnchorHeaders() internal pure returns (AnchorHeaders) {
+        bytes32[] finalityBranch = new bytes32[](7);
+        return AnchorHeaders({
+            attestedSlot:           uint64(0),
+            attestedProposerIndex:  uint64(0),
+            attestedParentRoot:     bytes32(0),
+            attestedStateRoot:      bytes32(0),
+            attestedBodyRoot:       bytes32(0),
+            finalizedSlot:          uint64(0),
+            finalizedProposerIndex: uint64(0),
+            finalizedParentRoot:    bytes32(uint256(0xfeedbeef)), // arbitrary; whatever parent[0]'s hash must equal
+            finalizedStateRoot:     bytes32(0),
+            finalizedBodyRoot:      bytes32(0),
+            finalityBranch:         finalityBranch
+        });
+    }
+
+    function _stubSync() internal pure returns (SyncAggregateInput) {
+        return SyncAggregateInput({
+            participationBits: new bytes(64),
+            signature:         new bytes(96),
+            signatureSlot:     uint64(_signaturePeriod() * 8192)
+        });
+    }
+
+    function _stubEPH() internal pure returns (ExecutionPayloadHeader) {
+        return ExecutionPayloadHeader({
+            parentHash:        bytes32(0),
+            feeRecipient:      address(0),
+            stateRoot:         bytes32(0),
+            receiptsRoot:      bytes32(0),
+            logsBloomRoot:     bytes32(0),
+            prevRandao:        bytes32(0),
+            blockNumber:       uint64(0),
+            gasLimit:          uint64(0),
+            gasUsed:           uint64(0),
+            timestamp:         uint64(0),
+            extraDataRoot:     bytes32(0),
+            baseFeePerGas:     uint256(0),
+            blockHash:         bytes32(0),
+            transactionsRoot:  bytes32(0),
+            withdrawalsRoot:   bytes32(0),
+            blobGasUsed:       uint64(0),
+            excessBlobGas:     uint64(0)
+        });
+    }
+
+    function it_anchor_rejects_parent_chain_with_mismatched_hash() {
+        // First parent's hash doesn't match finalizedHeader.parent_root,
+        // so the very first walk step should reject. We don't get to
+        // bootstrap or BLS verification — this is purely about catching
+        // a bad parent chain early.
+        lc.bootstrap(_signaturePeriod(), _stubCommittee(), _gvr(), _forkVersion());
+
+        BeaconBlockHeaderInput[] chain = new BeaconBlockHeaderInput[](1);
+        chain[0] = BeaconBlockHeaderInput({
+            slot:           uint64(123),
+            proposerIndex:  uint64(456),
+            parentRoot:     bytes32(0),
+            stateRoot:      bytes32(0),
+            bodyRoot:       bytes32(0)
+        });
+        // The header's hash_tree_root won't equal the AnchorHeaders'
+        // arbitrary 0xfeedbeef parent_root.
+
+        bool reverted = false;
+        try {
+            lc.anchorBlockHeader(_stubAnchorHeaders(), _stubSync(), chain, _stubEPH(), new bytes32[](4));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "mismatched parent-chain hash should revert");
     }
 }

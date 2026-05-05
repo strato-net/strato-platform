@@ -123,6 +123,18 @@ contract Describe_EthBridgeInClaim {
         return p;
     }
 
+    /// All-zero assignment = "no redirect; credit goes to original recipient".
+    function _emptyAssignment() internal pure returns (ClaimAssignment) {
+        return ClaimAssignment({
+            depositKey:   bytes32(0),
+            newRecipient: address(0),
+            deadline:     uint256(0),
+            v:            uint8(0),
+            r:            bytes32(0),
+            s:            bytes32(0)
+        });
+    }
+
     function beforeEach() {
         lc = new TestableEthLightClient(address(this));
         // SolidVM doesn't auto-upcast from the derived class reference;
@@ -144,15 +156,15 @@ contract Describe_EthBridgeInClaim {
         // return without reverting (MPT proof, log address, event
         // sig, dedup, decode). The dedup bookkeeping itself is
         // separately checked by it_claim_dedups_repeat_attempts.
-        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
     }
 
     function it_claim_dedups_repeat_attempts() {
-        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
 
         bool reverted = false;
         try {
-            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
         } catch {
             reverted = true;
         }
@@ -165,7 +177,7 @@ contract Describe_EthBridgeInClaim {
 
         bool reverted = false;
         try {
-            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
         } catch {
             reverted = true;
         }
@@ -176,7 +188,7 @@ contract Describe_EthBridgeInClaim {
         bridge.setDepositRoutedSig(bytes32(uint256(1)));
         bool reverted = false;
         try {
-            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
         } catch {
             reverted = true;
         }
@@ -189,7 +201,7 @@ contract Describe_EthBridgeInClaim {
         MockBridgeMintTarget mock = new MockBridgeMintTarget();
         bridge.setMintTarget(address(mock));
 
-        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
 
         require(mock.callCount() == 1, "callback should fire once");
         require(mock.lastSrcChainId() == 11155111, "srcChainId mismatch");
@@ -210,7 +222,7 @@ contract Describe_EthBridgeInClaim {
 
         bool reverted = false;
         try {
-            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
         } catch {
             reverted = true;
         }
@@ -218,7 +230,7 @@ contract Describe_EthBridgeInClaim {
 
         // Retry path: clear the revert, repeat the claim — should succeed.
         mock.setShouldRevert(false);
-        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
         require(mock.callCount() == 1, "callback should fire on retry");
     }
 
@@ -227,11 +239,11 @@ contract Describe_EthBridgeInClaim {
         // succeed and just emit ClaimVerified without invoking any
         // mint hook.
         require(bridge.mintTarget() == address(0), "default mintTarget should be zero");
-        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+        bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
         // Dedup is the proof of success: a second attempt must revert.
         bool reverted = false;
         try {
-            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof());
+            bridge.claim(uint256(1234), uint256(0), uint256(0), _receiptRlp(), _proof(), _emptyAssignment());
         } catch {
             reverted = true;
         }

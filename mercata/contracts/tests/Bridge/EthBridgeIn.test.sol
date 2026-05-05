@@ -114,9 +114,13 @@ contract Describe_EthBridgeIn {
         // Stub MPT proof; doesn't matter — the unanchored-block check
         // fires first.
         bytes[] proof = new bytes[](0);
+        ClaimAssignment empty = ClaimAssignment({
+            depositKey: bytes32(0), newRecipient: address(0), deadline: uint256(0),
+            v: uint8(0), r: bytes32(0), s: bytes32(0)
+        });
         bool reverted = false;
         try {
-            bridge.claim(uint256(99999), uint256(0), uint256(0), hex"00", proof);
+            bridge.claim(uint256(99999), uint256(0), uint256(0), hex"00", proof, empty);
         } catch {
             reverted = true;
         }

@@ -27,6 +27,46 @@ struct ClaimedDeposit {
 }
 
 /**
+ * @notice EIP-712-style claim assignment. The original recipient (the
+ *         `stratoRecipient` decoded from the deposit log) signs a
+ *         ClaimAssignment authorizing some other address to receive
+ *         the credit. Liquidity providers buy these signed assignments
+ *         off-chain in exchange for advancing funds before finality —
+ *         then post-finality, the LP submits the claim with the
+ *         assignment attached and the bridge credits them instead of
+ *         the original recipient.
+ *
+ *         Signature scheme (EIP-712 inspired, simplified for v1):
+ *           digest = keccak256(0x1901 || DOMAIN_SEPARATOR || structHash)
+ *           structHash = keccak256(ASSIGNMENT_TYPEHASH || depositKey || padded_addr || deadline)
+ *           where DOMAIN_SEPARATOR = keccak256("EthBridgeIn:v1")
+ *           and  ASSIGNMENT_TYPEHASH = keccak256(
+ *               "ClaimAssignment(bytes32 depositKey,address newRecipient,uint256 deadline)"
+ *           )
+ *
+ *         Signer must be the deposit's stratoRecipient (decoded from
+ *         the log). The assignment is bound to a specific depositKey,
+ *         so an LP can't reuse a signature on a different deposit.
+ *
+ *         Setting `newRecipient = address(0)` means "no assignment" —
+ *         the credit goes to the original stratoRecipient as usual.
+ *         Useful as a sentinel so callers can pass an empty
+ *         assignment unconditionally.
+ *
+ *         Future hardening (v2): bind to chainId + verifyingContract
+ *         in the domain separator for cross-deployment replay safety.
+ *         Today's v1 binding is by depositKey alone.
+ */
+struct ClaimAssignment {
+    bytes32 depositKey;
+    address newRecipient;
+    uint256 deadline;
+    uint8   v;
+    bytes32 r;
+    bytes32 s;
+}
+
+/**
  * @title  EthBridgeIn
  * @notice Trustless Ethereum→STRATO bridge claim contract. Verifies
  *         that a `DepositRouted` log was emitted by the configured
@@ -63,6 +103,20 @@ struct ClaimedDeposit {
  */
 contract EthBridgeIn is Ownable {
     using RLPDecode for *;
+
+    // ─────────────────────────────────────────────────────────────────
+    // EIP-712 constants (precomputed off-chain to avoid runtime keccak)
+    // ─────────────────────────────────────────────────────────────────
+
+    /// keccak256("EthBridgeIn:v1") — domain separator for v1 of the
+    /// claim-assignment scheme. Constant so signatures can be
+    /// pre-computed off-chain without depending on deployment specifics.
+    bytes32 constant DOMAIN_SEPARATOR =
+        bytes32(hex"36eec31ea92b007b08060dd7f286f181473321810dbad5e99d2444f84d542d53");
+
+    /// keccak256("ClaimAssignment(bytes32 depositKey,address newRecipient,uint256 deadline)")
+    bytes32 constant ASSIGNMENT_TYPEHASH =
+        bytes32(hex"60eb56ba5f9062650211119df58cdbc350096368e17dcf2d21250fab31bd346d");
 
     // ─────────────────────────────────────────────────────────────────
     // State
@@ -118,6 +172,17 @@ contract EthBridgeIn is Ownable {
     event RouterUpdated(address oldRouter, address newRouter);
     event EventSigUpdated(bytes32 oldSig, bytes32 newSig);
     event MintTargetUpdated(address oldTarget, address newTarget);
+
+    /// @notice Emitted when a claim used a valid signed assignment
+    ///         and the credit was redirected away from the original
+    ///         stratoRecipient. Off-chain accounting (LPs, indexers)
+    ///         keys off this to track who actually received the funds.
+    event ClaimReassigned(
+        bytes32 indexed depositKey,
+        address indexed originalRecipient,
+        address indexed assignedRecipient,
+        uint256 deadline
+    );
 
     // ─────────────────────────────────────────────────────────────────
     // Construction & admin
@@ -195,13 +260,20 @@ contract EthBridgeIn is Ownable {
      *                          root to leaf, as returned by
      *                          eth_getProof / eth_getTransactionReceipt
      *                          + custom proof builder.
+     * @param assignment        Optional signed claim assignment that
+     *                          redirects the credit to a different
+     *                          recipient. When `assignment.newRecipient`
+     *                          is the zero address the assignment is
+     *                          ignored and the credit goes to the
+     *                          stratoRecipient decoded from the log.
      */
     function claim(
         uint256 blockNumber,
         uint256 txIndex,
         uint256 logIndex,
         bytes   receiptValueBytes,
-        bytes[] mptProof
+        bytes[] mptProof,
+        ClaimAssignment assignment
     ) external returns (bytes32 depositKey) {
         // 1. Look up the verified receipts_root from the light client.
         bytes32 receiptsRoot = lightClient.getReceiptsRoot(blockNumber);
@@ -245,7 +317,17 @@ contract EthBridgeIn is Ownable {
         require(!processed[depositKey], "EthBridgeIn: already processed");
         processed[depositKey] = true;
 
-        // 6. Optional mint callback. If the mint target reverts, our
+        // 6. Optional claim assignment. If newRecipient is non-zero,
+        //    the original stratoRecipient must have signed an
+        //    EIP-712 ClaimAssignment authorizing the redirect.
+        address effectiveRecipient = dep.stratoRecipient;
+        if (assignment.newRecipient != address(0)) {
+            _verifyAssignment(assignment, depositKey, dep.stratoRecipient);
+            effectiveRecipient = assignment.newRecipient;
+            emit ClaimReassigned(depositKey, dep.stratoRecipient, assignment.newRecipient, assignment.deadline);
+        }
+
+        // 7. Optional mint callback. If the mint target reverts, our
         //    storage write to `processed` is rolled back with the
         //    transaction, so the user can re-claim once the
         //    integration is fixed (e.g., admin enables the route on
@@ -256,7 +338,7 @@ contract EthBridgeIn is Ownable {
                 srcChainId,
                 dep.ethToken,
                 dep.ethSender,
-                dep.stratoRecipient,
+                effectiveRecipient,
                 dep.targetStratoToken,
                 dep.amount
             );
@@ -264,6 +346,65 @@ contract EthBridgeIn is Ownable {
 
         emit ClaimVerified(depositKey, srcChainId, blockNumber, txIndex, logIndex, dep);
         return depositKey;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // EIP-712 assignment verification
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * @dev Verify an EIP-712 signed claim assignment. Reverts on any
+     *      failure so the surrounding tx rolls back the dedup flag.
+     */
+    function _verifyAssignment(
+        ClaimAssignment assignment,
+        bytes32 expectedDepositKey,
+        address expectedSigner
+    ) private view {
+        require(
+            assignment.depositKey == expectedDepositKey,
+            "EthBridgeIn: assignment depositKey mismatch"
+        );
+        // Strict <: an assignment with deadline == block.timestamp has
+        // already expired by the time it's mined. Also rejects the
+        // deadline=0 sentinel cleanly.
+        require(
+            block.timestamp < assignment.deadline,
+            "EthBridgeIn: assignment expired"
+        );
+
+        // structHash = keccak256(typeHash || depositKey || padded_addr || deadline)
+        // Manual ABI-encode (each value occupies 32 bytes).
+        bytes encoded = bytes(ASSIGNMENT_TYPEHASH)
+                      + bytes(assignment.depositKey)
+                      + bytes(_addressTo32(assignment.newRecipient))
+                      + bytes(_uint256To32(assignment.deadline));
+        bytes32 structHash = keccak256(encoded);
+
+        // digest = keccak256("\x19\x01" || DOMAIN_SEPARATOR || structHash)
+        // 0x1901 packs to 2 bytes via the integer-to-bytes builtin.
+        bytes32 digest = keccak256(
+            bytes(uint256(0x1901))
+            + bytes(DOMAIN_SEPARATOR)
+            + bytes(structHash)
+        );
+
+        // SolidVM's ecrecover dispatcher requires r/s as uint or hex
+        // string; cast bytes32 → uint256 before passing.
+        address signer = ecrecover(digest, assignment.v, uint256(assignment.r), uint256(assignment.s));
+        require(signer != address(0), "EthBridgeIn: ecrecover failed");
+        require(signer == expectedSigner, "EthBridgeIn: assignment not signed by recipient");
+    }
+
+    /// @dev Pad an address into a 32-byte left-zero word (right-aligned
+    ///      address bytes), the layout EIP-712 ABI-encode uses.
+    function _addressTo32(address a) private pure returns (bytes32) {
+        return bytes32(uint256(uint160(a)));
+    }
+
+    /// @dev Cast uint256 to bytes32 (BE; same byte layout).
+    function _uint256To32(uint256 v) private pure returns (bytes32) {
+        return bytes32(v);
     }
 
     // ─────────────────────────────────────────────────────────────────

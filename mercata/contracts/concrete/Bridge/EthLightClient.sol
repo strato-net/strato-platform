@@ -25,6 +25,21 @@ struct AnchorHeaders {
 }
 
 /**
+ * @notice A flat representation of one BeaconBlockHeader, used for
+ *         parent-chain extension. The walk verifies a sequence of
+ *         these starting just below `finalizedHeader` and ending at
+ *         the user's target block — each step is checked by
+ *         hash_tree_root chaining via parent_root.
+ */
+struct BeaconBlockHeaderInput {
+    uint64  slot;
+    uint64  proposerIndex;
+    bytes32 parentRoot;
+    bytes32 stateRoot;
+    bytes32 bodyRoot;
+}
+
+/**
  * @notice Sync aggregate from finality_update.sync_aggregate. The
  *         aggregate pubkey is computed on-chain by summing committee
  *         members whose bit is set in participationBits — that's the
@@ -35,6 +50,44 @@ struct SyncAggregateInput {
     bytes  participationBits;   // 64 bytes (SSZ Bitvector[512])
     bytes  signature;           // 96 bytes IETF compressed G2
     uint64 signatureSlot;       // determines which committee signed
+}
+
+/**
+ * @notice Inputs for a sync-committee period transition. A
+ *         consensus-spec LightClientUpdate at a period boundary
+ *         carries this data plus a finalized_header / finality_branch
+ *         we don't need for the committee-anchoring step. The
+ *         reduced struct is what {EthLightClient.advanceCommittee}
+ *         consumes.
+ *
+ *         Verification chain inside advanceCommittee:
+ *           1. Sync committee for period(signatureSlot) signed
+ *              attested_header (BLS pairing).
+ *           2. hash_tree_root(nextCommittee) is computed on-chain
+ *              from the supplied pubkeys + aggregatePubkey.
+ *           3. nextSyncCommitteeBranch proves that root from
+ *              attestedStateRoot at nextSyncCommitteeIndex.
+ *           4. Store nextPubkeys at period(attestedSlot) + 1.
+ *
+ *         Notably we do NOT keep the next committee's
+ *         aggregatePubkey: future verifications recompute the
+ *         participating-subset aggregate on-chain from pubkeys[].
+ */
+struct PeriodTransition {
+    // attested_header.beacon (signed by current period's sync committee)
+    uint64  attestedSlot;
+    uint64  attestedProposerIndex;
+    bytes32 attestedParentRoot;
+    bytes32 attestedStateRoot;
+    bytes32 attestedBodyRoot;
+    // sync aggregate
+    bytes  participationBits;
+    bytes  signature;
+    uint64 signatureSlot;
+    // next_sync_committee
+    bytes[]   nextPubkeys;          // 512 × 48 bytes IETF compressed
+    bytes     nextAggregatePubkey;  // 48 bytes IETF compressed (used only to verify the SSZ root)
+    bytes32[] nextBranch;           // proves committee SSZ root from attestedStateRoot
 }
 
 /**
@@ -105,11 +158,14 @@ contract EthLightClient is Ownable {
     /// shifted at Electra; Fulu inherited it). Pre-Electra clients
     /// would set finalizedRootIndex = 41 with depth 6 not 7.
     ///
-    /// finalizedRootIndex   : leaf position of finalized_checkpoint.root in
-    ///                        BeaconState. Electra+: position 41 in level 7.
-    /// executionPayloadIndex: leaf position of execution_payload in
-    ///                        BeaconBlockBody. Capella+: position 9 in level 4.
+    /// finalizedRootIndex      : leaf position of finalized_checkpoint.root in
+    ///                           BeaconState. Electra+: position 41 in level 7.
+    /// nextSyncCommitteeIndex  : leaf position of next_sync_committee in
+    ///                           BeaconState. Electra+: position 23 in level 6.
+    /// executionPayloadIndex   : leaf position of execution_payload in
+    ///                           BeaconBlockBody. Capella+: position 9 in level 4.
     uint256 public finalizedRootIndex;
+    uint256 public nextSyncCommitteeIndex;
     uint256 public executionPayloadIndex;
 
     /// Sync committees keyed by period (= slot / 8192). Stored as a
@@ -136,7 +192,8 @@ contract EthLightClient is Ownable {
 
     event Bootstrapped(uint64 period, bytes32 genesisValidatorsRoot, bytes4 forkVersion);
     event ForkVersionUpdated(bytes4 oldVersion, bytes4 newVersion);
-    event IndicesUpdated(uint256 finalizedRootIndex, uint256 executionPayloadIndex);
+    event IndicesUpdated(uint256 finalizedRootIndex, uint256 nextSyncCommitteeIndex, uint256 executionPayloadIndex);
+    event CommitteeAnchored(uint64 period);
     event HeaderAnchored(uint256 blockNumber, bytes32 receiptsRoot, uint64 beaconSlot, uint64 timestamp);
 
     // ─────────────────────────────────────────────────────────────────
@@ -147,8 +204,9 @@ contract EthLightClient is Ownable {
         // SSZ generalized indices for Electra/Fulu by default. Bootstrap
         // sets the rest; admin can override indices via setIndices() if
         // needed (e.g., for pre-Electra forks).
-        finalizedRootIndex = 41;     // leaf position in level 7 (gindex 169 in Electra+ BeaconState)
-        executionPayloadIndex = 9;   // leaf position in level 4 (gindex 25 in Capella+ BeaconBlockBody)
+        finalizedRootIndex = 41;        // level 7 / gindex 169 (Electra+ BeaconState)
+        nextSyncCommitteeIndex = 23;    // level 6 / gindex 87  (Electra+ BeaconState)
+        executionPayloadIndex = 9;      // level 4 / gindex 25  (Capella+ BeaconBlockBody)
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -204,11 +262,13 @@ contract EthLightClient is Ownable {
      */
     function setIndices(
         uint256 finalizedRootIndex_,
+        uint256 nextSyncCommitteeIndex_,
         uint256 executionPayloadIndex_
     ) external onlyOwner {
         finalizedRootIndex = finalizedRootIndex_;
+        nextSyncCommitteeIndex = nextSyncCommitteeIndex_;
         executionPayloadIndex = executionPayloadIndex_;
-        emit IndicesUpdated(finalizedRootIndex_, executionPayloadIndex_);
+        emit IndicesUpdated(finalizedRootIndex_, nextSyncCommitteeIndex_, executionPayloadIndex_);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -252,15 +312,29 @@ contract EthLightClient is Ownable {
      *              SSZHashTree.computeSigningRoot).
      *           2. finalityBranch proves finalized_header from
      *              attestedHeader.stateRoot.
-     *           3. hash_tree_root(eph) is computed on-chain.
-     *           4. executionBranch proves the EPH root from
-     *              finalizedHeader.bodyRoot at executionPayloadIndex.
-     *           5. eph.receiptsRoot and eph.blockNumber are read
+     *           3. parentChain (optional) walks from finalizedHeader
+     *              down to the user's target block via parent_root
+     *              chaining. If empty, target = finalizedHeader.
+     *              This lets callers anchor blocks older than the
+     *              current finalized head — they just supply the
+     *              intermediate headers from any beacon node.
+     *           4. hash_tree_root(eph) is computed on-chain.
+     *           5. executionBranch proves the EPH root from
+     *              target.bodyRoot at executionPayloadIndex.
+     *           6. eph.receiptsRoot and eph.blockNumber are read
      *              directly from the verified struct and stored.
+     *
+     * @param parentChain  Optional sequence of intermediate beacon
+     *                     headers from finalizedHeader's parent down
+     *                     to the target. Empty (length 0) means the
+     *                     finalizedHeader is itself the target. The
+     *                     last element of a non-empty parentChain is
+     *                     the target.
      */
     function anchorBlockHeader(
         AnchorHeaders headers,
         SyncAggregateInput sync,
+        BeaconBlockHeaderInput[] parentChain,
         ExecutionPayloadHeader eph,
         bytes32[] executionBranch
     ) external returns (uint256) {
@@ -307,26 +381,136 @@ contract EthLightClient is Ownable {
             "EthLightClient: finality branch verify failed"
         );
 
-        // ─── 3. EPH root + executionBranch ────────────────────────
+        // ─── 3. Walk parent chain to determine the anchor target ──
+        //
+        // If parentChain is empty, the finalizedHeader IS the target.
+        // Otherwise we walk: each header's hash_tree_root must equal
+        // the previous header's parent_root, starting with
+        // finalizedHeader.parent_root for the very first step. The
+        // last header in parentChain is the target.
+        bytes32 targetBodyRoot = headers.finalizedBodyRoot;
+        uint64  targetSlot     = headers.finalizedSlot;
+        if (parentChain.length > 0) {
+            bytes32 expected = headers.finalizedParentRoot;
+            for (uint256 i = 0; i < parentChain.length; i = i + 1) {
+                bytes32 h = SSZHashTree.hashTreeRootBeaconHeader(
+                    parentChain[i].slot,
+                    parentChain[i].proposerIndex,
+                    parentChain[i].parentRoot,
+                    parentChain[i].stateRoot,
+                    parentChain[i].bodyRoot
+                );
+                require(h == expected, "EthLightClient: parent chain mismatch");
+                expected = parentChain[i].parentRoot;
+            }
+            BeaconBlockHeaderInput memory tgt = parentChain[parentChain.length - 1];
+            targetBodyRoot = tgt.bodyRoot;
+            targetSlot     = tgt.slot;
+        }
+
+        // ─── 4. EPH root + executionBranch (against target) ───────
         bytes32 ephRoot = SSZHashTree.hashTreeRootEPH(eph);
         require(
             SSZHashTree.verifyMerkleBranch(
-                ephRoot, executionBranch, executionPayloadIndex, headers.finalizedBodyRoot
+                ephRoot, executionBranch, executionPayloadIndex, targetBodyRoot
             ),
             "EthLightClient: execution branch verify failed"
         );
 
-        // ─── 4. Anchor ────────────────────────────────────────────
+        // ─── 5. Anchor ────────────────────────────────────────────
         uint256 blockNumber = uint256(eph.blockNumber);
         anchored[blockNumber] = AnchoredHeader({
             blockNumber: blockNumber,
             receiptsRoot: eph.receiptsRoot,
-            beaconSlot: headers.finalizedSlot,
+            beaconSlot: targetSlot,
             timestamp: eph.timestamp
         });
 
-        emit HeaderAnchored(blockNumber, eph.receiptsRoot, headers.finalizedSlot, eph.timestamp);
+        emit HeaderAnchored(blockNumber, eph.receiptsRoot, targetSlot, eph.timestamp);
         return blockNumber;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Permissionless: advance the sync-committee chain by one period
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * @notice Anchor the next sync committee using a
+     *         LightClientUpdate signed by the current committee.
+     *
+     *         Caller is permissionless: any actor (relayer, user
+     *         about to claim a deposit, an LP about to advance funds)
+     *         can pay the gas to advance the chain. The verification
+     *         binds the new committee to the prior one via:
+     *
+     *           1. Sync sig from period(signatureSlot)'s committee.
+     *           2. hash_tree_root(nextCommittee) computed on-chain.
+     *           3. Merkle branch from that root to attested.state_root.
+     *
+     *         Idempotent: if period(attestedSlot) + 1 is already
+     *         anchored, the call is a no-op (so two callers racing
+     *         to advance don't trip each other up).
+     *
+     * @return newPeriod the period now anchored (= attestedSlot's
+     *         period + 1). Returned as 0 in the idempotent no-op case.
+     */
+    function advanceCommittee(PeriodTransition update) external returns (uint64 newPeriod) {
+        // ─── 1. Look up the current committee for the signing slot ──
+        uint64 signaturePeriod = update.signatureSlot / uint64(8192);
+        uint64 attestedPeriod = update.attestedSlot / uint64(8192);
+        // The light-client spec requires signature_slot to be in the
+        // same period as the attested header for non-finality updates
+        // (otherwise the signing committee wouldn't match the chain
+        // being attested). Enforce here.
+        require(signaturePeriod == attestedPeriod, "EthLightClient: signature period != attested period");
+        require(committeePubkeys[signaturePeriod].length == 512, "EthLightClient: no committee for signing period");
+
+        newPeriod = attestedPeriod + 1;
+        if (committeePubkeys[newPeriod].length == 512) {
+            // Already anchored; nothing more to do. Idempotent for racing callers.
+            return uint64(0);
+        }
+        require(update.nextPubkeys.length == 512, "EthLightClient: expected 512 next pubkeys");
+        require(update.nextAggregatePubkey.length == 48, "EthLightClient: nextAggregatePubkey must be 48 bytes");
+
+        // ─── 2. Verify BLS signature from the current committee ────
+        require(
+            BLSVerify.popcount(update.participationBits) >= MIN_PARTICIPATION,
+            "EthLightClient: below 2/3 sync committee participation"
+        );
+        (bytes computedAggPk, /* count */) = BLSVerify.aggregateParticipants(
+            committeePubkeys[signaturePeriod],
+            update.participationBits
+        );
+
+        bytes32 signingRoot = SSZHashTree.computeSigningRoot(
+            SSZHashTree.hashTreeRootBeaconHeader(
+                update.attestedSlot, update.attestedProposerIndex,
+                update.attestedParentRoot, update.attestedStateRoot, update.attestedBodyRoot
+            ),
+            SSZHashTree.computeDomain(DOMAIN_SYNC_COMMITTEE, forkVersion, genesisValidatorsRoot)
+        );
+        require(
+            BLSVerify.verifySyncCommitteeAggregateG1(computedAggPk, signingRoot, update.signature),
+            "EthLightClient: BLS verify failed"
+        );
+
+        // ─── 3. Verify nextSyncCommitteeBranch ─────────────────────
+        bytes32 committeeRoot = SSZHashTree.hashTreeRootSyncCommittee(
+            update.nextPubkeys, update.nextAggregatePubkey
+        );
+        require(
+            SSZHashTree.verifyMerkleBranch(
+                committeeRoot, update.nextBranch, nextSyncCommitteeIndex, update.attestedStateRoot
+            ),
+            "EthLightClient: next-committee branch verify failed"
+        );
+
+        // ─── 4. Anchor the next period's pubkeys ───────────────────
+        committeePubkeys[newPeriod] = update.nextPubkeys;
+        if (newPeriod > latestPeriod) latestPeriod = newPeriod;
+        emit CommitteeAnchored(newPeriod);
+        return newPeriod;
     }
 
     // ─────────────────────────────────────────────────────────────────

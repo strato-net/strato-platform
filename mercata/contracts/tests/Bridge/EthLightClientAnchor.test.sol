@@ -625,7 +625,9 @@ contract Describe_EthLightClientAnchor {
             signature:         _signature(),
             signatureSlot:     uint64(10182913)
         });
-        uint256 anchored = lc.anchorBlockHeader(_headers(), sync, _eph(), _executionBranch());
+        // parentChain empty: target = finalizedHeader (today's behavior).
+        BeaconBlockHeaderInput[] noParents = new BeaconBlockHeaderInput[](0);
+        uint256 anchored = lc.anchorBlockHeader(_headers(), sync, noParents, _eph(), _executionBranch());
         require(anchored == 10790533, "anchored block number mismatch");
         require(lc.isAnchored(10790533), "isAnchored should be true");
         require(

@@ -324,6 +324,75 @@ library SSZHashTree {
     }
 
     // ─────────────────────────────────────────────────────────────────
+    // SyncCommittee hash_tree_root (Altair+; unchanged through Fulu)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * @notice hash_tree_root(BLSPubkey) where BLSPubkey = Bytes48.
+     *
+     *         A 48-byte value packs into 1.5 chunks → 2 chunks (the
+     *         second is right-padded with 16 zero bytes). The two
+     *         chunks merkleize via a single sha256, which is the
+     *         pubkey's hash_tree_root.
+     */
+    function hashTreeRootBLSPubkey(bytes pubkey48) internal pure returns (bytes32) {
+        require(pubkey48.length == 48, "SSZ: pubkey must be 48 bytes");
+        // chunk0 = bytes 0..31 of the pubkey
+        // chunk1 = bytes 32..47 of the pubkey + 16 zero bytes
+        bytes chunk0 = new bytes(32);
+        for (uint256 i = 0; i < 32; i = i + 1) {
+            chunk0[i] = pubkey48[i];
+        }
+        bytes chunk1 = new bytes(32);
+        for (uint256 j = 0; j < 16; j = j + 1) {
+            chunk1[j] = pubkey48[32 + j];
+        }
+        // bytes 16..31 of chunk1 stay zero (right-pad).
+        return bytes32(sha256(chunk0 + chunk1));
+    }
+
+    /**
+     * @notice hash_tree_root(SyncCommittee). The SSZ container has
+     *         two fields:
+     *           pubkeys: Vector[BLSPubkey, 512]
+     *           aggregate_pubkey: BLSPubkey
+     *         where Vector[BLSPubkey, 512] hash_tree_root is the
+     *         merkleization of 512 pubkey roots (depth 9 binary tree),
+     *         and the container root is sha256(vectorRoot || aggregateRoot).
+     *
+     *         Computational cost: 512 + 511 + 1 + 1 = 1025 sha256 calls
+     *         per invocation. Heavy but bounded; called once per period
+     *         transition (~ once per 27 hours in production), so the
+     *         cost amortizes across all reads of the new committee.
+     */
+    function hashTreeRootSyncCommittee(
+        bytes[] pubkeys,
+        bytes aggregatePubkey
+    ) internal pure returns (bytes32) {
+        require(pubkeys.length == 512, "SSZ: expected 512 pubkeys");
+
+        // 1. Compute hash_tree_root of each pubkey → 512 leaves.
+        // 2. Merkleize the 512 leaves to depth 9, collapsing in-place.
+        bytes32[] leaves = new bytes32[](512);
+        for (uint256 i = 0; i < 512; i = i + 1) {
+            leaves[i] = hashTreeRootBLSPubkey(pubkeys[i]);
+        }
+        uint256 n = 512;
+        while (n > 1) {
+            uint256 half = n / 2;
+            for (uint256 j = 0; j < half; j = j + 1) {
+                leaves[j] = bytes32(sha256(bytes(leaves[2 * j]) + bytes(leaves[2 * j + 1])));
+            }
+            n = half;
+        }
+        bytes32 vectorRoot = leaves[0];
+
+        // 3. Container hash_tree_root over (vectorRoot, aggregateRoot).
+        bytes32 aggregateRoot = hashTreeRootBLSPubkey(aggregatePubkey);
+        return bytes32(sha256(bytes(vectorRoot) + bytes(aggregateRoot)));
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     // Merkle proof verification
     // ─────────────────────────────────────────────────────────────────
 
