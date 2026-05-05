@@ -42,7 +42,6 @@ executables:
       - blockDB
       - common-log
       - containers
-      - evm-solidity
       - hflags
       - monad-alter
       - process-monitor
@@ -51,7 +50,6 @@ executables:
       - strato-conf
       - strato-index
       - strato-model
-      - strato-statediff
     other-modules:
       - Wiring
 
@@ -64,7 +62,6 @@ executables:
       - blockDB
       - common-log
       - containers
-      - evm-solidity
       - hflags
       - kafka-monad
       - monad-alter

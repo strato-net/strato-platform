@@ -37,8 +37,6 @@ library
     , blockapps-data
     , blockapps-datadefs
     , blockapps-init
-    , blockapps-vault-wrapper-api
-    , blockapps-vault-wrapper-client
     , blockstanbul
     , bytestring
     , classy-prelude
@@ -49,9 +47,7 @@ library
     , directory
     , format
     , hflags
-    , http-client
     , kafka-monad
-    , labeled-error
     , lens
     , leveldb-haskell
     , monad-alter
@@ -93,7 +89,6 @@ executable strato-sequencer
       async
     , base
     , blockDB
-    , blockapps-data
     , blockapps-init
     , blockstanbul
     , common-log
@@ -101,8 +96,6 @@ executable strato-sequencer
     , hedis
     , hflags
     , process-monitor
-    , prometheus-client
-    , seqevents
     , stm
     , stm-chans
     , strato-conf
@@ -110,8 +103,6 @@ executable strato-sequencer
     , strato-model
     , strato-redis-blockdb
     , strato-sequencer
-    , text
-    , vault-monad
     , wai-middleware-prometheus
     , warp
   default-language: Haskell2010

@@ -41,32 +41,22 @@ library
     , bloc2
     , blockapps-data
     , blockapps-datadefs
-    , blockapps-mpdbs
     , bytestring
-    , classy-prelude
     , common-log
     , conduit
     , containers
-    , cross-monitoring
     , deepseq
     , esqueleto
     , evm-solidity
-    , extra
-    , filepath
     , format
-    , hflags
     , kafka-monad
     , lens
-    , monad-alter
     , network
     , ordered-containers
     , persistent
     , persistent-postgresql
-    , postgresql-simple
     , prometheus-client
-    , raw-strings-qq
     , resource-pool
-    , resourcet
     , scientific
     , solid-vm-model
     , source-tools
@@ -77,7 +67,6 @@ library
     , time
     , transformers
     , unliftio
-    , unliftio-core
     , vm-tools
   default-language: Haskell2010
 
@@ -90,19 +79,12 @@ executable slipstream
   ghc-options: -Wall -Werror -rtsopts
   build-depends:
       base
-    , bloc2
     , blockapps-init
-    , bytestring
     , common-log
-    , containers
-    , evm-solidity
     , hflags
     , kafka-monad
-    , monad-alter
     , persistent-postgresql
-    , postgresql-simple
     , process-monitor
-    , raw-strings-qq
     , resourcet
     , slipstream
     , sql-monad
@@ -140,7 +122,6 @@ test-suite slipstream-test
     , containers
     , core-api2
     , data-default
-    , evm-solidity
     , hflags
     , hspec
     , hspec-expectations-lifted
@@ -148,8 +129,6 @@ test-suite slipstream-test
     , monad-alter
     , ordered-containers
     , persistent-sqlite
-    , raw-strings-qq
-    , resourcet
     , slipstream
     , solid-vm-model
     , strato-model

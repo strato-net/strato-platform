@@ -21,7 +21,6 @@ library:
     - merkle-patricia-db
     - monad-alter
     - prometheus-client
-    - strato-conf
     - strato-model
     - text
 

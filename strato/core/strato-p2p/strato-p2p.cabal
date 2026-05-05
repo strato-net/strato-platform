@@ -82,7 +82,6 @@ library
     , servant-client
     , servant-server
     , split
-    , sql-monad
     , stm-conduit
     , strato-conf
     , strato-model

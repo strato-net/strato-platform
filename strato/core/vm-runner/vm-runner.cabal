@@ -31,8 +31,7 @@ library
       src/
   ghc-options: -Wall -O2
   build-depends:
-      aeson
-    , base
+      base
     , base16-bytestring
     , binary
     , blockDB
@@ -49,22 +48,17 @@ library
     , dlist
     , ethereum-rlp
     , evm-solidity
-    , exceptions
-    , extra
     , format
     , kafka-monad
     , lens
     , merkle-patricia-db
     , monad-alter
     , ordered-containers
-    , persistent-postgresql
     , prometheus-client
-    , redis-monad
     , seqevents
     , solid-vm
     , solid-vm-compiler
     , solid-vm-model
-    , sql-monad
     , strato-conf
     , strato-genesis
     , strato-index
@@ -75,7 +69,6 @@ library
     , time
     , transformers
     , unliftio
-    , vector
     , vm-tools
   default-language: Haskell2010
 

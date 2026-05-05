@@ -12,40 +12,30 @@ ghc-options: -Wall -Werror -rtsopts
 
 dependencies:
   - base
-  - bytestring
-  - containers
   - common-log
-  - evm-solidity
-  - hflags
-  - monad-alter
-  - raw-strings-qq
-  - resourcet
 
 library:
   source-dirs: src/
   dependencies: 
     - aeson
+    - bytestring
+    - containers
+    - evm-solidity
     - base16-bytestring
     - binary
     - bloc2
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-mpdbs
-    - classy-prelude
     - conduit
     - containers
-    - cross-monitoring
     - deepseq
     - esqueleto
-    - extra
-    - filepath
     - format
     - lens
     - kafka-monad
     - network
     - persistent
     - persistent-postgresql
-    - postgresql-simple
     - prometheus-client
     - resource-pool
     - solid-vm-model
@@ -58,7 +48,6 @@ library:
     - time
     - transformers
     - unliftio
-    - unliftio-core
     - vm-tools
     - ordered-containers
 
@@ -68,13 +57,12 @@ executables:
     main: Main.hs
     dependencies:
       - base
-      - bloc2
       - blockapps-init
       - hflags
       - kafka-monad
       - persistent-postgresql
       - process-monitor
-      - postgresql-simple
+      - resourcet
       - slipstream
       - sql-monad
       - strato-conf

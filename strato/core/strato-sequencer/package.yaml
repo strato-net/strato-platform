@@ -17,11 +17,8 @@ library:
   dependencies:
     - alarmclock
     - binary
-    - blockapps-data
     - blockapps-datadefs
     - blockapps-init
-    - blockapps-vault-wrapper-api
-    - blockapps-vault-wrapper-client
     - blockDB
     - blockstanbul
     - bytestring
@@ -31,21 +28,20 @@ library:
     - directory
     - format
     - hflags
-    - http-client
     - kafka-monad
-    - labeled-error
     - lens
     - leveldb-haskell
     - monad-alter
+    - stm-conduit
+    - blockapps-data
     - prometheus-client
     - seqevents
-    - stm-conduit
     - strato-conf
     - strato-model
     - strato-redis-blockdb
-    - vault-monad
     - text
     - time
+    - vault-monad
     - classy-prelude
     - containers
     - mtl
@@ -59,7 +55,6 @@ executables:
     main:             Main.hs
     dependencies:
       - async
-      - blockapps-data
       - blockapps-init
       - blockDB
       - blockstanbul
@@ -68,8 +63,6 @@ executables:
       - hedis
       - hflags
       - process-monitor
-      - prometheus-client
-      - seqevents
       - stm
       - strato-genesis
       - stm-chans
@@ -78,8 +71,6 @@ executables:
       - strato-model
       - strato-redis-blockdb
       - strato-sequencer
-      - text
-      - vault-monad
       - wai-middleware-prometheus
       - warp
     other-modules: []

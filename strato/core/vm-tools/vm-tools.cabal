@@ -41,8 +41,7 @@ library
       src/
   ghc-options: -Wall -O2
   build-depends:
-      QuickCheck
-    , aeson
+      aeson
     , base
     , binary
     , binary-instances
@@ -55,7 +54,6 @@ library
     , bytestring
     , common-log
     , composable-monads-base
-    , conduit
     , containers
     , cross-monitoring
     , data-default
@@ -67,7 +65,6 @@ library
     , exceptions
     , extra
     , format
-    , generic-arbitrary
     , hedis
     , hflags
     , kafka-monad
@@ -85,7 +82,6 @@ library
     , resourcet
     , seqevents
     , solid-vm-model
-    , sql-monad
     , strato-conf
     , strato-model
     , strato-redis-blockdb

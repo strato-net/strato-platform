@@ -24,8 +24,6 @@ library:
     - kafka-monad
     - postgresql-simple
     - process
-    - servant-client
     - strato-model
     - template-haskell
-    - text
     - yaml
