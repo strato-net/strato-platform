@@ -58,6 +58,29 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
     }
   }, []);
 
+  const restoreStratoWalletOption = React.useCallback(() => {
+    const stratoOption = document.querySelector<HTMLElement>(
+      '[data-testid="rk-wallet-option-stratoWallet"]'
+    );
+    if (!stratoOption) return;
+
+    stratoOption.style.display = '';
+
+    const stratoRow = stratoOption.parentElement as HTMLElement | null;
+    if (stratoRow) {
+      stratoRow.style.display = '';
+    }
+
+    const walletList = stratoRow?.parentElement as HTMLElement | null;
+    if (walletList) {
+      walletList.style.display = '';
+      const groupHeader = walletList.previousElementSibling as HTMLElement | null;
+      if (groupHeader?.textContent?.trim() === 'STRATO') {
+        groupHeader.style.display = '';
+      }
+    }
+  }, []);
+
   React.useEffect(() => {
     if (!externalOnly || !connectModalOpen) return;
 
@@ -65,8 +88,11 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
     const observer = new MutationObserver(hideStratoWalletOption);
     observer.observe(document.body, { childList: true, subtree: true });
 
-    return () => observer.disconnect();
-  }, [connectModalOpen, externalOnly, hideStratoWalletOption]);
+    return () => {
+      observer.disconnect();
+      restoreStratoWalletOption();
+    };
+  }, [connectModalOpen, externalOnly, hideStratoWalletOption, restoreStratoWalletOption]);
 
   const copyToClipboard = async () => {
     if (address) {
