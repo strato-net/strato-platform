@@ -496,6 +496,10 @@ type RewardClaimResult = {
   hash?: string;
 };
 
+type RewardClaimOptions = {
+  walletAuth?: boolean;
+};
+
 const normalizeRewardClaimResult = (data: RewardClaimResult): RewardClaimResult => ({
   ...data,
   success: data.success || isTxSubmitted(data.status),
@@ -506,9 +510,9 @@ const normalizeRewardClaimResult = (data: RewardClaimResult): RewardClaimResult 
  * Claim all rewards for a user
  * Backend will handle the contract interaction
  */
-export const claimAllRewards = async (userAddress: string): Promise<RewardClaimResult> => {
+export const claimAllRewards = async (userAddress: string, options?: RewardClaimOptions): Promise<RewardClaimResult> => {
   try {
-    const response = await api.post("/rewards/claim-all");
+    const response = await api.post("/rewards/claim-all", undefined, options as any);
     return normalizeRewardClaimResult(response.data);
   } catch (error: unknown) {
     // Extract error message from response if available
@@ -523,7 +527,7 @@ export const claimAllRewards = async (userAddress: string): Promise<RewardClaimR
  * Claim rewards for specific activities
  * Backend will handle the contract interaction
  */
-export const claimRewards = async (userAddress: string, activityIds: number[]): Promise<RewardClaimResult> => {
+export const claimRewards = async (userAddress: string, activityIds: number[], options?: RewardClaimOptions): Promise<RewardClaimResult> => {
   // Use the first activityId for the claim endpoint (since it's /claim/:activityId)
   // TODO: Update backend to accept multiple activityIds or call multiple times
   if (activityIds.length === 0) {
@@ -531,7 +535,7 @@ export const claimRewards = async (userAddress: string, activityIds: number[]): 
   }
   
   try {
-    const response = await api.post(`/rewards/claim/${activityIds[0]}`);
+    const response = await api.post(`/rewards/claim/${activityIds[0]}`, undefined, options as any);
     return normalizeRewardClaimResult(response.data);
   } catch (error: unknown) {
     // Extract error message from response if available
