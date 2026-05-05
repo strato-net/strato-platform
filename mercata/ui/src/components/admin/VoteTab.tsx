@@ -22,8 +22,51 @@ import RemoveGuardianModal from './RemoveGuardianModal';
 import { parseJsonBigInt } from '@/utils/numberUtils';
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE, ADMIN_VOTE_OPEN_ISSUES_PER_PAGE } from '@/lib/constants';
 
+type Timelock = {
+  queuedAt: number;
+  executableAt: number;
+  expiresAt: number;
+};
+
+type AdminRecord = {
+  address: string;
+};
+
+type VoteRecord = {
+  issueId: string;
+  index: number;
+  voter: string;
+};
+
+type ThresholdRecord = {
+  target: string;
+  func: string;
+  threshold: number | string;
+};
+
+type IssueRecord = {
+  issueId: string;
+  target: string;
+  func: string;
+  args: string | unknown[];
+  timelock?: Timelock;
+  executor?: string;
+  block_number?: number | string;
+};
+
+type SelectedIssue = {
+  issueId: string;
+  target: string;
+  func: string;
+  args: unknown[];
+  votesCast: number;
+  votesNeeded: number;
+  threshold: number;
+  timelock?: Timelock;
+};
+
 const VoteTab = () => {
-  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues, castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin, addGuardian, removeGuardian } = useUser();
+  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues, castVoteOnIssue, castVoteOnIssueById, executeIssue, withdrawVote, dismissIssue, addAdmin, removeAdmin, addGuardian, removeGuardian } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
   const [voteModalOpen, setVoteModalOpen] = useState(false);
   const [addAdminOpen, setAddAdminOpen] = useState(false);
@@ -32,15 +75,8 @@ const VoteTab = () => {
   const [removeGuardianOpen, setRemoveGuardianOpen] = useState(false);
   const [executedPage, setExecutedPage] = useState(1);
   const [openIssuesPage, setOpenIssuesPage] = useState(1);
-  const [selectedIssue, setSelectedIssue] = useState<{
-    issueId: string;
-    target: string;
-    func: string;
-    args: any[];
-    votesCast: number;
-    votesNeeded: number;
-    threshold: number;
-  } | null>(null);
+  const [executingIssueId, setExecutingIssueId] = useState<string | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<SelectedIssue | null>(null);
 
   useEffect(() => {
     getOpenIssues();
@@ -56,15 +92,7 @@ const VoteTab = () => {
     setExecutedPage(1);
   };
 
-  const handleOpenVoteModal = (issueData: {
-    issueId: string;
-    target: string;
-    func: string;
-    args: any[];
-    votesCast: number;
-    votesNeeded: number;
-    threshold: number;
-  }) => {
+  const handleOpenVoteModal = (issueData: SelectedIssue) => {
     setSelectedIssue(issueData);
     setVoteModalOpen(true);
   };
@@ -72,6 +100,24 @@ const VoteTab = () => {
   const handleCastVoteOnIssueById = async (issueId: string) => {
     await castVoteOnIssueById(issueId);
     // Reset to page 1 to show the recently executed issue
+    setExecutedPage(1);
+  };
+
+  const handleExecuteIssue = async (issue: IssueRecord) => {
+    const issueId = issue.issueId;
+    const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as unknown[];
+
+    setExecutingIssueId(issueId);
+    try {
+      await executeIssue(issue.target, issue.func, issueArgs);
+      setExecutedPage(1);
+    } finally {
+      setExecutingIssueId(null);
+    }
+  };
+
+  const handleExecuteSelectedIssue = async (target: string, func: string, args: unknown[]) => {
+    await executeIssue(target, func, args);
     setExecutedPage(1);
   };
 
@@ -110,13 +156,14 @@ const VoteTab = () => {
     );
   }
 
-  const admins: any[] = (openIssues && openIssues['admins']) || [];
-  const guardians: any[] = (openIssues && openIssues['guardians']) || [];
-  const allIssues: any[] = (openIssues && openIssues['issues']) || [];
-  const votes: any[] = (openIssues && openIssues['votes']) || [];
-  const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
+  const admins: AdminRecord[] = (openIssues && openIssues['admins']) || [];
+  const guardians: AdminRecord[] = (openIssues && openIssues['guardians']) || [];
+  const allIssues: IssueRecord[] = (openIssues && openIssues['issues']) || [];
+  const queuedIssues: IssueRecord[] = (openIssues && openIssues['queuedIssues']) || [];
+  const votes: VoteRecord[] = (openIssues && openIssues['votes']) || [];
+  const thresholds: ThresholdRecord[] = (openIssues && openIssues['thresholds']) || [];
   const globalThreshold: number = (openIssues && openIssues['globalThreshold']) || 6000;
-  const executed: object[] = (executedIssues && executedIssues['executed']) || [];
+  const executed: IssueRecord[] = (executedIssues && executedIssues['executed']) || [];
   const executedTotal: number = (executedIssues && executedIssues['executedTotal']) || 0;
   const executedTotalPages = Math.ceil(executedTotal / ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
   
@@ -125,6 +172,24 @@ const VoteTab = () => {
   const openIssuesStartIndex = (openIssuesPage - 1) * ADMIN_VOTE_OPEN_ISSUES_PER_PAGE;
   const openIssuesEndIndex = openIssuesStartIndex + ADMIN_VOTE_OPEN_ISSUES_PER_PAGE;
   const issues = allIssues.slice(openIssuesStartIndex, openIssuesEndIndex);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  const getIssueDetails = (issue: IssueRecord) => {
+    const issueId = issue.issueId;
+    const address = issue.target;
+    const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as unknown[];
+    const threshold = Number(thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || globalThreshold)/100;
+    const votesNeeded = Math.ceil((admins.length * threshold)/100);
+    const votesCast = votes.filter((v) => v.issueId === issueId).length;
+    const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
+
+    return { issueId, address, issueArgs, threshold, votesNeeded, votesCast, hasUserVoted };
+  };
+
+  const formatTime = (timestamp?: number) => {
+    if (!timestamp) return '-';
+    return new Date(timestamp * 1000).toLocaleString();
+  };
 
   return (
     <div className="space-y-6">
@@ -167,7 +232,7 @@ const VoteTab = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
-              {admins.map((admin: {address: string}, index: number) => (
+              {admins.map((admin, index: number) => (
                 <div 
                   key={`${admin.address}-${index}`}
                   className="flex items-center justify-between p-2 md:p-3 border rounded-lg bg-muted/50 hover:bg-muted transition-colors border-border"
@@ -308,13 +373,8 @@ const VoteTab = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {issues.map((issue: any, index) => {
-                    const issueId = issue.issueId;
-                    const address = issue.target;
-                    const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as any[];
-                    const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || globalThreshold)/100;
-                    const votesNeeded = Math.ceil((admins.length * threshold)/100);
-                    const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
+                    {issues.map((issue, index) => {
+                    const { issueId, address, issueArgs, threshold, votesNeeded, votesCast, hasUserVoted } = getIssueDetails(issue);
 
                     return (
                       <TableRow key={`${issueId}-${index}`} className={`border-border hover:bg-muted/50 ${hasUserVoted ? 'bg-green-500/10' : ''}`}>
@@ -365,9 +425,10 @@ const VoteTab = () => {
                                 target: address,
                                 func: issue.func,
                                 args: issueArgs,
-                                votesCast: votes.filter((v) => v.issueId === issueId).length,
+                                votesCast,
                                 votesNeeded,
-                                threshold
+                                threshold,
+                                timelock: issue.timelock,
                               })}
                               className="bg-strato-blue hover:bg-strato-blue/90 text-[10px] md:text-xs px-2 md:px-3 dark:text-white whitespace-nowrap"
                             >
@@ -436,6 +497,139 @@ const VoteTab = () => {
         </CardContent>
       </Card>
 
+      <Card className="dark:bg-card overflow-hidden">
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="text-base md:text-xl dark:text-foreground whitespace-nowrap">Queued Issues</CardTitle>
+          <CardDescription className="text-xs md:text-sm dark:text-muted-foreground">
+            Issues waiting for the timelock before execution
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-4 md:px-6">
+          <div className="mb-3 md:mb-4">
+            <span className="text-xs md:text-sm text-muted-foreground">
+              {queuedIssues.length > 0 ? `${queuedIssues.length} queued issue${queuedIssues.length !== 1 ? 's' : ''}` : 'No queued issues'}
+            </span>
+          </div>
+          {queuedIssues.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground text-sm">No queued issues found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-4 md:mx-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="dark:border-border dark:hover:bg-transparent">
+                    <TableHead className="text-xs md:text-sm pl-4 md:pl-4 dark:text-muted-foreground whitespace-nowrap">Issue ID</TableHead>
+                    <TableHead className="text-xs md:text-sm dark:text-muted-foreground hidden md:table-cell">Contract</TableHead>
+                    <TableHead className="text-xs md:text-sm dark:text-muted-foreground hidden md:table-cell">Function</TableHead>
+                    <TableHead className="text-xs md:text-sm dark:text-muted-foreground whitespace-nowrap">Executable</TableHead>
+                    <TableHead className="text-xs md:text-sm dark:text-muted-foreground whitespace-nowrap">Expires</TableHead>
+                    <TableHead className="text-xs md:text-sm pr-4 md:pr-4 dark:text-muted-foreground">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {queuedIssues.map((issue, index) => {
+                    const { issueId, address, issueArgs, threshold, votesNeeded, votesCast, hasUserVoted } = getIssueDetails(issue);
+                    const executableAt = Number(issue.timelock?.executableAt || 0);
+                    const expiresAt = Number(issue.timelock?.expiresAt || 0);
+                    const canExecute = executableAt > 0 && nowSeconds >= executableAt && nowSeconds <= expiresAt;
+                    const isExpired = expiresAt > 0 && nowSeconds > expiresAt;
+
+                    return (
+                      <TableRow key={`${issueId}-${index}`} className={`border-border hover:bg-muted/50 ${hasUserVoted ? 'bg-green-500/10' : ''}`}>
+                        <TableCell className="font-medium text-xs md:text-sm pl-4 md:pl-4 dark:text-foreground">
+                          <div className="flex items-center gap-1 md:space-x-2">
+                            {hasUserVoted && (
+                              <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                            )}
+                            <span className="truncate">
+                              {issueId && issueId !== 'Unknown'
+                                ? `${issueId.slice(0, 6)}...${issueId.slice(-4)}`
+                                : issueId
+                              }
+                            </span>
+                            {issueId && issueId !== 'Unknown' && (
+                              <CopyButton address={issueId} />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs hidden md:table-cell dark:text-foreground">
+                          <div className="flex items-center space-x-2">
+                            <span>
+                              {address && address !== 'Unknown'
+                                ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                                : address
+                              }
+                            </span>
+                            {address && address !== 'Unknown' && (
+                              <CopyButton address={address} />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm hidden md:table-cell dark:text-foreground">
+                          {issue.func}
+                        </TableCell>
+                        <TableCell className="text-xs md:text-sm dark:text-foreground whitespace-nowrap">
+                          {formatTime(executableAt)}
+                        </TableCell>
+                        <TableCell className="text-xs md:text-sm dark:text-foreground whitespace-nowrap">
+                          {formatTime(expiresAt)}
+                        </TableCell>
+                        <TableCell className="pr-4 md:pr-4">
+                          <div className="flex flex-col items-start gap-1">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenVoteModal({
+                                  issueId,
+                                  target: address,
+                                  func: issue.func,
+                                  args: issueArgs,
+                                  votesCast,
+                                  votesNeeded,
+                                  threshold,
+                                  timelock: issue.timelock,
+                                })}
+                                className="text-[10px] md:text-xs px-2 md:px-3 whitespace-nowrap"
+                              >
+                                View Vote
+                              </Button>
+                              {canExecute && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleExecuteIssue(issue)}
+                                  disabled={executingIssueId === issueId}
+                                  className="bg-strato-blue hover:bg-strato-blue/90 text-[10px] md:text-xs px-2 md:px-3 dark:text-white whitespace-nowrap"
+                                >
+                                  {executingIssueId === issueId ? (
+                                    <>
+                                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                      Executing...
+                                    </>
+                                  ) : (
+                                    'Execute'
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                            {!canExecute && (
+                              <span className="text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
+                                {isExpired ? 'Expired' : 'Timelock pending'}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* List Executed Issues */}
       <Card className="dark:bg-card overflow-hidden">
         <CardHeader className="px-4 md:px-6">
@@ -481,10 +675,10 @@ const VoteTab = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody className={executedIssuesLoading ? "opacity-50 pointer-events-none" : ""}>
-                    {executed.map((issue: any, index) => {
+                    {executed.map((issue: IssueRecord, index) => {
                       const issueId = issue.issueId;
                       const address = issue.target;
-                      const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as any[];
+                      const issueArgs = parseJsonBigInt(typeof issue.args === 'string' ? issue.args : JSON.stringify(issue.args), { fallback: [] }) as unknown[];
                       return (
                         <TableRow key={`${issueId}-${index}`} className="dark:border-border dark:hover:bg-muted/50">
                           <TableCell className="font-mono text-xs pl-4 dark:text-foreground">
@@ -517,7 +711,7 @@ const VoteTab = () => {
                             {issue.func}
                           </TableCell>
                           <TableCell className="font-mono text-xs max-w-[200px] truncate dark:text-foreground">
-                            {issueArgs.join(', ')}
+                            {issueArgs.map(String).join(', ')}
                           </TableCell>
                           <TableCell className="font-mono text-xs pr-4 dark:text-foreground">
                             <div className="flex items-center space-x-2">
@@ -599,6 +793,8 @@ const VoteTab = () => {
         onOpenChange={setVoteModalOpen}
         issue={selectedIssue}
         onCastVote={handleCastVoteOnIssueById}
+        onExecuteIssue={handleExecuteSelectedIssue}
+        onWithdrawVote={withdrawVote}
         onDismissIssue={dismissIssue}
         votes={votes}
         userAddress={userAddress}

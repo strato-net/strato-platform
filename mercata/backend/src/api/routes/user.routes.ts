@@ -265,6 +265,10 @@ router.post("/admin/vote", authHandler.authorizeRequest(), UserController.castVo
  */
 router.post("/admin/vote/by-id", authHandler.authorizeRequest(), UserController.castVoteOnIssueById);
 
+router.post("/admin/issues/execute", authHandler.authorizeRequest(), UserController.executeIssue);
+
+router.post("/admin/vote/withdraw", authHandler.authorizeRequest(), UserController.withdrawVote);
+
 /**
  * @openapi
  * /user/admin/dismiss:

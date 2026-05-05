@@ -30,12 +30,25 @@ interface UserContextType {
   getContractDetails: (address: string) => Promise<void>;
   castVoteOnIssue: (target: string, func: string, args: string[]) => Promise<void>;
   castVoteOnIssueById: (issueId: string) => Promise<void>;
+  executeIssue: (target: string, func: string, args: unknown[]) => Promise<void>;
+  withdrawVote: (target: string, func: string, args: unknown[]) => Promise<void>;
   dismissIssue: (issueId: string) => Promise<void>;
   addAdmin: (userAddress: string) => Promise<void>;
   removeAdmin: (userAddress: string) => Promise<void>;
   addGuardian: (userAddress: string) => Promise<void>;
   removeGuardian: (userAddress: string) => Promise<void>;
 }
+
+type UnsignedWalletTx = {
+  data: {
+    to: string;
+    functionName: string;
+    args: string[];
+    nonce: string | number | bigint;
+    gasLimit: string | number | bigint;
+    network: string;
+  };
+};
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
@@ -110,7 +123,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const castVoteOnIssue = async (target: string, func: string, args: any[]) => {
+  const castVoteOnIssue = async (target: string, func: string, args: unknown[]) => {
     try {
       await api.post('/user/admin/vote', { target, func, args });
       await getOpenIssues();
@@ -134,6 +147,27 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const executeIssue = async (target: string, func: string, args: unknown[]) => {
+    try {
+      await api.post('/user/admin/issues/execute', { target, func, args });
+      await getOpenIssues();
+      await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
+    } catch (error) {
+      await getOpenIssues();
+      throw error;
+    }
+  };
+
+  const withdrawVote = async (target: string, func: string, args: unknown[]) => {
+    try {
+      await api.post('/user/admin/vote/withdraw', { target, func, args });
+      await getOpenIssues();
+    } catch (error) {
+      await getOpenIssues();
+      throw error;
+    }
+  };
+
   const getOpenIssues = async () => {
     try {
       setOpenIssuesLoading(true);
@@ -141,6 +175,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const response = await api.get('/user/admin/issues');
         setOpenIssues(response?.data || {});
       } catch (error) {
+        // Keep the previous issue state if refresh fails.
       }
     } finally {
       setOpenIssuesLoading(false);
@@ -159,6 +194,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         });
         setExecutedIssues(response?.data || {});
       } catch (error) {
+        // Keep the previous executed issue state if refresh fails.
       }
     } finally {
       setExecutedIssuesLoading(false);
@@ -172,6 +208,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const response = await api.get(`/user/admin/contract/search?search=${search}`);
         setContractSearchResults(response?.data || []);
       } catch (error) {
+        // Keep the previous search results if refresh fails.
       }
     } finally {
       setContractSearchResultsLoading(false);
@@ -185,6 +222,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const response = await api.get(`/user/admin/contract/details?address=${address}`);
         setContractDetailsResults(response?.data || {});
       } catch (error) {
+        // Keep the previous contract details if refresh fails.
       }
     } finally {
       setContractDetailsResultsLoading(false);
@@ -223,9 +261,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     const connected = account.isConnected && account.address;
     setConnectedWalletAddress(connected ? account.address : null);
     if (connected && walletClient) {
-      setWalletSigner(async (unsignedTx: any) => {
+      setWalletSigner(async (unsignedTx: UnsignedWalletTx) => {
         const d = unsignedTx.data;
-        return walletClient.signTypedData({
+        const typedData = {
           domain: {
             name: "STRATO",
             version: "1",
@@ -249,7 +287,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
             gasLimit: BigInt(d.gasLimit),
             network: d.network,
           },
-        });
+        } as const;
+        return walletClient.signTypedData(typedData as unknown as Parameters<typeof walletClient.signTypedData>[0]);
       });
     } else {
       setWalletSigner(null);
@@ -291,6 +330,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getExecutedIssues,
     castVoteOnIssue,
     castVoteOnIssueById,
+    executeIssue,
+    withdrawVote,
     dismissIssue,
     addAdmin,
     removeAdmin,
@@ -304,7 +345,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     contractDetailsResultsLoading,
   }), [userAddress, effectiveLoggedIn, isAdmin, loading, userName,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,
-    castVoteOnIssue, castVoteOnIssueById, dismissIssue, addAdmin, removeAdmin, addGuardian, removeGuardian,
+    castVoteOnIssue, castVoteOnIssueById, executeIssue, withdrawVote, dismissIssue, addAdmin, removeAdmin, addGuardian, removeGuardian,
     contractSearch, contractSearchResults, contractSearchResultsLoading,
     getContractDetails, contractDetailsResults, contractDetailsResultsLoading,
   ]);

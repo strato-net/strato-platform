@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin, addGuardian, removeGuardian, castVoteOnIssue, castVoteOnIssueById, dismissIssue, getOpenIssues,
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, addGuardian, removeGuardian, castVoteOnIssue, castVoteOnIssueById, dismissIssue, executeIssue, withdrawVote, getOpenIssues,
          getExecutedIssues, contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
@@ -194,6 +194,56 @@ class UserController {
       res.status(RestStatus.OK).json({ 
         message: "Issue dismissed successfully", 
         issueId,
+        status: result.status,
+        hash: result.hash,
+      });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async executeIssue(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: actorAddress } = req;
+      const { target, func, args } = req.body;
+      validateAddressField(target);
+
+      const result = await executeIssue(accessToken, actorAddress as string, target, func, args);
+      res.status(RestStatus.OK).json({
+        message: "Issue executed successfully",
+        target,
+        func,
+        args,
+        status: result.status,
+        hash: result.hash,
+      });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async withdrawVote(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: actorAddress } = req;
+      const { target, func, args } = req.body;
+      validateAddressField(target);
+
+      const result = await withdrawVote(accessToken, actorAddress as string, target, func, args);
+      res.status(RestStatus.OK).json({
+        message: "Vote withdrawn successfully",
+        target,
+        func,
+        args,
         status: result.status,
         hash: result.hash,
       });
