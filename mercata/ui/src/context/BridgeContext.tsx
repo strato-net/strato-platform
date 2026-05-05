@@ -114,7 +114,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       // Error toast is already handled by axios interceptor for non-guest-safe URLs
       console.error("Failed to load networks and tokens:", error);
       setAvailableNetworks([]);
-      setNetworksLoaded(true); // Set to true to prevent retry loops
+      setNetworksLoaded(false);
     } finally {
       setLoading(false);
     }
