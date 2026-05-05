@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -59,7 +58,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   // Context Hooks
   // ============================================================================
 
-  const navigate = useNavigate();
   const { fetchAllPrices } = useOracleContext();
   const { tokenApys } = useEarnContext();
   const { vaultState } = useVaultContext();
@@ -957,7 +955,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
           
           if (shouldRefreshOnClose) {
             setShouldRefreshOnClose(false);
-            navigate(0);
+            onSuccess?.();
           }
         }}
       />
