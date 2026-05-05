@@ -1,4 +1,38 @@
 /**
+ * @notice ExecutionPayloadHeader fields for Deneb / Electra / Fulu.
+ *
+ *         Defined at file scope so it can be used as a parameter or
+ *         storage type from contracts that import this library.
+ *
+ *         logsBloomRoot and extraDataRoot are caller-provided
+ *         pre-computed roots — logs_bloom is 256 bytes (8 chunks
+ *         merkleized to depth 3) and extra_data is a ByteList
+ *         requiring length mixin. Both are too large to feed in raw
+ *         and would dominate calldata; the executionBranch verification
+ *         catches any cheating because it ties the EPH root we compute
+ *         here back to the verified beacon body root.
+ */
+struct ExecutionPayloadHeader {
+    bytes32 parentHash;
+    address feeRecipient;
+    bytes32 stateRoot;
+    bytes32 receiptsRoot;
+    bytes32 logsBloomRoot;     // pre-hashed off-chain
+    bytes32 prevRandao;
+    uint64  blockNumber;
+    uint64  gasLimit;
+    uint64  gasUsed;
+    uint64  timestamp;
+    bytes32 extraDataRoot;     // pre-hashed off-chain
+    uint256 baseFeePerGas;
+    bytes32 blockHash;
+    bytes32 transactionsRoot;
+    bytes32 withdrawalsRoot;
+    uint64  blobGasUsed;
+    uint64  excessBlobGas;
+}
+
+/**
  * @title SSZHashTree
  * @notice SimpleSerialize hash_tree_root + Merkle proof primitives for
  *         the Ethereum→STRATO bridge. Pure SHA-256 work; no curve
@@ -212,6 +246,81 @@ library SSZHashTree {
         returns (bytes32)
     {
         return bytes32(sha256(bytes(objectRoot) + bytes(domain)));
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // ExecutionPayloadHeader hash_tree_root (Fulu / Electra / Deneb)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * @notice SSZ-encode a uint256 as a 32-byte little-endian leaf.
+     *         Used for base_fee_per_gas (uint256) inside the EPH.
+     */
+    function uint256ToLELeaf(uint256 v) internal pure returns (bytes32) {
+        // Reverse byte order: place LSB at byte 0 of bytes32, MSB at byte 31.
+        uint256 result = 0;
+        uint256 vv = v;
+        for (uint256 i = 0; i < 32; i = i + 1) {
+            result = result | ((vv & 0xff) << ((31 - i) * 8));
+            vv = vv >> 8;
+        }
+        return bytes32(result);
+    }
+
+    /**
+     * @notice SSZ-encode a 20-byte address as a 32-byte leaf, left-justified.
+     *         Used for fee_recipient inside the EPH.
+     */
+    function addressToLeaf(address a) internal pure returns (bytes32) {
+        // address as uint160 occupies the bottom 160 bits; shift up by 96
+        // so the 20 bytes land at byte positions 0..19 of the bytes32.
+        return bytes32(uint256(uint160(a)) << 96);
+    }
+
+    /**
+     * @notice hash_tree_root(ExecutionPayloadHeader) for Deneb / Electra / Fulu.
+     *
+     *         17 fields padded to 32 leaves (depth 5). 31 internal
+     *         sha256 calls plus the 6 non-trivial leaf encodings.
+     */
+    function hashTreeRootEPH(ExecutionPayloadHeader eph) internal pure returns (bytes32) {
+        bytes32 z = bytes32(0);
+
+        // Build the 32 leaves (17 fields + 15 zero pad).
+        bytes32[] leaves = new bytes32[](32);
+        leaves[0]  = eph.parentHash;
+        leaves[1]  = addressToLeaf(eph.feeRecipient);
+        leaves[2]  = eph.stateRoot;
+        leaves[3]  = eph.receiptsRoot;
+        leaves[4]  = eph.logsBloomRoot;
+        leaves[5]  = eph.prevRandao;
+        leaves[6]  = uint64ToLeaf(eph.blockNumber);
+        leaves[7]  = uint64ToLeaf(eph.gasLimit);
+        leaves[8]  = uint64ToLeaf(eph.gasUsed);
+        leaves[9]  = uint64ToLeaf(eph.timestamp);
+        leaves[10] = eph.extraDataRoot;
+        leaves[11] = uint256ToLELeaf(eph.baseFeePerGas);
+        leaves[12] = eph.blockHash;
+        leaves[13] = eph.transactionsRoot;
+        leaves[14] = eph.withdrawalsRoot;
+        leaves[15] = uint64ToLeaf(eph.blobGasUsed);
+        leaves[16] = uint64ToLeaf(eph.excessBlobGas);
+        for (uint256 i = 17; i < 32; i = i + 1) {
+            leaves[i] = z;
+        }
+
+        // Merkleize 32 leaves to depth 5. We collapse pairs in-place
+        // by overwriting the lower half of the working array each round.
+        // After level 1 has 16 nodes, level 2 has 8, ..., level 5 has 1 = root.
+        uint256 n = 32;
+        while (n > 1) {
+            uint256 half = n / 2;
+            for (uint256 i = 0; i < half; i = i + 1) {
+                leaves[i] = bytes32(sha256(bytes(leaves[2 * i]) + bytes(leaves[2 * i + 1])));
+            }
+            n = half;
+        }
+        return leaves[0];
     }
 
     // ─────────────────────────────────────────────────────────────────

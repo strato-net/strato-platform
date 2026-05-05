@@ -89,12 +89,27 @@ library BLSVerify {
         bytes signatureCompressed
     ) internal returns (bool ok) {
         bytes aggPk = bls12381DecompressG1(aggPubkeyCompressed);
+        return verifySyncCommitteeAggregateG1(aggPk, signingRoot, signatureCompressed);
+    }
+
+    /**
+     * @notice Same as {verifySyncCommitteeAggregate} but takes an
+     *         already-uncompressed 128-byte EIP-2537 G1 aggregate
+     *         pubkey. This is the form {aggregateParticipants} returns,
+     *         so EthLightClient can avoid a round-trip through compress
+     *         + decompress when it builds the aggregate from the
+     *         pinned committee on-chain.
+     */
+    function verifySyncCommitteeAggregateG1(
+        bytes aggPubkeyG1,
+        bytes32 signingRoot,
+        bytes signatureCompressed
+    ) internal returns (bool ok) {
         bytes sig = bls12381DecompressG2(signatureCompressed);
         bytes msgG2 = bls12381HashToCurveG2(bytes(signingRoot), _ethDst());
-
         // Single pairing call: e(-G1, σ) · e(P, H(M)) == 1
         // Each pair is 128B G1 || 256B G2 = 384 bytes; total input 768B.
-        return bls12381Pairing(_negG1Gen() + sig + aggPk + msgG2);
+        return bls12381Pairing(_negG1Gen() + sig + aggPubkeyG1 + msgG2);
     }
 
     // ─────────────────────────────────────────────────────────────────
