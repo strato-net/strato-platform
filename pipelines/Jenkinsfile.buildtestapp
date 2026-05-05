@@ -3,14 +3,14 @@ pipeline {
     label "testnet-buildtest-app"
   }
   environment {
-    PATH = "~/.local/bin:${env.PATH}"
+    PATH = "${env.HOME}/.local/bin:${env.PATH}"
   }
   stages {
     
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
-          docker system prune -fa || true
+          docker system prune -f || true
         '''
       }
     }
