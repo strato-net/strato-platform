@@ -20,7 +20,8 @@ pipeline {
         sh 'rm -rf .docker-work'
         sh "git checkout BUILD_METADATA"
         script {
-          sh '''#!/bin/bash -leo pipefail
+          sh '''#!/bin/bash -le
+            set -o pipefail
             make app | tee make-app.log
           '''
           // Last line of `make app` is:
@@ -67,7 +68,7 @@ pipeline {
       slackSend(
           channel: '#engineering',
           color: 'danger',
-          message: "buildtest.testnet.strato.nexus has FAILED to be updated in place with app version from develop"
+          message: "buildtest-app.testnet.strato.nexus has FAILED to be updated in place with app version from develop"
       )
     }
   }
