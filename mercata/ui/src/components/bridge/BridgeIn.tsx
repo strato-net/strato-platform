@@ -451,6 +451,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
   const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
+  const visibleMatchingActions = useMemo(
+    () => useExternalWalletSigning ? matchingActions.filter((action) => action.action !== 1) : matchingActions,
+    [matchingActions, useExternalWalletSigning]
+  );
 
   const {
     data: nativeBalance,
@@ -543,6 +547,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setSelectedNetwork,
     setSelectedToken,
   ]);
+
+  useEffect(() => {
+    if (useExternalWalletSigning && selectedAction?.action === 1) {
+      setSelectedAction(null);
+    }
+  }, [useExternalWalletSigning, selectedAction]);
 
   useEffect(() => {
     if (selectedToken && currentNetwork) {
@@ -956,7 +966,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const adjustedAmount = (amount18Decimals * WAD / factor).toString();
 
       const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
-      const action = selectedAction?.action || 0;
+      const action = useExternalWalletSigning && selectedAction?.action === 1 ? 0 : selectedAction?.action || 0;
       existing.push({
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
@@ -1261,7 +1271,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                       />
                     );
                   }),
-                  ...matchingActions.map((action) => {
+                  ...visibleMatchingActions.map((action) => {
                     let est = amount || "0";
                     if (action.action === 2 && action.oraclePrice && amount) {
                       try {
