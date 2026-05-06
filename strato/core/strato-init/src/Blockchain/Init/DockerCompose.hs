@@ -137,7 +137,7 @@ generateDockerCompose = do
             }
         , logging = noLogging
         , volumes = Just ["./logs:/logs", "./redis:/data"]
-        , ports = Just ["6379:6379"]
+        , ports = Just ["127.0.0.1:6379:6379"]
         }
 
   let postgrest = def
@@ -184,7 +184,7 @@ generateDockerCompose = do
             , start_period = Nothing
             }
         , logging = noLogging
-        , ports = Just ["5432:5432"]
+        , ports = Just ["127.0.0.1:5432:5432"]
         }
 
 
@@ -281,7 +281,7 @@ generateDockerCompose = do
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /__cacert_entrypoint.sh /etc/kafka/docker/run >> /logs/kafka.log 2>&1"]
         , logging = noLogging
-        , ports = Just ["9092:9092"]
+        , ports = Just ["127.0.0.1:9092:9092"]
         }
 
   let prometheus = def
@@ -321,7 +321,7 @@ generateDockerCompose = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /entrypoint.sh >> /logs/local-auth.log 2>&1"]
-        , ports = Just ["4444:4444"]  -- Only expose Hydra OAuth port; login UI accessed via nginx proxy
+        , ports = Just ["127.0.0.1:4444:4444"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
