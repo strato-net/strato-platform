@@ -232,7 +232,7 @@ generateDockerCompose = do
             , interval = Just "5s"
             , timeout = Just "1s"
             , retries = Nothing
-            , start_period = Nothing
+            , start_period = Just "30s"
             }
         , logging = noLogging
         }

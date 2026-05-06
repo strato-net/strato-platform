@@ -232,7 +232,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config 
       Just (BestBlock s n) -> BestBlock s n
   put _ (BestBlock s n) =
     RBDB.withRedisBlockDB (putBestBlockInfo s n) >>= \case
-      Left _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
+      Left err -> error $ "Failed to update best block in Redis: " ++ show err
       Right _ -> return ()
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT Config m) where
@@ -244,7 +244,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
       Just bestSequencedBlock -> return bestSequencedBlock
   put _ bestSequencedBlock =
     RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
-      Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
+      Left err -> error $ "Failed to update best sequenced block in Redis: " ++ show err
       Right _ -> return ()
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
