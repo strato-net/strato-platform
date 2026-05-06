@@ -452,7 +452,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
   const visibleMatchingActions = useMemo(
-    () => useExternalWalletSigning ? matchingActions.filter((action) => action.action !== 1) : matchingActions,
+    () => useExternalWalletSigning ? [] : matchingActions,
     [matchingActions, useExternalWalletSigning]
   );
 
@@ -549,7 +549,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   ]);
 
   useEffect(() => {
-    if (useExternalWalletSigning && selectedAction?.action === 1) {
+    if (useExternalWalletSigning && selectedAction) {
       setSelectedAction(null);
     }
   }, [useExternalWalletSigning, selectedAction]);
@@ -966,7 +966,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const adjustedAmount = (amount18Decimals * WAD / factor).toString();
 
       const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
-      const action = useExternalWalletSigning && selectedAction?.action === 1 ? 0 : selectedAction?.action || 0;
+      const action = useExternalWalletSigning ? 0 : selectedAction?.action || 0;
       existing.push({
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
