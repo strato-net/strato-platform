@@ -108,7 +108,7 @@ router.post("/requestWithdrawal", walletAuth, BridgeController.requestWithdrawal
  *                     hash:
  *                       type: string
  */
-router.post("/requestDepositAction", authHandler.authorizeRequest(), BridgeController.requestDepositAction);
+router.post("/requestDepositAction", walletAuth, BridgeController.requestDepositAction);
 
 /**
  * @openapi
