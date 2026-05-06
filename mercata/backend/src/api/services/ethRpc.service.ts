@@ -109,3 +109,112 @@ export async function getBlockReceipts(
 ): Promise<EthTransactionReceipt[]> {
   return rpcCall<EthTransactionReceipt[]>(chainId, "eth_getBlockReceipts", [blockNumberHexOrTag]);
 }
+
+/**
+ * Block header fields the trustless bridge-in needs for the Base/Cannon
+ * path. Mirrors the standard JSON-RPC `eth_getBlockByNumber(_, false)`
+ * response — we keep all fields because the backend RLP-encoder needs
+ * them to round-trip the header to the same hash the chain committed
+ * to. Field presence varies by hard-fork (`withdrawalsRoot` post-Shanghai,
+ * `blobGasUsed`/`excessBlobGas`/`parentBeaconBlockRoot` post-Cancun).
+ */
+export interface EthBlockHeader {
+  parentHash: string;
+  sha3Uncles: string;
+  miner: string;
+  stateRoot: string;
+  transactionsRoot: string;
+  receiptsRoot: string;
+  logsBloom: string;
+  difficulty: string;
+  number: string;
+  gasLimit: string;
+  gasUsed: string;
+  timestamp: string;
+  extraData: string;
+  mixHash: string;
+  nonce: string;
+  baseFeePerGas?: string;
+  hash: string;
+  // Post-fork additions:
+  withdrawalsRoot?: string;
+  blobGasUsed?: string;
+  excessBlobGas?: string;
+  parentBeaconBlockRoot?: string;
+  requestsHash?: string;
+}
+
+export async function getBlockByNumber(
+  chainId: string,
+  blockNumberHex: string,
+): Promise<EthBlockHeader> {
+  return rpcCall<EthBlockHeader>(chainId, "eth_getBlockByNumber", [blockNumberHex, false]);
+}
+
+/** A subset of `eth_getProof` we care about. */
+export interface EthGetProofResponse {
+  address: string;
+  accountProof: string[];
+  balance: string;
+  codeHash: string;
+  nonce: string;
+  storageHash: string;
+  storageProof: Array<{
+    key: string;
+    value: string;
+    proof: string[];
+  }>;
+}
+
+/**
+ * Fetch an EIP-1186 account+storage proof. We use this to read
+ * Base's `L2ToL1MessagePasser.storageHash` (for the OP-Stack
+ * outputRoot decomposition) and, more generally, to verify L1
+ * state for chains anchored via L1-state proofs.
+ */
+export async function getProof(
+  chainId: string,
+  account: string,
+  slots: string[],
+  blockNumberHex: string,
+): Promise<EthGetProofResponse> {
+  return rpcCall<EthGetProofResponse>(chainId, "eth_getProof", [account, slots, blockNumberHex]);
+}
+
+/**
+ * Generic JSON-RPC log query. The bridge-in flow uses it to locate
+ * `DisputeGameCreated` events on the L1 DisputeGameFactory.
+ */
+export interface EthGetLogsFilter {
+  address?: string | string[];
+  topics?: Array<string | string[] | null>;
+  fromBlock?: string;
+  toBlock?: string;
+}
+
+export async function getLogs(chainId: string, filter: EthGetLogsFilter): Promise<EthLog[]> {
+  return rpcCall<EthLog[]>(chainId, "eth_getLogs", [filter]);
+}
+
+export async function getBlockNumber(chainId: string): Promise<number> {
+  const hex = await rpcCall<string>(chainId, "eth_blockNumber", []);
+  return parseInt(hex, 16);
+}
+
+/** Subset of `eth_getTransactionByHash` we touch — just the calldata. */
+export interface EthTransaction {
+  hash: string;
+  input: string;          // 0x-prefixed calldata
+  to: string | null;
+  from: string;
+  blockNumber: string;
+  blockHash: string;
+  transactionIndex: string;
+}
+
+export async function getTransactionByHash(
+  chainId: string,
+  txHash: string,
+): Promise<EthTransaction | null> {
+  return rpcCall<EthTransaction | null>(chainId, "eth_getTransactionByHash", [txHash]);
+}

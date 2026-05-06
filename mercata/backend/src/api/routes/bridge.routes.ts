@@ -150,6 +150,85 @@ router.get(
 
 /**
  * @openapi
+ * /bridge/baseAnchorInputs/{chainId}/{txHash}:
+ *   get:
+ *     summary: "Build BaseLightClient.anchorBaseBlockViaCannon inputs (OP-Stack Cannon path)"
+ *     description: >
+ *       Trustless bridge-in step 1 for Base. Locates a DisputeGameCreated
+ *       event on L1 whose rootClaim matches the deposit block's outputRoot,
+ *       and returns the receipts-MPT proof + Base header RLP +
+ *       withdrawalStorageRoot the user submits to anchorBaseBlockViaCannon
+ *       on STRATO. Also bundles the L1 anchor inputs the frontend uses
+ *       to first anchor the L1 block on EthLightClient.
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         description: Source L2 chain id (8453 = Base mainnet, 84532 = Base Sepolia)
+ *         schema: { type: string }
+ *       - in: path
+ *         name: txHash
+ *         required: true
+ *         description: Deposit tx hash on the source L2
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: BaseAnchorInputs ready to submit
+ *       400:
+ *         description: Unsupported L2 chain
+ *       409:
+ *         description: Deposit older than the live finalized L1 head
+ *       425:
+ *         description: No matching DisputeGameCreated yet (or L1 not finalized)
+ */
+router.get(
+  "/baseAnchorInputs/:chainId/:txHash",
+  authHandler.authorizeRequest(),
+  BridgeController.getBaseAnchorInputs,
+);
+
+/**
+ * @openapi
+ * /bridge/baseAnchorChainInputs/{chainId}/{txHash}:
+ *   get:
+ *     summary: "Build BaseLightClient.anchorBaseBlockChainViaCannon inputs"
+ *     description: >
+ *       Trustless bridge-in for Base (Cannon, parent-chain). Locates a
+ *       DisputeGameCreated whose claimed L2 block covers the deposit
+ *       block, fetches Base headers from the anchor down to the
+ *       deposit, and returns the bundle the user submits to
+ *       anchorBaseBlockChainViaCannon. Use this when no DGC matches
+ *       the deposit block exactly (typical for fresh deposits) —
+ *       which is most of the time.
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: txHash
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: BaseAnchorChainInputs ready to submit
+ *       400:
+ *         description: Unsupported L2 chain
+ *       409:
+ *         description: Deposit older than the live finalized L1 head
+ *       425:
+ *         description: No covering dispute game (or L1 not finalized)
+ */
+router.get(
+  "/baseAnchorChainInputs/:chainId/:txHash",
+  authHandler.authorizeRequest(),
+  BridgeController.getBaseAnchorChainInputs,
+);
+
+/**
+ * @openapi
  * /bridge/claimInputs/{chainId}/{txHash}:
  *   get:
  *     summary: "Build EthBridgeIn.claim inputs (MPT receipts proof) for a deposit"

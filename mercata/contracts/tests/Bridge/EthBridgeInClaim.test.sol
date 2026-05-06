@@ -28,6 +28,7 @@ contract TestableEthLightClient is EthLightClient {
         anchored[blockNumber] = AnchoredHeader({
             blockNumber: blockNumber,
             receiptsRoot: receiptsRoot,
+            stateRoot: bytes32(0),
             beaconSlot: beaconSlot,
             timestamp: timestamp
         });

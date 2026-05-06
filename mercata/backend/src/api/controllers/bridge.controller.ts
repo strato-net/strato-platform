@@ -17,10 +17,20 @@ import {
   NotFinalizedYetError,
 } from "../services/bridgeProof.service";
 import {
+  buildBaseAnchorChainInputsViaCannon,
+  buildBaseAnchorInputsViaCannon,
+  buildBaseClaimInputs,
+  NoMatchingDisputeGameError,
+  UnsupportedL2ChainError,
+} from "../services/baseProof.service";
+import {
   loadTrustlessConfig,
   trustlessClaim,
   TrustlessClaimParams,
 } from "../services/trustlessBridge.service";
+
+/** Source chain ids the Cannon (OP-Stack) path covers. */
+const BASE_CHAIN_IDS = new Set(["8453", "84532"]);
 import { validateRequestWithdrawal, validateDepositAction, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
 import {
@@ -165,6 +175,94 @@ class BridgeController {
   }
 
   /**
+   * GET /bridge/baseAnchorInputs/:chainId/:txHash
+   *
+   * Trustless bridge-in (Cannon path): builds the calldata the user
+   * submits to BaseLightClient.anchorBaseBlockViaCannon on STRATO,
+   * plus the L1 anchor inputs the frontend needs to anchor the L1
+   * block first. Returns 425 when no DGC matches (proposer hasn't
+   * claimed the user's block yet) and 409 / 425 for the same Eth-side
+   * failure modes the L1 anchor surfaces.
+   */
+  static async getBaseAnchorInputs(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { chainId, txHash } = req.params;
+      if (!chainId || !txHash) {
+        res.status(400).json({ error: "chainId and txHash are required" });
+        return;
+      }
+      const inputs = await buildBaseAnchorInputsViaCannon(chainId, txHash);
+      res.json({ success: true, data: inputs });
+    } catch (error: any) {
+      if (error instanceof UnsupportedL2ChainError) {
+        res.status(400).json({ error: error.message, code: "UNSUPPORTED_L2_CHAIN" });
+        return;
+      }
+      if (error instanceof NoMatchingDisputeGameError) {
+        res.status(425).json({ error: error.message, code: "NO_MATCHING_DISPUTE_GAME" });
+        return;
+      }
+      if (error instanceof NotFinalizedYetError) {
+        res.status(425).json({ error: error.message, code: "NOT_FINALIZED_YET" });
+        return;
+      }
+      if (error instanceof DepositTooOldError) {
+        res.status(409).json({ error: error.message, code: "DEPOSIT_TOO_OLD" });
+        return;
+      }
+      next(error);
+    }
+  }
+
+  /**
+   * GET /bridge/baseAnchorChainInputs/:chainId/:txHash
+   *
+   * Trustless bridge-in (Cannon, parent-chain): builds the calldata
+   * for {BaseLightClient.anchorBaseBlockChainViaCannon}. Used when no
+   * DGC exists for the deposit's exact block (typical for fresh
+   * deposits) — the backend locates a covering DGC whose claimed L2
+   * block ≥ deposit block, fetches Base headers from the anchor down
+   * to the deposit, and returns the full bundle.
+   */
+  static async getBaseAnchorChainInputs(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { chainId, txHash } = req.params;
+      if (!chainId || !txHash) {
+        res.status(400).json({ error: "chainId and txHash are required" });
+        return;
+      }
+      const inputs = await buildBaseAnchorChainInputsViaCannon(chainId, txHash);
+      res.json({ success: true, data: inputs });
+    } catch (error: any) {
+      if (error instanceof UnsupportedL2ChainError) {
+        res.status(400).json({ error: error.message, code: "UNSUPPORTED_L2_CHAIN" });
+        return;
+      }
+      if (error instanceof NoMatchingDisputeGameError) {
+        res.status(425).json({ error: error.message, code: "NO_MATCHING_DISPUTE_GAME" });
+        return;
+      }
+      if (error instanceof NotFinalizedYetError) {
+        res.status(425).json({ error: error.message, code: "NOT_FINALIZED_YET" });
+        return;
+      }
+      if (error instanceof DepositTooOldError) {
+        res.status(409).json({ error: error.message, code: "DEPOSIT_TOO_OLD" });
+        return;
+      }
+      next(error);
+    }
+  }
+
+  /**
    * GET /bridge/claimInputs/:chainId/:txHash?depositRoutedSig=0x...
    *
    * Trustless bridge-in: builds the calldata the user submits to
@@ -173,6 +271,10 @@ class BridgeController {
    * `DepositRouted(...)` event signature — the frontend reads it
    * from the EthBridgeIn contract and forwards it here so we can
    * locate the right log inside the receipt.
+   *
+   * Dispatches on chainId: Base-flavoured chains use {buildBaseClaimInputs}
+   * (Base RPC, identical receipts-trie semantics); everything else
+   * goes through the original Eth-path builder.
    */
   static async getClaimInputs(
     req: Request,
@@ -190,7 +292,9 @@ class BridgeController {
         res.status(400).json({ error: "depositRoutedSig query param required (32-byte hex hash)" });
         return;
       }
-      const inputs = await buildClaimInputs(chainId, txHash, depositRoutedSig);
+      const inputs = BASE_CHAIN_IDS.has(chainId)
+        ? await buildBaseClaimInputs(chainId, txHash, depositRoutedSig)
+        : await buildClaimInputs(chainId, txHash, depositRoutedSig);
       res.json({ success: true, data: inputs });
     } catch (error: any) {
       if (error?.message?.includes("no DepositRouted log")) {

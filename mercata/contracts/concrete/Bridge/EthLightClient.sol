@@ -182,6 +182,7 @@ contract EthLightClient is Ownable, ILightClient {
     struct AnchoredHeader {
         uint256 blockNumber;
         bytes32 receiptsRoot;
+        bytes32 stateRoot;        // L1 state root — enables L1 state-proof flows (Base/Cannon, Linea, etc.)
         uint64  beaconSlot;
         uint64  timestamp;
     }
@@ -423,6 +424,7 @@ contract EthLightClient is Ownable, ILightClient {
         anchored[blockNumber] = AnchoredHeader({
             blockNumber: blockNumber,
             receiptsRoot: eph.receiptsRoot,
+            stateRoot: eph.stateRoot,
             beaconSlot: targetSlot,
             timestamp: eph.timestamp
         });
@@ -532,6 +534,13 @@ contract EthLightClient is Ownable, ILightClient {
     /// first or treat the zero return as "not yet verified".
     function getReceiptsRoot(uint256 blockNumber) external view override returns (bytes32) {
         return anchored[blockNumber].receiptsRoot;
+    }
+
+    /// Read the verified L1 state root for a block. Used by L1-state-anchored
+    /// flows (Base/Cannon dispute-game proofs, Linea finalization-storage
+    /// proofs, etc.). Returns bytes32(0) for un-anchored block numbers.
+    function getStateRoot(uint256 blockNumber) external view returns (bytes32) {
+        return anchored[blockNumber].stateRoot;
     }
 
     /// Number of validators in the period's sync committee.
