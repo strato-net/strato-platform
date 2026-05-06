@@ -62,19 +62,43 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
     }
   }, [open, initialChainId, initialTxHash]);
 
+  // Phase copy depends on which flow ran. The Cannon path involves a
+  // dispute-game search + parent-chain walk under the build_proof
+  // phase; Eth-flavor is just a finality update + receipts proof.
+  // We only know the flavor once the result lands, so the build_proof
+  // copy is intentionally generic before that.
+  const flavor = result?.flavor;
+  const isBase = flavor === "base";
+
+  const submitDescription = (() => {
+    if (result?.anchorSkipped && result?.l1AnchorSkipped) {
+      return "All anchors already on-chain — only the claim transaction needs your signature.";
+    }
+    if (result?.anchorSkipped) {
+      return "Block already anchored — only the claim transaction needs your signature.";
+    }
+    if (isBase) {
+      return result?.l1AnchorSkipped
+        ? "Sign the Base anchor + claim transactions in your wallet."
+        : "Sign the L1 anchor + Base anchor + claim transactions in your wallet.";
+    }
+    return "Sign the anchorBlockHeader + claim transactions in your wallet.";
+  })();
+
+  const buildProofDescription = isBase
+    ? "Backend locates a covering dispute game on L1, walks Base headers from the anchor down to your deposit, and assembles the receipts MPT proof."
+    : "Backend assembles the finality update + receipts MPT proof for your deposit.";
+
   const steps: { key: TrustlessClaimStep; label: string; description: string }[] = [
     {
       key: "build_proof",
       label: "Build Inclusion Proof",
-      description:
-        "Backend assembles the finality update + receipt MPT proof for your deposit.",
+      description: buildProofDescription,
     },
     {
       key: "submit_strato",
       label: "Submit on STRATO",
-      description: result?.anchorSkipped
-        ? "Block already anchored — only the claim transaction needs your signature."
-        : "Sign the anchorBlockHeader + claim transactions in your wallet.",
+      description: submitDescription,
     },
     {
       key: "complete",
@@ -253,7 +277,9 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
 
         {step === "complete" && result && (
           <div className="text-xs text-muted-foreground space-y-1">
-            <div>Block anchored: {result.blockNumber}</div>
+            <div>
+              {result.flavor === "base" ? "Base block" : "Block"} anchored: {result.blockNumber}
+            </div>
             {result.hashes.map((h, i) => (
               <div key={i} className="font-mono">
                 tx {i + 1}: {formatTxHash(h)}

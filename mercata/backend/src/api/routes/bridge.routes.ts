@@ -267,22 +267,30 @@ router.get(
 
 /**
  * @openapi
- * /bridge/trustlessConfig:
+ * /bridge/trustlessConfig/{chainId}:
  *   get:
  *     summary: "On-chain deployment metadata for the trustless bridge-in path"
  *     description: >
- *       Returns the EthBridgeIn / EthLightClient addresses (read live
- *       from cirrus, not env) plus the DepositRouted event signature
- *       hash. Frontend uses this to label phases and decide whether
- *       the trustless path is available at all (503 when disabled).
+ *       Returns per-source-chain deployment metadata: bridge-in
+ *       address, light-client address, DepositRouted event sig hash,
+ *       and (for OP-Stack/Cannon chains) the L1 EthLightClient the
+ *       BaseLightClient wraps. Read live from cirrus.
  *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         description: Source chain identifier (1 = Ethereum, 11155111 = Sepolia, 8453 = Base, 84532 = Base Sepolia)
+ *         schema: { type: string }
  *     responses:
  *       200:
  *         description: Trustless deployment config
+ *       400:
+ *         description: chainId not supported by trustless path
  *       503:
- *         description: Trustless path disabled (MercataBridge.ethBridgeIn unset)
+ *         description: Trustless path disabled for that chain (no bridge-in registered)
  */
-router.get("/trustlessConfig", walletAuth, BridgeController.getTrustlessConfig);
+router.get("/trustlessConfig/:chainId", walletAuth, BridgeController.getTrustlessConfig);
 
 /**
  * @openapi

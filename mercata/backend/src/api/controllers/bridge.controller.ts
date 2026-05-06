@@ -306,12 +306,17 @@ class BridgeController {
   }
 
   /**
-   * GET /bridge/trustlessConfig
+   * GET /bridge/trustlessConfig/:chainId
    *
-   * Surfaces the on-chain EthBridgeIn / EthLightClient deployment
-   * addresses + the DepositRouted event sig the proof builder needs.
-   * The frontend reads this once at mount so it can label phases and
-   * render explorer links without baking addresses into the bundle.
+   * Surfaces the on-chain bridge-in / light-client deployment
+   * addresses + the DepositRouted event sig for `chainId`. The
+   * frontend reads this once per source chain so it can label
+   * phases / render explorer links without baking addresses.
+   *
+   * Eth-flavor chains return `{flavor:"eth", bridgeIn, lightClient,
+   * depositRoutedSig}`. Base-flavor chains additionally include
+   * `l1LightClient` (the L1 EthLightClient that BaseLightClient
+   * wraps).
    */
   static async getTrustlessConfig(
     req: Request,
@@ -320,11 +325,20 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const cfg = await loadTrustlessConfig(accessToken);
+      const { chainId } = req.params;
+      if (!chainId) {
+        res.status(400).json({ error: "chainId path param required" });
+        return;
+      }
+      const cfg = await loadTrustlessConfig(accessToken, chainId);
       res.json({ success: true, data: cfg });
     } catch (error: any) {
       if (typeof error?.message === "string" && error.message.includes("trustless path disabled")) {
         res.status(503).json({ error: error.message, code: "TRUSTLESS_DISABLED" });
+        return;
+      }
+      if (typeof error?.message === "string" && error.message.includes("not supported")) {
+        res.status(400).json({ error: error.message, code: "UNSUPPORTED_CHAIN" });
         return;
       }
       next(error);

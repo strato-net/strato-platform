@@ -20,12 +20,19 @@ import type { WalletTxProgressEvent } from "@/lib/axios";
  * The per-phase signal the modal listens to. Compare to
  * `WithdrawalStep` in WithdrawalProgressModal — the trustless flow is
  * a strict subset because there's no chain-switch and no catch-up.
+ *
+ * The same step set serves both Eth and Base/Cannon paths; the modal
+ * relabels copy per `flavor` to surface flow-specific work (parent
+ * walk, dispute-game search, etc.) under the build_proof phase.
  */
 export type TrustlessClaimStep =
-  | "build_proof"      // Backend assembles anchor + claim inputs
-  | "submit_strato"    // User wallet signs and submits the STRATO batch
+  | "build_proof"        // Backend assembles anchor + claim inputs
+  | "submit_strato"      // User wallet signs and submits the STRATO batch
   | "complete"
   | "error";
+
+/** Tag returned by /bridge/trustlessConfig — drives UI labelling. */
+export type LightClientFlavor = "eth" | "base";
 
 export interface ClaimAssignmentInput {
   depositKey: `0x${string}`;
@@ -48,30 +55,39 @@ export interface TrustlessClaimRequest {
 export interface TrustlessClaimResult {
   status?: string;
   hashes: string[];
-  /** Backend skipped anchorBlockHeader because the block was already on-chain. */
+  /** Backend skipped the source-chain anchor tx (block already on-chain). */
   anchorSkipped: boolean;
+  /** Backend skipped the L1 anchor tx (Cannon flow only; L1 already anchored). */
+  l1AnchorSkipped: boolean;
   blockNumber: string;
+  flavor: LightClientFlavor;
 }
 
 export interface TrustlessConfig {
-  ethBridgeIn: `0x${string}`;
+  flavor: LightClientFlavor;
+  bridgeIn: `0x${string}`;
   lightClient: `0x${string}`;
   depositRoutedSig: `0x${string}`;
+  /** Base flavor only: the wrapped L1 EthLightClient. */
+  l1LightClient?: `0x${string}`;
 }
 
 /**
- * Fetch the EthBridgeIn / EthLightClient deployment metadata. Returns
- * undefined when the trustless path is disabled (503 from backend) so
- * the UI can hide the entry point gracefully.
+ * Fetch the per-source-chain bridge-in deployment metadata. Returns
+ * undefined when the trustless path is disabled (503) or the chain
+ * isn't supported (400) so the UI can hide the entry point gracefully.
  */
-export async function fetchTrustlessConfig(): Promise<TrustlessConfig | undefined> {
+export async function fetchTrustlessConfig(
+  chainId: string | number,
+): Promise<TrustlessConfig | undefined> {
   try {
     const { data } = await api.get<{ success: boolean; data: TrustlessConfig }>(
-      "/bridge/trustlessConfig",
+      `/bridge/trustlessConfig/${chainId}`,
     );
     return data?.data;
   } catch (err: any) {
-    if (err?.response?.status === 503) return undefined;
+    const status = err?.response?.status;
+    if (status === 503 || status === 400) return undefined;
     throw err;
   }
 }

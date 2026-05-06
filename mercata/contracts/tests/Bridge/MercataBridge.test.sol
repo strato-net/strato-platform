@@ -1816,7 +1816,7 @@ contract Describe_MercataBridge is Authorizable {
     function it_bridge_credit_trustless_deposit_mints_to_recipient() {
         // Configure the trustless caller (in production this would be EthBridgeIn).
         User trustlessCaller = new User();
-        bridge.setEthBridgeIn(address(trustlessCaller));
+        bridge.setBridgeIn(externalChainId, address(trustlessCaller));
 
         address recipient = address(new User());
         uint256 amount = 1000e18;
@@ -1841,7 +1841,7 @@ contract Describe_MercataBridge is Authorizable {
 
     function it_bridge_credit_trustless_deposit_rejects_unauthorized_caller() {
         User trustlessCaller = new User();
-        bridge.setEthBridgeIn(address(trustlessCaller));
+        bridge.setBridgeIn(externalChainId, address(trustlessCaller));
 
         // A different User tries to call. Should revert.
         User attacker = new User();
@@ -1865,7 +1865,7 @@ contract Describe_MercataBridge is Authorizable {
 
     function it_bridge_credit_trustless_deposit_dedups_repeat_attempts() {
         User trustlessCaller = new User();
-        bridge.setEthBridgeIn(address(trustlessCaller));
+        bridge.setBridgeIn(externalChainId, address(trustlessCaller));
 
         address recipient = address(new User());
         bytes32 depositKey = keccak256("trustless-deposit-key-3");
@@ -1891,7 +1891,7 @@ contract Describe_MercataBridge is Authorizable {
 
     function it_bridge_credit_trustless_deposit_rejects_disabled_route() {
         User trustlessCaller = new User();
-        bridge.setEthBridgeIn(address(trustlessCaller));
+        bridge.setBridgeIn(externalChainId, address(trustlessCaller));
 
         // 0x9999 isn't a registered ethToken; route is not enabled.
         bytes32 depositKey = keccak256("trustless-deposit-key-4");
@@ -1910,8 +1910,8 @@ contract Describe_MercataBridge is Authorizable {
     }
 
     function it_bridge_credit_trustless_deposit_disabled_when_caller_unset() {
-        // Default: ethBridgeIn = address(0). All trustless calls revert
-        // regardless of who's calling, even an admin.
+        // Default: bridgeIns[chainId] = address(0). All trustless calls
+        // revert regardless of who's calling, even an admin.
         User trustlessCaller = new User();
         bytes32 depositKey = keccak256("trustless-deposit-key-5");
         bool reverted = false;
@@ -1924,7 +1924,7 @@ contract Describe_MercataBridge is Authorizable {
         } catch {
             reverted = true;
         }
-        require(reverted, "trustless path should be off when ethBridgeIn unset");
+        require(reverted, "trustless path should be off when bridgeIn unset");
     }
 
 }

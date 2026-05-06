@@ -75,8 +75,8 @@ contract record MercataBridge is Ownable, IBridgeMintTarget {
         uint256 amount
     );
 
-    /// @notice EthBridgeIn caller updated.
-    event EthBridgeInUpdated(address oldBridge, address newBridge);
+    /// @notice Per-chain trustless bridge-in caller updated.
+    event BridgeInUpdated(uint256 indexed srcChainId, address oldBridge, address newBridge);
 
     /// @notice Emitted when a deposit is initiated
     /// @param externalChainId The external chain identifier where the deposit occurred
@@ -205,14 +205,20 @@ contract record MercataBridge is Ownable, IBridgeMintTarget {
     /// @dev When true, all withdrawal operations are paused
     bool public withdrawalsPaused;
 
-    /// @notice Trustless deposit verifier address. Only this caller is
-    ///         allowed to invoke {creditTrustlessDeposit}. Setting it
-    ///         to address(0) disables the trustless path entirely.
-    /// @dev    Currently always EthBridgeIn; the field is just an
-    ///         address rather than a typed reference so MercataBridge
-    ///         doesn't have a build-time dependency on the
-    ///         bridge-in contract.
-    address public ethBridgeIn;
+    /// @notice Per-source-chain trustless deposit verifier. The address
+    ///         registered for `srcChainId` is the only caller permitted
+    ///         to invoke {creditTrustlessDeposit} with that chain id.
+    ///         Setting an entry to address(0) disables the trustless
+    ///         path for that chain. Different source chains use
+    ///         different verifier deployments because each one wraps
+    ///         a chain-specific light client (EthLightClient for
+    ///         Ethereum, BaseLightClient for Base, etc.) — the
+    ///         verifier contract type itself is the same EthBridgeIn
+    ///         template, parameterized at construction time.
+    /// @dev    Stored as plain addresses rather than typed references
+    ///         so MercataBridge doesn't have a build-time dependency
+    ///         on the bridge-in contract.
+    mapping(uint256 => address) public bridgeIns;
 
     /// @notice Per-deposit dedup for trustless claims. Keyed on the
     ///         same depositKey EthBridgeIn dedups on, so even if one
@@ -525,26 +531,34 @@ contract record MercataBridge is Ownable, IBridgeMintTarget {
     }
 
     /**
-     * @dev Authorize the EthBridgeIn caller for the trustless deposit
-     *      path. Only this address may invoke {creditTrustlessDeposit}.
-     *      Setting it to address(0) disables the trustless path
-     *      entirely (deposits then have to flow through the legacy
+     * @dev Authorize the per-chain bridge-in caller for the trustless
+     *      deposit path. Only the address registered for `srcChainId`
+     *      may invoke {creditTrustlessDeposit} with that chain id.
+     *      Setting an entry to address(0) disables the trustless path
+     *      for that chain (deposits then fall back to the legacy
      *      relayer-attested {confirmDeposit}).
+     *
+     *      Each source chain gets its own bridge-in deployment because
+     *      each one wraps a chain-specific light client (EthLightClient
+     *      for Ethereum, BaseLightClient for Base, etc.). The caller
+     *      authorization here is what binds (chain → verifier).
      */
-    function setEthBridgeIn(address newBridge) external onlyOwner {
-        address old = ethBridgeIn;
-        ethBridgeIn = newBridge;
-        emit EthBridgeInUpdated(old, newBridge);
+    function setBridgeIn(uint256 srcChainId, address newBridge) external onlyOwner {
+        require(srcChainId != 0, "MB: zero srcChainId");
+        address old = bridgeIns[srcChainId];
+        bridgeIns[srcChainId] = newBridge;
+        emit BridgeInUpdated(srcChainId, old, newBridge);
     }
 
     /**
-     * @notice IBridgeMintTarget hook called by EthBridgeIn after a
-     *         successfully verified deposit claim. Mints `amount` of
-     *         `stratoToken` to `stratoRecipient`.
+     * @notice IBridgeMintTarget hook called by a per-chain EthBridgeIn
+     *         after a successfully verified deposit claim. Mints
+     *         `amount` of `stratoToken` to `stratoRecipient`.
      *
-     *         Authorization: only the configured ethBridgeIn caller.
-     *         Idempotency: dedups on `depositKey` (the same key
-     *         EthBridgeIn dedups on; double-keyed for defense-in-depth).
+     *         Authorization: only the bridge-in registered for
+     *         `srcChainId` (via {setBridgeIn}) may call.
+     *         Idempotency: dedups on `depositKey` (the same key the
+     *         bridge-in dedups on; double-keyed for defense-in-depth).
      *         Route allowlist: reuses {_requireRouteEnabled} so the
      *         existing per-asset route configuration also gates
      *         trustless deposits.
@@ -558,8 +572,9 @@ contract record MercataBridge is Ownable, IBridgeMintTarget {
         address stratoToken,
         uint256 amount
     ) external override whenDepositsOpen {
-        require(ethBridgeIn != address(0), "MB: trustless path disabled");
-        require(msg.sender == ethBridgeIn, "MB: caller not ethBridgeIn");
+        address registered = bridgeIns[srcChainId];
+        require(registered != address(0), "MB: trustless path disabled for chain");
+        require(msg.sender == registered, "MB: caller not bridgeIn for chain");
         require(stratoRecipient != address(0), "MB: zero recipient");
         require(stratoToken != address(0), "MB: zero strato token");
         require(amount > 0, "MB: zero amount");
