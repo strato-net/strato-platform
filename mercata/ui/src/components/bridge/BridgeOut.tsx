@@ -43,8 +43,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
   const {
-    externalWalletAddress,
-    isExternalWalletConnected,
+    externalEvmWalletAddress,
+    isExternalEvmWalletConnected,
     isAppAuthenticated,
     walletSignerReady,
   } = useUser();
@@ -85,8 +85,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   // Computed values
   const modeLabels = BRIDGE_MODE_LABELS[isSaving ? "convert" : "bridge"];
-  const externalRecipient = externalWalletAddress;
-  const hasExternalRecipient = isConnected && isExternalWalletConnected && !!externalRecipient;
+  const externalRecipient = externalEvmWalletAddress;
+  const hasExternalRecipient = isConnected && isExternalEvmWalletConnected && !!externalRecipient;
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
@@ -303,7 +303,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         ? NATIVE_TOKEN_ADDRESS
         : selectedToken.externalToken;
 
-      const useExternalWalletSigning = isExternalWalletConnected && !isAppAuthenticated;
+      const useExternalWalletSigning = isExternalEvmWalletConnected && !isAppAuthenticated;
       const res = await bridgeOutAPI(
         {
           externalChainId: currentNetwork.chainId,

@@ -1,0 +1,75 @@
+pipeline {
+  agent {
+    label "testnet-buildtest-app"
+  }
+  environment {
+    PATH = "${env.HOME}/.local/bin:${env.PATH}"
+  }
+  stages {
+    
+    stage('Prepare') {
+      steps {
+        sh '''#!/bin/bash -le
+          docker system prune -f || true
+        '''
+      }
+    }
+    
+    stage('Build') {
+      steps {
+        sh 'rm -rf .docker-work'
+        sh "git checkout BUILD_METADATA"
+        script {
+          sh '''#!/bin/bash -le
+            set -o pipefail
+            make app | tee make-app.log
+          '''
+          // Last line of `make app` is:
+          //   strato-patch-app <node-dir> <OPTIONAL_PREFIX>mercata-backend:<TAG> <OPTIONAL_PREFIX>mercata-ui:<TAG>
+          // Strip the `strato-patch-app <node-dir>` prefix so we keep just the two image args.
+          env.PATCH_APP_IMAGES = sh(
+            script: "tail -n 1 make-app.log | sed -E 's/^[[:space:]]*strato-patch-app[[:space:]]+[^[:space:]]+[[:space:]]+//'",
+            returnStdout: true
+          ).trim()
+          echo "Captured patch-app image args: ${env.PATCH_APP_IMAGES}"
+        }
+      }
+    }
+
+    stage('Deploy to testnet-buildtest-app') {
+      steps {
+        sh "unlink strato-platform-origin || true"
+        sh "ln -s /home/ubuntu/strato-platform strato-platform-origin"
+        dir ("strato-platform-origin") {
+          sh "strato-patch-app mynode ${env.PATCH_APP_IMAGES}"
+          sh "strato-down"
+          withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+            sh "./run.sh"
+          }
+        }
+        script {
+          def lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
+          // Then wait for the full sync
+          lib.waitLocalNodeIsSynced()
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      slackSend(
+          channel: '#engineering',
+          color: 'good',
+          message: "buildtest-app.testnet.strato.nexus was updated in place with app version from develop"
+      )
+    }
+    failure {
+      slackSend(
+          channel: '#engineering',
+          color: 'danger',
+          message: "buildtest-app.testnet.strato.nexus has FAILED to be updated in place with app version from develop"
+      )
+    }
+  }
+}

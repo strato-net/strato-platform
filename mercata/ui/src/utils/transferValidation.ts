@@ -8,6 +8,7 @@ import {
   safeParseUnits,
 } from "@/utils/numberUtils";
 
+const normalizeAddress = (addr?: string): string => (addr || "").toLowerCase().replace(/^0x/, "");
 
 export const validateRecipientAddress = (
   value: string,
@@ -16,7 +17,7 @@ export const validateRecipientAddress = (
   const addr = value.trim();
   if (!addr) return "";
   if (!isAddress(addr)) return "Invalid address";
-  if (userAddress && addr.toLowerCase() === userAddress.toLowerCase()) {
+  if (userAddress && normalizeAddress(addr) === normalizeAddress(userAddress)) {
     return "You cannot transfer to your own address.";
   }
   return "";

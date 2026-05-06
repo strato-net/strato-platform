@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { useUser } from '@/context/UserContext';
 import { useNetwork } from '@/context/NetworkContext';
-import { redirectToLogin } from '@/lib/auth';
+import { requestWalletConnection } from '@/lib/auth';
 import { ModeToggle } from './mode-toggle';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
@@ -22,7 +22,7 @@ const Navbar = () => {
     if (isLoggedIn) {
       logout();
     } else {
-      redirectToLogin();
+      requestWalletConnection();
     }
   };
 
@@ -70,7 +70,7 @@ const Navbar = () => {
                     : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue/30 dark:border-strato-lightblue/50 hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
               }`}
             >
-              {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login/Sign Up'}
+              {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Connect Wallet'}
             </button>
           </div>
           <div className="flex md:hidden">
@@ -118,7 +118,7 @@ const Navbar = () => {
                       : 'text-strato-blue dark:text-strato-lightblue border border-strato-blue dark:border-strato-lightblue hover:bg-strato-blue/5 dark:hover:bg-strato-lightblue/10'
                 }`}
               >
-                {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Login/Sign Up'}
+                {loading ? <Spinner /> : isLoggedIn ? 'Log Out' : 'Connect Wallet'}
               </button>
             </div>
           </div>

@@ -295,7 +295,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const { signTypedDataAsync } = useSignTypedData();
   const { openConnectModal } = useConnectModal();
   const { toast } = useToast();
-  const { userAddress, externalWalletAddress, isExternalWalletConnected, isAppAuthenticated } = useUser();
+  const { userAddress, externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
   const {
@@ -446,10 +446,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [bridgeableTokens]);
 
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
-  const externalSender = externalWalletAddress;
+  const externalSender = externalEvmWalletAddress;
   const externalSenderHex = externalSender ? (externalSender as `0x${string}`) : undefined;
   const stratoRecipient = userAddress;
-  const hasExternalWallet = isConnected && isExternalWalletConnected && !!externalSenderHex;
+  const hasExternalWallet = isConnected && isExternalEvmWalletConnected && !!externalSenderHex;
   const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
   const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;

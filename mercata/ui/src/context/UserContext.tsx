@@ -2,9 +2,10 @@
 
 // context/UserContext.tsx
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
-import { isAuthenticated, logout as authLogout } from "@/lib/auth";
+import { isAuthenticated, logout as authLogout, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 
@@ -13,6 +14,8 @@ interface UserContextType {
   stratoAddress: string | null;
   externalWalletAddress: string | null;
   isExternalWalletConnected: boolean;
+  externalEvmWalletAddress: string | null;
+  isExternalEvmWalletConnected: boolean;
   setUserAddress: (address: string | null) => void;
   isLoggedIn: boolean;
   isAppAuthenticated: boolean;
@@ -49,8 +52,12 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+const isStratoConnector = (connector?: { id?: string; name?: string } | null) =>
+  connector?.id === "stratoWallet" || connector?.name === "STRATO Wallet";
+
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const account = useAccount();
+  const { openConnectModal } = useConnectModal();
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
   const [stratoAddress, setStratoAddress] = useState<string | null>(null);
@@ -82,7 +89,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const storedUser = localStorage.getItem("user");
         if (!storedUser || !stratoAddress) {
           try {
-            const response = await api.get('/user/me');
+            const response = await api.get('/user/me', { walletAuth: false } as any);
             const newUserAddress = response.data.userAddress;
             const serverIsAdmin = response.data.isAdmin;
             const userName = response.data.userName
@@ -124,7 +131,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const castVoteOnIssue = async (target: string, func: string, args: any[]) => {
     try {
-      await api.post('/user/admin/vote', { target, func, args });
+      await api.post('/user/admin/vote', { target, func, args }, { walletAuth: false } as any);
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
@@ -136,7 +143,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const castVoteOnIssueById = async (issueId: string) => {
     try {
-      await api.post('/user/admin/vote/by-id', { issueId });
+      await api.post('/user/admin/vote/by-id', { issueId }, { walletAuth: false } as any);
       await getOpenIssues();
       // Show the recently executed issue
       await getExecutedIssues(1, ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE);
@@ -204,24 +211,27 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const addAdmin = async (userAddress: string) => {
-    await api.post('/user/admin', { userAddress });
+    await api.post('/user/admin', { userAddress }, { walletAuth: false } as any);
     await getOpenIssues();
   };
 
   const removeAdmin = async (userAddress: string) => {
-    await api.delete('/user/admin', { data: { userAddress } });
+    await api.delete('/user/admin', { data: { userAddress }, walletAuth: false } as any);
     await getOpenIssues();
   };
 
   const dismissIssue = async (issueId: string) => {
-    await api.post('/user/admin/dismiss', { issueId });
+    await api.post('/user/admin/dismiss', { issueId }, { walletAuth: false } as any);
     await getOpenIssues();
   };
 
   const externalWalletAddress = account.isConnected && account.address ? account.address : null;
   const isExternalWalletConnected = !!externalWalletAddress;
-  const userAddress = isLoggedIn ? stratoAddress : externalWalletAddress;
-  const effectiveLoggedIn = isLoggedIn || isExternalWalletConnected;
+  const externalEvmWalletAddress = !isStratoConnector(account.connector) ? externalWalletAddress : null;
+  const isExternalEvmWalletConnected = !!externalEvmWalletAddress;
+  const shouldUseExternalWallet = !loading && !isLoggedIn && isExternalWalletConnected;
+  const userAddress = isLoggedIn ? stratoAddress : shouldUseExternalWallet ? externalWalletAddress : null;
+  const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
 
   useEffect(() => {
     setConnectedWalletAddress(externalWalletAddress);
@@ -230,6 +240,15 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     setAppAuthenticated(isLoggedIn);
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    const openWalletConnect = () => {
+      if (!account.isConnected) openConnectModal?.();
+    };
+
+    window.addEventListener(WALLET_CONNECT_REQUEST_EVENT, openWalletConnect);
+    return () => window.removeEventListener(WALLET_CONNECT_REQUEST_EVENT, openWalletConnect);
+  }, [account.isConnected, openConnectModal]);
 
   useEffect(() => {
     const connected = account.isConnected && account.address;
@@ -311,6 +330,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     stratoAddress,
     externalWalletAddress,
     isExternalWalletConnected,
+    externalEvmWalletAddress,
+    isExternalEvmWalletConnected,
     setUserAddress,
     userName,
     isLoggedIn: effectiveLoggedIn,
@@ -338,7 +359,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     contractDetailsResults,
     contractDetailsResultsLoading,
   }), [
-    userAddress, stratoAddress, externalWalletAddress, isExternalWalletConnected,
+    userAddress, stratoAddress,
+    externalWalletAddress, isExternalWalletConnected,
+    externalEvmWalletAddress, isExternalEvmWalletConnected,
     effectiveLoggedIn, isLoggedIn, isAdmin, loading, userName, walletSignerReady,
     handleLogout,
     openIssues, openIssuesLoading, getOpenIssues, executedIssues, executedIssuesLoading, getExecutedIssues,

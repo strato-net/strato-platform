@@ -6,7 +6,7 @@ export const useRewardsUserInfo = () => {
   const [userRewards, setUserRewards] = useState<UserRewardsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { userAddress, isLoggedIn } = useUser();
+  const { userAddress, isLoggedIn, isAppAuthenticated } = useUser();
 
   useEffect(() => {
     if (!isLoggedIn || !userAddress) {
@@ -17,7 +17,7 @@ export const useRewardsUserInfo = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await fetchUserRewards(userAddress);
+        const data = await fetchUserRewards(false, { walletAuth: !isAppAuthenticated });
         setUserRewards(data);
         setError(null);
       } catch (err) {
@@ -28,7 +28,7 @@ export const useRewardsUserInfo = () => {
     };
 
     fetchData();
-  }, [userAddress, isLoggedIn]);
+  }, [userAddress, isLoggedIn, isAppAuthenticated]);
 
   const refetch = async () => {
     if (!isLoggedIn || !userAddress) {
@@ -36,7 +36,7 @@ export const useRewardsUserInfo = () => {
     }
     try {
       setLoading(true);
-      const data = await fetchUserRewards(userAddress, true); // Force refresh to bypass cache
+      const data = await fetchUserRewards(true, { walletAuth: !isAppAuthenticated }); // Force refresh to bypass cache
       setUserRewards(data);
       setError(null);
     } catch (err) {
