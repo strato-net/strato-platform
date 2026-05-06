@@ -984,7 +984,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           externalTxHash: txHash,
           action,
           targetToken: action === 2 ? selectedAction.stratoToken : undefined,
-        });
+        }, useExternalWalletSigning ? { walletAuth: true } : undefined);
       }
 
       // Step: Complete
