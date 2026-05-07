@@ -31,7 +31,6 @@ module Control.Monad.Composable.Kafka (
   Offset,
   ConsumerGroup,
   ProduceResponse,
-  conduitSourceUsingEnv,
   conduitBatchSource,
   createKafkaEnv,
   createTopic,
@@ -42,7 +41,7 @@ import Blockchain.MilenaTools
 import Conduit
 import Control.Concurrent (threadDelay)
 import Control.Lens
-import Control.Monad (forM_, void)
+import Control.Monad (void)
 import Control.Monad.Composable.Base
 import Control.Monad.Loops
 import Control.Monad.Reader
@@ -202,16 +201,6 @@ fetchBytes topic offset = do
     _ -> return ()
 
   return $ fetchResponseToPayload [offset] fetched
-
-conduitSourceUsingEnv :: (MonadIO m, Binary a) =>
-                         KafkaEnv -> TopicName -> ConduitT i a m b
-conduitSourceUsingEnv env topicName = do
-  startingOffset <- runKafkaMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
-
-  flip iterateM_ startingOffset $ \offset -> do
-      items <- runKafkaMUsingEnv env $ fetchItems topicName offset
-      forM_ items yield
-      return $ offset + fromIntegral (length items)
 
 conduitBatchSource :: (MonadIO m, Binary a) =>
                       KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i [a] m b

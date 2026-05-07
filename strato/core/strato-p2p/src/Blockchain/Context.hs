@@ -54,7 +54,6 @@ import           Control.Exception                       hiding (bracket, catch)
 import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
-import           Control.Monad.Composable.Kafka
 import           Control.Monad.Composable.Vault
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
@@ -147,8 +146,7 @@ withPeerAddress :: (Maybe Address -> Maybe Address) -> PeerAddress -> PeerAddres
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState     :: KafkaEnv
-  , blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
+  { blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
@@ -494,13 +492,9 @@ initConfig wireMessagesRef = do
     }
 
 initContext :: MonadIO m => m Context
-initContext = do
-  let k = kafkaConfig ethConf
-      address = (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
-  kafkaEnv <- createKafkaEnv "strato-p2p" address
+initContext =
   return $
     Context { actionTimestamp = emptyActionTimestamp
-            , contextKafkaState = kafkaEnv
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing

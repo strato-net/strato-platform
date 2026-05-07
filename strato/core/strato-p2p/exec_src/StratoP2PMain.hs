@@ -53,12 +53,11 @@ initP2P = labelTheThread "initP2P" $ do
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef
   let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      sSource = seqEventNotificationSource . contextKafkaState
       runner f = runLoggingT $ runVaultM vaultUrl' $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         let cfg' = cfg { configContext = ctx }
-        runContextM cfg' . f $ sSource c'
+        runContextM cfg' . f $ seqEventNotificationSource
   liftIO $
     race_
       (run 10248 $ prometheus def p2pApp)
