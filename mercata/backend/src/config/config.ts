@@ -74,6 +74,14 @@ export const yieldBenchmarks = [
   { tokenSymbol: "aUSDT", baseSymbol: "USDT", tokenAddress: "7d2a2b963e1fa273b60f9b7891392903de5e66b8" },
 ];
 
+// Carry-vault off-chain capital tracking (assets bridged out via MercataBridge):
+//   - Display floor: hide the off-chain section (and exclude from APY equity adjustment) when the
+//     pooled USD value falls below this number — suppresses oracle drift / dust noise.
+//   - Event window: only count `WithdrawalRequested` and `DepositCompleted` events from the last
+//     N days. Caps slippage residual accumulation and ages out stale (failed/forgotten) bridges.
+export const OFF_CHAIN_DISPLAY_FLOOR_USD = 100;
+export const OFF_CHAIN_EVENT_WINDOW_DAYS = 7;
+
 // For AAVE aTokens wrapping yield-bearing LSTs, composite APY = AAVE lending yield + underlying staking yield.
 // Maps aToken address → underlying token's exchange rate address (used to sum APYs).
 export const compositeYieldMap: Record<string, string> = {
@@ -140,6 +148,7 @@ export const defaultWbtcCarryVaultFor: Record<string, string> = {
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
+export let networkName: string | undefined;
 export let referralUrl: string | undefined;
 export let escrow: string = '';
 export let vaultFactory: string = '';
@@ -230,6 +239,7 @@ export async function initNetworkConfig() {
   const accessToken = await getServiceToken();
   const { data } = await eth.get(accessToken, `/metadata`);
   networkId = data.networkID;
+  networkName = data.networkName;
   if (!networkId) {
     throw new Error("Network ID not found in metadata");
   }

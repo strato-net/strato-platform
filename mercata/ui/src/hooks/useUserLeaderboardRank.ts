@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchLeaderboard } from "@/services/rewardsService";
+import { fetchLeaderboard, normalizeRewardsAddress } from "@/services/rewardsService";
 import { useUser } from "@/context/UserContext";
 
 export const useUserLeaderboardRank = () => {
@@ -24,6 +24,7 @@ export const useUserLeaderboardRank = () => {
       let found = false;
       let userRank: number | null = null;
       let userTotalEarned: string | null = null;
+      const normalizedUserAddress = normalizeRewardsAddress(userAddress);
 
       while (!found) {
         const response = await fetchLeaderboard(forceRefresh, limit, offset);
@@ -33,7 +34,7 @@ export const useUserLeaderboardRank = () => {
         }
 
         const userEntry = response.entries.find(
-          (entry) => entry.address.toLowerCase() === userAddress.toLowerCase()
+          (entry) => normalizeRewardsAddress(entry.address) === normalizedUserAddress
         );
 
         if (userEntry) {

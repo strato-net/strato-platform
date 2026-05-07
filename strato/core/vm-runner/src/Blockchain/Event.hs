@@ -37,7 +37,6 @@ import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.StateDiff
 import Blockchain.Stream.VMEvent
-import qualified Data.ByteString as B
 import qualified Data.DList as DL
 import Data.Map (Map)
 
@@ -98,7 +97,7 @@ data VmOutEvent
   | OutLog LogDB
   | OutEvent [EventDB]
   | OutASM (Map Address AddressStateModification)
-  | OutJSONRPC String B.ByteString
+  | OutJSONRPC JsonRpcResponse
   | OutBlockVerificationFailure [BlockVerificationFailure]
   | OutGetMPNodes [StateRoot]
   | OutMPNodesResponse TXOrigin [NodeData]
@@ -113,7 +112,7 @@ data VmOutEventBatch = OutBatch
     outLogs :: DL.DList LogDB,
     outEvents :: DL.DList EventDB,
     outASMs :: DL.DList (Map Address AddressStateModification),
-    outJSONRPCs :: DL.DList (String, B.ByteString),
+    outJSONRPCs :: DL.DList JsonRpcResponse,
     outBlockVerificationFailure :: [BlockVerificationFailure],
     outGetMPNodes :: DL.DList [StateRoot],
     outMPNodesResponses :: DL.DList (TXOrigin, [NodeData]),
@@ -146,7 +145,7 @@ insertOutBatch e b = case e of
   OutLog a -> b {outLogs = outLogs b `DL.snoc` a}
   OutEvent a -> b {outEvents = outEvents b `DL.append` DL.fromList a}
   OutASM a -> b {outASMs = outASMs b `DL.snoc` a}
-  OutJSONRPC x y -> b {outJSONRPCs = outJSONRPCs b `DL.snoc` (x, y)}
+  OutJSONRPC r -> b {outJSONRPCs = outJSONRPCs b `DL.snoc` r}
   OutBlockVerificationFailure bvf -> b {outBlockVerificationFailure = bvf}
   OutGetMPNodes srs -> b {outGetMPNodes = outGetMPNodes b `DL.snoc` srs}
   OutMPNodesResponse o nds -> b {outMPNodesResponses = outMPNodesResponses b `DL.snoc` (o, nds)}

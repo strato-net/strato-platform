@@ -103,12 +103,12 @@ module.exports = {
 
   healthStatus: async function (req, res, next) {
     try {
-      let health = null, uptime = null;
+      let health = null, uptime = null, healthStatus = null, healthIssues = [], healthData = null;
       const [healthInfo, stallInfo, systemInfo, syncInfo] =
         await utils.getLatestHealth();
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
-        ({ health, uptime } = utils.consolidateHealthData(
+        ({ health, uptime, healthStatus, healthIssues, healthData } = utils.consolidateHealthData(
           healthInfo,
           stallInfo,
           systemInfo,
@@ -125,6 +125,10 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         health: health,
+        healthStatus: healthStatus,
+        healthIssues: healthIssues,
+        nodeSync: healthData && healthData.nodeSync,
+        stallHealth: healthData && healthData.stallHealth,
         uptime: uptime,
       });
     } catch (error) {

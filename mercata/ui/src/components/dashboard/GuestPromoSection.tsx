@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { redirectToLogin } from "@/lib/auth";
+import { requestWalletConnection } from "@/lib/auth";
 import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
@@ -111,13 +111,10 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
     return { dailyPointsStr: formatDailyPoints(perDay), emissionFillPct: fillPct };
   }, [userRewards, rewardsState]);
 
-  const highestNativeApy = useMemo(() => {
+  const highestAvailableApy = useMemo(() => {
     let best = 0;
     for (const info of buildEarnApyMap(tokenApys).values()) {
-      const rewardsItem = info.breakdown.find((b) => b.label === "Rewards APY");
-      const rewardsVal = rewardsItem ? parseFloat(rewardsItem.apy) : 0;
-      const organic = info.total - rewardsVal;
-      if (organic > best) best = organic;
+      if (info.total > best) best = info.total;
     }
     return best > 0 ? best.toFixed(1) : null;
   }, [tokenApys]);
@@ -136,15 +133,15 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
                 <span className="text-white text-xs font-medium">Live Now</span>
               </div>
               <h1 className="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-2 leading-tight">
-                {tokenApysLoaded && highestNativeApy
-                  ? `Earn Up to ${highestNativeApy}% APY`
+                {tokenApysLoaded && highestAvailableApy
+                  ? `Earn Up to ${highestAvailableApy}% APY`
                   : !tokenApysLoaded
                     ? <span className="inline-flex items-center gap-2">Earn Up to <Loader2 className="w-7 h-7 animate-spin opacity-60" /> APY</span>
                     : "Start Earning Today"
                 }
               </h1>
               <p className="text-white/60 text-sm md:text-base mb-6">
-                Plus 11,111 reward points daily, just for holding
+                Including 11,111 reward points daily, just for holding
               </p>
               <button
                 onClick={() => navigate("/dashboard/earn")}
@@ -202,8 +199,8 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
             </div>
 
             <h1 className="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mb-2 leading-tight">
-              {tokenApysLoaded && highestNativeApy
-                ? `Earn Up to ${highestNativeApy}% APY`
+              {tokenApysLoaded && highestAvailableApy
+                ? `Earn Up to ${highestAvailableApy}% APY`
                 : !tokenApysLoaded
                   ? <span className="inline-flex items-center gap-2">Earn Up to <Loader2 className="w-7 h-7 animate-spin opacity-60" /> APY</span>
                   : "Start Earning Today"
@@ -214,7 +211,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
             </p>
 
             <button
-              onClick={() => variant === 1 ? redirectToLogin() : navigate("/dashboard/earn")}
+              onClick={() => variant === 1 ? requestWalletConnection() : navigate("/dashboard/earn")}
               className="inline-flex items-center gap-2 border border-white/30 text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-white/10 transition-colors"
             >
               Start Earning
@@ -239,12 +236,12 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
               </div>
               {variant === 1 ? (
                 <button
-                  onClick={() => redirectToLogin()}
+                  onClick={() => requestWalletConnection()}
                   onMouseEnter={() => setRewardsButtonHovered(true)}
                   onMouseLeave={() => setRewardsButtonHovered(false)}
                   className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
                 >
-                  Sign in to start earning
+                  Connect wallet to start earning
                   <ArrowRight size={14} />
                 </button>
               ) : (

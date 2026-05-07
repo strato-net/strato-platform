@@ -13,11 +13,11 @@ library
   exposed-modules:
       Blockchain.SolidVM
       Blockchain.SolidVM.Builtins
+      Blockchain.SolidVM.Environment
+      Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.Simple
       Blockchain.SolidVM.SM
   other-modules:
-      Blockchain.SolidVM.Environment
-      Blockchain.SolidVM.GasInfo
       Blockchain.SolidVM.SetGet
       Blockchain.SolidVM.TraceTools
       Paths_solid_vm

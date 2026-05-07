@@ -161,7 +161,7 @@ spec = describe "Action conversions" $ do
                     }),
               Action._src = Just "contract Vehicle {}",
               Action._name = Just "Vehicle",
-              Action._events = S.singleton $ Event zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" 0x2e385b6a3aea46d4172df98617b5385c13b7100d "Vehicle Event" [("field", "value", "String"), ("anotherField", "anotherValue", "String")],
+              Action._events = S.singleton $ Event zeroHash zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" 0x2e385b6a3aea46d4172df98617b5385c13b7100d "Vehicle Event" [("field", "value", "String"), ("anotherField", "anotherValue", "String")],
               Action._delegatecalls = S.empty
             }
         )

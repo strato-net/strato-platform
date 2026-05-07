@@ -25,6 +25,22 @@ export type YieldVaultInfo = {
   strategyHoldings: {
     strategyAddress: string;
     deployedAssets: string;
+    composition: {
+      tokenAddress: string;
+      tokenSymbol: string;
+      decimals: number;
+      amount: string;
+    }[];
+    usdstDebt: string;
+    baseApyPct: number | null;
+    offChainUsdWad: string;
+    recentOutflows: {
+      tokenAddress: string;
+      tokenSymbol: string;
+      decimals: number;
+      amount: string;
+      timestampMs: number;
+    }[];
   }[];
   maxDeploy: string;
   minIdleRequirement: string;

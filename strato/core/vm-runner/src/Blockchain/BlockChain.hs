@@ -505,7 +505,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
               "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
             let selector = B.take 4 callData
                 argsBytes = B.drop 4 callData
-            lift (resolveFunction toAddr selector) >>= \case
+            lift (resolveFunction b tAddr toAddr selector) >>= \case
               Nothing -> throwE $ TFCodeCollectionNotFound toAddr
                 ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
               Just (fName, func) -> do
@@ -649,7 +649,7 @@ mkLogEntry :: Keccak256 -> Keccak256 -> Log -> LogDB
 mkLogEntry bHash tHash Log {..} = LogDB bHash tHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
 mkEventEntry :: Event -> EventDB
-mkEventEntry Event {..} = EventDB evBlockHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
+mkEventEntry Event {..} = EventDB evBlockHash evTxHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult ::
   VMBase m =>
