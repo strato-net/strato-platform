@@ -20,8 +20,6 @@ module Control.Monad.Composable.Kafka (
   runKafkaM,
   runKafkaMUsingEnv,
   execKafka,
-  commitSingleOffset,
-  fetchSingleOffset,
   produceItems,
   produceItemsAsJSON,
   consume,
@@ -31,16 +29,10 @@ module Control.Monad.Composable.Kafka (
   KafkaAddress,
   KafkaClientId,
   Offset,
-  Metadata(..),
   ConsumerGroup,
-  KafkaError(..),
   ProduceResponse,
-  packMetadata,
-  unpackMetadata,
-  conduitSource,
   conduitSourceUsingEnv,
   conduitBatchSource,
-  conduitBatchSourceUsingEnv,
   createKafkaEnv,
   createTopic,
   createTopicAndWait
@@ -59,7 +51,6 @@ import Control.Monad.Trans.State
 import qualified Data.Aeson as JSON
 import Data.Binary
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
@@ -129,40 +120,27 @@ execKafka f = do
       return v
 
 
-unpackMetadata :: Binary a =>
-                  Metadata -> a
-unpackMetadata = decode . BL.fromStrict . either (error "error in unpackMetadata, data is not valid base 16 encoded") id . B16.decode . _kString . _kMetadata
-
-packMetadata :: Binary a =>
-                a -> Metadata
-packMetadata = Metadata . KString . B16.encode . BL.toStrict . encode
-
 ----------------------
 --   Checkpoints    --
 ----------------------
 
 getKafkaCheckpoint :: HasKafka m =>
-                      ConsumerGroup -> TopicName -> m (Offset, Metadata)
+                      ConsumerGroup -> TopicName -> m Offset
 getKafkaCheckpoint consumerGroup topicName =
   execKafka (fetchSingleOffset consumerGroup topicName 0) >>= \case
     Left UnknownTopicOrPartition -> do
-      let md' = ""
-          theOffset = 0
-      setKafkaCheckpoint consumerGroup topicName theOffset md'
-      return (theOffset, md')
+      setKafkaCheckpoint consumerGroup topicName 0
+      return 0
     Left err -> error $ "Unexpected response when fetching offset for " ++ show consumerGroup ++ ": " ++ show err
-    Right (o, md) -> return (o, md)
+    Right (o, _) -> return o
 
 setKafkaCheckpoint :: HasKafka m =>
-                      ConsumerGroup -> TopicName -> Offset -> Metadata -> m ()
-setKafkaCheckpoint consumerGroup topicName ofs md = do
-  op' <- execKafka $ setKafkaCheckpoint' consumerGroup topicName ofs md
+                      ConsumerGroup -> TopicName -> Offset -> m ()
+setKafkaCheckpoint consumerGroup topicName ofs = do
+  op' <- execKafka $ commitSingleOffset consumerGroup topicName 0 ofs ""
   case op' of
     Left err -> error $ "Client error: " ++ show err
     Right _ -> return ()
-
-setKafkaCheckpoint' :: Kafka k => ConsumerGroup -> TopicName -> Offset -> Metadata -> k (Either KafkaError ())
-setKafkaCheckpoint' consumerGroup targetTopicName offset md = commitSingleOffset consumerGroup targetTopicName 0 `flip` md $ offset
 
 
 ----------------------
@@ -189,20 +167,20 @@ produceItemsAsJSON topicName events = do
 --Consuming/Fetching--
 ----------------------
 
-consume :: (Binary a, Binary md, HasKafka m) =>
-           Text -> ConsumerGroup -> TopicName -> (md -> [a] -> m md) -> m ()
-consume name consumerGroup topicName f = void $ runConsume name consumerGroup topicName (\md a -> (Nothing :: Maybe Void,) <$> f md a)
+consume :: (Binary a, HasKafka m) =>
+           Text -> ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
+consume name consumerGroup topicName f = void $ runConsume name consumerGroup topicName (\a -> Nothing <$ f a)
 
-runConsume :: (Binary a, Binary md, HasKafka m) =>
-              Text -> ConsumerGroup -> TopicName -> (md -> [a] -> m (Maybe b, md)) -> m b
+runConsume :: (Binary a, HasKafka m) =>
+              Text -> ConsumerGroup -> TopicName -> ([a] -> m (Maybe b)) -> m b
 runConsume _ consumerGroup topicName f = consumeOnce
   where
     consumeOnce = do
-      (offset, md) <- getKafkaCheckpoint consumerGroup topicName
+      offset <- getKafkaCheckpoint consumerGroup topicName
       items <- fetchItems topicName offset
-      (mReturnVal, md') <- f (unpackMetadata md) items
+      mReturnVal <- f items
       let nextOffset' = offset + fromIntegral (length items)
-      setKafkaCheckpoint consumerGroup topicName nextOffset' $ packMetadata md'
+      setKafkaCheckpoint consumerGroup topicName nextOffset'
       case mReturnVal of
         Just returnVal -> pure returnVal
         Nothing -> consumeOnce
@@ -225,13 +203,6 @@ fetchBytes topic offset = do
 
   return $ fetchResponseToPayload [offset] fetched
 
-conduitSource :: (MonadIO m, Binary a) =>
-                 KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i a m b
-conduitSource clientId kafkaAddress topicName = do
-  env <- createKafkaEnv clientId kafkaAddress
-
-  conduitSourceUsingEnv env topicName
-
 conduitSourceUsingEnv :: (MonadIO m, Binary a) =>
                          KafkaEnv -> TopicName -> ConduitT i a m b
 conduitSourceUsingEnv env topicName = do
@@ -246,12 +217,6 @@ conduitBatchSource :: (MonadIO m, Binary a) =>
                       KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i [a] m b
 conduitBatchSource clientId kafkaAddress topicName = do
   env <- createKafkaEnv clientId kafkaAddress
-
-  conduitBatchSourceUsingEnv env topicName
-
-conduitBatchSourceUsingEnv :: (MonadIO m, Binary a) =>
-                              KafkaEnv -> TopicName -> ConduitT i [a] m b
-conduitBatchSourceUsingEnv env topicName = do
   startingOffset <- runKafkaMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
 
   flip iterateM_ startingOffset $ \offset -> do

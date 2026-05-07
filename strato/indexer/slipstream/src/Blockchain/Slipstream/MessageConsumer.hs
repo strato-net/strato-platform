@@ -38,7 +38,7 @@ getAndProcessMessages ::
 getAndProcessMessages conn = do
   createTopicAndWait solidVmEventsTopicName
 
-  consume "getAndProcessMessages'" "slipstream" "vmevents" $ \() messages -> do
+  consume "getAndProcessMessages'" "slipstream" "vmevents" $ \messages -> do
     recordKafkaMessages messages
     emittedEvents <- runConduit $
       processTheMessages messages `fuseUpstream`

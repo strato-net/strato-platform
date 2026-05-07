@@ -75,7 +75,7 @@ ethereumVM = runResourceT $ do
 
     initializeBestBlock
 
-    failures <- runConsume "evm/loop" consumerGroup seqVmTasksTopicName $ \_ seqEvents -> do
+    failures <- runConsume "evm/loop" consumerGroup seqVmTasksTopicName $ \seqEvents -> do
 
         let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
         $logInfoS "ethereumVM/maybeSelfAddress" $ T.pack $ format maybeSelfAddress
@@ -100,7 +100,7 @@ ethereumVM = runResourceT $ do
 
         loopTimeit "compactContextM" $ compactContextM
 
-        return (if null failures then Nothing else Just failures, ())
+        return $ if null failures then Nothing else Just failures
 
     for_ failures $ \(BlockVerificationFailure bNum bHash bDetails) -> case bDetails of
       StateRootMismatch BlockDelta{..} -> do

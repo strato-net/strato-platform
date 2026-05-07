@@ -35,7 +35,6 @@ import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Foldable (for_)
 import Data.List (intercalate)
@@ -82,12 +81,12 @@ instance ( MonadUnliftIO m
     Nothing -> do
       StateRootMismatchM . void $ writeUnseqEvents [IEGetMPNodes [k]]
       fmap (Just . fromMaybe MP.EmptyNodeData) . timeout 10000000 $
-        runConsume "StateRootMismatchM/lookup" "ethereum-vm" seqVmTasksTopicName $ \_ evs -> do
+        runConsume "StateRootMismatchM/lookup" "ethereum-vm" seqVmTasksTopicName $ \evs -> do
           let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd
               findND _ = Nothing
               mND = foldr (<|>) Nothing (findND <$> evs)
           for_ mND $ lift . A.insert (A.Proxy @MP.NodeData) k
-          pure (mND, B.empty)
+          pure mND
   insert _ = error "StateRootMismatchM insert StateDB"
   delete _ = error "StateRootMismatchM delete StateDB"
 

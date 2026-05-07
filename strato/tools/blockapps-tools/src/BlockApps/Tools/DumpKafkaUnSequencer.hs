@@ -15,6 +15,6 @@ import Text.Format
 dumpKafkaUnSequencer :: Offset -> IO ()
 dumpKafkaUnSequencer startingBlock | startingBlock /= 0 = error "startingBlock currently can only equal 0"
 dumpKafkaUnSequencer _ = runStderrLoggingT $ runKafkaMConfigured "queryStrato" $
-  consume "queryStrato" "queryStrato" unseqEventsTopicName $ \() unseqEvents -> do
+  consume "queryStrato" "queryStrato" unseqEventsTopicName $ \unseqEvents -> do
     liftIO . putStrLn . unlines $ format <$> (unseqEvents :: [IngestEvent])
     return ()
