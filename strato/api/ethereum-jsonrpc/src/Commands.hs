@@ -28,8 +28,9 @@ import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
 import Blockchain.Strato.Model.Address (Address(..), addressToHex)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, keccak256ToHex)
 import Text.Format (format)
+import Control.Monad (void)
 import Control.Monad.IO.Class
-import Control.Monad.Composable.Kafka (fetchItems, execKafka)
+import Control.Monad.Composable.Kafka (consumeFromLatest)
 import Control.Monad.Except
 import Blockchain.Sequencer.HexData (HexData(..))
 import qualified Blockchain.Sequencer.TxCallObject as TxCall
@@ -39,8 +40,7 @@ import qualified Handlers.Transaction as Tx
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Blocks
 import qualified Handlers.TransactionResult as TxResults
-import Network.Kafka (getLastOffset, KafkaTime(..))
-import Network.Kafka.Protocol (Offset(..))
+import System.Timeout (timeout)
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
@@ -253,32 +253,21 @@ eth_blockNumber = toMethod "eth_blockNumber" f ()
 
 ----------------
 
-emitJsonRpcCommand :: JsonRpcCommand -> IO ()
-emitJsonRpcCommand c = do
-  putStrLn $ "emitJsonRpcCommand: " ++ show c
-  _ <- runKafkaMConfigured "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
-  return ()
-
-waitForResponse :: String -> Int -> Offset -> IO JsonRpcResponse
-waitForResponse rpcId retries offset = do
-  if retries <= 0
-    then return $ Error rpcId "timeout waiting for vm-runner response"
-    else do
-      responses <- runKafkaMConfigured "ethereum-jsonrpc" $
-        fetchItems "jsonrpcresponse" offset
-      let matched = filter ((rpcId ==) . fst) (responses :: [(String, B.ByteString)])
-      case matched of
-        ((_, val) : _) -> return $ Bin.decode (BL.fromStrict val)
-        [] -> do
-          let newOffset = offset + fromIntegral (length responses)
-          waitForResponse rpcId (retries - 1) newOffset
-
 callVM :: JsonRpcCommand -> IO JsonRpcResponse
 callVM c = do
-  lastOffset <- runKafkaMConfigured "ethereum-jsonrpc" $
-    execKafka $ getLastOffset LatestTime 0 "jsonrpcresponse"
-  emitJsonRpcCommand c
-  waitForResponse (jrcId c) 50 lastOffset
+  putStrLn $ "callVM: " ++ show (jrcId c)
+  result <- timeout 30000000 $ runKafkaMConfigured "ethereum-jsonrpc" $
+    consumeFromLatest "jsonrpcresponse"
+      (void $ writeSeqVmTasks [VmJsonRpcCommand c])
+      (\responses ->
+        let matched = filter ((jrcId c ==) . fst) (responses :: [(String, B.ByteString)])
+        in case matched of
+          ((_, val) : _) -> return $ Just $ Bin.decode (BL.fromStrict val)
+          [] -> return Nothing
+      )
+  return $ case result of
+    Just resp -> resp
+    Nothing -> Error (jrcId c) "timeout waiting for vm-runner response"
 
 eth_getBalance :: Method Server
 eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "blockString" :+: ())

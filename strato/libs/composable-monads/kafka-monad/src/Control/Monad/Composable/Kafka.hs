@@ -24,6 +24,7 @@ module Control.Monad.Composable.Kafka (
   produceItemsAsJSON,
   consume,
   runConsume,
+  consumeFromLatest,
   fetchItems,
   KafkaString(..),
   KafkaAddress,
@@ -183,6 +184,20 @@ runConsume consumerGroup topicName f = consumeOnce
       case mReturnVal of
         Just returnVal -> pure returnVal
         Nothing -> consumeOnce
+
+consumeFromLatest :: (Binary a, HasKafka m) =>
+                     TopicName -> m () -> ([a] -> m (Maybe b)) -> m b
+consumeFromLatest topicName initAction f = do
+  startOffset <- execKafka $ getLastOffset LatestTime 0 topicName
+  initAction
+  consumeLoop startOffset
+  where
+    consumeLoop offset = do
+      items <- fetchItems topicName offset
+      result <- f items
+      case result of
+        Just val -> return val
+        Nothing -> consumeLoop (offset + fromIntegral (length items))
 
 fetchItems :: (Binary a, HasKafka m) =>
               TopicName -> Offset -> m [a]
