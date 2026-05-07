@@ -27,7 +27,7 @@ import Text.Format
 
 p2pIndexerMainLoop ::
   ( MonadLogger m,
-    HasKafka m,
+    HasStreaming m,
     (Keccak256 `A.Alters` P2P OutputBlock) m,
     Mod.Modifiable (P2P BestBlock) m
   ) =>

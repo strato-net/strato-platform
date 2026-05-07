@@ -191,11 +191,11 @@ logEventSummaries evs = do
 
 -- KAFKA
 
-routeOutEvent :: (MonadLogger m, HasKafka m, HasContext m) => VmOutEvent -> m (Maybe [BlockVerificationFailure])
+routeOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m (Maybe [BlockVerificationFailure])
 routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
 routeOutEvent oev = Nothing <$ sendOutEvent oev
 
-sendOutEvent :: (MonadLogger m, HasKafka m, HasContext m) => VmOutEvent -> m ()
+sendOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m ()
 sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry diff]

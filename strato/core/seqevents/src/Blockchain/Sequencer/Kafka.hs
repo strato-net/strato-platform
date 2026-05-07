@@ -30,22 +30,22 @@ seqVmTasksTopicName = "vm_tasks"
 seqP2pEventsTopicName :: TopicName
 seqP2pEventsTopicName = "seq_p2p_events"
 
-assertSequencerTopicsCreation :: HasKafka m => m ()
+assertSequencerTopicsCreation :: HasStreaming m => m ()
 assertSequencerTopicsCreation = do
   createTopicAndWait unseqEventsTopicName
   createTopicAndWait seqVmTasksTopicName
   createTopicAndWait seqP2pEventsTopicName
 
-writeUnseqEvents :: HasKafka k => [IngestEvent] -> k [ProduceResponse]
+writeUnseqEvents :: HasStreaming k => [IngestEvent] -> k [ProduceResponse]
 writeUnseqEvents events = do
   produceItems unseqEventsTopicName events
 
-writeSeqVmTasks :: HasKafka k => [VmTask] -> k [ProduceResponse]
+writeSeqVmTasks :: HasStreaming k => [VmTask] -> k [ProduceResponse]
 writeSeqVmTasks events = do
   recordEvents seqVMWrites events
   produceItems seqVmTasksTopicName events
 
-writeSeqP2pEvents :: HasKafka k => [P2pEvent] -> k [ProduceResponse]
+writeSeqP2pEvents :: HasStreaming k => [P2pEvent] -> k [ProduceResponse]
 writeSeqP2pEvents events = do
   recordEvents seqP2PWrites events
   produceItems seqP2pEventsTopicName events

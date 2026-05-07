@@ -72,7 +72,7 @@ instance MonadUnliftIO m => MonadUnliftIO (StateRootMismatchM m) where
 
 instance ( MonadUnliftIO m
          , MonadLogger m
-         , HasKafka m
+         , HasStreaming m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          )
       => (MP.StateRoot `A.Alters` MP.NodeData) (StateRootMismatchM m) where

@@ -140,7 +140,7 @@ initSequencer = do
 writeToKafka :: (
   MonadFail m,
   MonadSequencer m,
-  HasKafka m
+  HasStreaming m
   ) =>
   ConduitT SeqOutEvent Void m ()
 writeToKafka = awaitForever $ either writeSeqP2pEvents writeSeqVmTasks

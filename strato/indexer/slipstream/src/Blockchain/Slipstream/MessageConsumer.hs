@@ -30,7 +30,7 @@ import Prelude hiding (lookup)
 
 getAndProcessMessages ::
   ( MonadLogger m,
-    HasKafka m,
+    HasStreaming m,
     HasSQL m
   ) =>
   PGConnection ->

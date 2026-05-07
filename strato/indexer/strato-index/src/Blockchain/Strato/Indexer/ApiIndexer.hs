@@ -35,7 +35,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
 apiIndexerMainLoop :: ( MonadLogger m,
-                        HasKafka m,
+                        HasStreaming m,
                         HasSQLDB m,
                         (Keccak256 `A.Alters` API OutputTx) m,
                         (Keccak256 `A.Alters` API OutputBlock) m

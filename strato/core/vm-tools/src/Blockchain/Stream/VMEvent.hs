@@ -40,5 +40,5 @@ instance JSON.ToJSON VMEvent
 
 instance JSON.FromJSON VMEvent
 
-produceVMEvents :: HasKafka k => [VMEvent] -> k [ProduceResponse]
+produceVMEvents :: HasStreaming k => [VMEvent] -> k [ProduceResponse]
 produceVMEvents = produceItems "vmevents"

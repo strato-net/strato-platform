@@ -16,6 +16,6 @@ import Data.Binary
 indexEventsTopicName :: TopicName
 indexEventsTopicName = "indexevents"
 
-produceIndexEvents :: (Binary a, HasKafka m) =>
+produceIndexEvents :: (Binary a, HasStreaming m) =>
                       [a] -> m [ProduceResponse]
 produceIndexEvents = produceItems indexEventsTopicName

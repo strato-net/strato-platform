@@ -56,10 +56,10 @@ import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPie
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format (format)
 
-produceResponse :: HasKafka m => JsonRpcResponse -> m ()
+produceResponse :: HasStreaming m => JsonRpcResponse -> m ()
 produceResponse resp = void $ produceItems "jsonrpcresponse" [(responseId resp, BL.toStrict $ Bin.encode resp)]
 
-runJsonRpcCommand :: (VMBase m, HasKafka m) => JsonRpcCommand -> m ()
+runJsonRpcCommand :: (VMBase m, HasStreaming m) => JsonRpcCommand -> m ()
 runJsonRpcCommand =
   produceResponse
     <=< runJsonRpcCommand'

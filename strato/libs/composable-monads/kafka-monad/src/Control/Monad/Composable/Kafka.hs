@@ -11,31 +11,43 @@
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 
 module Control.Monad.Composable.Kafka (
-  KafkaM,
-  HasKafka,
-  KafkaEnv(..),
+  -- Core types
+  StreamM,
+  HasStreaming,
+  StreamEnv(..),
   TopicName,
-  kafkaStateToKafkaEnv,
-  getKafkaEnv,
-  runKafkaM,
-  runKafkaMUsingEnv,
-  execKafka,
+  ConsumerGroup,
+  ClientId,
+  StreamAddress,
+  -- Running
+  runStreamM,
+  runStreamMUsingEnv,
+  createStreamEnv,
+  getStreamEnv,
+  -- Producing
   produceItems,
   produceItemsAsJSON,
+  -- Consuming
   consume,
   runConsume,
   consumeFromLatest,
-  fetchItems,
+  -- Topics
+  createTopicAndWait,
+  -- Conduit
+  conduitBatchSource,
+  -- Deprecated/internal (for migration)
+  KafkaM,
+  HasKafka,
+  KafkaEnv,
   KafkaString(..),
   KafkaAddress,
   KafkaClientId,
   Offset,
-  ConsumerGroup,
   ProduceResponse,
-  conduitBatchSource,
+  runKafkaM,
+  runKafkaMUsingEnv,
   createKafkaEnv,
-  createTopic,
-  createTopicAndWait
+  getKafkaEnv
   ) where
 
 import Blockchain.MilenaTools
@@ -62,24 +74,34 @@ import Network.Kafka hiding (createTopic)
 import qualified Network.Kafka as Milena
 import Network.Kafka.Consumer
 import Network.Kafka.Producer
-import Network.Kafka.Protocol
+import Network.Kafka.Protocol hiding (ClientId)
 
 
 
-type KafkaM = ReaderT (IORef KafkaState)
+-- Generic streaming type aliases
+type StreamM = ReaderT (IORef KafkaState)
+type HasStreaming m = (MonadIO m, AccessibleEnv (IORef KafkaState) m)
+type ClientId = KafkaClientId
+type StreamAddress = KafkaAddress
 
-type HasKafka m = (MonadIO m, AccessibleEnv (IORef KafkaState) m)
-
-data KafkaEnv = KafkaEnv
-  { kafkaStateIORef :: IORef KafkaState
+data StreamEnv = StreamEnv
+  { streamStateIORef :: IORef KafkaState
   }
 
-createKafkaEnv ::
+-- Deprecated aliases for backward compatibility
+type KafkaM = StreamM
+type HasKafka m = HasStreaming m
+type KafkaEnv = StreamEnv
+
+kafkaStateIORef :: StreamEnv -> IORef KafkaState
+kafkaStateIORef = streamStateIORef
+
+createStreamEnv ::
   MonadIO m =>
-  KafkaClientId ->
-  KafkaAddress ->
-  m KafkaEnv
-createKafkaEnv x y = do
+  ClientId ->
+  StreamAddress ->
+  m StreamEnv
+createStreamEnv x y = do
   let kafkaState =
         (mkKafkaState x y)
           { _stateRequiredAcks = -1,
@@ -87,26 +109,39 @@ createKafkaEnv x y = do
             _stateWaitTime = 100000 -- 100s
           }
 
-  kafkaStateToKafkaEnv kafkaState
+  kafkaStateToStreamEnv kafkaState
 
-kafkaStateToKafkaEnv :: MonadIO m =>
-                        KafkaState -> m KafkaEnv
-kafkaStateToKafkaEnv kafkaState = do
+kafkaStateToStreamEnv :: MonadIO m =>
+                         KafkaState -> m StreamEnv
+kafkaStateToStreamEnv kafkaState = do
   ksIORef <- liftIO $ newIORef kafkaState
-  return $ KafkaEnv ksIORef
+  return $ StreamEnv ksIORef
 
-getKafkaEnv :: HasKafka m => m KafkaEnv
-getKafkaEnv = KafkaEnv <$> accessEnv
+getStreamEnv :: HasStreaming m => m StreamEnv
+getStreamEnv = StreamEnv <$> accessEnv
 
-runKafkaMUsingEnv :: KafkaEnv -> KafkaM m a -> m a
-runKafkaMUsingEnv env f =
-  runReaderT f $ kafkaStateIORef env
+runStreamMUsingEnv :: StreamEnv -> StreamM m a -> m a
+runStreamMUsingEnv env f =
+  runReaderT f $ streamStateIORef env
 
-runKafkaM :: MonadIO m => KafkaClientId -> KafkaAddress -> KafkaM m a -> m a
-runKafkaM x y f = flip runKafkaMUsingEnv f =<< createKafkaEnv x y
+runStreamM :: MonadIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+runStreamM x y f = flip runStreamMUsingEnv f =<< createStreamEnv x y
+
+-- Deprecated aliases
+createKafkaEnv :: MonadIO m => KafkaClientId -> KafkaAddress -> m StreamEnv
+createKafkaEnv = createStreamEnv
+
+getKafkaEnv :: HasStreaming m => m StreamEnv
+getKafkaEnv = getStreamEnv
+
+runKafkaMUsingEnv :: StreamEnv -> StreamM m a -> m a
+runKafkaMUsingEnv = runStreamMUsingEnv
+
+runKafkaM :: MonadIO m => KafkaClientId -> KafkaAddress -> StreamM m a -> m a
+runKafkaM = runStreamM
 
 execKafka ::
-  HasKafka m =>
+  HasStreaming m =>
   StateT KafkaState (ExceptT KafkaClientError IO) a ->
   m a
 execKafka f = do
@@ -124,7 +159,7 @@ execKafka f = do
 --   Checkpoints    --
 ----------------------
 
-getKafkaCheckpoint :: HasKafka m =>
+getKafkaCheckpoint :: HasStreaming m =>
                       ConsumerGroup -> TopicName -> m Offset
 getKafkaCheckpoint consumerGroup topicName =
   execKafka (fetchSingleOffset consumerGroup topicName 0) >>= \case
@@ -134,7 +169,7 @@ getKafkaCheckpoint consumerGroup topicName =
     Left err -> error $ "Unexpected response when fetching offset for " ++ show consumerGroup ++ ": " ++ show err
     Right (o, _) -> return o
 
-setKafkaCheckpoint :: HasKafka m =>
+setKafkaCheckpoint :: HasStreaming m =>
                       ConsumerGroup -> TopicName -> Offset -> m ()
 setKafkaCheckpoint consumerGroup topicName ofs = do
   op' <- execKafka $ commitSingleOffset consumerGroup topicName 0 ofs ""
@@ -147,7 +182,7 @@ setKafkaCheckpoint consumerGroup topicName ofs = do
 --    Producing     --
 ----------------------
 
-produceItems :: (Binary a, HasKafka m) => TopicName -> [a] -> m [ProduceResponse]
+produceItems :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
 produceItems topicName events = do
   results <-
     execKafka $ produceMessagesAsSingletonSets $
@@ -155,7 +190,7 @@ produceItems topicName events = do
   liftIO $ mapM_ parseKafkaResponse results
   return results
 
-produceItemsAsJSON :: (JSON.ToJSON a, HasKafka m) => TopicName -> [a] -> m [ProduceResponse]
+produceItemsAsJSON :: (JSON.ToJSON a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
 produceItemsAsJSON topicName events = do
   results <-
     execKafka $ produceMessagesAsSingletonSets $
@@ -167,11 +202,11 @@ produceItemsAsJSON topicName events = do
 --Consuming/Fetching--
 ----------------------
 
-consume :: (Binary a, HasKafka m) =>
+consume :: (Binary a, HasStreaming m) =>
            ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
 consume consumerGroup topicName f = void $ runConsume consumerGroup topicName (\a -> Nothing <$ f a)
 
-runConsume :: (Binary a, HasKafka m) =>
+runConsume :: (Binary a, HasStreaming m) =>
               ConsumerGroup -> TopicName -> ([a] -> m (Maybe b)) -> m b
 runConsume consumerGroup topicName f = consumeOnce
   where
@@ -185,7 +220,7 @@ runConsume consumerGroup topicName f = consumeOnce
         Just returnVal -> pure returnVal
         Nothing -> consumeOnce
 
-consumeFromLatest :: (Binary a, HasKafka m) =>
+consumeFromLatest :: (Binary a, HasStreaming m) =>
                      TopicName -> m () -> ([a] -> m (Maybe b)) -> m b
 consumeFromLatest topicName initAction f = do
   startOffset <- execKafka $ getLastOffset LatestTime 0 topicName
@@ -199,11 +234,11 @@ consumeFromLatest topicName initAction f = do
         Just val -> return val
         Nothing -> consumeLoop (offset + fromIntegral (length items))
 
-fetchItems :: (Binary a, HasKafka m) =>
+fetchItems :: (Binary a, HasStreaming m) =>
               TopicName -> Offset -> m [a]
 fetchItems topicName offset = map (decode . BL.fromStrict) <$> fetchBytes topicName offset
 
-fetchBytes :: HasKafka m => TopicName -> Offset -> m [B.ByteString]
+fetchBytes :: HasStreaming m => TopicName -> Offset -> m [B.ByteString]
 fetchBytes topic offset = do
   fetched <- execKafka $ fetch offset 0 topic
 
@@ -218,17 +253,17 @@ fetchBytes topic offset = do
   return $ fetchResponseToPayload [offset] fetched
 
 conduitBatchSource :: (MonadIO m, Binary a) =>
-                      KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i [a] m b
-conduitBatchSource clientId kafkaAddress topicName = do
-  env <- createKafkaEnv clientId kafkaAddress
-  startingOffset <- runKafkaMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
+                      ClientId -> StreamAddress -> TopicName -> ConduitT i [a] m b
+conduitBatchSource clientId streamAddress topicName = do
+  env <- createStreamEnv clientId streamAddress
+  startingOffset <- runStreamMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
 
   flip iterateM_ startingOffset $ \offset -> do
-      items <- runKafkaMUsingEnv env $ fetchItems topicName offset
+      items <- runStreamMUsingEnv env $ fetchItems topicName offset
       yield items
       return $ offset + fromIntegral (length items)
 
-createTopic :: HasKafka m =>
+createTopic :: HasStreaming m =>
                TopicName -> m ()
 createTopic name = do
   TopicsResp result <- execKafka $ Milena.createTopic $ createTopicsRequest name 1 1 [] []
@@ -238,7 +273,7 @@ createTopic name = do
     [(_, TopicAlreadyExists)] -> return () -- No problem, it was already there
     _ -> error $ "Error creating kafka topic " ++ show name ++ ": " ++ show errors
 
-createTopicAndWait :: HasKafka m => TopicName -> m ()
+createTopicAndWait :: HasStreaming m => TopicName -> m ()
 createTopicAndWait name = do
   createTopic name
   waitForLeader (50 :: Int)  -- max 50 retries * 100ms = 5 seconds
