@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BlockApps.Tools.DumpKafkaVMEvents where
 
@@ -10,11 +11,7 @@ import Control.Monad.IO.Class
 import Text.Format
 
 dumpKafkaVMEvents :: Offset -> IO ()
-dumpKafkaVMEvents startingBlock = do
-  _ <- runKafkaMConfigured "queryStrato" $ doConsume' startingBlock
-  return ()
-  where
-    doConsume' offset = do
-      vmEvents <- fetchVMEvents offset
+dumpKafkaVMEvents _ =
+  runKafkaMConfigured "queryStrato" $
+    consume "dumpVMEvents" "queryStrato" "vmevents" $ \(vmEvents :: [VMEvent]) ->
       liftIO $ putStrLn $ unlines $ map format vmEvents
-      doConsume' (offset + fromIntegral (length vmEvents))

@@ -5,7 +5,6 @@
 module Blockchain.Stream.VMEvent
   ( VMEvent(..),
     produceVMEvents,
-    fetchVMEvents
   )
 where
 
@@ -43,6 +42,3 @@ instance JSON.FromJSON VMEvent
 
 produceVMEvents :: HasKafka k => [VMEvent] -> k [ProduceResponse]
 produceVMEvents = produceItems "vmevents"
-
-fetchVMEvents :: HasKafka k => Offset -> k [VMEvent]
-fetchVMEvents = fetchItems "vmevents"
