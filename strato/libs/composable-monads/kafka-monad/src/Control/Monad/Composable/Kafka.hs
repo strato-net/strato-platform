@@ -56,7 +56,7 @@ import Data.IORef
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe (isJust)
-import Data.Text (Text)
+
 import Network.Kafka hiding (createTopic)
 import qualified Network.Kafka as Milena
 import Network.Kafka.Consumer
@@ -167,12 +167,12 @@ produceItemsAsJSON topicName events = do
 ----------------------
 
 consume :: (Binary a, HasKafka m) =>
-           Text -> ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
-consume name consumerGroup topicName f = void $ runConsume name consumerGroup topicName (\a -> Nothing <$ f a)
+           ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
+consume consumerGroup topicName f = void $ runConsume consumerGroup topicName (\a -> Nothing <$ f a)
 
 runConsume :: (Binary a, HasKafka m) =>
-              Text -> ConsumerGroup -> TopicName -> ([a] -> m (Maybe b)) -> m b
-runConsume _ consumerGroup topicName f = consumeOnce
+              ConsumerGroup -> TopicName -> ([a] -> m (Maybe b)) -> m b
+runConsume consumerGroup topicName f = consumeOnce
   where
     consumeOnce = do
       offset <- getKafkaCheckpoint consumerGroup topicName

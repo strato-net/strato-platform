@@ -33,7 +33,7 @@ p2pIndexerMainLoop ::
   ) =>
   m ()
 p2pIndexerMainLoop = forever $ do
-  consume "p2pIndexer" "strato-p2p-indexer" targetTopicName $ \idxEvents -> do
+  consume "strato-p2p-indexer" targetTopicName $ \idxEvents -> do
     indexP2P idxEvents
     return ()
 

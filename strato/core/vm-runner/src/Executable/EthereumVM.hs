@@ -75,7 +75,7 @@ ethereumVM = runResourceT $ do
 
     initializeBestBlock
 
-    failures <- runConsume "evm/loop" consumerGroup seqVmTasksTopicName $ \seqEvents -> do
+    failures <- runConsume consumerGroup seqVmTasksTopicName $ \seqEvents -> do
 
         let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
         $logInfoS "ethereumVM/maybeSelfAddress" $ T.pack $ format maybeSelfAddress

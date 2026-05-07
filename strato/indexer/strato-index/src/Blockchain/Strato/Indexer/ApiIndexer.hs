@@ -42,7 +42,7 @@ apiIndexerMainLoop :: ( MonadLogger m,
                       ) =>
                       m ()
 apiIndexerMainLoop =
-  consume "apiIndexer" (snd kafkaClientIds) targetTopicName $ \idxEvents -> do
+  consume (snd kafkaClientIds) targetTopicName $ \idxEvents -> do
     indexAPI idxEvents
     return ()
 
