@@ -43,7 +43,7 @@ import qualified Control.Exception as E
 import Control.Monad (forever, forM, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.Vault (runVaultM, getPub)
 import Data.Foldable
 import Data.Maybe

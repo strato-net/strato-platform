@@ -47,7 +47,6 @@ library
     , directory
     , format
     , hflags
-    , kafka-monad
     , lens
     , leveldb-haskell
     , monad-alter
@@ -60,6 +59,7 @@ library
     , strato-conf
     , strato-model
     , strato-redis-blockdb
+    , streaming
     , text
     , time
     , transformers
@@ -75,9 +75,9 @@ executable forced-config-change
       base
     , blockstanbul
     , hflags
-    , kafka-monad
     , seqevents
     , strato-conf
+    , streaming
   default-language: Haskell2010
 
 executable strato-sequencer

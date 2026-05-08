@@ -31,7 +31,7 @@ import           Data.IORef
 import           Data.Set.Ordered (empty)
 import           Instrumentation
 import           Blockchain.Sequencer.Kafka (seqP2pEventsTopicName, unseqEventsTopicName)
-import           Control.Monad.Composable.Kafka (createTopicAndWait)
+import           Control.Monad.Composable.Streaming (createTopicAndWait)
 
 main :: IO ()
 main = runLoggingT initP2P

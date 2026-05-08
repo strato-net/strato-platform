@@ -43,7 +43,7 @@ import Conduit
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.Trans.Reader (ReaderT, runReaderT, asks)
 import Blockchain.Strato.RedisBlockDB (RedisConnection, withRedisBlockDB)
 import Data.Foldable (for_)

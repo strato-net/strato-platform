@@ -56,7 +56,7 @@ import Conduit hiding (Flush)
 import Control.Monad
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List

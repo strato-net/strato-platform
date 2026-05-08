@@ -30,7 +30,7 @@ import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, kec
 import Text.Format (format)
 import Control.Monad (void)
 import Control.Monad.IO.Class
-import Control.Monad.Composable.Kafka (consumeFromLatest)
+import Control.Monad.Composable.Streaming (consumeFromLatest)
 import Control.Monad.Except
 import Blockchain.Sequencer.HexData (HexData(..))
 import qualified Blockchain.Sequencer.TxCallObject as TxCall

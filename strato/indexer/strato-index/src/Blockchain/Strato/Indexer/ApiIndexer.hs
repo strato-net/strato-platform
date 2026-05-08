@@ -30,7 +30,7 @@ import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Control.Arrow ((&&&))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 

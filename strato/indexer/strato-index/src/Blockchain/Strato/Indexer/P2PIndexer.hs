@@ -21,7 +21,7 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import qualified Data.Text as T
 import Text.Format
 

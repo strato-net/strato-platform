@@ -16,7 +16,7 @@ where
 
 import Blockchain.EthConf.Model
 import Control.Exception (catch, IOException)
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import Data.Default

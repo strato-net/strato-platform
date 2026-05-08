@@ -19,7 +19,7 @@ import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.PostgresqlTypedShim
 import Control.Concurrent
 import Control.Monad
-import Control.Monad.Composable.Kafka (createTopicAndWait)
+import Control.Monad.Composable.Streaming (createTopicAndWait)
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (runReaderT)

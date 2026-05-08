@@ -15,7 +15,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks, writeSeqP2pEvents, assertSequencerTopicsCreation)
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import qualified Data.ByteString.Char8 as C8
 
 -- | Bootstrap genesis block into LevelDB and Kafka.

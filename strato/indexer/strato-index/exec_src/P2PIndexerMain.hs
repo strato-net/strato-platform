@@ -6,7 +6,7 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.Strato.Indexer.Kafka (indexEventsTopicName)
 import Blockchain.Strato.Indexer.P2PIndexer
-import Control.Monad.Composable.Kafka (createTopicAndWait)
+import Control.Monad.Composable.Streaming (createTopicAndWait)
 import Control.Monad.Composable.Redis
 import HFlags
 import Instrumentation

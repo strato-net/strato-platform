@@ -6,7 +6,7 @@ module BlockApps.Tools.DumpKafkaUnSequencer where
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Text.Format

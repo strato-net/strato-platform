@@ -18,7 +18,7 @@ import qualified Blockchain.Blockstanbul as PBFT
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka.Metrics
 import Control.Monad.Change.Modify (Outputs (..))
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 
 
 unseqEventsTopicName :: TopicName

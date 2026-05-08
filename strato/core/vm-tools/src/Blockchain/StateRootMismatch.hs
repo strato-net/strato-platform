@@ -31,7 +31,7 @@ import Blockchain.Strato.StateDiff
 import Control.Applicative ((<|>))
 import Control.Monad (void)
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource

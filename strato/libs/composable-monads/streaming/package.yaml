@@ -1,0 +1,17 @@
+name:                streaming
+version:             0.1.0.0
+license:             Apache-2.0
+
+# Umbrella package for message streaming.
+# Change the dependency below to switch backends:
+#   kafka-monad      - Kafka via Milena
+#   rabbitmq-monad   - RabbitMQ (future)
+#   redpanda-monad   - Redpanda (future)
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  dependencies:
+  - kafka-monad  # <- change this line to switch backends

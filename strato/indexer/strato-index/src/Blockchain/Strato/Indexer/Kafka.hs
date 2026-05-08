@@ -10,7 +10,7 @@ module Blockchain.Strato.Indexer.Kafka
   )
 where
 
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Data.Binary
 
 indexEventsTopicName :: TopicName

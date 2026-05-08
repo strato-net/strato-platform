@@ -6,7 +6,7 @@ module BlockApps.Tools.DumpKafkaVMEvents where
 
 import Blockchain.EthConf
 import Blockchain.Stream.VMEvent
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
 import Text.Format
 

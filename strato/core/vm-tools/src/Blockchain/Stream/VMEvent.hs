@@ -10,7 +10,7 @@ where
 
 import Blockchain.Data.TransactionResult
 import Blockchain.Stream.Action (Action)
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import qualified Data.Aeson as JSON
 import Data.Binary
 import Data.Text (Text)

@@ -30,7 +30,7 @@ library:
     - format
     - hedis
     - hflags
-    - kafka-monad
+    - streaming
     - labeled-error
     - leveldb-haskell
     - merkle-patricia-db

@@ -6,7 +6,7 @@ import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Control.Monad
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import HFlags
 import System.Exit
 

@@ -52,7 +52,7 @@ import Control.Monad (join, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
-import Control.Monad.Composable.Kafka (HasStreaming)
+import Control.Monad.Composable.Streaming (HasStreaming)
 import Control.Monad.IO.Class
 import Control.Monad.Reader (ReaderT)
 import qualified Data.ByteString as B

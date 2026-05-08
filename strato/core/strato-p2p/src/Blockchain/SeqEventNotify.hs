@@ -5,7 +5,7 @@ module Blockchain.SeqEventNotify (
   ) where
 
 import           Conduit
-import           Control.Monad.Composable.Kafka
+import           Control.Monad.Composable.Streaming
 import           Blockchain.EthConf (ethConf)
 import           Blockchain.EthConf.Model (kafkaConfig, kafkaHost, kafkaPort)
 import           Blockchain.Sequencer.Event

@@ -10,7 +10,7 @@ where
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Strato.Indexer.Kafka (indexEventsTopicName)
-import Control.Monad.Composable.Kafka (createTopicAndWait)
+import Control.Monad.Composable.Streaming (createTopicAndWait)
 import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.Text as T
 import Database.Persist.Postgresql (withPostgresqlConn, rawExecute, runMigration)

@@ -59,7 +59,7 @@ import Control.Lens
 import Control.Monad (unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.Vault (HasVault, VaultM, runVaultM)
 import Control.Monad.Reader
 import Control.Monad.State

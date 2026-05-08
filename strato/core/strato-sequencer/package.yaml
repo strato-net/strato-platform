@@ -28,7 +28,7 @@ library:
     - directory
     - format
     - hflags
-    - kafka-monad
+    - streaming
     - lens
     - leveldb-haskell
     - monad-alter
@@ -82,7 +82,7 @@ executables:
     dependencies:
       - blockstanbul
       - hflags
-      - kafka-monad
+      - streaming
       - seqevents
       - strato-conf
 

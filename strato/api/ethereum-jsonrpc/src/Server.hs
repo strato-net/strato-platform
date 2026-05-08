@@ -8,7 +8,7 @@ where
 import Blaze.ByteString.Builder (copyByteString)
 import qualified Data.ByteString as BS
 import Blockchain.EthConf (runKafkaMConfigured)
-import Control.Monad.Composable.Kafka (createTopicAndWait)
+import Control.Monad.Composable.Streaming (createTopicAndWait)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.CaseInsensitive as CI

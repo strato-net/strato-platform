@@ -20,7 +20,7 @@ executables:
       - blockapps-init
       - ethereum-discovery
       - hflags
-      - kafka-monad
+      - streaming
       - lifted-async
       - ordered-containers
       - process-monitor
@@ -60,7 +60,7 @@ library:
     - hflags
     - http-client
     - iproute
-    - kafka-monad
+    - streaming
     - lens
     - lifted-async
     - lifted-base

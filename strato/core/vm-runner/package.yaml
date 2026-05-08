@@ -38,7 +38,7 @@ library:
   - evm-solidity
   - format
   - lens
-  - kafka-monad
+  - streaming
   - merkle-patricia-db
   - monad-alter
   - prometheus-client

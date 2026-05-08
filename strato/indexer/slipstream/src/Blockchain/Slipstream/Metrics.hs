@@ -15,7 +15,7 @@ module Blockchain.Slipstream.Metrics
 where
 
 import Control.Monad
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
 import qualified Data.Text as T
 import Prometheus

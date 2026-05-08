@@ -30,7 +30,7 @@ executables:
       - http-client
       - http-types
       - json-rpc-server
-      - kafka-monad
+      - streaming
       - milena
       - mtl
       - seqevents

@@ -21,7 +21,7 @@ library:
     - data-default
     - file-embed
     - hedis
-    - kafka-monad
+    - streaming
     - postgresql-simple
     - process
     - strato-model

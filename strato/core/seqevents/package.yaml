@@ -17,7 +17,7 @@ library:
     - blockstanbul
     - bytestring
     - format
-    - kafka-monad
+    - streaming
     - merkle-patricia-db
     - monad-alter
     - prometheus-client

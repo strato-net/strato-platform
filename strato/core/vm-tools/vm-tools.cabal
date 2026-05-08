@@ -67,7 +67,6 @@ library
     , format
     , hedis
     , hflags
-    , kafka-monad
     , lens
     , leveldb-haskell
     , lrucache
@@ -86,6 +85,7 @@ library
     , strato-model
     , strato-redis-blockdb
     , strato-statediff
+    , streaming
     , text
     , time
     , transformers

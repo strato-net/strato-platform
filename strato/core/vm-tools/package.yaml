@@ -59,7 +59,7 @@ library:
     - extra
     - format
     - hedis
-    - kafka-monad
+    - streaming
     - lens
     - leveldb-haskell
     - lrucache

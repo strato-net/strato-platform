@@ -49,7 +49,6 @@ library
     , ethereum-rlp
     , evm-solidity
     , format
-    , kafka-monad
     , lens
     , merkle-patricia-db
     , monad-alter
@@ -65,6 +64,7 @@ library
     , strato-model
     , strato-redis-blockdb
     , strato-statediff
+    , streaming
     , text
     , time
     , transformers

@@ -22,7 +22,7 @@ import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.SQL
 import Conduit
 import Control.Monad
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.SQL
 import Data.String
 import Blockchain.Slipstream.PostgresqlTypedShim

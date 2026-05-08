@@ -21,7 +21,7 @@ library:
   - common-log
   - containers
   - format
-  - kafka-monad
+  - streaming
   - monad-alter
   - persistent-postgresql
   - seqevents
@@ -63,7 +63,7 @@ executables:
       - common-log
       - containers
       - hflags
-      - kafka-monad
+      - streaming
       - monad-alter
       - process-monitor
       - redis-monad
