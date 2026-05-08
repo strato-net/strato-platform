@@ -375,6 +375,60 @@ async function addCarryVaultApys(
       add(addr, { source: "vault", apy: info.apy });
     }
 
+    // Vault-level Base APY = weighted average of per-strategy `baseApyPct`,
+    // weighted by *productive* on-chain equity (deployedAssetsUSD − offChainUsdWad).
+    //
+    // Why productive equity (not deployedAssets):
+    //   Per-strategy `baseApyPct` is computed on productive equity, not on
+    //   deployed equity (the "subtract off-chain from equity" rule). Weighting
+    //   by deployedAssets here would mix incompatible denominators across
+    //   strategies and produce a number that matches neither "rate on productive
+    //   capital" nor "rate on deposited capital". Weighting by productive equity
+    //   makes the rollup mathematically equal to Σ netYieldUSD / Σ productiveUSD,
+    //   which matches the per-strategy display semantics.
+    //
+    // Emitted as `vault_weighted` so the headline tooltip on
+    // Dashboard / Earn / Rewards / EarnYieldVault renders Native + Base + Rewards
+    // consistently with the main protocol vault.
+    if (info?.deployed && info.strategyHoldings?.length) {
+      let assetPriceWad = 0n;
+      try { assetPriceWad = BigInt(info.assetPriceWad || "0"); } catch { assetPriceWad = 0n; }
+      const assetDecimals = Number.isFinite(info.decimals) ? info.decimals : 18;
+      const assetUnit = 10n ** BigInt(assetDecimals);
+
+      let totalProductive = 0n; // USD-WAD
+      let weightedSumBps = 0n;  // bps × USD-WAD
+      for (const h of info.strategyHoldings) {
+        if (h.baseApyPct === null || h.baseApyPct === undefined) continue;
+        if (!Number.isFinite(h.baseApyPct)) continue;
+        if (assetPriceWad <= 0n || assetUnit === 0n) continue;
+
+        let deployed = 0n;
+        let offChain = 0n;
+        try {
+          deployed = BigInt(h.deployedAssets || "0");
+          offChain = BigInt(h.offChainUsdWad || "0");
+        } catch { continue; }
+        if (deployed <= 0n) continue;
+
+        const deployedUsdWad = (deployed * assetPriceWad) / assetUnit;
+        const productiveUsdWad =
+          deployedUsdWad > offChain ? deployedUsdWad - offChain : 0n;
+        if (productiveUsdWad <= 0n) continue;
+
+        const apyBps = BigInt(Math.round(h.baseApyPct * 100));
+        totalProductive += productiveUsdWad;
+        weightedSumBps += apyBps * productiveUsdWad;
+      }
+      if (totalProductive > 0n) {
+        const avgBps = Number(weightedSumBps / totalProductive);
+        const vaultBaseApy = avgBps / 100;
+        if (Number.isFinite(vaultBaseApy) && vaultBaseApy > 0) {
+          add(addr, { source: "vault_weighted", apy: vaultBaseApy.toFixed(2) });
+        }
+      }
+    }
+
     const rewardsActivity = findRewardActivity(rewardActivities, {
       sourceContract: addr,
       stakeAssetAddress: addr,

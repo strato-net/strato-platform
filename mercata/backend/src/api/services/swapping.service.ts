@@ -64,6 +64,8 @@ const { Pool: PoolTable, PoolFactory, PoolSwap, StablePool: StablePoolTable, swa
 // READ OPERATIONS
 // ============================================================================
 
+const normalizeAddress = (address: string): string => address.toLowerCase().replace(/^0x/, "");
+
 // --- Pool Queries ---
 
 export const getPools = async (
@@ -382,12 +384,13 @@ export const getSwapHistory = async (
   senderAddress?: string
 ): Promise<SwapHistoryResponse> => {
   const offset = (page - 1) * limit;
+  const normalizedSenderAddress = senderAddress ? normalizeAddress(senderAddress) : undefined;
 
   const [swapEventsResponse, countResponse] = await Promise.all([
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
-        ...(senderAddress ? { sender: `eq.${senderAddress}` } : {}),
+        ...(normalizedSenderAddress ? { sender: `eq.${normalizedSenderAddress}` } : {}),
         select: swapHistorySelectFields.join(','),
         order: 'block_timestamp.desc',
         limit: limit.toString(),
@@ -397,7 +400,7 @@ export const getSwapHistory = async (
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
-        ...(senderAddress ? { sender: `eq.${senderAddress}` } : {}),
+        ...(normalizedSenderAddress ? { sender: `eq.${normalizedSenderAddress}` } : {}),
         select: "count()",
       }
     })

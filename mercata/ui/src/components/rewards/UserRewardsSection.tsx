@@ -84,7 +84,7 @@ export const UserRewardsSection = ({
 }: UserRewardsSectionProps) => {
   const { toast } = useToast();
   const { saveUsdstInfo } = useSaveUsdstContext();
-  const { userAddress } = useUser();
+  const { userAddress, isAppAuthenticated } = useUser();
   const { getPrice } = useOracleContext();
   const [claimingActivityIds, setClaimingActivityIds] = useState<number[]>([]);
 
@@ -110,7 +110,7 @@ export const UserRewardsSection = ({
     try {
       setClaimingActivityIds(activityIds);
       
-      const result = await claimRewards(userAddress, activityIds);
+      const result = await claimRewards(userAddress, activityIds, { walletAuth: !isAppAuthenticated });
       
       if (result.success) {
         toast({

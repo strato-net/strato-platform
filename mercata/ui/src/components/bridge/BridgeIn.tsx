@@ -294,7 +294,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const { signTypedDataAsync } = useSignTypedData();
   const { openConnectModal } = useConnectModal();
   const { toast } = useToast();
-  const { userAddress, externalWalletAddress, isExternalWalletConnected, isAppAuthenticated } = useUser();
+  const { userAddress, externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
   const {
@@ -444,13 +444,17 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [bridgeableTokens]);
 
   const expectedChainId = currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : null;
-  const externalSender = externalWalletAddress;
+  const externalSender = externalEvmWalletAddress;
   const externalSenderHex = externalSender ? (externalSender as `0x${string}`) : undefined;
   const stratoRecipient = userAddress;
-  const hasExternalWallet = isConnected && isExternalWalletConnected && !!externalSenderHex;
+  const hasExternalWallet = isConnected && isExternalEvmWalletConnected && !!externalSenderHex;
   const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
   const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
+  const visibleMatchingActions = useMemo(
+    () => useExternalWalletSigning ? [] : matchingActions,
+    [matchingActions, useExternalWalletSigning]
+  );
 
   const {
     data: nativeBalance,
@@ -543,6 +547,12 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setSelectedNetwork,
     setSelectedToken,
   ]);
+
+  useEffect(() => {
+    if (useExternalWalletSigning && selectedAction) {
+      setSelectedAction(null);
+    }
+  }, [useExternalWalletSigning, selectedAction]);
 
   useEffect(() => {
     if (selectedToken && currentNetwork) {
@@ -956,7 +966,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const adjustedAmount = (amount18Decimals * WAD / factor).toString();
 
       const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
-      const action = selectedAction?.action || 0;
+      const action = useExternalWalletSigning ? 0 : selectedAction?.action || 0;
       existing.push({
         externalChainId: parseInt(activeChainId),
         externalTxHash: txHash,
@@ -984,7 +994,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           externalTxHash: txHash,
           action,
           targetToken: action === 2 ? selectedAction.stratoToken : undefined,
-        });
+        }, useExternalWalletSigning ? { walletAuth: true } : undefined);
       }
 
       // Step: Complete
@@ -1261,7 +1271,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                       />
                     );
                   }),
-                  ...matchingActions.map((action) => {
+                  ...visibleMatchingActions.map((action) => {
                     let est = amount || "0";
                     if (action.action === 2 && action.oraclePrice && amount) {
                       try {
