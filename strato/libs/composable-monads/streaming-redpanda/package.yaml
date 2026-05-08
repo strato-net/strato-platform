@@ -1,0 +1,15 @@
+name:                streaming-redpanda
+version:             0.1.0.0
+license:             Apache-2.0
+
+# Redpanda streaming backend.
+# Redpanda is Kafka-compatible, so this re-exports streaming-kafka-hw.
+# Benefits over Kafka: no JVM, lower latency, simpler operations.
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  dependencies:
+  - streaming-kafka-hw
