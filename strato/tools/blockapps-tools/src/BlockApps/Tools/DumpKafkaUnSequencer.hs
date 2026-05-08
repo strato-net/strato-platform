@@ -14,7 +14,7 @@ import Text.Format
 --ignoring startingBlock for now, might fix this later, but it won't apply to RabbitMQ
 dumpKafkaUnSequencer :: Offset -> IO ()
 dumpKafkaUnSequencer startingBlock | startingBlock /= 0 = error "startingBlock currently can only equal 0"
-dumpKafkaUnSequencer _ = runStderrLoggingT $ runKafkaMConfigured "queryStrato" $
+dumpKafkaUnSequencer _ = runStderrLoggingT $ runStreamMConfigured "queryStrato" $
   consume "queryStrato" unseqEventsTopicName $ \unseqEvents -> do
     liftIO . putStrLn . unlines $ format <$> (unseqEvents :: [IngestEvent])
     return ()

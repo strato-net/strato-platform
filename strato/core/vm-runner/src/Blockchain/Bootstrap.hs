@@ -26,7 +26,6 @@ import qualified Blockchain.EthConf as UEC
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.SolidVM.CodeCollectionDB
-import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
 import Blockchain.Strato.Model.Event
@@ -97,7 +96,7 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs genesisInfo genesisBlock genesisChainId = do
-  kafkaEnv <- liftIO $ UEC.runKafkaMConfigured "vm-runner-bootstrap" $ do
+  kafkaEnv <- liftIO $ UEC.runStreamMConfigured "vm-runner-bootstrap" $ do
     createTopicAndWait IdxKafka.indexEventsTopicName
     createTopicAndWait "vmevents"
     createTopicAndWait "jsonrpcresponse"
@@ -204,10 +203,9 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
 
 bootstrapIndexer :: OutputBlock -> IO ()
 bootstrapIndexer obGB = do
-  let clientId = fst ApiIndexer.kafkaClientIds
   putStrLn "About to bootstrap index events"
   res <-
-    UEC.runKafkaMConfigured clientId $
+    UEC.runStreamMConfigured "strato-api-indexer" $
     IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
 
   print res

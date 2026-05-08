@@ -7,7 +7,7 @@ where
 
 import Blaze.ByteString.Builder (copyByteString)
 import qualified Data.ByteString as BS
-import Blockchain.EthConf (runKafkaMConfigured)
+import Blockchain.EthConf (runStreamMConfigured)
 import Control.Monad.Composable.Streaming (createTopicAndWait)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BLC
@@ -23,7 +23,7 @@ startServer :: IO ()
 startServer = do
   hSetBuffering stdout LineBuffering
   let port = 8545
-  runKafkaMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
+  runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
   putStrLn $ "Listening on port " ++ show port
   run port app
 

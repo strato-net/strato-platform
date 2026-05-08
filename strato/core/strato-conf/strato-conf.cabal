@@ -33,6 +33,5 @@ library
     , strato-model
     , streaming
     , template-haskell
-    , text
     , yaml
   default-language: Haskell2010

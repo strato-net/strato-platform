@@ -13,7 +13,7 @@ import EthLog (eventRowToLog, matchesTopics)
 import TransactionReceipt (TransactionReceipt, mkTransactionReceipt)
 import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
-import Blockchain.EthConf (runKafkaMConfigured, ethConf)
+import Blockchain.EthConf (runStreamMConfigured, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
@@ -256,7 +256,7 @@ eth_blockNumber = toMethod "eth_blockNumber" f ()
 callVM :: JsonRpcCommand -> IO JsonRpcResponse
 callVM c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
-  result <- timeout 30000000 $ runKafkaMConfigured "ethereum-jsonrpc" $
+  result <- timeout 30000000 $ runStreamMConfigured "ethereum-jsonrpc" $
     consumeFromLatest "jsonrpcresponse"
       (void $ writeSeqVmTasks [VmJsonRpcCommand c])
       (\responses ->

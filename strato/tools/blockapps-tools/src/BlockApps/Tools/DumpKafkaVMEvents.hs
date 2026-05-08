@@ -12,6 +12,6 @@ import Text.Format
 
 dumpKafkaVMEvents :: Offset -> IO ()
 dumpKafkaVMEvents _ =
-  runKafkaMConfigured "queryStrato" $
+  runStreamMConfigured "queryStrato" $
     consume "queryStrato" "vmevents" $ \(vmEvents :: [VMEvent]) ->
       liftIO $ putStrLn $ unlines $ map format vmEvents

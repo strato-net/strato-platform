@@ -22,7 +22,7 @@ import UnliftIO.Exception (catch, SomeException)
 
 bootstrapIndexer :: (MonadLoggerIO m, MonadUnliftIO m) => m ()
 bootstrapIndexer = do
-  UEC.runKafkaMConfigured "strato-api-indexer" $ createTopicAndWait indexEventsTopicName
+  UEC.runStreamMConfigured "strato-api-indexer" $ createTopicAndWait indexEventsTopicName
   let ethconf = UEC.ethConf
       pgconf = EC.sqlConfig ethconf
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}

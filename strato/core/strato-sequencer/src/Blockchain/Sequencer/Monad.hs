@@ -110,7 +110,7 @@ data SequencerConfig = SequencerConfig
     cablePackage :: CablePackage,
     maxEventsPerIter :: Int,
     maxUsPerIter :: Int,
-    kafkaClientId :: KafkaClientId,
+    kafkaClientId :: ClientId,
     redisConn :: RBDB.RedisConnection
   }
 
@@ -182,7 +182,7 @@ instance (MonadIO m, MonadLogger m, Mod.Modifiable BestSequencedBlock m) => Mod.
 runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM vaultUrl' c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runVaultM vaultUrl' . runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
+  a <- runVaultM vaultUrl' . runResourceT . runStreamMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
@@ -200,7 +200,7 @@ runSequencerM vaultUrl' c bc m = do
 runSequencerMTest :: SequencerConfig -> BlockstanbulContext -> SequencerMTest a -> (LoggingT IO) a
 runSequencerMTest c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
+  a <- runResourceT . runStreamMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c

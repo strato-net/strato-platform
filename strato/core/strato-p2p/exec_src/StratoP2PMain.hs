@@ -46,7 +46,7 @@ initP2P = labelTheThread "initP2P" $ do
   -- a freshly created table will already have all peers in the inactive state.
   _ <- liftIO $ (try resetPeers :: IO (Either SomeException ()))
   _ <- liftIO $ $initHFlags "Strato P2P"
-  liftIO $ runKafkaMConfigured "strato-p2p" $ do
+  liftIO $ runStreamMConfigured "strato-p2p" $ do
     createTopicAndWait seqP2pEventsTopicName
     createTopicAndWait unseqEventsTopicName
   setParticipationMode flags_participationMode

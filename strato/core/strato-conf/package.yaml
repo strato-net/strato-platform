@@ -26,5 +26,4 @@ library:
     - process
     - strato-model
     - template-haskell
-    - text
     - yaml

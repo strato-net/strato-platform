@@ -391,7 +391,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Point PPeer (Reader
       actions = SQL.selectList [PPeerPubkey SQL.==. Just pk] []
 
 instance {-# OVERLAPPING #-} MonadIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
-  output = void . runKafkaMConfigured "strato-p2p" . SK.writeUnseqEvents
+  output = void . runStreamMConfigured "strato-p2p" . SK.writeUnseqEvents
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p

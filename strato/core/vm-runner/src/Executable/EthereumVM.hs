@@ -68,7 +68,7 @@ import Text.Format (format)
 ethereumVM :: LoggingT IO ()
 ethereumVM = runResourceT $ do
   ctx <- initContext
-  void . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
+  void . runStreamMConfigured "ethereum-vm" $ execContextM' ctx $ do
 --    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
     bootstrapIfFirstRun

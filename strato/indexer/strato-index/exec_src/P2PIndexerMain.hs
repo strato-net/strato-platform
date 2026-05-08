@@ -20,7 +20,7 @@ main = do
   _ <- $initHFlags "Strato P2P Indexer"
 
   runLoggingT $ do
-    runKafkaMConfigured "strato-p2p-indexer" $ createTopicAndWait indexEventsTopicName
-    runKafkaMConfigured "strato-p2p-indexer" $
+    runStreamMConfigured "strato-p2p-indexer" $ createTopicAndWait indexEventsTopicName
+    runStreamMConfigured "strato-p2p-indexer" $
       runRedisM lookupRedisBlockDBConfig $
         p2pIndexerMainLoop
