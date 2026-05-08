@@ -21,6 +21,7 @@ import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import Data.Default
 import Data.String
+import qualified Data.Text.Encoding as TE
 import Data.Yaml
 import qualified Database.Redis as Redis
 import System.IO.Unsafe
@@ -50,9 +51,9 @@ runStreamMConfigured name =
   let k = kafkaConfig ethConf
   in runStreamM name (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
 
--- Deprecated alias
-runKafkaMConfigured :: MonadIO m => ClientId -> StreamM m a -> m a
-runKafkaMConfigured = runStreamMConfigured
+-- Deprecated alias (accepts old KafkaClientId type for backward compatibility)
+runKafkaMConfigured :: MonadIO m => KafkaClientId -> StreamM m a -> m a
+runKafkaMConfigured (KString bs) = runStreamMConfigured (TE.decodeUtf8 bs)
 
 lookupRedisBlockDBConfig :: Redis.ConnectInfo
 lookupRedisBlockDBConfig = redisConnection $ redisBlockDBConfig ethConf

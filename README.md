@@ -32,6 +32,7 @@ Choose one of the following options to install dependencies:
         libleveldb-dev \
         liblzma-dev \
         libpq-dev \
+	librdkafka-dev \
         libsecp256k1-dev \
         libsodium-dev \
         pkg-config \

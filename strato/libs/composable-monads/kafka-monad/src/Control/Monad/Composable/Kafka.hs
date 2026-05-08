@@ -69,6 +69,8 @@ import Data.IORef
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe (isJust)
+import Data.Text (Text)
+import qualified Data.Text.Encoding as TE
 
 import Network.Kafka hiding (createTopic)
 import qualified Network.Kafka as Milena
@@ -81,8 +83,12 @@ import Network.Kafka.Protocol hiding (ClientId)
 -- Generic streaming type aliases
 type StreamM = ReaderT (IORef KafkaState)
 type HasStreaming m = (MonadIO m, AccessibleEnv (IORef KafkaState) m)
-type ClientId = KafkaClientId
-type StreamAddress = KafkaAddress
+type ClientId = Text
+type StreamAddress = (String, Int)
+
+-- Internal conversion from Text to Milena's KString
+toKafkaClientId :: ClientId -> KafkaClientId
+toKafkaClientId = KString . TE.encodeUtf8
 
 data StreamEnv = StreamEnv
   { streamStateIORef :: IORef KafkaState
@@ -101,9 +107,11 @@ createStreamEnv ::
   ClientId ->
   StreamAddress ->
   m StreamEnv
-createStreamEnv x y = do
-  let kafkaState =
-        (mkKafkaState x y)
+createStreamEnv clientId (host, port) = do
+  let kafkaClientId = toKafkaClientId clientId
+      kafkaAddress = (Host (KString (BC.pack host)), Port (fromIntegral port))
+      kafkaState =
+        (mkKafkaState kafkaClientId kafkaAddress)
           { _stateRequiredAcks = -1,
             _stateWaitSize = 1, -- Awaken from sleep only if there is at least one message
             _stateWaitTime = 100000 -- 100s
@@ -127,9 +135,10 @@ runStreamMUsingEnv env f =
 runStreamM :: MonadIO m => ClientId -> StreamAddress -> StreamM m a -> m a
 runStreamM x y f = flip runStreamMUsingEnv f =<< createStreamEnv x y
 
--- Deprecated aliases
+-- Deprecated aliases (accept old types for backward compatibility)
 createKafkaEnv :: MonadIO m => KafkaClientId -> KafkaAddress -> m StreamEnv
-createKafkaEnv = createStreamEnv
+createKafkaEnv (KString cid) (Host (KString host), Port port) =
+  createStreamEnv (TE.decodeUtf8 cid) (BC.unpack host, fromIntegral port)
 
 getKafkaEnv :: HasStreaming m => m StreamEnv
 getKafkaEnv = getStreamEnv
@@ -138,7 +147,7 @@ runKafkaMUsingEnv :: StreamEnv -> StreamM m a -> m a
 runKafkaMUsingEnv = runStreamMUsingEnv
 
 runKafkaM :: MonadIO m => KafkaClientId -> KafkaAddress -> StreamM m a -> m a
-runKafkaM = runStreamM
+runKafkaM cid addr f = flip runStreamMUsingEnv f =<< createKafkaEnv cid addr
 
 execKafka ::
   HasStreaming m =>
