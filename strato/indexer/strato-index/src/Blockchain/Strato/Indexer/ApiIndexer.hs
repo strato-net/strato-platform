@@ -92,7 +92,7 @@ indexAPI idxEvents = do
         | (addr, ASModification as) <- M.toList asmMap
         ]
 
-kafkaClientIds :: (KafkaClientId, ConsumerGroup)
+kafkaClientIds :: (ClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", "strato-api-indexer")
 
 {-

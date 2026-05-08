@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -52,6 +53,7 @@ import qualified Data.Aeson as JSON
 import Data.Binary
 import Data.IORef
 import Data.Int (Int64)
+import Data.String (IsString)
 import Data.Text (Text)
 import qualified Network.AMQP as AMQP
 
@@ -63,7 +65,7 @@ data ProduceResponse = ProduceResponse
   deriving (Show, Eq)
 
 newtype TopicName = TopicName { unTopicName :: Text }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, IsString)
 
 type ClientId = Text
 type StreamAddress = (String, Int)

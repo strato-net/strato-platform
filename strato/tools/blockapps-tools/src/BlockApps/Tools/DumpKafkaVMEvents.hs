@@ -10,8 +10,8 @@ import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
 import Text.Format
 
-dumpKafkaVMEvents :: Offset -> IO ()
-dumpKafkaVMEvents _ =
+dumpKafkaVMEvents :: IO ()
+dumpKafkaVMEvents =
   runStreamMConfigured "queryStrato" $
     consume "queryStrato" "vmevents" $ \(vmEvents :: [VMEvent]) ->
       liftIO $ putStrLn $ unlines $ map format vmEvents
