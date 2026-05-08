@@ -55,6 +55,7 @@ library:
   - strato-conf
   - strato-genesis
   - strato-model
+  - streaming
   # - strato-p2p
   - template-haskell
   - transformers

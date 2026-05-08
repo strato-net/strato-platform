@@ -3,15 +3,34 @@ version:             0.1.0.0
 license:             Apache-2.0
 
 # Umbrella package for message streaming.
-# Change the dependency below to switch backends:
-#   kafka-monad      - Kafka via Milena
-#   rabbitmq-monad   - RabbitMQ (future)
-#   redpanda-monad   - Redpanda (future)
+# To switch backends, change THREE things:
+#   1. The dependency below (client library)
+#   2. The import in Streaming.hs (client library)
+#   3. The import in DockerConfig.hs (server container)
+#
+# Client libraries (dependency + Streaming.hs):
+#   kafka-monad        - Kafka via Milena (pure Haskell)
+#   streaming-kafka-hw - Kafka via hw-kafka-client (librdkafka)
+#   streaming-redpanda - Redpanda via hw-kafka-client
+#   streaming-rabbitmq - RabbitMQ via amqp
+#
+# Server containers (DockerConfig.hs):
+#   DockerConfig.Kafka    - Apache Kafka (for kafka-monad or streaming-kafka-hw)
+#   DockerConfig.Redpanda - Redpanda (for streaming-kafka-hw or streaming-redpanda)
+#   DockerConfig.RabbitMQ - RabbitMQ (for streaming-rabbitmq)
 
 dependencies:
 - base >= 4.7 && < 5
+- containers
 
 library:
   source-dirs: src
+  exposed-modules:
+  - Control.Monad.Composable.Streaming
+  - Control.Monad.Composable.Streaming.DockerConfig
+  other-modules:
+  - Control.Monad.Composable.Streaming.DockerConfig.Kafka
+  - Control.Monad.Composable.Streaming.DockerConfig.RabbitMQ
+  - Control.Monad.Composable.Streaming.DockerConfig.Redpanda
   dependencies:
   - kafka-monad  # <- change this line to switch backends

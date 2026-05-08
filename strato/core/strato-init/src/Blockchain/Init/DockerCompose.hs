@@ -9,6 +9,7 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
+import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
@@ -247,39 +248,23 @@ generateDockerCompose = do
         , logging = noLogging
         }
 
-  let kafka = def
-        { image = "apache/kafka:3.9.2"
-        , environment = Just $ Map.fromList
-            [ ("KAFKA_NODE_ID", "1")
-            , ("KAFKA_PROCESS_ROLES", "broker,controller")
-            , ("KAFKA_LISTENERS", "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093")
-            , ("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://localhost:9092")
-            , ("KAFKA_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
-            , ("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP", "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT")
-            , ("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@localhost:9093")
-            , ("KAFKA_LOG_DIRS", "/kafka/kafka-logs")
-            , ("KAFKA_DELETE_TOPIC_ENABLE", "true")
-            , ("KAFKA_LOG_CLEANER_ENABLE", "true")
-            , ("KAFKA_LOG_RETENTION_HOURS", "168")
-            , ("KAFKA_OFFSET_METADATA_MAX_BYTES", "1048576")
-            , ("KAFKA_OFFSETS_RETENTION_MINUTES", "2147483647")
-            , ("KAFKA_MAX_REQUEST_SIZE", "2500000")
-            , ("KAFKA_MESSAGE_MAX_BYTES", "2500000")
-            , ("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
-            , ("KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR", "1")
-            , ("KAFKA_TRANSACTION_STATE_LOG_MIN_ISR", "1")
-            ]
+  -- Message broker service (configured via streaming package)
+  let bc = brokerConfig
+      streaming = def
+        { image = bcImage bc
+        , user = if bcNeedsUserGid bc then Just userGid else Nothing
+        , environment = bcEnvironment bc
+        , entrypoint = bcEntrypoint bc
+        , command = bcCommand bc
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
-            { test = ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+            { test = bcHealthcheckTest bc
             , interval = Just "5s"
             , timeout = Just "10s"
             , retries = Just 10
             , start_period = Nothing
             }
-        , volumes = Just ["./logs:/logs", "./kafka:/kafka"]
-        , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec /__cacert_entrypoint.sh /etc/kafka/docker/run >> /logs/kafka.log 2>&1"]
+        , volumes = Just (bcVolumes bc)
         , logging = noLogging
         , ports = Just ["127.0.0.1:9092:9092"]
         }
@@ -336,7 +321,7 @@ generateDockerCompose = do
             , ("postgres", postgres)
             , ("nginx", nginx)
             , ("docs", docs)
-            , ("kafka", kafka)
+            , ("streaming", streaming)
             , ("prometheus", prometheus)
             ]
 

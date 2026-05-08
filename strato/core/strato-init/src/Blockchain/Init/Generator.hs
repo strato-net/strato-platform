@@ -17,6 +17,7 @@ import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_sslDir)
+import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Strato.Model.Validator
@@ -138,7 +139,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
     -- Create node directories first (needed before genEthConf reads postgres_password)
     liftIO $ mapM_ (createDirectoryIfMissing True)
-      ["postgres", "redis", "kafka", "prometheus", "logs", "secrets", ".ethereumH"]
+      (["postgres", "redis", "prometheus", "logs", "secrets", ".ethereumH"] ++ brokerVolumeDirs)
 
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
