@@ -11,6 +11,7 @@ class RpcController {
     "eth_chainId",
     "eth_getCode",
     "eth_getTransactionCount",
+    "eth_getTransactionByHash",
     "eth_getTransactionReceipt",
     "eth_getBlockByNumber",
     "eth_getBlockByHash",
@@ -111,4 +112,3 @@ class RpcController {
 }
 
 export default RpcController;
-
