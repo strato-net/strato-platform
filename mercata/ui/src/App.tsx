@@ -73,7 +73,7 @@ import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
-import { initializeCsrfToken } from "./lib/csrf";
+import { csrfOnRequest, initializeCsrfToken } from "./lib/csrf";
 import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/nodeHealth";
 
 
@@ -156,7 +156,11 @@ const App = () => {
       const transports: Record<number, Transport> = Object.fromEntries(
         chains.map((chain) => [
           chain.id,
-          chain === stratoChain ? http(`/rpc`) : proxiedChainIds.has(chain.id) ? http(`/api/rpc/${chain.id}`) : http(),
+          chain === stratoChain
+            ? http(`/rpc`)
+            : proxiedChainIds.has(chain.id)
+              ? http(`/api/rpc/${chain.id}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
+              : http(),
         ])
       );
 
