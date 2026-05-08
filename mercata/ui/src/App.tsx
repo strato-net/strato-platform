@@ -4,7 +4,7 @@ import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Transport, WagmiProvider } from "wagmi";
-import { mainnet, polygon, sepolia, base, baseSepolia } from "wagmi/chains";
+import { mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia } from "wagmi/chains";
 import {
   connectorsForWallets,
   RainbowKitProvider,
@@ -78,7 +78,8 @@ import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/node
 
 
 const queryClient = new QueryClient();
-const baseChains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
+const proxiedChainIds = new Set([mainnet.id, sepolia.id, base.id, baseSepolia.id, linea.id, lineaSepolia.id]);
+const baseChains = [mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia] as const;
 
 const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
@@ -153,7 +154,10 @@ const App = () => {
       const stratoChain = getStratoChain();
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
-        chains.map((chain) => [chain.id, chain === stratoChain ? http(`/rpc`) : http()])
+        chains.map((chain) => [
+          chain.id,
+          chain === stratoChain ? http(`/rpc`) : proxiedChainIds.has(chain.id) ? http(`/api/rpc/${chain.id}`) : http(),
+        ])
       );
 
       const connectors = connectorsForWallets(
