@@ -324,6 +324,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     setIsAdmin(false);
     setUserName(null);
     localStorage.removeItem("user");
+    const gtag = (window as any).gtag;
+    if (gtag) gtag('set', { user_id: null });
     authLogout();
   }, [disconnect]);
 
