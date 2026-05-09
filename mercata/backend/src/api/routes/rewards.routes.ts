@@ -4,6 +4,7 @@ import RewardsController from "../controllers/rewards.controller";
 
 const router = Router();
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
+const userRewardsAuth = authHandler.authorizeRequest({ allowWalletAuth: true, allowAnonAccess: false });
 
 // ═════════════════════════════════════════════════════════════════════════
 // REWARDS CONTRACT ENDPOINTS
@@ -85,18 +86,10 @@ router.get("/activities", authHandler.authorizeRequest(true), RewardsController.
 
 /**
  * @openapi
- * /rewards/activities/{userAddress}:
+ * /rewards/activities/me:
  *   get:
- *     summary: Get all activities with user-specific data for the specified user
+ *     summary: Get all activities with user-specific data for the authenticated user
  *     tags: [Rewards]
- *     parameters:
- *       - in: path
- *         name: userAddress
- *         required: true
- *         schema:
- *           type: string
- *         description: The user address to fetch activities for
- *         example: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
  *     responses:
  *       200:
  *         description: Activities with user-specific data and rewards breakdown
@@ -148,7 +141,7 @@ router.get("/activities", authHandler.authorizeRequest(true), RewardsController.
  *       401:
  *         description: Unauthorized
  */
-router.get("/activities/:userAddress", authHandler.authorizeRequest(), RewardsController.getUserActivities);
+router.get("/activities/me", userRewardsAuth, RewardsController.getMyActivities);
 
 /**
  * @openapi

@@ -1092,21 +1092,21 @@ solidityTypeToSQLType _ _ _ SVMType.Variadic = Just SqlJsonb
 ------------------
 
 solidityValueToText :: SolidityValue -> Text
-solidityValueToText (SolidityValueAsString x) = escapeQuotes $ V.unEscapeStringValue x
+solidityValueToText (SolidityValueAsString x) = escapeQuestionMarks . escapeQuotes $ V.unEscapeStringValue x
 solidityValueToText (SolidityBool x) = tshow x
 solidityValueToText (SolidityNum x) = tshow x
-solidityValueToText (SolidityBytes x) = escapeQuotes $ tshow x
+solidityValueToText (SolidityBytes x) = escapeQuestionMarks . escapeQuotes $ tshow x
 solidityValueToText (SolidityArray x) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 solidityValueToText x@(SolidityObject _) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 
 valueToSQLText' :: Bool -> Value -> Maybe Text
 valueToSQLText' _ (SimpleValue (ValueBool x)) = Just $ if x then "true" else "false"
 valueToSQLText' _ (SimpleValue (ValueInt _ _ v)) = Just $ tshow v
-valueToSQLText' _ (SimpleValue (ValueString s)) = Just s
+valueToSQLText' _ (SimpleValue (ValueString s)) = Just . escapeQuestionMarks $ escapeQuotes s
 valueToSQLText' _ (SimpleValue (ValueAddress (Address 0))) = Just ""
 valueToSQLText' _ (SimpleValue (ValueAddress (Address addr))) =
   Just . T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just $
+valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just . escapeQuestionMarks . escapeQuotes $
   case decodeUtf8' bytes of
     Left _ -> decodeUtf8 $ Base16.encode bytes
     Right x -> x

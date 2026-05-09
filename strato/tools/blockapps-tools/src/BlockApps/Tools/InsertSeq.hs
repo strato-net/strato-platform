@@ -27,7 +27,7 @@ import Text.Printf
 insertSeq :: IngestEvent -> IO ()
 insertSeq iev = do
   printf "Inserting %s into unseqevents...\n" $ show iev
-  resps <- runKafkaMConfigured "queryStrato" $ do
+  resps <- runStreamMConfigured "queryStrato" $ do
     assertSequencerTopicsCreation
     writeUnseqEvents [iev]
   mapM_ print resps
@@ -37,7 +37,7 @@ validatorBehavior valB = do
   printf "Validator behavior = %s \n" $ show valB
   let msg = IEValidatorBehavior . ForcedValidator $ valB
   print msg
-  resp <- runKafkaMConfigured "validator-bevaiour-flag" $ do
+  resp <- runStreamMConfigured "validator-bevaiour-flag" $ do
     writeUnseqEvents [msg]
   print resp
 
@@ -46,7 +46,7 @@ deleteDepBlock k = do
   printf "deleteDepBlock = %s \n" $ k
   let msg = IEDeleteDepBlock $ keccak256FromHex k
   print msg
-  resp <- runKafkaMConfigured "delete-dep-block" $ do
+  resp <- runStreamMConfigured "delete-dep-block" $ do
     writeUnseqEvents [msg]
   print resp
 
@@ -67,7 +67,7 @@ addBlocksFromFile fileName = do
     Right b -> do
       let bs = map bPrimeToB b
       printf "Inserting %d blocks into unseq_events...\n" (length bs)
-      resps <- runKafkaMConfigured "queryStrato" $ do
+      resps <- runStreamMConfigured "queryStrato" $ do
         assertSequencerTopicsCreation
         writeUnseqEvents $
           map
@@ -86,7 +86,7 @@ addTxsFromFile fileName = do
       let bs = map (\(Transaction' t) -> t) b
       printf "Inserting %d transactions into unseq_events...\n" (length bs)
       t <- getCurrentMicrotime
-      resps <- runKafkaMConfigured "queryStrato" $ do
+      resps <- runStreamMConfigured "queryStrato" $ do
         assertSequencerTopicsCreation
         writeUnseqEvents $
           map (IETx t . IngestTx (TXO.PeerString "")) bs

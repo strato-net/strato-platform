@@ -26,7 +26,6 @@ import qualified Blockchain.EthConf as UEC
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.SolidVM.CodeCollectionDB
-import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
 import Blockchain.Strato.Model.Event
@@ -43,7 +42,7 @@ import Conduit
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.Trans.Reader (ReaderT, runReaderT, asks)
 import Blockchain.Strato.RedisBlockDB (RedisConnection, withRedisBlockDB)
 import Data.Foldable (for_)
@@ -97,14 +96,14 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs genesisInfo genesisBlock genesisChainId = do
-  kafkaEnv <- liftIO $ UEC.runKafkaMConfigured "vm-runner-bootstrap" $ do
+  streamEnv <- liftIO $ UEC.runStreamMConfigured "vm-runner-bootstrap" $ do
     createTopicAndWait IdxKafka.indexEventsTopicName
     createTopicAndWait "vmevents"
     createTopicAndWait "jsonrpcresponse"
     createTopicAndWait "vm_tasks"
-    getKafkaEnv
+    getStreamEnv
   let pub sd vmes = do
-        void . runKafkaMUsingEnv kafkaEnv $ do
+        void . runStreamMUsingEnv streamEnv $ do
           for_ sd $ \diff -> IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]
           produceVMEvents vmes
   let sr = GI.stateRoot genesisInfo
@@ -204,10 +203,9 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
 
 bootstrapIndexer :: OutputBlock -> IO ()
 bootstrapIndexer obGB = do
-  let clientId = fst ApiIndexer.kafkaClientIds
   putStrLn "About to bootstrap index events"
   res <-
-    UEC.runKafkaMConfigured clientId $
+    UEC.runStreamMConfigured "strato-api-indexer" $
     IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
 
   print res
@@ -228,10 +226,13 @@ seedDatabases genesisBlock = do
 
   _ <- withRedisBlockDB $ putBestSequencedBlockInfo $ BestSequencedBlock genesisHash' 0 validators'
 
-  void . withRedisBlockDB $ do
+  bestBlockResult <- withRedisBlockDB $
     forceBestBlockInfo
       genesisHash'
       (number . blockBlockData $ genesisBlock)
+  case bestBlockResult of
+    Right _ -> pure ()
+    Left err -> error $ "Failed to seed best block in Redis: " ++ show err
 
   void . withRedisBlockDB $
     putBlock OutputBlock

@@ -55,7 +55,6 @@ library
     , format
     , generic-random
     , hashable
-    , labeled-error
     , lens
     , openapi3
     , persistent

@@ -1,0 +1,24 @@
+name:                streaming-kafka-hw
+version:             0.1.0.0
+license:             Apache-2.0
+
+# Kafka streaming backend using hw-kafka-client (librdkafka wrapper)
+# More performant than Milena-based kafka-monad
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  dependencies:
+  - aeson
+  - binary
+  - bytestring
+  - composable-monads-base
+  - conduit
+  - containers
+  - hw-kafka-client
+  - mtl
+  - random
+  - text
+  - transformers

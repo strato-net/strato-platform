@@ -45,6 +45,7 @@ local wallet_auth_routes = {
   ["/api/credit-card/manual-top-up"] = true,
   ["/api/credit-card/remove-card"] = true,
   ["/api/credit-card/update-card"] = true,
+  ["/api/bridge/requestWithdrawal"] = true,
   ["/api/metal-forge/buy"] = true,
   ["/api/oracle/price"] = true,
   ["/api/rpc/results"] = true,
@@ -76,6 +77,11 @@ local wallet_auth_methods = {
   POST = true,
   PUT = true
 }
+
+-- Backend only proxies allow-listed read-only JSON-RPC methods on these routes.
+local function allow_rpc_proxy_request()
+  return ngx.req.get_method() == "POST" and (ngx.var.uri or ""):match("^/api/rpc/%d+$") ~= nil
+end
 
 local function is_valid_wallet_address(addr)
   if type(addr) ~= "string" then
@@ -128,7 +134,9 @@ else
   local authenticate_res, authenticate_err, authenticate_session
   -- Allow anonymous access only for safe/read-only methods on endpoints that explicitly allow it
   local method = ngx.req.get_method()
-  local allow_anonymous_request = ngx.var.allow_optional_anon_access == "true" and (method == "GET" or method == "HEAD" or method == "OPTIONS")
+  local allow_anonymous_request =
+    (ngx.var.allow_optional_anon_access == "true" and (method == "GET" or method == "HEAD" or method == "OPTIONS"))
+    or allow_rpc_proxy_request()
   local allow_wallet_request = allow_wallet_auth_request()
   -- if requested_uri is the UI page (like SMD), else the API call
   if ngx.var.is_ui == "true" then

@@ -83,7 +83,7 @@ export const UserRewardsSummary = ({
   rewardsStateLoading,
 }: UserRewardsSummaryProps) => {
   const { toast } = useToast();
-  const { userAddress } = useUser();
+  const { userAddress, isAppAuthenticated } = useUser();
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
   const handleClaimAll = async () => {
@@ -107,7 +107,7 @@ export const UserRewardsSummary = ({
 
     try {
       setIsClaimingAll(true);
-      const result = await claimAllRewards(userAddress);
+      const result = await claimAllRewards(userAddress, { walletAuth: !isAppAuthenticated });
 
       if (result.success) {
         toast({

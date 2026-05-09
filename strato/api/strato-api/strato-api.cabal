@@ -26,8 +26,6 @@ executable strato-api
     , blockapps-datadefs
     , blockapps-init
     , blockapps-mpdbs
-    , blockapps-vault-wrapper-api
-    , blockapps-vault-wrapper-client
     , bytestring
     , cache
     , clock
@@ -43,13 +41,10 @@ executable strato-api
     , monad-alter
     , openapi3
     , process-monitor
-    , regex-compat
-    , servant-client-core
     , servant-multipart
     , servant-openapi3
     , servant-server
     , servant-swagger-ui
-    , solid-vm-model
     , source-tools
     , sql-monad
     , strato-auth
@@ -59,7 +54,6 @@ executable strato-api
     , text
     , transformers
     , unliftio
-    , vault-monad
     , wai
     , wai-cors
     , wai-extra

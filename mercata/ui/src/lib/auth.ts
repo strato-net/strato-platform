@@ -1,6 +1,8 @@
 import { api } from './axios';
 import { clearDismissedForUser, LAST_USER_ADDRESS_KEY } from '@/hooks/useLiquidationDismiss';
 
+export const WALLET_CONNECT_REQUEST_EVENT = 'mercata:wallet-connect-request';
+
 // Check authentication status via server API call (works with HttpOnly cookies).
 // Uses fetch directly to bypass the Axios 401 interceptor — this is a probe,
 // not a user action, so a 401 here means "not logged in," not "session expired."
@@ -48,4 +50,8 @@ export const redirectToLogin = (returnTo?: string): void => {
   }
 
   window.location.href = `/login?${params.toString()}`;
+};
+
+export const requestWalletConnection = (): void => {
+  window.dispatchEvent(new CustomEvent(WALLET_CONNECT_REQUEST_EVENT));
 };

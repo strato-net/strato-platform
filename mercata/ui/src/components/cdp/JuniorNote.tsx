@@ -5,7 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { cdpService, JuniorNote as JuniorNoteType } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
-import { redirectToLogin } from "@/lib/auth";
+import { requestWalletConnection } from "@/lib/auth";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import { isTxPending, isTxSubmitted } from "@/utils/transactionStatus";
 import CopyableHash from "../common/CopyableHash";
@@ -163,12 +163,12 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
     return (
       <div className="text-center py-6">
         <p className="text-sm text-muted-foreground mb-4">
-          Sign in to view your Junior Note details, claimable rewards, and remaining cap.
+          Connect a wallet to view your Junior Note details, claimable rewards, and remaining cap.
         </p>
         <Button
-          onClick={() => redirectToLogin()}
+          onClick={() => requestWalletConnection()}
         >
-          Sign In to View Your Junior Note
+          Connect Wallet to View Your Junior Note
         </Button>
       </div>
     );

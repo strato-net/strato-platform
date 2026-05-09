@@ -50,7 +50,7 @@ $(info )
 
 # Compute content hash for a directory (truncated to 12 chars)
 # Usage: $(call dir_hash,directory_path)
-dir_hash = $(shell git ls-files $(1) 2>/dev/null | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
+dir_hash = $(shell git ls-files $(1) 2>/dev/null | LC_ALL=C sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
 
 # Image content hashes - used for docker tags
 HASH_STRATO := $(call dir_hash,strato)
@@ -190,7 +190,7 @@ build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd
 app: mercata-backend mercata-ui
 	@echo ""
 	@echo "Both app images built. To patch a running node:"
-	@echo "  strato-up <node-dir> --patch-app $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
+	@echo "  strato-patch-app <node-dir> $(REPO_URL)mercata-backend:$(VERSION)-$(HASH_MERCATA_BACKEND) $(REPO_URL)mercata-ui:$(VERSION)-$(HASH_MERCATA_UI)"
 
 # Force rebuild targets (unconditional)
 apex-force:
@@ -267,6 +267,7 @@ build_common: generate-version-file
 	@install -m 755 bin/strato-up $(HOME)/.local/bin/
 	@install -m 755 bin/strato-down $(HOME)/.local/bin/
 	@install -m 755 bin/strato-ps $(HOME)/.local/bin/
+	@install -m 755 bin/strato-patch-app $(HOME)/.local/bin/
 
 build_common_docker: generate-version-file
 	@echo building haskell libraries and creating directories in docker
@@ -439,6 +440,7 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-up
 	@rm -f $(HOME)/.local/bin/strato-down
 	@rm -f $(HOME)/.local/bin/strato-ps
+	@rm -f $(HOME)/.local/bin/strato-patch-app
 	@rm -f $(HOME)/.local/bin/strato-setup
 	@rm -f $(HOME)/.local/bin/convoke
 	@echo "Done"

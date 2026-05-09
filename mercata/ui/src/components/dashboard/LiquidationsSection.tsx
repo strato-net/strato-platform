@@ -18,6 +18,7 @@ import {
 import { ChevronDown, ChevronRight, PauseCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
+const normalizeAddress = (addr?: string | null): string => (addr || "").toLowerCase().replace(/^0x/, "");
 const weiToEther = (v?: string) => {
   if (!v) return 0;
   try {
@@ -37,7 +38,7 @@ const LiquidationsSection: React.FC = () => {
   } | null>(null);
 
   // You cannot liquidate your own loans
-  const isOwnLoan = (loan: LiquidationEntry) => loan.user.toLowerCase() === userAddress?.toLowerCase();
+  const isOwnLoan = (loan: LiquidationEntry) => normalizeAddress(loan.user) === normalizeAddress(userAddress);
 
   // Refresh liquidation data when component mounts (tab is opened) - only if logged in
   useEffect(() => {

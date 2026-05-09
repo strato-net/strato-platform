@@ -105,6 +105,9 @@ escapeDoubleQuotes = T.replace "\"" "\\\""
 escapeQuotes :: T.Text -> T.Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
+escapeQuestionMarks :: T.Text -> T.Text
+escapeQuestionMarks = T.replace "?" "??"
+
 escapeUnderscores :: T.Text -> T.Text
 escapeUnderscores = T.replace "_" "\\_"
 

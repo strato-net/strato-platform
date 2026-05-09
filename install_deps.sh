@@ -35,8 +35,8 @@ get_package_version() {
             if [ -f "/etc/os-release" ]; then
                 DISTRO_NAME=$(. /etc/os-release; echo $NAME)
                 case $DISTRO_NAME in
-                    "Amazon Linux"*)
-                        # Amazon Linux - use dnf/rpm
+                    "Amazon Linux"*|"Oracle Linux Server"*)
+                        # Amazon Linux / Oracle Linux - use dnf/rpm
                         version=$(rpm -q --queryformat '%{VERSION}-%{RELEASE}' "$package_name" 2>/dev/null | head -1)
                         if [ "$?" -ne 0 ]; then
                             version=""
@@ -267,7 +267,103 @@ Linux)
 
             # Update library cache
             sudo ldconfig
-            
+
+            ;;
+
+        "Oracle Linux Server")
+            # Check Oracle Linux version constraints - only allow 8.10
+            ORACLE_VERSION=$(. /etc/os-release; echo $VERSION_ID)
+            case $ORACLE_VERSION in
+                8.10|8.10.*)
+                    echo "Installing STRATO dependencies on Oracle Linux $ORACLE_VERSION."
+                    ;;
+                *)
+                    echo "ERROR - STRATO only supports Oracle Linux 8.10."
+                    echo "Your Oracle Linux version: $ORACLE_VERSION"
+                    exit 1
+                    ;;
+            esac
+
+            # Install git
+            sudo dnf update -y
+            sudo dnf install -y git
+
+            # Enable EPEL and CodeReady Linux Builder repositories (needed for some -devel packages)
+            sudo dnf install -y oracle-epel-release-el8
+            sudo dnf config-manager --set-enabled ol8_codeready_builder
+
+            # Install Docker
+            sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+            sudo dnf install -y \
+                docker-ce \
+                docker-ce-cli \
+                containerd.io \
+                docker-buildx-plugin \
+                docker-compose-plugin
+            sudo systemctl enable docker
+            sudo systemctl start docker
+
+            # Add current user to docker group so Docker runs as non-root user
+            # See https://docs.docker.com/engine/install/linux-postinstall/
+            sudo groupadd docker 2>/dev/null || true
+            sudo usermod -aG docker $USER
+
+            # Install Haskell Stack dependencies
+            sudo dnf install -y \
+                gcc \
+                gcc-c++ \
+                gmp-devel \
+                make \
+                ncurses-devel \
+                zlib-devel
+            curl -sSL https://get.haskellstack.org/ | sh -s - -f
+
+            # Install PostgreSQL 15 via the official PGDG repo (OL8 AppStream only ships PG 13)
+            sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+            sudo dnf -y module disable postgresql
+            sudo dnf install -y postgresql15 postgresql15-devel
+            # PGDG installs pg_config to /usr/pgsql-15/bin/ which is not in the default PATH.
+            # Symlink it and the pkgconfig file into standard locations so build tools can find them.
+            sudo ln -sf /usr/pgsql-15/bin/pg_config /usr/local/bin/pg_config
+            sudo ln -sf /usr/pgsql-15/lib/pkgconfig/libpq.pc /usr/share/pkgconfig/libpq.pc
+
+            # Install remaining STRATO dependencies available in standard repos
+            sudo dnf install -y \
+                libsodium-devel \
+                xz-devel
+
+            # Build leveldb from source (not available in Oracle Linux 8 repositories)
+            sudo dnf install -y snappy-devel
+            git clone --branch v1.20 --recurse-submodules https://github.com/google/leveldb.git
+            cd leveldb
+            make
+            sudo mkdir -p /usr/local/include/leveldb
+            sudo cp -r include/leveldb/* /usr/local/include/leveldb/
+            sudo cp out-shared/libleveldb.* /usr/local/lib/
+            sudo cp out-static/libleveldb.a /usr/local/lib/
+            sudo cp /usr/local/lib/libleveldb.so.1 /lib64
+            cd ..
+            rm -rf leveldb
+
+            # Build secp256k1 from source (not available in Oracle Linux 8 repositories)
+            sudo dnf install -y autoconf libtool make
+            git clone --branch v0.7.0 https://github.com/bitcoin-core/secp256k1.git
+            cd secp256k1
+            ./autogen.sh
+            ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
+            make
+            sudo make install
+            # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
+            # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
+            # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
+            sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
+            sudo cp /usr/local/lib/libsecp256k1.so.6 /lib64
+            cd ..
+            rm -rf secp256k1
+
+            # Update library cache
+            sudo ldconfig
+
             ;;
 
         Ubuntu|"Linux Mint")
@@ -298,37 +394,50 @@ Linux)
                 fi
             fi
             
+            # If Docker is already installed, remove any stale apt source/key files left by a
+            # previous run of this script to prevent "Conflicting values set for Signed-By" errors
+            # (e.g. a prior run wrote docker.gpg but the existing install uses docker.asc).
+            if command -v docker > /dev/null 2>&1; then
+                sudo rm -f /etc/apt/sources.list.d/docker.list
+                sudo rm -f /etc/apt/keyrings/docker.gpg
+            fi
+
             # Install git
             sudo apt -q update
             sudo apt install -qy --no-install-recommends git
-            
-            # Install packaging-related tools needed for the Docker install
-            sudo apt install -qy --no-install-recommends \
-                ca-certificates \
-                curl \
-                gnupg \
-                lsb-release
 
-            # Download Docker GPG key and add to our Apt keyrings
-            sudo mkdir -p /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
+            # Install Docker if not already installed
+            if ! command -v docker > /dev/null 2>&1; then
+                # Install packaging-related tools needed for the Docker install
+                sudo apt install -qy --no-install-recommends \
+                    ca-certificates \
+                    curl \
+                    gnupg \
+                    lsb-release
 
-            # Add the appropriate "Additional Sources List" for the stable Docker packages for this distro version
-            if [ "$DISTRO_NAME" = "Linux Mint" ]; then
-                UBUNTU_CODENAME=$(cat /etc/upstream-release/lsb-release | grep DISTRIB_CODENAME | cut -d= -f2)
+                # Download Docker GPG key and add to our Apt keyrings
+                sudo mkdir -p /etc/apt/keyrings
+                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
+
+                # Add the appropriate "Additional Sources List" for the stable Docker packages for this distro version
+                if [ "$DISTRO_NAME" = "Linux Mint" ]; then
+                    UBUNTU_CODENAME=$(cat /etc/upstream-release/lsb-release | grep DISTRIB_CODENAME | cut -d= -f2)
+                else
+                    UBUNTU_CODENAME=$(lsb_release -cs)
+                fi
+                echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+                # Install the Docker packages
+                sudo apt -q update
+                sudo apt install -qy --no-install-recommends \
+                    docker-ce \
+                    docker-ce-cli \
+                    containerd.io \
+                    docker-buildx-plugin \
+                    docker-compose-plugin
             else
-                UBUNTU_CODENAME=$(lsb_release -cs)
+                echo "Docker is already installed."
             fi
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-            # Install the Docker packages
-            sudo apt -q update
-            sudo apt install -qy --no-install-recommends \
-                docker-ce \
-                docker-ce-cli \
-                containerd.io \
-                docker-buildx-plugin \
-                docker-compose-plugin
 
             # Add current user to docker group so Docker runs as non-root user
             # See https://docs.docker.com/engine/install/linux-postinstall/

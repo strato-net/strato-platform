@@ -8,14 +8,14 @@ module Blockchain.EthConf
     connStr,
     lookupRedisBlockDBConfig,
     cirrusConnStr,
-    runKafkaMConfigured,
+    runStreamMConfigured,
     module Blockchain.EthConf.Model,
   )
 where
 
 import Blockchain.EthConf.Model
 import Control.Exception (catch, IOException)
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import Data.Default
@@ -43,11 +43,11 @@ connStr = postgreSQLConnectionString . sqlConfig $ ethConf
 cirrusConnStr :: B.ByteString
 cirrusConnStr = postgreSQLConnectionString . cirrusConfig $ ethConf
 
-runKafkaMConfigured :: MonadIO m =>
-                       KafkaClientId -> KafkaM m a -> m a
-runKafkaMConfigured name =
+runStreamMConfigured :: MonadIO m =>
+                        ClientId -> StreamM m a -> m a
+runStreamMConfigured name =
   let k = kafkaConfig ethConf
-  in runKafkaM name (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
+  in runStreamM name (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
 
 lookupRedisBlockDBConfig :: Redis.ConnectInfo
 lookupRedisBlockDBConfig = redisConnection $ redisBlockDBConfig ethConf

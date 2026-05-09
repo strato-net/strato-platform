@@ -42,6 +42,7 @@ type StakeSemanticsConfig = {
 };
 
 const normalizeAddr = (a: string): string => a.toLowerCase();
+const normalizeUserAddress = (a: string): string => a.replace(/^0x/i, "").toLowerCase();
 
 const STAKE_SEMANTICS: StakeSemanticsConfig = stakeSemanticsConfig as StakeSemanticsConfig;
 
@@ -397,6 +398,7 @@ export const fetchUserActivities = async (
   forceRefresh: boolean = false
 ): Promise<UserActivitiesResponse> => {
   const rewardsAddress = getRewardsAddress();
+  const normalizedUserAddress = normalizeUserAddress(userAddress);
 
   try {
     // Fetch all activities
@@ -405,11 +407,11 @@ export const fetchUserActivities = async (
 
     if (activities.length === 0) {
       const [unclaimedRewards, claimedRewardsMap, bonusResult] = await Promise.all([
-        fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
+        fetchUnclaimedRewards(accessToken, rewardsAddress, normalizedUserAddress, forceRefresh),
         fetchClaimedRewards(accessToken, rewardsAddress),
-        fetchBonusRewards(accessToken, rewardsAddress, userAddress)
+        fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress)
       ]);
-      const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
+      const claimedRewards = claimedRewardsMap.get(normalizedUserAddress) || 0n;
       return {
         unclaimedRewards,
         claimedRewards: claimedRewards.toString(),
@@ -423,10 +425,10 @@ export const fetchUserActivities = async (
 
     const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap, bonusResult] = await Promise.all([
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
-      fetchUserInfo(accessToken, rewardsAddress, userAddress, activityIds, forceRefresh),
-      fetchUnclaimedRewards(accessToken, rewardsAddress, userAddress, forceRefresh),
+      fetchUserInfo(accessToken, rewardsAddress, normalizedUserAddress, activityIds, forceRefresh),
+      fetchUnclaimedRewards(accessToken, rewardsAddress, normalizedUserAddress, forceRefresh),
       fetchClaimedRewards(accessToken, rewardsAddress),
-      fetchBonusRewards(accessToken, rewardsAddress, userAddress)
+      fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress)
     ]);
 
     // Build shared pricing context once (used for LP/share-token TVL conversions)
@@ -488,7 +490,7 @@ export const fetchUserActivities = async (
       };
     }));
 
-    const claimedRewards = claimedRewardsMap.get(userAddress.toLowerCase()) || 0n;
+    const claimedRewards = claimedRewardsMap.get(normalizedUserAddress) || 0n;
 
     const bonusSources: BonusSource[] = [];
     for (const [actId, amount] of bonusResult.byActivity) {
