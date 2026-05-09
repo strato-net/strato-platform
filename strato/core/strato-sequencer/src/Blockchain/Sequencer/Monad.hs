@@ -114,10 +114,10 @@ data SequencerConfig = SequencerConfig
     redisConn :: RBDB.RedisConnection
   }
 
-type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (VaultM (LoggingT IO)))))
+type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (StreamM (ResourceT (VaultM (LoggingT IO)))))
 
 -- Test version without VaultM - relies on external HasVault instance for the base monad
-type SequencerMTest = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
+type SequencerMTest = StateT SequencerContext (ReaderT SequencerConfig (StreamM (ResourceT (LoggingT IO))))
 
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible DependentBlockDB (ReaderT SequencerConfig m) where
   access _ = asks dependentBlockDB
