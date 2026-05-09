@@ -280,6 +280,27 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
 
+    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum pair where baseToken matches the mapped contract address
+    } else if (parsePattern === 'dexscreener' && Array.isArray(data?.pairs)) {
+        symbols.forEach(symbol => {
+            const mappedAddress = (sourceConfig.symbolMapping?.[symbol] || symbol).toLowerCase();
+            const candidates = data.pairs.filter((p: any) =>
+                p.chainId === 'ethereum' &&
+                p.baseToken?.address?.toLowerCase() === mappedAddress &&
+                p.priceUsd
+            );
+            if (candidates.length === 0) return;
+            candidates.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+            const best = candidates[0];
+            const priceUSD = parseFloat(best.priceUsd);
+            if (!isNaN(priceUSD) && priceUSD > 0) {
+                const price = Math.floor(priceUSD * 1e18);
+                if (isValidPrice(price)) {
+                    result[symbol] = { price, feedTimestamp: new Date().toISOString() };
+                }
+            }
+        });
+
     // Generic fallback
     } else {
         symbols.forEach(symbol => {
