@@ -21,15 +21,15 @@ extra-source-files:
 dependencies:
   - base >= 4.12 && < 5
   - bytestring >= 0.10
-  - text >= 1.2
-  - cryptonite >= 0.25
-  - memory >= 0.14
 
 library:
   source-dirs: src
   exposed-modules:
     - Crypto.Curve.BabyJubJub
     - Crypto.Curve.BabyJubJub.EdDSA
+  dependencies:
+    - cryptonite >= 0.25
+    - memory >= 0.14
 
 executables:
   baby-jubjub-cli:

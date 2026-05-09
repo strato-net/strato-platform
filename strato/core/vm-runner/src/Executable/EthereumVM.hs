@@ -56,7 +56,7 @@ import Conduit hiding (Flush)
 import Control.Monad
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
@@ -68,14 +68,14 @@ import Text.Format (format)
 ethereumVM :: LoggingT IO ()
 ethereumVM = runResourceT $ do
   ctx <- initContext
-  void . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
+  void . runStreamMConfigured "ethereum-vm" $ execContextM' ctx $ do
 --    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
     bootstrapIfFirstRun
 
     initializeBestBlock
 
-    failures <- runConsume "evm/loop" consumerGroup seqVmTasksTopicName $ \_ seqEvents -> do
+    failures <- runConsume consumerGroup seqVmTasksTopicName $ \seqEvents -> do
 
         let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
         $logInfoS "ethereumVM/maybeSelfAddress" $ T.pack $ format maybeSelfAddress
@@ -100,7 +100,7 @@ ethereumVM = runResourceT $ do
 
         loopTimeit "compactContextM" $ compactContextM
 
-        return (if null failures then Nothing else Just failures, ())
+        return $ if null failures then Nothing else Just failures
 
     for_ failures $ \(BlockVerificationFailure bNum bHash bDetails) -> case bDetails of
       StateRootMismatch BlockDelta{..} -> do
@@ -191,11 +191,11 @@ logEventSummaries evs = do
 
 -- KAFKA
 
-routeOutEvent :: (MonadLogger m, HasKafka m, HasContext m) => VmOutEvent -> m (Maybe [BlockVerificationFailure])
+routeOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m (Maybe [BlockVerificationFailure])
 routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
 routeOutEvent oev = Nothing <$ sendOutEvent oev
 
-sendOutEvent :: (MonadLogger m, HasKafka m, HasContext m) => VmOutEvent -> m ()
+sendOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m ()
 sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry diff]

@@ -25,12 +25,8 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - async
-    - containers
     - directory
     - filepath
     - process
     - shellwords
-    - stm
-    - text
-    - typed-process
     - unix

@@ -28,42 +28,33 @@ library:
   dependencies:
     - QuickCheck
     - aeson
-    - aeson-casing
-    - asn1-encoding
     - asn1-types
     - base16-bytestring
     - binary
     - bytestring-arbitrary
-    - conduit
     - containers
     - cpu
     - crypton
-    - crypton-x509
-    - crypton-x509-validation
     - data-default
     - deepseq
     - ethereum-rlp
-    - extra
     - fast-keccak256
     - format
     - generic-arbitrary
     - hashable
     - hflags
-    - hourglass
     - http-api-data
     - integer-gmp
     - iproute
     - labeled-error
     - lens
     - memory
-    - monad-alter
     - mtl
     - nibblestring
     - quickcheck-instances
     - path-pieces
     - persistent
     - persistent-postgresql
-    - pem
     - primitive
     - blockapps-secp256k1-haskell
     - servant
@@ -72,10 +63,6 @@ library:
     - openapi3
     - text
     - time
-    - transformers
-    - vector
-    - Ranged-sets
-    - generic-random
 
 tests:
   strato-model-tests:

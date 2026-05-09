@@ -14,7 +14,6 @@ library:
   source-dirs: src/
   ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
   dependencies:
-    - base16-bytestring
     - bimap
     - bloc2api
     - blockapps-data
@@ -30,8 +29,6 @@ library:
     - containers
     - core-api2
     - deepseq
-    - esqueleto
-    - ethereum-rlp
     - evm-solidity
     - extra
     - format
@@ -40,7 +37,6 @@ library:
     - labeled-error
     - lens
     - monad-alter
-    - monad-logger
     - ordered-containers
     - mtl
     - parsec
@@ -53,10 +49,8 @@ library:
     - solid-vm-model
     - solid-vm-parser
     - source-tools
-    - sql-monad
     - strato-conf
     - strato-model
-    - strato-redis-blockdb
     - openapi3
     - text
     - time

@@ -30,19 +30,19 @@ import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Control.Arrow ((&&&))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
 apiIndexerMainLoop :: ( MonadLogger m,
-                        HasKafka m,
+                        HasStreaming m,
                         HasSQLDB m,
                         (Keccak256 `A.Alters` API OutputTx) m,
                         (Keccak256 `A.Alters` API OutputBlock) m
                       ) =>
                       m ()
 apiIndexerMainLoop =
-  consume "apiIndexer" (snd kafkaClientIds) targetTopicName $ \() idxEvents -> do
+  consume (snd kafkaClientIds) targetTopicName $ \idxEvents -> do
     indexAPI idxEvents
     return ()
 
@@ -92,7 +92,7 @@ indexAPI idxEvents = do
         | (addr, ASModification as) <- M.toList asmMap
         ]
 
-kafkaClientIds :: (KafkaClientId, ConsumerGroup)
+kafkaClientIds :: (ClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", "strato-api-indexer")
 
 {-

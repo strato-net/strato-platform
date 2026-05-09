@@ -34,7 +34,6 @@ library
     , resourcet
     , solid-vm-compiler
     , solid-vm-model
-    , source-tools
     , strato-conf
     , strato-model
     , text
