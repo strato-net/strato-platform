@@ -19,7 +19,6 @@ library:
     - Executable.EthereumVM2
   ghc-options: -Wall -O2
   dependencies:
-  - aeson
   - base16-bytestring
   - binary
   - blockapps-data
@@ -37,21 +36,16 @@ library:
   - ethereum-rlp
 #  - ethereum-vm
   - evm-solidity
-  - exceptions
-  - extra
   - format
   - lens
-  - kafka-monad
+  - streaming
   - merkle-patricia-db
   - monad-alter
-  - persistent-postgresql
   - prometheus-client
-  - redis-monad
   - seqevents
   - solid-vm
   - solid-vm-compiler
   - solid-vm-model
-  - sql-monad
   - strato-conf
   - strato-genesis
   - strato-index
@@ -62,7 +56,6 @@ library:
   - time
   - transformers
   - unliftio
-  - vector
   - vm-tools
   - ordered-containers
 

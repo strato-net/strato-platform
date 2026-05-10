@@ -95,16 +95,23 @@ function getTokenLogoUrl(symbol: string): string | null {
 }
 
 export default function CreditCardPage() {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, loading: userLoading, isAppAuthenticated, externalWalletAddress } = useUser();
   const { toast } = useToast();
   const { isTestnet } = useNetwork();
   const { loadNetworksAndTokens } = useBridgeContext();
 
   const [configs, setConfigs] = useState<OnChainCardConfig[]>([]);
   const [loadingCards, setLoadingCards] = useState(true);
+  const canLoadCardData = !userLoading && (isAppAuthenticated || !!externalWalletAddress);
 
   const loadCards = useCallback(async () => {
-    if (!isLoggedIn) return;
+    if (!canLoadCardData) {
+      if (!userLoading) {
+        setConfigs([]);
+        setLoadingCards(false);
+      }
+      return;
+    }
     setLoadingCards(true);
     try {
       const { data } = await api.get<OnChainCardConfig[]>("/credit-card");
@@ -115,7 +122,7 @@ export default function CreditCardPage() {
     } finally {
       setLoadingCards(false);
     }
-  }, [isLoggedIn]);
+  }, [canLoadCardData, userLoading]);
 
   useEffect(() => {
     loadCards();
@@ -164,8 +171,10 @@ export default function CreditCardPage() {
   const loading = loadingCards;
 
   useEffect(() => {
+    if (!canLoadCardData) return;
+
     loadNetworksAndTokens().catch(console.error);
-  }, [loadNetworksAndTokens]);
+  }, [canLoadCardData, loadNetworksAndTokens]);
 
   useEffect(() => {
     if (configs.length === 0) {
@@ -216,7 +225,7 @@ export default function CreditCardPage() {
   }, [configs]);
 
   useEffect(() => {
-    if (!isLoggedIn || cardDisplays.length === 0) return;
+    if (!canLoadCardData || cardDisplays.length === 0) return;
 
     let cancelled = false;
 
@@ -252,11 +261,11 @@ export default function CreditCardPage() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [cardDisplays.length, configs, isLoggedIn]);
+  }, [canLoadCardData, cardDisplays.length, configs]);
 
   // Fetch pending top-ups for each card
   useEffect(() => {
-    if (!isLoggedIn || cardDisplays.length === 0) return;
+    if (!canLoadCardData || cardDisplays.length === 0) return;
     let cancelled = false;
     const fetchPending = async () => {
       await Promise.allSettled(
@@ -277,7 +286,7 @@ export default function CreditCardPage() {
     void fetchPending();
     const id = window.setInterval(fetchPending, 60_000);
     return () => { cancelled = true; window.clearInterval(id); };
-  }, [cardDisplays.length, configs, isLoggedIn]);
+  }, [canLoadCardData, cardDisplays.length, configs]);
 
   const openModal = (config: OnChainCardConfig | null) => {
     setEditingConfig(config);

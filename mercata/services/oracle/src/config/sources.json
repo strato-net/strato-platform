@@ -89,6 +89,15 @@
       "WEETH": "coingecko:wrapped-eeth"
     }
   },
+  "DexScreener": {
+    "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
+    "parse": "dexscreener",
+    "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
+    "assets": ["SUSDS"],
+    "symbolMapping": {
+      "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd"
+    }
+  },
   "CommodityPriceAPI": {
     "url": "https://api.commoditypriceapi.com/v2/rates/latest",
     "params": "symbols",

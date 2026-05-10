@@ -51,7 +51,6 @@ executables:
       - monad-alter
       - solid-vm-compiler
       - solid-vm-fuzzer
-      - solid-vm-model
       - solid-vm-static-analysis
       - source-tools
       - strato-model

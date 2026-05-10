@@ -30,6 +30,7 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
   const { disconnect } = useDisconnect();
   const { connectModalOpen, openConnectModal } = useConnectModal();
   const { toast } = useToast();
+  const externalModalActiveRef = React.useRef(false);
   const hasConnectedWallet =
     isConnected && (!externalOnly || (connector ? !isStratoConnector(connector) : false));
 
@@ -58,15 +59,47 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
     }
   }, []);
 
+  const restoreStratoWalletOption = React.useCallback(() => {
+    const stratoOption = document.querySelector<HTMLElement>(
+      '[data-testid="rk-wallet-option-stratoWallet"]'
+    );
+    if (!stratoOption) return;
+
+    stratoOption.style.display = '';
+
+    const stratoRow = stratoOption.parentElement as HTMLElement | null;
+    if (stratoRow) {
+      stratoRow.style.display = '';
+    }
+
+    const walletList = stratoRow?.parentElement as HTMLElement | null;
+    if (walletList) {
+      walletList.style.display = '';
+      const groupHeader = walletList.previousElementSibling as HTMLElement | null;
+      if (groupHeader?.textContent?.trim() === 'STRATO') {
+        groupHeader.style.display = '';
+      }
+    }
+  }, []);
+
   React.useEffect(() => {
-    if (!externalOnly || !connectModalOpen) return;
+    if (!connectModalOpen) {
+      externalModalActiveRef.current = false;
+      restoreStratoWalletOption();
+      return;
+    }
+
+    if (!externalOnly || !externalModalActiveRef.current) return;
 
     hideStratoWalletOption();
     const observer = new MutationObserver(hideStratoWalletOption);
     observer.observe(document.body, { childList: true, subtree: true });
 
-    return () => observer.disconnect();
-  }, [connectModalOpen, externalOnly, hideStratoWalletOption]);
+    return () => {
+      observer.disconnect();
+      restoreStratoWalletOption();
+    };
+  }, [connectModalOpen, externalOnly, hideStratoWalletOption, restoreStratoWalletOption]);
 
   const copyToClipboard = async () => {
     if (address) {
@@ -84,7 +117,10 @@ const BridgeWalletStatus: React.FC<BridgeWalletStatusProps> = ({
       type="button"
       disabled={guestMode}
       className={CONNECT_BUTTON_CLASS}
-      onClick={() => openConnectModal?.()}
+      onClick={() => {
+        externalModalActiveRef.current = true;
+        openConnectModal?.();
+      }}
     >
       {connectLabel}
     </button>

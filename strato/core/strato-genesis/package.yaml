@@ -15,24 +15,19 @@ library:
     source-dirs: src/
     ghc-options: -Wall -O2
     dependencies:
-      - aeson-casing
       - base16-bytestring
-      - binary
       - blockapps-data
       - blockapps-mpdbs
       - common-log
       - containers
       - crypto-api
       - data-default
-      - directory
       - file-embed
       - filepath
       - format
       - json-stream
       - labeled-error
       - monad-alter
-      - scientific
-      - split
       - time
       - vector
       - aeson
@@ -43,7 +38,6 @@ library:
       - solid-vm-compiler
       - solid-vm-model
       - ethereum-rlp
-      - lens
       - template-haskell
       - vm-tools
 
