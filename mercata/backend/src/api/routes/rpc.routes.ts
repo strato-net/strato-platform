@@ -23,6 +23,6 @@ const router = Router();
  */
 router.post("/submit", authHandler.authorizeRequest({ allowWalletAuth: true }), RpcController.submitSignedTx);
 router.post("/results", authHandler.authorizeRequest({ allowWalletAuth: true }), RpcController.txResults);
-router.post("/:chainId", authHandler.authorizeRequest(false), RpcController.proxy);
+router.post("/:chainId", RpcController.proxy);
 
 export default router;
