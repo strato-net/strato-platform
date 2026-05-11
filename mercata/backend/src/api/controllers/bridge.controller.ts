@@ -392,9 +392,10 @@ class BridgeController {
    * GET /bridge/finalizedHead/:chainId
    *
    * Returns the latest "is the deposit ready?" cutoff for `chainId`
-   * (Eth flavor: live beacon-finalized EL block; Base flavor: L1
-   * finalized head as a coarse freshness indicator). UI polls this
-   * every few seconds to flip "waiting" → "ready" badges.
+   * (Eth flavor: live beacon-finalized EL block; Base flavor: the
+   * highest L2 block currently claimed by any recent L1
+   * DisputeGameCreated log). UI polls this every few seconds to flip
+   * "waiting" → "ready" badges.
    */
   static async getFinalizedHead(
     req: Request,
@@ -525,6 +526,14 @@ class BridgeController {
     } catch (error: any) {
       if (error instanceof NotFinalizedYetError) {
         res.status(425).json(notFinalizedBody(error));
+        return;
+      }
+      if (error instanceof NoMatchingDisputeGameError) {
+        // 425 Too Early: the deposit's L2 block isn't yet covered by
+        // any DisputeGameCreated event on L1. The frontend surfaces
+        // this as a "waiting for L1 anchor" state so the user can
+        // retry once a proposer submits a covering output.
+        res.status(425).json({ error: error.message, code: "NO_MATCHING_DISPUTE_GAME" });
         return;
       }
       if (error instanceof DepositTooOldError) {

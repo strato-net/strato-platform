@@ -162,6 +162,10 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
   const [error, setError] = useState<string | undefined>();
   const [waiting, setWaiting] = useState<
     | {
+        /** "finality" = Eth beacon-finality lag (deterministic ETA).
+         *  "anchor"  = Base/Cannon proposer hasn't anchored the deposit's
+         *  L2 block on L1 yet (no ETA — proposer cadence varies). */
+        kind: "finality" | "anchor";
         etaSeconds?: number;
         receivedAt: number;
         depositBlockNumber?: string;
@@ -385,12 +389,29 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
       if (code === "NOT_FINALIZED_YET") {
         const details = err?.response?.data?.details;
         setWaiting({
+          kind: "finality",
           etaSeconds:
             typeof details?.etaSeconds === "number" ? details.etaSeconds : undefined,
           receivedAt: Date.now(),
           depositBlockNumber: details?.depositBlockNumber,
           finalizedBlockNumber: details?.finalizedBlockNumber,
           finalityLagSeconds: details?.finalityLagSeconds,
+        });
+        setStep("error");
+        return;
+      }
+      if (code === "NO_MATCHING_DISPUTE_GAME") {
+        // Base flavor only: the L2 deposit isn't yet covered by any
+        // DisputeGameCreated event on L1. Treat the same as a finality
+        // wait — there's no concrete ETA (proposers anchor on their own
+        // cadence) but the user can retry once an anchor lands.
+        setWaiting({
+          kind: "anchor",
+          etaSeconds: undefined,
+          receivedAt: Date.now(),
+          depositBlockNumber: undefined,
+          finalizedBlockNumber: undefined,
+          finalityLagSeconds: undefined,
         });
         setStep("error");
         return;
@@ -469,7 +490,9 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
 
   const titleText = inClaim
     ? waiting
-      ? "Waiting for Ethereum finality"
+      ? waiting.kind === "anchor"
+        ? "Waiting for L1 anchor"
+        : "Waiting for Ethereum finality"
       : isError
       ? "Claim Failed"
       : step === "complete"
@@ -554,7 +577,7 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
             </div>
           )}
 
-          {waiting && (
+          {waiting && waiting.kind === "finality" && (
             <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
               <p className="text-sm text-blue-500 font-medium">
                 Your deposit hasn't reached Ethereum finality yet.
@@ -578,6 +601,26 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
                   {waiting.finalizedBlockNumber}
                 </p>
               )}
+              <div className="mt-3">
+                <Button onClick={onRetry} variant="outline" className="w-full">
+                  Retry now
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {waiting && waiting.kind === "anchor" && (
+            <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+              <p className="text-sm text-blue-500 font-medium">
+                Waiting for an L1 anchor for your Base block.
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Base claims require a DisputeGameCreated event on L1 that
+                anchors your deposit's L2 block. Proposers submit these on
+                their own cadence (typically every few minutes on mainnet,
+                up to an hour or two on testnet). Try again once a covering
+                dispute game has been posted.
+              </p>
               <div className="mt-3">
                 <Button onClick={onRetry} variant="outline" className="w-full">
                   Retry now
@@ -735,7 +778,10 @@ const PickerView: React.FC<PickerViewProps> = ({
         </div>
         {finalizedHead && (
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Finalized block: {finalizedHead.blockNumber}
+            {finalizedHead.flavor === "base"
+              ? "Latest L1-anchored block: "
+              : "Finalized block: "}
+            {finalizedHead.blockNumber}
           </p>
         )}
       </div>
@@ -804,7 +850,11 @@ const PickerView: React.FC<PickerViewProps> = ({
                           : "bg-blue-500/20 text-blue-500"
                       }`}
                     >
-                      {ready ? "Ready" : "Waiting for finality"}
+                      {ready
+                        ? "Ready"
+                        : finalizedHead?.flavor === "base"
+                        ? "Waiting for L1 anchor"
+                        : "Waiting for finality"}
                     </span>
                   </div>
                 </button>

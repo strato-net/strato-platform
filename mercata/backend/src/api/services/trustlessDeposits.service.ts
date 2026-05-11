@@ -23,6 +23,7 @@ import {
 } from "./ethRpc.service";
 import { ConfiguredChain } from "./trustlessBridge.service";
 import { MAX_PARENT_CHAIN_HEADERS } from "./bridgeProof.service";
+import { getLatestAnchoredL2BlockNumber } from "./baseProof.service";
 import { keccak256 } from "../helpers/keccak.helper";
 
 const { mercataBridge } = constants;
@@ -70,37 +71,25 @@ export async function getFinalizedHead(
       flavor: "eth",
     };
   }
-  // Base flavor: best-effort. Use the L1 finalized head as the
-  // freshness indicator. The UI treats Base deposits as "ready to
-  // attempt" once they're past it; the per-claim NO_MATCHING_DISPUTE_GAME
-  // path catches the case where no DGC has covered the L2 block yet.
-  const l1ChainId = guessL1ChainId(chain.chainId);
-  const beacon = beaconClientFor(l1ChainId);
-  const update = await beacon.getFinalityUpdate();
-  const exec = update.finalized_header.execution;
-  if (!exec) {
-    throw new Error(
-      `getFinalizedHead(base): L1 chain ${l1ChainId} beacon node missing execution payload`,
-    );
-  }
+  // Base flavor: L2 blocks become claimable when a DisputeGameCreated
+  // on L1 covers them. The deposits-list UI uses
+  // `deposit.blockNumber <= finalizedHead.blockNumber` to decide
+  // ready-vs-waiting, so we return the highest L2 block claimed by any
+  // recent L1 DGC. Deposits newer than that show "Waiting for L1 anchor"
+  // (mirroring the Eth flavor's "Waiting for finality"). Result is
+  // cached in baseProof.service for a short TTL so per-second polling
+  // doesn't hammer the L1 upstream.
+  const latestAnchoredL2 = await getLatestAnchoredL2BlockNumber(chain.chainId);
+  const headHex = await getBlockNumber(chain.chainId);
+  const block = await getBlockByNumber(
+    chain.chainId,
+    "0x" + Math.min(latestAnchoredL2, headHex).toString(16),
+  );
   return {
-    blockNumber: BigInt(exec.block_number).toString(),
-    timestamp: BigInt(exec.timestamp).toString(),
+    blockNumber: latestAnchoredL2.toString(),
+    timestamp: block?.timestamp ? BigInt(block.timestamp).toString() : "0",
     flavor: "base",
   };
-}
-
-/** Mirror of baseProof.service's BASE_CHAIN_CONFIGS L1 mapping; kept
- *  inline because we don't need the rest of that file for this read. */
-function guessL1ChainId(srcChainId: string): string {
-  switch (srcChainId) {
-    case "8453":
-      return "1";
-    case "84532":
-      return "11155111";
-    default:
-      throw new Error(`getFinalizedHead: no L1 mapping for chain ${srcChainId}`);
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -129,6 +118,18 @@ const PENDING_DEPOSIT_SEARCH_BLOCKS: number = (() => {
   const raw = process.env[PENDING_DEPOSIT_SEARCH_BLOCKS_ENV];
   const parsed = raw ? parseInt(raw, 10) : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 50_400;
+})();
+
+/** Base flavor search window: ~4h on a 2s-slot chain = 7200 blocks.
+ *  Base's L2 parent-walk reach is ~256 blocks, and dispute games anchor
+ *  every few minutes, so anything older is unclaimable in practice.
+ *  Keeping this tight matters because Base RPC providers commonly cap
+ *  eth_getLogs at 2000 blocks per call. */
+const BASE_PENDING_DEPOSIT_SEARCH_BLOCKS_ENV = "BASE_PENDING_DEPOSIT_SEARCH_BLOCKS";
+const BASE_PENDING_DEPOSIT_SEARCH_BLOCKS: number = (() => {
+  const raw = process.env[BASE_PENDING_DEPOSIT_SEARCH_BLOCKS_ENV];
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 7_200;
 })();
 
 /** Most providers cap a single eth_getLogs span; chunk to stay under. */
@@ -395,23 +396,49 @@ export async function getPendingDeposits(
       // Beacon hiccup — fall back to the absolute search-window cap.
     }
   }
+  // For Base flavor we don't have a beacon-anchored lower bound, but
+  // the L2 parent-walk reach is short (~256 blocks ≈ 8.5min on 2s slots)
+  // and dispute games anchor on the order of minutes, so deposits older
+  // than a few hours are practically unclaimable anyway. A ~4h cap
+  // keeps the eth_getLogs scan from ballooning into many provider-capped
+  // chunks while still surfacing anything a user could realistically claim.
+  const flavorSearchCap =
+    chain.flavor === "base" ? BASE_PENDING_DEPOSIT_SEARCH_BLOCKS : PENDING_DEPOSIT_SEARCH_BLOCKS;
   const fromBlock = Math.max(
     0,
     claimReachLowerBound,
-    headBlock - PENDING_DEPOSIT_SEARCH_BLOCKS,
+    headBlock - flavorSearchCap,
   );
   const recipientTopic = cleanWallets.map(topicFromAddress);
 
+  // Chunk size is adaptive: we start at PENDING_DEPOSIT_CHUNK_BLOCKS,
+  // and if the RPC complains about exceeding its block range we halve
+  // and retry. Once a provider's cap is established it stays in effect
+  // for the rest of this request — Base Sepolia caps at 2000, mainnet
+  // providers commonly cap at 10_000, so the right size varies.
   const allLogs: EthLog[] = [];
-  for (let from = fromBlock; from <= headBlock; from += PENDING_DEPOSIT_CHUNK_BLOCKS) {
-    const to = Math.min(headBlock, from + PENDING_DEPOSIT_CHUNK_BLOCKS - 1);
-    const chunk = await getLogs(chain.chainId, {
-      address: depositRouter,
-      fromBlock: "0x" + from.toString(16),
-      toBlock: "0x" + to.toString(16),
-      topics: [chain.depositRoutedSig, null, null, recipientTopic],
-    });
-    allLogs.push(...chunk);
+  let chunkSize = PENDING_DEPOSIT_CHUNK_BLOCKS;
+  let from = fromBlock;
+  while (from <= headBlock) {
+    const to = Math.min(headBlock, from + chunkSize - 1);
+    try {
+      const chunk = await getLogs(chain.chainId, {
+        address: depositRouter,
+        fromBlock: "0x" + from.toString(16),
+        toBlock: "0x" + to.toString(16),
+        topics: [chain.depositRoutedSig, null, null, recipientTopic],
+      });
+      allLogs.push(...chunk);
+      from = to + 1;
+    } catch (e: any) {
+      const msg = String(e?.message ?? e ?? "");
+      if (/max block range|exceeds.*block range|range is too|block range too large/i.test(msg) && chunkSize > 100) {
+        chunkSize = Math.max(100, Math.floor(chunkSize / 2));
+        console.warn(`[pendingDeposits] eth_getLogs chunk too large for chain ${chain.chainId}; retrying with chunk=${chunkSize}`);
+        continue; // don't advance `from`; retry the same range with smaller chunk
+      }
+      throw e;
+    }
   }
   if (allLogs.length === 0) return [];
 

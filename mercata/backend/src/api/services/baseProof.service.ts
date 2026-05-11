@@ -90,10 +90,87 @@ const L2_TO_L1_MESSAGE_PASSER = "0x4200000000000000000000000000000000000016";
 const DGC_SEARCH_CHUNK = 5_000;
 /** Total span we look back across before giving up. */
 const DGC_SEARCH_TOTAL = 200_000;
+/** Wall-clock budget for the DGC scan. If no covering game is found in
+ *  this window, we surface {NoMatchingDisputeGameError} → UI shows the
+ *  "Waiting for L1 anchor" panel instead of the request 504'ing. */
+const DGC_SEARCH_BUDGET_MS = Number(process.env.TRUSTLESS_DGC_SEARCH_BUDGET_MS ?? 20_000);
 /** Mirror of {BaseLightClient.MAX_PARENT_CHAIN_LEN}. Anchor blocks
  *  more than this many slots ahead of the deposit aren't usable —
  *  the contract would reject them at the first iteration past 256. */
 const MAX_PARENT_CHAIN_LEN = 256;
+
+// ─────────────────────────────────────────────────────────────────────
+// Latest-anchored-L2 helper (used by the deposits-list UI)
+// ─────────────────────────────────────────────────────────────────────
+
+/** TTL for the cached latest-anchored-L2 result. UI polls /finalizedHead
+ *  every few seconds; the L1 DGC scan is ~50-500ms, so caching avoids
+ *  hammering the upstream while still surfacing new anchors within the
+ *  TTL window. */
+const LATEST_ANCHORED_L2_TTL_MS = 20_000;
+
+interface LatestAnchoredL2CacheEntry {
+  blockNumber: number;
+  expiresAt: number;
+}
+const latestAnchoredL2Cache: Map<string, LatestAnchoredL2CacheEntry> = new Map();
+
+/**
+ * Highest L2 block number currently claimed by any L1 DisputeGameCreated
+ * log in the most recent {DGC_SEARCH_CHUNK} L1 blocks. Used as the
+ * "finalized head" for Base flavors in the pending-deposits UI: a
+ * deposit at block D is considered claimable iff D <= this number.
+ *
+ * Returns 0 if no DGCs are found in the recent window (proposer is
+ * very far behind or the chain has been quiet) — the UI will then
+ * show every deposit as "Waiting for L1 anchor".
+ */
+export async function getLatestAnchoredL2BlockNumber(
+  l2ChainId: string,
+): Promise<number> {
+  const cfg = BASE_CHAIN_CONFIGS[l2ChainId];
+  if (!cfg) {
+    throw new UnsupportedL2ChainError(
+      `getLatestAnchoredL2BlockNumber: L2 chainId ${l2ChainId} not configured`,
+    );
+  }
+  const now = Date.now();
+  const cached = latestAnchoredL2Cache.get(l2ChainId);
+  if (cached && cached.expiresAt > now) return cached.blockNumber;
+
+  const tip = await getBlockNumber(cfg.l1ChainId);
+  const toBlock = tip;
+  const fromBlock = Math.max(0, toBlock - DGC_SEARCH_CHUNK + 1);
+  let logs: EthLog[];
+  try {
+    logs = await getLogs(cfg.l1ChainId, {
+      address: cfg.disputeGameFactory,
+      topics: [cfg.disputeGameCreatedSig],
+      fromBlock: "0x" + fromBlock.toString(16),
+      toBlock: "0x" + toBlock.toString(16),
+    });
+  } catch {
+    return 0;
+  }
+
+  let max = 0;
+  for (const log of logs) {
+    if (log.topics.length !== 4) continue;
+    try {
+      const tx = await getTransactionByHash(cfg.l1ChainId, log.transactionHash);
+      if (!tx) continue;
+      const n = decodeL2BlockNumberFromCreateCalldata(tx.input);
+      if (n > max) max = n;
+    } catch {
+      continue;
+    }
+  }
+  latestAnchoredL2Cache.set(l2ChainId, {
+    blockNumber: max,
+    expiresAt: now + LATEST_ANCHORED_L2_TTL_MS,
+  });
+  return max;
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Public types
@@ -391,7 +468,6 @@ export async function buildBaseAnchorChainInputsViaCannon(
         `within the last ${DGC_SEARCH_TOTAL} L1 blocks`,
     );
   }
-
   // 3. Anchor block details (already verified during the search, but
   //    we re-fetch since the search returned only metadata). We could
   //    plumb these through the match struct — but a re-fetch keeps the
@@ -408,6 +484,9 @@ export async function buildBaseAnchorChainInputsViaCannon(
   const withdrawalStorageRoot = proofResp.storageHash;
 
   // 4. Build the parent walk: anchor.parent → ... → depositBlock.
+  //    Sequential by necessity — each block needs hash-chain validation
+  //    against the next. Rate-limited L2 endpoints make this the
+  //    likeliest bottleneck when claiming far-from-anchor deposits.
   const parentChain: Buffer[] = [];
   for (let n = anchorBlockNumber - 1; n >= depositBlockNumber; n--) {
     const block = await getBlockByNumber(l2ChainId, "0x" + n.toString(16));
@@ -627,6 +706,7 @@ async function findCoveringDisputeGame(
   l2ChainId: string,
   depositBlockNumber: number,
 ): Promise<CoveringDisputeGameMatch | null> {
+  const dgcT0 = Date.now();
   const tip = await getBlockNumber(cfg.l1ChainId);
   const chunks = Math.ceil(DGC_SEARCH_TOTAL / DGC_SEARCH_CHUNK);
   const upperBound = depositBlockNumber + MAX_PARENT_CHAIN_LEN;
@@ -636,6 +716,9 @@ async function findCoveringDisputeGame(
   // Across chunks: as soon as we have any verified candidate we
   // return it — newer chunks have already been checked.
   for (let i = 0; i < chunks; i++) {
+    // Wall-clock safety net so the request always returns within the
+    // gateway window even if the L1 upstream is wedged.
+    if (Date.now() - dgcT0 > DGC_SEARCH_BUDGET_MS) return null;
     const toBlock = tip - i * DGC_SEARCH_CHUNK;
     const fromBlock = Math.max(0, toBlock - DGC_SEARCH_CHUNK + 1);
     let logs: EthLog[];
@@ -651,11 +734,14 @@ async function findCoveringDisputeGame(
     }
 
     // Pre-decode each log's claimed L2 block; keep only in-range ones.
+    // Track chunkMaxL2 so we can early-exit once we've walked past the
+    // deposit (older L1 chunks can only have older L2 claims).
     interface Candidate {
       log: EthLog;
       l2BlockNumber: number;
     }
     const candidates: Candidate[] = [];
+    let chunkMaxL2 = Number.NEGATIVE_INFINITY;
     for (const log of logs) {
       if (log.topics.length !== 4) continue;
       // Decode the originating tx's calldata to read claimed l2BlockNumber.
@@ -667,6 +753,7 @@ async function findCoveringDisputeGame(
       } catch {
         continue;
       }
+      if (l2BlockNumber > chunkMaxL2) chunkMaxL2 = l2BlockNumber;
       if (l2BlockNumber < depositBlockNumber) continue;
       if (l2BlockNumber > upperBound) continue;
       candidates.push({ log, l2BlockNumber });
@@ -708,6 +795,11 @@ async function findCoveringDisputeGame(
         continue;
       }
     }
+
+    // Older L1 chunks can only produce older L2 claims. Once we've
+    // walked back far enough that every observed claim in this chunk
+    // is below the deposit's L2 block, no future chunk can cover it.
+    if (Number.isFinite(chunkMaxL2) && chunkMaxL2 < depositBlockNumber) return null;
 
     if (fromBlock === 0) break;
   }

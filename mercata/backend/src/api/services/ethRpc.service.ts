@@ -156,12 +156,108 @@ export async function getTransactionReceipt(
  * Fetch all receipts for a block, in transaction-index order. Used
  * to reconstruct the block's receipts trie when the upstream node
  * doesn't expose a receipts-trie proof endpoint (most don't).
+ *
+ * Free L2 RPC providers (notably free Base Sepolia endpoints) often
+ * reject `eth_getBlockReceipts` with HTTP 403 or JSON-RPC -32601
+ * ("method not found"). Fall back in that case to fetching the
+ * block's tx-hash list and looping `eth_getTransactionReceipt` per
+ * tx — slower but works on any provider that exposes the standard
+ * receipt endpoint.
  */
 export async function getBlockReceipts(
   chainId: string,
   blockNumberHexOrTag: string,
 ): Promise<EthTransactionReceipt[]> {
-  return rpcCall<EthTransactionReceipt[]>(chainId, "eth_getBlockReceipts", [blockNumberHexOrTag]);
+  try {
+    return await rpcCall<EthTransactionReceipt[]>(
+      chainId,
+      "eth_getBlockReceipts",
+      [blockNumberHexOrTag],
+    );
+  } catch (err: any) {
+    const status = err?.response?.status;
+    const msg = String(err?.message ?? "");
+    const looksLikeUnsupported =
+      status === 403 ||
+      status === 404 ||
+      status === 405 ||
+      /method not found|not supported|-32601|-32004|not allowed/i.test(msg);
+    if (!looksLikeUnsupported) throw err;
+    console.warn(
+      `[EthRpc] eth_getBlockReceipts unsupported on chain ${chainId} (${status ?? msg}); falling back to per-tx receipts`,
+    );
+    return await getBlockReceiptsFallback(chainId, blockNumberHexOrTag);
+  }
+}
+
+/** Max concurrent eth_getTransactionReceipt calls in the fallback.
+ *  Free Base Sepolia endpoints rate-limit hard (503s after handful of
+ *  parallel reads); unbounded `Promise.all` blows past the gateway
+ *  timeout. 5 keeps us under most provider RPS caps. Tunable via env. */
+const FALLBACK_RECEIPT_CONCURRENCY: number = (() => {
+  const raw = process.env.FALLBACK_RECEIPT_CONCURRENCY;
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 5;
+})();
+
+/** Fetch each tx's receipt individually for `blockNumberHexOrTag`,
+ *  returned in transactionIndex order. Used when eth_getBlockReceipts
+ *  is unavailable.
+ *
+ *  Reads are throttled via a small concurrency window (see
+ *  FALLBACK_RECEIPT_CONCURRENCY): the fallback is already O(N) round-
+ *  trips per block, and on rate-limited providers unbounded parallelism
+ *  produces a cascade of 503s + backoffs that overruns the request
+ *  gateway. The throttle keeps total wallclock proportional to
+ *  `ceil(N / concurrency) × roundtrip`, which is the cheapest the
+ *  fallback can be without an upstream batch endpoint. */
+async function getBlockReceiptsFallback(
+  chainId: string,
+  blockNumberHexOrTag: string,
+): Promise<EthTransactionReceipt[]> {
+  const t0 = Date.now();
+  const block = await rpcCall<{ transactions: string[] }>(
+    chainId,
+    "eth_getBlockByNumber",
+    [blockNumberHexOrTag, false],
+  );
+  if (!block || !Array.isArray(block.transactions)) return [];
+  const txHashes = block.transactions;
+
+  const receipts: (EthTransactionReceipt | null)[] = new Array(txHashes.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= txHashes.length) return;
+      receipts[i] = await rpcCall<EthTransactionReceipt | null>(
+        chainId,
+        "eth_getTransactionReceipt",
+        [txHashes[i]],
+      );
+    }
+  };
+  const workers = Array.from(
+    { length: Math.min(FALLBACK_RECEIPT_CONCURRENCY, txHashes.length) },
+    worker,
+  );
+  await Promise.all(workers);
+
+  const elapsed = Date.now() - t0;
+  if (elapsed > 5_000) {
+    console.warn(
+      `[EthRpc] getBlockReceiptsFallback(${chainId}, ${blockNumberHexOrTag}) ` +
+      `fetched ${txHashes.length} receipts in ${elapsed}ms (concurrency=${FALLBACK_RECEIPT_CONCURRENCY}); ` +
+      `consider an RPC provider that supports eth_getBlockReceipts`,
+    );
+  }
+
+  return receipts
+    .filter((r): r is EthTransactionReceipt => !!r)
+    .sort(
+      (a, b) =>
+        parseInt(a.transactionIndex, 16) - parseInt(b.transactionIndex, 16),
+    );
 }
 
 /**
