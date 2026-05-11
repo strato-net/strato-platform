@@ -48,6 +48,7 @@ import Blockchain.Strato.RedisBlockDB (RedisConnection, withRedisBlockDB)
 import Data.Foldable (for_)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
+import Data.String (fromString)
 import Data.Maybe
 import qualified Data.Sequence as S
 import qualified Data.Text as T
@@ -96,12 +97,15 @@ populateStorageDBs ::
   Maybe Word256 ->
   m ()
 populateStorageDBs genesisInfo genesisBlock genesisChainId = do
-  streamEnv <- liftIO $ UEC.runStreamMConfigured "vm-runner-bootstrap" $ do
+  -- Create topics (connection auto-closes after)
+  liftIO $ UEC.runStreamMConfigured "vm-runner-bootstrap" $ do
     createTopicAndWait IdxKafka.indexEventsTopicName
     createTopicAndWait "vmevents"
     createTopicAndWait "jsonrpcresponse"
     createTopicAndWait "vm_tasks"
-    getStreamEnv
+  -- Create a persistent connection for publishing
+  let k = UEC.kafkaConfig UEC.ethConf
+  streamEnv <- liftIO $ createStreamEnv "vm-runner-bootstrap" (fromString $ UEC.kafkaHost k, fromIntegral $ UEC.kafkaPort k)
   let pub sd vmes = do
         void . runStreamMUsingEnv streamEnv $ do
           for_ sd $ \diff -> IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]
