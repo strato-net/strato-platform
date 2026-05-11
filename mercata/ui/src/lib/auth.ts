@@ -43,6 +43,12 @@ export const redirectToLogin = (returnTo?: string): void => {
   window.location.href = `/login?${params.toString()}`;
 };
 
+// Passive session expiry should leave the app signed out without starting a
+// new OIDC login flow, since SSO can silently recreate the STRATO session.
+export const redirectToSignedOutLanding = (): void => {
+  window.location.replace('/dashboard');
+};
+
 export const requestWalletConnection = (): void => {
   window.dispatchEvent(new CustomEvent(WALLET_CONNECT_REQUEST_EVENT));
 };
