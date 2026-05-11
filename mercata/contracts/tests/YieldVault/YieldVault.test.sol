@@ -123,6 +123,43 @@ contract Describe_YieldVault is Authorizable {
         require(vault.exchangeRate() == (105e18 * WAD) / 100e18, "exchange rate should reflect realized profit");
     }
 
+    function it_recordStrategyProfit_raises_exchange_rate_without_reducing_debt() public {
+        User alice = new User();
+        User strategy = new User();
+
+        _mintAndDeposit(alice, 100e18);
+        _approveStrategy(address(strategy));
+        vault.deployCapital(address(strategy), 80e18);
+
+        Token(asset).mint(address(strategy), 5e18);
+        strategy.do(asset, "approve", address(vault), INFINITY);
+        vault.recordStrategyProfit(address(strategy), 5e18);
+
+        require(vault.strategyDebt(address(strategy)) == 80e18, "strategy debt should remain principal");
+        require(vault.deployedAssets() == 80e18, "deployed assets should remain unchanged");
+        require(vault.totalAssets() == 105e18, "recorded profit should increase total assets");
+        require(vault.exchangeRate() == (105e18 * WAD) / 100e18, "exchange rate should reflect recorded profit");
+    }
+
+    function it_recordStrategyProfit_can_be_redeployed_as_new_principal() public {
+        User alice = new User();
+        User strategy = new User();
+
+        _mintAndDeposit(alice, 100e18);
+        _approveStrategy(address(strategy));
+        vault.deployCapital(address(strategy), 80e18);
+
+        Token(asset).mint(address(strategy), 5e18);
+        strategy.do(asset, "approve", address(vault), INFINITY);
+        vault.recordStrategyProfit(address(strategy), 5e18);
+        vault.deployCapital(address(strategy), 5e18);
+
+        require(vault.strategyDebt(address(strategy)) == 85e18, "redeployed profit should become new principal");
+        require(vault.deployedAssets() == 85e18, "deployed assets should include redeployed profit");
+        require(vault.totalAssets() == 105e18, "redeploy should preserve recognized profit");
+        require(vault.exchangeRate() == (105e18 * WAD) / 100e18, "exchange rate should stay elevated after redeploy");
+    }
+
     function it_reportStrategyLoss_is_strategy_specific_write_down() public {
         User alice = new User();
         address strategyA = address(new User());

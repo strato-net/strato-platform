@@ -56,6 +56,7 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         uint256 strategyDebt,
         uint256 totalDeployed
     );
+    event StrategyProfitRecorded(address indexed strategy, uint256 assets);
     event StrategyLossReported(address indexed strategy, uint256 loss, uint256 strategyDebt, uint256 totalDeployed);
     event WithdrawalRequested(uint64 indexed requestId, address indexed owner, address indexed receiver, uint256 shares);
     event WithdrawalCanceled(uint64 indexed requestId, address indexed owner, uint256 shares);
@@ -476,6 +477,17 @@ contract record YieldVault is ERC4626, Ownable, Pausable {
         deployedAssets -= principalRepaid;
 
         emit CapitalReturned(from, assets, principalRepaid, realizedProfit, strategyDebt[from], deployedAssets);
+    }
+
+    function recordStrategyProfit(address from, uint256 assets) external onlyOwner nonReentrant {
+        _requireInitialized();
+        require(from != address(0), "YieldVault: from=0");
+        require(assets > 0, "YieldVault: zero profit");
+        require(strategyDebt[from] > 0, "YieldVault: no strategy debt");
+
+        require(IERC20(asset()).transferFrom(from, address(this), assets), "YieldVault: profit transfer failed");
+
+        emit StrategyProfitRecorded(from, assets);
     }
 
     function reportStrategyLoss(address strategy, uint256 loss) external onlyOwner whenNotPaused {
