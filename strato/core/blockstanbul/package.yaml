@@ -29,7 +29,6 @@ library:
   - generic-arbitrary
   - hflags
   - lens
-  - monad-alter
   - mtl
   - prometheus-client
   - strato-model

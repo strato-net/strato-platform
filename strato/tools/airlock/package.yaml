@@ -11,7 +11,12 @@ description: |
 license: Apache-2.0
 
 data-files:
-  - circuits/01x02/*
+  - circuits/01x02/circuit.wasm
+  - circuits/01x02/vkey.json
+  - circuits/01x02/vkey_check.json
+  - circuits/01x02/wasm.br
+  - circuits/01x02/zkey
+  - circuits/01x02/zkey.br
   - data/english.txt
 
 dependencies:
@@ -39,11 +44,9 @@ library:
     - baby-jubjub
     - base16-bytestring
     - poseidon-hash
-    - base64-bytestring
     - bloc2api
     - bloc2client
     - blockapps-vault-wrapper-api
-    - blockapps-vault-wrapper-client
     - bytestring
     - containers
     - cryptonite
@@ -52,17 +55,13 @@ library:
     - http-client
     - http-types
     - memory
-    - process
     - servant-client
     - servant-client-core
-    - core-api2
     - strato-auth
     - strato-conf
     - strato-model
-    - temporary
     - text
     - yaml
-    - transformers
     - vector
     - directory
     # Groth16 provers
@@ -80,7 +79,6 @@ executables:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-      - aeson
       - airlock
       - base16-bytestring
       - bloc2api
@@ -88,15 +86,10 @@ executables:
       - core-api2
       - directory
       - filepath
-      - http-client
-      - http-client-tls
-      - http-types
-      - network-uri
       - optparse-applicative
       - servant-client
       - strato-auth
       - strato-conf
       - strato-model
       - text
-      - time
       - yaml

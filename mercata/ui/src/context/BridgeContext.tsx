@@ -15,6 +15,7 @@ import {
   NetworkSummary,
   BridgeContextType,
   WithdrawalRequestOptions,
+  DepositActionRequestOptions,
 } from "@/lib/bridge/types";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, DepositActionRequestParams, WithdrawalSummaryResponse, WithdrawalTransactionResponse, WithdrawalProof, DepositAction } from "@mercata/shared-types";
 
@@ -367,10 +368,10 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const requestDepositAction = useCallback(
-    async (params: DepositActionRequestParams): Promise<TransactionResponse> => {
+    async (params: DepositActionRequestParams, options?: DepositActionRequestOptions): Promise<TransactionResponse> => {
       setLoading(true);
       try {
-        const { data } = await api.post<TransactionResponse>(`/bridge/requestDepositAction`, params);
+        const { data } = await api.post<TransactionResponse>(`/bridge/requestDepositAction`, params, options as any);
         return data;
       } finally {
         setLoading(false);

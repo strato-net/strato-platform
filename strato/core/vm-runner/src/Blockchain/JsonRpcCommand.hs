@@ -40,7 +40,7 @@ import Control.Applicative ((<|>))
 import Control.Monad ((<=<), void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -56,10 +56,10 @@ import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPie
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format (format)
 
-produceResponse :: HasKafka m => JsonRpcResponse -> m ()
+produceResponse :: HasStreaming m => JsonRpcResponse -> m ()
 produceResponse resp = void $ produceItems "jsonrpcresponse" [(responseId resp, BL.toStrict $ Bin.encode resp)]
 
-runJsonRpcCommand :: (VMBase m, HasKafka m) => JsonRpcCommand -> m ()
+runJsonRpcCommand :: (VMBase m, HasStreaming m) => JsonRpcCommand -> m ()
 runJsonRpcCommand =
   produceResponse
     <=< runJsonRpcCommand'

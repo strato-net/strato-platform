@@ -38,10 +38,8 @@ library
   ghc-options: -Wall -O2
   build-depends:
       aeson
-    , aeson-casing
     , base
     , base16-bytestring
-    , binary
     , blockapps-data
     , blockapps-mpdbs
     , bytestring
@@ -49,20 +47,16 @@ library
     , containers
     , crypto-api
     , data-default
-    , directory
     , ethereum-rlp
     , file-embed
     , filepath
     , format
     , json-stream
     , labeled-error
-    , lens
     , merkle-patricia-db
     , monad-alter
-    , scientific
     , solid-vm-compiler
     , solid-vm-model
-    , split
     , strato-model
     , template-haskell
     , text

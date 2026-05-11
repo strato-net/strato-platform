@@ -463,7 +463,7 @@ router.post("/trustlessClaim", walletAuth, BridgeController.trustlessClaim);
  *                     hash:
  *                       type: string
  */
-router.post("/requestDepositAction", authHandler.authorizeRequest(), BridgeController.requestDepositAction);
+router.post("/requestDepositAction", walletAuth, BridgeController.requestDepositAction);
 
 /**
  * @openapi

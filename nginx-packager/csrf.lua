@@ -244,6 +244,12 @@ local wallet_auth_methods = {
     PUT = true
 }
 
+-- Backend only proxies allow-listed read-only JSON-RPC methods on these routes.
+function _M.allow_rpc_proxy_request()
+    local uri = ngx.var.uri or ""
+    return ngx.var.request_method == "POST" and uri:match("^/api/rpc/%d+$") ~= nil
+end
+
 function _M.is_valid_wallet_address(addr)
     if type(addr) ~= "string" then
         return false
@@ -297,6 +303,10 @@ function _M.protect_api()
     end
 
     if method == "POST" or method == "PUT" or method == "DELETE" or method == "PATCH" then
+        if _M.allow_rpc_proxy_request() then
+            return
+        end
+
         if _M.allow_wallet_auth_request() then
             return
         end

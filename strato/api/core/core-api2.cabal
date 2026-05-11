@@ -33,18 +33,14 @@ library
   hs-source-dirs:
       src
   build-depends:
-      QuickCheck
-    , aeson
+      aeson
     , aeson-casing
     , base
     , base16-bytestring
-    , base64-bytestring
     , binary
     , blockDB
     , blockapps-data
     , blockapps-datadefs
-    , blockapps-vault-wrapper-api
-    , blockapps-vault-wrapper-client
     , bytestring
     , clock
     , common-log
@@ -55,13 +51,9 @@ library
     , esqueleto
     , ethereum-discovery
     , ethereum-rlp
-    , evm-solidity
-    , extra
     , filepath
     , format
-    , hflags
     , http-types
-    , labeled-error
     , lens
     , merkle-patricia-db
     , monad-alter
@@ -71,8 +63,6 @@ library
     , process
     , seqevents
     , servant-client
-    , servant-multipart
-    , servant-multipart-client
     , servant-server
     , solid-vm-model
     , source-tools
@@ -86,5 +76,4 @@ library
     , transformers
     , unliftio
     , unordered-containers
-    , vault-monad
   default-language: Haskell2010

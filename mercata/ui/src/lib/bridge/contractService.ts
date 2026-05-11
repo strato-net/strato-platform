@@ -1,4 +1,5 @@
 import { createPublicClient, http } from 'viem';
+import { csrfOnRequest } from '../csrf';
 import { 
   resolveViemChain, 
   DEPOSIT_ROUTER_ABI, 
@@ -17,9 +18,12 @@ import {
   Permit2Types
 } from './types';
 
+const PROXIED_CHAIN_IDS = new Set(["1", "11155111", "8453", "84532", "59144", "59141"]);
 
 async function getClient(chainId: string) {
-  const transport = http();
+  const transport = PROXIED_CHAIN_IDS.has(chainId)
+    ? http(`/api/rpc/${chainId}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
+    : http();
 
   return createPublicClient({
     chain: await resolveViemChain(chainId),

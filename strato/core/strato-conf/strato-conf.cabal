@@ -28,12 +28,10 @@ library
     , data-default
     , file-embed
     , hedis
-    , kafka-monad
     , postgresql-simple
     , process
-    , servant-client
     , strato-model
+    , streaming
     , template-haskell
-    , text
     , yaml
   default-language: Haskell2010

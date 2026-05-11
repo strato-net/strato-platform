@@ -21,6 +21,10 @@ export interface WithdrawalRequestOptions {
   onProgress?: (phase: "submit_strato" | "fetch_proof") => void;
 }
 
+export interface DepositActionRequestOptions {
+  walletAuth?: boolean;
+}
+
 export type NetworkSummary = {
   chainId: string;
   chainName: string;
@@ -57,7 +61,7 @@ export type BridgeContextType = {
     blockNumber: number,
     seq: number,
   ) => Promise<WithdrawalProof | undefined>;
-  requestDepositAction: (params: DepositActionRequestParams) => Promise<TransactionResponse>;
+  requestDepositAction: (params: DepositActionRequestParams, options?: DepositActionRequestOptions) => Promise<TransactionResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 

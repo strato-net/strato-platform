@@ -22,7 +22,7 @@ library:
   - common-log
   - containers
   - format
-  - kafka-monad
+  - streaming
   - monad-alter
   - persistent-postgresql
   - seqevents
@@ -43,7 +43,6 @@ executables:
       - blockDB
       - common-log
       - containers
-      - evm-solidity
       - hflags
       - monad-alter
       - process-monitor
@@ -52,7 +51,6 @@ executables:
       - strato-conf
       - strato-index
       - strato-model
-      - strato-statediff
     other-modules:
       - Wiring
 
@@ -65,9 +63,8 @@ executables:
       - blockDB
       - common-log
       - containers
-      - evm-solidity
       - hflags
-      - kafka-monad
+      - streaming
       - monad-alter
       - process-monitor
       - redis-monad
