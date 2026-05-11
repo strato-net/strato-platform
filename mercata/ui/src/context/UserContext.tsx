@@ -5,7 +5,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
-import { isAuthenticated, logout as authLogout, redirectToLogin, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
+import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
 
@@ -126,7 +126,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           } catch {
             // Continue session-expiry logout even if wallet disconnect fails.
           }
-          redirectToLogin();
+          redirectToSignedOutLanding();
           return;
         } else if (stratoAddress) {
           setStratoAddress(null);
