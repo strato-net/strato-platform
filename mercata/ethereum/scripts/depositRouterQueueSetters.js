@@ -25,6 +25,7 @@ const {
   loadDepositRouterArtifact,
   encodeCall,
   proposeBatch,
+  sendBatchEoa,
   chunkArray,
   writeOutput,
 } = require("./lib/depositRouterSafeOps");
@@ -43,6 +44,10 @@ function parseArgs() {
     const item = argv[i];
     if (item === "--apply") {
       args.apply = true;
+      continue;
+    }
+    if (item === "--eoa") {
+      args.eoa = true;
       continue;
     }
     if (!item.startsWith("--")) continue;
@@ -500,6 +505,7 @@ async function main() {
   const apply = !!args.apply;
   const chunkSize = 20;
   const nodeUrl = process.env.NODE_URL;
+  console.log(`NODE_URL: ${nodeUrl}`)
   if (!nodeUrl) {
     throw new Error("NODE_URL missing after env profile application");
   }
@@ -522,8 +528,9 @@ async function main() {
     env: envProfile.profile,
     nodeUrl,
     bridgeAddress: topology.bridgeAddress,
-    safeSource: "cirrus",
+    safeSource: args.eoa ? "skipped (eoa mode)" : "cirrus",
     routerSource: "cirrus",
+    mode: args.eoa ? "eoa" : "safe",
     apply,
     chunkSize,
     chains,
@@ -565,38 +572,60 @@ async function main() {
     };
 
     if (apply) {
-      if (!ownerIsSafe) {
-        throw new Error(
-          `Chain ${chainId}: proxy owner (${owner}) is not Safe (${safeAddress}); cannot safely propose setter txs`,
-        );
-      }
+      if (args.eoa) {
+        if (txs.length === 0) {
+          chainResult.warning = "No setter txs to send";
+        } else {
+          const eoaResult = await sendBatchEoa(
+            chainId,
+            txs.map((tx) => ({ to: tx.to, value: tx.value, data: tx.data })),
+            { expectedSender: owner },
+          );
+          chainResult.mode = "eoa";
+          chainResult.eoaSender = eoaResult.sender;
+          chainResult.transactions = eoaResult.results.map((r, i) => ({
+            batchIndex: i,
+            txCount: 1,
+            itemCount: txs[i].meta.itemCount,
+            hash: r.hash,
+            blockNumber: r.blockNumber,
+            status: r.status,
+          }));
+        }
+      } else {
+        if (!ownerIsSafe) {
+          throw new Error(
+            `Chain ${chainId}: proxy owner (${owner}) is not Safe (${safeAddress}); cannot safely propose setter txs. Re-run with --eoa to send directly from the owner EOA (set DEPOSIT_ROUTER_OWNER_PRIVATE_KEY).`,
+          );
+        }
 
-      let nonceCursor = null;
-      for (let i = 0; i < txs.length; i++) {
-        const tx = txs[i];
-        const proposal = await proposeBatch(
-          chainId,
-          [{
-            to: tx.to,
-            value: tx.value,
-            data: tx.data,
-            operation: tx.operation,
-          }],
-          {
-            safeAddress,
-            nonce: Number.isInteger(nonceCursor) ? nonceCursor : undefined,
-          },
-        );
+        let nonceCursor = null;
+        for (let i = 0; i < txs.length; i++) {
+          const tx = txs[i];
+          const proposal = await proposeBatch(
+            chainId,
+            [{
+              to: tx.to,
+              value: tx.value,
+              data: tx.data,
+              operation: tx.operation,
+            }],
+            {
+              safeAddress,
+              nonce: Number.isInteger(nonceCursor) ? nonceCursor : undefined,
+            },
+          );
 
-        nonceCursor = proposal.nonce + 1;
+          nonceCursor = proposal.nonce + 1;
 
-        chainResult.proposals.push({
-          batchIndex: i,
-          txCount: 1,
-          itemCount: tx.meta.itemCount,
-          nonce: proposal.nonce,
-          safeTxHash: proposal.safeTxHash,
-        });
+          chainResult.proposals.push({
+            batchIndex: i,
+            txCount: 1,
+            itemCount: tx.meta.itemCount,
+            nonce: proposal.nonce,
+            safeTxHash: proposal.safeTxHash,
+          });
+        }
       }
     } else {
       chainResult.preview = txs.map((tx, idx) => ({
@@ -616,7 +645,10 @@ async function main() {
   console.log(`Output: ${outputPath}`);
 
   if (!apply) {
-    console.log("Dry run only. Re-run with --apply to submit Safe proposals.");
+    const followUp = args.eoa
+      ? "Re-run with --apply --eoa to send setter txs directly from the owner EOA."
+      : "Re-run with --apply to submit Safe proposals (or add --eoa to send from the owner EOA).";
+    console.log(`Dry run only. ${followUp}`);
   }
 }
 

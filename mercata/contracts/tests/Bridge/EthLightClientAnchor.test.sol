@@ -544,11 +544,22 @@ contract Describe_EthLightClientAnchor {
         return pks;
     }
 
-    function _participationBits() internal pure returns (bytes) {
-        return hex"fedfffffff7ffffffffffeffdffffbbf7fdfbffbf7ffffbfbfdfffdfffeffeeffffeffffeffffffffe7ffefffebf9febffdfbbffefef77fffffbfefafeffffff";
+    function _participationBits() internal pure returns (bytes32[2]) {
+        // 64-byte SSZ Bitvector[512], chunked into 2×bytes32 to round-
+        // trip cleanly through SolidVM's JSON-RPC ABI (see
+        // SyncAggregateInput comment in EthLightClient.sol).
+        bytes32[2] r;
+        r[0] = bytes32(hex"fedfffffff7ffffffffffeffdffffbbf7fdfbffbf7ffffbfbfdfffdfffeffeef");
+        r[1] = bytes32(hex"fffeffffeffffffffe7ffefffebf9febffdfbbffefef77fffffbfefafeffffff");
+        return r;
     }
-    function _signature() internal pure returns (bytes) {
-        return hex"a68a6426fb3b654cf90f0d36f071a7edc93b8af9af7a1f8eb8f356d5e68876e8162492bfa9e8d0ec92bdc204f9a6ea4715bab09c09f4759ca276d521cfe56d184041b2c3c0d3f2903f5cec2bd2c7a5fbacc0248cdc5f64513bc0cfb4ad47b607";
+    function _signature() internal pure returns (bytes32[3]) {
+        // 96-byte IETF compressed G2 signature, chunked into 3×bytes32.
+        bytes32[3] r;
+        r[0] = bytes32(hex"a68a6426fb3b654cf90f0d36f071a7edc93b8af9af7a1f8eb8f356d5e68876e8");
+        r[1] = bytes32(hex"162492bfa9e8d0ec92bdc204f9a6ea4715bab09c09f4759ca276d521cfe56d18");
+        r[2] = bytes32(hex"4041b2c3c0d3f2903f5cec2bd2c7a5fbacc0248cdc5f64513bc0cfb4ad47b607");
+        return r;
     }
 
     function _headers() internal pure returns (AnchorHeaders) {

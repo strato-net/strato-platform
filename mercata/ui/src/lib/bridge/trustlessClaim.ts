@@ -59,6 +59,9 @@ export interface TrustlessClaimResult {
   anchorSkipped: boolean;
   /** Backend skipped the L1 anchor tx (Cannon flow only; L1 already anchored). */
   l1AnchorSkipped: boolean;
+  /** Number of `advanceCommittee` txs prepended to the batch (sync-
+   *  committee chain catchup). 0 in the steady state. */
+  committeeAdvanceCount: number;
   blockNumber: string;
   flavor: LightClientFlavor;
 }
@@ -70,6 +73,92 @@ export interface TrustlessConfig {
   depositRoutedSig: `0x${string}`;
   /** Base flavor only: the wrapped L1 EthLightClient. */
   l1LightClient?: `0x${string}`;
+}
+
+/** One row of {@link fetchConfiguredChains}. */
+export interface ConfiguredChain {
+  chainId: string;
+  name: string;
+  flavor: LightClientFlavor;
+  bridgeIn: `0x${string}`;
+  lightClient: `0x${string}`;
+  depositRoutedSig: `0x${string}`;
+  l1LightClient?: `0x${string}`;
+}
+
+/** Latest finalized head exposed by /bridge/finalizedHead/:chainId. */
+export interface FinalizedHead {
+  blockNumber: string;
+  timestamp: string;
+  flavor: LightClientFlavor;
+}
+
+/** One row of /bridge/pendingDeposits/:chainId. */
+export interface PendingDeposit {
+  txHash: `0x${string}`;
+  blockNumber: string;
+  timestamp: string;
+  logIndex: string;
+  ethToken: `0x${string}`;
+  ethSender: `0x${string}`;
+  stratoRecipient: `0x${string}`;
+  targetStratoToken: `0x${string}`;
+  amount: string;
+  depositId: string;
+  depositKey: `0x${string}`;
+}
+
+/**
+ * Enumerate the source chains the trustless path is currently
+ * configured for. Drives the chain-selector buttons; an empty result
+ * means the modal should hide itself.
+ */
+export async function fetchConfiguredChains(): Promise<ConfiguredChain[]> {
+  const { data: body } = await api.get<{ success: boolean; data: ConfiguredChain[] }>(
+    "/bridge/configuredChains",
+  );
+  return body?.data ?? [];
+}
+
+/**
+ * Fetch the latest finalized-head cutoff for a chain. UI polls this
+ * to flip "Waiting for finality" → "Ready to claim" badges per row.
+ */
+export async function fetchFinalizedHead(
+  chainId: string | number,
+): Promise<FinalizedHead | undefined> {
+  try {
+    const { data: body } = await api.get<{ success: boolean; data: FinalizedHead }>(
+      `/bridge/finalizedHead/${chainId}`,
+    );
+    return body?.data;
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status === 503 || status === 400) return undefined;
+    throw err;
+  }
+}
+
+/**
+ * List unclaimed DepositRouted logs across `wallets` on `chainId`.
+ * Returns [] (rather than throwing) when the chain isn't enabled.
+ */
+export async function fetchPendingDeposits(
+  chainId: string | number,
+  wallets: string[],
+): Promise<PendingDeposit[]> {
+  if (wallets.length === 0) return [];
+  try {
+    const { data: body } = await api.get<{ success: boolean; data: PendingDeposit[] }>(
+      `/bridge/pendingDeposits/${chainId}`,
+      { params: { wallets } },
+    );
+    return body?.data ?? [];
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status === 503 || status === 400) return [];
+    throw err;
+  }
 }
 
 /**
@@ -121,7 +210,19 @@ export async function claimTrustlessDeposit({
   // For the coarse top-level signal, we transition immediately after
   // the POST starts since the proof-building latency is dominated by
   // beacon-API I/O and short relative to wallet signing.
-  setTimeout(() => onProgress?.("submit_strato"), 0);
+  let phase: "build_proof" | "submit_strato" | "complete" | "error" = "build_proof";
+  const reportProgress = (next: typeof phase) => {
+    phase = next;
+    onProgress?.(next);
+  };
+  // The setTimeout below is a macrotask, so it runs AFTER any
+  // microtask-resolved promise rejection. Without this guard a
+  // fast-failing POST would land at step="error" inside the catch,
+  // then the deferred submit_strato would clobber it — leaving the
+  // modal stuck on the spinner with no visible error message.
+  setTimeout(() => {
+    if (phase === "build_proof") reportProgress("submit_strato");
+  }, 0);
 
   try {
     const { data: body } = await api.post<{
@@ -145,10 +246,10 @@ export async function claimTrustlessDeposit({
     if (!body?.success || !body.data) {
       throw new Error("trustlessClaim returned no data");
     }
-    onProgress?.("complete");
+    reportProgress("complete");
     return body.data;
   } catch (err: any) {
-    onProgress?.("error");
+    reportProgress("error");
     throw err;
   }
 }

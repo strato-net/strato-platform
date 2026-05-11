@@ -1,8 +1,10 @@
 /**
- * Deploys the proof-based bridge stack (STRATOLightClient + BridgeVault) to
- * the configured Hardhat network and optionally funds the vault with ETH.
+ * Deploys the full bridge stack on the configured external chain:
+ * STRATOLightClient + BridgeVault (OUT direction) + DepositRouter
+ * (IN direction). The DepositRouter's `gnosisSafe` is wired to the
+ * BridgeVault, so deposits and withdrawals share custody.
  *
- * It fetches the STRATO validator set + a starting tip block from the running
+ * Fetches the STRATO validator set + a starting tip block from the running
  * STRATO node (via strato_getReceiptProof), so the freshly-deployed light
  * client matches the live network's validator set without manual entry.
  *
@@ -25,6 +27,10 @@
  *                         liquidity (e.g. "0.1"). Skipped if unset/zero.
  *   GENESIS_TX_INDEX      Tx index to use when probing strato_getReceiptProof
  *                         for validator extraction. Defaults to 0.
+ *   PERMIT2_ADDRESS       Permit2 contract address. Defaults to the canonical
+ *                         deployment 0x000000000022D473030F116dDEE9F6B43aC78BA3
+ *                         which exists on every major EVM chain (Sepolia,
+ *                         Base Sepolia, mainnet, Base, etc.).
  * --------------------------------------------------------------------------
  *
  * Usage:
@@ -127,6 +133,12 @@ async function main() {
     : 50_000_000_000_000_000n; // 0.05 ETH default
   const fundEthString = process.env.FUND_ETH || "0";
   const fundEthWei = ethers.parseEther(fundEthString);
+  // Permit2 — canonical deployment lives at the same address on every
+  // major EVM (Sepolia, Base Sepolia, mainnet, Base, Arbitrum, etc.).
+  // Override only if you're on a chain where it's deployed elsewhere.
+  const permit2Addr = ensureHex(
+    process.env.PERMIT2_ADDRESS || "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+  );
 
   const [deployer] = await ethers.getSigners();
   const network = await ethers.provider.getNetwork();
@@ -146,9 +158,10 @@ async function main() {
   console.log(`Admin multisig     : ${adminMultisig}${adminMultisig === deployer.address ? "  (WARNING: deployer; pass ADMIN_MULTISIG for real deploys)" : ""}`);
   console.log(`ETH threshold      : ${ethThresholdWei} wei (${ethers.formatEther(ethThresholdWei)} ETH)`);
   console.log(`Vault funding      : ${fundEthString} ETH`);
+  console.log(`Permit2            : ${permit2Addr}`);
 
   // ---- Step 1: pull validators from STRATO ----
-  console.log("\n[1/4] Fetching validator set from STRATO...");
+  console.log("\n[1/5] Fetching validator set from STRATO...");
   const validators = await fetchValidatorsAtBlock(stratoRpcUrl, genesisBlock, genesisTxIndex);
   // STRATOLightClient.initialize requires strictly ascending order.
   const sortedValidators = [...validators]
@@ -159,7 +172,7 @@ async function main() {
   for (const v of sortedValidators) console.log(`    ${v}`);
 
   // ---- Step 2: deploy STRATOLightClient ----
-  console.log("\n[2/4] Deploying STRATOLightClient...");
+  console.log("\n[2/5] Deploying STRATOLightClient...");
   const LC = await ethers.getContractFactory("STRATOLightClient");
   const lc = await upgrades.deployProxy(
     LC,
@@ -171,7 +184,7 @@ async function main() {
   console.log(`  STRATOLightClient: ${lightClientAddr}`);
 
   // ---- Step 3: deploy BridgeVault ----
-  console.log("\n[3/4] Deploying BridgeVault...");
+  console.log("\n[3/5] Deploying BridgeVault...");
   const Vault = await ethers.getContractFactory("BridgeVault");
   const vault = await upgrades.deployProxy(
     Vault,
@@ -188,8 +201,27 @@ async function main() {
   const vaultAddr = await vault.getAddress();
   console.log(`  BridgeVault     : ${vaultAddr}`);
 
-  // ---- Step 4: configure ETH threshold + fund ----
-  console.log("\n[4/4] Configuring vault...");
+  // ---- Step 4: deploy DepositRouter, gnosisSafe = BridgeVault ----
+  // The router forwards inbound deposits to its `gnosisSafe`, which we
+  // wire to the BridgeVault so deposits and withdrawals share custody:
+  // outbound funds are released from the vault on a verified STRATO
+  // proof, inbound funds accumulate into the same address (and the
+  // vault is what the trustless EthBridgeIn flow on STRATO proves
+  // against via the receipts trie).
+  console.log("\n[4/5] Deploying DepositRouter...");
+  const Router = await ethers.getContractFactory("DepositRouter");
+  const router = await upgrades.deployProxy(
+    Router,
+    [permit2Addr, vaultAddr, deployer.address],
+    { kind: "uups" },
+  );
+  await router.waitForDeployment();
+  const routerAddr = await router.getAddress();
+  console.log(`  DepositRouter   : ${routerAddr}`);
+  console.log(`  → gnosisSafe wired to BridgeVault (${vaultAddr})`);
+
+  // ---- Step 5: configure ETH threshold + fund ----
+  console.log("\n[5/5] Configuring vault...");
   const ETH_TOKEN = "0x0000000000000000000000000000000000000000";
   const setThresh = await vault.setInstantThreshold(ETH_TOKEN, ethThresholdWei);
   await setThresh.wait();
@@ -208,6 +240,7 @@ async function main() {
   await saveDeployment(network, {
     stratoLightClient: lightClientAddr,
     bridgeVault: vaultAddr,
+    depositRouter: routerAddr,
   }, {
     stratoBridgeAddr,
     genesisBlock,
@@ -215,6 +248,7 @@ async function main() {
     ethThresholdWei: ethThresholdWei.toString(),
     fundEthWei: fundEthWei.toString(),
     adminMultisig,
+    permit2Addr,
   });
 
   console.log("\n" + "=".repeat(64));
@@ -222,9 +256,14 @@ async function main() {
   console.log("=".repeat(64));
   console.log(`bridgeVault       : ${vaultAddr}`);
   console.log(`stratoLightClient : ${lightClientAddr}`);
+  console.log(`depositRouter     : ${routerAddr}`);
   console.log("\nNext, on STRATO call MercataBridge.setChain with the same chainId:");
-  console.log(`  setChain("Sepolia", <custody>, <hotWallet>, true, ${network.chainId}, <lastProcessedBlock>, <depositRouter>, ${vaultAddr}, ${lightClientAddr})`);
-  console.log("\nThen reload the UI and try a withdrawal -- the proof flow will fire.");
+  console.log(`  setChain(<chainName>, <custody>, <hotWallet>, true, ${network.chainId}, <lastProcessedBlock>, ${routerAddr}, ${vaultAddr}, ${lightClientAddr})`);
+  console.log("\nThen run deployTrustlessBridge.js (mercata/contracts) to wire the IN-direction");
+  console.log("EthBridgeIn that points at this DepositRouter:");
+  console.log(`  npm run bridge:trustless:deploy:testnet -- \\`);
+  console.log(`    --${network.name === "sepolia" ? "sepolia" : "base-sepolia"}-deposit-router ${routerAddr} \\`);
+  console.log(`    --apply`);
 }
 
 main().catch((err) => {

@@ -49,9 +49,43 @@ export interface EthTransactionReceipt {
 interface JsonRpcSuccess<T> { jsonrpc: "2.0"; id: number; result: T }
 interface JsonRpcFailure { jsonrpc: "2.0"; id: number; error: { code: number; message: string } }
 
+/** Max attempts per JSON-RPC call (across primary+fallback). 429/5xx
+ *  are common on free public endpoints; without backoff a single
+ *  rate-limit hit cascades into a hard failure of the whole flow. */
+const ETHRPC_MAX_ATTEMPTS: number = (() => {
+  const raw = process.env.ETHRPC_MAX_ATTEMPTS;
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 4;
+})();
+
+function isRetryableHttpStatus(s: number | undefined): boolean {
+  if (s === undefined) return true; // network error / timeout
+  return s === 429 || (s >= 500 && s <= 599);
+}
+
+async function rpcBackoff(err: any, attempt: number): Promise<void> {
+  const retryAfter = err?.response?.headers?.["retry-after"];
+  let ms: number | undefined;
+  if (typeof retryAfter === "string") {
+    const asInt = parseInt(retryAfter, 10);
+    if (Number.isFinite(asInt)) ms = asInt * 1000;
+    else {
+      const asDate = Date.parse(retryAfter);
+      if (Number.isFinite(asDate)) ms = Math.max(0, asDate - Date.now());
+    }
+  }
+  if (ms === undefined) {
+    const base = Math.min(2000, 250 * 2 ** attempt);
+    ms = base * (0.8 + Math.random() * 0.4);
+  }
+  await new Promise((r) => setTimeout(r, ms));
+}
+
 /**
  * Resolve the JSON-RPC URL for `chainId` and POST a single request,
- * with primary→fallback failover on network/5xx errors.
+ * with primary→fallback failover plus 429/5xx exponential-backoff
+ * retry. In-band JSON-RPC errors (200s carrying `data.error`) are
+ * NOT retried — those are deterministic failures of the call itself.
  */
 async function rpcCall<T>(chainId: string, method: string, params: unknown[]): Promise<T> {
   const { upstream, fallback } = getRpcUpstream(chainId);
@@ -63,23 +97,43 @@ async function rpcCall<T>(chainId: string, method: string, params: unknown[]): P
     const res = await axios.post<JsonRpcSuccess<T> | JsonRpcFailure>(url, body, { timeout: 15_000 });
     const data = res.data;
     if ("error" in data && data.error) {
-      // Eth-RPC errors are reported in-band as 200s; treat them like a
-      // proper failure but don't auto-failover (the next node would
-      // probably reject the same call).
       throw new Error(`ethRpc ${method}: ${data.error.message} (code ${data.error.code})`);
     }
     return (data as JsonRpcSuccess<T>).result;
   };
 
-  try {
-    if (!upstream) throw new Error("no primary"); // forces fallback
-    return await tryUrl(upstream);
-  } catch (err: any) {
-    const status = err?.response?.status;
-    const isClientError = typeof status === "number" && status >= 400 && status < 500;
-    if (isClientError || !fallback || fallback === upstream) throw err;
-    return await tryUrl(fallback);
+  let lastErr: any;
+  for (let attempt = 0; attempt < ETHRPC_MAX_ATTEMPTS; attempt++) {
+    // Even attempts → primary; odd → fallback (if available). When
+    // there's only one URL, it's used every attempt with backoff.
+    const url =
+      attempt % 2 === 0 || !fallback || fallback === upstream
+        ? upstream
+        : fallback;
+    if (!url) {
+      // Fallback unavailable on an odd attempt — shift back to primary.
+      if (!upstream) throw lastErr ?? new Error("no upstream available");
+      try { return await tryUrl(upstream); }
+      catch (err: any) { lastErr = err; continue; }
+    }
+    try {
+      return await tryUrl(url);
+    } catch (err: any) {
+      lastErr = err;
+      const status = err?.response?.status;
+      // In-band JSON-RPC errors aren't HTTP-level → no `response.status`;
+      // those are deterministic and shouldn't be retried.
+      const isInBandRpcError =
+        typeof err?.message === "string" && err.message.startsWith(`ethRpc ${method}:`);
+      if (isInBandRpcError) throw err;
+      if (!isRetryableHttpStatus(status)) throw err;
+      if (attempt === ETHRPC_MAX_ATTEMPTS - 1) break;
+      const reason = status ?? "network";
+      console.warn(`[EthRpc] ${reason} on ${method} (attempt ${attempt + 1}/${ETHRPC_MAX_ATTEMPTS}); backing off`);
+      await rpcBackoff(err, attempt);
+    }
   }
+  throw lastErr;
 }
 
 // ─────────────────────────────────────────────────────────────────────

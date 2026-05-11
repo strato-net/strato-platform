@@ -294,6 +294,81 @@ router.get("/trustlessConfig/:chainId", walletAuth, BridgeController.getTrustles
 
 /**
  * @openapi
+ * /bridge/configuredChains:
+ *   get:
+ *     summary: "List source chains registered for the trustless bridge-in path"
+ *     description: >
+ *       Returns every chainId with a non-zero MercataBridge.bridgeIns[chainId]
+ *       entry, hydrated with its bridgeIn / lightClient / depositRoutedSig
+ *       (and l1LightClient for Base flavor). Drives the chain-selector
+ *       buttons on the claim modal.
+ *     tags: [Bridge]
+ *     responses:
+ *       200:
+ *         description: Configured chains
+ */
+router.get("/configuredChains", walletAuth, BridgeController.getConfiguredChains);
+
+/**
+ * @openapi
+ * /bridge/finalizedHead/{chainId}:
+ *   get:
+ *     summary: "Latest beacon-finalized EL block on the source chain"
+ *     description: >
+ *       Returns {blockNumber, timestamp, flavor}. UI polls this
+ *       every few seconds to determine which pending deposits are
+ *       ready to claim (deposit.blockNumber ≤ blockNumber).
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Finalized head
+ *       400:
+ *         description: chainId not supported
+ *       503:
+ *         description: Trustless path disabled
+ */
+router.get("/finalizedHead/:chainId", walletAuth, BridgeController.getFinalizedHead);
+
+/**
+ * @openapi
+ * /bridge/pendingDeposits/{chainId}:
+ *   get:
+ *     summary: "Unclaimed DepositRouted logs for the user's wallets"
+ *     description: >
+ *       Scans recent DepositRouted events from the chain's depositRouter
+ *       filtered to logs whose stratoRecipient ∈ wallets, drops entries
+ *       already in EthBridgeIn.processed, and returns the remainder
+ *       newest-first.
+ *     tags: [Bridge]
+ *     parameters:
+ *       - in: path
+ *         name: chainId
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: wallets
+ *         required: true
+ *         description: One or more recipient wallet addresses (repeat or comma-separated)
+ *         schema:
+ *           type: array
+ *           items: { type: string }
+ *     responses:
+ *       200:
+ *         description: Pending deposits for the requested wallets
+ *       400:
+ *         description: Missing wallets or unsupported chain
+ *       503:
+ *         description: Trustless path disabled
+ */
+router.get("/pendingDeposits/:chainId", walletAuth, BridgeController.getPendingDeposits);
+
+/**
+ * @openapi
  * /bridge/trustlessClaim:
  *   post:
  *     summary: "Submit a trustless bridge-in claim (anchor + claim batch)"

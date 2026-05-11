@@ -86,7 +86,8 @@ test-suite storage-test
       OverloadedStrings
   ghc-options: -dynamic
   build-depends:
-      base
+      QuickCheck
+    , base
     , bytestring
     , ethereum-rlp
     , format

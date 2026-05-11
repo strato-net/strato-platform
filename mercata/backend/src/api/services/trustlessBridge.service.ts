@@ -28,9 +28,15 @@ import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import {
   buildAnchorInputs,
+  buildAnchorInputsViaStateProof,
   buildClaimInputs,
+  buildPeriodTransitions,
   AnchorInputs,
+  BlockRootsAnchorInputs,
   ClaimInputs,
+  HistoricalSummariesAnchorInputs,
+  PeriodTransitionJSON,
+  StateProofAnchorInputs,
 } from "./bridgeProof.service";
 import {
   BaseAnchorChainInputs,
@@ -55,6 +61,16 @@ const FLAVOR_BY_CHAIN_ID: Record<string, LightClientFlavor> = {
   "11155111": "eth",
   "8453":     "base",
   "84532":    "base",
+};
+
+/** Display name for a supported source chain. Used by
+ *  {@link listConfiguredChains} so the UI doesn't have to map chainId
+ *  → label client-side. */
+const CHAIN_NAMES: Record<string, string> = {
+  "1":        "Ethereum",
+  "11155111": "Sepolia",
+  "8453":     "Base",
+  "84532":    "Base Sepolia",
 };
 
 export interface TrustlessClaimParams {
@@ -82,6 +98,10 @@ export interface TrustlessClaimResponse {
   anchorSkipped: boolean;
   /** True iff the L1 block was already anchored (Base flavor only). */
   l1AnchorSkipped: boolean;
+  /** Number of `advanceCommittee` txs prepended to the batch to catch
+   *  up the EthLightClient's sync-committee chain. 0 in the steady-
+   *  state case where a relayer keeps committees fresh. */
+  committeeAdvanceCount: number;
   blockNumber: string;
   flavor: LightClientFlavor;
 }
@@ -177,6 +197,107 @@ export const loadTrustlessConfig = async (
   return { flavor, bridgeIn, lightClient, depositRoutedSig, l1LightClient };
 };
 
+/** One row of {@link listConfiguredChains}. */
+export interface ConfiguredChain {
+  chainId: string;
+  name: string;
+  flavor: LightClientFlavor;
+  bridgeIn: string;
+  lightClient: string;
+  depositRoutedSig: string;
+  /** Base flavor only — the wrapped L1 EthLightClient. */
+  l1LightClient?: string;
+}
+
+/**
+ * Enumerate every source chain that has a non-zero `bridgeIns[chainId]`
+ * entry on MercataBridge AND a flavor we know how to bridge from.
+ * Drives the chain-button picker on the trustless claim modal.
+ *
+ * Each row is hydrated with the same fields {@link loadTrustlessConfig}
+ * returns, so the modal can stash the full bundle and skip the per-row
+ * config fetch when the user picks one.
+ */
+export const listConfiguredChains = async (
+  accessToken: string,
+): Promise<ConfiguredChain[]> => {
+  // 1. All bridgeIns rows on MercataBridge — postgrest returns the
+  //    full mapping when we omit the `key` filter.
+  const { data: rows } = await cirrus.get(
+    accessToken,
+    `/${MercataBridge}-bridgeIns`,
+    { params: { address: `eq.${mercataBridge}`, select: "key,value" } },
+  );
+  if (!Array.isArray(rows)) return [];
+
+  // 2. Filter to (a) chains we have a flavor for and (b) non-zero
+  //    bridgeIn entries (deletion stamps the value back to 0x0…).
+  const candidates = rows
+    .map((r: any) => ({
+      chainId: String(r.key),
+      bridgeIn: ensureHexPrefix(String(r.value)),
+    }))
+    .filter(
+      ({ chainId, bridgeIn }) =>
+        FLAVOR_BY_CHAIN_ID[chainId] &&
+        !/^0+$/.test(bridgeIn.replace(/^0x/, "")),
+    );
+  if (candidates.length === 0) return [];
+
+  // 3. Hydrate. We could parallel-await loadTrustlessConfig per chain
+  //    but that re-queries bridgeIns; doing the lightClient lookup
+  //    inline saves a round-trip per row.
+  const results = await Promise.all(
+    candidates.map(async ({ chainId, bridgeIn }): Promise<ConfiguredChain | undefined> => {
+      try {
+        const cfg = await loadTrustlessConfig(accessToken, chainId);
+        return {
+          chainId,
+          name: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
+          flavor: cfg.flavor,
+          bridgeIn: cfg.bridgeIn,
+          lightClient: cfg.lightClient,
+          depositRoutedSig: cfg.depositRoutedSig,
+          l1LightClient: cfg.l1LightClient,
+        };
+      } catch {
+        // A registered bridgeIn whose template-row is missing in cirrus
+        // is a misconfiguration — skip rather than 500 the whole list.
+        return undefined;
+      }
+    }),
+  );
+  return results.filter((r): r is ConfiguredChain => !!r);
+};
+
+/**
+ * Read `EthLightClient.latestPeriod` — the highest sync-committee
+ * period whose committeePubkeys[period] is anchored. Used to decide
+ * how many `advanceCommittee` txs to prepend so the deposit's signing
+ * committee is in scope.
+ *
+ * Returns undefined if the row doesn't exist or the field is null;
+ * caller treats that as "can't determine, skip the catchup".
+ */
+const fetchLatestAnchoredPeriod = async (
+  accessToken: string,
+  lightClient: string,
+): Promise<bigint | undefined> => {
+  try {
+    const { data } = await cirrus.get(accessToken, `/${EthLightClientName}`, {
+      params: {
+        address: `eq.${lightClient.replace(/^0x/, "")}`,
+        select: "latestPeriod",
+      },
+    });
+    const v = data?.[0]?.latestPeriod;
+    if (v === undefined || v === null) return undefined;
+    return BigInt(v);
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * Read EthLightClient.anchored[blockNumber]. Returns the receiptsRoot
  * (zero bytes32 if not anchored). Same idempotency optimization that
@@ -245,51 +366,287 @@ const fetchMappingValue = async (
 
 // ─────────────────────────────────────────────────────────────────────
 // Tx-builder helpers — one per (flavor, method)
+//
+// SolidVM JSON-RPC ABI requires bytesN / bytes args as Base16 strings
+// without a "0x" prefix; addresses are left prefixed (the engine
+// accepts both for `address`). We strip prefixes per-field rather
+// than walking blindly because addresses live alongside hashes in
+// these structs.
 // ─────────────────────────────────────────────────────────────────────
 
+const strip0x = (s: string): string =>
+  typeof s === "string" && s.startsWith("0x") ? s.slice(2) : s;
+const strip0xArr = (a: string[]): string[] => a.map(strip0x);
+
+/**
+ * Split a hex string (no 0x prefix) into N×64-char chunks (one per
+ * bytes32). Right-pads the final chunk with zeros if `s` is shorter
+ * than `chunks * 64`. Used to hand SolidVM a `bytes32[N]` argument
+ * that round-trips correctly through its JSON-RPC ABI for variable
+ * `bytes` nested in a struct (which doesn't decode otherwise).
+ */
+const chunkBytes32 = (s: string, chunks: number): string[] => {
+  const stripped = strip0x(s);
+  const expected = chunks * 64;
+  if (stripped.length > expected) {
+    throw new Error(
+      `chunkBytes32: hex too long for bytes32[${chunks}] (${stripped.length / 2} bytes > ${chunks * 32})`,
+    );
+  }
+  const padded = stripped.padEnd(expected, "0");
+  const out: string[] = [];
+  for (let i = 0; i < chunks; i++) {
+    out.push(padded.slice(i * 64, (i + 1) * 64));
+  }
+  return out;
+};
+
 const buildEthAnchorArgs = (anchor: AnchorInputs) => ({
-  headers: anchor.headers,
-  sync: anchor.sync,
-  parentChain: anchor.parentChain,
-  eph: anchor.eph,
-  executionBranch: anchor.executionBranch,
+  headers: {
+    attestedSlot:           anchor.headers.attestedSlot,
+    attestedProposerIndex:  anchor.headers.attestedProposerIndex,
+    attestedParentRoot:     strip0x(anchor.headers.attestedParentRoot),
+    attestedStateRoot:      strip0x(anchor.headers.attestedStateRoot),
+    attestedBodyRoot:       strip0x(anchor.headers.attestedBodyRoot),
+    finalizedSlot:          anchor.headers.finalizedSlot,
+    finalizedProposerIndex: anchor.headers.finalizedProposerIndex,
+    finalizedParentRoot:    strip0x(anchor.headers.finalizedParentRoot),
+    finalizedStateRoot:     strip0x(anchor.headers.finalizedStateRoot),
+    finalizedBodyRoot:      strip0x(anchor.headers.finalizedBodyRoot),
+    finalityBranch:         strip0xArr(anchor.headers.finalityBranch),
+  },
+  sync: {
+    // SolidVM ABI workaround: bytes nested in a struct doesn't
+    // round-trip via JSON-RPC; chunk into bytes32[N] which does.
+    participationBits: chunkBytes32(anchor.sync.participationBits, 2),  // 64 bytes
+    signature:         chunkBytes32(anchor.sync.signature, 3),           // 96 bytes
+    signatureSlot:     anchor.sync.signatureSlot,
+  },
+  parentChain: anchor.parentChain.map((p) => ({
+    slot:          p.slot,
+    proposerIndex: p.proposerIndex,
+    parentRoot:    strip0x(p.parentRoot),
+    stateRoot:     strip0x(p.stateRoot),
+    bodyRoot:      strip0x(p.bodyRoot),
+  })),
+  eph: {
+    parentHash:       strip0x(anchor.eph.parentHash),
+    feeRecipient:     anchor.eph.feeRecipient,
+    stateRoot:        strip0x(anchor.eph.stateRoot),
+    receiptsRoot:     strip0x(anchor.eph.receiptsRoot),
+    logsBloomRoot:    strip0x(anchor.eph.logsBloomRoot),
+    prevRandao:       strip0x(anchor.eph.prevRandao),
+    blockNumber:      anchor.eph.blockNumber,
+    gasLimit:         anchor.eph.gasLimit,
+    gasUsed:          anchor.eph.gasUsed,
+    timestamp:        anchor.eph.timestamp,
+    extraDataRoot:    strip0x(anchor.eph.extraDataRoot),
+    baseFeePerGas:    anchor.eph.baseFeePerGas,
+    blockHash:        strip0x(anchor.eph.blockHash),
+    transactionsRoot: strip0x(anchor.eph.transactionsRoot),
+    withdrawalsRoot:  strip0x(anchor.eph.withdrawalsRoot),
+    blobGasUsed:      anchor.eph.blobGasUsed,
+    excessBlobGas:    anchor.eph.excessBlobGas,
+  },
+  executionBranch: strip0xArr(anchor.executionBranch),
+});
+
+/** Common header/sync/eph/executionBranch envelope shared by the
+ *  state-proof entrypoints. Factored out because the parent-walk and
+ *  state-proof entrypoints both ride the same prelude. */
+const buildEthAnchorEnvelope = (anchor: StateProofAnchorInputs) => ({
+  headers: {
+    attestedSlot:           anchor.headers.attestedSlot,
+    attestedProposerIndex:  anchor.headers.attestedProposerIndex,
+    attestedParentRoot:     strip0x(anchor.headers.attestedParentRoot),
+    attestedStateRoot:      strip0x(anchor.headers.attestedStateRoot),
+    attestedBodyRoot:       strip0x(anchor.headers.attestedBodyRoot),
+    finalizedSlot:          anchor.headers.finalizedSlot,
+    finalizedProposerIndex: anchor.headers.finalizedProposerIndex,
+    finalizedParentRoot:    strip0x(anchor.headers.finalizedParentRoot),
+    finalizedStateRoot:     strip0x(anchor.headers.finalizedStateRoot),
+    finalizedBodyRoot:      strip0x(anchor.headers.finalizedBodyRoot),
+    finalityBranch:         strip0xArr(anchor.headers.finalityBranch),
+  },
+  sync: {
+    participationBits: chunkBytes32(anchor.sync.participationBits, 2),
+    signature:         chunkBytes32(anchor.sync.signature, 3),
+    signatureSlot:     anchor.sync.signatureSlot,
+  },
+  target: {
+    slot:          anchor.target.slot,
+    proposerIndex: anchor.target.proposerIndex,
+    parentRoot:    strip0x(anchor.target.parentRoot),
+    stateRoot:     strip0x(anchor.target.stateRoot),
+    bodyRoot:      strip0x(anchor.target.bodyRoot),
+  },
+  eph: {
+    parentHash:       strip0x(anchor.eph.parentHash),
+    feeRecipient:     anchor.eph.feeRecipient,
+    stateRoot:        strip0x(anchor.eph.stateRoot),
+    receiptsRoot:     strip0x(anchor.eph.receiptsRoot),
+    logsBloomRoot:    strip0x(anchor.eph.logsBloomRoot),
+    prevRandao:       strip0x(anchor.eph.prevRandao),
+    blockNumber:      anchor.eph.blockNumber,
+    gasLimit:         anchor.eph.gasLimit,
+    gasUsed:          anchor.eph.gasUsed,
+    timestamp:        anchor.eph.timestamp,
+    extraDataRoot:    strip0x(anchor.eph.extraDataRoot),
+    baseFeePerGas:    anchor.eph.baseFeePerGas,
+    blockHash:        strip0x(anchor.eph.blockHash),
+    transactionsRoot: strip0x(anchor.eph.transactionsRoot),
+    withdrawalsRoot:  strip0x(anchor.eph.withdrawalsRoot),
+    blobGasUsed:      anchor.eph.blobGasUsed,
+    excessBlobGas:    anchor.eph.excessBlobGas,
+  },
+  executionBranch: strip0xArr(anchor.executionBranch),
+});
+
+const buildEthAnchorViaBlockRootsArgs = (anchor: BlockRootsAnchorInputs) => {
+  const env = buildEthAnchorEnvelope(anchor);
+  return {
+    headers:          env.headers,
+    sync:             env.sync,
+    target:           env.target,
+    blockRootsBranch: strip0xArr(anchor.blockRootsBranch),
+    eph:              env.eph,
+    executionBranch:  env.executionBranch,
+  };
+};
+
+const buildEthAnchorViaHistoricalSummariesArgs = (anchor: HistoricalSummariesAnchorInputs) => {
+  const env = buildEthAnchorEnvelope(anchor);
+  return {
+    headers:           env.headers,
+    sync:              env.sync,
+    target:            env.target,
+    summaryIndex:      anchor.summaryIndex,
+    historicalBranch:  strip0xArr(anchor.historicalBranch),
+    eph:               env.eph,
+    executionBranch:   env.executionBranch,
+  };
+};
+
+const buildAdvanceCommitteeArgs = (p: PeriodTransitionJSON) => ({
+  update: {
+    attestedSlot:           p.attestedSlot,
+    attestedProposerIndex:  p.attestedProposerIndex,
+    attestedParentRoot:     strip0x(p.attestedParentRoot),
+    attestedStateRoot:      strip0x(p.attestedStateRoot),
+    attestedBodyRoot:       strip0x(p.attestedBodyRoot),
+    // Chunked bytes32[N] form — see SyncAggregateInput in
+    // EthLightClient.sol for why nested `bytes` struct fields
+    // can't ride the wire.
+    participationBits:      chunkBytes32(p.participationBits, 2),  // 64 bytes
+    signature:              chunkBytes32(p.signature, 3),           // 96 bytes
+    signatureSlot:          p.signatureSlot,
+    nextPubkeys:            strip0xArr(p.nextPubkeys),
+    // 48-byte BLS pubkey + 16-byte SSZ right-pad → bytes32[2].
+    nextAggregatePubkey:    chunkBytes32(p.nextAggregatePubkey, 2),
+    nextBranch:             strip0xArr(p.nextBranch),
+  },
 });
 
 const buildBaseAnchorArgs = (b: BaseAnchorChainInputs) => ({
   proof: {
-    l1BlockNumber: b.l1BlockNumber,
-    txIndex: b.txIndex,
-    logIndex: b.logIndex,
-    receiptValueBytes: b.receiptValueBytes,
-    mptProof: b.mptProof,
+    l1BlockNumber:     b.l1BlockNumber,
+    txIndex:           b.txIndex,
+    logIndex:          b.logIndex,
+    receiptValueBytes: strip0x(b.receiptValueBytes),
+    mptProof:          strip0xArr(b.mptProof),
   },
-  baseHeaderRLP: b.anchorHeaderRLP,
-  withdrawalStorageRoot: b.withdrawalStorageRoot,
-  parentChain: b.parentChain,
+  baseHeaderRLP:         strip0x(b.anchorHeaderRLP),
+  withdrawalStorageRoot: strip0x(b.withdrawalStorageRoot),
+  parentChain:           strip0xArr(b.parentChain),
 });
 
 const ZERO_BYTES32 =
-  "0x0000000000000000000000000000000000000000000000000000000000000000";
+  "0000000000000000000000000000000000000000000000000000000000000000";
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
 const buildClaimArgs = (
   claim: ClaimInputs,
   assignment: TrustlessClaimParams["assignment"],
 ) => ({
-  blockNumber: claim.blockNumber,
-  txIndex: claim.txIndex,
-  logIndex: claim.logIndex,
-  receiptValueBytes: claim.receiptValueBytes,
-  mptProof: claim.mptProof,
-  assignment: assignment ?? {
-    depositKey: ZERO_BYTES32,
-    newRecipient: ZERO_ADDR,
-    deadline: "0",
-    v: 0,
-    r: ZERO_BYTES32,
-    s: ZERO_BYTES32,
-  },
+  blockNumber:       claim.blockNumber,
+  txIndex:           claim.txIndex,
+  logIndex:          claim.logIndex,
+  receiptValueBytes: strip0x(claim.receiptValueBytes),
+  mptProof:          strip0xArr(claim.mptProof),
+  assignment: assignment
+    ? {
+        depositKey:   strip0x(assignment.depositKey),
+        newRecipient: assignment.newRecipient,
+        deadline:     assignment.deadline,
+        v:            assignment.v,
+        r:            strip0x(assignment.r),
+        s:            strip0x(assignment.s),
+      }
+    : {
+        depositKey:   ZERO_BYTES32,
+        newRecipient: ZERO_ADDR,
+        deadline:     "0",
+        v:            0,
+        r:            ZERO_BYTES32,
+        s:            ZERO_BYTES32,
+      },
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// Sync-committee catchup
+// ─────────────────────────────────────────────────────────────────────
+
+/** Slots per sync-committee period: SLOTS_PER_EPOCH (32) ×
+ *  EPOCHS_PER_SYNC_COMMITTEE_PERIOD (256). */
+const SLOTS_PER_PERIOD = 8192n;
+
+/** Map a source chain to the L1 beacon chain whose period transitions
+ *  drive its EthLightClient. Eth flavor → itself; Base flavor → its L1. */
+function beaconChainIdFor(srcChainId: string, flavor: LightClientFlavor): string {
+  if (flavor === "eth") return srcChainId;
+  switch (srcChainId) {
+    case "8453":  return "1";
+    case "84532": return "11155111";
+    default: throw new Error(`beaconChainIdFor: no mapping for base chain ${srcChainId}`);
+  }
+}
+
+/**
+ * Build the (possibly-empty) sequence of `advanceCommittee` txs that
+ * catch the EthLightClient's sync-committee chain up to the period
+ * needed by an upcoming `anchorBlockHeader` call.
+ *
+ * `anchorBlockHeader` requires `committeePubkeys[period(sync.signatureSlot)]`
+ * to exist; if the LC is N periods behind, we need N updates. The
+ * permissionless `advanceCommittee` is idempotent, so racing relayers
+ * don't break us — but we still skip the call when the chain is
+ * already caught up (no point paying gas).
+ */
+async function buildAdvanceCommitteeTxsIfNeeded(
+  accessToken: string,
+  beaconChainId: string,
+  ethLightClient: string,
+  signatureSlot: string,
+): Promise<Array<{ contractName: string; contractAddress: string; method: string; args: Record<string, any> }>> {
+  const signaturePeriod = BigInt(signatureSlot) / SLOTS_PER_PERIOD;
+  const latest = await fetchLatestAnchoredPeriod(accessToken, ethLightClient);
+  if (latest === undefined) {
+    // Can't determine the LC's state — let the on-chain call surface
+    // the error if a committee is missing. Don't blindly insert
+    // catchup txs that would compete with admin bootstrap windows.
+    return [];
+  }
+  if (latest >= signaturePeriod) return [];
+  const startPeriod = Number(latest);
+  const count = Number(signaturePeriod - latest);
+  const transitions = await buildPeriodTransitions(beaconChainId, startPeriod, count);
+  return transitions.map((t) => ({
+    contractName: extractContractName(EthLightClientName),
+    contractAddress: ethLightClient,
+    method: "advanceCommittee",
+    args: buildAdvanceCommitteeArgs(t),
+  }));
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Main entry
@@ -313,6 +670,7 @@ export const trustlessClaim = async (
   const txInputs: Array<{ contractName: string; contractAddress: string; method: string; args: Record<string, any> }> = [];
   let l1AnchorSkipped = false;
   let anchorSkipped = false;
+  let committeeAdvanceCount = 0;
 
   if (cfg.flavor === "eth") {
     // Single-block Eth path: anchor on EthLightClient if needed, claim.
@@ -321,13 +679,42 @@ export const trustlessClaim = async (
     );
     anchorSkipped = !!alreadyAnchored;
     if (!alreadyAnchored) {
-      const anchor = await buildAnchorInputs(externalChainId, externalTxHash);
-      txInputs.push({
-        contractName: extractContractName(EthLightClientName),
-        contractAddress: cfg.lightClient,
-        method: "anchorBlockHeader",
-        args: buildEthAnchorArgs(anchor),
-      });
+      // State-proof anchor (block_roots / historical_summaries). One
+      // BeaconState fetch (~50 MB on Sepolia) + a 19- or 45-deep
+      // Merkle proof, vs the legacy parent-chain walk's O(N) sequential
+      // beacon `getHeader` fetches and on-chain `hashTreeRootBeaconHeader`
+      // calls (where N grew quadratically with deposit age).
+      const anchor = await buildAnchorInputsViaStateProof(
+        externalChainId, externalTxHash,
+      );
+
+      // Catch up sync-committee chain on the LC if it's behind the
+      // deposit's signaturePeriod — anchor would otherwise revert
+      // with "no committee for this period".
+      const advances = await buildAdvanceCommitteeTxsIfNeeded(
+        accessToken,
+        beaconChainIdFor(externalChainId, "eth"),
+        cfg.lightClient,
+        anchor.sync.signatureSlot,
+      );
+      committeeAdvanceCount = advances.length;
+      txInputs.push(...advances);
+
+      if (anchor.kind === "block_roots") {
+        txInputs.push({
+          contractName: extractContractName(EthLightClientName),
+          contractAddress: cfg.lightClient,
+          method: "anchorBlockHeaderViaBlockRoots",
+          args: buildEthAnchorViaBlockRootsArgs(anchor),
+        });
+      } else {
+        txInputs.push({
+          contractName: extractContractName(EthLightClientName),
+          contractAddress: cfg.lightClient,
+          method: "anchorBlockHeaderViaHistoricalSummaries",
+          args: buildEthAnchorViaHistoricalSummariesArgs(anchor),
+        });
+      }
     }
   } else {
     // Base/Cannon path. Three potential txs; we skip whichever steps
@@ -352,6 +739,15 @@ export const trustlessClaim = async (
       );
       l1AnchorSkipped = !!alreadyAnchoredL1;
       if (!alreadyAnchoredL1) {
+        // Same catchup logic on the wrapped L1 EthLightClient.
+        const advances = await buildAdvanceCommitteeTxsIfNeeded(
+          accessToken,
+          beaconChainIdFor(externalChainId, "base"),
+          cfg.l1LightClient!,
+          baseAnchor.l1Anchor.sync.signatureSlot,
+        );
+        committeeAdvanceCount = advances.length;
+        txInputs.push(...advances);
         txInputs.push({
           contractName: extractContractName(EthLightClientName),
           contractAddress: cfg.l1LightClient!,
@@ -397,6 +793,7 @@ export const trustlessClaim = async (
     hashes,
     anchorSkipped,
     l1AnchorSkipped,
+    committeeAdvanceCount,
     blockNumber: claim.blockNumber,
     flavor: cfg.flavor,
   };

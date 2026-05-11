@@ -91,9 +91,9 @@ contract Describe_BaseLightClientCannon {
     function beforeEach() {
         admin = address(this);
         lc = new TestableEthLightClient4(admin);
-        bc = new BaseLightClient(
-            admin,
-            EthLightClient(address(lc)),
+        bc = new BaseLightClient(admin);
+        bc.initialize(
+            address(lc),
             FACTORY,
             DISPUTE_GAME_CREATED_SIG
         );

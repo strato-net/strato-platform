@@ -15,6 +15,7 @@ import {
   buildClaimInputs,
   DepositTooOldError,
   NotFinalizedYetError,
+  TooManyMissingPeriodsError,
 } from "../services/bridgeProof.service";
 import {
   buildBaseAnchorChainInputsViaCannon,
@@ -24,13 +25,34 @@ import {
   UnsupportedL2ChainError,
 } from "../services/baseProof.service";
 import {
+  listConfiguredChains,
   loadTrustlessConfig,
   trustlessClaim,
   TrustlessClaimParams,
 } from "../services/trustlessBridge.service";
+import {
+  getFinalizedHead,
+  getPendingDeposits,
+} from "../services/trustlessDeposits.service";
 
 /** Source chain ids the Cannon (OP-Stack) path covers. */
 const BASE_CHAIN_IDS = new Set(["8453", "84532"]);
+
+/** Structured 425 body for NOT_FINALIZED_YET — lets the UI render an
+ *  ETA countdown instead of a raw error string. */
+function notFinalizedBody(error: NotFinalizedYetError) {
+  return {
+    error: error.message,
+    code: "NOT_FINALIZED_YET",
+    details: {
+      depositBlockNumber: error.depositBlockNumber,
+      finalizedBlockNumber: error.finalizedBlockNumber,
+      depositBlockTimestamp: error.depositBlockTimestamp,
+      etaSeconds: error.etaSeconds,
+      finalityLagSeconds: error.finalityLagSeconds,
+    },
+  };
+}
 import { validateRequestWithdrawal, validateDepositAction, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
 import {
@@ -161,7 +183,7 @@ class BridgeController {
       res.json({ success: true, data: inputs });
     } catch (error: any) {
       if (error instanceof NotFinalizedYetError) {
-        res.status(425).json({ error: "deposit not yet finalized; retry after finality lag", code: "NOT_FINALIZED_YET" });
+        res.status(425).json(notFinalizedBody(error));
         return;
       }
       if (error instanceof DepositTooOldError) {
@@ -207,7 +229,7 @@ class BridgeController {
         return;
       }
       if (error instanceof NotFinalizedYetError) {
-        res.status(425).json({ error: error.message, code: "NOT_FINALIZED_YET" });
+        res.status(425).json(notFinalizedBody(error));
         return;
       }
       if (error instanceof DepositTooOldError) {
@@ -251,7 +273,7 @@ class BridgeController {
         return;
       }
       if (error instanceof NotFinalizedYetError) {
-        res.status(425).json({ error: error.message, code: "NOT_FINALIZED_YET" });
+        res.status(425).json(notFinalizedBody(error));
         return;
       }
       if (error instanceof DepositTooOldError) {
@@ -346,6 +368,135 @@ class BridgeController {
   }
 
   /**
+   * GET /bridge/configuredChains
+   *
+   * Lists every source chain registered in MercataBridge.bridgeIns
+   * that we can bridge from. Drives the chain-button picker on the
+   * trustless-claim modal.
+   */
+  static async getConfiguredChains(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const chains = await listConfiguredChains(accessToken);
+      res.json({ success: true, data: chains });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /bridge/finalizedHead/:chainId
+   *
+   * Returns the latest "is the deposit ready?" cutoff for `chainId`
+   * (Eth flavor: live beacon-finalized EL block; Base flavor: L1
+   * finalized head as a coarse freshness indicator). UI polls this
+   * every few seconds to flip "waiting" → "ready" badges.
+   */
+  static async getFinalizedHead(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { chainId } = req.params;
+      if (!chainId) {
+        res.status(400).json({ error: "chainId path param required" });
+        return;
+      }
+      const cfg = await loadTrustlessConfig(accessToken, chainId);
+      const head = await getFinalizedHead({
+        chainId,
+        name: chainId,
+        flavor: cfg.flavor,
+        bridgeIn: cfg.bridgeIn,
+        lightClient: cfg.lightClient,
+        depositRoutedSig: cfg.depositRoutedSig,
+        l1LightClient: cfg.l1LightClient,
+      });
+      res.json({ success: true, data: head });
+    } catch (error: any) {
+      if (typeof error?.message === "string" && error.message.includes("trustless path disabled")) {
+        res.status(503).json({ error: error.message, code: "TRUSTLESS_DISABLED" });
+        return;
+      }
+      if (typeof error?.message === "string" && error.message.includes("not supported")) {
+        res.status(400).json({ error: error.message, code: "UNSUPPORTED_CHAIN" });
+        return;
+      }
+      next(error);
+    }
+  }
+
+  /**
+   * GET /bridge/pendingDeposits/:chainId?wallets=0x..&wallets=0x..
+   *
+   * Scans recent DepositRouted logs from the chain's depositRouter
+   * filtered by stratoRecipient ∈ wallets, drops already-claimed
+   * entries (EthBridgeIn.processed), and returns the rest. Powers
+   * the deposit-row list in the trustless-claim modal.
+   */
+  static async getPendingDeposits(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { chainId } = req.params;
+      if (!chainId) {
+        res.status(400).json({ error: "chainId path param required" });
+        return;
+      }
+      // Accept both `?wallets=…&wallets=…` (qs/extended parser) and
+      // `?wallets[]=…&wallets[]=…` (Express's "simple" parser, where
+      // the key keeps the brackets). Also tolerate comma-separated.
+      const walletsRaw = (req.query.wallets ?? (req.query as any)["wallets[]"]) as
+        | string
+        | string[]
+        | undefined;
+      const wallets: string[] = Array.isArray(walletsRaw)
+        ? walletsRaw.map(String)
+        : typeof walletsRaw === "string"
+        ? walletsRaw.split(",").filter((s) => s.length > 0)
+        : [];
+      if (wallets.length === 0) {
+        res.status(400).json({ error: "wallets query param required" });
+        return;
+      }
+      const cfg = await loadTrustlessConfig(accessToken, chainId);
+      const deposits = await getPendingDeposits(
+        accessToken,
+        {
+          chainId,
+          name: chainId,
+          flavor: cfg.flavor,
+          bridgeIn: cfg.bridgeIn,
+          lightClient: cfg.lightClient,
+          depositRoutedSig: cfg.depositRoutedSig,
+          l1LightClient: cfg.l1LightClient,
+        },
+        wallets,
+      );
+      res.json({ success: true, data: deposits });
+    } catch (error: any) {
+      if (typeof error?.message === "string" && error.message.includes("trustless path disabled")) {
+        res.status(503).json({ error: error.message, code: "TRUSTLESS_DISABLED" });
+        return;
+      }
+      if (typeof error?.message === "string" && error.message.includes("not supported")) {
+        res.status(400).json({ error: error.message, code: "UNSUPPORTED_CHAIN" });
+        return;
+      }
+      next(error);
+    }
+  }
+
+  /**
    * POST /bridge/trustlessClaim
    *
    * End-to-end trustless deposit claim: builds the AnchorInputs +
@@ -373,11 +524,15 @@ class BridgeController {
       res.json({ success: true, data: result });
     } catch (error: any) {
       if (error instanceof NotFinalizedYetError) {
-        res.status(425).json({ error: "deposit not yet finalized; retry after finality lag", code: "NOT_FINALIZED_YET" });
+        res.status(425).json(notFinalizedBody(error));
         return;
       }
       if (error instanceof DepositTooOldError) {
         res.status(409).json({ error: error.message, code: "DEPOSIT_TOO_OLD" });
+        return;
+      }
+      if (error instanceof TooManyMissingPeriodsError) {
+        res.status(409).json({ error: error.message, code: "LIGHT_CLIENT_FAR_BEHIND" });
         return;
       }
       if (typeof error?.message === "string" && error.message.includes("no DepositRouted log")) {

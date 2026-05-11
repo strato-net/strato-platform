@@ -34,51 +34,51 @@ contract Describe_EthBridgeIn {
     function beforeEach() {
         admin = address(this);
         lc = new EthLightClient(admin);
-        // SolidVM doesn't auto-upcast EthLightClient → ILightClient,
-        // so wrap via address+cast wherever a constructor takes the
-        // interface type.
-        bridge = new EthBridgeIn(
-            admin,
-            ILightClient(address(lc)),
+        bridge = new EthBridgeIn(admin);
+        bridge.initialize(
+            address(lc),
             uint256(11155111),       // Sepolia
             _depositRouter(),
             _eventSig()
         );
     }
 
-    // ============ Construction ============
+    // ============ Construction / initialization ============
 
-    function it_constructor_stores_state() {
+    function it_initialize_stores_state() {
         require(address(bridge.lightClient()) == address(lc), "lightClient mismatch");
         require(bridge.srcChainId() == 11155111, "srcChainId mismatch");
         require(bridge.depositRouter() == _depositRouter(), "router mismatch");
         require(bridge.depositRoutedSig() == _eventSig(), "sig mismatch");
     }
 
-    function it_constructor_rejects_zero_lightclient() {
+    function it_initialize_rejects_zero_lightclient() {
+        EthBridgeIn fresh = new EthBridgeIn(admin);
         bool reverted = false;
         try {
-            new EthBridgeIn(admin, ILightClient(address(0)), uint256(1), _depositRouter(), _eventSig());
+            fresh.initialize(address(0), uint256(1), _depositRouter(), _eventSig());
         } catch {
             reverted = true;
         }
         require(reverted, "should revert on zero lightClient");
     }
 
-    function it_constructor_rejects_zero_router() {
+    function it_initialize_rejects_zero_router() {
+        EthBridgeIn fresh = new EthBridgeIn(admin);
         bool reverted = false;
         try {
-            new EthBridgeIn(admin, ILightClient(address(lc)), uint256(1), address(0), _eventSig());
+            fresh.initialize(address(lc), uint256(1), address(0), _eventSig());
         } catch {
             reverted = true;
         }
         require(reverted, "should revert on zero router");
     }
 
-    function it_constructor_rejects_zero_sig() {
+    function it_initialize_rejects_zero_sig() {
+        EthBridgeIn fresh = new EthBridgeIn(admin);
         bool reverted = false;
         try {
-            new EthBridgeIn(admin, ILightClient(address(lc)), uint256(1), _depositRouter(), bytes32(0));
+            fresh.initialize(address(lc), uint256(1), _depositRouter(), bytes32(0));
         } catch {
             reverted = true;
         }
@@ -100,9 +100,14 @@ contract Describe_EthBridgeIn {
     }
 
     function it_only_owner_can_change_admin_settings() {
-        EthBridgeIn unowned = new EthBridgeIn(
-            address(0xdead), ILightClient(address(lc)), uint256(1), _depositRouter(), _eventSig()
+        // Deploy + initialize as us, then hand ownership to a third
+        // party. After that, we (the test contract) are no longer the
+        // owner; setDepositRouter must revert.
+        EthBridgeIn unowned = new EthBridgeIn(admin);
+        unowned.initialize(
+            address(lc), uint256(1), _depositRouter(), _eventSig()
         );
+        unowned.transferOwnership(address(0xdead));
         bool reverted = false;
         try {
             unowned.setDepositRouter(address(0xbeef));

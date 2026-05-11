@@ -592,6 +592,20 @@ contract record MercataBridge is Ownable, IBridgeMintTarget {
         emit TrustlessDepositCredited(
             depositKey, srcChainId, ethToken, ethSender, stratoRecipient, stratoToken, amount
         );
+        // Also emit the canonical {DepositCompleted} so downstream consumers
+        // (UI deposit history, accounting feeds) count this exactly like a
+        // relayer-credited deposit. The trustless path doesn't have a real
+        // L1 tx hash to surface, so we encode the depositKey as a "0x…"
+        // hex string for the externalTxHash slot — uniquely identifies the
+        // claim and round-trips back to the bytes32 via standard hex parsing.
+        emit DepositCompleted(
+            srcChainId,
+            ethSender,
+            "0x" + string(BytesUtils.b16encode(bytes(depositKey))),
+            stratoRecipient,
+            stratoToken,
+            amount
+        );
     }
 
     /**

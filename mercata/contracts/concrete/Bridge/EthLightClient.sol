@@ -48,8 +48,16 @@ struct BeaconBlockHeaderInput {
  *         aggregate can't satisfy the pairing.
  */
 struct SyncAggregateInput {
-    bytes  participationBits;   // 64 bytes (SSZ Bitvector[512])
-    bytes  signature;           // 96 bytes IETF compressed G2
+    // 64-byte SSZ Bitvector[512], split into 2×bytes32 chunks. The
+    // chunked layout is required to round-trip through SolidVM's
+    // JSON-RPC ABI: variable-length `bytes` nested in a struct field
+    // gets coerced to a string and never Base16-decoded, so we'd
+    // otherwise receive a 128-byte ASCII payload on-chain. Fixed-size
+    // bytes32 (and bytes32[]) decode correctly through the wallet-
+    // wrapping path, so the chunked form is the cheapest workaround.
+    bytes32[2] participationBits;
+    // 96-byte IETF compressed G2 BLS signature, split into 3×bytes32.
+    bytes32[3] signature;
     uint64 signatureSlot;       // determines which committee signed
 }
 
@@ -81,14 +89,21 @@ struct PeriodTransition {
     bytes32 attestedParentRoot;
     bytes32 attestedStateRoot;
     bytes32 attestedBodyRoot;
-    // sync aggregate
-    bytes  participationBits;
-    bytes  signature;
-    uint64 signatureSlot;
+    // sync aggregate — chunked layout (see SyncAggregateInput).
+    bytes32[2] participationBits;
+    bytes32[3] signature;
+    uint64     signatureSlot;
     // next_sync_committee
-    bytes[]   nextPubkeys;          // 512 × 48 bytes IETF compressed
-    bytes     nextAggregatePubkey;  // 48 bytes IETF compressed (used only to verify the SSZ root)
-    bytes32[] nextBranch;           // proves committee SSZ root from attestedStateRoot
+    // pubkeys[] is fine as `bytes[]` because the array decoder threads
+    // its element type through correctly; only `bytes` standalone in a
+    // struct trips the JSON-RPC bug.
+    bytes[]    nextPubkeys;            // 512 × 48 bytes IETF compressed
+    // 48-byte BLS pubkey + 16-byte SSZ right-pad, packed into 2×bytes32.
+    // The trailing 16 bytes of word1 must be zero per the SSZ spec; if
+    // they aren't, hashTreeRootSyncCommittee yields a different root and
+    // the next-committee branch verify reverts — no extra check needed.
+    bytes32[2] nextAggregatePubkey;
+    bytes32[]  nextBranch;             // proves committee SSZ root from attestedStateRoot
 }
 
 /**
@@ -169,6 +184,23 @@ contract EthLightClient is Ownable, ILightClient {
     uint256 public nextSyncCommitteeIndex;
     uint256 public executionPayloadIndex;
 
+    /// Container gindices for the BeaconState fields used by the
+    /// constant-cost state-proof anchor entrypoints
+    /// ({anchorBlockHeaderViaBlockRoots} and
+    /// {anchorBlockHeaderViaHistoricalSummaries}).
+    ///
+    /// Each value is the gindex of the FIELD (not the leaf within it):
+    ///   blockRootsContainerGindex          : gindex of state.block_roots          in BeaconState
+    ///   historicalSummariesContainerGindex : gindex of state.historical_summaries in BeaconState
+    ///
+    /// Defaults below are for Electra/Fulu (BeaconState ≈ 37 fields →
+    /// padded to 64 leaves at depth 6, so field-i gindex = 64 + i).
+    /// Pre-Electra these would be 32 + i (depth 5) — admin-updatable
+    /// via {setStateProofIndices} for forks that restructure the
+    /// container.
+    uint256 public blockRootsContainerGindex;
+    uint256 public historicalSummariesContainerGindex;
+
     /// Sync committees keyed by period (= slot / 8192). Stored as a
     /// single bytes[] mapping (not a struct-of-fields) — SolidVM's
     /// storage layout for nested dynamic types can cross-pollute reads
@@ -195,6 +227,7 @@ contract EthLightClient is Ownable, ILightClient {
     event Bootstrapped(uint64 period, bytes32 genesisValidatorsRoot, bytes4 forkVersion);
     event ForkVersionUpdated(bytes4 oldVersion, bytes4 newVersion);
     event IndicesUpdated(uint256 finalizedRootIndex, uint256 nextSyncCommitteeIndex, uint256 executionPayloadIndex);
+    event StateProofIndicesUpdated(uint256 blockRootsContainerGindex, uint256 historicalSummariesContainerGindex);
     event CommitteeAnchored(uint64 period);
     event HeaderAnchored(uint256 blockNumber, bytes32 receiptsRoot, uint64 beaconSlot, uint64 timestamp);
 
@@ -209,6 +242,11 @@ contract EthLightClient is Ownable, ILightClient {
         finalizedRootIndex = 41;        // level 7 / gindex 169 (Electra+ BeaconState)
         nextSyncCommitteeIndex = 23;    // level 6 / gindex 87  (Electra+ BeaconState)
         executionPayloadIndex = 9;      // level 4 / gindex 25  (Capella+ BeaconBlockBody)
+        // State-proof container gindices (Electra+ BeaconState):
+        //   block_roots          = field 5  → gindex 64+5  = 69
+        //   historical_summaries = field 27 → gindex 64+27 = 91
+        blockRootsContainerGindex          = 69;
+        historicalSummariesContainerGindex = 91;
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -271,6 +309,27 @@ contract EthLightClient is Ownable, ILightClient {
         nextSyncCommitteeIndex = nextSyncCommitteeIndex_;
         executionPayloadIndex = executionPayloadIndex_;
         emit IndicesUpdated(finalizedRootIndex_, nextSyncCommitteeIndex_, executionPayloadIndex_);
+    }
+
+    /**
+     * @notice Update the BeaconState container gindices used by the
+     *         state-proof anchor entrypoints. Needed only at forks that
+     *         restructure BeaconState's field layout.
+     *
+     *         For Electra/Fulu (37 fields, depth-6 container):
+     *           blockRootsContainerGindex          = 69   (field 5)
+     *           historicalSummariesContainerGindex = 91   (field 27)
+     *         For Capella/Deneb (28 fields, depth-5 container):
+     *           blockRootsContainerGindex          = 37   (32+5)
+     *           historicalSummariesContainerGindex = 59   (32+27)
+     */
+    function setStateProofIndices(
+        uint256 blockRootsContainerGindex_,
+        uint256 historicalSummariesContainerGindex_
+    ) external onlyOwner {
+        blockRootsContainerGindex          = blockRootsContainerGindex_;
+        historicalSummariesContainerGindex = historicalSummariesContainerGindex_;
+        emit StateProofIndicesUpdated(blockRootsContainerGindex_, historicalSummariesContainerGindex_);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -340,56 +399,22 @@ contract EthLightClient is Ownable, ILightClient {
         ExecutionPayloadHeader eph,
         bytes32[] executionBranch
     ) external returns (uint256) {
-        // ─── 1. Sync committee BLS verification ───────────────────
-        // 8192 = SLOTS_PER_EPOCH (32) * EPOCHS_PER_SYNC_COMMITTEE_PERIOD (256).
-        // Inlined here because SolidVM constant-folds literals more
-        // reliably than uint64*uint64 multiplications.
-        uint64 period = sync.signatureSlot / uint64(8192);
-        require(committeePubkeys[period].length == 512, "EthLightClient: no committee for this period");
+        // 1. Sync-committee BLS + finality branch (shared prelude).
+        _verifySyncAndFinality(headers, sync);
 
-        // Aggregate the participating pubkeys from the pinned committee
-        // — this is the soundness anchor. The popcount check inside
-        // aggregateParticipants would already revert on zero participants;
-        // here we additionally require ≥ ⅔ for the safety threshold.
-        (bytes computedAggPk, uint256 participantCount) = BLSVerify.aggregateParticipants(
-            committeePubkeys[period],
-            sync.participationBits
-        );
-        require(participantCount >= MIN_PARTICIPATION, "EthLightClient: below 2/3 sync committee participation");
-
-        bytes32 signingRoot = SSZHashTree.computeSigningRoot(
-            SSZHashTree.hashTreeRootBeaconHeader(
-                headers.attestedSlot, headers.attestedProposerIndex,
-                headers.attestedParentRoot, headers.attestedStateRoot, headers.attestedBodyRoot
-            ),
-            SSZHashTree.computeDomain(DOMAIN_SYNC_COMMITTEE, forkVersion, genesisValidatorsRoot)
-        );
-        require(
-            // computedAggPk comes back already in 128-byte EIP-2537 form,
-            // so use the G1-input variant rather than re-compressing it.
-            BLSVerify.verifySyncCommitteeAggregateG1(computedAggPk, signingRoot, sync.signature),
-            "EthLightClient: BLS verify failed"
-        );
-
-        // ─── 2. Finality branch ───────────────────────────────────
-        bytes32 finalizedRoot = SSZHashTree.hashTreeRootBeaconHeader(
-            headers.finalizedSlot, headers.finalizedProposerIndex,
-            headers.finalizedParentRoot, headers.finalizedStateRoot, headers.finalizedBodyRoot
-        );
-        require(
-            SSZHashTree.verifyMerkleBranch(
-                finalizedRoot, headers.finalityBranch, finalizedRootIndex, headers.attestedStateRoot
-            ),
-            "EthLightClient: finality branch verify failed"
-        );
-
-        // ─── 3. Walk parent chain to determine the anchor target ──
+        // 2. Walk parent chain to determine the anchor target.
+        //    If parentChain is empty, the finalizedHeader IS the target.
+        //    Otherwise we walk: each header's hash_tree_root must equal
+        //    the previous header's parent_root, starting with
+        //    finalizedHeader.parent_root for the very first step. The
+        //    last header in parentChain is the target.
         //
-        // If parentChain is empty, the finalizedHeader IS the target.
-        // Otherwise we walk: each header's hash_tree_root must equal
-        // the previous header's parent_root, starting with
-        // finalizedHeader.parent_root for the very first step. The
-        // last header in parentChain is the target.
+        //    Heads-up: this loop's gas is O(parentChain.length × cost of
+        //    hashTreeRootBeaconHeader). For deposits more than ~50 slots
+        //    behind finalized, prefer {anchorBlockHeaderViaBlockRoots}
+        //    or {anchorBlockHeaderViaHistoricalSummaries} — those use
+        //    a constant-depth state-root SSZ proof and don't hash one
+        //    header per hop.
         bytes32 targetBodyRoot = headers.finalizedBodyRoot;
         uint64  targetSlot     = headers.finalizedSlot;
         if (parentChain.length > 0) {
@@ -410,7 +435,201 @@ contract EthLightClient is Ownable, ILightClient {
             targetSlot     = tgt.slot;
         }
 
-        // ─── 4. EPH root + executionBranch (against target) ───────
+        // 3. Verify execution payload against target, anchor.
+        return _verifyAndAnchor(targetSlot, targetBodyRoot, eph, executionBranch);
+    }
+
+    /**
+     * @notice Anchor an execution-layer block whose beacon block is in
+     *         the last 8192 slots — the last ~27h of chain history.
+     *         Constant on-chain cost: ~19 sha256 hashes for the state-
+     *         proof + the standard sync-committee verification +
+     *         execution-branch check. No parent-chain walk.
+     *
+     *         Verification chain:
+     *           1. attested header is signed by ≥ ⅔ of the period's sync
+     *              committee (same as {anchorBlockHeader}).
+     *           2. finalized header is committed in attested.state_root
+     *              (finality branch — same as before).
+     *           3. target.slot ≤ finalized.slot (so we only anchor blocks
+     *              the chain has actually finalized).
+     *           4. SSZ Merkle proof: hash_tree_root(target) is at
+     *              state.block_roots[target.slot mod 8192], where the
+     *              state is committed by attested.state_root. The branch
+     *              is composed (vector-internal 13 levels + container 6
+     *              levels = 19 levels for Electra+).
+     *           5. Standard execution-branch verification against
+     *              target.bodyRoot, then anchor.
+     *
+     * @param target            Full beacon header at the deposit's slot
+     *                          — slot, proposer index, parent root,
+     *                          state root, body root. The contract
+     *                          rebuilds its hash_tree_root and checks
+     *                          it against the supplied state-proof leaf.
+     * @param blockRootsBranch  19-element SSZ branch from
+     *                          state.block_roots[target.slot mod 8192]
+     *                          up to attested.state_root.
+     */
+    function anchorBlockHeaderViaBlockRoots(
+        AnchorHeaders headers,
+        SyncAggregateInput sync,
+        BeaconBlockHeaderInput target,
+        bytes32[] blockRootsBranch,
+        ExecutionPayloadHeader eph,
+        bytes32[] executionBranch
+    ) external returns (uint256) {
+        _verifySyncAndFinality(headers, sync);
+        require(target.slot <= headers.finalizedSlot, "EthLightClient: target not finalized");
+
+        // SSZ proof: target's beacon root is at state.block_roots[D mod 8192].
+        bytes32 targetBeaconRoot = SSZHashTree.hashTreeRootBeaconHeader(
+            target.slot, target.proposerIndex,
+            target.parentRoot, target.stateRoot, target.bodyRoot
+        );
+        // gindex = blockRootsContainerGindex << 13 | (slot mod 8192).
+        // For Electra+ with block_roots at field 5 (depth-6 container,
+        // base gindex 64+5=69): top 6 bits = 1<<6|5 = 69, bottom 13 bits
+        // = slot mod 8192 → 19-bit gindex. verifyMerkleBranch consumes
+        // the bottom 19 bits as the path; the leading 1 of the gindex
+        // isn't used.
+        uint256 brIndex = (blockRootsContainerGindex << 13)
+                        | (uint256(target.slot) % uint256(8192));
+        require(
+            SSZHashTree.verifyMerkleBranch(
+                targetBeaconRoot, blockRootsBranch, brIndex, headers.attestedStateRoot
+            ),
+            "EthLightClient: block_roots proof failed"
+        );
+
+        return _verifyAndAnchor(target.slot, target.bodyRoot, eph, executionBranch);
+    }
+
+    /**
+     * @notice Anchor an execution-layer block whose beacon block is more
+     *         than 8192 slots behind the attested header. Uses the
+     *         post-Capella `historical_summaries` accumulator: each
+     *         summary records hash_tree_root(state.block_roots) at the
+     *         end of one 8192-slot period, so we can chain a vector
+     *         proof inside that summary up to attested.state_root.
+     *
+     *         Branch length is fork-dependent but constant per fork
+     *         (~45 levels for Electra+: 13 inner vector + 1 summary
+     *         container + 25 list internal + 6 outer container).
+     *
+     * @param target               Full beacon header at the deposit's slot.
+     * @param summaryIndex         Index in `state.historical_summaries`.
+     *                             Off-chain prover computes this as
+     *                             `period(target.slot) − capella_first_aligned_period`.
+     *                             If wrong, the proof simply won't
+     *                             verify against attested.state_root.
+     * @param historicalBranch     ~45-element SSZ branch from the leaf
+     *                             beacon root up to attested.state_root.
+     */
+    function anchorBlockHeaderViaHistoricalSummaries(
+        AnchorHeaders headers,
+        SyncAggregateInput sync,
+        BeaconBlockHeaderInput target,
+        uint64 summaryIndex,
+        bytes32[] historicalBranch,
+        ExecutionPayloadHeader eph,
+        bytes32[] executionBranch
+    ) external returns (uint256) {
+        _verifySyncAndFinality(headers, sync);
+        require(target.slot <= headers.finalizedSlot, "EthLightClient: target not finalized");
+
+        bytes32 targetBeaconRoot = SSZHashTree.hashTreeRootBeaconHeader(
+            target.slot, target.proposerIndex,
+            target.parentRoot, target.stateRoot, target.bodyRoot
+        );
+        // Composite gindex (Electra+):
+        //   bits [0..12]   slot mod 8192   (depth-13 inner block_roots vector)
+        //   bit  [13]      0               (block_summary_root is field 0 in HistoricalSummary)
+        //   bits [14..37]  summaryIndex    (depth-24 list-data tree)
+        //   bit  [38]      0               (data side of the List, vs length)
+        //   bits [39..44]  27              (historical_summaries field in BeaconState container)
+        // = (1 << 45) | (27 << 39) | (summaryIndex << 14) | (slot mod 8192).
+        //
+        // We store `historicalSummariesContainerGindex` = (1<<6)|27 = 91
+        // for Electra+; shift by (1+24+1+13)=39 to position it.
+        uint256 hsIndex = (historicalSummariesContainerGindex << 39)
+                        | (uint256(summaryIndex) << 14)
+                        | (uint256(target.slot) % uint256(8192));
+        require(
+            SSZHashTree.verifyMerkleBranch(
+                targetBeaconRoot, historicalBranch, hsIndex, headers.attestedStateRoot
+            ),
+            "EthLightClient: historical_summaries proof failed"
+        );
+
+        return _verifyAndAnchor(target.slot, target.bodyRoot, eph, executionBranch);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Shared prelude / postlude for the three anchor entrypoints
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * @dev Verify the sync-committee BLS aggregate over the attested
+     *      header and the finality branch tying the finalized header
+     *      to attested.state_root. Reverts on any verification failure.
+     *      Same logic the original {anchorBlockHeader} ran inline; the
+     *      three entrypoints share it.
+     */
+    function _verifySyncAndFinality(
+        AnchorHeaders headers,
+        SyncAggregateInput sync
+    ) private view {
+        // 8192 = SLOTS_PER_EPOCH (32) × EPOCHS_PER_SYNC_COMMITTEE_PERIOD (256).
+        uint64 period = sync.signatureSlot / uint64(8192);
+        require(committeePubkeys[period].length == 512, "EthLightClient: no committee for this period");
+
+        // Re-flatten the chunked struct fields. The chunked layout is a
+        // JSON-RPC ABI workaround (see SyncAggregateInput comment);
+        // BLSVerify is unchanged and still consumes flat `bytes`.
+        bytes participationBitsBytes = _chunks2ToBytes(sync.participationBits);
+        bytes signatureBytes         = _chunks3ToBytes(sync.signature);
+
+        (bytes computedAggPk, uint256 participantCount) = BLSVerify.aggregateParticipants(
+            committeePubkeys[period],
+            participationBitsBytes
+        );
+        require(participantCount >= MIN_PARTICIPATION, "EthLightClient: below 2/3 sync committee participation");
+
+        bytes32 signingRoot = SSZHashTree.computeSigningRoot(
+            SSZHashTree.hashTreeRootBeaconHeader(
+                headers.attestedSlot, headers.attestedProposerIndex,
+                headers.attestedParentRoot, headers.attestedStateRoot, headers.attestedBodyRoot
+            ),
+            SSZHashTree.computeDomain(DOMAIN_SYNC_COMMITTEE, forkVersion, genesisValidatorsRoot)
+        );
+        require(
+            BLSVerify.verifySyncCommitteeAggregateG1(computedAggPk, signingRoot, signatureBytes),
+            "EthLightClient: BLS verify failed"
+        );
+
+        bytes32 finalizedRoot = SSZHashTree.hashTreeRootBeaconHeader(
+            headers.finalizedSlot, headers.finalizedProposerIndex,
+            headers.finalizedParentRoot, headers.finalizedStateRoot, headers.finalizedBodyRoot
+        );
+        require(
+            SSZHashTree.verifyMerkleBranch(
+                finalizedRoot, headers.finalityBranch, finalizedRootIndex, headers.attestedStateRoot
+            ),
+            "EthLightClient: finality branch verify failed"
+        );
+    }
+
+    /**
+     * @dev Verify the EPH against `targetBodyRoot` via executionBranch,
+     *      then anchor (blockNumber, receiptsRoot, stateRoot, beaconSlot,
+     *      timestamp) and emit. Returns the anchored block number.
+     */
+    function _verifyAndAnchor(
+        uint64 targetSlot,
+        bytes32 targetBodyRoot,
+        ExecutionPayloadHeader eph,
+        bytes32[] executionBranch
+    ) private returns (uint256) {
         bytes32 ephRoot = SSZHashTree.hashTreeRootEPH(eph);
         require(
             SSZHashTree.verifyMerkleBranch(
@@ -419,7 +638,6 @@ contract EthLightClient is Ownable, ILightClient {
             "EthLightClient: execution branch verify failed"
         );
 
-        // ─── 5. Anchor ────────────────────────────────────────────
         uint256 blockNumber = uint256(eph.blockNumber);
         anchored[blockNumber] = AnchoredHeader({
             blockNumber: blockNumber,
@@ -474,16 +692,23 @@ contract EthLightClient is Ownable, ILightClient {
             return uint64(0);
         }
         require(update.nextPubkeys.length == 512, "EthLightClient: expected 512 next pubkeys");
-        require(update.nextAggregatePubkey.length == 48, "EthLightClient: nextAggregatePubkey must be 48 bytes");
+        // nextAggregatePubkey is `bytes32[2]` (always 64 bytes by ABI),
+        // so the prior length-48 check is no longer meaningful — the
+        // SSZ root verification below enforces canonical layout.
+
+        // Re-flatten the chunked struct fields. See SyncAggregateInput
+        // comment for the JSON-RPC ABI rationale.
+        bytes participationBitsBytes = _chunks2ToBytes(update.participationBits);
+        bytes signatureBytes         = _chunks3ToBytes(update.signature);
 
         // ─── 2. Verify BLS signature from the current committee ────
         require(
-            BLSVerify.popcount(update.participationBits) >= MIN_PARTICIPATION,
+            BLSVerify.popcount(participationBitsBytes) >= MIN_PARTICIPATION,
             "EthLightClient: below 2/3 sync committee participation"
         );
         (bytes computedAggPk, /* count */) = BLSVerify.aggregateParticipants(
             committeePubkeys[signaturePeriod],
-            update.participationBits
+            participationBitsBytes
         );
 
         bytes32 signingRoot = SSZHashTree.computeSigningRoot(
@@ -494,7 +719,7 @@ contract EthLightClient is Ownable, ILightClient {
             SSZHashTree.computeDomain(DOMAIN_SYNC_COMMITTEE, forkVersion, genesisValidatorsRoot)
         );
         require(
-            BLSVerify.verifySyncCommitteeAggregateG1(computedAggPk, signingRoot, update.signature),
+            BLSVerify.verifySyncCommitteeAggregateG1(computedAggPk, signingRoot, signatureBytes),
             "EthLightClient: BLS verify failed"
         );
 
@@ -554,5 +779,28 @@ contract EthLightClient is Ownable, ILightClient {
     /// Exposed for off-chain tooling and tests.
     function periodOfSlot(uint64 slot) external pure returns (uint64) {
         return slot / uint64(8192);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Chunked-field flatteners
+    //
+    // These rebuild the flat-bytes form expected by BLSVerify from the
+    // chunked layout we receive over JSON-RPC. The layout transformation
+    // is a SolidVM ABI workaround (see SyncAggregateInput comment) —
+    // BLSVerify itself is unchanged.
+    //
+    // `bytes(bytes32)` is a value cast (no copy); `+` does the actual
+    // concatenation. Total work per call is one allocation + one copy
+    // of the underlying bytes — much cheaper than an N-byte loop.
+    // ─────────────────────────────────────────────────────────────────
+
+    /// Concatenate `bytes32[2]` (64 bytes) into a flat `bytes`.
+    function _chunks2ToBytes(bytes32[2] xs) private pure returns (bytes) {
+        return bytes(xs[0]) + bytes(xs[1]);
+    }
+
+    /// Concatenate `bytes32[3]` (96 bytes) into a flat `bytes`.
+    function _chunks3ToBytes(bytes32[3] xs) private pure returns (bytes) {
+        return bytes(xs[0]) + bytes(xs[1]) + bytes(xs[2]);
     }
 }

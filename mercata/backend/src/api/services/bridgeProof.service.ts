@@ -20,11 +20,12 @@
  */
 import {
   BeaconBlockHeader,
+  BeaconBlockResponse,
   ExecutionPayloadHeader,
   LightClientFinalityUpdate,
   beaconClientFor,
 } from "./beaconClient.service";
-import { EthLog, EthTransactionReceipt, getBlockReceipts, getTransactionReceipt } from "./ethRpc.service";
+import { EthLog, EthTransactionReceipt, getBlockByNumber, getBlockReceipts, getTransactionReceipt } from "./ethRpc.service";
 import { buildTrieAndProof } from "../helpers/mptBuilder.helper";
 import { rlpEncode, rlpEncodeUint } from "../helpers/rlp.helper";
 import {
@@ -33,6 +34,12 @@ import {
   hashTreeRootByteVector,
   hexToBuffer,
 } from "../helpers/ssz.helper";
+import { buildExecutionPayloadProof } from "../helpers/beaconBody.helper";
+import {
+  StateProofResult,
+  buildStateRootProof,
+  SLOTS_PER_HISTORICAL_ROOT,
+} from "../helpers/stateProof.helper";
 
 // ─────────────────────────────────────────────────────────────────────
 // Public types — match the Solidity struct shapes EthLightClient and
@@ -115,6 +122,45 @@ export interface ClaimInputs {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// State-proof anchor inputs (replaces parent-chain walk for cost)
+// ─────────────────────────────────────────────────────────────────────
+
+/** Inputs for `EthLightClient.anchorBlockHeaderViaBlockRoots`. */
+export interface BlockRootsAnchorInputs {
+  kind: "block_roots";
+  blockNumber: string;
+  headers: AnchorHeadersJSON;
+  sync: SyncAggregateJSON;
+  /** Full beacon header at the deposit's slot — contract recomputes its
+   *  hash_tree_root and matches it against the state-proof leaf. */
+  target: BeaconBlockHeaderJSON;
+  /** SSZ branch from `state.block_roots[D mod 8192]` to attested.state_root. */
+  blockRootsBranch: string[];
+  eph: EPHJSON;
+  executionBranch: string[];
+}
+
+/** Inputs for `EthLightClient.anchorBlockHeaderViaHistoricalSummaries`. */
+export interface HistoricalSummariesAnchorInputs {
+  kind: "historical_summaries";
+  blockNumber: string;
+  headers: AnchorHeadersJSON;
+  sync: SyncAggregateJSON;
+  target: BeaconBlockHeaderJSON;
+  /** Index into `state.historical_summaries` the leaf lives under. */
+  summaryIndex: string;
+  /** Concatenated branch (inner block_summary_root vector + outer
+   *  historical_summaries → state_root). */
+  historicalBranch: string[];
+  eph: EPHJSON;
+  executionBranch: string[];
+}
+
+export type StateProofAnchorInputs =
+  | BlockRootsAnchorInputs
+  | HistoricalSummariesAnchorInputs;
+
+// ─────────────────────────────────────────────────────────────────────
 // Public API
 // ─────────────────────────────────────────────────────────────────────
 
@@ -128,9 +174,12 @@ export interface ClaimInputs {
  * @throws {NotFinalizedYetError} if the deposit's EL block hasn't
  *         yet caught up to the live finalized header — UI surfaces
  *         this as "wait ~13 minutes for finality, then retry".
- * @throws {DepositTooOldError} if the deposit is older than the live
- *         finalized header — needs parent-chain extension which is a
- *         later milestone.
+ * @throws {DepositTooOldError} if the deposit is more than
+ *         {@link MAX_PARENT_CHAIN_HEADERS} blocks behind the live
+ *         finalized header — beyond what the per-request walk will
+ *         cover. Recovery: rerun once the deposit is closer to the
+ *         finalized head, or raise the cap if the user-facing wait
+ *         is acceptable.
  * @throws if the source RPC / beacon API can't resolve the request.
  */
 export async function buildAnchorInputs(
@@ -161,20 +210,97 @@ export async function buildAnchorInputs(
   // 3. v1: only handle the case where the deposit's block IS the
   //    current finalized block. parentChain stays empty.
   if (depositBlockNumber > finalizedBlockNumber) {
+    let depositBlockTimestamp: number | undefined;
+    let etaSeconds: number | undefined;
+    try {
+      const block = await getBlockByNumber(srcChainId, receipt.blockNumber);
+      if (block?.timestamp) {
+        depositBlockTimestamp = parseInt(block.timestamp, 16);
+        const nowSec = Math.floor(Date.now() / 1000);
+        etaSeconds = Math.max(
+          0,
+          depositBlockTimestamp + ETHEREUM_FINALITY_LAG_SECONDS - nowSec,
+        );
+      }
+    } catch { /* ETA is best-effort; fall through with undefined */ }
     throw new NotFinalizedYetError(
       `deposit at block ${depositBlockNumber} not yet finalized (live finalized ${finalizedBlockNumber})`,
+      {
+        depositBlockNumber,
+        finalizedBlockNumber,
+        depositBlockTimestamp,
+        etaSeconds,
+      },
     );
   }
-  if (depositBlockNumber < finalizedBlockNumber) {
-    throw new DepositTooOldError(
-      `deposit at block ${depositBlockNumber} is older than live finalized ${finalizedBlockNumber}; ` +
-        `parent-chain anchoring not yet implemented`,
+  // 4. If the deposit is older than finalized, walk the parent chain.
+  //    Each post-merge beacon header maps 1:1 to an EL block, so the
+  //    number of hops is exactly (finalized - deposit). The contract's
+  //    `parentChain` is the sequence of beacon headers from
+  //    `finalizedHeader.parent_root` back to (and including) the
+  //    target. The last entry is the target itself.
+  const numHops = Number(finalizedBlockNumber - depositBlockNumber);
+  const parentChain: BeaconBlockHeaderJSON[] = [];
+  let targetBeaconRoot: string | undefined;
+  let targetEph: EPHJSON | undefined;
+  let targetExecutionBranch: string[] | undefined;
+  let targetBlockNumber: string = finalizedExec.block_number;
+
+  if (numHops < 0) {
+    throw new Error(
+      `buildAnchorInputs: invariant violation — depositBlockNumber > finalizedBlockNumber after early-return`,
     );
   }
 
-  // 4. Pre-compute logsBloomRoot and extraDataRoot. The on-chain
-  //    SSZHashTree.hashTreeRootEPH expects these pre-hashed because
-  //    the raw fields would dominate calldata.
+  if (numHops > MAX_PARENT_CHAIN_HEADERS) {
+    throw new DepositTooOldError(
+      `deposit at block ${depositBlockNumber} is ${numHops} blocks behind live finalized ${finalizedBlockNumber}; ` +
+        `parent-chain walk capped at ${MAX_PARENT_CHAIN_HEADERS}`,
+    );
+  }
+
+  if (numHops > 0) {
+    let nextRoot = update.finalized_header.beacon.parent_root;
+    for (let i = 0; i < numHops; i++) {
+      const resp = await beacon.getHeader(nextRoot);
+      const m = resp.header.message;
+      parentChain.push({
+        slot:          m.slot,
+        proposerIndex: m.proposer_index,
+        parentRoot:    m.parent_root,
+        stateRoot:     m.state_root,
+        bodyRoot:      m.body_root,
+      });
+      if (i === numHops - 1) {
+        targetBeaconRoot = resp.root;
+      }
+      nextRoot = m.parent_root;
+    }
+
+    if (!targetBeaconRoot) {
+      throw new Error("buildAnchorInputs: parent chain walk produced no target root");
+    }
+
+    const targetBlock = await beacon.getBlock(targetBeaconRoot);
+    const proof = await buildExecutionPayloadProof(targetBlock);
+    targetEph = proof.ephJson;
+    targetExecutionBranch = proof.executionBranch;
+    targetBlockNumber = proof.ephJson.blockNumber;
+
+    // Sanity check: the EPH we assembled must correspond to the
+    // deposit's EL block. If lodestar derived a different block_number
+    // we have a walk bug and should fail loudly rather than emit a
+    // proof the contract will reject.
+    if (BigInt(targetEph.blockNumber) !== depositBlockNumber) {
+      throw new Error(
+        `buildAnchorInputs: target block_number ${targetEph.blockNumber} != deposit ${depositBlockNumber}`,
+      );
+    }
+  }
+
+  // 5. Pre-compute logsBloomRoot and extraDataRoot for the
+  //    finalized-as-target case (parent-chain walk produces these
+  //    inside buildExecutionPayloadProof).
   const logsBloomRoot = bufferToHex(
     hashTreeRootByteVector(hexToBuffer(finalizedExec.logs_bloom), 256),
   );
@@ -182,7 +308,7 @@ export async function buildAnchorInputs(
     hashTreeRootByteList(hexToBuffer(finalizedExec.extra_data), 32),
   );
 
-  // 5. Assemble the JSON the frontend hands to wagmi.writeContract.
+  // 6. Assemble the JSON the frontend hands to wagmi.writeContract.
   const headers: AnchorHeadersJSON = {
     attestedSlot:           update.attested_header.beacon.slot,
     attestedProposerIndex:  update.attested_header.beacon.proposer_index,
@@ -203,7 +329,7 @@ export async function buildAnchorInputs(
     signatureSlot:     update.signature_slot,
   };
 
-  const eph: EPHJSON = {
+  const eph: EPHJSON = targetEph ?? {
     parentHash:        finalizedExec.parent_hash,
     feeRecipient:      finalizedExec.fee_recipient,
     stateRoot:         finalizedExec.state_root,
@@ -224,18 +350,297 @@ export async function buildAnchorInputs(
   };
 
   return {
-    blockNumber:    finalizedExec.block_number,
+    blockNumber:    targetBlockNumber,
     headers,
     sync,
-    parentChain:    [],
+    parentChain,
     eph,
-    executionBranch,
+    executionBranch: targetExecutionBranch ?? executionBranch,
   };
 }
 
-/** Caller should retry after ~13 minutes (one beacon-chain finality lag). */
+/**
+ * Build the inputs for one of the state-proof anchor entrypoints —
+ * either {EthLightClient.anchorBlockHeaderViaBlockRoots} (cheap, last
+ * 8192 slots) or {anchorBlockHeaderViaHistoricalSummaries} (constant
+ * cost beyond that). Picks the cheaper variant automatically based on
+ * how far behind the deposit is.
+ *
+ * The on-chain cost is bounded — a depth-19 (block_roots) or depth-45
+ * (historical_summaries) Merkle proof, vs O(N) hashTreeRootBeaconHeader
+ * calls in the parent-walk path. For deposits more than ~50 slots
+ * behind finalized this is a large gas win.
+ *
+ * Off-chain trade-off: one or two BeaconState fetches (each ~50 MB
+ * SSZ on Sepolia) instead of N sequential `getHeader` calls. Single
+ * round-trip latency ≪ N × per-getHeader latency.
+ */
+export async function buildAnchorInputsViaStateProof(
+  srcChainId: string,
+  srcTxHash: string,
+): Promise<StateProofAnchorInputs> {
+  const beacon = beaconClientFor(srcChainId);
+
+  // 1. Resolve the deposit's EL block.
+  const receipt = await getTransactionReceipt(srcChainId, srcTxHash);
+  if (!receipt) {
+    throw new Error(`buildAnchorInputsViaStateProof: receipt not found for tx ${srcTxHash}`);
+  }
+  const depositBlockNumber = BigInt(receipt.blockNumber);
+
+  // 2. Fetch the live LightClientFinalityUpdate.
+  const update = await beacon.getFinalityUpdate();
+  const finalizedExec = update.finalized_header.execution;
+  if (!finalizedExec) {
+    throw new Error(
+      "buildAnchorInputsViaStateProof: LightClientFinalityUpdate missing execution payload",
+    );
+  }
+  const finalizedBlockNumber = BigInt(finalizedExec.block_number);
+
+  // 3. Reject not-yet-finalized deposits with structured ETA — same
+  //    contract as the legacy buildAnchorInputs.
+  if (depositBlockNumber > finalizedBlockNumber) {
+    let depositBlockTimestamp: number | undefined;
+    let etaSeconds: number | undefined;
+    try {
+      const block = await getBlockByNumber(srcChainId, receipt.blockNumber);
+      if (block?.timestamp) {
+        depositBlockTimestamp = parseInt(block.timestamp, 16);
+        const nowSec = Math.floor(Date.now() / 1000);
+        etaSeconds = Math.max(
+          0,
+          depositBlockTimestamp + ETHEREUM_FINALITY_LAG_SECONDS - nowSec,
+        );
+      }
+    } catch { /* best-effort */ }
+    throw new NotFinalizedYetError(
+      `deposit at block ${depositBlockNumber} not yet finalized (live finalized ${finalizedBlockNumber})`,
+      { depositBlockNumber, finalizedBlockNumber, depositBlockTimestamp, etaSeconds },
+    );
+  }
+
+  // 4. Locate the deposit's beacon block. The slot↔EL-block mapping
+  //    isn't 1:1: missed slots (no proposer) bump the slot count
+  //    without producing an EL block, so the gap (slot − blockNumber)
+  //    grows monotonically with cumulative misses. Our initial guess
+  //    assumes the deposit's slot has the same total miss count as
+  //    finalized — usually wrong by however many misses landed in
+  //    between, so we then walk back by `delta` until the slot we
+  //    fetched produces exactly `depositBlockNumber`.
+  const finalizedSlot = BigInt(update.finalized_header.beacon.slot);
+  let depositSlot = finalizedSlot - (finalizedBlockNumber - depositBlockNumber);
+  if (depositSlot <= 0n) {
+    throw new Error(
+      `buildAnchorInputsViaStateProof: depositSlot ${depositSlot} <= 0 — chain too young?`,
+    );
+  }
+
+  // 5. Fetch + correct. Each iteration: skip back over any missed
+  //    slots (404 from the beacon API), then nudge by the EL-block
+  //    delta. Bounded so a degenerate beacon never loops forever.
+  const MAX_SLOT_RESOLVE_ATTEMPTS = 64;
+  let targetBlock!: BeaconBlockResponse;
+  let epProof!: Awaited<ReturnType<typeof buildExecutionPayloadProof>>;
+  for (let attempt = 0; attempt < MAX_SLOT_RESOLVE_ATTEMPTS; attempt++) {
+    // Skip missed slots. Beacon API returns 404 for slots with no
+    // block; walk back one slot at a time until we find a populated
+    // one. Bound on the inner walk too — pathological but cheap.
+    let walkBudget = MAX_SLOT_RESOLVE_ATTEMPTS;
+    while (walkBudget-- > 0) {
+      try {
+        targetBlock = await beacon.getBlock(String(depositSlot));
+        break;
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          depositSlot -= 1n;
+          if (depositSlot <= 0n) {
+            throw new Error(
+              `buildAnchorInputsViaStateProof: walked past slot 0 looking for deposit block ${depositBlockNumber}`,
+            );
+          }
+          continue;
+        }
+        throw err;
+      }
+    }
+    if (walkBudget < 0) {
+      throw new Error(
+        `buildAnchorInputsViaStateProof: too many consecutive missed slots near ${depositSlot}`,
+      );
+    }
+    epProof = await buildExecutionPayloadProof(targetBlock);
+    const ephBlock = BigInt(epProof.ephJson.blockNumber);
+    if (ephBlock === depositBlockNumber) break;
+    if (ephBlock < depositBlockNumber) {
+      // Initial guess was too low — only happens if finalized is also
+      // a missed slot or our finalized→block math is off. Bail with a
+      // descriptive error rather than walking forward into ambiguity.
+      throw new Error(
+        `buildAnchorInputsViaStateProof: EPH block ${ephBlock} < deposit ${depositBlockNumber} at slot ${depositSlot}; cannot recover`,
+      );
+    }
+    depositSlot -= ephBlock - depositBlockNumber;
+    if (depositSlot <= 0n) {
+      throw new Error(
+        `buildAnchorInputsViaStateProof: corrected depositSlot ${depositSlot} <= 0`,
+      );
+    }
+    if (attempt === MAX_SLOT_RESOLVE_ATTEMPTS - 1) {
+      throw new Error(
+        `buildAnchorInputsViaStateProof: failed to converge on deposit block ${depositBlockNumber} after ${MAX_SLOT_RESOLVE_ATTEMPTS} attempts`,
+      );
+    }
+  }
+
+  // The block response carries `data.message.{slot,proposer_index,parent_root,state_root,body_root}`
+  // (well, body via merkleization — body_root is computed below).
+  const targetMsg = (targetBlock.data as any)?.message;
+  if (!targetMsg) {
+    throw new Error(`buildAnchorInputsViaStateProof: beacon block at slot ${depositSlot} has no .message`);
+  }
+  const target: BeaconBlockHeaderJSON = {
+    slot:          targetMsg.slot,
+    proposerIndex: targetMsg.proposer_index,
+    parentRoot:    targetMsg.parent_root,
+    stateRoot:     targetMsg.state_root,
+    bodyRoot:      epProof.bodyRoot,
+  };
+  const expectedLeaf = epProof.beaconBlockRoot;
+
+  // 7. Build the SSZ state-root proof. Picks block_roots vs historical_summaries.
+  const attestedSlotN  = Number(BigInt(update.attested_header.beacon.slot));
+  const proof: StateProofResult = await buildStateRootProof(
+    srcChainId,
+    beacon,
+    attestedSlotN,
+    targetBlock.version,    // attested header is in the same fork as the target
+    Number(depositSlot),
+    expectedLeaf,
+    update.attested_header.beacon.state_root,
+  );
+
+  // Fork-shape sanity log. The contract recomputes the leaf gindex as
+  // `(blockRootsContainerGindex << 13) | (slot % 8192)` with
+  // blockRootsContainerGindex defaulting to 69 (Electra/Fulu shape:
+  // ≤64 BeaconState fields → depth 6, block_roots at field index 5).
+  // If a future fork bumps the field count past 64 the depth becomes 7
+  // and the gindex jumps to 133 — proof on-chain then fails with the
+  // misleading "block_roots proof failed". Emit lodestar's gindex so an
+  // operator can call setStateProofIndices(...) to match.
+  if (proof.kind === "block_roots") {
+    const slotIdx = Number(depositSlot) % 8192;
+    const expectedGindexFor69 = (69n << 13n) | BigInt(slotIdx);
+    if (proof.gindex !== expectedGindexFor69) {
+      console.warn(
+        `[Trustless] block_roots gindex mismatch: lodestar=${proof.gindex.toString()}, ` +
+        `contract-expected=${expectedGindexFor69.toString()} (slot=${depositSlot}, ` +
+        `fork=${targetBlock.version}). Update setStateProofIndices on EthLightClient ` +
+        `with blockRootsContainerGindex=${(proof.gindex >> 13n).toString()}.`,
+      );
+    }
+
+  } else {
+    const expectedOuterFor91 = 91n << (5n + 8n + 25n + 1n); // 91 << 39 (depth: 6 outer + 25 list + 8 list-mix + 1 inner-container)
+    if (proof.outerGindex !== expectedOuterFor91) {
+      console.warn(
+        `[Trustless] historical_summaries outer gindex mismatch: lodestar=${proof.outerGindex.toString()}, ` +
+        `contract-expected=${expectedOuterFor91.toString()} (fork=${targetBlock.version}). ` +
+        `Update setStateProofIndices on EthLightClient.`,
+      );
+    }
+  }
+
+  // 8. Common envelope.
+  const headers: AnchorHeadersJSON = {
+    attestedSlot:           update.attested_header.beacon.slot,
+    attestedProposerIndex:  update.attested_header.beacon.proposer_index,
+    attestedParentRoot:     update.attested_header.beacon.parent_root,
+    attestedStateRoot:      update.attested_header.beacon.state_root,
+    attestedBodyRoot:       update.attested_header.beacon.body_root,
+    finalizedSlot:          update.finalized_header.beacon.slot,
+    finalizedProposerIndex: update.finalized_header.beacon.proposer_index,
+    finalizedParentRoot:    update.finalized_header.beacon.parent_root,
+    finalizedStateRoot:     update.finalized_header.beacon.state_root,
+    finalizedBodyRoot:      update.finalized_header.beacon.body_root,
+    finalityBranch:         update.finality_branch,
+  };
+  const sync: SyncAggregateJSON = {
+    participationBits: update.sync_aggregate.sync_committee_bits,
+    signature:         update.sync_aggregate.sync_committee_signature,
+    signatureSlot:     update.signature_slot,
+  };
+
+  if (proof.kind === "block_roots") {
+    return {
+      kind: "block_roots",
+      blockNumber:      epProof.ephJson.blockNumber,
+      headers,
+      sync,
+      target,
+      blockRootsBranch: proof.branch,
+      eph:              epProof.ephJson,
+      executionBranch:  epProof.executionBranch,
+    };
+  }
+  return {
+    kind: "historical_summaries",
+    blockNumber:       epProof.ephJson.blockNumber,
+    headers,
+    sync,
+    target,
+    summaryIndex:      String(proof.summaryIndex),
+    historicalBranch:  proof.branch,
+    eph:               epProof.ephJson,
+    executionBranch:   epProof.executionBranch,
+  };
+}
+
+/** Conservative upper bound on Ethereum's finality lag from block
+ *  inclusion to beacon-chain finality (2 epochs * 32 slots * 12s = 768s,
+ *  plus a small buffer for the slot the deposit landed in). The UI uses
+ *  this as the basis for an ETA countdown. */
+export const ETHEREUM_FINALITY_LAG_SECONDS = 13 * 60;
+
+/** Largest parent-chain walk we'll attempt off the current finalized
+ *  head. 1024 ≈ ~3.4h of EL blocks (12s slot time) — well past the
+ *  ~13-minute "just-finalized" floor so users can claim deposits they
+ *  forgot about for hours. Each hop costs one beacon `getHeader` round-
+ *  trip; the cap mainly bounds the worst-case RPC fan-out. Tunable via
+ *  the {@link MAX_PARENT_CHAIN_HEADERS_ENV} env var. */
+const MAX_PARENT_CHAIN_HEADERS_ENV = "MAX_PARENT_CHAIN_HEADERS";
+export const MAX_PARENT_CHAIN_HEADERS: number = (() => {
+  const raw = process.env[MAX_PARENT_CHAIN_HEADERS_ENV];
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1024;
+})();
+
+/** Caller should retry after ~13 minutes (one beacon-chain finality lag).
+ *  Carries structured detail so the UI can render a friendly ETA. */
 export class NotFinalizedYetError extends Error {
-  constructor(msg: string) { super(msg); this.name = "NotFinalizedYetError"; }
+  depositBlockNumber: string;
+  finalizedBlockNumber: string;
+  depositBlockTimestamp?: number;
+  etaSeconds?: number;
+  finalityLagSeconds: number;
+  constructor(
+    msg: string,
+    details: {
+      depositBlockNumber: bigint | string;
+      finalizedBlockNumber: bigint | string;
+      depositBlockTimestamp?: number;
+      etaSeconds?: number;
+      finalityLagSeconds?: number;
+    },
+  ) {
+    super(msg);
+    this.name = "NotFinalizedYetError";
+    this.depositBlockNumber = String(details.depositBlockNumber);
+    this.finalizedBlockNumber = String(details.finalizedBlockNumber);
+    this.depositBlockTimestamp = details.depositBlockTimestamp;
+    this.etaSeconds = details.etaSeconds;
+    this.finalityLagSeconds = details.finalityLagSeconds ?? ETHEREUM_FINALITY_LAG_SECONDS;
+  }
 }
 
 /** Deposit is older than the live finalized header — needs parent-chain
@@ -381,4 +786,110 @@ export async function fetchLightClientUpdateAtPeriod(
 ): Promise<LightClientFinalityUpdate | undefined> {
   const updates = await beaconClientFor(srcChainId).getLightClientUpdates(period, 1);
   return updates[0];
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Period-transition builder — for EthLightClient.advanceCommittee
+// ─────────────────────────────────────────────────────────────────────
+
+/** Mirrors the Solidity `PeriodTransition` struct. Drives the
+ *  permissionless `advanceCommittee(update)` call that anchors the
+ *  next period's sync committee. */
+export interface PeriodTransitionJSON {
+  attestedSlot: string;
+  attestedProposerIndex: string;
+  attestedParentRoot: string;
+  attestedStateRoot: string;
+  attestedBodyRoot: string;
+  participationBits: string;          // 64 bytes hex
+  signature: string;                   // 96 bytes compressed G2 hex
+  signatureSlot: string;
+  nextPubkeys: string[];               // 512 × 48-byte compressed G1 hex
+  nextAggregatePubkey: string;         // 48 bytes compressed G1 hex
+  nextBranch: string[];                // depth-5 SSZ Merkle branch hex
+}
+
+/** Largest number of period catch-up advanceCommittee txs we'll bundle
+ *  into a single trustless-claim batch. A typical deployment has the
+ *  sync-committee chain advanced periodically by a relayer; if we
+ *  need to walk more than this in one tx, the LC was clearly under-
+ *  maintained and the user should ask an admin to run catchup
+ *  rather than pay the gas themselves.
+ *
+ *  Each period ≈ 27 h, so 16 ≈ 18 days of catchup. Tunable via env
+ *  for unusual maintenance windows. */
+const MAX_ADVANCE_COMMITTEE_TXS_ENV = "MAX_ADVANCE_COMMITTEE_TXS";
+export const MAX_ADVANCE_COMMITTEE_TXS: number = (() => {
+  const raw = process.env[MAX_ADVANCE_COMMITTEE_TXS_ENV];
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 16;
+})();
+
+/**
+ * Build the PeriodTransition JSON list to bring an EthLightClient from
+ * `startPeriod` up to `endPeriodInclusive`. Each transition in the
+ * result is signed by the committee at its own period and anchors the
+ * committee at the next period — i.e. transition[i] anchors period
+ * `startPeriod + i + 1`.
+ *
+ * Throws if the beacon node returns fewer updates than requested
+ * (typically because it's aged the older periods out of its
+ * historical buffer).
+ */
+export async function buildPeriodTransitions(
+  srcChainId: string,
+  startPeriod: number,
+  count: number,
+): Promise<PeriodTransitionJSON[]> {
+  if (count <= 0) return [];
+  if (count > MAX_ADVANCE_COMMITTEE_TXS) {
+    throw new TooManyMissingPeriodsError(
+      `light client is ${count} periods behind the deposit; admin needs to run catchup ` +
+        `(cap=${MAX_ADVANCE_COMMITTEE_TXS}, raise via env ${MAX_ADVANCE_COMMITTEE_TXS_ENV})`,
+    );
+  }
+  const updates = await beaconClientFor(srcChainId).getLightClientUpdates(startPeriod, count);
+  if (updates.length < count) {
+    throw new Error(
+      `buildPeriodTransitions: beacon node returned ${updates.length} updates, expected ${count} ` +
+        `(start_period=${startPeriod}). Some periods aged out of the beacon's historical buffer.`,
+    );
+  }
+
+  return updates.map((u, i) => {
+    const sc = (u as any).next_sync_committee;
+    const scBranch = (u as any).next_sync_committee_branch;
+    if (!sc || !Array.isArray(sc.pubkeys) || sc.pubkeys.length !== 512) {
+      throw new Error(
+        `buildPeriodTransitions: update ${i} (period ${startPeriod + i}) missing next_sync_committee.pubkeys (512)`,
+      );
+    }
+    if (!Array.isArray(scBranch)) {
+      throw new Error(
+        `buildPeriodTransitions: update ${i} missing next_sync_committee_branch`,
+      );
+    }
+    return {
+      attestedSlot:           u.attested_header.beacon.slot,
+      attestedProposerIndex:  u.attested_header.beacon.proposer_index,
+      attestedParentRoot:     u.attested_header.beacon.parent_root,
+      attestedStateRoot:      u.attested_header.beacon.state_root,
+      attestedBodyRoot:       u.attested_header.beacon.body_root,
+      participationBits:      u.sync_aggregate.sync_committee_bits,
+      signature:              u.sync_aggregate.sync_committee_signature,
+      signatureSlot:          u.signature_slot,
+      nextPubkeys:            sc.pubkeys,
+      nextAggregatePubkey:    sc.aggregate_pubkey,
+      nextBranch:             scBranch,
+    };
+  });
+}
+
+/** Raised when the light client is so far behind that catching up
+ *  would require more advanceCommittee txs than {MAX_ADVANCE_COMMITTEE_TXS}. */
+export class TooManyMissingPeriodsError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = "TooManyMissingPeriodsError";
+  }
 }

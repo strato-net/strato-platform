@@ -24,39 +24,43 @@ contract Describe_BaseLightClient {
     function beforeEach() {
         admin = address(this);
         lc = new EthLightClient(admin);
-        bc = new BaseLightClient(admin, lc, FACTORY, _dgcSig());
+        bc = new BaseLightClient(admin);
+        bc.initialize(address(lc), FACTORY, _dgcSig());
     }
 
-    function it_constructor_stores_state() {
+    function it_initialize_stores_state() {
         require(address(bc.l1LightClient()) == address(lc), "l1 mismatch");
         require(bc.disputeGameFactory() == FACTORY, "factory mismatch");
         require(bc.disputeGameCreatedSig() == _dgcSig(), "sig mismatch");
     }
 
-    function it_constructor_rejects_zero_l1() {
+    function it_initialize_rejects_zero_l1() {
+        BaseLightClient fresh = new BaseLightClient(admin);
         bool reverted = false;
         try {
-            new BaseLightClient(admin, EthLightClient(address(0)), FACTORY, _dgcSig());
+            fresh.initialize(address(0), FACTORY, _dgcSig());
         } catch {
             reverted = true;
         }
         require(reverted, "should revert on zero l1");
     }
 
-    function it_constructor_rejects_zero_factory() {
+    function it_initialize_rejects_zero_factory() {
+        BaseLightClient fresh = new BaseLightClient(admin);
         bool reverted = false;
         try {
-            new BaseLightClient(admin, lc, address(0), _dgcSig());
+            fresh.initialize(address(lc), address(0), _dgcSig());
         } catch {
             reverted = true;
         }
         require(reverted, "should revert on zero factory");
     }
 
-    function it_constructor_rejects_zero_sig() {
+    function it_initialize_rejects_zero_sig() {
+        BaseLightClient fresh = new BaseLightClient(admin);
         bool reverted = false;
         try {
-            new BaseLightClient(admin, lc, FACTORY, bytes32(0));
+            fresh.initialize(address(lc), FACTORY, bytes32(0));
         } catch {
             reverted = true;
         }

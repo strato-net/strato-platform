@@ -11,7 +11,7 @@ const PROFILE_ALIASES = {
 
 const DEFAULTS = {
   [PROFILE_TESTNET]: {
-    NODE_URL: "https://node1.testnet.strato.nexus",
+    NODE_URL: "http://localhost:8081",
     DEFAULT_CHAINS: "11155111,84532",
   },
   [PROFILE_PROD]: {

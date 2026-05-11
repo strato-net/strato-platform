@@ -119,7 +119,8 @@ contract Describe_BaseLightClientChain {
     function beforeEach() {
         admin = address(this);
         lc = new TestableEthLightClient5(admin);
-        bc = new BaseLightClient(admin, EthLightClient(address(lc)), FACTORY, DGC_SIG);
+        bc = new BaseLightClient(admin);
+        bc.initialize(address(lc), FACTORY, DGC_SIG);
         lc.adminAnchor(L1_BLOCK_NUMBER, _l1ReceiptsRoot(), bytes32(0), uint64(0), uint64(0));
     }
 

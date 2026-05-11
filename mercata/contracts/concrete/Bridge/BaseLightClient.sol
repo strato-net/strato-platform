@@ -158,16 +158,30 @@ contract BaseLightClient is Ownable, ILightClient {
     // Construction & admin
     // ─────────────────────────────────────────────────────────────────
 
-    constructor(
-        address owner_,
-        EthLightClient l1LightClient_,
+    /**
+     * @dev Constructor only sets the owner — all chain-specific state
+     *      goes through {initialize} so the contract can be deployed
+     *      behind a {Proxy}. See {EthBridgeIn} for the same pattern.
+     */
+    constructor(address owner_) Ownable(owner_) { }
+
+    /**
+     * @notice Configure L1 light client + DisputeGameFactory + DGC sig.
+     *         Called once by the proxy admin after deploy.
+     *
+     *         `l1LightClient_` is `address` rather than `EthLightClient`
+     *         because SolidVM's JSON-RPC ABI doesn't know how to encode
+     *         contract-typed args; we cast on assignment.
+     */
+    function initialize(
+        address l1LightClient_,
         address disputeGameFactory_,
         bytes32 disputeGameCreatedSig_
-    ) Ownable(owner_) {
-        require(address(l1LightClient_) != address(0), "BaseLightClient: l1 zero");
+    ) external onlyOwner {
+        require(l1LightClient_ != address(0), "BaseLightClient: l1 zero");
         require(disputeGameFactory_ != address(0), "BaseLightClient: factory zero");
         require(disputeGameCreatedSig_ != bytes32(0), "BaseLightClient: sig zero");
-        l1LightClient = l1LightClient_;
+        l1LightClient = EthLightClient(l1LightClient_);
         disputeGameFactory = disputeGameFactory_;
         disputeGameCreatedSig = disputeGameCreatedSig_;
     }

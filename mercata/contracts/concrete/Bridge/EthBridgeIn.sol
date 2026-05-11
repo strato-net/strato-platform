@@ -191,17 +191,44 @@ contract EthBridgeIn is Ownable {
     // Construction & admin
     // ─────────────────────────────────────────────────────────────────
 
-    constructor(
-        address owner_,
-        ILightClient lightClient_,
+    /**
+     * @dev Constructor only sets the owner — all chain-specific state is
+     *      configured via {initialize}, which the proxy calls once after
+     *      deployment. This split is what lets us deploy the contract
+     *      behind a {Proxy}: the proxy holds storage, the logic
+     *      contract holds code, and the constructor running on the
+     *      logic contract has no business state to set.
+     *
+     *      Direct (non-proxy) deploys still work — call {initialize}
+     *      yourself right after construction. SolidVM tests use that
+     *      pattern.
+     */
+    constructor(address owner_) Ownable(owner_) { }
+
+    /**
+     * @notice Configure the chain-specific bridge-in state. Called
+     *         once by the proxy admin (or by the deployer for direct
+     *         deploys) immediately after construction.
+     *
+     *         `lightClient_` is `address` rather than `ILightClient`
+     *         because SolidVM's JSON-RPC ABI doesn't know how to
+     *         encode interface-typed args; we cast on assignment.
+     *
+     *         Calling twice is permitted but discouraged: it's
+     *         equivalent to invoking the four individual setters
+     *         atomically. For per-field updates, prefer
+     *         {setLightClient} / {setDepositRouter} / {setDepositRoutedSig}.
+     */
+    function initialize(
+        address lightClient_,
         uint256 srcChainId_,
         address depositRouter_,
         bytes32 depositRoutedSig_
-    ) Ownable(owner_) {
-        require(address(lightClient_) != address(0), "EthBridgeIn: lightClient zero");
+    ) external onlyOwner {
+        require(lightClient_ != address(0), "EthBridgeIn: lightClient zero");
         require(depositRouter_ != address(0), "EthBridgeIn: router zero");
         require(depositRoutedSig_ != bytes32(0), "EthBridgeIn: sig zero");
-        lightClient = lightClient_;
+        lightClient = ILightClient(lightClient_);
         srcChainId = srcChainId_;
         depositRouter = depositRouter_;
         depositRoutedSig = depositRoutedSig_;

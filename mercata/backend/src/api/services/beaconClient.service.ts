@@ -187,6 +187,30 @@ export class BeaconClient {
     return r;
   }
 
+  /**
+   * Full BeaconState at a slot, in SSZ-encoded form. Used by the
+   * state-proof anchor path (block_roots / historical_summaries) — we
+   * deserialize off-chain to build a Merkle proof against
+   * attested.state_root.
+   *
+   * Returned bytes are the SSZ Container encoding; the caller picks
+   * the fork-specific schema (lodestar's `ssz[fork].BeaconState`) to
+   * deserialize.
+   *
+   * Response is sizable (50–80 MB on mainnet, ~10–20 MB on Sepolia)
+   * so this trades the parent-walk's O(N) sequential `getHeader`
+   * fetches for one big payload — net much faster on rate-limited
+   * endpoints, plus it's amenable to gzip on the wire.
+   *
+   * Endpoint requires the beacon node to expose `/eth/v2/debug/beacon/
+   * states/{state_id}`. Lodestar enables this by default; Nimbus needs
+   * `--rest-debug-enabled`. If it's gated, callers should fall back to
+   * the parent-walk path.
+   */
+  async getStateSSZ(stateId: string): Promise<Buffer> {
+    return fetchSSZWithRetry(this.primary, this.fallback, `/eth/v2/debug/beacon/states/${stateId}`);
+  }
+
   // ───────── One-time setup helpers ─────────
 
   async getGenesis(): Promise<{ genesis_time: string; genesis_validators_root: string; genesis_fork_version: string }> {
@@ -205,21 +229,107 @@ export class BeaconClient {
 
   // ───────── Internals ─────────
 
-  /** GET helper with primary→fallback failover. Beacon endpoints
-   *  occasionally rate-limit; we don't retry on 4xx (bad request),
-   *  only on 5xx and network-level failures. */
+  /** GET helper with primary→fallback failover plus 429/5xx
+   *  exponential-backoff retry. Beacon endpoints (free public ones
+   *  especially) routinely rate-limit; without backoff a single 429
+   *  cascades into a hard failure of the whole flow. */
   private async fetch<T>(path: string): Promise<T> {
-    try {
-      return (await this.primary.get<T>(path)).data;
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const isClientError = status >= 400 && status < 500;
-      if (isClientError || !this.fallback) throw err;
-      try {
-        return (await this.fallback.get<T>(path)).data;
-      } catch {
-        throw err; // surface the original (primary) error
-      }
+    return fetchWithRetry(this.primary, this.fallback, path);
+  }
+}
+
+/** Max attempts per beacon GET (across primary+fallback). Tunable via
+ *  env so an operator with a paid endpoint can drop it back to 1. */
+const BEACON_MAX_ATTEMPTS: number = (() => {
+  const raw = process.env.BEACON_MAX_ATTEMPTS;
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 4;
+})();
+
+/** Status codes worth retrying. 429 = rate limit, 502/503/504 =
+ *  upstream hiccup. Hard 4xx (400, 401, 404) don't retry — the
+ *  request is wrong, not transient. */
+function isRetryableStatus(s: number | undefined): boolean {
+  if (s === undefined) return true; // network error / timeout
+  return s === 429 || (s >= 500 && s <= 599);
+}
+
+/** Sleep helper that honours a server-supplied Retry-After (seconds
+ *  or HTTP-date), falling back to exponential backoff. */
+async function backoffDelay(err: any, attempt: number): Promise<void> {
+  const retryAfter = err?.response?.headers?.["retry-after"];
+  let ms: number | undefined;
+  if (typeof retryAfter === "string") {
+    const asInt = parseInt(retryAfter, 10);
+    if (Number.isFinite(asInt)) {
+      ms = asInt * 1000;
+    } else {
+      const asDate = Date.parse(retryAfter);
+      if (Number.isFinite(asDate)) ms = Math.max(0, asDate - Date.now());
     }
   }
+  if (ms === undefined) {
+    // 250 → 500 → 1000 → 2000 ms with ±20% jitter.
+    const base = Math.min(2000, 250 * 2 ** attempt);
+    ms = base * (0.8 + Math.random() * 0.4);
+  }
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function fetchWithRetry<T>(
+  primary: AxiosInstance,
+  fallback: AxiosInstance | undefined,
+  path: string,
+): Promise<T> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < BEACON_MAX_ATTEMPTS; attempt++) {
+    const client = attempt === 0 || !fallback ? primary : fallback;
+    try {
+      return (await client.get<T>(path)).data;
+    } catch (err: any) {
+      lastErr = err;
+      const status = err?.response?.status;
+      if (!isRetryableStatus(status)) throw err;
+      if (attempt === BEACON_MAX_ATTEMPTS - 1) break;
+      const reason = status ?? "network";
+      console.warn(`[Beacon] ${reason} on GET ${path} (attempt ${attempt + 1}/${BEACON_MAX_ATTEMPTS}); backing off`);
+      await backoffDelay(err, attempt);
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * Same shape as {fetchWithRetry} but for SSZ binary responses. Sets
+ * `Accept: application/octet-stream` and an arraybuffer responseType
+ * so the body comes back as raw bytes (BeaconState is many MB; JSON
+ * would balloon it 3–5×). The 30s default timeout in the client
+ * constructor is bumped to 120s here since state fetches are big.
+ */
+async function fetchSSZWithRetry(
+  primary: AxiosInstance,
+  fallback: AxiosInstance | undefined,
+  path: string,
+): Promise<Buffer> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < BEACON_MAX_ATTEMPTS; attempt++) {
+    const client = attempt === 0 || !fallback ? primary : fallback;
+    try {
+      const res = await client.get(path, {
+        headers: { Accept: "application/octet-stream" },
+        responseType: "arraybuffer",
+        timeout: 120_000,
+      });
+      return Buffer.from(res.data as ArrayBuffer);
+    } catch (err: any) {
+      lastErr = err;
+      const status = err?.response?.status;
+      if (!isRetryableStatus(status)) throw err;
+      if (attempt === BEACON_MAX_ATTEMPTS - 1) break;
+      const reason = status ?? "network";
+      console.warn(`[Beacon] ${reason} on GET ${path} SSZ (attempt ${attempt + 1}/${BEACON_MAX_ATTEMPTS}); backing off`);
+      await backoffDelay(err, attempt);
+    }
+  }
+  throw lastErr;
 }

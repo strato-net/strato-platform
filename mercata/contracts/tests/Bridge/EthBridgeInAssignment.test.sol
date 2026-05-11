@@ -150,9 +150,9 @@ contract Describe_EthBridgeInAssignment {
 
     function beforeEach() {
         lc = new TestableEthLightClient2(address(this));
-        bridge = new EthBridgeIn(
-            address(this),
-            ILightClient(address(lc)),
+        bridge = new EthBridgeIn(address(this));
+        bridge.initialize(
+            address(lc),
             uint256(11155111),
             ROUTER,
             _eventSig()

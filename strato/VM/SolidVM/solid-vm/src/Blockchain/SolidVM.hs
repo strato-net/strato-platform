@@ -585,6 +585,7 @@ call' from to' fnCalltype functionName valList = do
         SString s -> Just $ MS.Index $ DT.encodeUtf8 $ T.pack s
         SAddress a _ -> Just $ MS.Index $ BC.pack $ show a
         SBool b -> Just $ MS.Index $ bool "false" "true" b
+        SBytes bs -> Just $ MS.Index bs  -- bytes32 keys (matches expToPath)
         _ -> Nothing
 
 callWithResult :: MonadSM m => Address -> Address -> CC.FunctionCallType -> SolidString -> ValList -> m (Maybe Value)
@@ -2601,7 +2602,7 @@ callBuiltin "create" args@(cName : src : argVals) = do
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True . DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddress creator
   execResults <- create' creator newAddress hsh cc contractName' argVals
@@ -2625,7 +2626,7 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True . DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddressWithSalt creator salt hsh $ n:argVals
   execResults <- create' creator newAddress hsh cc contractName' argVals

@@ -32,6 +32,28 @@ contract Describe_EthLightClient {
         return hex"9203acd34ebb3ff76268f9fe68f066a48a3f518686ae0f2230b322e19435ccfc4f208e5ba5a39cb2a409292c48a37c22";
     }
 
+    /// `_samplePubkey0` in the SSZ chunked layout (32 bytes + 16 bytes
+    /// pubkey + 16 bytes zero pad), used for `nextAggregatePubkey:
+    /// bytes32[2]` after the JSON-RPC ABI workaround.
+    function _samplePubkey0Chunks() internal pure returns (bytes32[2]) {
+        bytes32[2] r;
+        r[0] = bytes32(hex"9203acd34ebb3ff76268f9fe68f066a48a3f518686ae0f2230b322e19435ccfc");
+        r[1] = bytes32(hex"4f208e5ba5a39cb2a409292c48a37c2200000000000000000000000000000000");
+        return r;
+    }
+
+    /// 64 zero bytes in the chunked SyncAggregateInput.participationBits layout.
+    function _zeroParticipationChunks() internal pure returns (bytes32[2]) {
+        bytes32[2] r;
+        return r;
+    }
+
+    /// 96 zero bytes in the chunked SyncAggregateInput.signature layout.
+    function _zeroSignatureChunks() internal pure returns (bytes32[3]) {
+        bytes32[3] r;
+        return r;
+    }
+
     function _aggregatePubkey() internal pure returns (bytes) {
         return hex"a297f349051d1ec7276a464b343d7f68fe8483c2213f84b500fb8bbe4c2aa3fe5584d4416f9a0ee933c9153a80dce92e";
     }
@@ -156,11 +178,11 @@ contract Describe_EthLightClient {
             attestedParentRoot:    bytes32(0),
             attestedStateRoot:     bytes32(0),
             attestedBodyRoot:      bytes32(0),
-            participationBits:     new bytes(64),
-            signature:             new bytes(96),
+            participationBits:     _zeroParticipationChunks(),
+            signature:             _zeroSignatureChunks(),
             signatureSlot:         attestedSlot,
             nextPubkeys:           dummyPks,
-            nextAggregatePubkey:   _samplePubkey0(),
+            nextAggregatePubkey:   _samplePubkey0Chunks(),
             nextBranch:            branch
         });
     }
@@ -178,11 +200,11 @@ contract Describe_EthLightClient {
             attestedParentRoot:    bytes32(0),
             attestedStateRoot:     bytes32(0),
             attestedBodyRoot:      bytes32(0),
-            participationBits:     new bytes(64),
-            signature:             new bytes(96),
+            participationBits:     _zeroParticipationChunks(),
+            signature:             _zeroSignatureChunks(),
             signatureSlot:         uint64(1243 * 8192 + 0),
             nextPubkeys:           dummyPks,
-            nextAggregatePubkey:   _samplePubkey0(),
+            nextAggregatePubkey:   _samplePubkey0Chunks(),
             nextBranch:            new bytes32[](6)
         });
         bool reverted = false;
@@ -234,8 +256,8 @@ contract Describe_EthLightClient {
 
     function _stubSync() internal pure returns (SyncAggregateInput) {
         return SyncAggregateInput({
-            participationBits: new bytes(64),
-            signature:         new bytes(96),
+            participationBits: _zeroParticipationChunks(),
+            signature:         _zeroSignatureChunks(),
             signatureSlot:     uint64(_signaturePeriod() * 8192)
         });
     }

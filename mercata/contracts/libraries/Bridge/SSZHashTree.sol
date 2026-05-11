@@ -332,23 +332,17 @@ library SSZHashTree {
      *
      *         A 48-byte value packs into 1.5 chunks → 2 chunks (the
      *         second is right-padded with 16 zero bytes). The two
-     *         chunks merkleize via a single sha256, which is the
-     *         pubkey's hash_tree_root.
+     *         chunks merkleize via a single sha256.
+     *
+     *         The 48 || 16-zeros layout is exactly `pubkey48 + zeros16`
+     *         — concatenating in-place is dramatically cheaper than
+     *         the per-byte copy loop the original implementation used,
+     *         which dominated advanceCommittee gas (513 calls per
+     *         hashTreeRootSyncCommittee → 513 × 48 byte writes).
      */
     function hashTreeRootBLSPubkey(bytes pubkey48) internal pure returns (bytes32) {
         require(pubkey48.length == 48, "SSZ: pubkey must be 48 bytes");
-        // chunk0 = bytes 0..31 of the pubkey
-        // chunk1 = bytes 32..47 of the pubkey + 16 zero bytes
-        bytes chunk0 = new bytes(32);
-        for (uint256 i = 0; i < 32; i = i + 1) {
-            chunk0[i] = pubkey48[i];
-        }
-        bytes chunk1 = new bytes(32);
-        for (uint256 j = 0; j < 16; j = j + 1) {
-            chunk1[j] = pubkey48[32 + j];
-        }
-        // bytes 16..31 of chunk1 stay zero (right-pad).
-        return bytes32(sha256(chunk0 + chunk1));
+        return bytes32(sha256(pubkey48 + new bytes(16)));
     }
 
     /**
@@ -364,10 +358,20 @@ library SSZHashTree {
      *         per invocation. Heavy but bounded; called once per period
      *         transition (~ once per 27 hours in production), so the
      *         cost amortizes across all reads of the new committee.
+     *
+     * @param  aggregatePubkey  The 48-byte BLSPubkey, packed into 2×
+     *         bytes32 with the trailing 16 bytes of word1 being the
+     *         SSZ right-pad. Chunked layout — rather than `bytes` —
+     *         because variable-length `bytes` standalone in a struct
+     *         field doesn't round-trip through SolidVM's JSON-RPC
+     *         ABI; the chunked form decodes correctly. Canonical form
+     *         requires word1's low 128 bits to be zero; if they
+     *         aren't, the resulting root won't match a genuine
+     *         committee root and the caller's branch verify reverts.
      */
     function hashTreeRootSyncCommittee(
         bytes[] pubkeys,
-        bytes aggregatePubkey
+        bytes32[2] aggregatePubkey
     ) internal pure returns (bytes32) {
         require(pubkeys.length == 512, "SSZ: expected 512 pubkeys");
 
@@ -388,7 +392,12 @@ library SSZHashTree {
         bytes32 vectorRoot = leaves[0];
 
         // 3. Container hash_tree_root over (vectorRoot, aggregateRoot).
-        bytes32 aggregateRoot = hashTreeRootBLSPubkey(aggregatePubkey);
+        // The aggregate pubkey is already in the SSZ chunk layout, so
+        // sha256(chunk0 || chunk1) IS hash_tree_root(BLSPubkey)
+        // directly — no padding step needed.
+        bytes32 aggregateRoot = bytes32(sha256(
+            bytes(aggregatePubkey[0]) + bytes(aggregatePubkey[1])
+        ));
         return bytes32(sha256(bytes(vectorRoot) + bytes(aggregateRoot)));
     }
 

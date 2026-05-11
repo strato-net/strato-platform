@@ -139,11 +139,11 @@ contract Describe_EthBridgeInClaim {
 
     function beforeEach() {
         lc = new TestableEthLightClient(address(this));
+        bridge = new EthBridgeIn(address(this));
         // SolidVM doesn't auto-upcast from the derived class reference;
-        // pass via address+cast so the constructor sees ILightClient.
-        bridge = new EthBridgeIn(
-            address(this),
-            ILightClient(address(lc)),
+        // pass via address+cast so initialize sees ILightClient.
+        bridge.initialize(
+            address(lc),
             uint256(11155111),
             ROUTER,
             _eventSig()
