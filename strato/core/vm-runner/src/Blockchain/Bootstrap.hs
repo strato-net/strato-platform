@@ -104,8 +104,8 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
     createTopicAndWait "jsonrpcresponse"
     createTopicAndWait "vm_tasks"
   -- Create a persistent connection for publishing
-  let k = UEC.kafkaConfig UEC.ethConf
-  streamEnv <- liftIO $ createStreamEnv "vm-runner-bootstrap" (fromString $ UEC.kafkaHost k, fromIntegral $ UEC.kafkaPort k)
+  let k = UEC.streamingConfig UEC.ethConf
+  streamEnv <- liftIO $ createStreamEnv "vm-runner-bootstrap" (fromString $ UEC.streamingHost k, fromIntegral $ UEC.streamingPort k)
   let pub sd vmes = do
         void . runStreamMUsingEnv streamEnv $ do
           for_ sd $ \diff -> IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]

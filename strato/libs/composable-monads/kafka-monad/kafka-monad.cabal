@@ -12,6 +12,7 @@ build-type:     Simple
 library
   exposed-modules:
       Control.Monad.Composable.Kafka
+      Control.Monad.Composable.Kafka.DockerConfig
   other-modules:
       Paths_kafka_monad
   hs-source-dirs:

@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Docker configuration for Apache Kafka
-module Control.Monad.Composable.Streaming.DockerConfig.Kafka (
+module Control.Monad.Composable.Kafka.DockerConfig (
   BrokerConfig(..),
   brokerConfig,
   brokerVolumeDirs
@@ -17,6 +17,7 @@ data BrokerConfig = BrokerConfig
   , bcCommand :: Maybe [String]
   , bcHealthcheckTest :: [String]
   , bcVolumes :: [String]
+  , bcPort :: Int
   , bcNeedsUserGid :: Bool
   }
 
@@ -47,6 +48,7 @@ brokerConfig = BrokerConfig
   , bcCommand = Just ["exec /__cacert_entrypoint.sh /etc/kafka/docker/run >> /logs/kafka.log 2>&1"]
   , bcHealthcheckTest = ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
   , bcVolumes = ["./logs:/logs", "./kafka:/kafka"]
+  , bcPort = 9092
   , bcNeedsUserGid = False
   }
 

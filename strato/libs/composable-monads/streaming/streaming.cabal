@@ -14,13 +14,10 @@ library
       Control.Monad.Composable.Streaming
       Control.Monad.Composable.Streaming.DockerConfig
   other-modules:
-      Control.Monad.Composable.Streaming.DockerConfig.Kafka
-      Control.Monad.Composable.Streaming.DockerConfig.RabbitMQ
-      Control.Monad.Composable.Streaming.DockerConfig.Redpanda
+      Paths_streaming
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
-    , containers
-    , kafka-monad
+    , streaming-rabbitmq
   default-language: Haskell2010

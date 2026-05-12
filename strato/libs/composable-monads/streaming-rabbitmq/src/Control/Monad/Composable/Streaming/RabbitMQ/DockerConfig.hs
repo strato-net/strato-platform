@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Docker configuration for RabbitMQ
-module Control.Monad.Composable.Streaming.DockerConfig.RabbitMQ (
+module Control.Monad.Composable.Streaming.RabbitMQ.DockerConfig (
   BrokerConfig(..),
   brokerConfig,
   brokerVolumeDirs
@@ -17,6 +17,7 @@ data BrokerConfig = BrokerConfig
   , bcCommand :: Maybe [String]
   , bcHealthcheckTest :: [String]
   , bcVolumes :: [String]
+  , bcPort :: Int
   , bcNeedsUserGid :: Bool
   }
 
@@ -26,11 +27,13 @@ brokerConfig = BrokerConfig
   , bcEnvironment = Just $ Map.fromList
       [ ("RABBITMQ_DEFAULT_USER", "guest")
       , ("RABBITMQ_DEFAULT_PASS", "guest")
+      , ("RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS", "-rabbit consumer_timeout infinity")
       ]
   , bcEntrypoint = Just ["/bin/sh", "-c"]
   , bcCommand = Just ["exec docker-entrypoint.sh rabbitmq-server >> /logs/rabbitmq.log 2>&1"]
   , bcHealthcheckTest = ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
   , bcVolumes = ["./logs:/logs", "./rabbitmq:/var/lib/rabbitmq"]
+  , bcPort = 5672
   , bcNeedsUserGid = True
   }
 

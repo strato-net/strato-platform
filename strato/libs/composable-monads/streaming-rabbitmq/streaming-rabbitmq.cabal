@@ -12,6 +12,7 @@ build-type:     Simple
 library
   exposed-modules:
       Control.Monad.Composable.Streaming.RabbitMQ
+      Control.Monad.Composable.Streaming.RabbitMQ.DockerConfig
   other-modules:
       Paths_streaming_rabbitmq
   hs-source-dirs:

@@ -13,7 +13,7 @@ parseBootnodeString s = read s
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
 defineFlag "p:password" ("" :: String) "Postgres password"
-defineFlag "K:kafkahost" ("localhost" :: String) "Kafka hostname"
+defineFlag "K:kafkahost" ("localhost" :: String) "Streaming broker hostname"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag

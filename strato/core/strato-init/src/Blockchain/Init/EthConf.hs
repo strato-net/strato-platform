@@ -5,6 +5,7 @@ module Blockchain.Init.EthConf (genEthConf) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
+import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcPort)
 import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
@@ -47,7 +48,7 @@ runtimeConfig = def
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
-  , kafkaConfig = def { kafkaHost = "kafka" }
+  , streamingConfig = def { streamingHost = "streaming", streamingPort = bcPort brokerConfig }
   , discoveryConfig = def { minAvailablePeers = flags_minPeers }
   , p2pConfig = def
       { maxConnections = flags_maxConn
@@ -131,7 +132,7 @@ genEthConf = do
         , host = flags_pghost
         , password = pgPass
         }
-    , kafkaConfig = (kafkaConfig runtimeConfig) { kafkaHost = flags_kafkahost }
+    , streamingConfig = (streamingConfig runtimeConfig) { streamingHost = flags_kafkahost }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize
         , blockSize = flags_ldbBlockSize

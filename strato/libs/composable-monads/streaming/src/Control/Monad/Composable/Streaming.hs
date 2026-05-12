@@ -10,7 +10,7 @@
 --   streaming-rabbitmq -> import Control.Monad.Composable.Streaming.RabbitMQ
 
 module Control.Monad.Composable.Streaming (
-  module Control.Monad.Composable.Kafka
+  module Control.Monad.Composable.Streaming.RabbitMQ
 ) where
 
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming.RabbitMQ

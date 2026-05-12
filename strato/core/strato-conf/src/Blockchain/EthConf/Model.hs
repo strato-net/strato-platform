@@ -10,6 +10,7 @@ module Blockchain.EthConf.Model where
 
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
+import Control.Applicative ((<|>))
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
@@ -46,7 +47,7 @@ data EthConf = EthConf
   { sqlConfig :: SqlConf,
     cirrusConfig :: SqlConf,
     redisBlockDBConfig :: RedisBlockDBConf,
-    kafkaConfig :: KafkaConf,
+    streamingConfig :: StreamingConf,
     levelDBConfig :: LevelDBConf,
     quarryConfig :: QuarryConf,
     discoveryConfig :: DiscoveryConf,
@@ -59,12 +60,17 @@ data EthConf = EthConf
   }
   deriving (Show, Eq, Generic)
 
+-- Backward compatibility alias
+kafkaConfig :: EthConf -> StreamingConf
+kafkaConfig = streamingConfig
+{-# DEPRECATED kafkaConfig "Use streamingConfig instead" #-}
+
 instance FromJSON EthConf where
   parseJSON = withObject "EthConf" $ \v -> EthConf
     <$> v .: "sqlConfig"
     <*> v .: "cirrusConfig"
     <*> v .: "redisBlockDBConfig"
-    <*> v .: "kafkaConfig"
+    <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
     <*> v .:? "levelDBConfig" .!= def
     <*> v .:? "quarryConfig" .!= def
     <*> v .: "discoveryConfig"
@@ -114,11 +120,30 @@ data SqlConf = SqlConf
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
-data KafkaConf = KafkaConf
-  { kafkaHost :: String,
-    kafkaPort :: Int
+data StreamingConf = StreamingConf
+  { streamingHost :: String,
+    streamingPort :: Int
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, ToJSON)
+
+-- Parse both old "kafkaHost/Port" and new "streamingHost/Port" field names
+instance FromJSON StreamingConf where
+  parseJSON = withObject "StreamingConf" $ \v -> StreamingConf
+    <$> (v .:? "streamingHost" >>= maybe (v .:? "kafkaHost" .!= "localhost") pure)
+    <*> (v .:? "streamingPort" >>= maybe (v .:? "kafkaPort" .!= 9092) pure)
+
+-- Backward compatibility type alias
+type KafkaConf = StreamingConf
+{-# DEPRECATED KafkaConf "Use StreamingConf instead" #-}
+
+-- Backward compatibility field accessors
+kafkaHost :: StreamingConf -> String
+kafkaHost = streamingHost
+{-# DEPRECATED kafkaHost "Use streamingHost instead" #-}
+
+kafkaPort :: StreamingConf -> Int
+kafkaPort = streamingPort
+{-# DEPRECATED kafkaPort "Use streamingPort instead" #-}
 
 data RedisBlockDBConf = RedisBlockDBConf
   { redisHost :: String,
@@ -205,10 +230,10 @@ instance Default SqlConf where
     , poolsize = 10
     }
 
-instance Default KafkaConf where
-  def = KafkaConf
-    { kafkaHost = "localhost"
-    , kafkaPort = 9092
+instance Default StreamingConf where
+  def = StreamingConf
+    { streamingHost = "localhost"
+    , streamingPort = 9092
     }
 
 instance Default RedisBlockDBConf where
@@ -293,7 +318,7 @@ instance Default EthConf where
     { sqlConfig = def
     , cirrusConfig = def { database = "cirrus" }
     , redisBlockDBConfig = def
-    , kafkaConfig = def
+    , streamingConfig = def
     , levelDBConfig = def
     , quarryConfig = def
     , discoveryConfig = def

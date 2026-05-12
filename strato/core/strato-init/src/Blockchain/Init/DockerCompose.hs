@@ -266,7 +266,7 @@ generateDockerCompose = do
             }
         , volumes = Just (bcVolumes bc)
         , logging = noLogging
-        , ports = Just ["127.0.0.1:9092:9092"]
+        , ports = Just ["127.0.0.1:" ++ show (bcPort bc) ++ ":" ++ show (bcPort bc)]
         }
 
   let prometheus = def

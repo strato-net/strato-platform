@@ -9,6 +9,9 @@ dependencies:
 
 library:
   source-dirs: src
+  exposed-modules:
+  - Control.Monad.Composable.Streaming.RabbitMQ
+  - Control.Monad.Composable.Streaming.RabbitMQ.DockerConfig
   dependencies:
   - aeson
   - amqp

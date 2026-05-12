@@ -21,6 +21,7 @@ module Control.Monad.Composable.Streaming.Kafka (
   ConsumerGroup,
   ClientId,
   StreamAddress,
+  MonadUnliftIO,
   -- Running
   runStreamM,
   runStreamMUsingEnv,
@@ -31,10 +32,12 @@ module Control.Monad.Composable.Streaming.Kafka (
   produceItemsAsJSON,
   -- Consuming
   consume,
+  consumeBroadcast,
   runConsume,
   consumeFromLatest,
   -- Topics
   createTopicAndWait,
+  createBroadcastTopic,
   -- Conduit
   conduitBatchSource,
   -- Deprecated/internal (for migration)
@@ -154,11 +157,11 @@ runStreamMUsingEnv env f = do
 runKafkaMUsingEnv :: MonadIO m => StreamEnv -> StreamM m a -> m a
 runKafkaMUsingEnv = runStreamMUsingEnv
 
-runStreamM :: MonadIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
 runStreamM x y f = flip runStreamMUsingEnv f =<< createStreamEnv x y
 
 -- Deprecated alias
-runKafkaM :: MonadIO m => KafkaClientId -> KafkaAddress -> StreamM m a -> m a
+runKafkaM :: MonadUnliftIO m => KafkaClientId -> KafkaAddress -> StreamM m a -> m a
 runKafkaM = runStreamM
 
 ----------------------
@@ -240,6 +243,11 @@ consume :: (Binary a, HasStreaming m) =>
            ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
 consume consumerGroup topicName f =
   void $ runConsume consumerGroup topicName (\a -> Nothing <$ f a)
+
+-- | Pub-sub consume. For Kafka, same as consume since consumer groups provide pub-sub.
+consumeBroadcast :: (Binary a, HasStreaming m) =>
+                    ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
+consumeBroadcast = consume
 
 runConsume :: (Binary a, HasStreaming m) =>
               ConsumerGroup -> TopicName -> ([a] -> m (Maybe b)) -> m b
@@ -363,6 +371,10 @@ createTopicAndWait topicName = do
         else do
           liftIO $ threadDelay 100000
           waitForReady (retries - 1)
+
+-- | Create a broadcast-only topic. For Kafka, same as createTopicAndWait since Kafka retains messages.
+createBroadcastTopic :: HasStreaming m => TopicName -> m ()
+createBroadcastTopic = createTopicAndWait
 
 checkTopicReady :: StreamEnv -> TopicName -> IO Bool
 checkTopicReady env topicName =
