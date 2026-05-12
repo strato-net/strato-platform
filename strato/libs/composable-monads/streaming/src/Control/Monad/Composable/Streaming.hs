@@ -8,9 +8,10 @@
 --   streaming-kafka-hw -> import Control.Monad.Composable.Streaming.Kafka
 --   streaming-redpanda -> import Control.Monad.Composable.Streaming.Redpanda
 --   streaming-rabbitmq -> import Control.Monad.Composable.Streaming.RabbitMQ
+--   streaming-jlog     -> import Control.Monad.Composable.Streaming.JLog (embedded, no server)
 
 module Control.Monad.Composable.Streaming (
-  module Control.Monad.Composable.Streaming.RabbitMQ
+  module Control.Monad.Composable.Streaming.JLog
 ) where
 
-import Control.Monad.Composable.Streaming.RabbitMQ
+import Control.Monad.Composable.Streaming.JLog

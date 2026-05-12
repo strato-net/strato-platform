@@ -5,7 +5,7 @@ module Blockchain.Init.EthConf (genEthConf) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
-import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcPort)
+import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
 import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network, flags_txSizeLimit, flags_gasLimit, computeNetworkID)
@@ -48,7 +48,7 @@ runtimeConfig = def
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
-  , streamingConfig = def { streamingHost = "streaming", streamingPort = bcPort brokerConfig }
+  , streamingConfig = def { streamingHost = bcHost brokerConfig, streamingPort = bcPort brokerConfig }
   , discoveryConfig = def { minAvailablePeers = flags_minPeers }
   , p2pConfig = def
       { maxConnections = flags_maxConn
@@ -132,7 +132,11 @@ genEthConf = do
         , host = flags_pghost
         , password = pgPass
         }
-    , streamingConfig = (streamingConfig runtimeConfig) { streamingHost = flags_kafkahost }
+    , streamingConfig = (streamingConfig runtimeConfig) 
+        { streamingHost = if flags_kafkahost == "localhost" 
+                          then bcHost brokerConfig  -- Use backend default for JLog etc
+                          else flags_kafkahost 
+        }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize
         , blockSize = flags_ldbBlockSize

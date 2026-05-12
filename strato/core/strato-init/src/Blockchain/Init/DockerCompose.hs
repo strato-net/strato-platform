@@ -311,6 +311,9 @@ generateDockerCompose = do
         , logging = noLogging
         }
 
+  -- Only include streaming service if a broker image is configured (not embedded like JLog)
+  let streamingService = if null (bcImage bc) then [] else [("streaming", streaming)]
+  
   let baseServices =
             [ ("mercata-backend", mercataBackend)
             , ("mercata-ui", mercataUi)
@@ -321,9 +324,8 @@ generateDockerCompose = do
             , ("postgres", postgres)
             , ("nginx", nginx)
             , ("docs", docs)
-            , ("streaming", streaming)
             , ("prometheus", prometheus)
-            ]
+            ] ++ streamingService
 
   let allServices = if flags_localAuth
         then ("local-auth", localAuth) : baseServices

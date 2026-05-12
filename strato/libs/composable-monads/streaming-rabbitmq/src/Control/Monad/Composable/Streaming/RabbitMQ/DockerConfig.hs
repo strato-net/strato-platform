@@ -12,6 +12,7 @@ import qualified Data.Map as Map
 
 data BrokerConfig = BrokerConfig
   { bcImage :: String
+  , bcHost :: String  -- Hostname or path for embedded backends
   , bcEnvironment :: Maybe (Map String String)
   , bcEntrypoint :: Maybe [String]
   , bcCommand :: Maybe [String]
@@ -24,6 +25,7 @@ data BrokerConfig = BrokerConfig
 brokerConfig :: BrokerConfig
 brokerConfig = BrokerConfig
   { bcImage = "rabbitmq:3.13-management"
+  , bcHost = "streaming"  -- Docker container name
   , bcEnvironment = Just $ Map.fromList
       [ ("RABBITMQ_DEFAULT_USER", "guest")
       , ("RABBITMQ_DEFAULT_PASS", "guest")

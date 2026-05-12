@@ -22,4 +22,4 @@ library:
   - Control.Monad.Composable.Streaming
   - Control.Monad.Composable.Streaming.DockerConfig
   dependencies:
-  - streaming-rabbitmq  # <- change this line to switch backends
+  - streaming-jlog  # <- change this line to switch backends
