@@ -77,7 +77,11 @@ module.exports = {
         },
       };
 
-      const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData] = await Promise.all([utils.getLatestHealth(), getPbftData()]);
+      const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData, nodeAddress] = await Promise.all([
+        utils.getLatestHealth(),
+        getPbftData(),
+        getNodeAddress(),
+      ]);
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
         healthBody = utils.consolidateHealthData(
@@ -96,6 +100,7 @@ module.exports = {
         apiVersion: API_VERSION,
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
+        nodeAddress,
         lastBlock: {
           number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
           hash: lastBlock.hash,
@@ -147,6 +152,23 @@ module.exports = {
     }
   },
 };
+
+// Fetches the node's blockchain (coinbase) address from strato-api.
+// Returns null if the call fails so /status remains usable.
+async function getNodeAddress() {
+  try {
+    return await rp({
+      method: "GET",
+      uri: `${process.env.stratoRoot}/coinbase`,
+      json: true,
+      timeout: config.healthCheck.requestTimeout - 100,
+      followRedirects: false,
+    });
+  } catch (err) {
+    winston.warn(`Unable to fetch node coinbase address: ${err.message}`);
+    return null;
+  }
+}
 
 function getPbftData() {
   if (!process.env["PROMETHEUS_HOST"]) {
