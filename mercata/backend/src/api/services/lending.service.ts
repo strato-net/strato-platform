@@ -1006,18 +1006,33 @@ export const getLoan = async (
     });
   });
 
-  const normalizedUser = userAddress?.trim();
-  if (normalizedUser) {
-    const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === normalizedUser);
+  if (userAddress) {
+    const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === userAddress);
     const userLoan = userLoanEntry?.LoanInfo;
     const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
-      .filter((c: any) => c.user === normalizedUser)
+      .filter((c: any) => c.user === userAddress)
       .map((c: any) => ({ asset: c.asset, amount: c.amount }));
 
     return simulateLoan(userLoan || null, userCollaterals, assetConfigs, borrowIndex, borrowableAsset);
   }
 
-  return simulateLoan(null, [], assetConfigs, borrowIndex, borrowableAsset);
+  // All users
+  const allLoans: any[] = [];
+  const allUserLoans = registry.lendingPool?.userLoan || [];
+  for (const loanEntry of allUserLoans) {
+    const userLoan = loanEntry.LoanInfo;
+    const userAddr = loanEntry.user;
+    if (!userLoan || !userAddr) continue;
+
+    const userCollaterals: CollateralInfo[] = (registry.collateralVault?.userCollaterals || [])
+      .filter((c: any) => c.user === userAddr)
+      .map((c: any) => ({ asset: c.asset, amount: c.amount }));
+
+    const simulatedLoan = simulateLoan(userLoan || null, userCollaterals, assetConfigs, borrowIndex, borrowableAsset);
+    allLoans.push({ user: userAddr, ...simulatedLoan });
+  }
+
+  return allLoans;
 };
 
 export const repayAll = async (
