@@ -1,11 +1,11 @@
 "use client";
 
 // context/UserContext.tsx
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useWalletClient } from "wagmi";
 import { api, setAppAuthenticated, setConnectedWalletAddress, setWalletSigner } from "@/lib/axios";
-import { isAuthenticated, logout as authLogout, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
+import { isAuthenticated, logout as authLogout, redirectToSignedOutLanding, WALLET_CONNECT_REQUEST_EVENT } from "@/lib/auth";
 import { ADMIN_VOTE_EXECUTED_ISSUES_PER_PAGE } from "@/lib/constants";
 import { readAttribution, clearAttribution } from "@/lib/attribution";
 import { ensureStratoChainInWallet } from "@/lib/stratoChain";
@@ -67,10 +67,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [contractSearchResultsLoading, setContractSearchResultsLoading] = useState<boolean>(false)
   const [contractDetailsResults, setContractDetailsResults] = useState<object>({});
   const [contractDetailsResultsLoading, setContractDetailsResultsLoading] = useState<boolean>(false);
+  const sessionExpiryLogoutStartedRef = useRef(false);
 
   const checkAuthenticationStatus = async (initialCheck = false) => {
     try {
       if (initialCheck) setLoading(true); // Only show loader on first load
+      const storedUser = localStorage.getItem("user");
       const { authenticated, userData: probedUserData } = await isAuthenticated();
 
       if (authenticated !== isLoggedIn) {
@@ -79,7 +81,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
       // If authenticated and we don't have user data, try to get it
       if (authenticated) {
-        const storedUser = localStorage.getItem("user");
+        sessionExpiryLogoutStartedRef.current = false;
         if (!storedUser || !stratoAddress) {
           try {
             // Reuse the body from isAuthenticated()'s probe so we don't issue a
@@ -132,10 +134,29 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           }
         }
       } else {
-        if (stratoAddress) {
+        const hadStratoSession = !!storedUser || !!stratoAddress || isLoggedIn;
+        if (hadStratoSession) {
+          sessionExpiryLogoutStartedRef.current = true;
           localStorage.removeItem("user");
           setStratoAddress(null);
+          setIsLoggedIn(false);
           setIsAdmin(false);
+          setUserName(null);
+          setConnectedWalletAddress(null);
+          setWalletSigner(null);
+          setAppAuthenticated(false);
+          try {
+            disconnect();
+          } catch {
+            // Continue session-expiry logout even if wallet disconnect fails.
+          }
+          redirectToSignedOutLanding();
+          return;
+        } else if (stratoAddress) {
+          setStratoAddress(null);
+          setIsLoggedIn(false);
+          setIsAdmin(false);
+          setUserName(null);
         }
       }
     } catch (error) {
@@ -245,7 +266,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const isExternalWalletConnected = !!externalWalletAddress;
   const externalEvmWalletAddress = !isStratoConnector(account.connector) ? externalWalletAddress : null;
   const isExternalEvmWalletConnected = !!externalEvmWalletAddress;
-  const shouldUseExternalWallet = !loading && !isLoggedIn && isExternalWalletConnected;
+  const shouldUseExternalWallet = !sessionExpiryLogoutStartedRef.current && !loading && !isLoggedIn && isExternalWalletConnected;
   const userAddress = isLoggedIn ? stratoAddress : shouldUseExternalWallet ? externalWalletAddress : null;
   const effectiveLoggedIn = isLoggedIn || shouldUseExternalWallet;
 
