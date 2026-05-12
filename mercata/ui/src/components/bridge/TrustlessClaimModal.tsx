@@ -317,6 +317,8 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
   // ─── Phase 2 (claim): step list + UI scaffolding ──────────────────
   const flavor = result?.flavor ?? selectedChain?.flavor;
   const isBase = flavor === "base";
+  const isLinea = flavor === "linea";
+  const isL2 = isBase || isLinea;
 
   const submitDescription = (() => {
     if (result?.anchorSkipped && result?.l1AnchorSkipped) {
@@ -325,16 +327,19 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
     if (result?.anchorSkipped) {
       return "Block already anchored — only the claim transaction needs your signature.";
     }
-    if (isBase) {
+    if (isL2) {
+      const l2Name = isBase ? "Base" : "Linea";
       return result?.l1AnchorSkipped
-        ? "Sign the Base anchor + claim transactions in your wallet."
-        : "Sign the L1 anchor + Base anchor + claim transactions in your wallet.";
+        ? `Sign the ${l2Name} anchor + claim transactions in your wallet.`
+        : `Sign the L1 anchor + ${l2Name} anchor + claim transactions in your wallet.`;
     }
     return "Sign the anchorBlockHeader + claim transactions in your wallet.";
   })();
 
   const buildProofDescription = isBase
     ? "Backend locates a covering dispute game on L1, walks Base headers from the anchor down to your deposit, and assembles the receipts MPT proof."
+    : isLinea
+    ? "Backend locates a covering finalization (DataFinalizedV3) on L1, walks Linea headers from the anchor down to your deposit, and assembles the receipts MPT proof."
     : "Backend assembles the finality update + receipts MPT proof for your deposit.";
 
   const steps: { key: TrustlessClaimStep; label: string; description: string }[] = [
@@ -400,11 +405,12 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
         setStep("error");
         return;
       }
-      if (code === "NO_MATCHING_DISPUTE_GAME") {
-        // Base flavor only: the L2 deposit isn't yet covered by any
-        // DisputeGameCreated event on L1. Treat the same as a finality
-        // wait — there's no concrete ETA (proposers anchor on their own
-        // cadence) but the user can retry once an anchor lands.
+      if (code === "NO_MATCHING_DISPUTE_GAME" || code === "NO_MATCHING_FINALIZATION") {
+        // L2 deposit not yet anchored on L1 — Base: no covering DGC;
+        // Linea: no covering DataFinalizedV3. Same UX: surface as a
+        // wait-state with no concrete ETA (proposers/aggregators anchor
+        // on their own cadence) so the user can retry once an anchor
+        // lands.
         setWaiting({
           kind: "anchor",
           etaSeconds: undefined,
@@ -491,7 +497,9 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
   const titleText = inClaim
     ? waiting
       ? waiting.kind === "anchor"
-        ? "Waiting for L1 anchor"
+        ? flavor === "linea"
+          ? "Waiting for L1 finalization"
+          : "Waiting for L1 anchor"
         : "Waiting for Ethereum finality"
       : isError
       ? "Claim Failed"
@@ -612,14 +620,22 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
           {waiting && waiting.kind === "anchor" && (
             <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
               <p className="text-sm text-blue-500 font-medium">
-                Waiting for an L1 anchor for your Base block.
+                {flavor === "linea"
+                  ? "Waiting for L1 finalization of your Linea block."
+                  : "Waiting for an L1 anchor for your Base block."}
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
-                Base claims require a DisputeGameCreated event on L1 that
-                anchors your deposit's L2 block. Proposers submit these on
-                their own cadence (typically every few minutes on mainnet,
-                up to an hour or two on testnet). Try again once a covering
-                dispute game has been posted.
+                {flavor === "linea"
+                  ? "Linea claims require a DataFinalizedV3 event on L1 " +
+                    "whose endBlock covers your deposit's L2 block. The " +
+                    "Linea aggregator submits these on its own cadence " +
+                    "(typically every hour or so). Try again once a " +
+                    "covering finalization has landed."
+                  : "Base claims require a DisputeGameCreated event on L1 that " +
+                    "anchors your deposit's L2 block. Proposers submit these on " +
+                    "their own cadence (typically every few minutes on mainnet, " +
+                    "up to an hour or two on testnet). Try again once a covering " +
+                    "dispute game has been posted."}
               </p>
               <div className="mt-3">
                 <Button onClick={onRetry} variant="outline" className="w-full">
@@ -668,7 +684,11 @@ const TrustlessClaimModal: React.FC<TrustlessClaimModalProps> = ({
           {step === "complete" && result && (
             <div className="text-xs text-muted-foreground space-y-1">
               <div>
-                {result.flavor === "base" ? "Base block" : "Block"} anchored: {result.blockNumber}
+                {result.flavor === "base"
+                  ? "Base block"
+                  : result.flavor === "linea"
+                  ? "Linea block"
+                  : "Block"} anchored: {result.blockNumber}
               </div>
               {result.hashes.map((h, i) => (
                 <div key={i} className="font-mono">
@@ -780,6 +800,8 @@ const PickerView: React.FC<PickerViewProps> = ({
           <p className="mt-2 text-[11px] text-muted-foreground">
             {finalizedHead.flavor === "base"
               ? "Latest L1-anchored block: "
+              : finalizedHead.flavor === "linea"
+              ? "Latest L1-finalized block: "
               : "Finalized block: "}
             {finalizedHead.blockNumber}
           </p>
@@ -854,6 +876,8 @@ const PickerView: React.FC<PickerViewProps> = ({
                         ? "Ready"
                         : finalizedHead?.flavor === "base"
                         ? "Waiting for L1 anchor"
+                        : finalizedHead?.flavor === "linea"
+                        ? "Waiting for L1 finalization"
                         : "Waiting for finality"}
                     </span>
                   </div>

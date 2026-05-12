@@ -1,5 +1,6 @@
 import "../../libraries/Bridge/IBridgeMintTarget.sol";
 import "../../libraries/Bridge/ILightClient.sol";
+import "../../libraries/Bridge/LightClientShared.sol";
 import "../../libraries/Bridge/MPTProof.sol";
 import "../../libraries/Bridge/RLPDecode.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
@@ -310,7 +311,7 @@ contract EthBridgeIn is Ownable {
         require(receiptsRoot != bytes32(0), "EthBridgeIn: block not anchored");
 
         // 2. MPT inclusion proof against the receipts trie.
-        bytes mptKey = _rlpUint(txIndex);
+        bytes mptKey = LightClientShared.rlpUint(txIndex);
         require(
             MPTProof.verifyInclusion(receiptsRoot, mptKey, receiptValueBytes, mptProof),
             "EthBridgeIn: MPT proof failed"
@@ -320,7 +321,7 @@ contract EthBridgeIn is Ownable {
         // We avoid the variable name `log` because SolidVM treats that
         // identifier as a builtin function, so a local of the same
         // name shadows the wrong way.
-        bytes receiptRlp = _stripTypedTxPrefix(receiptValueBytes);
+        bytes receiptRlp = LightClientShared.stripTypedTxPrefix(receiptValueBytes);
         bytes[] receiptFields = RLPDecode.decodeList(receiptRlp);
         require(receiptFields.length == 4, "EthBridgeIn: receipt must be 4-field list");
         // receiptFields = [status, cumulativeGasUsed, logsBloom, logs]
@@ -491,48 +492,5 @@ contract EthBridgeIn is Ownable {
     ///      (an ABI-encoded address word: 12 zero bytes + 20 address bytes).
     function _readAddress(bytes data, uint256 off) private pure returns (address) {
         return address(uint160(_readUint256(data, off)));
-    }
-
-    /**
-     * @dev If `b` starts with an EIP-2718 transaction-type prefix
-     *      (single byte < 0xc0), strip it and return the remaining
-     *      RLP. Otherwise return `b` unchanged. The prefix is always
-     *      0x01..0x7f for the typed-tx envelopes we care about
-     *      (EIP-2930, EIP-1559, EIP-4844, EIP-7702 …); 0x00..0x7f is
-     *      the safe range, anything < 0xc0 isn't a top-level RLP list
-     *      so it can't be a legacy receipt.
-     */
-    function _stripTypedTxPrefix(bytes b) private pure returns (bytes) {
-        require(b.length > 0, "EthBridgeIn: empty receipt");
-        if (uint8(b[0]) >= 0xc0) {
-            // Legacy receipt: the bytes are already pure RLP.
-            return b;
-        }
-        bytes out = new bytes(b.length - 1);
-        for (uint256 i = 0; i < out.length; i = i + 1) {
-            out[i] = b[i + 1];
-        }
-        return out;
-    }
-
-    /**
-     * @dev RLP-encode a uint as the receipts-trie key. RLP integer
-     *      encoding canonicalizes to the minimum-byte big-endian form.
-     *
-     *      Implemented via SolidVM's `bytes(integer)` builtin, which
-     *      gives the minimum-byte BE representation directly — avoids
-     *      manual byte-by-byte construction (which the typechecker
-     *      doesn't love because of the bytes1/uint8 cast story).
-     *
-     *      Special cases:
-     *        v = 0     → 0x80 (empty string)
-     *        v < 0x80  → single self-encoded byte
-     */
-    function _rlpUint(uint256 v) private pure returns (bytes) {
-        if (v == 0) return bytes(uint256(0x80));         // empty string in RLP
-        if (v < 0x80) return bytes(v);                   // self-encoded byte
-        bytes valueBytes = bytes(v);                     // BE bytes, no leading zeros
-        bytes prefix = bytes(uint256(0x80) + valueBytes.length);
-        return prefix + valueBytes;
     }
 }

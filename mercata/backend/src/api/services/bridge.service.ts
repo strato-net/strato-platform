@@ -198,11 +198,26 @@ export const getWithdrawalProofForSeq = async (
       if (l.eventName !== "Withdrawal") continue;
       if ((l.contractAddress || "").toLowerCase().replace(/^0x/, "") !== wantedAddr) continue;
       const args = l.args || [];
-      if (args.length !== 10) continue;
+      // The Withdrawal event has had two shapes over MercataBridge's
+      // lifetime: an 8-arg legacy form (no seq/prevWithdrawalBlock) and the
+      // current 10-arg sequenced form. On a deployment that was upgraded
+      // mid-chain, an early hot-path withdrawal can still be sitting in
+      // legacy form while subsequent ones are sequenced. The L1 vault's
+      // {STRATOEventDecoder} accepts both shapes and defaults
+      // `seq=0` / `prevWithdrawalBlock=0` for legacy logs, so for the
+      // catch-up walk we accept the 8-arg form too — but only when the
+      // caller's targetSeq is 0, since that's how the decoder will
+      // interpret it on-chain.
+      if (args.length !== 10 && args.length !== 8) continue;
       const eventChainId = rlpUintToNumber(args[1]);
-      const seq = rlpUintToNumber(args[9]);
-      if (eventChainId !== chainId || seq !== targetSeq) continue;
-      // Match -- assemble the same WithdrawalProof shape as getWithdrawalProof.
+      if (eventChainId !== chainId) continue;
+      const seq = args.length === 10 ? rlpUintToNumber(args[9]) : 0;
+      const prevWithdrawalBlock = args.length === 10 ? rlpUintToNumber(args[8]) : 0;
+      if (args.length === 10 && seq !== targetSeq) continue;
+      // Legacy 8-arg: the event encodes no seq, so we can only match it
+      // when the caller wants seq=0 (the legacy event always decodes as
+      // seq=0 on-chain). Anything else here is a misalignment.
+      if (args.length === 8 && targetSeq !== 0) continue;
       return {
         blockNumber: typeof data.blockNumber === "number" ? data.blockNumber : Number(data.blockNumber || 0),
         txIndex,
@@ -212,8 +227,8 @@ export const getWithdrawalProofForSeq = async (
         receiptRLP: data.receiptRLP,
         mptProof: data.mptProof || [],
         eventName: "Withdrawal",
-        seq,
-        prevWithdrawalBlock: rlpUintToNumber(args[8]),
+        seq: args.length === 10 ? seq : targetSeq,
+        prevWithdrawalBlock,
       };
     }
   }

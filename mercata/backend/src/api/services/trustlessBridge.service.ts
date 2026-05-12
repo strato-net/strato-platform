@@ -43,24 +43,32 @@ import {
   buildBaseAnchorChainInputsViaCannon,
   buildBaseClaimInputs,
 } from "./baseProof.service";
+import {
+  LineaAnchorChainInputs,
+  buildLineaAnchorChainInputs,
+  buildLineaClaimInputs,
+} from "./lineaProof.service";
 
 const { MercataBridge, mercataBridge } = constants;
 const EthBridgeInName    = "BlockApps-EthBridgeIn";
 const EthLightClientName = "BlockApps-EthLightClient";
 const BaseLightClientName = "BlockApps-BaseLightClient";
+const LineaLightClientName = "BlockApps-LineaLightClient";
 
 /**
  * Tag identifying which on-chain anchor flow a given source chain
  * uses. Drives both the contract dispatch (which method to call) and
  * the proof-builder selection (which off-chain service runs).
  */
-type LightClientFlavor = "eth" | "base";
+type LightClientFlavor = "eth" | "base" | "linea";
 
 const FLAVOR_BY_CHAIN_ID: Record<string, LightClientFlavor> = {
   "1":        "eth",
   "11155111": "eth",
   "8453":     "base",
   "84532":    "base",
+  "59144":    "linea",
+  "59141":    "linea",
 };
 
 /** Display name for a supported source chain. Used by
@@ -71,6 +79,8 @@ const CHAIN_NAMES: Record<string, string> = {
   "11155111": "Sepolia",
   "8453":     "Base",
   "84532":    "Base Sepolia",
+  "59144":    "Linea",
+  "59141":    "Linea Sepolia",
 };
 
 export interface TrustlessClaimParams {
@@ -179,19 +189,21 @@ export const loadTrustlessConfig = async (
     return { flavor, bridgeIn, lightClient, depositRoutedSig };
   }
 
-  // 3. Base flavor: also fetch BaseLightClient.l1LightClient so we can
-  //    submit the L1 anchor tx to the right contract.
-  const { data: baseRows } = await cirrus.get(accessToken, `/${BaseLightClientName}`, {
+  // 3. Base / Linea flavors: also fetch the wrapped EthLightClient
+  //    address so we can submit the L1 anchor tx to the right contract.
+  //    Both wrapper contracts use the same `l1LightClient` field name.
+  const wrapperName = flavor === "base" ? BaseLightClientName : LineaLightClientName;
+  const { data: wrapperRows } = await cirrus.get(accessToken, `/${wrapperName}`, {
     params: {
       address: `eq.${lightClient.replace(/^0x/, "")}`,
       select: "l1LightClient",
     },
   });
-  const baseRow = baseRows?.[0];
-  if (!baseRow) throw new Error(`BaseLightClient ${lightClient} not found in cirrus`);
-  const l1LightClient = ensureHexPrefix(baseRow.l1LightClient);
+  const wrapperRow = wrapperRows?.[0];
+  if (!wrapperRow) throw new Error(`${wrapperName} ${lightClient} not found in cirrus`);
+  const l1LightClient = ensureHexPrefix(wrapperRow.l1LightClient);
   if (!l1LightClient || /^0+$/.test(l1LightClient.replace(/^0x/, ""))) {
-    throw new Error("BaseLightClient: l1LightClient unset");
+    throw new Error(`${wrapperName}: l1LightClient unset`);
   }
 
   return { flavor, bridgeIn, lightClient, depositRoutedSig, l1LightClient };
@@ -331,6 +343,25 @@ const fetchBaseLightClientAnchored = async (
   const v = await fetchMappingValue(
     accessToken,
     `${BaseLightClientName}-anchoredFlag`,
+    lightClient,
+    blockNumber,
+  );
+  return v === true || v === "true";
+};
+
+/**
+ * Read LineaLightClient.anchoredFlag[blockNumber]. Same shape as the
+ * Base reader — both wrapper contracts use the same `anchoredFlag`
+ * field name for the per-block "already anchored?" mapping.
+ */
+const fetchLineaLightClientAnchored = async (
+  accessToken: string,
+  lightClient: string,
+  blockNumber: string,
+): Promise<boolean> => {
+  const v = await fetchMappingValue(
+    accessToken,
+    `${LineaLightClientName}-anchoredFlag`,
     lightClient,
     blockNumber,
   );
@@ -560,6 +591,18 @@ const buildBaseAnchorArgs = (b: BaseAnchorChainInputs) => ({
   parentChain:           strip0xArr(b.parentChain),
 });
 
+const buildLineaAnchorArgs = (b: LineaAnchorChainInputs) => ({
+  proof: {
+    l1BlockNumber:     b.l1BlockNumber,
+    txIndex:           b.txIndex,
+    logIndex:          b.logIndex,
+    receiptValueBytes: strip0x(b.receiptValueBytes),
+    mptProof:          strip0xArr(b.mptProof),
+  },
+  lineaHeaderRLP:        strip0x(b.lineaHeaderRLP),
+  parentChain:           strip0xArr(b.parentChain),
+});
+
 const ZERO_BYTES32 =
   "0000000000000000000000000000000000000000000000000000000000000000";
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
@@ -605,9 +648,11 @@ const SLOTS_PER_PERIOD = 8192n;
 function beaconChainIdFor(srcChainId: string, flavor: LightClientFlavor): string {
   if (flavor === "eth") return srcChainId;
   switch (srcChainId) {
-    case "8453":  return "1";
-    case "84532": return "11155111";
-    default: throw new Error(`beaconChainIdFor: no mapping for base chain ${srcChainId}`);
+    case "8453":  return "1";          // Base mainnet → Eth mainnet
+    case "84532": return "11155111";   // Base Sepolia → Eth Sepolia
+    case "59144": return "1";          // Linea mainnet → Eth mainnet
+    case "59141": return "11155111";   // Linea Sepolia → Eth Sepolia
+    default: throw new Error(`beaconChainIdFor: no mapping for L2 chain ${srcChainId}`);
   }
 }
 
@@ -665,7 +710,9 @@ export const trustlessClaim = async (
   const claim: ClaimInputs =
     cfg.flavor === "base"
       ? await buildBaseClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig)
-      : await buildClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
+      : cfg.flavor === "linea"
+        ? await buildLineaClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig)
+        : await buildClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
 
   const txInputs: Array<{ contractName: string; contractAddress: string; method: string; args: Record<string, any> }> = [];
   let l1AnchorSkipped = false;
@@ -716,7 +763,7 @@ export const trustlessClaim = async (
         });
       }
     }
-  } else {
+  } else if (cfg.flavor === "base") {
     // Base/Cannon path. Three potential txs; we skip whichever steps
     // are already on-chain.
     const alreadyAnchoredBase = await fetchBaseLightClientAnchored(
@@ -764,6 +811,52 @@ export const trustlessClaim = async (
       });
     } else {
       // Both anchors already on-chain — record the skip.
+      l1AnchorSkipped = true;
+    }
+  } else {
+    // Linea / zk-rollup path. Same overall shape as Base — anchor an
+    // L1 block on EthLightClient, then anchor the L2 endBlock + parent
+    // walk on LineaLightClient — but the L2-side anchor binds against a
+    // DataFinalizedV3 event (no rootClaim reconstruction needed).
+    const alreadyAnchoredLinea = await fetchLineaLightClientAnchored(
+      accessToken, cfg.lightClient, claim.blockNumber,
+    );
+    anchorSkipped = alreadyAnchoredLinea;
+
+    if (!alreadyAnchoredLinea) {
+      const lineaAnchor = await buildLineaAnchorChainInputs(
+        externalChainId, externalTxHash,
+      );
+
+      // L1 anchor check.
+      const alreadyAnchoredL1 = await fetchEthLightClientAnchor(
+        accessToken, cfg.l1LightClient!, lineaAnchor.l1BlockNumber,
+      );
+      l1AnchorSkipped = !!alreadyAnchoredL1;
+      if (!alreadyAnchoredL1) {
+        const advances = await buildAdvanceCommitteeTxsIfNeeded(
+          accessToken,
+          beaconChainIdFor(externalChainId, "linea"),
+          cfg.l1LightClient!,
+          lineaAnchor.l1Anchor.sync.signatureSlot,
+        );
+        committeeAdvanceCount = advances.length;
+        txInputs.push(...advances);
+        txInputs.push({
+          contractName: extractContractName(EthLightClientName),
+          contractAddress: cfg.l1LightClient!,
+          method: "anchorBlockHeader",
+          args: buildEthAnchorArgs(lineaAnchor.l1Anchor),
+        });
+      }
+
+      txInputs.push({
+        contractName: extractContractName(LineaLightClientName),
+        contractAddress: cfg.lightClient,
+        method: "anchorLineaBlockChain",
+        args: buildLineaAnchorArgs(lineaAnchor),
+      });
+    } else {
       l1AnchorSkipped = true;
     }
   }

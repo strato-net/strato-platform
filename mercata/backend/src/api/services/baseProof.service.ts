@@ -856,7 +856,7 @@ export function decodeL2BlockNumberFromCreateCalldata(input: string): number {
 // Internal — RLP helpers
 // ─────────────────────────────────────────────────────────────────────
 
-function hexToBuffer(h: string): Buffer {
+export function hexToBuffer(h: string): Buffer {
   return Buffer.from(h.startsWith("0x") ? h.slice(2) : h, "hex");
 }
 
@@ -866,7 +866,7 @@ function hexToBuffer(h: string): Buffer {
  * to `block.hash` is the integrity check; we assert it at the call
  * site to catch encoder bugs early.
  */
-function rlpEncodeBlockHeader(b: import("./ethRpc.service").EthBlockHeader): Buffer {
+export function rlpEncodeBlockHeader(b: import("./ethRpc.service").EthBlockHeader): Buffer {
   const intToBuf = (h: string | undefined): Uint8Array | null => {
     if (h === undefined || h === null) return null;
     if (h === "0x" || h === "0x0") return new Uint8Array(0);
@@ -934,7 +934,7 @@ interface OpStackDepositReceiptExtras {
   depositReceiptVersion?: string;
 }
 
-function encodeReceiptForTrie(
+export function encodeReceiptForTrie(
   r: EthTransactionReceipt & OpStackDepositReceiptExtras,
 ): Buffer {
   const status = r.status === "0x1" ? new Uint8Array([1]) : new Uint8Array(0);

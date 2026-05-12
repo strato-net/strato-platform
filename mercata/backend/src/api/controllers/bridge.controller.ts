@@ -25,6 +25,9 @@ import {
   UnsupportedL2ChainError,
 } from "../services/baseProof.service";
 import {
+  NoMatchingFinalizationError,
+} from "../services/lineaProof.service";
+import {
   listConfiguredChains,
   loadTrustlessConfig,
   trustlessClaim,
@@ -534,6 +537,14 @@ class BridgeController {
         // this as a "waiting for L1 anchor" state so the user can
         // retry once a proposer submits a covering output.
         res.status(425).json({ error: error.message, code: "NO_MATCHING_DISPUTE_GAME" });
+        return;
+      }
+      if (error instanceof NoMatchingFinalizationError) {
+        // 425 Too Early: the Linea deposit's L2 block isn't yet covered
+        // by any DataFinalizedV3 event on L1 — the proposer hasn't
+        // submitted a SNARK whose endBlock reaches our deposit. UI
+        // shows the same "waiting for L1 finalization" panel.
+        res.status(425).json({ error: error.message, code: "NO_MATCHING_FINALIZATION" });
         return;
       }
       if (error instanceof DepositTooOldError) {

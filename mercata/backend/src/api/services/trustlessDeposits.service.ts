@@ -24,6 +24,7 @@ import {
 import { ConfiguredChain } from "./trustlessBridge.service";
 import { MAX_PARENT_CHAIN_HEADERS } from "./bridgeProof.service";
 import { getLatestAnchoredL2BlockNumber } from "./baseProof.service";
+import { getLatestFinalizedLineaL2BlockNumber } from "./lineaProof.service";
 import { keccak256 } from "../helpers/keccak.helper";
 
 const { mercataBridge } = constants;
@@ -35,15 +36,16 @@ const MercataBridgeName = "BlockApps-MercataBridge";
 // ─────────────────────────────────────────────────────────────────────
 
 export interface FinalizedHead {
-  /** EL block number (decimal string). For Eth flavor this is the
-   *  beacon-chain finalized header's execution payload block number;
-   *  for Base flavor v1 we just return the L1 finalized head's block
-   *  number (the UI uses it as an "at-least-this-fresh" indicator). */
+  /** EL block number (decimal string). Eth flavor → beacon-finalized
+   *  EL block. Base flavor → highest L2 block covered by any recent
+   *  L1 DisputeGameCreated. Linea flavor → highest L2 block covered
+   *  by any recent L1 DataFinalizedV3. UI uses this to decide ready-
+   *  vs-waiting per deposit. */
   blockNumber: string;
   /** Unix timestamp of `blockNumber` (seconds). */
   timestamp: string;
   /** Tag the UI renders ("Sepolia finalized at block …"). */
-  flavor: "eth" | "base";
+  flavor: "eth" | "base" | "linea";
 }
 
 /**
@@ -71,24 +73,37 @@ export async function getFinalizedHead(
       flavor: "eth",
     };
   }
-  // Base flavor: L2 blocks become claimable when a DisputeGameCreated
-  // on L1 covers them. The deposits-list UI uses
-  // `deposit.blockNumber <= finalizedHead.blockNumber` to decide
-  // ready-vs-waiting, so we return the highest L2 block claimed by any
-  // recent L1 DGC. Deposits newer than that show "Waiting for L1 anchor"
-  // (mirroring the Eth flavor's "Waiting for finality"). Result is
-  // cached in baseProof.service for a short TTL so per-second polling
-  // doesn't hammer the L1 upstream.
-  const latestAnchoredL2 = await getLatestAnchoredL2BlockNumber(chain.chainId);
+  if (chain.flavor === "base") {
+    // L2 blocks become claimable when a DisputeGameCreated on L1
+    // covers them. Return the highest L2 block claimed by any recent
+    // L1 DGC; deposits newer than that show "Waiting for L1 anchor"
+    // in the modal.
+    const latestAnchoredL2 = await getLatestAnchoredL2BlockNumber(chain.chainId);
+    const headHex = await getBlockNumber(chain.chainId);
+    const block = await getBlockByNumber(
+      chain.chainId,
+      "0x" + Math.min(latestAnchoredL2, headHex).toString(16),
+    );
+    return {
+      blockNumber: latestAnchoredL2.toString(),
+      timestamp: block?.timestamp ? BigInt(block.timestamp).toString() : "0",
+      flavor: "base",
+    };
+  }
+  // Linea flavor: L2 blocks become claimable when a DataFinalizedV3
+  // event on L1 covers them (endBlockNumber ≥ deposit). Highest such
+  // endBlock is the ready/waiting cutoff. Deposits newer than that
+  // show "Waiting for L1 finalization" in the modal.
+  const latestFinalizedL2 = await getLatestFinalizedLineaL2BlockNumber(chain.chainId);
   const headHex = await getBlockNumber(chain.chainId);
   const block = await getBlockByNumber(
     chain.chainId,
-    "0x" + Math.min(latestAnchoredL2, headHex).toString(16),
+    "0x" + Math.min(latestFinalizedL2, headHex).toString(16),
   );
   return {
-    blockNumber: latestAnchoredL2.toString(),
+    blockNumber: latestFinalizedL2.toString(),
     timestamp: block?.timestamp ? BigInt(block.timestamp).toString() : "0",
-    flavor: "base",
+    flavor: "linea",
   };
 }
 
@@ -398,14 +413,15 @@ export async function getPendingDeposits(
       // Beacon hiccup — fall back to the absolute search-window cap.
     }
   }
-  // For Base flavor we don't have a beacon-anchored lower bound, but
-  // the L2 parent-walk reach is short (~256 blocks ≈ 8.5min on 2s slots)
-  // and dispute games anchor on the order of minutes, so deposits older
-  // than a few hours are practically unclaimable anyway. A ~4h cap
-  // keeps the eth_getLogs scan from ballooning into many provider-capped
-  // chunks while still surfacing anything a user could realistically claim.
+  // For Base / Linea we don't have a beacon-anchored lower bound, but
+  // both chains run on 2s slots and L1 anchoring (DGCs for Base,
+  // DataFinalizedV3 for Linea) happens on the order of hours. The
+  // BASE_PENDING_DEPOSIT_SEARCH_BLOCKS env var caps the eth_getLogs
+  // scan so it doesn't balloon into many provider-capped chunks while
+  // still surfacing anything a user could realistically claim. Same
+  // physical timing applies to Linea, so we reuse the cap.
   const flavorSearchCap =
-    chain.flavor === "base" ? BASE_PENDING_DEPOSIT_SEARCH_BLOCKS : PENDING_DEPOSIT_SEARCH_BLOCKS;
+    chain.flavor === "eth" ? PENDING_DEPOSIT_SEARCH_BLOCKS : BASE_PENDING_DEPOSIT_SEARCH_BLOCKS;
   const fromBlock = Math.max(
     0,
     claimReachLowerBound,

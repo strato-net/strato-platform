@@ -32,7 +32,7 @@ export type TrustlessClaimStep =
   | "error";
 
 /** Tag returned by /bridge/trustlessConfig — drives UI labelling. */
-export type LightClientFlavor = "eth" | "base";
+export type LightClientFlavor = "eth" | "base" | "linea";
 
 export interface ClaimAssignmentInput {
   depositKey: `0x${string}`;

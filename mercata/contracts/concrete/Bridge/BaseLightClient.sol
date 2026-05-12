@@ -1,23 +1,9 @@
 import "../../libraries/Bridge/ILightClient.sol";
+import "../../libraries/Bridge/LightClientShared.sol";
 import "../../libraries/Bridge/MPTProof.sol";
 import "../../libraries/Bridge/RLPDecode.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "./EthLightClient.sol";
-
-/**
- * @notice Four header fields the bridge cares about.
- *
- *           - parentHash    : drives parent-chain walking.
- *           - stateRoot     : feeds the OP-Stack outputRoot preimage.
- *           - receiptsRoot  : the actual thing we anchor.
- *           - number        : the key in our anchor mapping.
- */
-struct BaseHeader {
-    bytes32 parentHash;
-    bytes32 stateRoot;
-    bytes32 receiptsRoot;
-    uint256 number;
-}
 
 /**
  * @notice Bundle the bridge submits with the Cannon DisputeGameCreated
@@ -147,8 +133,7 @@ contract BaseLightClient is Ownable, ILightClient {
     /// Emitted once per ancestor anchored via parent-chain extension.
     event BaseBlockExtended(
         uint256 indexed l2BlockNumber,
-        bytes32 receiptsRoot,
-        uint256 anchorBlockNumber
+        bytes32 receiptsRoot
     );
     event L1LightClientUpdated(address oldClient, address newClient);
     event DisputeGameFactoryUpdated(address oldFactory, address newFactory);
@@ -238,7 +223,7 @@ contract BaseLightClient is Ownable, ILightClient {
 
         bytes32 outputRoot = _verifyAndDecodeDisputeGameCreated(l1ReceiptsRoot, proof);
 
-        BaseHeader memory h = _decodeBaseHeader(baseHeaderRLP);
+        LightClientShared.BlockHeader memory h = LightClientShared.decodeStandardHeader(baseHeaderRLP);
         bytes32 baseBlockHash = keccak256(baseHeaderRLP);
         bytes32 computed = keccak256(
             abi.encodePacked(
@@ -302,7 +287,7 @@ contract BaseLightClient is Ownable, ILightClient {
 
         bytes32 outputRoot = _verifyAndDecodeDisputeGameCreated(l1ReceiptsRoot, proof);
 
-        BaseHeader memory anchor = _decodeBaseHeader(baseHeaderRLP);
+        LightClientShared.BlockHeader memory anchor = LightClientShared.decodeStandardHeader(baseHeaderRLP);
         bytes32 anchorBlockHash = keccak256(baseHeaderRLP);
         bytes32 computed = keccak256(
             abi.encodePacked(
@@ -318,30 +303,32 @@ contract BaseLightClient is Ownable, ILightClient {
         emit BaseBlockAnchored(anchor.number, anchor.receiptsRoot, outputRoot, proof.l1BlockNumber);
 
         anchorBlockNumber = anchor.number;
-        oldestBlockNumber = anchor.number;
 
-        // ── 2. Walk parents. Each entry's keccak must equal the
-        //       previous child's parentHash; each is independently
-        //       anchored. We stop early if the chain is empty.
-        bytes32 expectedParentHash = anchor.parentHash;
-        uint256 expectedNumber = anchor.number - 1;
+        // ── 2. Walk parents via the shared helper. Each entry's keccak
+        //       must equal the previous child's parentHash; each is
+        //       independently anchored via the `_anchorFromShared`
+        //       self-only callback below.
+        oldestBlockNumber = LightClientShared.verifyAndAnchorParentChain(
+            anchor,
+            parentChain,
+            address(this),
+            "_anchorFromShared"
+        );
+    }
 
-        for (uint256 i = 0; i < parentChain.length; i = i + 1) {
-            bytes parentRLP = parentChain[i];
-            require(keccak256(parentRLP) == expectedParentHash,
-                "BaseLightClient: parent hash mismatch");
-
-            BaseHeader memory parent = _decodeBaseHeader(parentRLP);
-            require(parent.number == expectedNumber,
-                "BaseLightClient: parent number not contiguous");
-
-            _anchor(parent.number, parent.receiptsRoot);
-            emit BaseBlockExtended(parent.number, parent.receiptsRoot, anchor.number);
-
-            expectedParentHash = parent.parentHash;
-            expectedNumber = parent.number - 1;
-            oldestBlockNumber = parent.number;
-        }
+    /**
+     * @dev Library callback. {LightClientShared.verifyAndAnchorParentChain}
+     *      reaches back into us to record each verified parent.
+     *      The self-only guard is what keeps this from being a public
+     *      "anchor anything" footgun: the library is compiled-in to
+     *      this contract, so when *it* invokes `address(this).call(...)`,
+     *      `msg.sender == address(this)` holds. No external caller can
+     *      satisfy that.
+     */
+    function _anchorFromShared(uint256 blockNumber, bytes32 receiptsRoot) external {
+        require(msg.sender == address(this), "BaseLightClient: self-only");
+        _anchor(blockNumber, receiptsRoot);
+        emit BaseBlockExtended(blockNumber, receiptsRoot);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -382,13 +369,13 @@ contract BaseLightClient is Ownable, ILightClient {
         bytes32 l1ReceiptsRoot,
         OutputReceiptProof proof
     ) private view returns (bytes32 outputRoot) {
-        bytes mptKey = _rlpUint(proof.txIndex);
+        bytes mptKey = LightClientShared.rlpUint(proof.txIndex);
         require(
             MPTProof.verifyInclusion(l1ReceiptsRoot, mptKey, proof.receiptValueBytes, proof.mptProof),
             "BaseLightClient: MPT proof failed"
         );
 
-        bytes receiptRlp = _stripTypedTxPrefix(proof.receiptValueBytes);
+        bytes receiptRlp = LightClientShared.stripTypedTxPrefix(proof.receiptValueBytes);
         bytes[] receiptFields = RLPDecode.decodeList(receiptRlp);
         require(receiptFields.length == 4, "BaseLightClient: receipt must be 4-field list");
 
@@ -411,47 +398,4 @@ contract BaseLightClient is Ownable, ILightClient {
         outputRoot = RLPDecode.decodeBytes32(topics[3]);
     }
 
-    /**
-     * @dev RLP-decode a Base block header and pluck the four fields
-     *      we care about: parentHash (0), stateRoot (3), receiptsRoot (5),
-     *      number (8). Tolerates post-Shanghai/Cancun extensions
-     *      (≥ 17 fields) since we don't index past position 8.
-     */
-    function _decodeBaseHeader(bytes headerRLP) private pure returns (BaseHeader memory h) {
-        bytes[] fields = RLPDecode.decodeList(headerRLP);
-        require(fields.length >= 9, "BaseLightClient: header too short");
-        h.parentHash   = RLPDecode.decodeBytes32(fields[0]);
-        h.stateRoot    = RLPDecode.decodeBytes32(fields[3]);
-        h.receiptsRoot = RLPDecode.decodeBytes32(fields[5]);
-        h.number       = RLPDecode.decodeUint(fields[8]);
-        return h;
-    }
-
-    // ─────────────────────────────────────────────────────────────────
-    // Internal — RLP integer key + EIP-2718 prefix strip.
-    //
-    // Duplicates the same private helpers in EthBridgeIn. If a third
-    // user appears (LineaLightClient, BscLightClient) factor these
-    // out into a shared library.
-    // ─────────────────────────────────────────────────────────────────
-
-    function _rlpUint(uint256 v) private pure returns (bytes) {
-        if (v == 0) return bytes(uint256(0x80));
-        if (v < 0x80) return bytes(v);
-        bytes valueBytes = bytes(v);
-        bytes prefix = bytes(uint256(0x80) + valueBytes.length);
-        return prefix + valueBytes;
-    }
-
-    function _stripTypedTxPrefix(bytes b) private pure returns (bytes) {
-        require(b.length > 0, "BaseLightClient: empty receipt");
-        if (uint8(b[0]) >= 0xc0) {
-            return b;
-        }
-        bytes out = new bytes(b.length - 1);
-        for (uint256 i = 0; i < out.length; i = i + 1) {
-            out[i] = b[i + 1];
-        }
-        return out;
-    }
 }

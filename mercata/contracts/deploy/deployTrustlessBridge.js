@@ -205,14 +205,22 @@ async function combineSource(concreteRelPath) {
   const file = path.resolve(__dirname, "..", concreteRelPath);
   if (!fs.existsSync(file)) throw new Error(`source not found: ${file}`);
   let combined = await importer.combine(file);
-  if (Buffer.isBuffer(combined)) combined = combined.toString();
-  if (typeof combined === "object") {
-    combined = Object.values(combined)
-      .map((c) => (typeof c === "string" ? c : String(c)))
-      .map((c) => c.replace(/^.*?\.sol,\s*/i, ""))
-      .join("\n");
+  if (Buffer.isBuffer(combined)) return combined.toString();
+  if (typeof combined === "string") return combined;
+  if (Array.isArray(combined) || typeof combined === "object") {
+    // blockapps-rest returns an array of [filename, source] tuples for
+    // multi-file projects. Joining with stringification gives
+    // `filename.sol,source` — strip the prefix and concatenate. Mirrors
+    // deploy/contract.js's handler so a single helper change works
+    // across all deploy entry points.
+    const parts = Object.keys(combined).map((k) => {
+      let content = combined[k];
+      content = typeof content === "string" ? content : String(content);
+      return content.replace(/^.*?\.sol,\s*/i, "");
+    });
+    return parts.join("\n");
   }
-  return combined;
+  return String(combined);
 }
 
 async function deployContract(tokenObj, name, sourceRelPath, args) {
