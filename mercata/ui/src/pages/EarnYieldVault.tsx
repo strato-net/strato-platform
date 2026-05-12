@@ -67,6 +67,14 @@ const VAULT_META: Record<string, {
     cardBorder: "border-orange-500/25 dark:border-orange-400/25 bg-gradient-to-br from-[#fff7ed] to-[#ffedd5] dark:from-[#241a0a] dark:to-[#2b1d0c]",
     strategyDescription: "The vault targets growth in BTC per share. Deposited wBTC is used as collateral to borrow USDST, which is deployed into yield-bearing stablecoins (syrupUSDC, sUSDS). The net carry is periodically converted back into BTC, increasing each share's claim on BTC over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
   },
+  "usdc-yield": {
+    title: "USDC Yield Vault",
+    subtitle: "ERC-4626 yield vault for USDC deposits",
+    iconBg: "bg-emerald-500/15 dark:bg-emerald-400/15",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    cardBorder: "border-emerald-500/25 dark:border-emerald-400/25 bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] dark:from-[#0a2018] dark:to-[#0c2a1f]",
+    strategyDescription: "The vault targets growth in USDC per share by routing deposits across approved yield strategies. USDC may be converted into other tokens when needed to access yield, but the vault manages returns back to USDC-denominated value. Yield is harvested, rebalanced, and compounded over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
+  },
 };
 
 const formatTokenAmount = (value: string, decimals: number = 18, maxFractionDigits: number = 4): string => {
