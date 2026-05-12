@@ -6,12 +6,21 @@ export const WALLET_CONNECT_REQUEST_EVENT = 'mercata:wallet-connect-request';
 // Check authentication status via server API call (works with HttpOnly cookies).
 // Uses fetch directly to bypass the Axios 401 interceptor — this is a probe,
 // not a user action, so a 401 here means "not logged in," not "session expired."
-export const isAuthenticated = async (): Promise<boolean> => {
+// Also returns the parsed user data when available so callers can avoid a
+// duplicate /user/me request (which would otherwise mask transient flags like
+// `isNewUser` that only appear on the first call after key creation).
+export const isAuthenticated = async (): Promise<{ authenticated: boolean; userData?: any }> => {
   try {
     const res = await fetch('/api/user/me', { credentials: 'include' });
-    return res.ok;
+    if (!res.ok) return { authenticated: false };
+    try {
+      const userData = await res.json();
+      return { authenticated: true, userData };
+    } catch {
+      return { authenticated: true };
+    }
   } catch {
-    return false;
+    return { authenticated: false };
   }
 };
 
