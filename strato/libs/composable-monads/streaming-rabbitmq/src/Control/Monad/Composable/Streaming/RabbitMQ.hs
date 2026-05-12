@@ -54,7 +54,7 @@ import Conduit
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM
 import Control.Exception (bracket)
-import Control.Monad (void, forever, when)
+import Control.Monad (void, forever)
 import Control.Monad.Composable.Base
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
@@ -133,12 +133,10 @@ produceItems topicName events = do
   env <- getStreamEnv
   let chan = seChannel env
       exchange = unTopicName topicName
-  liftIO $ do
-    putStrLn $ "[RabbitMQ] produceItems: publishing " ++ show (length events) ++ " items to " ++ show exchange
-    mapM_ (\e -> AMQP.publishMsg chan exchange ""
-            AMQP.newMsg { AMQP.msgBody = encode e
-                        , AMQP.msgDeliveryMode = Just AMQP.Persistent
-                        }) events
+  liftIO $ mapM_ (\e -> AMQP.publishMsg chan exchange ""
+          AMQP.newMsg { AMQP.msgBody = encode e
+                      , AMQP.msgDeliveryMode = Just AMQP.Persistent
+                      }) events
   return [ProduceResponse]
 
 produceItemsAsJSON :: (JSON.ToJSON a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
@@ -177,28 +175,22 @@ runConsume _consumerGroup topicName f = do
   
   -- Ensure exchange, queue, and binding all exist (idempotent)
   liftIO $ do
-    putStrLn $ "[RabbitMQ] runConsume: declaring exchange " ++ show exchange
     AMQP.declareExchange chan AMQP.newExchange
       { AMQP.exchangeName = exchange
       , AMQP.exchangeType = "fanout"
       , AMQP.exchangeDurable = True
       }
-    putStrLn $ "[RabbitMQ] runConsume: declaring queue " ++ show queueName
     _ <- AMQP.declareQueue chan AMQP.newQueue
       { AMQP.queueName = queueName
       , AMQP.queueDurable = True
       }
-    putStrLn $ "[RabbitMQ] runConsume: binding queue to exchange"
     AMQP.bindQueue chan queueName exchange ""
-    putStrLn $ "[RabbitMQ] runConsume: starting consumer on " ++ show queueName
-    return ()
   
   -- Use a TQueue to properly queue up incoming messages
   msgQueue <- liftIO newTQueueIO
   
   liftIO $ do
     _ <- AMQP.consumeMsgs chan queueName AMQP.Ack $ \(msg, envelope) -> do
-      putStrLn $ "[RabbitMQ] runConsume: received message on " ++ show queueName
       let payload = decode (AMQP.msgBody msg)
       atomically $ writeTQueue msgQueue (payload, envelope)
     return ()
@@ -260,55 +252,40 @@ consumeFromLatest topicName initAction f = do
 conduitBatchSource :: (MonadIO m, Binary a) =>
                       ClientId -> StreamAddress -> TopicName -> ConduitT i [a] m b
 conduitBatchSource clientId streamAddress topicName = do
-  liftIO $ putStrLn $ "[RabbitMQ] conduitBatchSource: creating connection for " ++ show topicName
   env <- createStreamEnv clientId streamAddress
   let chan = seChannel env
       exchange = unTopicName topicName
-      queueName = exchange  -- Same queue name as Kafka topic (point-to-point)
+      queueName = exchange  -- Same queue name as topic (point-to-point)
       _ = clientId  -- unused, kept for API compatibility
   
   -- Ensure exchange, queue, and binding all exist
   liftIO $ do
-    putStrLn $ "[RabbitMQ] conduitBatchSource: declaring exchange " ++ show exchange
     AMQP.declareExchange chan AMQP.newExchange
       { AMQP.exchangeName = exchange
       , AMQP.exchangeType = "fanout"
       , AMQP.exchangeDurable = True
       }
-    putStrLn $ "[RabbitMQ] conduitBatchSource: declaring queue " ++ show queueName
     _ <- AMQP.declareQueue chan AMQP.newQueue
       { AMQP.queueName = queueName
       , AMQP.queueDurable = True
       }
-    putStrLn $ "[RabbitMQ] conduitBatchSource: binding queue to exchange"
     AMQP.bindQueue chan queueName exchange ""
   
   batchVar <- liftIO $ newTVarIO []
-  msgCount <- liftIO $ newTVarIO (0 :: Int)
   
   liftIO $ do
-    putStrLn $ "[RabbitMQ] conduitBatchSource: registering consumer on " ++ show queueName
     _ <- AMQP.consumeMsgs chan queueName AMQP.Ack $ \(msg, envelope) -> do
-      cnt <- atomically $ do
-        modifyTVar msgCount (+1)
-        readTVar msgCount
-      putStrLn $ "[RabbitMQ] conduitBatchSource: CALLBACK received message #" ++ show cnt ++ " on " ++ show queueName
       let payload = decode (AMQP.msgBody msg)
       atomically $ modifyTVar batchVar (payload :)
       AMQP.ackEnv envelope
-      putStrLn $ "[RabbitMQ] conduitBatchSource: CALLBACK acked message #" ++ show cnt
-    putStrLn $ "[RabbitMQ] conduitBatchSource: consumer registered successfully"
     return ()
   
-  liftIO $ putStrLn $ "[RabbitMQ] conduitBatchSource: entering batch loop"
   forever $ do
     liftIO $ threadDelay 100000  -- 100ms batch window
     batch <- liftIO $ atomically $ do
       items <- readTVar batchVar
       writeTVar batchVar []
       return (reverse items)
-    when (not $ null batch) $
-      liftIO $ putStrLn $ "[RabbitMQ] conduitBatchSource: yielding batch of " ++ show (length batch) ++ " items"
     yield batch
 
 ----------------------
@@ -322,7 +299,6 @@ createTopicAndWait topicName = do
       exchange = unTopicName topicName
       queueName = exchange  -- Same name for shared queue
   
-  liftIO $ putStrLn $ "[RabbitMQ] createTopicAndWait: creating exchange " ++ show exchange
   -- Declare fanout exchange
   liftIO $ AMQP.declareExchange chan AMQP.newExchange
     { AMQP.exchangeName = exchange
@@ -332,12 +308,10 @@ createTopicAndWait topicName = do
   
   -- Also create and bind a queue with the same name (shared by all consumers)
   liftIO $ do
-    putStrLn $ "[RabbitMQ] createTopicAndWait: creating queue " ++ show queueName
     _ <- AMQP.declareQueue chan AMQP.newQueue
       { AMQP.queueName = queueName
       , AMQP.queueDurable = True
       }
-    putStrLn $ "[RabbitMQ] createTopicAndWait: binding queue to exchange"
     AMQP.bindQueue chan queueName exchange ""
 
 -- | Alias for createTopicAndWait (for API compatibility)

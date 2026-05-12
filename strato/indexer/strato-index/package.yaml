@@ -50,25 +50,7 @@ executables:
       - strato-conf
       - strato-index
       - strato-model
+      - streaming
     other-modules:
       - Wiring
 
-  strato-p2p-indexer:
-    main: P2PIndexerMain.hs
-    source-dirs: exec_src
-    dependencies:
-      - blockapps-data
-      - blockapps-init
-      - blockDB
-      - common-log
-      - containers
-      - hflags
-      - streaming
-      - monad-alter
-      - process-monitor
-      - redis-monad
-      - strato-conf
-      - strato-index
-      - strato-model
-    other-modules:
-      - Wiring
