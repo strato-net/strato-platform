@@ -3,7 +3,7 @@ import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Trophy, Medal, Award, User } from "lucide-react";
-import { LeaderboardEntry, formatRoundedWithCommas, roundByMagnitude } from "@/services/rewardsService";
+import { LeaderboardEntry, formatRoundedWithCommas, normalizeRewardsAddress, roundByMagnitude } from "@/services/rewardsService";
 import { formatBalance } from "@/utils/numberUtils";
 import CopyButton from "@/components/ui/copy";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,7 @@ export const LeaderboardTable = ({
 }: LeaderboardTableProps) => {
   const { userAddress } = useUser();
   const isMobile = useIsMobile();
+  const normalizedUserAddress = normalizeRewardsAddress(userAddress);
   
   const columns: ColumnsType<LeaderboardEntry> = useMemo(() => [
     {
@@ -62,7 +63,7 @@ export const LeaderboardTable = ({
       key: "address",
       dataIndex: "address",
       render: (address: string) => {
-        const isCurrentUser = userAddress && address.toLowerCase() === userAddress.toLowerCase();
+        const isCurrentUser = normalizedUserAddress && normalizeRewardsAddress(address) === normalizedUserAddress;
         return (
           <div className="flex items-center gap-2 font-mono text-sm">
             <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
@@ -83,7 +84,7 @@ export const LeaderboardTable = ({
       dataIndex: "totalRewardsEarned",
       render: formatPoints,
     },
-  ], [userAddress]);
+  ], [normalizedUserAddress]);
 
 
   if (loading) {
@@ -142,7 +143,7 @@ export const LeaderboardTable = ({
               }}
               className="[&_.ant-table-thead>tr>th]:font-semibold"
               rowClassName={(record: LeaderboardEntry) => 
-                userAddress && record.address.toLowerCase() === userAddress.toLowerCase() 
+                normalizedUserAddress && normalizeRewardsAddress(record.address) === normalizedUserAddress
                   ? "highlight-row" 
                   : ""
               }

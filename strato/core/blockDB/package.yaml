@@ -18,7 +18,6 @@ library:
   source-dirs: src
   ghc-options: -fconstraint-solver-iterations=8
   dependencies:
-  - QuickCheck
   - aeson
   - binary
   - blockapps-data
@@ -31,7 +30,6 @@ library:
   - esqueleto
   - ethereum-rlp
   - format
-  - generic-arbitrary
   - hedis
   - labeled-error
   - lens

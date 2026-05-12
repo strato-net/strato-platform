@@ -18,16 +18,13 @@ import Blockchain.Model.SyncState
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Monad
-import Blockchain.Strato.Model.Address (fromPublicKey)
 import qualified Blockchain.EthConf.Model as Conf
-import Blockchain.Strato.Model.Secp256k1 (getPub)
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.SyncDB
 import Control.Concurrent.Async as Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
-import Control.Monad.Composable.Vault (runVaultM)
 import Data.String
 import qualified Database.Redis as Redis
 import Flags
@@ -69,12 +66,6 @@ main = do
 
   pkg <- atomically newCablePackage
 
-  selfAddress <- runVaultM vaultUrl' $ do
-    pubKey <- getPub
-    return $ fromPublicKey pubKey
-
-  putStrLn $ "strato-sequencer nodeAddress: " ++ format selfAddress
-
   ctx <- do
     let blockPeriodMs' = Conf.blockPeriodMs (networkConfig ethConf)
     let roundPeriodS' = Conf.roundPeriodS (networkConfig ethConf)
@@ -87,7 +78,7 @@ main = do
 
     let ckpt = def {checkpointValidators = validators, checkpointView=View 0 $ fromIntegral $ bestSequencedBlockNumber bestSequencedBlock}
 
-    return $ newContext (Conf.network (networkConfig ethConf)) ckpt (Just selfAddress) flags_validatorBehavior
+    return $ newContext (Conf.network (networkConfig ethConf)) ckpt Nothing flags_validatorBehavior
 
   cht <- atomically newTMChan
 

@@ -22,7 +22,7 @@ import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.SQL
 import Conduit
 import Control.Monad
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.SQL
 import Data.String
 import Blockchain.Slipstream.PostgresqlTypedShim
@@ -30,7 +30,7 @@ import Prelude hiding (lookup)
 
 getAndProcessMessages ::
   ( MonadLogger m,
-    HasKafka m,
+    HasStreaming m,
     HasSQL m
   ) =>
   PGConnection ->
@@ -38,7 +38,7 @@ getAndProcessMessages ::
 getAndProcessMessages conn = do
   createTopicAndWait solidVmEventsTopicName
 
-  consume "getAndProcessMessages'" "slipstream" "vmevents" $ \() messages -> do
+  consume "slipstream" "vmevents" $ \messages -> do
     recordKafkaMessages messages
     emittedEvents <- runConduit $
       processTheMessages messages `fuseUpstream`
@@ -58,4 +58,4 @@ solidVmEventsTopicName = fromString "solidvmevents"
 
 produceSolidVmEvents :: MonadIO m =>
                         [AggregateEvent] -> m [ProduceResponse]
-produceSolidVmEvents = runKafkaMConfigured "slipstream" . produceItemsAsJSON solidVmEventsTopicName
+produceSolidVmEvents = runStreamMConfigured "slipstream" . produceItemsAsJSON solidVmEventsTopicName

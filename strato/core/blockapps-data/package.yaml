@@ -29,6 +29,7 @@ library:
   - common-log
   - composable-monads-base
   - containers
+  - solid-vm-model
   - data-default
   - deepseq
   - esqueleto

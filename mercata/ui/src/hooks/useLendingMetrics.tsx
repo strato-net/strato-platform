@@ -4,6 +4,8 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { usdstAddress } from "@/lib/constants";
 
+const normalizeAddress = (addr?: string | null): string => (addr || "").toLowerCase().replace(/^0x/, "");
+
 export const useLendingMetrics = () => {
   const [loanList, setLoanList] = useState([]);
   
@@ -18,6 +20,7 @@ export const useLendingMetrics = () => {
   const fetchLoans = useCallback(async () => {
     if (!userAddress) return;
     try {
+      const normalizedUserAddress = normalizeAddress(userAddress);
       const userLoans = Object.entries(loans || {})
         .map(([loanId, loan]) => ({loanId,
           ...(loan as unknown as {
@@ -34,7 +37,7 @@ export const useLendingMetrics = () => {
             assetSymbol?: string;
             [key: string]: unknown;
           }),}))
-        .filter((loan) => loan?.loan?.user === userAddress && loan?.loan?.active === true);
+        .filter((loan) => normalizeAddress(loan?.loan?.user) === normalizedUserAddress && loan?.loan?.active === true);
 
       const enrichedLoans = await Promise.all(
         userLoans.map(async (loan) => {
@@ -54,7 +57,7 @@ export const useLendingMetrics = () => {
     } catch (e) {
       console.error("Error fetching loans:", e);
     }
-  }, [loans]);
+  }, [loans, userAddress]);
 
   useEffect(() => {
     if (Object.keys(loans || {}).length > 0 && userAddress) {

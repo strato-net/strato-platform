@@ -27,6 +27,21 @@ interface ActivityFeedCardsProps {
   isMyActivity: boolean;
 }
 
+type YieldVaultDef = {
+  key: string;
+  address: string;
+  name: string;
+  shareSymbol: string;
+};
+
+type YieldVaultInfo = {
+  vaultAddress: string;
+  name: string;
+  shareSymbol: string;
+};
+
+const normalizeAddress = (address?: string) => (address || "").toLowerCase().replace(/^0x/, "");
+
 const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
   const { userAddress } = useUser();
   const [cardData, setCardData] = useState<ActivityCardData[]>([]);
@@ -142,6 +157,39 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
       const tokenSymbolMap = new Map<string, string>();
       const tokenImageMap = new Map<string, string>();
 
+      const yieldVaultAddresses = new Set(
+        response.events
+          .filter(event => event.contract_name === "YieldVault" && event.event_name === "Transfer")
+          .map(event => normalizeAddress(event.address))
+          .filter(Boolean)
+      );
+
+      if (yieldVaultAddresses.size > 0) {
+        try {
+          const res = await api.get<YieldVaultDef[]>("/earn/yield-vault");
+          const matchingVaults = (res.data || []).filter((vault) =>
+            yieldVaultAddresses.has(normalizeAddress(vault.address))
+          );
+          const vaultInfos = await Promise.all(
+            matchingVaults.map((vault) =>
+              api.get<YieldVaultInfo>(`/earn/yield-vault/${vault.key}/info`).then((infoRes) => infoRes.data).catch(() => ({
+                vaultAddress: vault.address,
+                name: vault.name,
+                shareSymbol: vault.shareSymbol,
+              }))
+            )
+          );
+          vaultInfos.forEach((vault) => {
+            const label = vault.name || vault.shareSymbol || "YieldVault";
+            const symbol = label;
+            tokenSymbolMap.set(vault.vaultAddress, symbol);
+            tokenSymbolMap.set(normalizeAddress(vault.vaultAddress), symbol);
+          });
+        } catch {
+          // YieldVault transfers can still render without vault metadata.
+        }
+      }
+
       if (allTokenAddresses.length > 0) {
         try {
           // Fetch token metadata (symbols and images) in batch
@@ -221,6 +269,10 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
                 tokenImagesMap.set(address, image);
               }
             });
+          }
+          if (event.contract_name === "YieldVault" && event.event_name === "Transfer") {
+            const symbol = tokenSymbolMap.get(normalizeAddress(event.address)) || tokenSymbolMap.get(event.address);
+            if (symbol) tokenSymbolsMap.set(event.address, symbol);
           }
           const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap);
           // Add iconConfig from the activity type config

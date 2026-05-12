@@ -52,10 +52,15 @@ packages:
 - libs/common-log
 - libs/composable-monads/composable-monads-base
 - libs/composable-monads/kafka-monad
+- libs/composable-monads/streaming-kafka-hw
+- libs/composable-monads/streaming-rabbitmq
+- libs/composable-monads/streaming-redpanda
+- libs/composable-monads/streaming
 - libs/composable-monads/redis-monad
 - libs/composable-monads/sql-monad
 - libs/composable-monads/notification-monad
 - libs/composable-monads/vault-monad
+- libs/composable-monads/codedb-monad
 - libs/ethereum-rlp
 - libs/format
 - libs/json-rpc-server

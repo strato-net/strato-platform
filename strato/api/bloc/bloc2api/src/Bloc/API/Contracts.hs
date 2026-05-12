@@ -148,7 +148,7 @@ instance ToSample Contract where
           _functions = Map.empty,
           _constructor = Nothing,
           _modifiers = Map.empty,
-          _usings = Map.empty,
+          _usings = [],
           _contractType = ContractType,
           _importedFrom = Nothing,
           _contractContext = SourceAnnotation (SourcePosition "SimpleStorage.sol" 1 1) (SourcePosition "SimpleStorage.sol" 1 2) ()

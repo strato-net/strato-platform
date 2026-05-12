@@ -44,7 +44,11 @@ instance HasSQLDB m => (Keccak256 `A.Alters` API OutputBlock) m where
 
 instance (MonadIO m, HasRedis m) => Mod.Modifiable (P2P BestBlock) m where
   get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
-  put _ (P2P (BestBlock s n)) = void . execRedis $ putBestBlockInfo s n
+  put _ (P2P (BestBlock s n)) = do
+    result <- execRedis $ putBestBlockInfo s n
+    case result of
+      Right _ -> pure ()
+      Left err -> error $ "Failed to update best block in Redis: " ++ show err
 
 instance (MonadIO m, HasRedis m) => (Keccak256 `A.Alters` P2P OutputBlock) m where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"

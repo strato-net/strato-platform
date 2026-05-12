@@ -1,5 +1,6 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { nodeUrl, bridgeUrl } from "../config/config";
+import { requestContext } from "./requestContext";
 
 const createApiClient = (baseURL: string): AxiosInstance =>
   axios.create({
@@ -15,6 +16,21 @@ const _strato = createApiClient(`${nodeUrl}/strato/v2.3`);
 const _cirrus = createApiClient(`${nodeUrl}/cirrus/search`);
 const _bloc = createApiClient(`${nodeUrl}/bloc/v2.2`);
 const _eth = createApiClient(`${nodeUrl}/strato-api/eth/v1.2`);
+
+function unsignedTxInterceptor(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
+  const store = requestContext.getStore();
+  if (store?.externalSigning && config.url?.includes("/transaction/parallel")) {
+    config.baseURL = `${nodeUrl}/bloc/v2.2`;
+    config.url = "/transaction/unsigned";
+    if (config.data && typeof config.data === "object") {
+      config.data = { ...config.data, address: store.userAddress };
+    }
+  }
+  return config;
+}
+
+_strato.interceptors.request.use(unsignedTxInterceptor);
+_bloc.interceptors.request.use(unsignedTxInterceptor);
 
 function makeTokenClient(client: AxiosInstance) {
   return {

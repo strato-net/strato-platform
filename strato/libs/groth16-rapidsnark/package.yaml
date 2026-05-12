@@ -38,10 +38,7 @@ library:
     - bytestring
     - text
     - vector
-    - filepath
-    - temporary
     - directory
-    - process
   
   # C sources (wasm3 + circom witness calculator)
   c-sources:

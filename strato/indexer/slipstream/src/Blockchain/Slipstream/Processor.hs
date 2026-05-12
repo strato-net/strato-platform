@@ -135,6 +135,7 @@ processedCollectionRow collection ttype AggregateAction {..} ks v =
       collection_name = collection,
       collection_type = ttype,
       blockHash = actionBlockHash,
+      transactionHash = zeroHash,
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       collectionDataKeys = ks,
@@ -168,9 +169,9 @@ getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . 
   where filterAndExtract name vd = case extractKeys (_varType vd) of
           ([], _) -> Nothing
           (ks, v) -> Just (T.pack name, ks, v)
-        extractKeys (SVMType.Array entry _)     = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
-        extractKeys (SVMType.Mapping _ k entry) = let (ks, v) = extractKeys entry in (k:ks, v)
-        extractKeys v                           = ([], v)
+        extractKeys (SVMType.Array entry _)         = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
+        extractKeys (SVMType.Mapping _ k entry _ _) = let (ks, v) = extractKeys entry in (k:ks, v)
+        extractKeys v                               = ([], v)
 
 processTheMessages ::
   ( MonadIO m

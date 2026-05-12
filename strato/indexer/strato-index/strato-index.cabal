@@ -36,13 +36,13 @@ library
     , common-log
     , containers
     , format
-    , kafka-monad
     , monad-alter
     , persistent-postgresql
     , seqevents
     , strato-conf
     , strato-model
     , strato-statediff
+    , streaming
     , text
     , transformers
     , unliftio
@@ -62,7 +62,6 @@ executable strato-api-indexer
     , blockapps-init
     , common-log
     , containers
-    , evm-solidity
     , hflags
     , monad-alter
     , process-monitor
@@ -71,7 +70,6 @@ executable strato-api-indexer
     , strato-conf
     , strato-index
     , strato-model
-    , strato-statediff
   default-language: Haskell2010
 
 executable strato-p2p-indexer
@@ -88,13 +86,12 @@ executable strato-p2p-indexer
     , blockapps-init
     , common-log
     , containers
-    , evm-solidity
     , hflags
-    , kafka-monad
     , monad-alter
     , process-monitor
     , redis-monad
     , strato-conf
     , strato-index
     , strato-model
+    , streaming
   default-language: Haskell2010

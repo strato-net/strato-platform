@@ -10,6 +10,6 @@ library:
   dependencies:
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
+  - bytestring
   - mtl
   - strato-auth
-  - strato-model

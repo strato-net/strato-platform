@@ -4,6 +4,7 @@ const rp = require("request-promise");
 const config = require("../config/app.config");
 
 const utils = require("../lib/utils");
+const redisBlockDB = require("../lib/redis-block-db");
 
 
 const API_VERSION = "2.0";
@@ -17,20 +18,29 @@ module.exports = {
   nodeStatus: async function (req, res, next) {
     try {
       //get node's block number, best block hash, best block parent hash
-      const lastBlock = await BlockDataRef.findOne({
-        where: {
-          pow_verified: true,
-          is_confirmed: true,
-        },
-        order: [["number", "DESC"]],
-        attributes: [
-          "number",
-          "hash",
-          "parent_hash",
-          "nonce",
-        ],
-        raw: true,
-      });
+      const [lastBlock, bestBlockNumber] = await Promise.all([
+        BlockDataRef.findOne({
+          where: {
+            pow_verified: true,
+            is_confirmed: true,
+          },
+          order: [["number", "DESC"]],
+          attributes: [
+            "number",
+            "hash",
+            "parent_hash",
+            "nonce",
+          ],
+          raw: true,
+        }),
+        // Source `lastBlock.number` from the same place as `strato-barometer syncstats`
+        // (used by `bin/strato-ps`): the BestBlock entry in Redis. Falls back to
+        // BlockDataRef.number if Redis is unavailable.
+        redisBlockDB.getBestBlockNumber().catch((err) => {
+          winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
+          return null;
+        }),
+      ]);
 
       //adding an empty body so the fields are present in the response even if
       //the health table doesn't have any records yet
@@ -67,7 +77,11 @@ module.exports = {
         },
       };
 
-      const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData] = await Promise.all([utils.getLatestHealth(), getPbftData()]);
+      const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData, nodeAddress] = await Promise.all([
+        utils.getLatestHealth(),
+        getPbftData(),
+        getNodeAddress(),
+      ]);
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
         healthBody = utils.consolidateHealthData(
@@ -86,8 +100,9 @@ module.exports = {
         apiVersion: API_VERSION,
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
+        nodeAddress,
         lastBlock: {
-          number: lastBlock.number,
+          number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
           hash: lastBlock.hash,
           parentHash: lastBlock.parent_hash,
           nonce: lastBlock.nonce,
@@ -103,12 +118,12 @@ module.exports = {
 
   healthStatus: async function (req, res, next) {
     try {
-      let health = null, uptime = null;
+      let health = null, uptime = null, healthStatus = null, healthIssues = [], healthData = null;
       const [healthInfo, stallInfo, systemInfo, syncInfo] =
         await utils.getLatestHealth();
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
-        ({ health, uptime } = utils.consolidateHealthData(
+        ({ health, uptime, healthStatus, healthIssues, healthData } = utils.consolidateHealthData(
           healthInfo,
           stallInfo,
           systemInfo,
@@ -125,6 +140,10 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         health: health,
+        healthStatus: healthStatus,
+        healthIssues: healthIssues,
+        nodeSync: healthData && healthData.nodeSync,
+        stallHealth: healthData && healthData.stallHealth,
         uptime: uptime,
       });
     } catch (error) {
@@ -133,6 +152,23 @@ module.exports = {
     }
   },
 };
+
+// Fetches the node's blockchain (coinbase) address from strato-api.
+// Returns null if the call fails so /status remains usable.
+async function getNodeAddress() {
+  try {
+    return await rp({
+      method: "GET",
+      uri: `${process.env.stratoRoot}/coinbase`,
+      json: true,
+      timeout: config.healthCheck.requestTimeout - 100,
+      followRedirects: false,
+    });
+  } catch (err) {
+    winston.warn(`Unable to fetch node coinbase address: ${err.message}`);
+    return null;
+  }
+}
 
 function getPbftData() {
   if (!process.env["PROMETHEUS_HOST"]) {

@@ -16,6 +16,7 @@ import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
 import qualified Strato.Strato23.API.Types as VC
 import Strato.Strato23.Client
 import System.Info (os)
+import System.Process (readProcess)
 import Text.ShortDescription
 
 -- | Address strato-api binds its socket to
@@ -23,13 +24,6 @@ getApiListenAddress :: String
 getApiListenAddress
   | os == "linux" = "172.17.0.1"
   | otherwise = "127.0.0.1"
-
--- | Address Docker containers use to reach strato-api on the host
-getApiHost :: String
-getApiHost
-  | flags_apiIPAddress /= "" = flags_apiIPAddress
-  | os == "linux" = "172.17.0.1"
-  | otherwise = "host.docker.internal"
 
 -- | Get Railgun contract addresses for known networks
 -- Returns Nothing for networks where contracts haven't been deployed yet
@@ -64,7 +58,6 @@ runtimeConfig = def
       }
   , apiConfig = def
       { apiListenAddress = getApiListenAddress
-      , apiHost = getApiHost
       }
   , contractsConfig = ContractsConf
       { railgunProxy = getRailgunProxyForNetwork flags_network
@@ -113,9 +106,16 @@ genEthConf :: IO EthConf
 genEthConf = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
+  localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
+
+  let ssl = not $ null flags_sslDir
+      !nodeBaseUrl = (if ssl then "https://" else "http://")
+        ++ localHostname
+        ++ if ssl then "" else ":" ++ show flags_httpPort
+
   -- For local auth mode, skip vault during setup (vault-wrapper starts later)
   if Opts.flags_localAuth
-    then putStrLn "  ✓ Local auth mode: node key will be created when vault-wrapper starts"
+    then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be created when vault-wrapper starts"
     else do
       (pub, _addr) <- getNodeKey
       putStrLn $ "  ✓ Node key: " ++ shortDescription pub
@@ -142,11 +142,9 @@ genEthConf = do
         , mempoolLivenessCutoff = flags_mempoolLivenessCutoff
         }
     , urlConfig = def
-        { vaultUrl = if Opts.flags_localAuth
-            then "http://localhost:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
-            else flags_vaultUrl
-        , vaultUrlDocker = if Opts.flags_localAuth
-            then "http://nginx:" ++ show Opts.flags_httpPort ++ "/vault/strato/v2.3"
+        { nodeUrl = nodeBaseUrl
+        , vaultUrl = if Opts.flags_localAuth
+            then nodeBaseUrl ++ "/vault/strato/v2.3"
             else flags_vaultUrl
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl

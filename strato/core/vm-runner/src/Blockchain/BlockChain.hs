@@ -52,6 +52,7 @@ import Blockchain.Event
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SolidVM
+import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -102,9 +103,6 @@ import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
 import SolidVM.Model.SolidString (labelToText)
 import SolidVM.Model.Value (Value(..))
-import qualified Data.Aeson as Aeson
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -279,6 +277,8 @@ addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock ->
 addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   trrs <- addTransactions bd transactions proposer
+
+  lift $ runPatches bd
 
   flushMemStorageTxDBToBlockDB
 
@@ -505,7 +505,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
               "runCodeForTransaction: EthereumTX caller: " ++ format tAddr ++ ", address: " ++ format toAddr
             let selector = B.take 4 callData
                 argsBytes = B.drop 4 callData
-            lift (resolveFunction toAddr selector) >>= \case
+            lift (resolveFunction b tAddr toAddr selector) >>= \case
               Nothing -> throwE $ TFCodeCollectionNotFound toAddr
                 ("no matching function for selector 0x" ++ concatMap (printf "%02x") (B.unpack selector)) t
               Just (fName, func) -> do
@@ -649,7 +649,7 @@ mkLogEntry :: Keccak256 -> Keccak256 -> Log -> LogDB
 mkLogEntry bHash tHash Log {..} = LogDB bHash tHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
 mkEventEntry :: Event -> EventDB
-mkEventEntry Event {..} = EventDB evBlockHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
+mkEventEntry Event {..} = EventDB evBlockHash evTxHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult ::
   VMBase m =>
@@ -677,9 +677,9 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
       ranBlockHash = hashFunction b
       (!response, theTrace', theLogs, theEvents) =
         case result of
-          Left _ -> ("", [], [], []) --TODO keep the trace when the run fails
+          Left _ -> (Nothing, [], [], [])
           Right r ->
-            (maybe "" (TL.unpack . TLE.decodeUtf8 . Aeson.encode) $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
+            (erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash <$> theLogs
   yield . OutEvent $ mkEventEntry <$> theEvents
@@ -835,3 +835,14 @@ completeDiff src' dst hsh num = withCurrentBlockHash hsh $ do
     SD.stateDiff Nothing num hsh src' dst
       .| mapM_C (yield . OutStateDiff)
 
+runPatches :: (MonadLogger m, HasRawStorageDB m) => BlockHeader -> m ()
+runPatches bh = case Conf.networkID (networkConfig ethConf) of
+  114784819836269 -> case blockHeaderBlockNumber bh of
+    49820 -> do
+      putRawStorageKeyVal' (0x1005, MS.StoragePath [MS.Field "userLoan", MS.Index "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7", MS.Field "lastUpdated"]) (MS.BInteger 1775496883)
+      putRawStorageKeyVal' (0x1005, MS.StoragePath [MS.Field "userLoan", MS.Index "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7", MS.Field "scaledDebt"]) (MS.BInteger 1000000000000000000000000000000)
+    49824 -> do
+      putRawStorageKeyVal' (0x1005, MS.StoragePath [MS.Field "userLoan", MS.Index "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7", MS.Field "lastUpdated"]) (MS.BInteger 1775497158)
+      putRawStorageKeyVal' (0x1005, MS.StoragePath [MS.Field "userLoan", MS.Index "ac840dd68e2ab32e98c8d7ccd3b9a725139f1aa7", MS.Field "scaledDebt"]) MS.BDefault
+    _ -> pure ()
+  _ -> pure ()
