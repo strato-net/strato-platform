@@ -160,12 +160,16 @@ export const getTokens = async (
 
 export const getEarningAssets = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string | undefined
 ): Promise<EarningAsset[]> => {
+  if (!userAddress?.trim()) {
+    return [];
+  }
+  const addr = userAddress.trim();
   const [tokens, collaterals, cdps, rawPrices, vaultShareToken, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
-        "balances.key": `eq.${userAddress}`,
+        "balances.key": `eq.${addr}`,
         select: buildTokenSelectFields({
           images: true,
           attributes: true,
@@ -177,21 +181,21 @@ export const getEarningAssets = async (
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
         select: "user:key,asset:key2,amount:value::text",
-        key: `eq.${userAddress}`,
+        key: `eq.${addr}`,
         value: `gt.0`,
       },
     }),
     cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
       params: {
         select: "user:key,asset:key2,amount:value->>collateral::text",
-        key: `eq.${userAddress}`,
+        key: `eq.${addr}`,
         "value->>collateral": `gt.0`,
       },
     }),
     getCompletePriceMap(accessToken),
     getVaultShareTokenAddress(accessToken),
     getSaveUsdstInfo(accessToken).catch(() => null),
-    getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
+    getSaveUsdstUserInfo(accessToken, addr).catch(() => null),
     getRebaseFactors(accessToken),
   ]);
 
@@ -895,12 +899,16 @@ export const getPoolPriceHistory = async (
 
 export const getNetBalance = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string | undefined
 ): Promise<{ netBalance: number; totalBorrowed: number; totalAssetValue: number }> => {
+  if (!userAddress?.trim()) {
+    return { netBalance: 0, totalBorrowed: 0, totalAssetValue: 0 };
+  }
+  const addr = userAddress.trim();
   const [earningAssetsResult, loanResult, vaultsResult] = await Promise.allSettled([
-    getEarningAssets(accessToken, userAddress),
-    getLoan(accessToken, userAddress),
-    getVaults(accessToken, userAddress),
+    getEarningAssets(accessToken, addr),
+    getLoan(accessToken, addr),
+    getVaults(accessToken, addr),
   ]);
 
   let totalAssetValue = 0;
