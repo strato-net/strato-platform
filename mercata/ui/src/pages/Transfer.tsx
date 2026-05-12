@@ -366,7 +366,7 @@ const Transfer = () => {
                         This address has no transaction history on the STRATO network.
                         If you are trying to withdraw to an external chain (e.g. Ethereum),
                         please use the{" "}
-                        <Link to="/dashboard/withdrawals?tab=bridge-out" className="font-medium underline">
+                        <Link to="/dashboard/withdrawals" className="font-medium underline">
                           Withdraw page
                         </Link>{" "}
                         instead.
