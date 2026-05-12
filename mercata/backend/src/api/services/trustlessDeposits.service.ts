@@ -120,16 +120,18 @@ const PENDING_DEPOSIT_SEARCH_BLOCKS: number = (() => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 50_400;
 })();
 
-/** Base flavor search window: ~4h on a 2s-slot chain = 7200 blocks.
- *  Base's L2 parent-walk reach is ~256 blocks, and dispute games anchor
- *  every few minutes, so anything older is unclaimable in practice.
- *  Keeping this tight matters because Base RPC providers commonly cap
- *  eth_getLogs at 2000 blocks per call. */
+/** Base flavor search window: ~48h on a 2s-slot chain = 86400 blocks.
+ *  On Base mainnet DGCs anchor every few minutes so a few hours would
+ *  suffice, but on Base Sepolia the proposer cadence is much slower
+ *  (~hours between games), and deposits routinely sit unclaimed
+ *  overnight waiting for a covering anchor. Base RPC providers cap
+ *  eth_getLogs around 2000 blocks per call; the adaptive-halving
+ *  chunker handles that automatically. */
 const BASE_PENDING_DEPOSIT_SEARCH_BLOCKS_ENV = "BASE_PENDING_DEPOSIT_SEARCH_BLOCKS";
 const BASE_PENDING_DEPOSIT_SEARCH_BLOCKS: number = (() => {
   const raw = process.env[BASE_PENDING_DEPOSIT_SEARCH_BLOCKS_ENV];
   const parsed = raw ? parseInt(raw, 10) : NaN;
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 7_200;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 86_400;
 })();
 
 /** Most providers cap a single eth_getLogs span; chunk to stay under. */
