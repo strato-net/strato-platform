@@ -364,12 +364,6 @@ cradle:
     - path: "indexer/strato-index/exec_src/Wiring.hs"
       component: "strato-index:exe:strato-api-indexer"
 
-    - path: "indexer/strato-index/exec_src/P2PIndexerMain.hs"
-      component: "strato-index:exe:strato-p2p-indexer"
-
-    - path: "indexer/strato-index/exec_src/Wiring.hs"
-      component: "strato-index:exe:strato-p2p-indexer"
-
     - path: "indexer/strato-index/exec_src/TxrIndexerMain.hs"
       component: "strato-index:exe:strato-txr-indexer"
 
