@@ -34,10 +34,7 @@ library:
   - ethereum-rlp
   - evm-solidity
   - exceptions
-  - extra
   - format
-  - galois-field
-  - labeled-error
   - lens
   - merkle-patricia-db
   - monad-alter
@@ -72,7 +69,6 @@ executables:
     dependencies:
       - containers
       - parsec
-      - solid-vm-compiler
       - solid-vm-model
       - solid-vm-parser
       - solid-vm-static-analysis

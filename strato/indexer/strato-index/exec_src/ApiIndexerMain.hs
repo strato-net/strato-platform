@@ -20,6 +20,6 @@ main = do
 
   runLoggingT $ do
     bootstrapIndexer
-    runKafkaMConfigured "strato-api-indexer" $
+    runStreamMConfigured "strato-api-indexer" $
       runSQLM $
         apiIndexerMainLoop

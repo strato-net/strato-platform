@@ -9,6 +9,7 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
+import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Blockchain.Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
@@ -48,28 +49,28 @@ generateDockerCompose = do
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , environment = Just $ Map.fromList
-            [ ("RPC_URL_MAINNET", "${RPC_URL_MAINNET}")
-            , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK}")
-            , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA}")
-            , ("RPC_URL_SEPOLIA_FALLBACK", "${RPC_URL_SEPOLIA_FALLBACK}")
-            , ("RPC_URL_BASE", "${RPC_URL_BASE}")
-            , ("RPC_URL_BASE_FALLBACK", "${RPC_URL_BASE_FALLBACK}")
-            , ("RPC_URL_BASE_SEPOLIA", "${RPC_URL_BASE_SEPOLIA}")
-            , ("RPC_URL_BASE_SEPOLIA_FALLBACK", "${RPC_URL_BASE_SEPOLIA_FALLBACK}")
-            , ("POOL_FACTORY", "${POOL_FACTORY}")
-            , ("LENDING_REGISTRY", "${LENDING_REGISTRY}")
-            , ("TOKEN_FACTORY", "${TOKEN_FACTORY}")
-            , ("ADMIN_REGISTRY", "${ADMIN_REGISTRY}")
-            , ("MERCATA_BRIDGE", "${MERCATA_BRIDGE}")
-            , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID}")
-            , ("STRIPE_SECRET_KEY", "${STRIPE_SECRET_KEY}")
-            , ("STRIPE_PUBLISHABLE_KEY", "${STRIPE_PUBLISHABLE_KEY}")
-            , ("STRIPE_WEBHOOK_SECRET", "${STRIPE_WEBHOOK_SECRET}")
-            , ("ONRAMP_HOT_WALLET_ADDRESS", "${ONRAMP_HOT_WALLET_ADDRESS}")
-            , ("BA_USERNAME", "${BA_USERNAME}")
-            , ("BA_PASSWORD", "${BA_PASSWORD}")
-            , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT}")
-            , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY}")
+            [ ("RPC_URL_MAINNET", "${RPC_URL_MAINNET:-}")
+            , ("RPC_URL_MAINNET_FALLBACK", "${RPC_URL_MAINNET_FALLBACK:-}")
+            , ("RPC_URL_SEPOLIA", "${RPC_URL_SEPOLIA:-}")
+            , ("RPC_URL_SEPOLIA_FALLBACK", "${RPC_URL_SEPOLIA_FALLBACK:-}")
+            , ("RPC_URL_BASE", "${RPC_URL_BASE:-}")
+            , ("RPC_URL_BASE_FALLBACK", "${RPC_URL_BASE_FALLBACK:-}")
+            , ("RPC_URL_BASE_SEPOLIA", "${RPC_URL_BASE_SEPOLIA:-}")
+            , ("RPC_URL_BASE_SEPOLIA_FALLBACK", "${RPC_URL_BASE_SEPOLIA_FALLBACK:-}")
+            , ("POOL_FACTORY", "${POOL_FACTORY:-}")
+            , ("LENDING_REGISTRY", "${LENDING_REGISTRY:-}")
+            , ("TOKEN_FACTORY", "${TOKEN_FACTORY:-}")
+            , ("ADMIN_REGISTRY", "${ADMIN_REGISTRY:-}")
+            , ("MERCATA_BRIDGE", "${MERCATA_BRIDGE:-}")
+            , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")
+            , ("STRIPE_SECRET_KEY", "${STRIPE_SECRET_KEY:-}")
+            , ("STRIPE_PUBLISHABLE_KEY", "${STRIPE_PUBLISHABLE_KEY:-}")
+            , ("STRIPE_WEBHOOK_SECRET", "${STRIPE_WEBHOOK_SECRET:-}")
+            , ("ONRAMP_HOT_WALLET_ADDRESS", "${ONRAMP_HOT_WALLET_ADDRESS:-}")
+            , ("BA_USERNAME", "${BA_USERNAME:-}")
+            , ("BA_PASSWORD", "${BA_PASSWORD:-}")
+            , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT:-}")
+            , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-backend.log 2>&1"]
@@ -82,8 +83,8 @@ generateDockerCompose = do
         , depends_on = Just $ DependsOnList ["mercata-backend"]
         , volumes = Just ["./logs:/logs"]
         , environment = Just $ Map.fromList
-            [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID}")
-            , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID}")
+            [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID:-}")
+            , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh docker-run.sh >> /logs/mercata-ui.log 2>&1"]
@@ -104,12 +105,14 @@ generateDockerCompose = do
 
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
-        , depends_on = Just $ DependsOnList ["postgres", "prometheus"]
+        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis"]
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
             [ ("postgres_host", "postgres")
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
+            , ("redis_host", "redis")
+            , ("redis_port", "6379")
             ]
         , volumes = Just
             [ "./logs:/logs"
@@ -137,7 +140,7 @@ generateDockerCompose = do
             }
         , logging = noLogging
         , volumes = Just ["./logs:/logs", "./redis:/data"]
-        , ports = Just ["6379:6379"]
+        , ports = Just ["127.0.0.1:6379:6379"]
         }
 
   let postgrest = def
@@ -184,7 +187,7 @@ generateDockerCompose = do
             , start_period = Nothing
             }
         , logging = noLogging
-        , ports = Just ["5432:5432"]
+        , ports = Just ["127.0.0.1:5432:5432"]
         }
 
 
@@ -232,7 +235,7 @@ generateDockerCompose = do
             , interval = Just "5s"
             , timeout = Just "1s"
             , retries = Nothing
-            , start_period = Nothing
+            , start_period = Just "30s"
             }
         , logging = noLogging
         }
@@ -247,41 +250,25 @@ generateDockerCompose = do
         , logging = noLogging
         }
 
-  let kafka = def
-        { image = "apache/kafka:3.9.2"
-        , environment = Just $ Map.fromList
-            [ ("KAFKA_NODE_ID", "1")
-            , ("KAFKA_PROCESS_ROLES", "broker,controller")
-            , ("KAFKA_LISTENERS", "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093")
-            , ("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://localhost:9092")
-            , ("KAFKA_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
-            , ("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP", "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT")
-            , ("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@localhost:9093")
-            , ("KAFKA_LOG_DIRS", "/kafka/kafka-logs")
-            , ("KAFKA_DELETE_TOPIC_ENABLE", "true")
-            , ("KAFKA_LOG_CLEANER_ENABLE", "true")
-            , ("KAFKA_LOG_RETENTION_HOURS", "168")
-            , ("KAFKA_OFFSET_METADATA_MAX_BYTES", "1048576")
-            , ("KAFKA_OFFSETS_RETENTION_MINUTES", "2147483647")
-            , ("KAFKA_MAX_REQUEST_SIZE", "2500000")
-            , ("KAFKA_MESSAGE_MAX_BYTES", "2500000")
-            , ("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
-            , ("KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR", "1")
-            , ("KAFKA_TRANSACTION_STATE_LOG_MIN_ISR", "1")
-            ]
+  -- Message broker service (configured via streaming package)
+  let bc = brokerConfig
+      streaming = def
+        { image = bcImage bc
+        , user = if bcNeedsUserGid bc then Just userGid else Nothing
+        , environment = bcEnvironment bc
+        , entrypoint = bcEntrypoint bc
+        , command = bcCommand bc
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
-            { test = ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+            { test = bcHealthcheckTest bc
             , interval = Just "5s"
             , timeout = Just "10s"
             , retries = Just 10
             , start_period = Nothing
             }
-        , volumes = Just ["./logs:/logs", "./kafka:/kafka"]
-        , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec /__cacert_entrypoint.sh /etc/kafka/docker/run >> /logs/kafka.log 2>&1"]
+        , volumes = Just (bcVolumes bc)
         , logging = noLogging
-        , ports = Just ["9092:9092"]
+        , ports = Just ["127.0.0.1:9092:9092"]
         }
 
   let prometheus = def
@@ -321,7 +308,7 @@ generateDockerCompose = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /entrypoint.sh >> /logs/local-auth.log 2>&1"]
-        , ports = Just ["4444:4444"]  -- Only expose Hydra OAuth port; login UI accessed via nginx proxy
+        , ports = Just ["127.0.0.1:4444:4444"]
         , restart = Just "unless-stopped"
         , logging = noLogging
         }
@@ -336,7 +323,7 @@ generateDockerCompose = do
             , ("postgres", postgres)
             , ("nginx", nginx)
             , ("docs", docs)
-            , ("kafka", kafka)
+            , ("streaming", streaming)
             , ("prometheus", prometheus)
             ]
 
