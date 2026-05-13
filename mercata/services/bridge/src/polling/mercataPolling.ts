@@ -4,13 +4,11 @@ import {
   reviewDepositBatch,
   confirmNativeDepositBatch,
   reviewNativeDepositBatch,
-  confirmNativeWithdrawalBatch,
+  finalizeNativeWithdrawalBatch,
   queueManualNativeWithdrawalBatch,
   confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
-  finaliseNativeWithdrawalBatch,
-  handleRejectedNativeWithdrawalBatch,
 } from "../services/bridgeService";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositInfo, NativeDepositInfo, ConfirmDepositArgs, ConfirmNativeDepositArgs } from "../types";
 import {
@@ -21,7 +19,6 @@ import {
   getSafeTxHashFromEvents,
 } from "../services/cirrusService";
 import { monitorSafeTransactionStatusBatch } from "../services/safeService";
-import { monitorExternalTransactionStatusBatch } from "../services/externalTxService";
 import { logInfo, logError } from "../utils/logger";
 import { safeToBigInt } from "../utils/utils";
 import { verifyDepositsBatch } from "../services/verificationService";
@@ -29,11 +26,6 @@ import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationServ
 import { checkBalances } from "../utils/balanceCheck";
 
 const POLLING_BATCH_SIZE = 10;
-
-const isUnsetHash = (value?: string | null): boolean => {
-  const normalized = String(value || "").toLowerCase().replace(/^0x/, "");
-  return normalized.length === 0 || /^0+$/.test(normalized);
-};
 
 const chunk = <T>(items: T[], size: number): T[][] => {
   const chunks: T[][] = [];
@@ -302,7 +294,7 @@ export const startNativeWithdrawalRequestPolling = (): void => {
 
       if (instantWithdrawals.length > 0) {
         for (const batch of chunk(instantWithdrawals, POLLING_BATCH_SIZE)) {
-          await confirmNativeWithdrawalBatch(
+          await finalizeNativeWithdrawalBatch(
             batch as NonEmptyArray<NativeWithdrawalInfo>,
           );
         }
@@ -331,52 +323,26 @@ export const startNativeWithdrawalRequestPolling = (): void => {
 
 export const startNativeWithdrawalTxPolling = (): void => {
   const pollingInterval = config.polling.bridgeOutInterval ?? 5 * 60 * 1000;
-  type Withdrawal = { id: Number; txHash: string };
 
   const poll = async () => {
     try {
       const pending: NativeWithdrawalInfo[] = await getNativeWithdrawalsByStatus("2");
       if (!Array.isArray(pending) || pending.length === 0) return;
 
-      const toFinalize: Array<Number> = [];
-      const toReject: Array<Number> = [];
       const pendingInstantExecution: NativeWithdrawalInfo[] = [];
       const pendingManualExecution: NativeWithdrawalInfo[] = [];
-      const byChain = new Map<bigint, Array<Withdrawal>>();
 
       for (const w of pending) {
-        const id = Number(w.withdrawalId);
-        if (isUnsetHash(w.externalTxHash)) {
-          if (w.useInstantPath) {
-            pendingInstantExecution.push(w);
-          } else {
-            pendingManualExecution.push(w);
-          }
-          continue;
-        }
-
-        const cid = safeToBigInt(w.externalChainId);
-        (byChain.get(cid) ?? byChain.set(cid, []).get(cid)!).push({
-          id,
-          txHash: w.externalTxHash,
-        });
-      }
-
-      for (const [chainId, withdrawals] of byChain) {
-        const statuses = await monitorExternalTransactionStatusBatch(
-          withdrawals as NonEmptyArray<Withdrawal>,
-          safeToBigInt(chainId)
-        );
-        for (const { id } of withdrawals) {
-          const st = statuses.get(id);
-          if (st === "executed") toFinalize.push(id);
-          else if (st === "rejected") toReject.push(id);
+        if (w.useInstantPath) {
+          pendingInstantExecution.push(w);
+        } else {
+          pendingManualExecution.push(w);
         }
       }
 
       if (pendingInstantExecution.length > 0) {
         for (const batch of chunk(pendingInstantExecution, POLLING_BATCH_SIZE)) {
-          await confirmNativeWithdrawalBatch(
+          await finalizeNativeWithdrawalBatch(
             batch as NonEmptyArray<NativeWithdrawalInfo>,
           );
         }
@@ -386,16 +352,6 @@ export const startNativeWithdrawalTxPolling = (): void => {
           await queueManualNativeWithdrawalBatch(
             batch as NonEmptyArray<NativeWithdrawalInfo>,
           );
-        }
-      }
-      if (toFinalize.length) {
-        for (const batch of chunk(toFinalize, POLLING_BATCH_SIZE)) {
-          await finaliseNativeWithdrawalBatch(batch as NonEmptyArray<Number>);
-        }
-      }
-      if (toReject.length) {
-        for (const batch of chunk(toReject, POLLING_BATCH_SIZE)) {
-          await handleRejectedNativeWithdrawalBatch(batch as NonEmptyArray<Number>);
         }
       }
     } catch (e: any) {

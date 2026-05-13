@@ -115,16 +115,17 @@ const syncManualNativeMintProposal = async (
     return true;
   }
 
-  const confirmResult = await execute({
+  const finalizeResult = await execute({
     contractName: "StratoNativeBridge",
     contractAddress: config.nativeBridge.address!,
-    method: "confirmWithdrawal",
+    method: "finalizeWithdrawal",
     args: {
       id: Number(withdrawal.withdrawalId),
       externalTxHash: result.txHash,
+      nativeMintProposalHash: proposalReference,
     },
   });
-  if (confirmResult.status !== "Success") {
+  if (finalizeResult.status !== "Success") {
     return true;
   }
   announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
@@ -613,7 +614,7 @@ const getNativeInstantWithdrawalDelayRemaining = (
   return notBefore > now ? Number(notBefore - now) : 0;
 };
 
-export const confirmNativeWithdrawalBatch = async (
+export const finalizeNativeWithdrawalBatch = async (
   withdrawals: NonEmptyArray<NativeWithdrawalInfo>,
 ) => {
   if (!config.nativeBridge.address) {
@@ -666,17 +667,18 @@ export const confirmNativeWithdrawalBatch = async (
       const result = await execute({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
-        method: "confirmWithdrawal",
+        method: "finalizeWithdrawal",
         args: {
           id: Number(withdrawal.withdrawalId),
           externalTxHash,
+          nativeMintProposalHash: "",
         },
       });
 
       if (result.status !== "Success") {
         logInfo(
           "BridgeService",
-          `Native withdrawal ${withdrawal.withdrawalId} destination mint recorded but STRATO confirm is still ${result.status}`,
+          `Native withdrawal ${withdrawal.withdrawalId} destination mint succeeded but STRATO finalize is still ${result.status}`,
         );
         continue;
       }
@@ -693,7 +695,7 @@ export const confirmNativeWithdrawalBatch = async (
         pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
         logInfo(
           "BridgeService",
-          `Native withdrawal already confirmed by another server: ${withdrawal.withdrawalId}`,
+          `Native withdrawal already finalized by another server: ${withdrawal.withdrawalId}`,
         );
         continue;
       }
@@ -703,7 +705,7 @@ export const confirmNativeWithdrawalBatch = async (
         message: errorMessage,
       });
       logError("BridgeService", error as Error, {
-        operation: "confirmNativeWithdrawalBatch",
+        operation: "finalizeNativeWithdrawalBatch",
         withdrawalId: withdrawal.withdrawalId,
         externalChainId: withdrawal.externalChainId,
       });
@@ -713,13 +715,13 @@ export const confirmNativeWithdrawalBatch = async (
   if (successful > 0) {
     logInfo(
       "BridgeService",
-      `Successfully confirmed ${successful} native withdrawals`,
+      `Successfully finalized ${successful} native withdrawals`,
     );
   }
 
   if (failures.length > 0) {
     throw new Error(
-      `Failed to confirm ${failures.length} native withdrawals: ${failures
+      `Failed to finalize ${failures.length} native withdrawals: ${failures
         .map((failure) => `${failure.withdrawalId} (${failure.message})`)
         .join(", ")}`,
     );
@@ -807,77 +809,5 @@ export const queueManualNativeWithdrawalBatch = async (
         externalChainId: withdrawal.externalChainId,
       });
     }
-  }
-};
-
-export const finaliseNativeWithdrawalBatch = async (
-  ids: NonEmptyArray<Number>,
-) => {
-  if (!config.nativeBridge.address) {
-    throw new Error("Native bridge address not configured");
-  }
-
-  try {
-    await execute(
-      ids.map((id) => ({
-        contractName: "StratoNativeBridge",
-        contractAddress: config.nativeBridge.address!,
-        method: "finaliseWithdrawal",
-        args: { id },
-      }))
-    );
-
-    logInfo(
-      "BridgeService",
-      `Successfully finalized ${ids.length} native withdrawals`,
-    );
-  } catch (error) {
-    const errorMessage = (error as Error).message;
-
-    if (errorMessage.includes("SNB: bad state")) {
-      logInfo(
-        "BridgeService",
-        `Native withdrawals already finalized by another server: ${ids.length} withdrawals (${ids.join(", ")})`,
-      );
-      return;
-    }
-
-    throw error;
-  }
-};
-
-export const handleRejectedNativeWithdrawalBatch = async (
-  ids: NonEmptyArray<Number>,
-) => {
-  if (!config.nativeBridge.address) {
-    throw new Error("Native bridge address not configured");
-  }
-
-  try {
-    await execute(
-      ids.map((id) => ({
-        contractName: "StratoNativeBridge",
-        contractAddress: config.nativeBridge.address!,
-        method: "abortWithdrawal",
-        args: { id },
-      }))
-    );
-
-    logInfo(
-      "BridgeService",
-      `Successfully aborted ${ids.length} rejected native withdrawals`,
-    );
-  } catch (error) {
-    const errorMessage = (error as Error).message;
-
-    if (errorMessage.includes("SNB: not abortable")) {
-      logInfo(
-        "BridgeService",
-        `Native withdrawals already aborted by another server: ${ids.length} withdrawals (${ids.join(", ")})`,
-      );
-      return;
-    }
-
-    throw error;
   }
 };

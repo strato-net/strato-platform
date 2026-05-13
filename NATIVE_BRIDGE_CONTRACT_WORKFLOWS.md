@@ -310,36 +310,16 @@ recipient representation token balance increases
 representation token total supply increases
 ```
 
-### Step 4: STRATO Withdrawal Is Confirmed
+### Step 4: STRATO Withdrawal Is Finalized
 
-After external mint transaction exists, the bridge operator calls `StratoNativeBridge.confirmWithdrawal(id, externalTxHash)`.
+After the external mint transaction succeeds, the bridge operator calls `StratoNativeBridge.finalizeWithdrawal(id, externalTxHash, nativeMintProposalHash)`.
 
 STRATO contract behavior:
 
 - Requires status `PENDING_REVIEW`.
-- Requires no existing `externalTxHash`.
+- Requires a non-empty `externalTxHash`.
 - Stores normalized `externalTxHash`.
-- Emits `NativeWithdrawalPending`.
-
-State remains:
-
-```text
-PENDING_REVIEW
-```
-
-Meaning:
-
-- The external transaction hash is now recorded.
-- The withdrawal is not yet final until finalized.
-
-### Step 5: STRATO Withdrawal Is Finalized
-
-The bridge operator calls `StratoNativeBridge.finaliseWithdrawal(id)`.
-
-STRATO contract behavior:
-
-- Requires status `PENDING_REVIEW`.
-- Requires `externalTxHash` to be set.
+- Optionally stores normalized `nativeMintProposalHash` if supplied and not already recorded.
 - Sets status to `COMPLETED`.
 - Emits `NativeWithdrawalCompleted`.
 
@@ -360,6 +340,7 @@ Custody state:
 Operator or whitelisted abort:
 
 - Allowed from `INITIATED` or `PENDING_REVIEW`.
+- Not allowed after `externalTxHash` is set.
 
 User abort:
 
@@ -420,7 +401,7 @@ PENDING_REVIEW -> ABORTED
 NONE
   -> INITIATED        requestWithdrawal
   -> PENDING_REVIEW   markWithdrawalPending
-  -> COMPLETED        finaliseWithdrawal
+  -> COMPLETED        finalizeWithdrawal
   -> ABORTED          abortWithdrawal
 ```
 
@@ -428,7 +409,12 @@ External execution metadata while pending:
 
 ```text
 PENDING_REVIEW -> PENDING_REVIEW   recordWithdrawalProposal
-PENDING_REVIEW -> PENDING_REVIEW   confirmWithdrawal
+```
+
+Completion is atomic:
+
+```text
+PENDING_REVIEW -> COMPLETED        finalizeWithdrawal(id, externalTxHash, nativeMintProposalHash)
 ```
 
 ## Security-Relevant Invariants
@@ -442,6 +428,7 @@ PENDING_REVIEW -> PENDING_REVIEW   confirmWithdrawal
 - `instantWithdrawalThreshold` determines whether a withdrawal is instant-lane eligible.
 - `nativeMintNotBefore` delays instant-lane destination mint eligibility.
 - Manual lane withdrawals are not automatically executed by the STRATO contract.
+- Withdrawals cannot be aborted after destination execution has been recorded.
 - External minting requires valid EIP-712 attestations from configured attestation signers.
 - Pauses exist independently for STRATO deposits, STRATO withdrawals, vault custody operations, external mints, and external redemptions.
 - User abort after delay is available only before the withdrawal is moved out of `INITIATED`.

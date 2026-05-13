@@ -204,7 +204,7 @@ contract Describe_StratoNativeBridge is Authorizable {
 
         require(reverted, "User should not abort once execution is pending");
 
-        relayer.do(nativeBridgeAddress, "confirmWithdrawal", withdrawalId, "0x1234");
+        relayer.do(nativeBridgeAddress, "finalizeWithdrawal", withdrawalId, "0x1234", "");
 
         (
             BridgeStatus confirmedStatus,
@@ -221,8 +221,8 @@ contract Describe_StratoNativeBridge is Authorizable {
             bool confirmedUseInstantPath
         ) = nativeBridge.getWithdrawalInfo(withdrawalId);
 
-        require(confirmedStatus == BridgeStatus.PENDING_REVIEW, "Withdrawal should remain pending until destination finality");
-        require(bytes(confirmedTxHash).length > 0, "Destination tx hash should be stored after mint submission");
+        require(confirmedStatus == BridgeStatus.COMPLETED, "Withdrawal should complete when destination tx is recorded");
+        require(bytes(confirmedTxHash).length > 0, "Destination tx hash should be stored at completion");
         require(confirmedUseInstantPath, "Confirmed withdrawal should retain lane selection");
     }
 
@@ -240,12 +240,35 @@ contract Describe_StratoNativeBridge is Authorizable {
         relayer.do(nativeBridgeAddress, "markWithdrawalPending", withdrawalId);
 
         bool reverted = false;
-        try relayer.do(nativeBridgeAddress, "finaliseWithdrawal", withdrawalId) {
+        try relayer.do(nativeBridgeAddress, "finalizeWithdrawal", withdrawalId, "", "") {
         } catch {
             reverted = true;
         }
 
         require(reverted, "Withdrawal should not finalize before destination tx hash is recorded");
+    }
+
+    function it_native_withdrawal_cannot_abort_after_destination_tx_hash_is_recorded() {
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 withdrawalId = user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        );
+
+        relayer.do(nativeBridgeAddress, "markWithdrawalPending", withdrawalId);
+        relayer.do(nativeBridgeAddress, "finalizeWithdrawal", withdrawalId, "0x1234", "");
+
+        bool reverted = false;
+        try relayer.do(nativeBridgeAddress, "abortWithdrawal", withdrawalId) {
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Withdrawal should not abort after destination execution is recorded");
     }
 
     function it_native_withdrawal_requires_vault_allowance_not_bridge_allowance() {

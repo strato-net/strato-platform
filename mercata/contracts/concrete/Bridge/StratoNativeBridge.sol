@@ -122,7 +122,7 @@ contract record StratoNativeBridge is Ownable {
     );
     event NativeWithdrawalPending(uint256 indexed withdrawalId, string externalTxHash);
     event NativeWithdrawalProposalRecorded(uint256 indexed withdrawalId, string nativeMintProposalHash);
-    event NativeWithdrawalCompleted(uint256 indexed withdrawalId);
+    event NativeWithdrawalCompleted(uint256 indexed withdrawalId, string externalTxHash, string nativeMintProposalHash);
     event NativeWithdrawalAborted(uint256 indexed withdrawalId);
     event InstantWithdrawalDelayUpdated(uint256 previousDelaySeconds, uint256 newDelaySeconds);
 
@@ -469,7 +469,11 @@ contract record StratoNativeBridge is Ownable {
         emit NativeWithdrawalProposalRecorded(id, w.nativeMintProposalHash);
     }
 
-    function confirmWithdrawal(uint256 id, string externalTxHash) public onlyBridgeOperator whenWithdrawalsOpen {
+    function finalizeWithdrawal(
+        uint256 id,
+        string externalTxHash,
+        string nativeMintProposalHash
+    ) public onlyBridgeOperator whenWithdrawalsOpen {
         require(id > 0, "SNB: invalid withdrawal id");
         require(bytes(externalTxHash).length > 0, "SNB: invalid external tx hash");
 
@@ -477,23 +481,23 @@ contract record StratoNativeBridge is Ownable {
         require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "SNB: bad state");
         require(bytes(w.externalTxHash).length == 0, "SNB: tx hash already set");
 
-        w.externalTxHash = externalTxHash.normalizeHex();
-        w.timestamp = block.timestamp;
+        string normalizedExternalTxHash = externalTxHash.normalizeHex();
+        w.externalTxHash = normalizedExternalTxHash;
 
-        emit NativeWithdrawalPending(id, w.externalTxHash);
-    }
-
-    function finaliseWithdrawal(uint256 id) public onlyBridgeOperator whenWithdrawalsOpen {
-        require(id > 0, "SNB: invalid withdrawal id");
-
-        NativeWithdrawalInfo w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "SNB: bad state");
-        require(bytes(w.externalTxHash).length > 0, "SNB: missing external tx hash");
+        if (bytes(nativeMintProposalHash).length > 0) {
+            string normalizedProposalHash = nativeMintProposalHash.normalizeHex();
+            if (bytes(w.nativeMintProposalHash).length > 0) {
+                require(w.nativeMintProposalHash == normalizedProposalHash, "SNB: proposal mismatch");
+            } else {
+                w.nativeMintProposalHash = normalizedProposalHash;
+                emit NativeWithdrawalProposalRecorded(id, w.nativeMintProposalHash);
+            }
+        }
 
         w.bridgeStatus = BridgeStatus.COMPLETED;
         w.timestamp = block.timestamp;
 
-        emit NativeWithdrawalCompleted(id);
+        emit NativeWithdrawalCompleted(id, w.externalTxHash, w.nativeMintProposalHash);
     }
 
     function abortWithdrawal(uint256 id) public whenWithdrawalsOpen {
@@ -514,6 +518,7 @@ contract record StratoNativeBridge is Ownable {
             require(w.bridgeStatus == BridgeStatus.INITIATED, "SNB: not abortable");
             require(currentTimestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "SNB: wait 48h");
         }
+        require(bytes(w.externalTxHash).length == 0, "SNB: external tx set");
 
         w.bridgeStatus = BridgeStatus.ABORTED;
         w.timestamp = currentTimestamp;
