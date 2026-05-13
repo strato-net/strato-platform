@@ -168,14 +168,10 @@ export const getCDPRegistry = async (
  */
 export const getUserVaults = async (
   accessToken: string,
-  userAddress: string | undefined
+  userAddress: string
 ): Promise<any[]> => {
-  const addr = userAddress?.trim();
-  if (!addr) {
-    return [];
-  }
   try {
-    const registry = await getCDPRegistry(accessToken, addr, {}, "getUserVaults");
+    const registry = await getCDPRegistry(accessToken, userAddress, {}, "getUserVaults");
     
     if (!registry?.cdpEngine) {
       return [];
@@ -191,7 +187,7 @@ export const getUserVaults = async (
       {
         params: {
           select: "user:key,asset:key2,Vault:value",
-          key: `eq.${addr.toLowerCase()}`,
+          key: `eq.${userAddress.toLowerCase()}`,
           address: `eq.${cdpEngineAddress}`
         }
       }
@@ -199,7 +195,7 @@ export const getUserVaults = async (
 
     return userVaults || [];
   } catch (error) {
-    console.warn(`❌ [CDP] Failed to fetch user vaults for ${addr}:`, error);
+    console.warn(`❌ [CDP] Failed to fetch user vaults for ${userAddress}:`, error);
     return [];
   }
 };
@@ -341,20 +337,16 @@ interface BadDebt {
 
 export const getVaults = async (
   accessToken: string,
-  userAddress: string | undefined
+  userAddress: string
 ): Promise<VaultData[]> => {
-  if (!userAddress?.trim()) {
-    return [];
-  }
-  const addr = userAddress.trim();
-  const registry = await getCDPRegistry(accessToken, addr, {}, "getVaults");
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getVaults");
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
 
   // Use efficient user-specific vault query
-  const userVaults = await getUserVaults(accessToken, addr);
+  const userVaults = await getUserVaults(accessToken, userAddress);
 
   if (userVaults.length === 0) {
     return [];

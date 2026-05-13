@@ -276,11 +276,9 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      if (userAddress) {
-        validateUserAddress(userAddress);
-      }
+      validateUserAddress(userAddress);
 
-      const result = await getLoan(accessToken, userAddress);
+      const result = await getLoan(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
