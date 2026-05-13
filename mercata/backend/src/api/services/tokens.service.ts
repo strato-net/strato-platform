@@ -8,8 +8,145 @@ import { getPool as getLendingRegistry } from "./lending.service";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices } from "./oracle.service";
 import { getTokenDetails } from "../helpers/cirrusHelpers";
+import * as config from "../../config/config";
+import { listVaultDefs } from "./yieldVault.service";
 
-const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher, CollateralVault } = constants;
+const {
+  tokenSelectFields,
+  tokenBalanceSelectFields,
+  Token,
+  PriceOracle,
+  tokenFactory,
+  TokenFactory,
+  CDPEngine,
+  Voucher,
+  CollateralVault,
+  YieldVault,
+  SaveUSDSTVault,
+} = constants;
+
+const normalizeAddress = (address?: string | null) =>
+  (address || "").toLowerCase().replace(/^0x/, "");
+
+const getConfiguredYieldVaultDefs = () =>
+  listVaultDefs()
+    .filter((vault) => Boolean(vault.address));
+
+const isConfiguredYieldVault = (address?: string | null) => {
+  const normalized = normalizeAddress(address);
+  if (!normalized) return false;
+  return getConfiguredYieldVaultDefs().some((vault) => normalizeAddress(vault.address) === normalized);
+};
+
+const isConfiguredSaveUsdstVault = (address?: string | null) => {
+  const vault = config.saveUsdstVault;
+  if (!vault) return false;
+  return normalizeAddress(address) === normalizeAddress(vault);
+};
+
+const getTransferContractName = (address?: string | null) => {
+  if (isConfiguredSaveUsdstVault(address)) return "SaveUSDSTVault";
+  if (isConfiguredYieldVault(address)) return "YieldVault";
+  return extractContractName(Token);
+};
+
+const getYieldVaultTransferableTokens = async (accessToken: string, userAddress: string) => {
+  const vaultDefs = getConfiguredYieldVaultDefs();
+  const vaultAddresses = vaultDefs.map((vault) => vault.address);
+  if (vaultAddresses.length === 0) return [];
+
+  try {
+    const { data: balanceRows } = await cirrus.get(accessToken, `/${YieldVault}-_balances`, {
+      params: {
+        address: `in.(${vaultAddresses.join(",")})`,
+        key: `eq.${userAddress}`,
+        value: "gt.0",
+        select: "address,user:key,balance:value::text",
+      },
+    });
+
+    const balances = (balanceRows || []).filter((row: any) => row.balance !== "0");
+    if (balances.length === 0) return [];
+
+    const heldVaultAddresses = Array.from(new Set(balances.map((row: any) => row.address).filter(Boolean)));
+    const { data: vaultRows } = await cirrus.get(accessToken, `/${YieldVault}`, {
+      params: {
+        address: `in.(${heldVaultAddresses.join(",")})`,
+        select: "address,_name,_symbol,_paused",
+      },
+    });
+
+    const vaultByAddress = new Map((vaultRows || []).map((vault: any) => [normalizeAddress(vault.address), vault]));
+    const defByAddress = new Map(vaultDefs.map((vault) => [normalizeAddress(vault.address), vault]));
+
+    return balances.map((row: any) => {
+      const vault = (vaultByAddress.get(normalizeAddress(row.address)) || {}) as any;
+      const def = defByAddress.get(normalizeAddress(row.address));
+      const paused = vault._paused === true;
+
+      return {
+        address: row.address,
+        user: row.user || userAddress,
+        balance: row.balance,
+        collateralBalance: "0",
+        token: {
+          address: row.address,
+          _name: vault._name || def?.name || "Yield Vault",
+          _symbol: vault._symbol || def?.shareSymbol || "YV",
+          status: paused ? "1" : "2",
+          _paused: paused,
+        },
+      };
+    });
+  } catch {
+    return [];
+  }
+};
+
+const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddress: string) => {
+  const vaultAddress = config.saveUsdstVault;
+  if (!vaultAddress) return [];
+
+  try {
+    const { data: balanceRows } = await cirrus.get(accessToken, `/${SaveUSDSTVault}-_balances`, {
+      params: {
+        address: `eq.${vaultAddress}`,
+        key: `eq.${userAddress}`,
+        value: "gt.0",
+        select: "address,user:key,value::text",
+      },
+    });
+
+    const balances = (balanceRows || []).filter((row: any) => row.value && row.value !== "0");
+    if (balances.length === 0) return [];
+
+    const { data: vaultRows } = await cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
+      params: {
+        address: `eq.${vaultAddress}`,
+        select: "address,_name,_symbol,_paused",
+      },
+    });
+
+    const vault = (vaultRows?.[0] || {}) as any;
+    const paused = vault._paused === true;
+
+    return balances.map((row: any) => ({
+      address: row.address || vaultAddress,
+      user: row.user || userAddress,
+      balance: row.value,
+      collateralBalance: "0",
+      token: {
+        address: row.address || vaultAddress,
+        _name: vault._name || "Save USDST Vault",
+        _symbol: vault._symbol || "saveUSDST",
+        status: paused ? "1" : "2",
+        _paused: paused,
+      },
+    }));
+  } catch {
+    return [];
+  }
+};
 
 // Get all tokens
 export const getTokens = async (
@@ -173,11 +310,14 @@ export const getBalance = async (
  * Returns tokens with positive balance that are not paused
  */
 export const getTransferableTokens = async (accessToken: string, userAddress: string) => {
-  // Get normal balance
-  const tokens = await getBalance(accessToken, userAddress);
+  const [tokens, yieldVaultTokens, saveUsdstVaultTokens] = await Promise.all([
+    getBalance(accessToken, userAddress),
+    getYieldVaultTransferableTokens(accessToken, userAddress),
+    getSaveUsdstVaultTransferableTokens(accessToken, userAddress),
+  ]);
 
   // Filter out paused tokens and ensure nonzero balance
-  return tokens.filter((tokenData: any) => {
+  return [...tokens, ...yieldVaultTokens, ...saveUsdstVaultTokens].filter((tokenData: any) => {
     const hasBalance = tokenData.balance !== "0";
     const isNotPaused = tokenData.token?._paused !== true;
     return hasBalance && isNotPaused;
@@ -217,7 +357,7 @@ export const transferToken = async (
 ) => {
   try {
     const tx = await buildFunctionTx({
-      contractName: extractContractName(Token),
+      contractName: getTransferContractName(body.address),
       contractAddress: body.address || "",
       method: "transfer",
       args: {
@@ -269,7 +409,7 @@ export const bulkTransferToken = async (
   for (const transfer of transfers) {
     try {
       const tx = await buildFunctionTx({
-        contractName: extractContractName(Token),
+        contractName: getTransferContractName(tokenAddress),
         contractAddress: tokenAddress,
         method: "transfer",
         args: {

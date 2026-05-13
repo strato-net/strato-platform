@@ -14,8 +14,9 @@ pkgs.mkShell {
     
     # System libraries matching Ubuntu dependencies
     leveldb        # libleveldb-dev
-    xz            # liblzma-dev  
+    xz            # liblzma-dev
     postgresql    # libpq-dev and postgresql-client
+    rdkafka       # librdkafka-dev
     secp256k1     # libsecp256k1-dev
     libsodium     # libsodium-dev
     
@@ -31,15 +32,16 @@ pkgs.mkShell {
 
   # Environment variables for build tools
   shellHook = ''
-    export PKG_CONFIG_PATH="${pkgs.lib.getDev pkgs.postgresql}/lib/pkgconfig:${pkgs.lib.getDev pkgs.openssl}/lib/pkgconfig:${pkgs.lib.getDev pkgs.zlib}/lib/pkgconfig:${pkgs.libsodium}/lib/pkgconfig:${pkgs.leveldb}/lib/pkgconfig:${pkgs.secp256k1}/lib/pkgconfig:$PKG_CONFIG_PATH"
-    export LD_LIBRARY_PATH="${pkgs.lib.getLib pkgs.postgresql}/lib:${pkgs.lib.getLib pkgs.openssl}/lib:${pkgs.lib.getLib pkgs.zlib}/lib:${pkgs.libsodium}/lib:${pkgs.leveldb}/lib:${pkgs.secp256k1}/lib:$LD_LIBRARY_PATH"
-    export C_INCLUDE_PATH="${pkgs.lib.getDev pkgs.postgresql}/include:${pkgs.lib.getDev pkgs.openssl}/include:${pkgs.lib.getDev pkgs.zlib}/include:${pkgs.libsodium}/include:${pkgs.leveldb}/include:${pkgs.secp256k1}/include:$C_INCLUDE_PATH"
-    
+    export PKG_CONFIG_PATH="${pkgs.lib.getDev pkgs.postgresql}/lib/pkgconfig:${pkgs.lib.getDev pkgs.openssl}/lib/pkgconfig:${pkgs.lib.getDev pkgs.zlib}/lib/pkgconfig:${pkgs.libsodium}/lib/pkgconfig:${pkgs.leveldb}/lib/pkgconfig:${pkgs.rdkafka}/lib/pkgconfig:${pkgs.secp256k1}/lib/pkgconfig:$PKG_CONFIG_PATH"
+    export LD_LIBRARY_PATH="${pkgs.lib.getLib pkgs.postgresql}/lib:${pkgs.lib.getLib pkgs.openssl}/lib:${pkgs.lib.getLib pkgs.zlib}/lib:${pkgs.libsodium}/lib:${pkgs.leveldb}/lib:${pkgs.rdkafka}/lib:${pkgs.secp256k1}/lib:$LD_LIBRARY_PATH"
+    export C_INCLUDE_PATH="${pkgs.lib.getDev pkgs.postgresql}/include:${pkgs.lib.getDev pkgs.openssl}/include:${pkgs.lib.getDev pkgs.zlib}/include:${pkgs.libsodium}/include:${pkgs.leveldb}/include:${pkgs.rdkafka}/include:${pkgs.secp256k1}/include:$C_INCLUDE_PATH"
+
     echo "Development environment loaded with:"
     echo "  - Stack build tool"
     echo "  - PostgreSQL ${pkgs.postgresql.version}"
     echo "  - LevelDB ${pkgs.leveldb.version}"
     echo "  - libsodium ${pkgs.libsodium.version}"
+    echo "  - librdkafka ${pkgs.rdkafka.version}"
     echo "  - secp256k1 ${pkgs.secp256k1.version}"
     echo "  - All other required system dependencies"
   '';
