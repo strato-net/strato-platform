@@ -48,7 +48,7 @@ library
     , unliftio
   default-language: Haskell2010
 
-executable strato-api-indexer
+executable strato-indexer
   main-is: ApiIndexerMain.hs
   other-modules:
       Wiring

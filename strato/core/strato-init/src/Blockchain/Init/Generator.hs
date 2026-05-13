@@ -89,7 +89,7 @@ createCommandsFile = do
         , "strato-p2p +RTS -T -RTS"
         , "strato-sequencer +RTS -T -N1 -RTS"
         , "vm-runner --diffPublish=true +RTS -T -I2 -N1 -RTS"
-        , "strato-api-indexer"
+        , "strato-indexer"
         , "slipstream +RTS -T -RTS"
         , "strato-api +RTS -T -N1 -RTS"
         , "strato-network-monitor"

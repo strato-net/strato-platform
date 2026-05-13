@@ -33,7 +33,7 @@ library:
   - unliftio
 
 executables:
-  strato-api-indexer:
+  strato-indexer:
     main: ApiIndexerMain.hs
     source-dirs: exec_src
     dependencies:
