@@ -227,6 +227,15 @@ const YIELD_VAULTS = [
     iconBg: "bg-orange-500/15 dark:bg-orange-400/15",
     iconColor: "text-orange-600 dark:text-orange-400",
   },
+  {
+    key: "usdc-yield",
+    name: "USDC Yield Vault",
+    subtitle: "ERC-4626 yield vault for USDC deposits",
+    asset: "USDC",
+    badge: "Yield Vault",
+    iconBg: "bg-emerald-500/15 dark:bg-emerald-400/15",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+  },
 ] as const;
 
 const Earn = () => {
