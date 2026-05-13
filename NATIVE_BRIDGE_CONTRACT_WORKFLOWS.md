@@ -131,6 +131,7 @@ External state:
 
 - Representation token supply decreases.
 - No STRATO state changes yet.
+- The redemption is source-final on the external chain: there is no automatic Sepolia refund path after the burn.
 
 ### Step 2: Relayer Records Deposit on STRATO
 
@@ -177,7 +178,7 @@ State transition:
 INITIATED -> PENDING_REVIEW
 ```
 
-If rejected, the relayer may call `abortDeposit(...)`.
+If rejected, the bridge operator may call `abortDeposit(...)`.
 
 State transition:
 
@@ -185,6 +186,13 @@ State transition:
 INITIATED -> ABORTED
 PENDING_REVIEW -> ABORTED
 ```
+
+Abort meaning:
+
+- `abortDeposit` is a STRATO-side rejection or escalation marker.
+- It does not re-mint representation tokens on the external chain.
+- If a redemption cannot be completed after a valid external burn, Safe/admin operators must intervene manually, either by fixing the STRATO-side issue and confirming the deposit or by performing a controlled compensating action on the external chain.
+- Automatic external refunds are intentionally not part of the current redemption flow because re-minting after a burn is privileged and can create supply risk if the STRATO unlock later succeeds.
 
 ## Workflow: STRATO to External Native Bridge-Out
 
@@ -423,6 +431,7 @@ PENDING_REVIEW -> COMPLETED        finalizeWithdrawal(id, externalTxHash, native
 - `StratoNativeCustodyVault.lock` and `unlock` are callable only by the configured bridge.
 - A native deposit is keyed by `(externalChainId, externalBridge, externalRedemptionId)` and cannot be recorded twice.
 - A native external mint is keyed by `(sourceChainId, sourceBridge, sourceWithdrawalId)` and cannot be processed twice.
+- Native redemptions burn representation tokens on the external chain before STRATO unlock; aborting the STRATO-side deposit does not automatically refund the external burn.
 - STRATO route configuration and external route mapping must agree.
 - `maxPerWithdrawal` limits individual bridge-out requests.
 - `instantWithdrawalThreshold` determines whether a withdrawal is instant-lane eligible.

@@ -308,8 +308,13 @@ If the bridge service is deployed through `docker-compose.bridge.tpl.yml`, these
 - `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2` through `_5`
 
 The bridge service now has a native mint path:
-- instant withdrawals move to `PENDING_REVIEW`, wait until the STRATO contract-provided `nativeMintNotBefore`, sign the EIP-712 `NativeMintAttestation`, submit `mintRepresentationWithAttestation(attestation, signatures)` with the chain-specific native bridge key, wait for a successful destination receipt, then record the destination tx hash on STRATO
-- approval-lane withdrawals sign the same attestation, propose `mintRepresentationWithAttestation(attestation, signatures)` to the configured Safe, persist the Safe tx hash on STRATO, and later record the destination tx hash after Safe execution
+- instant withdrawals move to `PENDING_REVIEW`, wait until the STRATO contract-provided `nativeMintNotBefore`, sign the EIP-712 `NativeMintAttestation`, submit `mintRepresentationWithAttestation(attestation, signatures)` with the chain-specific native bridge key, wait for a successful destination receipt, then call `finalizeWithdrawal` on STRATO with the destination tx hash
+- approval-lane withdrawals sign the same attestation, propose `mintRepresentationWithAttestation(attestation, signatures)` to the configured Safe, persist the Safe tx hash on STRATO, and later call `finalizeWithdrawal` after Safe execution
+
+Native redemption recovery policy:
+- external-to-STRATO redemptions burn representation tokens on Sepolia before STRATO unlock
+- `abortDeposit` on STRATO is an operator rejection/escalation marker and does not automatically re-mint representation tokens on Sepolia
+- if a valid external burn cannot be completed on STRATO, Safe/admin operators must intervene manually by fixing and confirming the STRATO deposit or by performing a controlled compensating action on the external chain
 
 The existing bridge service still also requires its normal Safe envs:
 - `SAFE_ADDRESS`
