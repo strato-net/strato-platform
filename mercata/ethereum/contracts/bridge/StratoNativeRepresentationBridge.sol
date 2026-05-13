@@ -91,6 +91,10 @@ contract StratoNativeRepresentationBridge is
         address indexed stratoToken,
         address indexed representationToken
     );
+    event TokenMappingEnabled(
+        address indexed stratoToken,
+        address indexed representationToken
+    );
     event TokenMappingFrozen(
         address indexed stratoToken,
         address indexed representationToken
@@ -320,6 +324,13 @@ contract StratoNativeRepresentationBridge is
         if (representationToken == address(0)) revert TokenNotMapped();
         routeActive[stratoToken] = false;
         emit TokenMappingDisabled(stratoToken, representationToken);
+    }
+
+    function enableTokenMapping(address stratoToken) external onlyRole(MAPPING_ADMIN_ROLE) {
+        address representationToken = stratoToRepresentation[stratoToken];
+        if (representationToken == address(0)) revert TokenNotMapped();
+        routeActive[stratoToken] = true;
+        emit TokenMappingEnabled(stratoToken, representationToken);
     }
 
     function freezeTokenMapping(address stratoToken) external onlyRole(MAPPING_ADMIN_ROLE) {

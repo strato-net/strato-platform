@@ -54,14 +54,14 @@ Responsibilities:
 - Mints representation tokens through `mintRepresentationWithAttestation`.
 - Validates EIP-712 native mint attestations before minting.
 - Enforces replay protection through `processedMints`.
-- Supports route disable/freeze/migration controls.
+- Supports route disable/enable/freeze/migration controls.
 - Supports mint and redemption pause controls.
 
 Main privileged roles:
 
 - `DEFAULT_ADMIN_ROLE`: role administrator.
 - `UPGRADER_ROLE`: proxy upgrades.
-- `MAPPING_ADMIN_ROLE`: route registration, disable, freeze, and migration.
+- `MAPPING_ADMIN_ROLE`: route registration, disable, enable, freeze, and migration.
 - `PAUSER_ROLE` / `UNPAUSER_ROLE`: emergency controls.
 - `ATTESTATION_ADMIN_ROLE`: signer set and threshold configuration.
 
@@ -433,6 +433,7 @@ PENDING_REVIEW -> COMPLETED        finalizeWithdrawal(id, externalTxHash, native
 - A native external mint is keyed by `(sourceChainId, sourceBridge, sourceWithdrawalId)` and cannot be processed twice.
 - Native redemptions burn representation tokens on the external chain before STRATO unlock; aborting the STRATO-side deposit does not automatically refund the external burn.
 - STRATO route configuration and external route mapping must agree.
+- External route disablement is reversible through `enableTokenMapping`; route freezing is intentionally irreversible.
 - `maxPerWithdrawal` limits individual bridge-out requests.
 - `instantWithdrawalThreshold` determines whether a withdrawal is instant-lane eligible.
 - `nativeMintNotBefore` delays instant-lane destination mint eligibility.

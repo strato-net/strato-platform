@@ -600,6 +600,7 @@ Other useful Safe admin calls:
 
 ```text
 StratoNativeRepresentationBridge.disableTokenMapping(<STRATO_TOKEN>)
+StratoNativeRepresentationBridge.enableTokenMapping(<STRATO_TOKEN>)
 StratoNativeRepresentationBridge.freezeTokenMapping(<STRATO_TOKEN>)
 StratoNativeRepresentationBridge.pause()
 StratoNativeRepresentationBridge.unpause()
@@ -609,6 +610,8 @@ StratoNativeRepresentationBridge.migrateTokenMapping(<STRATO_TOKEN>, <NEW_REPRES
 StratoNativeRepresentationToken.grantRole(<role>, <account>)
 StratoNativeRepresentationToken.revokeRole(<role>, <account>)
 ```
+
+Use `disableTokenMapping` / `enableTokenMapping` for temporary route-level suspension. Use `freezeTokenMapping` only when the mapping should become permanently non-migratable.
 
 ### Sepolia: Safe Transaction Builder JSON
 

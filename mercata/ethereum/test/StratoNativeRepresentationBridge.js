@@ -269,6 +269,27 @@ describe("StratoNativeRepresentationBridge", function () {
     expect(await token.totalSupply()).to.equal(100n);
   });
 
+  it("allows mapping admin to re-enable a disabled route", async function () {
+    await mintWithAttestation({ amount: 100n });
+    await token.connect(user).approve(await bridge.getAddress(), 100n);
+
+    await expect(bridge.disableTokenMapping(stratoToken))
+      .to.emit(bridge, "TokenMappingDisabled")
+      .withArgs(stratoToken, await token.getAddress());
+    expect(await bridge.routeActive(stratoToken)).to.equal(false);
+
+    await expect(bridge.enableTokenMapping(stratoToken))
+      .to.emit(bridge, "TokenMappingEnabled")
+      .withArgs(stratoToken, await token.getAddress());
+    expect(await bridge.routeActive(stratoToken)).to.equal(true);
+
+    await expect(
+      bridge
+        .connect(user)
+        .requestRedemption(await token.getAddress(), 100n, stratoRecipient.address),
+    ).to.emit(bridge, "RedemptionRequested");
+  });
+
   it("does not allow silent remapping of a live route", async function () {
     const Token = await ethers.getContractFactory("StratoNativeRepresentationToken");
     const replacementToken = await upgrades.deployProxy(
