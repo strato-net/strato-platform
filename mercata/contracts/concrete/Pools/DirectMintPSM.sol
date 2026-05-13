@@ -14,6 +14,7 @@ contract DirectMintPSM is Ownable {
     mapping(address => bool) public eligibleTokens;
     uint public burnReqCounter; // follows MercataBridge.withdrawalCounter pattern
     mapping(uint => BurnRequest) public burnRequests;
+    mapping(address => uint) public reservedRedeemTokenAmounts;
     uint public burnDelay;
 
     event EligibleTokenAdded(address token);
@@ -67,6 +68,13 @@ contract DirectMintPSM is Ownable {
         emit BurnDelaySet(_burnDelay);
     }
 
+    function availableRedeemLiquidity(address token) public view returns (uint) {
+        uint balance = IERC20(token).balanceOf(address(this));
+        uint reserved = reservedRedeemTokenAmounts[token];
+        if (balance <= reserved) return 0;
+        return balance - reserved;
+    }
+
     function _transfer(address token, address to, uint amount) internal {
         uint balancePSMBefore = IERC20(token).balanceOf(address(this));
         uint balanceRecipientBefore = IERC20(token).balanceOf(to);
@@ -118,9 +126,13 @@ contract DirectMintPSM is Ownable {
 
     function requestBurn(uint amount, address redeemToken) external nonReentrant isEligible(redeemToken) returns (uint) {
         require(amount > 0, "Amount must be nonzero");
+        require(availableRedeemLiquidity(redeemToken) >= amount, "Insufficient liquidity");
 
         // Escrow mintableToken in this contract's balance
         _transferFrom(mintableToken, msg.sender, address(this), amount);
+
+        // Reserve payout liquidity for this request
+        reservedRedeemTokenAmounts[redeemToken] += amount;
 
         // Create burn request
         burnRequests[++burnReqCounter] = BurnRequest(amount, redeemToken, msg.sender, block.timestamp);
@@ -143,6 +155,9 @@ contract DirectMintPSM is Ownable {
 
         // Remove burn request
         _deleteBurnRequest(id);
+
+        // Release reserved payout liquidity
+        reservedRedeemTokenAmounts[redeemToken] -= amount;
 
         // Burn escrowed mintable token
         Token(mintableToken).burn(address(this), amount);
@@ -169,6 +184,9 @@ contract DirectMintPSM is Ownable {
 
         // Remove burn request
         _deleteBurnRequest(id);
+
+        // Release reserved payout liquidity
+        reservedRedeemTokenAmounts[redeemToken] -= amount;
 
         // Check liquidity
         require(IERC20(mintableToken).balanceOf(address(this)) >= amount, "Insufficient liquidity");
