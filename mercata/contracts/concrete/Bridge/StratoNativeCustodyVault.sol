@@ -18,6 +18,7 @@ contract record StratoNativeCustodyVault is Ownable {
     mapping(address => uint256) public record lockedBalance;
 
     event BridgeUpdated(address indexed previousBridge, address indexed newBridge);
+    event NativeCustodyVaultGuardianUpdated(address indexed previousGuardian, address indexed newGuardian);
     event PauseToggled(bool paused);
     event Locked(address indexed token, address indexed from, uint256 amount);
     event Unlocked(address indexed token, address indexed to, uint256 amount);
@@ -39,12 +40,17 @@ contract record StratoNativeCustodyVault is Ownable {
         address _guardian
     ) external onlyOwner {
         require(_guardian != address(0), "SNCV: zero guardian");
-        guardian = _guardian;
+        _setGuardian(_guardian);
         _setBridge(_bridge);
     }
 
     function setGuardian(address newGuardian) external onlyOwner {
+        _setGuardian(newGuardian);
+    }
+
+    function _setGuardian(address newGuardian) internal {
         require(newGuardian != address(0), "SNCV: zero guardian");
+        emit NativeCustodyVaultGuardianUpdated(guardian, newGuardian);
         guardian = newGuardian;
     }
 

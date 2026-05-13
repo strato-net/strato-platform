@@ -64,6 +64,8 @@ contract record StratoNativeBridge is Ownable {
     event PauseToggled(bool depositsPaused, bool withdrawalsPaused);
     event TokenFactoryUpdated(address indexed newFactory, address indexed oldFactory);
     event CustodyVaultUpdated(address indexed newVault, address indexed oldVault);
+    event NativeBridgeOperatorUpdated(address indexed previousBridgeOperator, address indexed newBridgeOperator);
+    event NativeBridgeGuardianUpdated(address indexed previousGuardian, address indexed newGuardian);
     event NativeAssetUpdated(
         bool enabled,
         uint256 externalChainId,
@@ -175,19 +177,29 @@ contract record StratoNativeBridge is Ownable {
         require(_bridgeOperator != address(0), "SNB: zero operator");
         require(_guardian != address(0), "SNB: zero guardian");
 
-        bridgeOperator = _bridgeOperator;
-        guardian = _guardian;
+        _setBridgeOperator(_bridgeOperator);
+        _setGuardian(_guardian);
         _setTokenFactory(_tokenFactory);
         _setCustodyVault(_custodyVault);
     }
 
     function setBridgeOperator(address newBridgeOperator) external onlyOwner {
+        _setBridgeOperator(newBridgeOperator);
+    }
+
+    function _setBridgeOperator(address newBridgeOperator) internal {
         require(newBridgeOperator != address(0), "SNB: zero operator");
+        emit NativeBridgeOperatorUpdated(bridgeOperator, newBridgeOperator);
         bridgeOperator = newBridgeOperator;
     }
 
     function setGuardian(address newGuardian) external onlyOwner {
+        _setGuardian(newGuardian);
+    }
+
+    function _setGuardian(address newGuardian) internal {
         require(newGuardian != address(0), "SNB: zero guardian");
+        emit NativeBridgeGuardianUpdated(guardian, newGuardian);
         guardian = newGuardian;
     }
 
