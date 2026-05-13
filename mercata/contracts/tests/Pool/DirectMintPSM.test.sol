@@ -106,6 +106,8 @@ contract Describe_DirectMintPSM {
         require(requester == address(user), "Burn request requester should be user");
         require(requestTime == block.timestamp, "Burn request request time should be current block timestamp");
         require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDST");
+        require(psm.reservedRedeemTokenAmounts(address(USDC)) == 100e18, "PSM should reserve 100 USDC");
+        require(psm.availableRedeemLiquidity(address(USDC)) == 0, "PSM should have no available USDC");
         require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC");
 
         // Complete the burn USDST 1:1 in exchange for USDC
@@ -114,6 +116,7 @@ contract Describe_DirectMintPSM {
         require(USDC.balanceOf(address(user)) == 100e18, "User should have 100 USDC");
         require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");
         require(USDC.balanceOf(address(psm)) == 0, "PSM should have 0 USDC");
+        require(psm.reservedRedeemTokenAmounts(address(USDC)) == 0, "PSM should release USDC reservation");
         (uint _amount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(psm.burnReqCounter());
         require(_amount == 0, "Burn request amount should be 0");
         require(_redeemToken == address(0), "Burn request redeem token should be 0");
@@ -146,6 +149,8 @@ contract Describe_DirectMintPSM {
         require(requester == address(user), "Burn request requester should be user");
         require(requestTime == block.timestamp, "Burn request request time should be current block timestamp");
         require(USDC.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDC");
+        require(psm.reservedRedeemTokenAmounts(address(USDC)) == 100e18, "PSM should reserve 100 USDC");
+        require(psm.availableRedeemLiquidity(address(USDC)) == 0, "PSM should have no available USDC");
         require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
 
         // Attempt to burn too early
@@ -174,6 +179,7 @@ contract Describe_DirectMintPSM {
         require(USDC.balanceOf(address(user)) == 100e18, "User should have 100 USDC");
         require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");
         require(USDC.balanceOf(address(psm)) == 0, "PSM should have 0 USDC");
+        require(psm.reservedRedeemTokenAmounts(address(USDC)) == 0, "PSM should release USDC reservation");
         (uint _amount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(psm.burnReqCounter());
         require(_amount == 0, "Burn request amount should be 0");
         require(_redeemToken == address(0), "Burn request redeem token should be 0");
@@ -193,10 +199,12 @@ contract Describe_DirectMintPSM {
         user.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
         user.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDC));
         require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDST");
+        require(psm.reservedRedeemTokenAmounts(address(USDC)) == 100e18, "PSM should reserve 100 USDC");
         require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
         user.doSuccessfully(address(psm), "cancelBurn", psm.burnReqCounter());
         require(USDST.balanceOf(address(user)) == 100e18, "User should have 100 USDST");
         require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");
+        require(psm.reservedRedeemTokenAmounts(address(USDC)) == 0, "PSM should release USDC reservation");
 
         // User now tries and fails to complete the burn
         user.doExpectingFailure(address(psm), "completeBurn", "Invalid burn request ID", psm.burnReqCounter());
@@ -230,49 +238,43 @@ contract Describe_DirectMintPSM {
         require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDST");
         require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
 
-        // User2 is allowed to redeem their USDST for USDC
+        // User2 is allowed to redeem their USDST for unreserved USDT
         uint initialCounter = psm.burnReqCounter() + 1;
         user2.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
         user2.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDT));
         user2.doSuccessfully(address(USDST), "approve", address(psm), 100e18);
-        user2.doSuccessfully(address(psm), "requestBurn", 100e18, address(USDC));
-        require(USDST.balanceOf(address(psm)) == 300e18, "PSM should have 300 USDST");
-        require(USDST.balanceOf(address(user2)) == 100e18, "User2 should have 100 USDST");
+        user2.doExpectingFailure(address(psm), "requestBurn", "Insufficient liquidity", 100e18, address(USDC));
+        require(USDST.balanceOf(address(psm)) == 200e18, "PSM should have 200 USDST");
+        require(USDST.balanceOf(address(user2)) == 200e18, "User2 should have 200 USDST");
         user2.doExpectingFailure(address(psm), "completeBurn", "Unauthorized", initialCounter - 1); // Can't burn the other user's request
-        user2.doSuccessfully(address(psm), "completeBurn", initialCounter + 1); // Test completing in opposite order
         user2.doSuccessfully(address(psm), "completeBurn", initialCounter);
 
         // Enforce conditions after burns
         require(USDST.balanceOf(address(psm)) == 100e18, "PSM should have 200 USDST");
-        require(USDST.balanceOf(address(user2)) == 100e18, "User2 should have 100 USDST");
-        require(USDC.balanceOf(address(user2)) == 100e18, "User2 should have 100 USDC");
+        require(USDST.balanceOf(address(user2)) == 200e18, "User2 should have 200 USDST");
+        require(USDC.balanceOf(address(user2)) == 0, "User2 should have 0 USDC");
         require(USDT.balanceOf(address(user2)) == 100e18, "User2 should have 100 USDT");
         require(USDT.balanceOf(address(psm)) == 0, "PSM should have 0 USDT");
-        require(USDC.balanceOf(address(psm)) == 0, "PSM should have 0 USDC");
+        require(USDC.balanceOf(address(psm)) == 100e18, "PSM should have 100 USDC");
         require(USDST.balanceOf(address(user)) == 0, "User should have 0 USDST");
         require(USDT.balanceOf(address(user)) == 0, "User should have 0 USDT");
         require(USDC.balanceOf(address(user)) == 0, "User should have 0 USDC");
+        require(psm.reservedRedeemTokenAmounts(address(USDC)) == 100e18, "PSM should keep user1 USDC reservation");
+        require(psm.reservedRedeemTokenAmounts(address(USDT)) == 0, "PSM should release user2 USDT reservation");
         (uint _amount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(initialCounter);
         require(_amount == 0, "Burn request amount should be 0");
         require(_redeemToken == address(0), "Burn request redeem token should be 0");
         require(_requester == address(0), "Burn request requester should be 0");
         require(_requestTime == 0, "Burn request request time should be 0");
-        (uint _amount2, address _redeemToken2, address _requester2, uint _requestTime2) = psm.burnRequests(initialCounter + 1);
-        require(_amount2 == 0, "Burn request amount should be 0");
-        require(_redeemToken2 == address(0), "Burn request redeem token should be 0");
-        require(_requester2 == address(0), "Burn request requester should be 0");
-        require(_requestTime2 == 0, "Burn request request time should be 0");
     }
 
     function it_psm_liquidity_limited() {
-        // There's no liquidity for user1 to redeem now
-        user.doExpectingFailure(address(psm), "completeBurn", "Insufficient liquidity", psm.burnReqCounter()-2);
-
-        // So, cancel instead
-        user.doSuccessfully(address(psm), "cancelBurn", psm.burnReqCounter()-2);
+        // User1's earlier USDC redemption remains reserved until claimed or canceled
+        user.doSuccessfully(address(psm), "cancelBurn", psm.burnReqCounter()-1);
         require(USDST.balanceOf(address(user)) == 100e18, "User should have 100 USDST");
         require(USDST.balanceOf(address(psm)) == 0, "PSM should have 0 USDST");
-        (uint _amount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(psm.burnReqCounter()-2);
+        require(psm.reservedRedeemTokenAmounts(address(USDC)) == 0, "PSM should release USDC reservation");
+        (uint _amount, address _redeemToken, address _requester, uint _requestTime) = psm.burnRequests(psm.burnReqCounter()-1);
         require(_amount == 0, "Burn request amount should be 0");
         require(_redeemToken == address(0), "Burn request redeem token should be 0");
         require(_requester == address(0), "Burn request requester should be 0");
