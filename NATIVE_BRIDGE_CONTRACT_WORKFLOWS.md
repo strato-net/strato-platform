@@ -65,6 +65,12 @@ Main privileged roles:
 - `PAUSER_ROLE` / `UNPAUSER_ROLE`: emergency controls.
 - `ATTESTATION_ADMIN_ROLE`: signer set and threshold configuration.
 
+Initialization note:
+
+- `initialize(admin)` bootstraps all roles to `admin` so a Safe can complete deployment.
+- Production deployment should split operational roles after initialization with `grantRole` / `revokeRole`.
+- The Safe should retain `DEFAULT_ADMIN_ROLE`; operational roles may be moved to separate addresses according to the deployment role plan.
+
 #### `StratoNativeRepresentationToken`
 
 External-chain ERC-20 representation of a STRATO-native asset.

@@ -259,12 +259,15 @@ Saved batch file:
 
 This batch does:
 - on `StratoNativeRepresentationToken`, `grantRole(BRIDGE_ROLE, <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)`
+- on `StratoNativeRepresentationBridge`, optionally split operational roles with `grantRole` / `revokeRole`
 - on `StratoNativeRepresentationBridge`, `setAttestationSigner(<STRATO_VAULT_BACKED_SIGNER>, true)` for each native mint attestation signer
 - on `StratoNativeRepresentationBridge`, `setAttestationThreshold(<native mint attestation threshold>)`
 - on `StratoNativeRepresentationBridge`, optionally `setMaxAttestationValiditySeconds(<seconds>)` if the default 7 day maximum validity should change
 - on `StratoNativeRepresentationBridge`, `registerTokenMapping(<STRATO_TOKEN>, <SEPOLIA_REPRESENTATION_TOKEN_PROXY>, false)`
 
 Normal instant mint execution submits vault-signed `NativeMintAttestation` payloads through `mintRepresentationWithAttestation`. The Sepolia representation bridge does not need a hot mint operator role.
+
+`StratoNativeRepresentationBridge.initialize(<SEPOLIA_ADMIN_SAFE>)` bootstraps all bridge roles to the Safe. For production, the Safe should explicitly grant operational roles to the intended addresses and optionally revoke those roles from itself while keeping `DEFAULT_ADMIN_ROLE`.
 
 ### Step 5: Optional verify
 
@@ -283,6 +286,7 @@ Verification is optional for bridge setup. It is not required to continue if:
 Fastest checks:
 - Safe shows the full batch executed successfully
 - on the token proxy, `hasRole(BRIDGE_ROLE, <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)` returns `true`
+- on the bridge proxy, operational role holders match the deployment role plan
 - on the bridge proxy, `attestationSigners(<STRATO_VAULT_BACKED_SIGNER>)` returns `true`
 - on the bridge proxy, `attestationThreshold()` returns the configured native mint attestation threshold
 - on the bridge proxy, `maxAttestationValiditySeconds()` returns the configured maximum attestation validity
@@ -548,6 +552,26 @@ args:
 ### Sepolia: Safe Admin Config Calls
 
 Execute these from `SEPOLIA_ADMIN_SAFE` after fresh deploy or whenever config changes.
+
+Representation bridge role separation:
+
+```text
+target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: grantRole(bytes32 role, address account)
+args:
+  role: <UPGRADER_ROLE | MAPPING_ADMIN_ROLE | PAUSER_ROLE | UNPAUSER_ROLE | ATTESTATION_ADMIN_ROLE>
+  account: <ROLE_HOLDER>
+```
+
+After confirming the intended role holders are active, the Safe may revoke operational roles from itself while retaining `DEFAULT_ADMIN_ROLE`:
+
+```text
+target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: revokeRole(bytes32 role, address account)
+args:
+  role: <UPGRADER_ROLE | MAPPING_ADMIN_ROLE | PAUSER_ROLE | UNPAUSER_ROLE | ATTESTATION_ADMIN_ROLE>
+  account: <SEPOLIA_ADMIN_SAFE>
+```
 
 Token grants bridge mint/burn permission:
 
