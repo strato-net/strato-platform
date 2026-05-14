@@ -131,7 +131,7 @@ export const defaultVaultFor: Record<string, string> = {
 };
 
 export const defaultDirectMintPsmFor: Record<string, string> = {
-  "114784819836269": "df2e081198110fdf287508e069a8c9bc6113707e", // Helium testnet
+  "114784819836269": "0b30adc5f2d90bada37afa699b75f485f04e7287", // Helium testnet
   // Upquark mainnet TBD
 };
 
