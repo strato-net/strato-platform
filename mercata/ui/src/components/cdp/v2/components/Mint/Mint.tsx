@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -45,7 +44,7 @@ import { isTxSubmitted } from '@/utils/transactionStatus';
 import { DECIMAL, ADDRESS, UNITS, USD } from '@/components/cdp/v2/cdpTypes';
 
 interface MintProps {
-  onSuccess?: () => void;
+  onSuccess?: () => void | Promise<void>;
   refreshTrigger?: number;
   guestMode?: boolean;
 }
@@ -57,7 +56,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   // Context Hooks
   // ============================================================================
 
-  const navigate = useNavigate();
   const { fetchAllPrices } = useOracleContext();
   const { tokenApys } = useEarnContext();
   const { vaultState } = useVaultContext();
@@ -104,7 +102,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   const [currentProgressStep, setCurrentProgressStep] = useState<ProgressStep>("");
   const [transactionsToSend, setTransactionsToSend] = useState<TransactionProgress[]>([]);
   const [progressError, setProgressError] = useState<string | undefined>();
-  const [shouldRefreshOnClose, setShouldRefreshOnClose] = useState(false);
 
   // ============================================================================
   // State - Manual Mode Tracking
@@ -496,6 +493,19 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
     requestWalletConnection();
   }, []);
 
+  const resetLoanForm = useCallback(() => {
+    setMintAmountInput('');
+    setIsMaxMode(false);
+    setAutoAllocate(true);
+    setManualAllocations([]);
+    setTotalManualMint('0');
+    setMintMaxVaults(new Set());
+    setExceedsMaxMint(false);
+    setHasLowHF(false);
+    setExceedsBalance(false);
+    setMintExceedsMax(false);
+  }, []);
+
   const handleAutoAllocateChange = useCallback((checked: boolean) => {
     // When switching to manual mode, snapshot current optimal allocations
     if (!checked && optimalAllocationsRef.current.length > 0) {
@@ -609,7 +619,6 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
     setTransactionsExecuting(true);
     setProgressModalOpen(true);
     setProgressError(undefined);
-    setShouldRefreshOnClose(true);
     
     try {
       // Build transactions: deposits first, then mints
@@ -942,11 +951,8 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
           setCurrentProgressStep('depositing');
           setTransactionsToSend([]);
           setProgressError(undefined);
-          
-          if (shouldRefreshOnClose) {
-            setShouldRefreshOnClose(false);
-            navigate(0);
-          }
+          resetLoanForm();
+          void onSuccess?.();
         }}
       />
     </>
