@@ -61,18 +61,19 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Unsafe as BSU
 import Data.IORef
 import Data.Int (Int64)
+import qualified Data.Map.Strict as Map
 import Data.String (IsString)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Foreign.C.String
 import Foreign.Marshal.Alloc (alloca)
-import Foreign.Ptr (nullPtr, castPtr)
+import Foreign.Ptr (Ptr, nullPtr, castPtr)
 import Foreign.Storable (peek, poke)
 import qualified Data.ByteString as BS
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 
-import JLog.FFI (JLogId(..), JLogMessage(..), jlog_new, jlog_ctx_init, jlog_ctx_open_writer,
+import JLog.FFI (JLogCtx, JLogId(..), JLogMessage(..), jlog_new, jlog_ctx_init, jlog_ctx_open_writer,
                  jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber,
                  jlog_ctx_open_reader, jlog_ctx_err_string, jlog_ctx_read_interval,
                  jlog_ctx_read_message, jlog_ctx_read_checkpoint, jlog_ctx_advance_id)
@@ -97,12 +98,14 @@ type HasStreaming m = (MonadIO m, AccessibleEnv (IORef StreamEnv) m)
 data StreamEnv = StreamEnv
   { seBasePath :: FilePath
   , seClientId :: Text
+  , seWriterCache :: IORef (Map.Map TopicName (Ptr JLogCtx))
   }
 
 createStreamEnv :: MonadIO m => ClientId -> StreamAddress -> m StreamEnv
 createStreamEnv clientId (basePath, _port) = liftIO $ do
   createDirectoryIfMissing True basePath
-  return $ StreamEnv basePath clientId
+  cache <- newIORef Map.empty
+  return $ StreamEnv basePath clientId cache
 
 getStreamEnv :: HasStreaming m => m StreamEnv
 getStreamEnv = do
@@ -117,7 +120,7 @@ runStreamMUsingEnv env f = do
 runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
 runStreamM clientId addr f = withRunInIO $ \runInIO -> bracket
   (createStreamEnvIO clientId addr)
-  (\_ -> return ())  -- Nothing to close for JLog env
+  closeStreamEnvIO
   (\env -> do
     ref <- newIORef env
     runInIO $ runReaderT f ref)
@@ -125,10 +128,16 @@ runStreamM clientId addr f = withRunInIO $ \runInIO -> bracket
 createStreamEnvIO :: ClientId -> StreamAddress -> IO StreamEnv
 createStreamEnvIO clientId (basePath, _port) = do
   createDirectoryIfMissing True basePath
-  return $ StreamEnv basePath clientId
+  cache <- newIORef Map.empty
+  return $ StreamEnv basePath clientId cache
 
 closeStreamEnv :: MonadIO m => StreamEnv -> m ()
-closeStreamEnv _ = return ()  -- JLog contexts are per-operation
+closeStreamEnv env = liftIO $ closeStreamEnvIO env
+
+closeStreamEnvIO :: StreamEnv -> IO ()
+closeStreamEnvIO env = do
+  cache <- readIORef (seWriterCache env)
+  mapM_ jlog_ctx_close (Map.elems cache)
 
 ----------------------
 --    Producing     --
@@ -139,24 +148,8 @@ produceItems topicName events = do
   env <- getStreamEnv
   let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
   liftIO $ do
-    -- Ensure parent directory exists (but not the topic dir itself - let jlog create it)
-    createDirectoryIfMissing True (seBasePath env)
-    withCString topicPath $ \cpath -> do
-      -- Try to init (creates new log with metastore)
-      ctx1 <- jlog_new cpath
-      when (ctx1 == nullPtr) $ error "jlog_new failed"
-      _ <- jlog_ctx_init ctx1  -- Ignore error if already exists
-      jlog_ctx_close ctx1
-      
-      -- Now open fresh context for writing
-      ctx <- jlog_new cpath
-      when (ctx == nullPtr) $ error "jlog_new failed (writer)"
-      rc <- jlog_ctx_open_writer ctx
-      when (rc /= 0) $ do
-        errStr <- jlog_ctx_err_string ctx >>= peekCString
-        error $ "jlog_ctx_open_writer failed for " ++ topicPath ++ " (rc=" ++ show rc ++ "): " ++ errStr
-      mapM_ (writeMessage ctx) events
-      jlog_ctx_close ctx
+    ctx <- getOrCreateWriter env topicName topicPath
+    mapM_ (writeMessage ctx) events
   return [ProduceResponse]
   where
     writeMessage ctx e = do
@@ -164,26 +157,35 @@ produceItems topicName events = do
       BSU.unsafeUseAsCStringLen bs $ \(ptr, len) ->
         void $ jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
 
+getOrCreateWriter :: StreamEnv -> TopicName -> FilePath -> IO (Ptr JLogCtx)
+getOrCreateWriter env topicName topicPath = do
+  cache <- readIORef (seWriterCache env)
+  case Map.lookup topicName cache of
+    Just ctx -> return ctx
+    Nothing -> do
+      createDirectoryIfMissing True (seBasePath env)
+      withCString topicPath $ \cpath -> do
+        ctx1 <- jlog_new cpath
+        when (ctx1 == nullPtr) $ error "jlog_new failed"
+        _ <- jlog_ctx_init ctx1
+        jlog_ctx_close ctx1
+        
+        ctx <- jlog_new cpath
+        when (ctx == nullPtr) $ error "jlog_new failed (writer)"
+        rc <- jlog_ctx_open_writer ctx
+        when (rc /= 0) $ do
+          errStr <- jlog_ctx_err_string ctx >>= peekCString
+          error $ "jlog_ctx_open_writer failed for " ++ topicPath ++ " (rc=" ++ show rc ++ "): " ++ errStr
+        modifyIORef' (seWriterCache env) (Map.insert topicName ctx)
+        return ctx
+
 produceItemsAsJSON :: (JSON.ToJSON a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
 produceItemsAsJSON topicName events = do
   env <- getStreamEnv
   let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
   liftIO $ do
-    createDirectoryIfMissing True (seBasePath env)
-    withCString topicPath $ \cpath -> do
-      ctx1 <- jlog_new cpath
-      when (ctx1 == nullPtr) $ error "jlog_new failed"
-      _ <- jlog_ctx_init ctx1
-      jlog_ctx_close ctx1
-      
-      ctx <- jlog_new cpath
-      when (ctx == nullPtr) $ error "jlog_new failed (writer)"
-      rc <- jlog_ctx_open_writer ctx
-      when (rc /= 0) $ do
-        errStr <- jlog_ctx_err_string ctx >>= peekCString
-        error $ "jlog_ctx_open_writer failed for " ++ topicPath ++ " (rc=" ++ show rc ++ "): " ++ errStr
-      mapM_ (writeMessage ctx) events
-      jlog_ctx_close ctx
+    ctx <- getOrCreateWriter env topicName topicPath
+    mapM_ (writeMessage ctx) events
   return [ProduceResponse]
   where
     writeMessage ctx e = do
