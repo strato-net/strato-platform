@@ -242,5 +242,16 @@
       "amount": "shares",
       "user": "receiver"
     }
+  }, 
+
+  "afcfc4d847d59fbc402856fd6934aff6796812b1": {
+    "Deposit": {
+      "amount": "shares",
+      "user": "owner"
+    },
+    "Withdraw": {
+      "amount": "shares",
+      "user": "receiver"
+    }
   }
 }
