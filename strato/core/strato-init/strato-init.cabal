@@ -60,6 +60,7 @@ library
     , strato-conf
     , strato-genesis
     , strato-model
+    , strato-version
     , streaming
     , template-haskell
     , transformers

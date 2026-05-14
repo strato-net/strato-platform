@@ -10,7 +10,7 @@ import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
-import Blockchain.Strato.Version (stratoVersionTag)
+import Strato.Version (stratoVersionTag)
 import Data.Default (def)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml

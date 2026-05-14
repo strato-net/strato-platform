@@ -4,30 +4,23 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           strato-conf
+name:           strato-version
 version:        0.1.0.0
-category:       Web
-author:         Jamshid
-maintainer:     Jamshid
+synopsis:       STRATO version information
 license:        Apache-2.0
 build-type:     Simple
 
 library
   exposed-modules:
-      Blockchain.EthConf
-      Blockchain.EthConf.Model
+      Strato.Version
   other-modules:
-      Paths_strato_conf
+      Strato.Version.TH
+      Paths_strato_version
   hs-source-dirs:
       src
+  ghc-options: -Wall
   build-depends:
-      aeson
-    , base
-    , bytestring
-    , data-default
-    , hedis
-    , postgresql-simple
-    , strato-model
-    , streaming
-    , yaml
+      base
+    , process
+    , template-haskell
   default-language: Haskell2010

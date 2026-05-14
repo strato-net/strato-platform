@@ -1,0 +1,16 @@
+name: strato-version
+version: 0.1.0.0
+synopsis: STRATO version information
+license: Apache-2.0
+
+dependencies:
+  - base
+  - template-haskell
+  - process
+
+ghc-options: -Wall
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Strato.Version
