@@ -91,6 +91,7 @@ describe("StratoNativeRepresentationBridge", function () {
     const bridgeRole = await token.BRIDGE_ROLE();
 
     await token.grantRole(bridgeRole, await bridge.getAddress());
+    await token.setTransferEndpoint(await bridge.getAddress(), true);
 
     stratoToken = ethers.Wallet.createRandom().address;
     sourceBridge = ethers.Wallet.createRandom().address;
@@ -124,6 +125,22 @@ describe("StratoNativeRepresentationBridge", function () {
       );
 
     expect(await token.balanceOf(user.address)).to.equal(250n);
+    expect(await token.transfersEnabled()).to.equal(false);
+  });
+
+  it("blocks holder transfers until transfers are enabled", async function () {
+    await mintWithAttestation({ amount: 100n });
+
+    await expect(
+      token.connect(user).transfer(otherSigner.address, 1n),
+    ).to.be.revertedWithCustomError(token, "TransfersDisabled");
+
+    await expect(token.setTransfersEnabled(true))
+      .to.emit(token, "TransfersEnabledUpdated")
+      .withArgs(true);
+
+    await token.connect(user).transfer(otherSigner.address, 1n);
+    expect(await token.balanceOf(otherSigner.address)).to.equal(1n);
   });
 
   it("rejects attested mints from an untrusted signer", async function () {
@@ -219,6 +236,21 @@ describe("StratoNativeRepresentationBridge", function () {
     expect(await token.balanceOf(await bridge.getAddress())).to.equal(0n);
     expect(await token.totalSupply()).to.equal(50n);
     expect(await bridge.redemptionId()).to.equal(1n);
+  });
+
+  it("allows redemption transfers to the bridge while peer transfers are disabled", async function () {
+    await mintWithAttestation({ amount: 100n });
+    await token.connect(user).approve(await bridge.getAddress(), 100n);
+
+    await expect(
+      token.connect(user).transfer(otherSigner.address, 1n),
+    ).to.be.revertedWithCustomError(token, "TransfersDisabled");
+
+    await expect(
+      bridge
+        .connect(user)
+        .requestRedemption(await token.getAddress(), 100n, stratoRecipient.address),
+    ).to.emit(bridge, "RedemptionRequested");
   });
 
   it("does not let a bridge-role holder burn another user's balance directly", async function () {

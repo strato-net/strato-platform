@@ -17,9 +17,17 @@ contract StratoNativeRepresentationToken is
 {
     bytes32 public constant BRIDGE_ROLE = keccak256("BRIDGE_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    bytes32 public constant TRANSFER_ADMIN_ROLE = keccak256("TRANSFER_ADMIN_ROLE");
+
+    bool public transfersEnabled;
+    mapping(address => bool) public transferEndpoints;
+
+    event TransfersEnabledUpdated(bool enabled);
+    event TransferEndpointUpdated(address indexed account, bool allowed);
 
     error InvalidAddress();
     error ZeroAmount();
+    error TransfersDisabled();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -39,6 +47,7 @@ contract StratoNativeRepresentationToken is
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
+        _grantRole(TRANSFER_ADMIN_ROLE, admin);
     }
 
     function mint(address to, uint256 amount) external onlyRole(BRIDGE_ROLE) {
@@ -51,6 +60,30 @@ contract StratoNativeRepresentationToken is
     function burn(uint256 amount) external onlyRole(BRIDGE_ROLE) {
         if (amount == 0) revert ZeroAmount();
         _burn(_msgSender(), amount);
+    }
+
+    function setTransfersEnabled(bool enabled) external onlyRole(TRANSFER_ADMIN_ROLE) {
+        transfersEnabled = enabled;
+        emit TransfersEnabledUpdated(enabled);
+    }
+
+    function setTransferEndpoint(address account, bool allowed) external onlyRole(TRANSFER_ADMIN_ROLE) {
+        if (account == address(0)) revert InvalidAddress();
+        transferEndpoints[account] = allowed;
+        emit TransferEndpointUpdated(account, allowed);
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        if (
+            !transfersEnabled &&
+            from != address(0) &&
+            to != address(0) &&
+            !transferEndpoints[from] &&
+            !transferEndpoints[to]
+        ) {
+            revert TransfersDisabled();
+        }
+        super._update(from, to, value);
     }
 
     function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}

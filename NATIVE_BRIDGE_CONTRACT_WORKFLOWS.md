@@ -77,15 +77,27 @@ External-chain ERC-20 representation of a STRATO-native asset.
 
 Responsibilities:
 
-- Provides the transferable wrapped/representation token on the external chain.
+- Provides the wrapped/representation token on the external chain.
 - Allows minting only to accounts with `BRIDGE_ROLE`.
 - Allows burning only by accounts with `BRIDGE_ROLE`, from the bridge contract's own balance.
+- Blocks holder-to-holder transfers until `transfersEnabled` is turned on.
+- Allows transfers involving trusted transfer endpoints, such as the representation bridge for redemptions.
 - Supports upgradeability through `UPGRADER_ROLE`.
 
 Expected setup:
 
 - The representation bridge has `BRIDGE_ROLE` on the representation token.
+- Transfers are disabled by default for pre-sale or restricted-launch periods.
+- The representation bridge is marked as a transfer endpoint so users can redeem back to STRATO while peer-to-peer transfers remain blocked.
+- An account with `TRANSFER_ADMIN_ROLE` enables transfers after the sale or other release condition.
 - Users do not mint or burn directly.
+
+Main privileged roles:
+
+- `DEFAULT_ADMIN_ROLE`: role administrator.
+- `BRIDGE_ROLE`: representation bridge mint/burn authority.
+- `UPGRADER_ROLE`: proxy upgrades.
+- `TRANSFER_ADMIN_ROLE`: transfer gate administration.
 
 ## Shared Status Model
 

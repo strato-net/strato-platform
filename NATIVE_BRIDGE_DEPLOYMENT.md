@@ -259,6 +259,8 @@ Saved batch file:
 
 This batch does:
 - on `StratoNativeRepresentationToken`, `grantRole(BRIDGE_ROLE, <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)`
+- on `StratoNativeRepresentationToken`, keep `transfersEnabled = false` until the sale/release condition is met
+- on `StratoNativeRepresentationToken`, `setTransferEndpoint(<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>, true)` so redemptions can occur while peer-to-peer transfers are blocked
 - on `StratoNativeRepresentationBridge`, optionally split operational roles with `grantRole` / `revokeRole`
 - on `StratoNativeRepresentationBridge`, `setAttestationSigner(<STRATO_VAULT_BACKED_SIGNER>, true)` for each native mint attestation signer
 - on `StratoNativeRepresentationBridge`, `setAttestationThreshold(<native mint attestation threshold>)`
@@ -286,6 +288,8 @@ Verification is optional for bridge setup. It is not required to continue if:
 Fastest checks:
 - Safe shows the full batch executed successfully
 - on the token proxy, `hasRole(BRIDGE_ROLE, <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)` returns `true`
+- on the token proxy, `transfersEnabled()` returns the intended launch value
+- on the token proxy, `transferEndpoints(<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)` returns `true`
 - on the bridge proxy, operational role holders match the deployment role plan
 - on the bridge proxy, `attestationSigners(<STRATO_VAULT_BACKED_SIGNER>)` returns `true`
 - on the bridge proxy, `attestationThreshold()` returns the configured native mint attestation threshold
@@ -581,6 +585,37 @@ method: grantRole(bytes32 role, address account)
 args:
   role: <BRIDGE_ROLE>
   account: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+```
+
+Representation token transfer gate:
+
+Transfers are disabled by default. Keep them disabled until the sale or release condition is met. When ready to make the representation token transferable:
+
+```text
+target: <SEPOLIA_REPRESENTATION_TOKEN_PROXY>
+method: setTransfersEnabled(bool enabled)
+args:
+  enabled: true
+```
+
+Before enabling general transfers, mark the representation bridge as a transfer endpoint so users can redeem back to STRATO while peer-to-peer transfers remain blocked:
+
+```text
+target: <SEPOLIA_REPRESENTATION_TOKEN_PROXY>
+method: setTransferEndpoint(address account, bool allowed)
+args:
+  account: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+  allowed: true
+```
+
+If transfer control should be managed by a different address than the admin Safe, grant and optionally revoke `TRANSFER_ADMIN_ROLE` through the Safe.
+
+```text
+target: <SEPOLIA_REPRESENTATION_TOKEN_PROXY>
+method: grantRole(bytes32 role, address account)
+args:
+  role: <TRANSFER_ADMIN_ROLE>
+  account: <TRANSFER_ADMIN>
 ```
 
 Representation bridge signer and threshold config:
