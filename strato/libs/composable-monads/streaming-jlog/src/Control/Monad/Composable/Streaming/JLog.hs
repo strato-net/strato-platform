@@ -75,7 +75,7 @@ import System.FilePath ((</>))
 import JLog.FFI (JLogId(..), JLogMessage(..), jlog_new, jlog_ctx_init, jlog_ctx_open_writer,
                  jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber,
                  jlog_ctx_open_reader, jlog_ctx_err_string, jlog_ctx_read_interval,
-                 jlog_ctx_read_message, jlog_ctx_read_checkpoint)
+                 jlog_ctx_read_message, jlog_ctx_read_checkpoint, jlog_ctx_advance_id)
 
 -- Compatibility types
 newtype Offset = Offset { unOffset :: Int64 }
@@ -204,6 +204,13 @@ consumeBroadcast :: (Binary a, HasStreaming m) =>
                     ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
 consumeBroadcast = consume
 
+-- | Batch limits for reading messages
+maxBatchMessages :: Int
+maxBatchMessages = 1000
+
+maxBatchBytes :: Int
+maxBatchBytes = 10 * 1024 * 1024  -- 10 MB
+
 runConsume :: (Binary a, HasStreaming m) =>
               ConsumerGroup -> TopicName -> ([a] -> m (Maybe b)) -> m b
 runConsume consumerGroup topicName f = do
@@ -222,79 +229,117 @@ runConsume consumerGroup topicName f = do
         void $ jlog_ctx_add_subscriber ctx csub 0
       jlog_ctx_close ctx
   
-  consumeLoop
+  consumeLoop topicPath subscriber
   where
-    consumeLoop = do
-      env <- getStreamEnv
-      let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
-          subscriber = T.unpack consumerGroup
-      
-      -- Read a batch of messages with one context open
-      (msgs, hasMore) <- liftIO $ readBatch topicPath subscriber
-      if null msgs
-        then do
+    consumeLoop topicPath subscriber = do
+      -- Read batch without checkpointing, get messages + last ID
+      result <- liftIO $ readBatchNoCheckpoint topicPath subscriber
+      case result of
+        Nothing -> do
           liftIO $ threadDelay 100000  -- 100ms poll if no messages
-          consumeLoop
-        else processBatch msgs hasMore
+          consumeLoop topicPath subscriber
+        Just (msgs, lastId) -> do
+          -- Process batch, then checkpoint once at the end
+          mResult <- processBatch msgs
+          liftIO $ checkpointTo topicPath subscriber lastId
+          case mResult of
+            Just r -> return r
+            Nothing -> consumeLoop topicPath subscriber
     
-    processBatch [] hasMore = if hasMore then consumeLoop else do
-      liftIO $ threadDelay 100000
-      consumeLoop
-    processBatch (msgBytes:rest) hasMore = do
+    processBatch [] = return Nothing
+    processBatch (msgBytes:rest) = do
       let item = decode (LBS.fromStrict msgBytes)
       mResult <- f [item]
       case mResult of
-        Just result -> return result
-        Nothing -> processBatch rest hasMore
+        Just r -> return (Just r)
+        Nothing -> processBatch rest
     
-    -- Read up to 1000 messages in one context
-    readBatch topicPath subscriber = 
+    -- Read up to maxBatchMessages or maxBatchBytes, whichever comes first
+    -- Returns Nothing if no messages available
+    -- Returns Just (messages, lastId) with the ID of last message read
+    readBatchNoCheckpoint topicPath subscriber = 
       withCString topicPath $ \cpath ->
         withCString subscriber $ \csub -> do
           ctx <- jlog_new cpath
           if ctx == nullPtr
-            then return ([], False)
+            then return Nothing
             else do
               rc <- jlog_ctx_open_reader ctx csub
               if rc /= 0
                 then do
                   jlog_ctx_close ctx
-                  return ([], False)
-                else readMessages ctx [] (0 :: Int)
+                  return Nothing
+                else 
+                  alloca $ \startPtr ->
+                    alloca $ \endPtr -> do
+                      poke startPtr (JLogId 0 0)
+                      poke endPtr (JLogId 0 0)
+                      count <- jlog_ctx_read_interval ctx startPtr endPtr
+                      if count <= 0
+                        then do
+                          jlog_ctx_close ctx
+                          return Nothing
+                        else do
+                          startId <- peek startPtr
+                          readMessagesWithAdvance ctx startPtr endPtr [] 0 0 startId
     
-    readMessages ctx acc n
-      | n >= 1000 = do  -- Max batch size
-          jlog_ctx_close ctx
-          return (reverse acc, True)  -- hasMore = True
-      | otherwise = 
-          alloca $ \startPtr ->
-            alloca $ \endPtr -> do
-              poke startPtr (JLogId 0 0)
-              poke endPtr (JLogId 0 0)
-              count <- jlog_ctx_read_interval ctx startPtr endPtr
-              if count <= 0
-                then do
-                  jlog_ctx_close ctx
-                  return (reverse acc, False)
-                else do
-                  alloca $ \msgStructPtr -> do
-                    readRc <- jlog_ctx_read_message ctx startPtr msgStructPtr
-                    if readRc /= 0
-                      then do
-                        jlog_ctx_close ctx
-                        return (reverse acc, False)
+    -- Read messages using advance_id to iterate without checkpointing
+    -- lastReadId tracks the last message we successfully read (for correct checkpointing)
+    readMessagesWithAdvance ctx curPtr endPtr acc msgCount totalBytes lastReadId
+      | msgCount >= maxBatchMessages = finishBatch ctx lastReadId acc
+      | totalBytes >= maxBatchBytes  = finishBatch ctx lastReadId acc
+      | otherwise = do
+          curId <- peek curPtr
+          endId <- peek endPtr
+          if curId `idGreaterThan` endId
+            then finishBatch ctx lastReadId acc
+            else do
+              alloca $ \msgStructPtr -> do
+                readRc <- jlog_ctx_read_message ctx curPtr msgStructPtr
+                if readRc /= 0
+                  then finishBatch ctx lastReadId acc
+                  else do
+                    msg <- peek msgStructPtr
+                    let msgLen = jlogMsgLen msg
+                        msgDataPtr = jlogMsgData msg
+                    if msgDataPtr == nullPtr || msgLen == 0
+                      then finishBatch ctx lastReadId acc
                       else do
-                        msg <- peek msgStructPtr
-                        let msgLen = jlogMsgLen msg
-                            msgDataPtr = jlogMsgData msg
-                        if msgDataPtr == nullPtr || msgLen == 0
-                          then do
-                            jlog_ctx_close ctx
-                            return (reverse acc, False)
+                        msgBytes <- BS.packCStringLen (castPtr msgDataPtr, fromIntegral msgLen)
+                        let newTotal = totalBytes + BS.length msgBytes
+                        -- If we just read the last message (cur == end), stop here
+                        if curId == endId
+                          then finishBatch ctx curId (msgBytes : acc)
                           else do
-                            msgBytes <- BS.packCStringLen (castPtr msgDataPtr, fromIntegral msgLen)
-                            _ <- jlog_ctx_read_checkpoint ctx startPtr
-                            readMessages ctx (msgBytes : acc) (n + 1)
+                            -- Advance to next message
+                            alloca $ \nextPtr -> do
+                              poke nextPtr =<< peek curPtr  -- Copy cur to next first
+                              advRc <- jlog_ctx_advance_id ctx curPtr nextPtr endPtr
+                              if advRc /= 0
+                                then finishBatch ctx curId (msgBytes : acc)
+                                else readMessagesWithAdvance ctx nextPtr endPtr (msgBytes : acc) (msgCount + 1) newTotal curId
+    
+    idGreaterThan (JLogId l1 m1) (JLogId l2 m2) =
+      l1 > l2 || (l1 == l2 && m1 > m2)
+    
+    finishBatch ctx lastId acc = do
+      jlog_ctx_close ctx
+      if null acc
+        then return Nothing
+        else return $ Just (reverse acc, lastId)
+    
+    -- Checkpoint to a specific ID (single fsync for entire batch)
+    checkpointTo topicPath subscriber lastId =
+      withCString topicPath $ \cpath ->
+        withCString subscriber $ \csub -> do
+          ctx <- jlog_new cpath
+          when (ctx /= nullPtr) $ do
+            rc <- jlog_ctx_open_reader ctx csub
+            when (rc == 0) $
+              alloca $ \idPtr -> do
+                poke idPtr lastId
+                void $ jlog_ctx_read_checkpoint ctx idPtr
+            jlog_ctx_close ctx
 
 consumeFromLatest :: (Binary a, HasStreaming m) =>
                      TopicName -> m () -> ([a] -> m (Maybe b)) -> m b
@@ -333,59 +378,96 @@ conduitBatchSource clientId streamAddress topicName = do
         void $ jlog_ctx_add_subscriber ctx csub 0
       jlog_ctx_close ctx
   
-  -- Read batches of messages
+  -- Read batches of messages with single checkpoint at end
   forever $ do
-    batch <- liftIO $ readBatch topicPath subscriber
-    yield batch
-    when (null batch) $
-      liftIO $ threadDelay 100000  -- 100ms poll if no messages
+    result <- liftIO $ readBatchConduit topicPath subscriber
+    case result of
+      Nothing -> do
+        yield []
+        liftIO $ threadDelay 100000
+      Just (msgs, lastId) -> do
+        liftIO $ checkpointConduit topicPath subscriber lastId
+        let items = map (decode . LBS.fromStrict) msgs
+        yield items
   where
-    readBatch topicPath subscriber = 
+    readBatchConduit topicPath subscriber = 
       withCString topicPath $ \cpath ->
         withCString subscriber $ \csub -> do
           ctx <- jlog_new cpath
           if ctx == nullPtr
-            then return []
+            then return Nothing
             else do
               rc <- jlog_ctx_open_reader ctx csub
               if rc /= 0
                 then do
                   jlog_ctx_close ctx
-                  return []
-                else readAllAvailable ctx []
+                  return Nothing
+                else 
+                  alloca $ \startPtr ->
+                    alloca $ \endPtr -> do
+                      poke startPtr (JLogId 0 0)
+                      poke endPtr (JLogId 0 0)
+                      count <- jlog_ctx_read_interval ctx startPtr endPtr
+                      if count <= 0
+                        then do
+                          jlog_ctx_close ctx
+                          return Nothing
+                        else do
+                          startId <- peek startPtr
+                          readLoopAdvance ctx startPtr endPtr [] 0 0 startId
     
-    readAllAvailable ctx acc = do
-      alloca $ \startPtr ->
-        alloca $ \endPtr -> do
-          poke startPtr (JLogId 0 0)
-          poke endPtr (JLogId 0 0)
-          count <- jlog_ctx_read_interval ctx startPtr endPtr
-          if count <= 0
-            then do
-              jlog_ctx_close ctx
-              return (reverse acc)
+    readLoopAdvance ctx curPtr endPtr acc msgCount totalBytes lastReadId
+      | msgCount >= maxBatchMessages = finishConduit ctx lastReadId acc
+      | totalBytes >= maxBatchBytes  = finishConduit ctx lastReadId acc
+      | otherwise = do
+          curId <- peek curPtr
+          endId <- peek endPtr
+          if curId `idGt` endId
+            then finishConduit ctx lastReadId acc
             else do
-              -- Read one message
               alloca $ \msgStructPtr -> do
-                readRc <- jlog_ctx_read_message ctx startPtr msgStructPtr
+                readRc <- jlog_ctx_read_message ctx curPtr msgStructPtr
                 if readRc /= 0
-                  then do
-                    jlog_ctx_close ctx
-                    return (reverse acc)
+                  then finishConduit ctx lastReadId acc
                   else do
                     msg <- peek msgStructPtr
                     let msgLen = jlogMsgLen msg
                         msgDataPtr = jlogMsgData msg
                     if msgDataPtr == nullPtr || msgLen == 0
-                      then do
-                        jlog_ctx_close ctx
-                        return (reverse acc)
+                      then finishConduit ctx lastReadId acc
                       else do
                         msgBytes <- BS.packCStringLen (castPtr msgDataPtr, fromIntegral msgLen)
-                        let item = decode (LBS.fromStrict msgBytes)
-                        -- Checkpoint and continue reading
-                        _ <- jlog_ctx_read_checkpoint ctx startPtr
-                        readAllAvailable ctx (item : acc)
+                        let newTotal = totalBytes + BS.length msgBytes
+                        -- If we just read the last message (cur == end), stop here
+                        if curId == endId
+                          then finishConduit ctx curId (msgBytes : acc)
+                          else do
+                            alloca $ \nextPtr -> do
+                              poke nextPtr =<< peek curPtr  -- Copy cur to next first
+                              advRc <- jlog_ctx_advance_id ctx curPtr nextPtr endPtr
+                              if advRc /= 0
+                                then finishConduit ctx curId (msgBytes : acc)
+                                else readLoopAdvance ctx nextPtr endPtr (msgBytes : acc) (msgCount + 1) newTotal curId
+    
+    idGt (JLogId l1 m1) (JLogId l2 m2) = l1 > l2 || (l1 == l2 && m1 > m2)
+    
+    finishConduit ctx lastId acc = do
+      jlog_ctx_close ctx
+      if null acc
+        then return Nothing
+        else return $ Just (reverse acc, lastId)
+    
+    checkpointConduit topicPath subscriber lastId =
+      withCString topicPath $ \cpath ->
+        withCString subscriber $ \csub -> do
+          ctx <- jlog_new cpath
+          when (ctx /= nullPtr) $ do
+            rc <- jlog_ctx_open_reader ctx csub
+            when (rc == 0) $
+              alloca $ \idPtr -> do
+                poke idPtr lastId
+                void $ jlog_ctx_read_checkpoint ctx idPtr
+            jlog_ctx_close ctx
 
 ----------------------
 --  Topic creation  --

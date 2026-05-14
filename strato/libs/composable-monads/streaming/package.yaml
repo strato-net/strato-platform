@@ -15,11 +15,10 @@ license:             Apache-2.0
 
 dependencies:
 - base >= 4.7 && < 5
+- streaming-jlog  # <- change this line to switch backends
 
 library:
   source-dirs: src
   exposed-modules:
   - Control.Monad.Composable.Streaming
   - Control.Monad.Composable.Streaming.DockerConfig
-  dependencies:
-  - streaming-jlog  # <- change this line to switch backends
