@@ -41,6 +41,8 @@ export const constants = (() => {
   const YieldVault = `${CONTRACT_PREFIX}YieldVault`;
   const MetalForge = `${CONTRACT_PREFIX}MetalForge`;
   const SafetyModule = `${CONTRACT_PREFIX}SafetyModule`;
+  const FixedPriceSale = `${CONTRACT_PREFIX}FixedPriceSale`;
+  const FixedPriceSaleFactory = `${CONTRACT_PREFIX}FixedPriceSaleFactory`;
   const Event = "event";
     
   const tokenSelectFields = [
@@ -153,9 +155,13 @@ export const constants = (() => {
     YieldVault,
     MetalForge,
     SafetyModule,
+    FixedPriceSale,
+    FixedPriceSaleFactory,
     get metalForge() { return config.metalForge; },
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
     get vault() { return config.vault; },  // Use getter to get current value after init
+    get fixedPriceSale() { return config.fixedPriceSale; },
+    get fixedPriceSaleFactory() { return config.fixedPriceSaleFactory; },
     priceOracle,
     liquidityPool,
     lendingPool,

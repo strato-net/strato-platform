@@ -60,6 +60,10 @@ import "Vault/VaultFactory.sol";
 //YieldVault
 import "YieldVault/YieldVault.sol";
 
+//FixedPriceSale
+import "FixedPriceSale/FixedPriceSale.sol";
+import "FixedPriceSale/FixedPriceSaleFactory.sol";
+
 //TODO
 contract record Mercata is Authorizable {
     RateStrategy public rateStrategy;

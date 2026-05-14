@@ -18,7 +18,8 @@ import {
   HandCoins,
   Vault,
   CreditCard,
-  ArrowDownToLine
+  ArrowDownToLine,
+  Rocket
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import STRATOLOGO from '@/assets/strato.png';
@@ -50,6 +51,7 @@ const NAV_CATEGORIES: NavCategory[] = [
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
       { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
+      { icon: Rocket, label: 'STRATO Sale', path: '/dashboard/strato-sale' },
     ],
   },
   {

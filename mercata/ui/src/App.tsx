@@ -32,6 +32,7 @@ import CommunityRewardsOnePager from "./pages/CommunityRewardsOnePager";
 import ReferralsManagement from "./pages/ReferralsManagement";
 import PriceTracking from "./pages/PriceTracking";
 import Vault from "./pages/Vault";
+import FixedPriceSalePage from "./pages/FixedPriceSale";
 import Earn from "./pages/Earn";
 import EarnSave from "./pages/EarnSave";
 import EarnVault from "./pages/EarnVault";
@@ -301,6 +302,14 @@ const App = () => {
                                                   element={
                                                     <GuestAccessibleRoute>
                                                       <Vault />
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
+                                                  path="/dashboard/strato-sale"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <FixedPriceSalePage />
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />

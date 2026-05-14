@@ -23,6 +23,7 @@ import protocolFeeRoutes from "./routes/protocolFee.routes";
 import rpcRoutes from "./routes/rpc.routes";
 import referRoutes from "./routes/refer.routes";
 import vaultRoutes from "./routes/vault.routes";
+import fixedPriceSaleRoutes from "./routes/fixedPriceSale.routes";
 import onrampRoutes from "./routes/onramp.routes";
 import metalForgeRoutes from "./routes/metalForge.routes";
 import earnRoutes from "./routes/earn.routes";
@@ -99,6 +100,9 @@ router.use("/refer", referRoutes);
 
 // ----- Vault Routes -----
 router.use("/vault", vaultRoutes);
+
+// ----- Fixed Price Sale Routes -----
+router.use("/fixed-price-sale", fixedPriceSaleRoutes);
 
 // ----- Onramp Routes -----
 router.use("/onramp", onrampRoutes);

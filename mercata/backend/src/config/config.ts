@@ -150,6 +150,16 @@ export const defaultUsdcYieldVaultFor: Record<string, string> = {
   "33056204878082667": "",                                       // Upquark mainnet
 };
 
+export const defaultFixedPriceSaleFor: Record<string, string> = {
+  "114784819836269": "",  // Helium testnet — set after deploy
+  "33056204878082667": "", // Upquark mainnet — set after deploy
+};
+
+export const defaultFixedPriceSaleFactoryFor: Record<string, string> = {
+  "114784819836269": "",  // Helium testnet — set after deploy
+  "33056204878082667": "", // Upquark mainnet — set after deploy
+};
+
 export let bridgeUrl: string | undefined;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
@@ -164,6 +174,8 @@ export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
 export let usdcYieldVault: string = '';
+export let fixedPriceSale: string = '';
+export let fixedPriceSaleFactory: string = '';
 
 function setBridgeConfig(networkId: string) {
   if (process.env.BRIDGE_SERVICE_URL) {
@@ -243,6 +255,11 @@ export function setUsdcYieldVaultConfig(networkId: string) {
   usdcYieldVault = process.env.USDC_YIELD_VAULT || defaultUsdcYieldVaultFor[networkId] || "";
 }
 
+export function setFixedPriceSaleConfig(networkId: string) {
+  fixedPriceSale = process.env.FIXED_PRICE_SALE || defaultFixedPriceSaleFor[networkId] || "";
+  fixedPriceSaleFactory = process.env.FIXED_PRICE_SALE_FACTORY || defaultFixedPriceSaleFactoryFor[networkId] || "";
+}
+
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
   const { eth } = await import("../utils/mercataApiHelper");
@@ -263,6 +280,7 @@ export async function initNetworkConfig() {
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
+  setFixedPriceSaleConfig(networkId);
 }
 
 /**
