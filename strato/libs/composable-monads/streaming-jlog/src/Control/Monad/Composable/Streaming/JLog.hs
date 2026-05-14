@@ -247,12 +247,9 @@ runConsume consumerGroup topicName f = do
             Nothing -> consumeLoop topicPath subscriber
     
     processBatch [] = return Nothing
-    processBatch (msgBytes:rest) = do
-      let item = decode (LBS.fromStrict msgBytes)
-      mResult <- f [item]
-      case mResult of
-        Just r -> return (Just r)
-        Nothing -> processBatch rest
+    processBatch msgs = do
+      let items = map (decode . LBS.fromStrict) msgs
+      f items
     
     -- Read up to maxBatchMessages or maxBatchBytes, whichever comes first
     -- Returns Nothing if no messages available
