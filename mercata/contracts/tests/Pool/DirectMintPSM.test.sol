@@ -572,6 +572,38 @@ contract Describe_DirectMintPSM {
         admin.doSuccessfully(address(psm), "setMintConfig", address(USDC), true, 0, 0);
     }
 
+    function it_psm_enforces_global_mint_pause_controls() {
+        admin.doSuccessfully(address(USDC), "mint", address(user2), 20e18);
+        user2.doSuccessfully(address(USDC), "approve", address(psm), 20e18);
+
+        admin.doSuccessfully(address(psm), "pauseMint");
+        require(psm.mintPaused(), "Mint should be paused");
+        user2.doExpectingFailure(address(psm), "mint", "Minting is paused", 10e18, address(USDC));
+
+        admin.doSuccessfully(address(psm), "unpauseMint");
+        require(!psm.mintPaused(), "Mint should be unpaused");
+        user2.doSuccessfully(address(psm), "mint", 10e18, address(USDC));
+    }
+
+    function it_psm_enforces_global_burn_pause_controls() {
+        admin.doSuccessfully(address(USDST), "mint", address(user2), 40e18);
+        user2.doSuccessfully(address(USDST), "approve", address(psm), 40e18);
+
+        admin.doSuccessfully(address(psm), "pauseBurn");
+        require(psm.burnPaused(), "Burn should be paused");
+        user2.doExpectingFailure(address(psm), "requestBurn", "Burning is paused", 10e18, address(USDC));
+
+        admin.doSuccessfully(address(psm), "unpauseBurn");
+        require(!psm.burnPaused(), "Burn should be unpaused");
+        user2.doSuccessfully(address(psm), "requestBurn", 10e18, address(USDC));
+        uint requestId = psm.burnReqCounter();
+
+        admin.doSuccessfully(address(psm), "pauseBurn");
+        user2.doExpectingFailure(address(psm), "completeBurn", "Burning is paused", requestId);
+        user2.doSuccessfully(address(psm), "cancelBurn", requestId);
+        admin.doSuccessfully(address(psm), "unpauseBurn");
+    }
+
     function it_psm_applies_burn_fee_to_reserved_and_paid_amount() {
         admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 100);
         admin.doSuccessfully(address(USDST), "mint", address(user2), 100e18);
