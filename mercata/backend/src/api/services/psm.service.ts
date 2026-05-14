@@ -4,8 +4,10 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
+import JSONBig from "json-bigint";
 
 const { DirectMintPSM, Token } = constants;
+const JSONbigString = JSONBig({ storeAsString: true });
 
 const normalizeAddress = (value: string | undefined | null): string =>
   (value || "").toLowerCase().replace(/^0x/, "");
@@ -13,11 +15,42 @@ const normalizeAddress = (value: string | undefined | null): string =>
 const parseStructValue = (value: unknown): Record<string, any> => {
   if (!value) return {};
   if (typeof value === "string") {
-    try { return JSON.parse(value); } catch { return {}; }
+    try { return JSONbigString.parse(value); } catch { return {}; }
   }
   if (typeof value === "object") return value as Record<string, any>;
   return {};
 };
+
+const parseTupleValue = (value: unknown): string[] => {
+  if (typeof value !== "string") return [];
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("(") || !trimmed.endsWith(")")) return [];
+  return trimmed
+    .slice(1, -1)
+    .split(",")
+    .map((part) => part.trim().replace(/^"|"$/g, ""));
+};
+
+const toIntegerString = (value: unknown): string => {
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return "0";
+    return value.toLocaleString("fullwide", { useGrouping: false });
+  }
+  const raw = String(value ?? "0").trim();
+  return /^-?\d+$/.test(raw) ? raw : "0";
+};
+
+const toBigInt = (value: unknown): bigint => {
+  try {
+    return BigInt(toIntegerString(value));
+  } catch {
+    return 0n;
+  }
+};
+
+const toBoolean = (value: unknown): boolean =>
+  value === true || ["true", "t"].includes(String(value).toLowerCase());
 
 const getPsmAddress = (): string => {
   const addr = constants.directMintPsm;
@@ -25,13 +58,49 @@ const getPsmAddress = (): string => {
   return addr;
 };
 
+interface MintConfigInfo {
+  isEnabled: boolean;
+  maxBalance: string;
+  feeBps: string;
+}
+
+interface BurnConfigInfo {
+  isEnabled: boolean;
+  minReserve: string;
+  burnDelay: string;
+  feeBps: string;
+}
+
+const parseMintConfig = (value: unknown): MintConfigInfo => {
+  const parsed = parseStructValue(value);
+  const tuple = parseTupleValue(value);
+  return {
+    isEnabled: toBoolean(parsed.isEnabled ?? tuple[0]),
+    maxBalance: toIntegerString(parsed.maxBalance ?? tuple[1]),
+    feeBps: toIntegerString(parsed.feeBps ?? tuple[2]),
+  };
+};
+
+const parseBurnConfig = (value: unknown): BurnConfigInfo => {
+  const parsed = parseStructValue(value);
+  const tuple = parseTupleValue(value);
+  return {
+    isEnabled: toBoolean(parsed.isEnabled ?? tuple[0]),
+    minReserve: toIntegerString(parsed.minReserve ?? tuple[1]),
+    burnDelay: toIntegerString(parsed.burnDelay ?? tuple[2]),
+    feeBps: toIntegerString(parsed.feeBps ?? tuple[3]),
+  };
+};
+
 export interface BurnRequestInfo {
   id: string;
   amount: string;
+  payoutAmount: string;
   redeemToken: string;
   redeemTokenSymbol: string;
   requester: string;
   requestTime: string;
+  burnDelay: string;
   availableAt: string;
   isAvailable: boolean;
 }
@@ -40,13 +109,23 @@ export interface PsmInfo {
   address: string;
   mintableToken: string;
   mintableTokenSymbol: string;
-  burnDelay: string;
+  mintPaused: boolean;
+  burnPaused: boolean;
   eligibleTokens: Array<{
     address: string;
     symbol: string;
     name: string;
     userBalance: string;
     psmBalance: string;
+    mintEnabled: boolean;
+    burnEnabled: boolean;
+    maxBalance: string;
+    minReserve: string;
+    burnDelay: string;
+    mintFeeBps: string;
+    burnFeeBps: string;
+    pendingRedemptions: string;
+    availableLiquidity: string;
   }>;
   burnRequests: BurnRequestInfo[];
   userMintableBalance: string;
@@ -63,28 +142,41 @@ export const getPsmInfo = async (
   const psmResponse = await cirrus.get(accessToken, `/${DirectMintPSM}`, {
     params: {
       address: `eq.${psmAddress}`,
-      select: "mintableToken,burnReqCounter,burnDelay",
+      select: "mintableToken,mintPaused,burnPaused",
     },
   });
   const psm = psmResponse.data?.[0] || {};
   const mintableToken = normalizeAddress(psm.mintableToken);
-  const burnDelay = psm.burnDelay?.toString() || "0";
 
-  // 2. Eligible tokens (mapping entries where value is true)
-  const eligibleResponse = await cirrus.get(
-    accessToken,
-    `/${DirectMintPSM}-eligibleTokens`,
-    {
+  // 2. Per-token PSM configs
+  const [mintConfigResponse, burnConfigResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${DirectMintPSM}-mintConfigs`, {
       params: {
         address: `eq.${psmAddress}`,
-        value: "eq.true",
-        select: "key",
+        select: "key,value::text",
       },
-    }
-  );
-  const eligibleAddresses: string[] = (eligibleResponse.data || []).map(
-    (e: any) => normalizeAddress(e.key)
-  );
+    }),
+    cirrus.get(accessToken, `/${DirectMintPSM}-burnConfigs`, {
+      params: {
+        address: `eq.${psmAddress}`,
+        select: "key,value::text",
+      },
+    }),
+  ]);
+
+  const mintConfigs: Record<string, MintConfigInfo> = {};
+  for (const entry of mintConfigResponse.data || []) {
+    mintConfigs[normalizeAddress(entry.key)] = parseMintConfig(entry.value);
+  }
+
+  const burnConfigs: Record<string, BurnConfigInfo> = {};
+  for (const entry of burnConfigResponse.data || []) {
+    burnConfigs[normalizeAddress(entry.key)] = parseBurnConfig(entry.value);
+  }
+
+  const eligibleAddresses = [
+    ...new Set([...Object.keys(mintConfigs), ...Object.keys(burnConfigs)]),
+  ].filter(Boolean);
 
   // 3. Token metadata
   const allTokenAddresses = [
@@ -126,22 +218,30 @@ export const getPsmInfo = async (
     }
   }
 
-  // 5. PSM balances for eligible tokens
+  // 5. PSM balances and reserved redemption liquidity for eligible tokens
   let psmBalances: Record<string, string> = {};
+  let pendingRedemptions: Record<string, string> = {};
   if (eligibleAddresses.length > 0) {
-    const psmBalResponse = await cirrus.get(
-      accessToken,
-      `/${Token}-_balances`,
-      {
+    const [psmBalResponse, pendingResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${Token}-_balances`, {
         params: {
           address: `in.(${eligibleAddresses.join(",")})`,
           key: `eq.${psmAddress}`,
           select: "address,value::text",
         },
-      }
-    );
+      }),
+      cirrus.get(accessToken, `/${DirectMintPSM}-pendingRedemptions`, {
+        params: {
+          address: `eq.${psmAddress}`,
+          select: "key,value::text",
+        },
+      }),
+    ]);
     for (const b of psmBalResponse.data || []) {
       psmBalances[normalizeAddress(b.address)] = b.value || "0";
+    }
+    for (const entry of pendingResponse.data || []) {
+      pendingRedemptions[normalizeAddress(entry.key)] = toIntegerString(entry.value);
     }
   }
 
@@ -152,29 +252,33 @@ export const getPsmInfo = async (
     {
       params: {
         address: `eq.${psmAddress}`,
-        select: "key,value",
+        select: "key,value::text",
       },
     }
   );
 
   const currentTime = Math.floor(Date.now() / 1000);
-  const burnDelayNum = parseInt(burnDelay) || 0;
 
   const burnRequests: BurnRequestInfo[] = (burnReqResponse.data || [])
     .map((entry: any) => {
       const val = parseStructValue(entry.value);
-      const amount = String(val?.amount || "0");
-      const requester = normalizeAddress(val?.requester);
-      const requestTime = String(val?.requestTime || "0");
-      const availableAt = String(parseInt(requestTime) + burnDelayNum);
-      const redeemAddr = normalizeAddress(val?.redeemToken);
+      const tuple = parseTupleValue(entry.value);
+      const amount = toIntegerString(val?.burnAmount ?? tuple[0]);
+      const payoutAmount = toIntegerString(val?.payoutAmount ?? tuple[1]);
+      const redeemAddr = normalizeAddress(val?.redeemToken ?? tuple[2]);
+      const requester = normalizeAddress(val?.requester ?? tuple[3]);
+      const requestTime = toIntegerString(val?.requestTime ?? tuple[4]);
+      const burnDelay = burnConfigs[redeemAddr]?.burnDelay || "0";
+      const availableAt = String((toBigInt(requestTime) + toBigInt(burnDelay)).toString());
       return {
         id: String(entry.key),
         amount,
+        payoutAmount,
         redeemToken: redeemAddr,
         redeemTokenSymbol: tokenMeta[redeemAddr]?.symbol || redeemAddr,
         requester,
         requestTime,
+        burnDelay,
         availableAt,
         isAvailable: currentTime >= parseInt(availableAt),
       };
@@ -192,13 +296,29 @@ export const getPsmInfo = async (
     address: psmAddress,
     mintableToken,
     mintableTokenSymbol: tokenMeta[mintableToken]?.symbol || "USDST",
-    burnDelay,
+    mintPaused: toBoolean(psm.mintPaused),
+    burnPaused: toBoolean(psm.burnPaused),
     eligibleTokens: eligibleAddresses.map((addr) => ({
       address: addr,
       symbol: tokenMeta[addr]?.symbol || "",
       name: tokenMeta[addr]?.name || "",
       userBalance: userBalances[addr] || "0",
       psmBalance: psmBalances[addr] || "0",
+      mintEnabled: mintConfigs[addr]?.isEnabled || false,
+      burnEnabled: burnConfigs[addr]?.isEnabled || false,
+      maxBalance: mintConfigs[addr]?.maxBalance || "0",
+      minReserve: burnConfigs[addr]?.minReserve || "0",
+      burnDelay: burnConfigs[addr]?.burnDelay || "0",
+      mintFeeBps: mintConfigs[addr]?.feeBps || "0",
+      burnFeeBps: burnConfigs[addr]?.feeBps || "0",
+      pendingRedemptions: pendingRedemptions[addr] || "0",
+      availableLiquidity: (() => {
+        const psmBalance = toBigInt(psmBalances[addr]);
+        const pending = toBigInt(pendingRedemptions[addr]);
+        const minReserve = toBigInt(burnConfigs[addr]?.minReserve);
+        const unreserved = psmBalance - pending;
+        return unreserved > minReserve ? (unreserved - minReserve).toString() : "0";
+      })(),
     })),
     burnRequests,
     userMintableBalance: userBalances[mintableToken] || "0",

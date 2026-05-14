@@ -9,15 +9,26 @@ export interface EligibleToken {
   name: string;
   userBalance: string;
   psmBalance: string;
+  mintEnabled: boolean;
+  burnEnabled: boolean;
+  maxBalance: string;
+  minReserve: string;
+  burnDelay: string;
+  mintFeeBps: string;
+  burnFeeBps: string;
+  pendingRedemptions: string;
+  availableLiquidity: string;
 }
 
 export interface BurnRequest {
   id: string;
   amount: string;
+  payoutAmount: string;
   redeemToken: string;
   redeemTokenSymbol: string;
   requester: string;
   requestTime: string;
+  burnDelay: string;
   availableAt: string;
   isAvailable: boolean;
 }
@@ -26,7 +37,8 @@ export interface PsmInfo {
   address: string;
   mintableToken: string;
   mintableTokenSymbol: string;
-  burnDelay: string;
+  mintPaused: boolean;
+  burnPaused: boolean;
   eligibleTokens: EligibleToken[];
   burnRequests: BurnRequest[];
   userMintableBalance: string;
