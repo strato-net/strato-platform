@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import CDPController from "../controllers/cdp.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -21,7 +22,7 @@ const router = Router();
  *                 type: object
  *                 additionalProperties: true
  */
-router.get("/vaults", authHandler.authorizeRequest(), CDPController.getVaults);
+router.get("/vaults", authHandler.authorizeRequest(false), CDPController.getVaults);
 
 /**
  * @openapi
@@ -105,7 +106,7 @@ router.get("/vaults/:asset", authHandler.authorizeRequest(), CDPController.getVa
  *               type: object
  *               additionalProperties: true
  */
-router.post("/deposit", authHandler.authorizeRequest(), CDPController.deposit);
+router.post("/deposit", walletAuth, CDPController.deposit);
 
 /**
  * @openapi
@@ -138,7 +139,7 @@ router.post("/deposit", authHandler.authorizeRequest(), CDPController.deposit);
  *               type: object
  *               additionalProperties: true
  */
-router.post("/withdraw", authHandler.authorizeRequest(), CDPController.withdraw);
+router.post("/withdraw", walletAuth, CDPController.withdraw);
 
 /**
  * @openapi
@@ -169,7 +170,7 @@ router.post("/withdraw", authHandler.authorizeRequest(), CDPController.withdraw)
  *                 maxAmount:
  *                   type: string
  */
-router.post("/get-max-mint", authHandler.authorizeRequest(), CDPController.getMaxMint);
+router.post("/get-max-mint", walletAuth, CDPController.getMaxMint);
 
 /**
  * @openapi
@@ -201,7 +202,7 @@ router.post("/get-max-mint", authHandler.authorizeRequest(), CDPController.getMa
  *               type: object
  *               additionalProperties: true
  */
-router.post("/mint", authHandler.authorizeRequest(), CDPController.mint);
+router.post("/mint", walletAuth, CDPController.mint);
 
 /**
  * @openapi
@@ -233,7 +234,7 @@ router.post("/mint", authHandler.authorizeRequest(), CDPController.mint);
  *               type: object
  *               additionalProperties: true
  */
-router.post("/repay", authHandler.authorizeRequest(), CDPController.repay);
+router.post("/repay", walletAuth, CDPController.repay);
 
 /**
  * @openapi
@@ -264,7 +265,7 @@ router.post("/repay", authHandler.authorizeRequest(), CDPController.repay);
  *                 maxAmount:
  *                   type: string
  */
-router.post("/get-max-withdraw", authHandler.authorizeRequest(), CDPController.getMaxWithdraw);
+router.post("/get-max-withdraw", walletAuth, CDPController.getMaxWithdraw);
 
 /**
  * @openapi
@@ -293,7 +294,7 @@ router.post("/get-max-withdraw", authHandler.authorizeRequest(), CDPController.g
  *               type: object
  *               additionalProperties: true
  */
-router.post("/withdraw-max", authHandler.authorizeRequest(), CDPController.withdrawMax);
+router.post("/withdraw-max", walletAuth, CDPController.withdrawMax);
 
 /**
  * @openapi
@@ -322,7 +323,7 @@ router.post("/withdraw-max", authHandler.authorizeRequest(), CDPController.withd
  *               type: object
  *               additionalProperties: true
  */
-router.post("/mint-max", authHandler.authorizeRequest(), CDPController.mintMax);
+router.post("/mint-max", walletAuth, CDPController.mintMax);
 
 /**
  * @openapi
@@ -351,7 +352,7 @@ router.post("/mint-max", authHandler.authorizeRequest(), CDPController.mintMax);
  *               type: object
  *               additionalProperties: true
  */
-router.post("/repay-all", authHandler.authorizeRequest(), CDPController.repayAll);
+router.post("/repay-all", walletAuth, CDPController.repayAll);
 
 /**
  * @openapi
@@ -388,7 +389,7 @@ router.post("/repay-all", authHandler.authorizeRequest(), CDPController.repayAll
  *               type: object
  *               additionalProperties: true
  */
-router.post("/liquidate", authHandler.authorizeRequest(), CDPController.liquidate);
+router.post("/liquidate", walletAuth, CDPController.liquidate);
 
 /**
  * @openapi
@@ -440,7 +441,7 @@ router.get("/liquidatable", authHandler.authorizeRequest(), CDPController.getLiq
  *                 maxAmount:
  *                   type: string
  */
-router.post("/max-liquidatable", authHandler.authorizeRequest(), CDPController.getMaxLiquidatable);
+router.post("/max-liquidatable", walletAuth, CDPController.getMaxLiquidatable);
 
 /**
  * @openapi
@@ -523,7 +524,7 @@ router.get("/assets", authHandler.authorizeRequest(true), CDPController.getAsset
  *                 debtCeiling:
  *                   type: string
  */
-router.post("/asset-debt-info", authHandler.authorizeRequest(), CDPController.getAssetDebtInfo);
+router.post("/asset-debt-info", walletAuth, CDPController.getAssetDebtInfo);
 
 /**
  * @openapi
@@ -577,7 +578,7 @@ router.post("/asset-debt-info", authHandler.authorizeRequest(), CDPController.ge
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-collateral-config", authHandler.authorizeRequest(), CDPController.setCollateralConfig);
+router.post("/admin/set-collateral-config", walletAuth, CDPController.setCollateralConfig);
 
 /**
  * @openapi
@@ -608,7 +609,7 @@ router.post("/admin/set-collateral-config", authHandler.authorizeRequest(), CDPC
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-asset-paused", authHandler.authorizeRequest(), CDPController.setAssetPaused);
+router.post("/admin/set-asset-paused", walletAuth, CDPController.setAssetPaused);
 
 /**
  * @openapi
@@ -639,7 +640,7 @@ router.post("/admin/set-asset-paused", authHandler.authorizeRequest(), CDPContro
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-asset-supported", authHandler.authorizeRequest(), CDPController.setAssetSupported);
+router.post("/admin/set-asset-supported", walletAuth, CDPController.setAssetSupported);
 
 /**
  * @openapi
@@ -667,7 +668,7 @@ router.post("/admin/set-asset-supported", authHandler.authorizeRequest(), CDPCon
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/set-global-paused", authHandler.authorizeRequest(), CDPController.setGlobalPaused);
+router.post("/admin/set-global-paused", walletAuth, CDPController.setGlobalPaused);
 
 /**
  * @openapi
@@ -782,7 +783,7 @@ router.get("/bad-debt/juniors/:account", authHandler.authorizeRequest(), CDPCont
  *               type: object
  *               additionalProperties: true
  */
-router.post("/bad-debt/open-junior-note", authHandler.authorizeRequest(), CDPController.openJuniorNote);
+router.post("/bad-debt/open-junior-note", walletAuth, CDPController.openJuniorNote);
 
 /**
  * @openapi
@@ -811,7 +812,7 @@ router.post("/bad-debt/open-junior-note", authHandler.authorizeRequest(), CDPCon
  *               type: object
  *               additionalProperties: true
  */
-router.post("/bad-debt/top-up-junior-note", authHandler.authorizeRequest(), CDPController.topUpJuniorNote);
+router.post("/bad-debt/top-up-junior-note", walletAuth, CDPController.topUpJuniorNote);
 
 /**
  * @openapi
@@ -828,7 +829,7 @@ router.post("/bad-debt/top-up-junior-note", authHandler.authorizeRequest(), CDPC
  *               type: object
  *               additionalProperties: true
  */
-router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPController.claimJuniorNote);
+router.post("/bad-debt/claim-junior-note", walletAuth, CDPController.claimJuniorNote);
 
 /**
  * @openapi

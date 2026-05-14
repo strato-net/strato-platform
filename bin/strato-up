@@ -2,10 +2,31 @@
 
 set -e
 
-# Setup node (creates if needed, skips if exists with no flags, errors if exists with flags)
-strato-setup "$@"
+# --patch-app was removed - inform the user. To be removed soon.
+for arg in "$@"; do
+    if [[ "$arg" == "--patch-app" ]]; then
+        echo "Error: the --patch-app flag has been removed from strato-up."
+        echo "Use 'strato-patch-app' instead (see README for details)."
+        exit 1
+    fi
+done
 
-cd "$1"
+strato-setup "$@"
+NODE_DIR="$1"
+
+cd "$NODE_DIR"
+
+# Check if node is already running
+if [[ -f .strato.pid ]]; then
+    source .strato.pid
+    if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
+        echo "Error: STRATO is already running in $(pwd) (convoke PID $CONVOKE_PID)"
+        echo "Run 'strato-down' first to stop the running node."
+        exit 1
+    fi
+    # Stale pidfile from a previous crashed run — clean it up
+    rm -f .strato.pid
+fi
 
 echo "Starting convoke..."
 # stdout goes to log, stderr goes to both log and terminal

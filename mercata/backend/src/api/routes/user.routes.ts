@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import UserController from "../controllers/user.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -25,7 +26,7 @@ const router = Router();
  *                 userName:
  *                   type: string
  */
-router.get("/me", authHandler.authorizeRequest(), UserController.me);
+router.get("/me", authHandler.authorizeRequest(false), UserController.me);
 
 /**
  * @openapi
@@ -93,8 +94,8 @@ router.get("/me", authHandler.authorizeRequest(), UserController.me);
  *               additionalProperties: true
  */
 router.get("/admin", authHandler.authorizeRequest(), UserController.admin);
-router.post("/admin", authHandler.authorizeRequest(), UserController.addAdmin);
-router.delete("/admin", authHandler.authorizeRequest(), UserController.removeAdmin);
+router.post("/admin", walletAuth, UserController.addAdmin);
+router.delete("/admin", walletAuth, UserController.removeAdmin);
 
 /**
  * @openapi
@@ -181,7 +182,7 @@ router.get("/admin/contract/details", authHandler.authorizeRequest(), UserContro
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/vote", authHandler.authorizeRequest(), UserController.castVoteOnIssue);
+router.post("/admin/vote", walletAuth, UserController.castVoteOnIssue);
 
 /**
  * @openapi
@@ -210,7 +211,7 @@ router.post("/admin/vote", authHandler.authorizeRequest(), UserController.castVo
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/vote/by-id", authHandler.authorizeRequest(), UserController.castVoteOnIssueById);
+router.post("/admin/vote/by-id", walletAuth, UserController.castVoteOnIssueById);
 
 /**
  * @openapi
@@ -239,7 +240,7 @@ router.post("/admin/vote/by-id", authHandler.authorizeRequest(), UserController.
  *               type: object
  *               additionalProperties: true
  */
-router.post("/admin/dismiss", authHandler.authorizeRequest(), UserController.dismissIssue);
+router.post("/admin/dismiss", walletAuth, UserController.dismissIssue);
 
 /**
  * @openapi

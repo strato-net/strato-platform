@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail } from "lucide-react";
+import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail, Gift } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
@@ -21,10 +21,13 @@ import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { BalanceSnapshot } from "@mercata/shared-types";
 import { useUserLeaderboardRank } from "@/hooks/useUserLeaderboardRank";
 import { useRewards } from "@/hooks/useRewards";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsService";
+import { formatBalance, safeBigInt } from "@/utils/numberUtils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import LiquidationAlertBanner from "@/components/ui/LiquidationAlertBanner";
+import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import { useNetwork } from "@/context/NetworkContext";
 
@@ -93,6 +96,15 @@ const Dashboard = () => {
   const { activities: rewardsActivities, loading: rewardsActivitiesLoading } = useRewardsActivities();
   const { state: rewardsState } = useRewards();
   const { rank: userRank, totalEarned, loading: rankLoading } = useUserLeaderboardRank();
+  const { userRewards: rewardsUserInfo } = useRewardsUserInfo();
+  const communityBonusFormatted = useMemo(() => {
+    const bonus = rewardsUserInfo?.bonusRewards;
+    if (!bonus || safeBigInt(bonus) <= 0n) return null;
+    const numeric = formatBalance(bonus, "points", 18, 18, 18)
+      .replace(/\s*points?\s*$/i, "")
+      .trim();
+    return formatRoundedWithCommas(roundByMagnitude(numeric));
+  }, [rewardsUserInfo?.bonusRewards]);
   const highestIncentiveApy = useMemo(() => {
     if (!rewardsActivities.length) return 0;
     return rewardsActivities.reduce((maxApy, activity) => {
@@ -130,6 +142,8 @@ const Dashboard = () => {
   const { netBalance: totalBalance, cataBalance, totalBorrowed, isLoading: isLoadingNetBalance } = useNetBalance({
     cataToken,
   });
+
+  const showFullDashboard = isLoggedIn && (isLoadingNetBalance || totalBalance > 0);
 
   const chartConfig = useMemo(() => ({
     netBalance: {
@@ -282,66 +296,37 @@ const Dashboard = () => {
         <DashboardHeader title="Portfolio" />
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
-          {/* Physical Metals Deposit Banner (only when contact API is configured) */}
-          {contactEnabled && (
-            <div className="mb-8">
-              <div className="bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-200 dark:border-blue-800 rounded-xl p-4 md:p-5 hover:bg-blue-500/15 transition-colors">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-500 rounded-full p-1.5 shrink-0">
-                      <Gem className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm md:text-base font-semibold text-foreground">Deposit Physical Gold & Silver</h3>
-                      <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                        We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => setContactModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
-                  >
-                    <Mail size={16} />
-                    Contact Us
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-          {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to view your portfolio, track rewards, and manage your assets" />
-          )}
-          {isLoggedIn && <LiquidationAlertBanner />}
-          <div className={`grid grid-cols-1 ${rewardsEnabled && isLoggedIn ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
-            <AssetSummary
-              title="Net Balance"
-              value={isLoggedIn ? `$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : "-"}
-              icon={<Wallet className="text-white" size={18} />}
-              color="bg-blue-500"
-              onClick={isLoggedIn ? () => setActiveTab('netBalance') : undefined}
-              isActive={isLoggedIn && activeTab === 'netBalance'}
-              isLoading={isLoggedIn && isLoadingNetBalance}
-            />
+          {!isLoggedIn && <GuestPromoSection variant={1} />}
+          {isLoggedIn && !isLoadingNetBalance && totalBalance === 0 && <GuestPromoSection variant={2} />}
+          {isLoggedIn && (isLoadingNetBalance || totalBalance > 0) && <GuestPromoSection variant={3} />}
+          {showFullDashboard && <LiquidationAlertBanner />}
+          {showFullDashboard && (
+            <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3 md:gap-6 mb-4 md:mb-8`}>
+              <AssetSummary
+                title="Net Balance"
+                value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
+                icon={<Wallet className="text-white" size={18} />}
+                color="bg-blue-500"
+                onClick={() => setActiveTab('netBalance')}
+                isActive={activeTab === 'netBalance'}
+                isLoading={isLoadingNetBalance}
+              />
 
-            <AssetSummary
-              title="Rewards"
-              value={(() => {
-                if (!isLoggedIn) return "-";
-                if (rankLoading) return "Loading...";
-                if (!totalEarned) return "0 Reward Points";
-                const totalEarnedNum = parseFloat(totalEarned) / 1e18;
-                return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} Reward Points`;
-              })()}
-              icon={<Coins className="text-white" size={18} />}
-              color="bg-purple-500"
-              onClick={isLoggedIn ? () => setActiveTab('rewards') : undefined}
-              isActive={isLoggedIn && activeTab === 'rewards'}
-              isLoading={isLoggedIn && rankLoading}
-              additionalContent={
-                isLoggedIn ? (
-                  <div className="mt-2">
+              <AssetSummary
+                title="Rewards"
+                value={(() => {
+                  if (rankLoading) return "Loading...";
+                  if (!totalEarned) return "0 pts";
+                  const totalEarnedNum = parseFloat(totalEarned) / 1e18;
+                  return `${totalEarnedNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} pts`;
+                })()}
+                icon={<Coins className="text-white" size={18} />}
+                color="bg-purple-500"
+                onClick={() => setActiveTab('rewards')}
+                isActive={activeTab === 'rewards'}
+                isLoading={rankLoading}
+                additionalContent={
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -365,20 +350,34 @@ const Dashboard = () => {
                         "View Leaderboard"
                       )}
                     </Button>
+                    {communityBonusFormatted && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/dashboard/rewards`);
+                        }}
+                        title={`Community bonus: +${communityBonusFormatted} pts — view on Rewards page`}
+                        className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 whitespace-nowrap"
+                      >
+                        <Gift className="h-3.5 w-3.5" />
+                        +{communityBonusFormatted} Bonus
+                      </button>
+                    )}
                   </div>
-                ) : null
-              }
-            />
+                }
+              />
 
-            <AssetSummary
-              title="Total Borrowed"
-              value={isLoggedIn ? `${totalBorrowed.toFixed(2)} USDST` : "-"}
-              icon={<Shield className="text-white" size={18} />}
-              color="bg-orange-500"
-              onClick={isLoggedIn ? () => setActiveTab('borrowed') : undefined}
-              isActive={isLoggedIn && activeTab === 'borrowed'}
-            />
-          </div>
+              <AssetSummary
+                title="Total Borrowed"
+                value={`${totalBorrowed.toFixed(2)} USDST`}
+                icon={<Shield className="text-white" size={18} />}
+                color="bg-orange-500"
+                onClick={() => setActiveTab('borrowed')}
+                isActive={activeTab === 'borrowed'}
+              />
+            </div>
+          )}
 
           {/* Rewards Section */}
           {/* <div className="mb-4 md:mb-8">
@@ -411,7 +410,7 @@ const Dashboard = () => {
           </div> */}
 
           {/* Portfolio Value Chart - hidden on mobile and for guests */}
-          {isLoggedIn && (
+          {showFullDashboard && (
             <div className="mb-8 hidden md:block">
               <PortfolioValueChart
                 data={chartConfig[activeTab].data || []}
@@ -427,36 +426,67 @@ const Dashboard = () => {
           )}
 
           {/* Quick Action Buttons */}
-          <div className="mb-8 grid grid-cols-4 gap-2 md:gap-4">
-            <Button
-              onClick={() => navigate("/dashboard/deposits")}
-              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
-            >
-              <Wallet size={18} />
-              <span className="text-xs md:text-sm">Deposit</span>
-            </Button>
-            <Button
-              onClick={() => navigate("/dashboard/transfer")}
-              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
-            >
-              <Send size={18} />
-              <span className="text-xs md:text-sm">Transfer</span>
-            </Button>
-            <Button
-              onClick={() => navigate("/dashboard/borrow")}
-              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
-            >
-              <Book size={18} />
-              <span className="text-xs md:text-sm">Borrow</span>
-            </Button>
-            <Button
-              onClick={() => navigate("/dashboard/swap")}
-              className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
-            >
-              <ArrowRightLeft size={18} />
-              <span className="text-xs md:text-sm">Swap</span>
-            </Button>
-          </div>
+          {showFullDashboard && (
+            <div className="mb-8 grid grid-cols-4 gap-2 md:gap-4">
+              <Button
+                onClick={() => navigate("/dashboard/deposits")}
+                className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+              >
+                <Wallet size={18} />
+                <span className="text-xs md:text-sm">Deposit</span>
+              </Button>
+              <Button
+                onClick={() => navigate("/dashboard/transfer")}
+                className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+              >
+                <Send size={18} />
+                <span className="text-xs md:text-sm">Transfer</span>
+              </Button>
+              <Button
+                onClick={() => navigate("/dashboard/borrow")}
+                className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+              >
+                <Book size={18} />
+                <span className="text-xs md:text-sm">Borrow</span>
+              </Button>
+              <Button
+                onClick={() => navigate("/dashboard/swap")}
+                className="h-auto py-3 md:h-12 md:py-0 bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"
+              >
+                <ArrowRightLeft size={18} />
+                <span className="text-xs md:text-sm">Swap</span>
+              </Button>
+            </div>
+          )}
+
+          {/* Physical Metals Deposit Banner (only when contact API is configured) */}
+          {contactEnabled && (
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-200 dark:border-blue-800 rounded-xl p-4 md:p-5 hover:bg-blue-500/15 transition-colors">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-500 rounded-full p-1.5 shrink-0">
+                      <Gem className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm md:text-base font-semibold text-foreground">Deposit Physical Gold & Silver</h3>
+                      <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                        We are currently accepting gold and silver physical deposits for tokenizing into GOLDST and SILVST.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => setContactModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-2 shrink-0 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+                  >
+                    <Mail size={16} />
+                    Contact Us
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mb-8">
             <AssetsList

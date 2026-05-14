@@ -12,6 +12,7 @@
 module Blockchain.SolidVM.SetGet
   ( setVar,
     weakGetVar,
+    getStorageValue,
     getVar,
     getIntEither,
     getIntValEither,
@@ -107,22 +108,22 @@ setVal :: MonadSM m => Value -> Value -> m ()
 setVal (SUserDefined a _ _) (SUserDefined _ _ _) =
   when (True) (internalError "Unimplemented feature user defined types" (a))
 setVal (SReference dst) (SReference src) = do
-  len <- getInt (Constant $ SReference $ src `apSnoc` MS.Field "length")
-  setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger len
+  len <- getInt (Constant $ SReference $ src `MS.snoc` MS.Field "length")
+  setVal (SReference $ dst `MS.snoc` MS.Field "length") $ SInteger len
   forM_ [0 .. len - 1] $ \i -> do
     let i' = BC.pack $ show i
-    setVal (SReference $ dst `apSnoc` MS.Index i')
-      =<< getVar (Constant $ SReference $ src `apSnoc` MS.Index i')
+    setVal (SReference $ dst `MS.snoc` MS.Index i')
+      =<< getVar (Constant $ SReference $ src `MS.snoc` MS.Index i')
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
-    setVal (SReference $ dst `apSnoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
+    setVal (SReference $ dst `MS.snoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
 setVal (SReference dst) (SArray fs) = do
   let len = length fs
-  setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger $ fromIntegral len
+  setVal (SReference $ dst `MS.snoc` MS.Field "length") $ SInteger $ fromIntegral len
   forM_ [0 .. len - 1] $ \i -> do
     let i' = BC.pack $ show i
     elementVal <- getVar $ fs V.! i
-    setVal (SReference $ dst `apSnoc` MS.Index i') elementVal
+    setVal (SReference $ dst `MS.snoc` MS.Index i') elementVal
 setVal (STuple dstVector) (STuple srcVector) =
   if V.length dstVector /= V.length srcVector
     then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
@@ -134,8 +135,10 @@ setVal (STuple dstVector) (STuple srcVector) =
         return (dstItem, srcItemVal)
       forM_ zipped' $ \(dstItem, srcItemVal) -> do
         setVar dstItem srcItemVal
-setVal dst@(SReference (AddressPath addr path)) src = do
-  ro <- readOnly <$> getCurrentCallInfo
+setVal dst@(SReference path) src = do
+  cci <- getCurrentCallInfo
+  let ro = readOnly cci
+      addr = currentAddress cci
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
   basicSrc <- case src of
     SString s -> pure . Just . MS.BString . UTF8.fromString $ s
@@ -151,16 +154,21 @@ setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or 
 setVal (SNULL) _ = return ()
 setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
+getStorageValue :: HasSolidStorageDB m => Address -> MS.StoragePath -> m Value
+getStorageValue addr key = do
+  theValue <- getSolidStorageKeyVal' addr key
+  case theValue of
+    MS.BDefault -> pure $ SReference key
+    _ -> pure $ fromBasic theValue
+
 weakGetVar :: MonadIO m => Variable -> m Value
 weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
 --fromm variable to value
 getVar :: MonadSM m => Variable -> m Value
-getVar (Constant (SReference addressedPath@(AddressPath addr key))) = do
-  theValue <- getSolidStorageKeyVal' addr key
-  case theValue of
-    MS.BDefault -> pure $ SReference addressedPath
-    _ -> pure $ fromBasic theValue
+getVar (Constant (SReference key)) = do
+  ca <- currentAddress <$> getCurrentCallInfo
+  getStorageValue ca key
 getVar (Constant (SStruct s ma)) = do
   resolved <-
     mapM
@@ -207,10 +215,9 @@ getIntEither :: MonadSM m => Variable -> m (Either Value Integer)
 getIntEither p = getIntValEither <$> getVar p
 
 getIntValEither :: Value -> Either Value Integer
-getIntValEither = \case
+getIntValEither v' = case toNull v' of
   SInteger s -> Right s
   SNULL -> Right 0
-  SReference{} -> Right 0
   v -> Left v
 
 getInt :: MonadSM m => Variable -> m Integer
@@ -225,29 +232,27 @@ int = getIntVal
 getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
 getRealNum p = do
   v <- getVar p
-  case v of
+  case toNull v of
     SInteger s -> return $ Left s
     SDecimal s -> return $ Right s
     SNULL -> return $ Left 0
-    SReference{} -> pure $ Left 0
     _ -> typeError "getRealNum" $ show (p, v)
 
 getBool :: MonadSM m => Variable -> m Bool
 getBool = getBoolVal <=< getVar
 
 getBoolVal :: MonadSM m => Value -> m Bool
-getBoolVal = \case
+getBoolVal v' = case toNull v' of
   SBool b -> return b
-  SInteger i -> return $ i /= 0
+  SInteger _ -> return True -- integer is guaranteed to not be 0
   SNULL -> return False
-  SReference{} -> pure False
   v -> typeError "getBool" $ show v
 
 getAddress :: MonadSM m => Variable -> m Address
 getAddress = getAddressVal <=< getVar
 
 getAddressVal :: MonadSM m => Value -> m Address
-getAddressVal = \case
+getAddressVal v' = case toNull v' of
   SInteger i -> pure $ fromIntegral i
   SAddress a _ -> pure a
   SContract _ a -> pure a
@@ -256,27 +261,25 @@ getAddressVal = \case
     Just a -> pure a
   SBytes b -> pure $ addressFromByteString b
   SNULL -> pure 0
-  SReference{} -> pure 0
   v -> typeError "getAddress" $ show v
 
 getString :: MonadSM m => Variable -> m String
 getString = getStringVal <=< getVar
 
 getStringVal :: MonadSM m => Value -> m String
-getStringVal = \case
+getStringVal v' = case toNull v' of
   SString s -> pure s
   SBytes b -> case decodeUtf8' b of
     Left _ -> pure $ BC.unpack b
     Right r -> pure $ T.unpack r
   SNULL -> pure ""
-  SReference{} -> pure ""
   v -> typeError "getString" $ show v
 
 getBytes :: MonadSM m => Variable -> m BC.ByteString
 getBytes = getBytesVal <=< getVar
 
 getBytesVal :: MonadSM m => Value -> m BC.ByteString
-getBytesVal = \case
+getBytesVal v' = case toNull v' of
   SInteger i -> pure $ integer2Bytes i
   SAddress a _ -> pure $ addressToByteString a
   SContract _ a -> pure $ addressToByteString a
@@ -285,12 +288,13 @@ getBytesVal = \case
     _ -> pure . encodeUtf8 $ T.pack s
   SBytes b -> pure b
   SNULL -> pure BC.empty
-  SReference{} -> pure BC.empty
   v -> typeError "getAddress" $ show v
 
 deleteVar :: MonadSM m => Variable -> m ()
-deleteVar (Constant (SReference (AddressPath addr path))) = do
-  ro <- readOnly <$> getCurrentCallInfo
+deleteVar (Constant (SReference path)) = do
+  cci <- getCurrentCallInfo
+  let ro = readOnly cci
+      addr = currentAddress cci
   when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
   markDiffForAction addr path $ MS.BDefault
   putSolidStorageKeyVal' addr path $ MS.BDefault

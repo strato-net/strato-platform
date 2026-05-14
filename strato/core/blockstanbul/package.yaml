@@ -34,7 +34,7 @@ library:
   - strato-model
   - text
   - transformers
-  - monad-alter
+  - vault-monad
 
 tests:
   blockstanbul-test:

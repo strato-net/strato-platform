@@ -9,6 +9,8 @@ library:
   exposed-modules:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.Builtins
+    - Blockchain.SolidVM.Environment
+    - Blockchain.SolidVM.GasInfo
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
   ghc-options: -Wall -O2
@@ -32,10 +34,7 @@ library:
   - ethereum-rlp
   - evm-solidity
   - exceptions
-  - extra
   - format
-  - galois-field
-  - labeled-error
   - lens
   - merkle-patricia-db
   - monad-alter
@@ -70,7 +69,6 @@ executables:
     dependencies:
       - containers
       - parsec
-      - solid-vm-compiler
       - solid-vm-model
       - solid-vm-parser
       - solid-vm-static-analysis

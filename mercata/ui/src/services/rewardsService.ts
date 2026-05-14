@@ -1,6 +1,7 @@
 import { api } from "@/lib/axios";
 import { formatUnits } from "viem";
 import { safeBigInt } from "@/utils/numberUtils";
+import { isTxSubmitted } from "@/utils/transactionStatus";
 
 export interface Activity {
   activityId: number;
@@ -66,6 +67,9 @@ export interface LeaderboardResponse {
   limit: number;
 }
 
+export const normalizeRewardsAddress = (address: string | null | undefined): string =>
+  (address || "").toLowerCase().replace(/^0x/, "");
+
 
 /**
  * Fetch global Rewards contract state
@@ -130,13 +134,17 @@ export const fetchActivity = async (activityId: number): Promise<Activity> => {
   return response.data;
 };
 
+type RewardRequestOptions = {
+  walletAuth?: boolean;
+};
+
 /**
  * Fetch user's rewards data
  * @param forceRefresh - If true, bypasses cache and fetches fresh data from blockchain
  */
-export const fetchUserRewards = async (userAddress: string, forceRefresh: boolean = false): Promise<UserRewardsData> => {
+export const fetchUserRewards = async (forceRefresh: boolean = false, options?: RewardRequestOptions): Promise<UserRewardsData> => {
   const params = forceRefresh ? { refresh: "true" } : {};
-  const response = await api.get(`/rewards/activities/${userAddress}`, { params });
+  const response = await api.get(`/rewards/activities/me`, { params, ...options } as any);
   const data = response.data;
   
   const unclaimedRewards = data.unclaimedRewards || "0";
@@ -485,14 +493,29 @@ export const formatRoundedWithCommas = (value: string): string => {
   return formatWithCommas(value);
 };
 
+type RewardClaimResult = {
+  success: boolean;
+  txHash?: string;
+  status?: string;
+  hash?: string;
+};
+
+type RewardClaimOptions = RewardRequestOptions;
+
+const normalizeRewardClaimResult = (data: RewardClaimResult): RewardClaimResult => ({
+  ...data,
+  success: data.success || isTxSubmitted(data.status),
+  txHash: data.txHash || data.hash,
+});
+
 /**
  * Claim all rewards for a user
  * Backend will handle the contract interaction
  */
-export const claimAllRewards = async (userAddress: string): Promise<{ success: boolean; txHash?: string }> => {
+export const claimAllRewards = async (userAddress: string, options?: RewardClaimOptions): Promise<RewardClaimResult> => {
   try {
-    const response = await api.post("/rewards/claim-all");
-    return response.data;
+    const response = await api.post("/rewards/claim-all", undefined, options as any);
+    return normalizeRewardClaimResult(response.data);
   } catch (error: unknown) {
     // Extract error message from response if available
     const errorMessage = (error as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error 
@@ -506,7 +529,7 @@ export const claimAllRewards = async (userAddress: string): Promise<{ success: b
  * Claim rewards for specific activities
  * Backend will handle the contract interaction
  */
-export const claimRewards = async (userAddress: string, activityIds: number[]): Promise<{ success: boolean; txHash?: string }> => {
+export const claimRewards = async (userAddress: string, activityIds: number[], options?: RewardClaimOptions): Promise<RewardClaimResult> => {
   // Use the first activityId for the claim endpoint (since it's /claim/:activityId)
   // TODO: Update backend to accept multiple activityIds or call multiple times
   if (activityIds.length === 0) {
@@ -514,8 +537,8 @@ export const claimRewards = async (userAddress: string, activityIds: number[]): 
   }
   
   try {
-    const response = await api.post(`/rewards/claim/${activityIds[0]}`);
-    return response.data;
+    const response = await api.post(`/rewards/claim/${activityIds[0]}`, undefined, options as any);
+    return normalizeRewardClaimResult(response.data);
   } catch (error: unknown) {
     // Extract error message from response if available
     const errorMessage = (error as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error 
@@ -547,5 +570,3 @@ export const fetchLeaderboard = async (
   const response = await api.get<LeaderboardResponse>("/rewards/leaderboard", { params });
   return response.data;
 };
-
-

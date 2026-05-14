@@ -6,13 +6,13 @@ module BlockApps.Tools.DumpKafkaSequencer where
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Text.Format
 
-dumpKafkaSequencer :: Offset -> IO ()
-dumpKafkaSequencer ofs = do
+dumpKafkaSequencer :: IO ()
+dumpKafkaSequencer = do
   mapM_
     putStrLn
     [ "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ dumpKafkaSequencer ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -21,20 +21,16 @@ dumpKafkaSequencer ofs = do
       "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
       ""
     ]
-  dumpKafkaSequencerVM ofs
+  dumpKafkaSequencerVM
 
---ignoring startingBlock for now, might fix this later, but it won't apply to RabbitMQ
-dumpKafkaSequencerVM :: Offset -> IO ()
-dumpKafkaSequencerVM startingBlock | startingBlock /= 0 = error "startingBlock currently can only equal 0"
-dumpKafkaSequencerVM _ = runStderrLoggingT $ runKafkaMConfigured "queryStrato" $
-  consume "queryStrato" "queryStrato" seqVmTasksTopicName $ \() seqEvents -> do
+dumpKafkaSequencerVM :: IO ()
+dumpKafkaSequencerVM = runStderrLoggingT $ runStreamMConfigured "queryStrato" $
+  consume "queryStrato" seqVmTasksTopicName $ \seqEvents -> do
     liftIO . putStrLn . unlines $ format <$> (seqEvents :: [VmTask])
     return ()
 
---ignoring startingBlock for now, might fix this later, but it won't apply to RabbitMQ
-dumpKafkaSequencerP2P :: Offset -> IO ()
-dumpKafkaSequencerP2P startingBlock | startingBlock /= 0 = error "startingBlock currently can only equal 0"
-dumpKafkaSequencerP2P _ = runStderrLoggingT $ runKafkaMConfigured "queryStrato" $
-  consume "queryStrato" "queryStrato" seqP2pEventsTopicName $ \() seqEvents -> do
+dumpKafkaSequencerP2P :: IO ()
+dumpKafkaSequencerP2P = runStderrLoggingT $ runStreamMConfigured "queryStrato" $
+  consume "queryStrato" seqP2pEventsTopicName $ \seqEvents -> do
     liftIO . putStrLn . unlines $ format <$> (seqEvents :: [P2pEvent])
     return ()

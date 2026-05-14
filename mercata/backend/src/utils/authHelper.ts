@@ -109,24 +109,58 @@ async function createKey(token: string): Promise<string | null> {
 //   }
 // }
 
+// Tracks STRATO addresses that were just created by this server. Used to
+// surface `isNew=true` on parallel mount-time API calls during the post-signup
+// page load (without it, only the racing-first call sees isNew=true and the
+// signal is lost to non-attribution consumers).
+const RECENTLY_CREATED_ADDRESSES = new Map<string, number>();
+const NEW_USER_WINDOW_MS = 60_000;
+
+function markNewlyCreated(address: string): void {
+  RECENTLY_CREATED_ADDRESSES.set(address, Date.now());
+  if (RECENTLY_CREATED_ADDRESSES.size > 1000) {
+    const cutoff = Date.now() - NEW_USER_WINDOW_MS;
+    for (const [addr, ts] of RECENTLY_CREATED_ADDRESSES) {
+      if (ts < cutoff) RECENTLY_CREATED_ADDRESSES.delete(addr);
+    }
+  }
+}
+
+function isRecentlyCreated(address: string): boolean {
+  const ts = RECENTLY_CREATED_ADDRESSES.get(address);
+  if (!ts) return false;
+  if (Date.now() - ts > NEW_USER_WINDOW_MS) {
+    RECENTLY_CREATED_ADDRESSES.delete(address);
+    return false;
+  }
+  return true;
+}
+
 /**
  * Fetches an existing STRATO key, or creates one if none exists.
  *
  * @param token - Bearer token for authorization
- * @returns the address string
+ * @returns the address string and a flag indicating whether the key was just created
  */
-export async function createOrGetKey(token: string): Promise<string> {
+export async function createOrGetKey(token: string): Promise<{ address: string; isNew: boolean }> {
   let address = await getKey(token);
+  let isNew = false;
   if (!address) {
     console.info("No key found for the user, creating a new one…");
     address = await createKey(token);
+    if (address) {
+      isNew = true;
+      markNewlyCreated(address);
+    }
+  } else if (isRecentlyCreated(address)) {
+    isNew = true;
   }
 
   if (!address) {
     throw new Error("Key creation failed: no address returned after attempting to create a new key");
   }
 
-  return address;
+  return { address, isNew };
 }
 
 /**

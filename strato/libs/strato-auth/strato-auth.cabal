@@ -48,22 +48,6 @@ executable strato-auth
   hs-source-dirs:
       exec_src
   build-depends:
-      aeson
-    , base >=4.7 && <5
-    , base64
-    , bytestring
-    , directory
-    , filelock
-    , filepath
-    , http-client
-    , http-client-tls
-    , http-types
-    , modern-uri
-    , req
-    , servant-client
-    , servant-client-core
+      base >=4.7 && <5
     , strato-auth
-    , text
-    , time
-    , yaml
   default-language: Haskell2010

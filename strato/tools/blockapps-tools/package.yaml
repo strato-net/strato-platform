@@ -17,7 +17,6 @@ library:
   source-dirs: src/
   dependencies:
     - aeson
-    - binary
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
@@ -28,11 +27,10 @@ library:
     - data-default
     - ethereum-discovery
     - ethereum-rlp
-    - filepath
     - format
     - hedis
     - hflags
-    - kafka-monad
+    - streaming
     - labeled-error
     - leveldb-haskell
     - merkle-patricia-db
@@ -47,7 +45,6 @@ library:
     - strato-model
     - strato-redis-blockdb
     - text
-    - time
     - transformers
     - vm-tools
 
@@ -64,7 +61,6 @@ executables:
       - filepath
       - labeled-error
       - merkle-patricia-db
-      - process
       - seqevents
       - strato-model
       - strato-p2p

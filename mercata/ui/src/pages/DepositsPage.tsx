@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
@@ -9,18 +10,28 @@ import { useBridgeContext } from '@/context/BridgeContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 
 const DepositsPage = () => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, loading, isAppAuthenticated, externalWalletAddress } = useUser();
   const { loadNetworksAndTokens } = useBridgeContext();
-  const [fundingMode, setFundingMode] = useState<"bridge" | "metals">("bridge");
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get('tab');
+  const [fundingMode, setFundingMode] = useState<"bridge" | "metals">(() =>
+    tab === 'metals' ? 'metals' : 'bridge'
+  );
+
+  useEffect(() => {
+    if (tab === 'metals') setFundingMode('metals');
+  }, [tab]);
   const [metalRefreshKey, setMetalRefreshKey] = useState(0);
   const handleMetalPurchase = useCallback(() => setMetalRefreshKey(k => k + 1), []);
 
   useEffect(() => {
+    if (loading || !isLoggedIn) return;
+    if (!isAppAuthenticated && !externalWalletAddress) return;
     loadNetworksAndTokens().catch((error) => {
       console.error('Failed to load networks and tokens:', error);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loading, isLoggedIn, isAppAuthenticated, externalWalletAddress]);
 
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">

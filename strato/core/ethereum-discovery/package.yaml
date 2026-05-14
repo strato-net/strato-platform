@@ -9,7 +9,6 @@ ghc-options: -Wall -O2
 
 dependencies:
   - base
-  - network
 
 library:
   source-dirs: src/
@@ -29,7 +28,9 @@ library:
     - binary
     - blockapps-data
     - blockapps-datadefs
+    - blockapps-vault-wrapper-api
     - blockDB
+    - network
     - bytestring
     - common-log
     - containers
@@ -47,10 +48,7 @@ library:
     - exceptions
     - format
     - hedis
-    - hflags
-    - http-client
     - iproute
-    - labeled-error
     - lens
     - monad-alter
     - mtl
@@ -79,8 +77,8 @@ executables:
       - ethereum-discovery
       - format
       - hflags
-      - monad-logger
       - mtl
+      - network
       - process-monitor
       - resourcet
       - strato-conf

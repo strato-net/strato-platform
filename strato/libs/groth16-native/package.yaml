@@ -25,10 +25,8 @@ library:
     - pairing
     - galois-field
     - elliptic-curve
-    - groups
     # Utilities
     - random
-    - deepseq
     - parallel
 
 ghc-options:

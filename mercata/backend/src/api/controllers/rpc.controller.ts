@@ -1,7 +1,62 @@
 import { NextFunction, Request, Response } from "express";
 import { getRpcUpstream } from "../../config/rpc.config";
+import { eth, bloc } from "../../utils/mercataApiHelper";
+import { StratoPaths } from "../../config/constants";
 
 class RpcController {
+  private static readonly READ_ONLY_RPC_METHODS = new Set([
+    "eth_call",
+    "eth_getBalance",
+    "eth_blockNumber",
+    "eth_chainId",
+    "eth_getCode",
+    "eth_getTransactionCount",
+    "eth_getTransactionByHash",
+    "eth_getTransactionReceipt",
+    "eth_getBlockByNumber",
+    "eth_getBlockByHash",
+    "eth_getLogs",
+    "net_version",
+  ]);
+
+  private static isReadOnlyRpcPayload(payload: unknown): boolean {
+    const requests = Array.isArray(payload) ? payload : [payload];
+    return requests.every(
+      (request) =>
+        request &&
+        typeof request === "object" &&
+        "method" in request &&
+        typeof request.method === "string" &&
+        RpcController.READ_ONLY_RPC_METHODS.has(request.method),
+    );
+  }
+
+  static async submitSignedTx(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const result = await eth.post(req.accessToken!, "/transaction", req.body);
+      res.status(200).json(result.data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async txResults(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const result = await bloc.post(req.accessToken!, StratoPaths.result, req.body);
+      res.status(200).json(result.data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async proxy(
     req: Request,
     res: Response,
@@ -9,6 +64,11 @@ class RpcController {
   ): Promise<void> {
     const chainId = req.params.chainId;
     const {upstream, fallback} = getRpcUpstream(chainId);
+
+    if (!RpcController.isReadOnlyRpcPayload(req.body)) {
+      res.status(403).json({ error: "RPC method not allowed" });
+      return;
+    }
 
     if (!upstream || !fallback) {
       res.status(400).json({ error: "Unsupported chainId" });
@@ -27,7 +87,7 @@ class RpcController {
       try {
         const upstreamRes = await fetch(upstream, {...requestPayload, signal: AbortSignal.timeout(5000)});
         response = await upstreamRes.json();
-        if (!upstreamRes.ok || !response.result) throw new Error(); //fallback
+        if (!upstreamRes.ok || (!Array.isArray(response) && response.error)) throw new Error(); //fallback
         res.status(upstreamRes.status).json(response);
         return;
       }
@@ -52,4 +112,3 @@ class RpcController {
 }
 
 export default RpcController;
-

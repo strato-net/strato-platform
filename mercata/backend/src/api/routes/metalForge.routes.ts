@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import MetalForgeController from "../controllers/metalForge.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -97,6 +98,6 @@ router.get("/configs", authHandler.authorizeRequest(true), MetalForgeController.
  *                 hash:
  *                   type: string
  */
-router.post("/buy", authHandler.authorizeRequest(), MetalForgeController.buy);
+router.post("/buy", walletAuth, MetalForgeController.buy);
 
 export default router;

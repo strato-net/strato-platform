@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RewardsOverview } from "@/components/rewards/RewardsOverview";
 import { ActivitiesTable } from "@/components/rewards/ActivitiesTable";
 import { UserRewardsSection } from "@/components/rewards/UserRewardsSection";
+import { UserRewardsSummary } from "@/components/rewards/UserRewardsSummary";
 import { LeaderboardTable } from "@/components/rewards/LeaderboardTable";
 import { useRewards } from "@/hooks/useRewards";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
@@ -14,10 +15,10 @@ import { useTokenContext } from "@/context/TokenContext";
 import { useRewardsLeaderboard } from "@/hooks/useRewardsLeaderboard";
 import { useSearchParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
-import { redirectToLogin } from "@/lib/auth";
+import { requestWalletConnection } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LogIn, Gift } from "lucide-react";
+import { Wallet, Gift } from "lucide-react";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const Rewards = () => {
@@ -84,7 +85,7 @@ const Rewards = () => {
   };
 
   const handleLogin = () => {
-    redirectToLogin();
+    requestWalletConnection();
   };
 
   // Guest login prompt component
@@ -96,7 +97,7 @@ const Rewards = () => {
         </div>
         <CardTitle className="text-xl">Start Earning Rewards</CardTitle>
         <CardDescription className="text-base">
-          Sign in to start earning CATA tokens and track your rewards.
+          Connect a wallet to start earning CATA tokens and track your rewards.
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center space-y-4">
@@ -105,8 +106,8 @@ const Rewards = () => {
           className="gap-2"
           size="lg"
         >
-          <LogIn className="w-4 h-4" />
-          Sign In to Get Started
+          <Wallet className="w-4 h-4" />
+          Connect Wallet to Get Started
         </Button>
       </CardContent>
     </Card>
@@ -123,12 +124,24 @@ const Rewards = () => {
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to start earning CATA tokens and track your rewards" />
           )}
-          {/* Global Overview - visible to all */}
-          <div className="mb-6">
-            <RewardsOverview state={state} loading={stateLoading} onRefresh={handleRefresh} />
-          </div>
+          {/* Personal summary cards at top for logged-in users; guests see the global overview here */}
+          {isLoggedIn ? (
+            <div className="mb-6">
+              <UserRewardsSummary
+                userRewards={userRewards}
+                loading={userRewardsLoading}
+                onClaimSuccess={handleClaimSuccess}
+                rewardsState={state}
+                rewardsStateLoading={stateLoading}
+              />
+            </div>
+          ) : (
+            <div className="mb-6">
+              <RewardsOverview state={state} loading={stateLoading} onRefresh={handleRefresh} />
+            </div>
+          )}
 
-          {/* Tabs for Activities, My Rewards, and Leaderboard */}
+          {/* Tabs for Activities, Active Positions, and Leaderboard */}
           <Tabs
             value={activeTab}
             onValueChange={(value) => setActiveTab(value as "activities" | "my-rewards" | "leaderboard")}
@@ -136,7 +149,7 @@ const Rewards = () => {
           >
             <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="activities">Activities (Season {state?.currentSeason || 2})</TabsTrigger>
-               <TabsTrigger value="my-rewards">My Rewards</TabsTrigger>
+               <TabsTrigger value="my-rewards">My Active Positions</TabsTrigger>
               <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             </TabsList>
 

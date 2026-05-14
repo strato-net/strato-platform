@@ -10,9 +10,179 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor to add CSRF token to state-changing requests
+let _walletAddress: string | null = null;
+export function setConnectedWalletAddress(addr: string | null) {
+  _walletAddress = addr;
+}
+
+let _appAuthenticated = false;
+export function setAppAuthenticated(authenticated: boolean) {
+  _appAuthenticated = authenticated;
+}
+
+type WalletSignFn = (unsignedTx: any) => Promise<string>;
+let _walletSignFn: WalletSignFn | null = null;
+export function setWalletSigner(fn: WalletSignFn | null) {
+  _walletSignFn = fn;
+}
+
+export type WalletTxProgressStatus =
+  | "signing"
+  | "submitting"
+  | "submitted"
+  | "confirming"
+  | "completed"
+  | "failed";
+
+export interface WalletTxProgressEvent {
+  index: number;
+  total: number;
+  status: WalletTxProgressStatus;
+  functionName?: string;
+  hash?: string;
+  error?: string;
+}
+
+export type WalletTxProgressHandler = (event: WalletTxProgressEvent) => void;
+
+const WALLET_SIGNING_NETWORK = "STRATO";
+
+function normalizeUnsignedTxForWallet(unsignedTx: any): any {
+  return {
+    ...unsignedTx,
+    data: {
+      ...unsignedTx.data,
+      network: WALLET_SIGNING_NETWORK,
+    },
+  };
+}
+
+function parseSignature(sig: string): { r: string; s: string; v: string } {
+  const raw = sig.replace(/^0x/, "");
+  return {
+    r: raw.slice(0, 64),
+    s: raw.slice(64, 128),
+    v: raw.slice(128, 130),
+  };
+}
+
+function buildSignedTx(unsignedData: any, sig: { r: string; s: string; v: string }): any {
+  return {
+    nonce: unsignedData.nonce,
+    gasLimit: unsignedData.gasLimit,
+    to: unsignedData.to,
+    funcName: unsignedData.functionName,
+    args: unsignedData.args,
+    network: unsignedData.network,
+    r: sig.r,
+    s: sig.s,
+    v: sig.v,
+    txVersion: 1,
+  };
+}
+
+async function pollTxResult(
+  hashes: string[],
+  timeout = 60000,
+  interval = 3000,
+  onProgress?: WalletTxProgressHandler
+): Promise<any[]> {
+  const start = Date.now();
+  while (true) {
+    const { data: results } = await api.post("/rpc/results", hashes);
+    results.forEach((result: any, index: number) => {
+      if (result?.status === "Pending") {
+        onProgress?.({ index, total: hashes.length, status: "confirming", hash: hashes[index] });
+      }
+    });
+    const allDone = results.every((r: any) => r?.status !== "Pending");
+    if (allDone) return results;
+    if (Date.now() - start >= timeout) return results;
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+}
+
+async function signAndSubmitUnsignedTxs(
+  unsignedTxs: any[],
+  onProgress?: WalletTxProgressHandler
+): Promise<{ status: string; hash: string }> {
+  if (!_walletSignFn) throw new Error("No wallet signer available");
+
+  const hashes: string[] = [];
+  for (let index = 0; index < unsignedTxs.length; index++) {
+    const tx = unsignedTxs[index];
+    const txForWallet = normalizeUnsignedTxForWallet(tx);
+    const functionName = txForWallet.data?.functionName;
+
+    try {
+      onProgress?.({ index, total: unsignedTxs.length, status: "signing", functionName, hash: tx.hash });
+      const signature = await _walletSignFn(txForWallet);
+      const sig = parseSignature(signature);
+      const signedTx = buildSignedTx(txForWallet.data, sig);
+
+      onProgress?.({ index, total: unsignedTxs.length, status: "submitting", functionName, hash: tx.hash });
+      const submittedHash = await api.post("/rpc/submit", signedTx);
+      const hash = typeof submittedHash.data === "string" ? submittedHash.data : tx.hash;
+      hashes.push(hash);
+      onProgress?.({ index, total: unsignedTxs.length, status: "submitted", functionName, hash });
+    } catch (error) {
+      onProgress?.({
+        index,
+        total: unsignedTxs.length,
+        status: "failed",
+        functionName,
+        hash: tx.hash,
+        error: error instanceof Error ? error.message : "Transaction failed",
+      });
+      throw error;
+    }
+  }
+
+  const results = await pollTxResult(hashes, 60000, 3000, onProgress);
+  const failed = results.find((r: any) => r?.status === "Failure");
+  if (failed) {
+    const failedIndex = results.indexOf(failed);
+    onProgress?.({
+      index: failedIndex,
+      total: hashes.length,
+      status: "failed",
+      hash: hashes[failedIndex],
+      error: failed.txResult?.message || failed.message || "Transaction failed",
+    });
+    throw new Error(failed.txResult?.message || failed.message || "Transaction failed");
+  }
+  const pendingIndex = results.findIndex((r: any) => r?.status === "Pending");
+  if (pendingIndex >= 0) {
+    onProgress?.({
+      index: pendingIndex,
+      total: hashes.length,
+      status: "submitted",
+      hash: hashes[pendingIndex],
+    });
+    return { status: "Pending", hash: hashes[0] };
+  }
+  results.forEach((result: any, index: number) => {
+    onProgress?.({
+      index,
+      total: hashes.length,
+      status: "completed",
+      hash: hashes[index],
+      error: result?.status === "Failure" ? result.txResult?.message || result.message : undefined,
+    });
+  });
+  return { status: results[0]?.status || "Success", hash: hashes[0] };
+}
+
 api.interceptors.request.use(
   (config) => {
+    const walletAuth = (config as any).walletAuth;
+    const shouldSendWalletAddress =
+      walletAuth === true || (walletAuth !== false && !_appAuthenticated);
+
+    if (_walletAddress && shouldSendWalletAddress) {
+      config.headers["X-Wallet-Address"] = _walletAddress;
+    }
+
     const method = (config.method || "get").toLowerCase();
     const needsCsrf = ["post", "put", "delete", "patch"].includes(method);
 
@@ -65,64 +235,16 @@ function extractApiErrorMessage(error: any): string {
   return error?.message || "An unexpected error occurred.";
 }
 
-// URLs that are expected to fail for non-authenticated users (should not redirect to login)
-const GUEST_SAFE_URLS = [
-  '/user/me',
-  // DepositsGuestPage
-  '/tokens/v2/earning-assets/public',
-  '/bridge/networkConfigs',
-  '/bridge/bridgeableTokens',
-  '/bridge/depositActions',
-  '/bridge/withdrawalSummary',
-  '/bridge/balance',
-  '/bridge/transactions/withdrawal',
-  // Borrow page (CDP)
-  '/cdp/vaults',
-  '/cdp/assets',
-  // Advanced page - Borrow tab (Lending Pool)
-  '/lending/collateral/public',
-  '/lending/loans',
-  // StratoStats page
-  '/tokens/stats',
-  '/cdp/stats',
-  '/cdp/interest',
-  '/lending/interest',
-  '/protocol-fees/revenue',
-  // Borrow page - Liquidations sub-tab
-  '/cdp/liquidatable',
-  '/cdp/config',
-  '/cdp/admin/global-paused',
-  // Advanced page - Lending tab
-  '/lending/liquidity/public',
-  // Advanced page - Swap tab
-  '/swap-pools',
-  // Metal Forge page
-  '/metal-forge/configs',
-  // Advanced page - Safety tab
-  '/lending/safety/info',
-  '/lending/safety/info/public',
-  // Rewards page
-  '/rewards/overview',
-  '/rewards/activities',
-  '/earn/save-usdst/info',
-  '/earn/yield-vault/eth-carry/info',
-  '/earn/yield-vault/wbtc-carry/info',
-  // ActivityFeed page
-  '/events',
-  // Transfer page
-  '/tokens/transferable',
-  '/tokens/balance',
-  '/vouchers/balance',
-];
-
-// Check if a URL is expected to fail silently for guests
-function isGuestSafeUrl(url: string): boolean {
-  return GUEST_SAFE_URLS.some(safeUrl => url.includes(safeUrl));
-}
-
 // Response interceptor to catch 401, 403 (CSRF), and show global toast for all APIs
 api.interceptors.response.use(
-  (response) => response,
+  async (response) => {
+    if (response.data?._unsigned && response.data?._unsignedTxs) {
+      const onProgress = (response.config as any).walletTxProgress as WalletTxProgressHandler | undefined;
+      const result = await signAndSubmitUnsignedTxs(response.data._unsignedTxs, onProgress);
+      response.data = { ...response.data, ...result, _unsigned: undefined, _unsignedTxs: undefined };
+    }
+    return response;
+  },
   (error) => {
     // Skip error handling for aborted/canceled requests
     if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
@@ -144,15 +266,8 @@ api.interceptors.response.use(
       }
     }
     
-    // For 401 errors, handle based on whether the URL is guest-safe
+    // For 401 errors, redirect to login (session expired)
     if (error.response?.status === 401) {
-      // If URL is guest-safe, silently reject without toast or redirect
-      // This prevents errors when guests browse public pages that call user-specific APIs
-      if (isGuestSafeUrl(url)) {
-        return Promise.reject(error);
-      }
-      
-      // For non-guest-safe URLs, show session expired message and redirect
       toast({
         title: "Session Expired",
         description: "Reauthenticating the user...",
@@ -160,12 +275,6 @@ api.interceptors.response.use(
       setTimeout(() => {
         redirectToLogin();
       }, 1500);
-      return Promise.reject(error);
-    }
-    
-    // For 502 (Bad Gateway) and other server errors on guest-safe URLs, silently reject
-    // This prevents error toasts for non-logged-in users when backend services are unavailable
-    if (isGuestSafeUrl(url) && (error.response?.status === 502 || error.response?.status === 503 || error.response?.status === 504)) {
       return Promise.reject(error);
     }
     

@@ -32,6 +32,7 @@ Choose one of the following options to install dependencies:
         libleveldb-dev \
         liblzma-dev \
         libpq-dev \
+	librdkafka-dev \
         libsecp256k1-dev \
         libsodium-dev \
         pkg-config \
@@ -69,7 +70,7 @@ Login before the very first run:
 strato-login
 ```
 
-> To obtain the credentials for your node server, submit a request for client credentials at https://support.blockapps.net
+> To get the credentials for your node server, submit a request for client credentials at https://support.blockapps.net
 
 
 Start the node:
@@ -94,5 +95,40 @@ Stop and wipe all data:
 
 ```
 strato-down
-rm -rf mynode
+rm -rf mynode/
 ```
+
+### 5. Patch App on a Running Node (for development and testing)
+
+Steps to rebuild and patch the app on a running STRATO node.
+
+#### Rebuild the App Images
+
+```
+make app
+```
+
+This builds both app images and prints the command to deploy them (similar to `make` but only builds the app)
+
+#### Patch the App on a Node
+
+Update the `mercata-backend` and `mercata-ui` image tags in the node's `docker-compose.yml`:
+
+```
+strato-patch-app mynode mercata-backend:<tag> mercata-ui:<tag>
+```
+
+Use the exact image tags printed by `make app`.
+
+How the new images take effect depends on whether the node is currently running:
+
+- **Node is not running:** `strato-patch-app` only rewrites the image tags in `docker-compose.yml`. The new images will be picked up automatically on the next `strato-up`.
+- **Node is running:** the script will print a follow-up command. To apply the new images on the live node, either:
+  - Re-run docker compose up for just the app services, **reusing the same ENV VARS from your original run script** (e.g. `run.sh`), so the recreated containers get the same environment they were originally launched with:
+    ```
+    <ENV VARS> docker compose -p strato up -d --no-deps mercata-backend mercata-ui
+    ```
+  - Or restart the full node without wiping its data:
+    ```
+    strato-down && ./run.sh
+    ```

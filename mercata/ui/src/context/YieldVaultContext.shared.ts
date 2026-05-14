@@ -25,6 +25,22 @@ export type YieldVaultInfo = {
   strategyHoldings: {
     strategyAddress: string;
     deployedAssets: string;
+    composition: {
+      tokenAddress: string;
+      tokenSymbol: string;
+      decimals: number;
+      amount: string;
+    }[];
+    usdstDebt: string;
+    baseApyPct: number | null;
+    offChainUsdWad: string;
+    recentOutflows: {
+      tokenAddress: string;
+      tokenSymbol: string;
+      decimals: number;
+      amount: string;
+      timestampMs: number;
+    }[];
   }[];
   maxDeploy: string;
   minIdleRequirement: string;
@@ -60,6 +76,6 @@ export type YieldVaultContextType = {
   getUserVaultInfo: (key: string) => YieldVaultUserInfo | null;
 };
 
-export const VAULT_KEYS = ["eth-carry", "wbtc-carry"] as const;
+export const VAULT_KEYS = ["eth-carry", "wbtc-carry", "usdc-yield"] as const;
 
 export const YieldVaultContext = createContext<YieldVaultContextType | undefined>(undefined);

@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatUnits } from "ethers";
-import { ArrowLeft, CircleDollarSign, TrendingUp, Wallet } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ArrowLeft, CircleDollarSign, Sparkles, TrendingUp, Wallet } from "lucide-react";
+
+// Mirrors backend OFF_CHAIN_DISPLAY_FLOOR_USD: hide the off-chain section when
+// the pooled value is below this so transient slippage/oracle dust doesn't
+// noise up the strategy card.
+const OFF_CHAIN_DISPLAY_FLOOR_USD = 100;
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -24,10 +30,23 @@ import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
 import { api } from "@/lib/axios";
 import { useToast } from "@/hooks/use-toast";
 import { safeParseUnits } from "@/utils/numberUtils";
+import { useRewardsActivities } from "@/hooks/useRewardsActivities";
+import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { RewardsWidget } from "@/components/rewards/RewardsWidget";
+import {
+  calculateEstimatedRewardsPerDay,
+  formatRoundedWithCommas,
+  roundByMagnitude,
+} from "@/services/rewardsService";
+import { useEarnContext } from "@/context/EarnContext";
+import { findBestEarnApyInfo } from "@/utils/earnUtils";
+import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
+import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 
 const VAULT_META: Record<string, {
   title: string;
   subtitle: string;
+  badge: string;
   iconBg: string;
   iconColor: string;
   cardBorder: string;
@@ -36,6 +55,7 @@ const VAULT_META: Record<string, {
   "eth-carry": {
     title: "ETH Carry Vault",
     subtitle: "ERC-4626 carry vault for ETH deposits",
+    badge: "Carry Vault",
     iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
     iconColor: "text-indigo-600 dark:text-indigo-400",
     cardBorder: "border-indigo-500/25 dark:border-indigo-400/25 bg-gradient-to-br from-[#f5f3ff] to-[#ede9fe] dark:from-[#1a1533] dark:to-[#1c173a]",
@@ -44,10 +64,20 @@ const VAULT_META: Record<string, {
   "wbtc-carry": {
     title: "wBTC Carry Vault",
     subtitle: "ERC-4626 carry vault for wBTC deposits",
+    badge: "Carry Vault",
     iconBg: "bg-orange-500/15 dark:bg-orange-400/15",
     iconColor: "text-orange-600 dark:text-orange-400",
     cardBorder: "border-orange-500/25 dark:border-orange-400/25 bg-gradient-to-br from-[#fff7ed] to-[#ffedd5] dark:from-[#241a0a] dark:to-[#2b1d0c]",
     strategyDescription: "The vault targets growth in BTC per share. Deposited wBTC is used as collateral to borrow USDST, which is deployed into yield-bearing stablecoins (syrupUSDC, sUSDS). The net carry is periodically converted back into BTC, increasing each share's claim on BTC over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
+  },
+  "usdc-yield": {
+    title: "USDC Yield Vault",
+    subtitle: "ERC-4626 yield vault for USDC deposits",
+    badge: "Yield Vault",
+    iconBg: "bg-emerald-500/15 dark:bg-emerald-400/15",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    cardBorder: "border-emerald-500/25 dark:border-emerald-400/25 bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] dark:from-[#0a2018] dark:to-[#0c2a1f]",
+    strategyDescription: "The vault targets growth in USDC per share by routing deposits across approved yield strategies. USDC may be converted into other tokens when needed to access yield, but the vault manages returns back to USDC-denominated value. Yield is harvested, rebalanced, and compounded over time. The vault maintains an idle buffer for withdrawals; large redemptions may queue when capital is deployed.",
   },
 };
 
@@ -72,13 +102,6 @@ const formatExchangeRate = (exchangeRate: string, assetSymbol: string): string =
   } catch {
     return "-";
   }
-};
-
-const formatPercent = (value: string): string => {
-  if (!value || value === "-") return "-";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return "-";
-  return `${num.toFixed(2)}%`;
 };
 
 const formatUsdAmount = (value: string): string => {
@@ -126,6 +149,17 @@ const EarnYieldVault = () => {
   const { isLoggedIn } = useUser();
   const { toast } = useToast();
   const { getVaultInfo, getUserVaultInfo, loading: loadingVaults, refreshVaults } = useYieldVaultContext();
+  const { tokenApys } = useEarnContext();
+  const {
+    activities: rewardsActivities,
+    loading: rewardsActivitiesLoading,
+    refetch: refetchRewardsActivities,
+  } = useRewardsActivities();
+  const {
+    userRewards,
+    loading: rewardsUserLoading,
+    refetch: refetchUserRewards,
+  } = useRewardsUserInfo();
 
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
@@ -156,14 +190,17 @@ const EarnYieldVault = () => {
   const shareSymbol = effectiveInfo?.shareSymbol || "Shares";
   const exchangeRate = formatExchangeRate(effectiveInfo?.exchangeRate || "0", assetSymbol);
   const tvlDisplay = loadingVaults ? "..." : formatUsdAmount(effectiveInfo?.tvlUsd || "0");
-  const apyDisplay = (() => {
-    if (loadingVaults) return "...";
-    const raw = effectiveInfo?.apy ?? "-";
-    if (isDeployed) {
-      const n = Number(raw);
-      if (!raw || raw === "-" || !Number.isFinite(n) || n === 0) return "—";
+  const bestApyInfo = useMemo(
+    () => findBestEarnApyInfo(tokenApys, effectiveInfo?.vaultAddress),
+    [effectiveInfo?.vaultAddress, tokenApys]
+  );
+  const bestApyDisplay = (() => {
+    if (loadingVaults) return { label: "...", className: "text-foreground" };
+    const rawTotal = bestApyInfo?.total;
+    if (!isDeployed || !rawTotal || !Number.isFinite(rawTotal) || rawTotal <= 0) {
+      return { label: "—", className: "text-muted-foreground" };
     }
-    return formatPercent(typeof raw === "string" ? raw : String(raw));
+    return { label: `+${rawTotal.toFixed(2)}%`, className: "text-foreground" };
   })();
   const userShares = userInfo?.userShares || "0";
   const redeemableAssets = userInfo?.redeemableAssets || "0";
@@ -178,6 +215,68 @@ const EarnYieldVault = () => {
   const strategyHoldings = effectiveInfo?.strategyHoldings || [];
 
   const decimals = effectiveInfo?.decimals ?? 18;
+
+  const normalizedVaultAddress = effectiveInfo?.vaultAddress?.toLowerCase?.() || "";
+  // Strict match by on-chain sourceContract. If the Rewards activity isn't
+  // pointing at this vault address, no rewards UI renders for this page.
+  const matchesCarryActivity = (source: string | undefined): boolean => {
+    if (!normalizedVaultAddress) return false;
+    return (source || "").toLowerCase() === normalizedVaultAddress;
+  };
+  const carryRewardsActivity = useMemo(() => {
+    return (
+      rewardsActivities.find((activity) =>
+        matchesCarryActivity(activity.sourceContract)
+      ) || null
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedVaultAddress, rewardsActivities]);
+  const carryRewardEntries = useMemo(() => {
+    return (
+      userRewards?.activities.filter(({ activity }) =>
+        matchesCarryActivity(activity.sourceContract)
+      ) || []
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedVaultAddress, userRewards]);
+  const carryRewardPointsPerDollarPerDay = useMemo(() => {
+    try {
+      const emissionRate = carryRewardsActivity?.emissionRate;
+      const totalStakeUsd =
+        carryRewardsActivity?.totalStakeUsd ?? effectiveInfo?.tvlUsd ?? null;
+      if (!emissionRate || !totalStakeUsd) return null;
+      const totalStakeUsdBig = BigInt(totalStakeUsd);
+      if (totalStakeUsdBig <= 0n) return null;
+      const ptsPerDollarPerDayWei =
+        (BigInt(emissionRate) * 86400n * 10n ** 18n) / totalStakeUsdBig;
+      const decimal = formatUnits(ptsPerDollarPerDayWei, 18);
+      return formatRoundedWithCommas(roundByMagnitude(decimal));
+    } catch {
+      return null;
+    }
+  }, [carryRewardsActivity?.emissionRate, carryRewardsActivity?.totalStakeUsd, effectiveInfo?.tvlUsd]);
+  const carryRewardPointsPerDay = useMemo(() => {
+    if (carryRewardEntries.length === 0) return "0";
+    const rewardsPerDay = carryRewardEntries.reduce(
+      (total, { activity, userInfo: rewardUserInfo, personalEmissionRate }) => {
+        if (personalEmissionRate && BigInt(personalEmissionRate) > 0n) {
+          return total + BigInt(personalEmissionRate) * 86400n;
+        }
+        return (
+          total +
+          BigInt(
+            calculateEstimatedRewardsPerDay(
+              rewardUserInfo?.stake || "0",
+              activity.totalStake || "0",
+              activity.emissionRate || "0"
+            )
+          )
+        );
+      },
+      0n
+    );
+    return formatRoundedWithCommas(roundByMagnitude(formatUnits(rewardsPerDay, 18)));
+  }, [carryRewardEntries]);
 
   const depositDisabled = !isLoggedIn || !isDeployed;
   const redeemDisabled = !isLoggedIn || !isDeployed || hasPendingWithdrawal;
@@ -230,6 +329,23 @@ const EarnYieldVault = () => {
 
   const isActionAmountValid = amountWei > 0n && amountWei <= actionMaxWei;
 
+  // Refresh vault + rewards state after any user action. The rewards poller
+  // is an off-chain indexer, so we schedule a delayed second pass to give it
+  // a window to ingest the Deposit/Withdraw event before we read stake.
+  const REWARDS_POLLER_DELAY_MS = 10000;
+  const refreshAfterAction = async () => {
+    await Promise.allSettled([
+      refreshVaults(),
+      refetchRewardsActivities(),
+      refetchUserRewards(),
+    ]);
+    window.setTimeout(() => {
+      Promise.allSettled([refetchRewardsActivities(), refetchUserRewards()]).catch(
+        () => undefined
+      );
+    }, REWARDS_POLLER_DELAY_MS);
+  };
+
   const handleActionRequest = (mode: Exclude<ActionMode, null>) => {
     if (!isLoggedIn) {
       toast({
@@ -269,7 +385,7 @@ const EarnYieldVault = () => {
         });
       }
       setActionMode(null);
-      await refreshVaults();
+      await refreshAfterAction();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Transaction failed";
       toast({ title: `${actionMode === "deposit" ? "Deposit" : "Redeem"} failed`, description: msg, variant: "destructive" });
@@ -288,7 +404,7 @@ const EarnYieldVault = () => {
         description: `Claiming ${formatTokenAmount(claimableAssets, decimals)} ${assetSymbol}.`,
         variant: "success",
       });
-      await refreshVaults();
+      await refreshAfterAction();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Claim failed";
       toast({ title: "Claim failed", description: msg, variant: "destructive" });
@@ -311,7 +427,7 @@ const EarnYieldVault = () => {
         variant: "success",
       });
       setActionMode(null);
-      await refreshVaults();
+      await refreshAfterAction();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Redeem failed";
       toast({ title: "Redeem failed", description: msg, variant: "destructive" });
@@ -375,17 +491,30 @@ const EarnYieldVault = () => {
         ? "..."
         : isLoggedIn
           ? (() => {
-              const sharesBn = BigInt(userShares || "0");
-              const priceBn = BigInt(userInfo?.assetPriceWad || "0");
-              const usdPart = formatUsdAmount(positionUsdWad);
-              if (sharesBn <= 0n) return "--";
-              if (priceBn <= 0n && BigInt(positionUsdWad || "0") <= 0n) return "--";
-              const underlyingHint = `${formatTokenAmount(redeemableAssets, decimals)} ${assetSymbol}`;
-              return `${usdPart} (${underlyingHint})`;
-            })()
+            const sharesBn = BigInt(userShares || "0");
+            const priceBn = BigInt(userInfo?.assetPriceWad || "0");
+            const usdPart = formatUsdAmount(positionUsdWad);
+            if (sharesBn <= 0n) return "--";
+            if (priceBn <= 0n && BigInt(positionUsdWad || "0") <= 0n) return "--";
+            const underlyingHint = `${formatTokenAmount(redeemableAssets, decimals)} ${assetSymbol}`;
+            return `${usdPart} (${underlyingHint})`;
+          })()
           : "--",
       hint: "NAV: share claim × exchange ratio × oracle price",
       icon: <CircleDollarSign className="h-4 w-4 text-violet-600 dark:text-violet-400" />,
+    },
+    {
+      label: "Estimated Rewards/Day",
+      value:
+        loadingVaults || rewardsActivitiesLoading || rewardsUserLoading
+          ? "..."
+          : isLoggedIn
+            ? `${carryRewardPointsPerDay} points`
+            : "--",
+      hint: carryRewardPointsPerDollarPerDay
+        ? `Points you can earn per day at the current rate (${carryRewardPointsPerDollarPerDay} pts/$1/day)`
+        : "Points you can earn per day at the current rate",
+      icon: <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
     },
   ];
 
@@ -421,7 +550,7 @@ const EarnYieldVault = () => {
                 <section className="space-y-5">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                      Carry Vault
+                      {meta.badge}
                     </Badge>
                     <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
                       {assetSymbol}
@@ -469,10 +598,21 @@ const EarnYieldVault = () => {
                           </p>
                         </div>
                         <div className="rounded-lg border border-border/60 bg-background/70 p-3">
-                          <p className="text-muted-foreground">Yield</p>
-                          <p className="mt-1 text-lg font-semibold">{apyDisplay}</p>
+                          <p className="text-muted-foreground inline-flex items-center gap-1">
+                            Best Available APY
+                            <BestApyInfoTooltip />
+                          </p>
+                          {loadingVaults || rewardsActivitiesLoading ? (
+                            <p className="mt-1 text-lg font-semibold">...</p>
+                          ) : (
+                            <EarnApyTooltip info={bestApyInfo}>
+                              <p className={`mt-1 text-lg font-semibold cursor-default ${bestApyDisplay.className}`}>
+                                {bestApyDisplay.label}
+                              </p>
+                            </EarnApyTooltip>
+                          )}
                           <p className="text-xs text-muted-foreground mt-1">
-                            Estimated annualized yield
+                            Estimated annualized total yield, including rewards and native fees
                           </p>
                         </div>
                       </div>
@@ -508,7 +648,7 @@ const EarnYieldVault = () => {
                   </Card>
                 </section>
 
-                <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                   {metrics.map((metric) => (
                     <Card key={metric.label} className="border border-border/70">
                       <CardContent className="pt-4 space-y-3">
@@ -533,7 +673,6 @@ const EarnYieldVault = () => {
                           <p className="text-lg font-semibold break-all">{formatAddress(effectiveInfo?.vaultAddress || "")}</p>
                           <CopyButton address={effectiveInfo?.vaultAddress || ""} />
                         </div>
-                        <p className="text-xs text-muted-foreground">Configured carryETH vault on this network</p>
                       </CardContent>
                     </Card>
                     <Card className="border border-border/70">
@@ -551,7 +690,7 @@ const EarnYieldVault = () => {
                         <p className="text-lg font-semibold">
                           {formatTokenAmount(effectiveInfo?.deployedAssets || "0", decimals)} {assetSymbol}
                         </p>
-                        <p className="text-xs text-muted-foreground">Capital deployed to the carry strategy</p>
+                        <p className="text-xs text-muted-foreground">Capital deployed to the strategy</p>
                       </CardContent>
                     </Card>
                     <Card className="border border-border/70">
@@ -572,20 +711,136 @@ const EarnYieldVault = () => {
                     <div className="grid grid-cols-1 gap-3">
                       {strategyHoldings.map((holding) => (
                         <Card key={holding.strategyAddress} className="border border-border/70">
-                          <CardContent className="pt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">Strategy Address</p>
-                              <div className="flex items-center gap-1">
-                                <p className="text-sm font-medium break-all">{formatAddress(holding.strategyAddress)}</p>
-                                <CopyButton address={holding.strategyAddress} />
+                          <CardContent className="pt-4 space-y-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">Strategy Address</p>
+                                <div className="flex items-center gap-1">
+                                  <p className="text-sm font-medium break-all">{formatAddress(holding.strategyAddress)}</p>
+                                  <CopyButton address={holding.strategyAddress} />
+                                </div>
+                              </div>
+                              <div className="space-y-1 sm:text-right">
+                                <p className="text-xs text-muted-foreground">Deployed Capital</p>
+                                <p className="text-lg font-semibold">
+                                  {formatTokenAmount(holding.deployedAssets, decimals)} {assetSymbol}
+                                </p>
+                              </div>
+                              <div className="space-y-1 sm:text-right">
+                                <p className="text-xs text-muted-foreground">Base APY</p>
+                                {(() => {
+                                  const apy = holding.baseApyPct;
+                                  if (apy === null || apy === undefined || !Number.isFinite(apy)) {
+                                    return (
+                                      <p className="text-lg font-semibold text-muted-foreground">—</p>
+                                    );
+                                  }
+                                  const sign = apy > 0 ? "+" : apy < 0 ? "" : "";
+                                  const tone =
+                                    apy > 0
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : apy < 0
+                                        ? "text-red-600 dark:text-red-400"
+                                        : "text-foreground";
+                                  return (
+                                    <p className={`text-lg font-semibold ${tone}`}>
+                                      {`${sign}${apy.toFixed(2)}%`}
+                                    </p>
+                                  );
+                                })()}
+                                <p className="text-[11px] text-muted-foreground">
+                                  Forward yield in {assetSymbol}
+                                </p>
                               </div>
                             </div>
-                            <div className="space-y-1 sm:text-right">
-                              <p className="text-xs text-muted-foreground">Deployed Capital</p>
-                              <p className="text-lg font-semibold">
-                                {formatTokenAmount(holding.deployedAssets, decimals)} {assetSymbol}
+
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Composition</p>
+                              {holding.composition && holding.composition.length > 0 ? (
+                                <div className="rounded-md border border-border/60 divide-y divide-border/60">
+                                  {holding.composition.map((asset) => (
+                                    <div
+                                      key={asset.tokenAddress}
+                                      className="flex items-center justify-between px-3 py-2 text-sm"
+                                    >
+                                      <span className="font-medium text-foreground">
+                                        {asset.tokenSymbol || formatAddress(asset.tokenAddress)}
+                                      </span>
+                                      <span className="font-mono text-foreground">
+                                        {formatTokenAmount(asset.amount, asset.decimals)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">
+                                  No assets detected for this strategy.
+                                </p>
+                              )}
+                              <p className="text-[11px] text-muted-foreground">
+                                Total assets controlled by this strategy. Includes ERC-20 wallet balances and collateral locked in CDP.
                               </p>
                             </div>
+
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">USDST Debt</p>
+                              <div className="rounded-md border border-border/60 px-3 py-2 text-sm flex items-center justify-between">
+                                <span className="font-medium text-foreground">USDST</span>
+                                <span className="font-mono text-foreground">
+                                  {formatTokenAmount(holding.usdstDebt || "0", 18)}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Total USDST borrowed by this strategy across all CDP positions, accrued at the latest indexed rate.
+                              </p>
+                            </div>
+
+                            {(() => {
+                              const offChainUsd = Number(formatUnits(holding.offChainUsdWad || "0", 18));
+                              if (!Number.isFinite(offChainUsd) || offChainUsd < OFF_CHAIN_DISPLAY_FLOOR_USD) {
+                                return null;
+                              }
+                              const outflows = holding.recentOutflows || [];
+                              return (
+                                <div className="space-y-2">
+                                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Off-Chain Capital</p>
+                                  <div className="rounded-md border border-border/60 px-3 py-2 text-sm flex items-center justify-between">
+                                    <span className="font-medium text-foreground">In transit</span>
+                                    <span className="font-mono text-foreground">
+                                      ~{formatUsdAmount(holding.offChainUsdWad || "0")}
+                                    </span>
+                                  </div>
+                                  {outflows.length > 0 && (
+                                    <div className="rounded-md border border-border/60 divide-y divide-border/60">
+                                      <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        Recent bridge-outs
+                                      </div>
+                                      {outflows.map((outflow, idx) => (
+                                        <div
+                                          key={`${outflow.tokenAddress}-${outflow.timestampMs}-${idx}`}
+                                          className="flex items-center justify-between px-3 py-2 text-sm"
+                                        >
+                                          <span className="font-medium text-foreground">
+                                            {outflow.tokenSymbol || formatAddress(outflow.tokenAddress)}
+                                          </span>
+                                          <div className="flex flex-col items-end">
+                                            <span className="font-mono text-foreground">
+                                              {formatTokenAmount(outflow.amount, outflow.decimals)}
+                                            </span>
+                                            <span className="text-[11px] text-muted-foreground">
+                                              {outflow.timestampMs > 0
+                                                ? `bridged ${formatDistanceToNow(outflow.timestampMs, { addSuffix: true })}`
+                                                : "bridged recently"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                </div>
+                              );
+                            })()}
                           </CardContent>
                         </Card>
                       ))}
@@ -761,6 +1016,15 @@ const EarnYieldVault = () => {
                   </p>
                 )}
               </div>
+            )}
+            {carryRewardsActivity?.name && !rewardsUserLoading && (
+              <RewardsWidget
+                userRewards={userRewards}
+                activityName={carryRewardsActivity.name}
+                inputAmount={actionAmount}
+                isWithdrawal={actionMode === "redeem"}
+                actionLabel={actionMode === "redeem" ? "Withdraw" : "Deposit"}
+              />
             )}
             <div className="flex flex-col gap-2">
               <Button

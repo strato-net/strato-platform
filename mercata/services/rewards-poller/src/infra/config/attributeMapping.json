@@ -187,5 +187,60 @@
       "amount": "shares",
       "user": "receiver"
     }
+  },
+
+  "ac8ce8b3d4aa4b9a359dad3bb792a563f7f2e2f5": {
+    "Deposit": {
+      "amount": "shares",
+      "user": "owner"
+    },
+    "Withdraw": {
+      "amount": "shares",
+      "user": "receiver"
+    }
+  },
+
+  "a94905d8bd117e9bfbe57aadffd7abbea760e028": {
+    "Deposit": {
+      "amount": "shares",
+      "user": "owner"
+    },
+    "Withdraw": {
+      "amount": "shares",
+      "user": "receiver"
+    }
+  },
+
+  "97d3b5da244094dd940a173b42240b36eb79dceb": {
+    "Deposit": {
+      "amount": "shares",
+      "user": "owner"
+    },
+    "Withdraw": {
+      "amount": "shares",
+      "user": "receiver"
+    }
+  },
+
+  "0b5831edcab6f06256a790340426236c31bb463f": {
+    "Deposit": {
+      "amount": "shares",
+      "user": "owner"
+    },
+    "Withdraw": {
+      "amount": "shares",
+      "user": "receiver"
+    }
+  },
+
+  "9c9bcc6e040910c6705d15864067720923bacc82": {
+    "Deposit": {
+      "amount": "shares",
+      "user": "owner"
+    },
+    "Withdraw": {
+      "amount": "shares",
+      "user": "receiver"
+    }
   }
 }

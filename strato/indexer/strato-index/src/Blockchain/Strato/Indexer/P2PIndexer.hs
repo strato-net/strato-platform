@@ -21,19 +21,19 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Streaming
 import qualified Data.Text as T
 import Text.Format
 
 p2pIndexerMainLoop ::
   ( MonadLogger m,
-    HasKafka m,
+    HasStreaming m,
     (Keccak256 `A.Alters` P2P OutputBlock) m,
     Mod.Modifiable (P2P BestBlock) m
   ) =>
   m ()
 p2pIndexerMainLoop = forever $ do
-  consume "p2pIndexer" "strato-p2p-indexer" targetTopicName $ \() idxEvents -> do
+  consume "strato-p2p-indexer" targetTopicName $ \idxEvents -> do
     indexP2P idxEvents
     return ()
 

@@ -39,6 +39,7 @@ module SolidVM.Model.CodeCollection.Function
     usingContract,
     usingType,
     usingContext,
+    usingGlobal,
     module SolidVM.Model.CodeCollection.Visibility
   )
 where
@@ -59,6 +60,7 @@ import SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import SolidVM.Model.CodeCollection.Visibility
 import SolidVM.Model.SolidString
+import qualified SolidVM.Model.Type as SVMType
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import qualified Text.Colors as CL
@@ -179,7 +181,8 @@ instance Arbitrary a => Arbitrary (ModifierF a) where
 
 data UsingF a = Using
   { _usingContract :: SolidString,
-    _usingType :: SolidString, -- TODO: Use Type here
+    _usingType :: Maybe SVMType.Type,
+    _usingGlobal :: Bool,
     _usingContext :: a
   }
   deriving (Eq, Show, Generic, Functor, NFData, Traversable, Foldable)
@@ -191,10 +194,11 @@ type Using = Positioned UsingF
 instance Binary a => Binary (UsingF a)
 
 instance ToJSON a => ToJSON (UsingF a) where
-  toJSON (Using dec typ ctx) =
+  toJSON (Using dec typ g ctx) =
     object
       [ "using" .= dec,
         "for" .= typ,
+        "global" .= g,
         "context" .= ctx
       ]
 
@@ -203,11 +207,12 @@ instance FromJSON a => FromJSON (UsingF a) where
     Using
       <$> (o .: "using")
       <*> (o .: "for")
+      <*> (o .: "global")
       <*> (o .: "context")
   parseJSON o = fail $ "SolidVM.Using: Expected Object, got " ++ show o
 
 instance Arbitrary a => Arbitrary (UsingF a) where
-  arbitrary = Using <$> arbitrary <*> arbitrary <*> arbitrary
+  arbitrary = Using <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
 instance ToSchema Using where
   declareNamedSchema proxy =
@@ -217,7 +222,7 @@ instance ToSchema Using where
       & mapped . schema . example ?~ toJSON sampleUsing
     where
       sampleUsing :: UsingF ()
-      sampleUsing = Using "SafeMath" "uint256" ()
+      sampleUsing = Using "SafeMath" (Just $ SVMType.Int (Just False) (Just 32)) False ()
 
 instance Arbitrary a => Arbitrary (FuncF a) where
   arbitrary = GR.genericArbitrary GR.uniform

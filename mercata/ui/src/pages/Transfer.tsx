@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Token } from "@/interface";
+import { useWalletClient, useWriteContract } from "wagmi";
+import { ensureStratoChainInWallet, getStratoChainId } from "@/lib/stratoChain";
 
 import { useUser } from "@/context/UserContext";
 import { useTokenContext, BulkTransferItem, BulkTransferResponse } from "@/context/TokenContext";
@@ -27,10 +29,30 @@ import { ChevronDown, Upload, AlertTriangle } from "lucide-react";
 import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
+const erc20TransferAbi = [
+  {
+    name: "transfer",
+    type: "function",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "value", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
+const ensureHexPrefix = (addr: string): `0x${string}` =>
+  (addr.startsWith("0x") ? addr : `0x${addr}`) as `0x${string}`;
+
 const Transfer = () => {
-  const { userAddress, isLoggedIn } = useUser();
+  const { userAddress, userName, isLoggedIn } = useUser();
   const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance, getTransferableTokens, transferToken, bulkTransferToken } = useTokenContext();
+  const { writeContractAsync } = useWriteContract();
+  const { data: walletClient } = useWalletClient();
+  const stratoChainId = getStratoChainId();
   const { toast } = useToast();
+  const isVaultUser = !!userName;
   const guestMode = !isLoggedIn;
   useEffect(() => {
     document.title = "Transfer Assets | STRATO";
@@ -85,13 +107,12 @@ const Transfer = () => {
     return { activeTokens: active, inactiveTokens: inactive };
   }, [tokens]);
 
-  // Fetch USDST balance on mount (only for logged-in users)
   useEffect(() => {
     if (isLoggedIn) {
       fetchUserTokens();
       fetchUsdstBalance();
     }
-  }, [isLoggedIn, fetchUserTokens, fetchUsdstBalance]);
+  }, [isLoggedIn, userAddress, fetchUserTokens, fetchUsdstBalance]);
 
   // Check recipient nonce when a valid address is entered
   useEffect(() => {
@@ -117,11 +138,33 @@ const Transfer = () => {
     try {
       setSwapLoading(true);
       setShowConfirmModal(false);
-      await transferToken({
-        address: fromAsset.address,
-        to: recipient,
-        value: safeParseUnits(fromAmount, 18).toString(),
-      });
+      const weiValue = safeParseUnits(fromAmount, 18).toString();
+
+      if (isVaultUser) {
+        await transferToken({
+          address: fromAsset.address,
+          to: recipient,
+          value: weiValue,
+        });
+      } else {
+        await ensureStratoChainInWallet(walletClient);
+        const nonceRes = await fetch("/rpc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionCount", params: [userAddress, "latest"] }),
+        }).then((r) => r.json());
+        const nonce = Number(nonceRes.result);
+        await writeContractAsync({
+          chainId: stratoChainId || undefined,
+          address: ensureHexPrefix(fromAsset.address),
+          abi: erc20TransferAbi,
+          functionName: "transfer",
+          args: [ensureHexPrefix(recipient), BigInt(weiValue)],
+          nonce: Number(nonce),
+          gas: 1000000n,
+        });
+      }
+
       toast({
         title: "Success",
         description: `Transferred ${fromAmount} ${
@@ -131,17 +174,15 @@ const Transfer = () => {
       });
       setFromAmount("");
       setRecipient("");
-      const updatedTokens = await fetchUserTokens();
-      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
-      if (updatedToken) {
-        setFromAsset(updatedToken); // triggers re-render with updated balance
-      } else {
-        setFromAsset(null)
-      }
-      await fetchUsdstBalance();
+      setSwapLoading(false);
+
+      fetchUserTokens().then((updatedTokens) => {
+        const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);
+        setFromAsset(updatedToken || null);
+      }).catch(() => {});
+      fetchUsdstBalance();
     } catch (error) {
       console.error("Transfer error:", error);
-    } finally {
       setSwapLoading(false);
     }
   };
@@ -325,7 +366,7 @@ const Transfer = () => {
                         This address has no transaction history on the STRATO network.
                         If you are trying to withdraw to an external chain (e.g. Ethereum),
                         please use the{" "}
-                        <Link to="/dashboard/withdrawals?tab=bridge-out" className="font-medium underline">
+                        <Link to="/dashboard/withdrawals" className="font-medium underline">
                           Withdraw page
                         </Link>{" "}
                         instead.

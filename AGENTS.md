@@ -6,6 +6,7 @@
 - When asked to "figure it out yourself," read env files and configs autonomously; verify contract addresses, oracle addresses, and data shapes from code or Cirrus (never fabricate); test endpoints with real auth tokens from `.env`; call Cirrus/backend endpoints with `curl` to verify data before claiming things work
 - Put interfaces, types, and constants in canonical locations (types file, config index) not inline in service files; helper functions should only build params and parse results with all Cirrus/API calls in the service layer; avoid creating new files when an existing one is the right home
 - Ask for approval before making design-level decisions (e.g., sum vs max for bonus percentages); when asked to push, push only the specific files requested
+- ALWAYS stage and commit `BUILD_METADATA` — it must be included in every commit, no exceptions
 - Remove debug logs immediately after confirming a fix; reuse existing shared functions and constants (e.g. WAD, `truncateDecimals` from `numberUtils`) instead of redefining locally; trace actual backend/service and contract code before assuming fees, data shapes, or tx costs from frontend constants alone
 - Do not nest `<Link>` or `<a>` inside a parent `<button>`; use click + `stopPropagation` + router `navigate` for nested actions (e.g. yield line on a selectable card)
 - PR descriptions should be short summaries (2-3 bullets), not long write-ups; never mention Cursor or AI tools in PRs/issues; follow mockups closely and match layout, styling, and behavior exactly; when the user says "like the mockup" they mean pixel-level fidelity
@@ -26,3 +27,30 @@
 - Default priceOracle is system contract `0000…1002` (same for vaults and system default — no separate query)
 - Sidebar nav uses category groupings (TRADE, SPEND, EARN, PRO) defined in `DashboardSidebar.tsx`, `MobileSidebar.tsx`, and `MobileBottomNav.tsx`; all three must stay in sync; Card is under SPEND. SolidVM contract tests: `solid-vm-cli test <file>` from test dir; pattern is `Describe_*` contract with `beforeAll`/`beforeEach`/`it_*` functions; `fetchMinDepositAmount` depends on both `selectedToken` AND `currentNetwork`/`chainId`
 - CDP collateral on prod is listed via CDPRegistry (`…1012`) and CDPEngine (`…1011`) in Cirrus; many assets are configured with USDST often paused as collateral; the depositable set follows `getVaultCandidates` (excludes USDST and paused assets — typically on the order of a dozen depositable)
+
+## Cursor Cloud specific instructions
+
+### Services overview
+
+The primary dev loop involves three services — see `mercata/README.md` for canonical commands:
+
+| Service | Dir | Command | Port |
+|---|---|---|---|
+| Backend | `mercata/backend/` | `npm run dev` | 3001 |
+| UI | `mercata/ui/` | `npm run dev` | 8080 |
+| Nginx | `mercata/nginx/` | `docker compose -f docker-compose.nginx-standalone.yml up -d --build` | 80 |
+
+**Shared types** (`mercata/packages/shared-types/`) are built automatically via `postinstall` hooks in both backend and UI.
+
+### Required environment variables
+
+Backend requires four OAuth and node env vars (see `mercata/README.md` DEV MODE section for names). These are injected as secrets in the Cloud Agent environment.
+
+### Key caveats
+
+- **Access the app on port 80** (through nginx) — not port 8080. The OAuth/login flow only works through the nginx proxy; the Vite dev server on 8080 does not handle authentication.
+- **Docker is required** for nginx. In the Cloud Agent VM (nested container), Docker needs `fuse-overlayfs` storage driver and `iptables-legacy`. The daemon must be started manually: `sudo dockerd &>/tmp/dockerd.log &` then `sudo chmod 666 /var/run/docker.sock`.
+- **Nginx uses `host.docker.internal`** to reach backend (3001) and UI (8080) on the host. The `extra_hosts: host.docker.internal:host-gateway` directive in the compose file handles this.
+- Backend emits non-fatal YAML warnings from Swagger JSDoc annotations at startup — these can be ignored.
+- **Lint**: `cd mercata/ui && npx eslint .` — the existing codebase has pre-existing lint errors; this is normal.
+- **Type-check backend**: `cd mercata/backend && npx tsc --noEmit`
