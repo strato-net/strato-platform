@@ -140,49 +140,59 @@ function buildConfig() {
 }
 
 let cachedStratoToken;
+let pendingStratoToken;
 
 async function getStratoAccessToken(config) {
   if (cachedStratoToken) return cachedStratoToken;
+  if (pendingStratoToken) return pendingStratoToken;
 
-  let discovery;
+  pendingStratoToken = (async () => {
+    let discovery;
+    try {
+      discovery = await axios.get(config.oauthUrl, {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      throw new Error(formatAxiosError(error, "OAuth discovery"));
+    }
+    const tokenEndpoint = discovery.data && discovery.data.token_endpoint;
+    if (!tokenEndpoint) {
+      throw new Error(`OAuth discovery document missing token_endpoint: ${config.oauthUrl}`);
+    }
+
+    let response;
+    try {
+      response = await axios.post(
+        tokenEndpoint,
+        new URLSearchParams({
+          grant_type: "password",
+          client_id: config.oauthClientId,
+          client_secret: config.oauthClientSecret,
+          username: config.stratoUsername,
+          password: config.stratoPassword,
+        }).toString(),
+        {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        }
+      );
+    } catch (error) {
+      throw new Error(formatAxiosError(error, "OAuth token request"));
+    }
+
+    const accessToken = response.data && response.data.access_token;
+    if (!accessToken) {
+      throw new Error("OAuth token response missing access_token");
+    }
+
+    cachedStratoToken = accessToken;
+    return cachedStratoToken;
+  })();
+
   try {
-    discovery = await axios.get(config.oauthUrl, {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    throw new Error(formatAxiosError(error, "OAuth discovery"));
+    return await pendingStratoToken;
+  } finally {
+    pendingStratoToken = undefined;
   }
-  const tokenEndpoint = discovery.data && discovery.data.token_endpoint;
-  if (!tokenEndpoint) {
-    throw new Error(`OAuth discovery document missing token_endpoint: ${config.oauthUrl}`);
-  }
-
-  let response;
-  try {
-    response = await axios.post(
-      tokenEndpoint,
-      new URLSearchParams({
-        grant_type: "password",
-        client_id: config.oauthClientId,
-        client_secret: config.oauthClientSecret,
-        username: config.stratoUsername,
-        password: config.stratoPassword,
-      }).toString(),
-      {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      }
-    );
-  } catch (error) {
-    throw new Error(formatAxiosError(error, "OAuth token request"));
-  }
-
-  const accessToken = response.data && response.data.access_token;
-  if (!accessToken) {
-    throw new Error("OAuth token response missing access_token");
-  }
-
-  cachedStratoToken = accessToken;
-  return cachedStratoToken;
 }
 
 async function cirrusSearch(config, tableName, params = {}) {

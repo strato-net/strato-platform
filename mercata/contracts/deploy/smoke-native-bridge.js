@@ -128,48 +128,60 @@ async function fetchSingleRow(tableName, params, label) {
 }
 
 let cachedStratoToken;
+let pendingStratoToken;
 
 async function getStratoAccessToken() {
   if (cachedStratoToken) {
     return cachedStratoToken;
   }
-
-  const username = getRequiredEnv("GLOBAL_ADMIN_NAME");
-  const password = getRequiredEnv("GLOBAL_ADMIN_PASSWORD");
-  const discoveryUrl = getRequiredEnv("OAUTH_URL");
-  const clientId = getRequiredEnv("OAUTH_CLIENT_ID");
-  const clientSecret = getRequiredEnv("OAUTH_CLIENT_SECRET");
-
-  const discovery = await axios.get(discoveryUrl, {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  const tokenEndpoint = discovery.data && discovery.data.token_endpoint;
-  if (!tokenEndpoint) {
-    throw new Error(`OAuth discovery document did not include token_endpoint: ${discoveryUrl}`);
+  if (pendingStratoToken) {
+    return pendingStratoToken;
   }
 
-  const tokenResponse = await axios.post(
-    tokenEndpoint,
-    new URLSearchParams({
-      grant_type: "password",
-      client_id: clientId,
-      client_secret: clientSecret,
-      username,
-      password,
-    }).toString(),
-    {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
+  pendingStratoToken = (async () => {
+    const username = getRequiredEnv("GLOBAL_ADMIN_NAME");
+    const password = getRequiredEnv("GLOBAL_ADMIN_PASSWORD");
+    const discoveryUrl = getRequiredEnv("OAUTH_URL");
+    const clientId = getRequiredEnv("OAUTH_CLIENT_ID");
+    const clientSecret = getRequiredEnv("OAUTH_CLIENT_SECRET");
+
+    const discovery = await axios.get(discoveryUrl, {
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const tokenEndpoint = discovery.data && discovery.data.token_endpoint;
+    if (!tokenEndpoint) {
+      throw new Error(`OAuth discovery document did not include token_endpoint: ${discoveryUrl}`);
     }
-  );
 
-  cachedStratoToken = tokenResponse.data && tokenResponse.data.access_token;
-  if (!cachedStratoToken) {
-    throw new Error("OAuth token response did not include access_token");
+    const tokenResponse = await axios.post(
+      tokenEndpoint,
+      new URLSearchParams({
+        grant_type: "password",
+        client_id: clientId,
+        client_secret: clientSecret,
+        username,
+        password,
+      }).toString(),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    cachedStratoToken = tokenResponse.data && tokenResponse.data.access_token;
+    if (!cachedStratoToken) {
+      throw new Error("OAuth token response did not include access_token");
+    }
+    return cachedStratoToken;
+  })();
+
+  try {
+    return await pendingStratoToken;
+  } finally {
+    pendingStratoToken = undefined;
   }
-  return cachedStratoToken;
 }
 
 async function cirrusSearch(tableName, params = {}) {
@@ -603,5 +615,12 @@ async function main() {
 
 main().catch((error) => {
   console.error(`Failed: ${error.message}`);
+  if (error.config) {
+    console.error(`Request: ${String(error.config.method || "GET").toUpperCase()} ${error.config.url}`);
+  }
+  if (error.response) {
+    console.error(`Status: ${error.response.status}`);
+    console.error("Response:", error.response.data);
+  }
   process.exit(1);
 });

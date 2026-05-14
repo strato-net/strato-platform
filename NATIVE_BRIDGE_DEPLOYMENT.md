@@ -352,7 +352,7 @@ For a new deployment, run these in order. Each item is covered by the detailed s
 10. Deploy the Sepolia `StratoNativeRepresentationToken` proxy.
 11. Deploy the Sepolia `StratoNativeRepresentationBridge` proxy.
 12. Verify the Sepolia bridge proxy EIP-712 domain returns `StratoNativeRepresentationBridge` and version `1`.
-13. Execute the Sepolia Safe admin batch: token bridge role, attestation signer, threshold, optional attestation validity, and token mapping.
+13. Execute the Sepolia Safe admin batch: token bridge role, transfer endpoint setup, attestation signer, threshold, optional attestation validity, and token mapping.
 14. Confirm the Sepolia Safe batch worked.
 15. Configure the STRATO native route to point at the Sepolia representation bridge and token proxies.
 16. Whitelist the STRATO custody vault for paused-token `transferFrom` and `transfer`.
@@ -497,6 +497,15 @@ npm run deployWithProxy:sepolia
 ```
 
 Record both proxy and implementation addresses printed by the scripts.
+
+New representation tokens deploy with general transfers disabled. Include these token calls in the first Sepolia Safe admin batch:
+
+```text
+StratoNativeRepresentationToken.grantRole(<BRIDGE_ROLE>, <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)
+StratoNativeRepresentationToken.setTransferEndpoint(<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>, true)
+```
+
+Do not call `setTransfersEnabled(true)` until the sale or release condition is met. Keeping `transfersEnabled = false` blocks peer-to-peer transfers while `setTransferEndpoint` still lets users redeem through the representation bridge.
 
 ### Sepolia: Deploy New Implementations for Upgrades
 
