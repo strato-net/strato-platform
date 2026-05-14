@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
@@ -59,6 +59,8 @@ const AssetsList = ({
 }: AssetsProps) => {
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
+  const [showAllDeposits, setShowAllDeposits] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
   const { tokenApys, tokenApysLoaded } = useEarnContext();
 
   const earnByAddr = useMemo(() => {
@@ -78,8 +80,29 @@ const AssetsList = ({
     });
   }, [tokens]);
 
+  const hasPosition = (asset: EarningAsset) =>
+    !!asset?.totalBalance && asset.totalBalance !== "0";
+
+  const heldTokens = useMemo(
+    () => sortedTokens.filter(hasPosition),
+    [sortedTokens]
+  );
+  const otherTokens = useMemo(
+    () => sortedTokens.filter((t) => !hasPosition(t)),
+    [sortedTokens]
+  );
+
+  const displayedTokens = useMemo(() => {
+    if (guestMode) return sortedTokens;
+    if (heldTokens.length === 0) return sortedTokens;
+    return showAllDeposits ? sortedTokens : heldTokens;
+  }, [guestMode, sortedTokens, heldTokens, showAllDeposits]);
+
+  const canToggleMore =
+    !guestMode && heldTokens.length > 0 && otherTokens.length > 0;
+
   return (
-    <div className={`w-full overflow-hidden ${isDashboard ? 'bg-card rounded-xl border border-border shadow-sm' : ''}`}>
+    <div ref={sectionRef} className={`w-full overflow-hidden ${isDashboard ? 'bg-card rounded-xl border border-border shadow-sm' : ''}`}>
       {isDashboard && (
         <div className="p-4 md:p-5">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -164,8 +187,8 @@ const AssetsList = ({
                     </div>
                   </td>
                 </tr>
-              ) : sortedTokens.length > 0 ? (
-                sortedTokens.map(
+              ) : displayedTokens.length > 0 ? (
+                displayedTokens.map(
                   (asset, index) => (
                     <tr
                       key={index}
@@ -299,6 +322,35 @@ const AssetsList = ({
             </tbody>
           </table>
         </div>
+        {canToggleMore && (
+          <div className="flex justify-center p-3 md:p-4">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setShowAllDeposits((prev) => {
+                  if (prev) {
+                    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }
+                  return !prev;
+                });
+              }}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              {showAllDeposits ? (
+                <>
+                  Show less
+                  <ChevronUp size={16} />
+                </>
+              ) : (
+                <>
+                  Show more ({otherTokens.length})
+                  <ChevronDown size={16} />
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       {isDashboard && !guestMode && (

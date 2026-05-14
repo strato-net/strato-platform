@@ -5,7 +5,6 @@ import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
-import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield, Loader2, Trophy, Send, Book, ArrowRightLeft, Gem, Mail, Gift } from "lucide-react";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUser } from "@/context/UserContext";
@@ -81,7 +80,7 @@ const Dashboard = () => {
     }
     return 'netBalance';
   });
-  const { loans, refreshLoans } = useLendingContext();
+  const { refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
   const { contactEnabled } = useNetwork();
   const [contactModalOpen, setContactModalOpen] = useState(false);
@@ -493,13 +492,6 @@ const Dashboard = () => {
               loading={loadingEarningAssets || loadingInactiveTokens}
               tokens={nonPoolTokens}
               inActiveTokens={isLoggedIn ? inactiveTokens : []}
-              guestMode={!isLoggedIn}
-            />
-          </div>
-
-          <div className="mb-8">
-            <BorrowingSection
-              loanData={loans}
               guestMode={!isLoggedIn}
             />
           </div>
