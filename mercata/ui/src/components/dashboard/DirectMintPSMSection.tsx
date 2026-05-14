@@ -25,8 +25,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { psmService, PsmInfo, BurnRequest } from "@/services/psmService";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { psmService, PsmInfo, BurnRequest, EligibleToken } from "@/services/psmService";
+import { formatBalance, safeBigInt, safeParseUnits } from "@/utils/numberUtils";
 import {
   PSM_MINT_FEE,
   PSM_BURN_REQUEST_FEE,
@@ -44,6 +44,27 @@ const formatTimeRemaining = (seconds: number): string => {
   if (minutes > 0) return `${minutes}m ${secs}s`;
   return `${secs}s`;
 };
+
+const BPS_DENOMINATOR = 10000n;
+
+const applyBpsFee = (amount: bigint, feeBps: string): bigint => {
+  const fee = (amount * safeBigInt(feeBps)) / BPS_DENOMINATOR;
+  return amount > fee ? amount - fee : 0n;
+};
+
+const formatBps = (bps: string): string => {
+  const value = Number(bps || "0") / 100;
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
+};
+
+const getMintCapacity = (token: EligibleToken): bigint | null => {
+  const maxBalance = safeBigInt(token.maxBalance);
+  if (maxBalance === 0n) return null;
+  const psmBalance = safeBigInt(token.psmBalance);
+  return psmBalance >= maxBalance ? 0n : maxBalance - psmBalance;
+};
+
+const minBigInt = (a: bigint, b: bigint): bigint => (a < b ? a : b);
 
 const DirectMintPSMSection = () => {
   const { isLoggedIn } = useUser();
@@ -75,9 +96,19 @@ const DirectMintPSMSection = () => {
     try {
       setLoading(true);
       const info = await psmService.getInfo();
+      const mintTokens = info.eligibleTokens.filter((t) => t.mintEnabled);
+      const redeemTokens = info.eligibleTokens.filter((t) => t.burnEnabled);
       setPsmInfo(info);
-      setMintToken((prev) => prev || info.eligibleTokens[0]?.address || "");
-      setRedeemToken((prev) => prev || info.eligibleTokens[0]?.address || "");
+      setMintToken((prev) =>
+        mintTokens.some((t) => t.address === prev)
+          ? prev
+          : mintTokens[0]?.address || ""
+      );
+      setRedeemToken((prev) =>
+        redeemTokens.some((t) => t.address === prev)
+          ? prev
+          : redeemTokens[0]?.address || ""
+      );
     } catch {
       // Errors handled by axios interceptor
     } finally {
@@ -108,31 +139,47 @@ const DirectMintPSMSection = () => {
     return () => clearInterval(interval);
   }, [hasPending, refreshData]);
 
-  const selectedMintToken = psmInfo?.eligibleTokens.find(
+  const mintTokens = psmInfo?.eligibleTokens.filter((t) => t.mintEnabled) || [];
+  const redeemTokens = psmInfo?.eligibleTokens.filter((t) => t.burnEnabled) || [];
+
+  const selectedMintToken = mintTokens.find(
     (t) => t.address === mintToken
   );
-  const selectedRedeemToken = psmInfo?.eligibleTokens.find(
+  const selectedRedeemToken = redeemTokens.find(
     (t) => t.address === redeemToken
   );
 
   const isMintValid = () => {
-    if (!mintAmount || !selectedMintToken) return false;
+    if (!mintAmount || !selectedMintToken || psmInfo?.mintPaused) return false;
     try {
       const amountWei = safeParseUnits(mintAmount, 18);
-      const balanceWei = BigInt(selectedMintToken.userBalance);
-      return amountWei > 0n && amountWei <= balanceWei;
+      const balanceWei = safeBigInt(selectedMintToken.userBalance);
+      const capacity = getMintCapacity(selectedMintToken);
+      const netMintAmount = applyBpsFee(amountWei, selectedMintToken.mintFeeBps);
+      return (
+        amountWei > 0n &&
+        amountWei <= balanceWei &&
+        netMintAmount > 0n &&
+        (capacity === null || amountWei <= capacity)
+      );
     } catch {
       return false;
     }
   };
 
   const isRedeemValid = () => {
-    if (!redeemAmount || !selectedRedeemToken || !psmInfo) return false;
+    if (!redeemAmount || !selectedRedeemToken || !psmInfo || psmInfo.burnPaused) return false;
     try {
       const amountWei = safeParseUnits(redeemAmount, 18);
-      const psmBal = BigInt(selectedRedeemToken.psmBalance);
-      const userBal = BigInt(psmInfo.userMintableBalance);
-      return amountWei > 0n && amountWei <= psmBal && amountWei <= userBal;
+      const availableLiquidity = safeBigInt(selectedRedeemToken.availableLiquidity);
+      const userBal = safeBigInt(psmInfo.userMintableBalance);
+      const payoutAmount = applyBpsFee(amountWei, selectedRedeemToken.burnFeeBps);
+      return (
+        amountWei > 0n &&
+        amountWei <= availableLiquidity &&
+        amountWei <= userBal &&
+        payoutAmount > 0n
+      );
     } catch {
       return false;
     }
@@ -143,9 +190,13 @@ const DirectMintPSMSection = () => {
     try {
       setIsProcessing(true);
       await psmService.mint(mintAmount, mintToken);
+      const amountWei = safeParseUnits(mintAmount, 18);
+      const netMintAmount = selectedMintToken
+        ? formatUnits(applyBpsFee(amountWei, selectedMintToken.mintFeeBps), 18)
+        : mintAmount;
       toast({
         title: "Mint Successful",
-        description: `Minted ${mintAmount} ${psmInfo?.mintableTokenSymbol} against ${selectedMintToken?.symbol}`,
+        description: `Minted ${netMintAmount} ${psmInfo?.mintableTokenSymbol} against ${selectedMintToken?.symbol}`,
         variant: "success",
       });
       setMintAmount("");
@@ -162,9 +213,13 @@ const DirectMintPSMSection = () => {
     try {
       setIsProcessing(true);
       await psmService.requestBurn(redeemAmount, redeemToken);
+      const amountWei = safeParseUnits(redeemAmount, 18);
+      const payoutAmount = selectedRedeemToken
+        ? formatUnits(applyBpsFee(amountWei, selectedRedeemToken.burnFeeBps), 18)
+        : redeemAmount;
       toast({
         title: "Redeem Requested",
-        description: `Requested to redeem ${redeemAmount} ${psmInfo?.mintableTokenSymbol} for ${selectedRedeemToken?.symbol}`,
+        description: `Requested to redeem ${redeemAmount} ${psmInfo?.mintableTokenSymbol} for ${payoutAmount} ${selectedRedeemToken?.symbol}`,
         variant: "success",
       });
       setRedeemAmount("");
@@ -183,7 +238,7 @@ const DirectMintPSMSection = () => {
       await psmService.completeBurn(request.id);
       toast({
         title: "Redemption Complete",
-        description: `Redeemed ${formatUnits(request.amount, 18)} ${psmInfo?.mintableTokenSymbol} for ${request.redeemTokenSymbol}`,
+        description: `Redeemed ${formatUnits(request.amount, 18)} ${psmInfo?.mintableTokenSymbol} for ${formatUnits(request.payoutAmount || request.amount, 18)} ${request.redeemTokenSymbol}`,
         variant: "success",
       });
       await Promise.all([refreshData(), fetchUsdstBalance(), fetchTokens()]);
@@ -212,7 +267,25 @@ const DirectMintPSMSection = () => {
     }
   };
 
-  const burnDelaySec = parseInt(psmInfo?.burnDelay || "0");
+  const burnDelaySec = parseInt(selectedRedeemToken?.burnDelay || "0");
+  const mintCapacity = selectedMintToken ? getMintCapacity(selectedMintToken) : null;
+  const mintMaxAmount = selectedMintToken
+    ? mintCapacity === null
+      ? safeBigInt(selectedMintToken.userBalance)
+      : minBigInt(safeBigInt(selectedMintToken.userBalance), mintCapacity)
+    : 0n;
+  const redeemMaxAmount = selectedRedeemToken
+    ? minBigInt(
+        safeBigInt(psmInfo?.userMintableBalance || "0"),
+        safeBigInt(selectedRedeemToken.availableLiquidity)
+      )
+    : 0n;
+  const estimatedMintAmount = selectedMintToken
+    ? applyBpsFee(safeParseUnits(mintAmount, 18), selectedMintToken.mintFeeBps)
+    : 0n;
+  const estimatedRedeemPayout = selectedRedeemToken
+    ? applyBpsFee(safeParseUnits(redeemAmount, 18), selectedRedeemToken.burnFeeBps)
+    : 0n;
 
   return (
     <div>
@@ -233,7 +306,7 @@ const DirectMintPSMSection = () => {
                   Mint {psmInfo?.mintableTokenSymbol || "USDST"}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Deposit an eligible token 1:1 to mint{" "}
+                  Deposit an enabled collateral token to mint{" "}
                   {psmInfo?.mintableTokenSymbol || "USDST"}.
                 </p>
 
@@ -243,7 +316,7 @@ const DirectMintPSMSection = () => {
                     onValueChange={setMintToken}
                     disabled={
                       !isLoggedIn ||
-                      !psmInfo?.eligibleTokens.length ||
+                      !mintTokens.length ||
                       isProcessing
                     }
                   >
@@ -251,7 +324,7 @@ const DirectMintPSMSection = () => {
                       <SelectValue placeholder="Select token" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(psmInfo?.eligibleTokens || []).map((t) => (
+                      {mintTokens.map((t) => (
                         <SelectItem key={t.address} value={t.address}>
                           {t.symbol || t.address.slice(0, 8)}
                         </SelectItem>
@@ -273,9 +346,8 @@ const DirectMintPSMSection = () => {
                         type="button"
                         className="text-blue-600 hover:underline mr-2"
                         onClick={() => {
-                          const bal = BigInt(selectedMintToken.userBalance);
-                          if (bal <= 0n) return;
-                          const formatted = formatUnits(bal, 18);
+                          if (mintMaxAmount <= 0n) return;
+                          const formatted = formatUnits(mintMaxAmount, 18);
                           const [w, f = ""] = formatted.split(".");
                           setMintAmount(`${w}.${f.slice(0, 18)}`);
                         }}
@@ -290,6 +362,34 @@ const DirectMintPSMSection = () => {
                         2
                       )}{" "}
                       {selectedMintToken.symbol}
+                      {mintCapacity !== null && (
+                        <>
+                          {" · "}
+                          Capacity:{" "}
+                          {formatBalance(mintCapacity, undefined, 18, 2)}{" "}
+                          {selectedMintToken.symbol}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {isLoggedIn && selectedMintToken && (
+                    <div className="text-sm text-muted-foreground">
+                      PSM Fee: {formatBps(selectedMintToken.mintFeeBps)}
+                      {estimatedMintAmount > 0n && (
+                        <>
+                          {" · "}
+                          You receive:{" "}
+                          {formatBalance(estimatedMintAmount, undefined, 18, 2, 6)}{" "}
+                          {psmInfo?.mintableTokenSymbol || "USDST"}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {isLoggedIn && psmInfo?.mintPaused && (
+                    <div className="text-sm text-destructive">
+                      Minting is currently paused.
                     </div>
                   )}
 
@@ -318,10 +418,10 @@ const DirectMintPSMSection = () => {
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
                   Request to exchange {psmInfo?.mintableTokenSymbol || "USDST"}{" "}
-                  1:1 for an eligible token.
-                  {burnDelaySec > 0 && (
+                  for an enabled redemption token.
+                  {selectedRedeemToken && burnDelaySec > 0 && (
                     <span className="block mt-1">
-                      Redemptions have a{" "}
+                      {selectedRedeemToken.symbol} redemptions have a{" "}
                       {formatTimeRemaining(burnDelaySec)} delay
                       before they can be completed.
                     </span>
@@ -334,7 +434,7 @@ const DirectMintPSMSection = () => {
                     onValueChange={setRedeemToken}
                     disabled={
                       !isLoggedIn ||
-                      !psmInfo?.eligibleTokens.length ||
+                      !redeemTokens.length ||
                       isProcessing
                     }
                   >
@@ -342,7 +442,7 @@ const DirectMintPSMSection = () => {
                       <SelectValue placeholder="Token to receive" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(psmInfo?.eligibleTokens || []).map((t) => (
+                      {redeemTokens.map((t) => (
                         <SelectItem key={t.address} value={t.address}>
                           {t.symbol || t.address.slice(0, 8)}
                         </SelectItem>
@@ -364,11 +464,8 @@ const DirectMintPSMSection = () => {
                         type="button"
                         className="text-blue-600 hover:underline mr-2"
                         onClick={() => {
-                          const psmBal = BigInt(selectedRedeemToken.psmBalance);
-                          const userBal = BigInt(psmInfo?.userMintableBalance || "0");
-                          const max = psmBal < userBal ? psmBal : userBal;
-                          if (max <= 0n) return;
-                          const formatted = formatUnits(max, 18);
+                          if (redeemMaxAmount <= 0n) return;
+                          const formatted = formatUnits(redeemMaxAmount, 18);
                           const [w, f = ""] = formatted.split(".");
                           setRedeemAmount(`${w}.${f.slice(0, 18)}`);
                         }}
@@ -384,14 +481,34 @@ const DirectMintPSMSection = () => {
                         2
                       )}
                       {" · "}
-                      PSM reserves:{" "}
+                      Available liquidity:{" "}
                       {formatBalance(
-                        selectedRedeemToken.psmBalance,
+                        selectedRedeemToken.availableLiquidity,
                         undefined,
                         18,
                         2
                       )}{" "}
                       {selectedRedeemToken.symbol}
+                    </div>
+                  )}
+
+                  {isLoggedIn && selectedRedeemToken && (
+                    <div className="text-sm text-muted-foreground">
+                      PSM Fee: {formatBps(selectedRedeemToken.burnFeeBps)}
+                      {estimatedRedeemPayout > 0n && (
+                        <>
+                          {" · "}
+                          You receive:{" "}
+                          {formatBalance(estimatedRedeemPayout, undefined, 18, 2, 6)}{" "}
+                          {selectedRedeemToken.symbol}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {isLoggedIn && psmInfo?.burnPaused && (
+                    <div className="text-sm text-destructive">
+                      Redemptions are currently paused.
                     </div>
                   )}
 
@@ -429,21 +546,46 @@ const DirectMintPSMSection = () => {
               {psmInfo && (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Redeem Delay</span>
+                    <span className="text-muted-foreground">Minting</span>
                     <span className="font-medium">
-                      {burnDelaySec === 0
-                        ? "None (instant)"
-                        : formatTimeRemaining(burnDelaySec)}
+                      {psmInfo.mintPaused ? "Paused" : "Active"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Redemptions</span>
+                    <span className="font-medium">
+                      {psmInfo.burnPaused ? "Paused" : "Active"}
                     </span>
                   </div>
                   {psmInfo.eligibleTokens.map((t) => (
-                    <div key={t.address} className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        PSM {t.symbol} Reserves
-                      </span>
-                      <span className="font-medium">
-                        {formatBalance(t.psmBalance, undefined, 18, 2)}
-                      </span>
+                    <div key={t.address} className="rounded-md border border-border p-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          PSM {t.symbol} Reserves
+                        </span>
+                        <span className="font-medium">
+                          {formatBalance(t.psmBalance, undefined, 18, 2)}
+                        </span>
+                      </div>
+                      {t.burnEnabled && (
+                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                          <span>Redeem Available</span>
+                          <span>
+                            {formatBalance(t.availableLiquidity, undefined, 18, 2)}{" "}
+                            {t.symbol}
+                          </span>
+                        </div>
+                      )}
+                      {t.burnEnabled && (
+                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                          <span>Redeem Delay</span>
+                          <span>
+                            {parseInt(t.burnDelay) === 0
+                              ? "None"
+                              : formatTimeRemaining(parseInt(t.burnDelay))}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -464,6 +606,7 @@ const DirectMintPSMSection = () => {
                 <div className="space-y-3">
                   {(psmInfo?.burnRequests || []).map((req) => {
                     const amountFormatted = formatUnits(req.amount, 18);
+                    const payoutFormatted = formatUnits(req.payoutAmount || req.amount, 18);
                     const remaining = parseInt(req.availableAt) - nowSec;
                     const available = remaining <= 0;
                     const isCancelExpanded = cancelExpandedId === req.id;
@@ -490,6 +633,7 @@ const DirectMintPSMSection = () => {
                             <div className="font-medium text-sm">
                               {amountFormatted}{" "}
                               {psmInfo?.mintableTokenSymbol || "USDST"} →{" "}
+                              {payoutFormatted}{" "}
                               {req.redeemTokenSymbol}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5">
@@ -592,7 +736,11 @@ const DirectMintPSMSection = () => {
                   and transfer{" "}
                   <span className="font-semibold text-foreground">
                     {completeDialogRequest &&
-                      formatUnits(completeDialogRequest.amount, 18)}{" "}
+                      formatUnits(
+                        completeDialogRequest.payoutAmount ||
+                          completeDialogRequest.amount,
+                        18
+                      )}{" "}
                     {completeDialogRequest?.redeemTokenSymbol}
                   </span>{" "}
                   to you.
