@@ -351,6 +351,23 @@ contract Describe_DirectMintPSM {
         admin.doSuccessfully(address(psm), "setBurnConfig", address(USDC), true, 0, 0, 0);
     }
 
+    function it_psm_requires_active_tokens_for_user_flows() {
+        admin.doSuccessfully(address(USDC), "mint", address(user2), 30e18);
+        user2.doSuccessfully(address(USDC), "approve", address(psm), 30e18);
+        user2.doSuccessfully(address(psm), "mint", 10e18, address(USDC));
+        user2.doSuccessfully(address(USDST), "approve", address(psm), 10e18);
+        user2.doSuccessfully(address(psm), "requestBurn", 10e18, address(USDC));
+        uint requestId = psm.burnReqCounter();
+
+        admin.doSuccessfully(address(USDC), "setStatus", 3);
+        user2.doExpectingFailure(address(psm), "mint", "Token not active", 10e18, address(USDC));
+        user2.doExpectingFailure(address(psm), "requestBurn", "Token not active", 10e18, address(USDC));
+        user2.doExpectingFailure(address(psm), "completeBurn", "Token not active", requestId);
+
+        admin.doSuccessfully(address(USDC), "setStatus", 2);
+        user2.doSuccessfully(address(psm), "cancelBurn", requestId);
+    }
+
     function it_psm_rejects_invalid_amounts_without_state_changes() {
         uint usdcPsmBefore = USDC.balanceOf(address(psm));
         uint usdcUserBefore = USDC.balanceOf(address(user2));
@@ -680,10 +697,14 @@ contract Describe_DirectMintPSM {
         require(USDST.balanceOf(address(psm)) == psmUsdstBefore + 25e18, "PSM should hold escrowed USDST");
         require(psm.pendingRedemptions(address(USDC)) == pendingBefore + 25e18, "Burn request should reserve USDC");
 
-        admin.doExpectingFailure(address(psm), "cancelExpiredBurn", "Burn request not expired", requestId);
+        try admin.do(address(psm), "clearExpiredBurnRequest", requestId) {
+            revert("Expected clearExpiredBurnRequest to fail before expiry");
+        } catch Error(string e) {
+            require(e == "Burn request not expired", "Expected clearExpiredBurnRequest to fail before expiry");
+        }
 
         fastForward(7 * 24 * 60 * 60);
-        admin.doSuccessfully(address(psm), "cancelExpiredBurn", requestId);
+        admin.doSuccessfully(address(psm), "clearExpiredBurnRequest", requestId);
 
         require(USDST.balanceOf(address(user2)) == userUsdstBefore + 25e18, "Expired cancel should return escrowed USDST");
         require(USDST.balanceOf(address(psm)) == psmUsdstBefore, "Expired cancel should remove PSM escrow");
