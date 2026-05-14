@@ -1,6 +1,7 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../Admin/FeeCollector.sol";
 import "../Tokens/Token.sol";
+import "../Tokens/TokenFactory.sol";
 
 contract DirectMintPSM is Ownable {
 
@@ -98,6 +99,15 @@ contract DirectMintPSM is Ownable {
     function _requireValidConfigToken(address token) internal view {
         require(token != address(0) && token != mintableToken, "Invalid token");
         require(Token(token).decimals() == Token(mintableToken).decimals(), "Decimal mismatch"); // unsupported
+        _requireActiveToken(token);
+    }
+
+    function _tokenFactory() internal view returns (TokenFactory) {
+        return TokenFactory(address(Token(mintableToken).tokenFactory()));
+    }
+
+    function _requireActiveToken(address token) internal view {
+        require(_tokenFactory().isTokenActive(token), "Token not active");
     }
 
     function setMintConfig(
@@ -227,6 +237,8 @@ contract DirectMintPSM is Ownable {
         require(amount > 0, "Amount must be nonzero");
         require(!mintPaused, "Minting is paused");
         require(config.isEnabled, "Minting for this token is disabled");
+        _requireActiveToken(mintableToken);
+        _requireActiveToken(againstToken);
         require(config.maxBalance == 0 || (IERC20(againstToken).balanceOf(address(this)) <= config.maxBalance && amount <= config.maxBalance - IERC20(againstToken).balanceOf(address(this))), "Token balance cap exceeded");
         uint feeAmount = (amount * config.feeBps) / 10000;
         uint mintAmount = amount - feeAmount;
@@ -255,6 +267,8 @@ contract DirectMintPSM is Ownable {
         require(amount > 0, "Amount must be nonzero");
         require(!burnPaused, "Burning is paused");
         require(config.isEnabled, "Token burn is disabled");
+        _requireActiveToken(mintableToken);
+        _requireActiveToken(redeemToken);
         uint payoutAmount = amount - ((amount * config.feeBps) / 10000);
         require(payoutAmount > 0, "Payout amount must be nonzero");
         require(availableRedemptionLiquidity(redeemToken) >= amount, "Insufficient liquidity");
@@ -283,6 +297,8 @@ contract DirectMintPSM is Ownable {
         require(burnAmount > 0, "Invalid burn request ID");
         require(!burnPaused, "Burning is paused");
         require(burnConfigs[redeemToken].isEnabled, "Token burn is disabled");
+        _requireActiveToken(mintableToken);
+        _requireActiveToken(redeemToken);
         require(requester == msg.sender, "Unauthorized");
         uint burnDelay = burnConfigs[redeemToken].burnDelay;
         require(burnDelay == 0 || requestTime + burnDelay <= block.timestamp, "Burn delay not passed");
