@@ -41,11 +41,11 @@ data Options
 --  | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
   | Code {hash :: String}
   | DeleteDepBlock {valK :: String}
-  | DumpKafkaVMEvents {startingBlock :: Int}
-  | DumpKafkaSequencer {startingBlock :: Int}
-  | DumpKafkaSequencerVM {startingBlock :: Int}
-  | DumpKafkaSequencerP2P {startingBlock :: Int}
-  | DumpKafkaUnSequencer {startingBlock :: Int}
+  | DumpKafkaVMEvents
+  | DumpKafkaSequencer
+  | DumpKafkaSequencerVM
+  | DumpKafkaSequencerP2P
+  | DumpKafkaUnSequencer
   | SyncStats {}
   | FRawMP {stateRoot :: String, filename :: String}
   | Hash {hash :: String}
@@ -123,39 +123,19 @@ fRawMPOptions =
     ]
 
 dumpKafkaSequencerOptions :: Annotate Ann
-dumpKafkaSequencerOptions =
-  record
-    DumpKafkaSequencer {startingBlock = undefined}
-    [ startingBlock := 0 += typ "INT"
-    ]
+dumpKafkaSequencerOptions = record DumpKafkaSequencer []
 
 dumpKafkaSequencerVmOptions :: Annotate Ann
-dumpKafkaSequencerVmOptions =
-  record
-    DumpKafkaSequencerVM {startingBlock = undefined}
-    [ startingBlock := 0 += typ "INT"
-    ]
+dumpKafkaSequencerVmOptions = record DumpKafkaSequencerVM []
 
 dumpKafkaSequencerP2pOptions :: Annotate Ann
-dumpKafkaSequencerP2pOptions =
-  record
-    DumpKafkaSequencerP2P {startingBlock = undefined}
-    [ startingBlock := 0 += typ "INT"
-    ]
+dumpKafkaSequencerP2pOptions = record DumpKafkaSequencerP2P []
 
 dumpKafkaUnSequencerOptions :: Annotate Ann
-dumpKafkaUnSequencerOptions =
-  record
-    DumpKafkaUnSequencer {startingBlock = undefined}
-    [ startingBlock := 0 += typ "INT"
-    ]
+dumpKafkaUnSequencerOptions = record DumpKafkaUnSequencer []
 
 dumpKafkaVMEventsOptions :: Annotate Ann
-dumpKafkaVMEventsOptions =
-  record
-    DumpKafkaVMEvents {startingBlock = undefined}
-    [ startingBlock := 0 += typ "INT"
-    ]
+dumpKafkaVMEventsOptions = record DumpKafkaVMEvents []
 
 {-
 checkpointOptions :: Annotate Ann
@@ -352,11 +332,11 @@ run AddTxsFromFile {..} = addTxsFromFile fileName
 run AskForBlocks {..} = insertP2P (P2pAskForBlocks startBlock endBlock qAddr)
 run Code {..} = Code.doit hash
 run DeleteDepBlock {..} = deleteDepBlock valK
-run DumpKafkaSequencer {..} = dumpKafkaSequencer (fromIntegral startingBlock)
-run DumpKafkaSequencerVM {..} = dumpKafkaSequencerVM (fromIntegral startingBlock)
-run DumpKafkaSequencerP2P {..} = dumpKafkaSequencerP2P (fromIntegral startingBlock)
-run DumpKafkaUnSequencer {..} = dumpKafkaUnSequencer (fromIntegral startingBlock)
-run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
+run DumpKafkaSequencer = dumpKafkaSequencer
+run DumpKafkaSequencerVM = dumpKafkaSequencerVM
+run DumpKafkaSequencerP2P = dumpKafkaSequencerP2P
+run DumpKafkaUnSequencer = dumpKafkaUnSequencer
+run DumpKafkaVMEvents = dumpKafkaVMEvents
 run SyncStats = syncStats
 run Hash {..} = Hash.doit hash
 run Raw {..} = Raw.doit filename

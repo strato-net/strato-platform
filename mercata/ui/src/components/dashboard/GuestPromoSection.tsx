@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { redirectToLogin } from "@/lib/auth";
+import { requestWalletConnection } from "@/lib/auth";
 import { useEarnContext } from "@/context/EarnContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
@@ -211,7 +211,7 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
             </p>
 
             <button
-              onClick={() => variant === 1 ? redirectToLogin() : navigate("/dashboard/earn")}
+              onClick={() => variant === 1 ? requestWalletConnection() : navigate("/dashboard/earn")}
               className="inline-flex items-center gap-2 border border-white/30 text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-white/10 transition-colors"
             >
               Start Earning
@@ -236,12 +236,12 @@ const GuestPromoSection = ({ variant }: GuestPromoSectionProps) => {
               </div>
               {variant === 1 ? (
                 <button
-                  onClick={() => redirectToLogin()}
+                  onClick={() => requestWalletConnection()}
                   onMouseEnter={() => setRewardsButtonHovered(true)}
                   onMouseLeave={() => setRewardsButtonHovered(false)}
                   className="text-white/50 text-sm hover:text-white/70 transition-colors inline-flex items-center gap-1 self-start"
                 >
-                  Sign in to start earning
+                  Connect wallet to start earning
                   <ArrowRight size={14} />
                 </button>
               ) : (

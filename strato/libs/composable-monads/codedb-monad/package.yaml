@@ -1,0 +1,30 @@
+name:                codedb-monad
+version:             0.1.0.0
+license:             Apache-2.0
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  dependencies:
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-mpdbs
+  - common-log
+  - aeson
+  - bytestring
+  - composable-monads-base
+  - containers
+  - esqueleto
+  - monad-alter
+  - mtl
+  - persistent
+  - persistent-postgresql
+  - resourcet
+  - solid-vm-compiler
+  - solid-vm-model
+  - strato-conf
+  - strato-model
+  - text
+  - unliftio-core

@@ -15,10 +15,10 @@ import { useTokenContext } from "@/context/TokenContext";
 import { useRewardsLeaderboard } from "@/hooks/useRewardsLeaderboard";
 import { useSearchParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
-import { redirectToLogin } from "@/lib/auth";
+import { requestWalletConnection } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LogIn, Gift } from "lucide-react";
+import { Wallet, Gift } from "lucide-react";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const Rewards = () => {
@@ -85,7 +85,7 @@ const Rewards = () => {
   };
 
   const handleLogin = () => {
-    redirectToLogin();
+    requestWalletConnection();
   };
 
   // Guest login prompt component
@@ -97,7 +97,7 @@ const Rewards = () => {
         </div>
         <CardTitle className="text-xl">Start Earning Rewards</CardTitle>
         <CardDescription className="text-base">
-          Sign in to start earning CATA tokens and track your rewards.
+          Connect a wallet to start earning CATA tokens and track your rewards.
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center space-y-4">
@@ -106,8 +106,8 @@ const Rewards = () => {
           className="gap-2"
           size="lg"
         >
-          <LogIn className="w-4 h-4" />
-          Sign In to Get Started
+          <Wallet className="w-4 h-4" />
+          Connect Wallet to Get Started
         </Button>
       </CardContent>
     </Card>

@@ -24,6 +24,8 @@ interface CastVoteModalProps {
   userAddress?: string | null;
 }
 
+const normalizeAddress = (addr?: string | null): string => (addr || '').toLowerCase().replace(/^0x/, '');
+
 const CastVoteModal: React.FC<CastVoteModalProps> = ({
   open,
   onOpenChange,
@@ -77,7 +79,7 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
   const canDismiss = issue && onDismissIssue && userAddress && votes.length > 0
     ? (() => {
         const issueVotes = votes.filter(v => v.issueId === issue.issueId);
-        return issueVotes.length === 1 && issueVotes[0]?.voter === userAddress;
+        return issueVotes.length === 1 && normalizeAddress(issueVotes[0]?.voter) === normalizeAddress(userAddress);
       })()
     : false;
 
@@ -96,7 +98,7 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
       return "Only issues with a single vote can be dismissed";
     }
     
-    if (issueVotes[0]?.voter !== userAddress) {
+    if (normalizeAddress(issueVotes[0]?.voter) !== normalizeAddress(userAddress)) {
       return "Only the proposer can dismiss this issue";
     }
     

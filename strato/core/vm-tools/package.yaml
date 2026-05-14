@@ -47,7 +47,6 @@ library:
     - bytestring
     - common-log
     - composable-monads-base
-    - conduit
     - containers
     - cross-monitoring
     - data-default
@@ -59,9 +58,8 @@ library:
     - exceptions
     - extra
     - format
-    - generic-arbitrary
     - hedis
-    - kafka-monad
+    - streaming
     - lens
     - leveldb-haskell
     - lrucache
@@ -72,12 +70,10 @@ library:
     - ordered-containers
     - persistent-sqlite
     - prometheus-client
-    - QuickCheck
     - quickcheck-instances
     - resourcet
     - seqevents
     - solid-vm-model
-    - sql-monad
     - strato-conf
     - strato-model
     - strato-redis-blockdb

@@ -29,10 +29,8 @@ library
     , base
     , binary
     , bytestring
-    , deepseq
     , elliptic-curve
     , galois-field
-    , groups
     , pairing
     , parallel
     , random

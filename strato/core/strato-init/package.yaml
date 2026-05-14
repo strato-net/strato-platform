@@ -28,62 +28,41 @@ library:
     - Blockchain.Init.Options
   dependencies:
   - aeson
-  - base16-bytestring
   - blockapps-data
   - data-default
-  - blockapps-datadefs
   - blockapps-mpdbs
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
-  - blockDB
   - bytestring
   - common-log
   - conduit
   - containers
   - directory
-  - ethereum-rlp
-  - evm-solidity
-  - exceptions
   - filepath
   - format
   - hflags
-  - http-client
   - http-types
-  - kafka-monad
-  - lens
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
   - nibblestring
-  - persistent-postgresql
   - entropy
-  - file-embed
   - process
-  - raw-strings-qq
-  - redis-monad
   - resourcet
   - servant-client
   - strato-auth
-  - solid-vm
-  - solid-vm-compiler
   - solid-vm-model
-  - sql-monad
   - strato-conf
   - strato-genesis
-  - strato-index
   - strato-model
-  - strato-sequencer
-  - strato-statediff
+  - streaming
   # - strato-p2p
   - template-haskell
-  - text
   - transformers
   - turtle
   - unix
   - unliftio
-  - vm-tools
   - yaml
-  - ordered-containers
 
 executables:
 
@@ -91,7 +70,6 @@ executables:
     source-dirs: exec_src/
     main: Main.hs
     dependencies:
-      - common-log
       - hflags
       - strato-init
       - strato-model
@@ -112,6 +90,5 @@ executables:
       - strato-genesis
       - strato-init
       - strato-model
-      - text
     other-modules: []
 

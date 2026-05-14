@@ -1,0 +1,219 @@
+# -----------------------------------------------------------------------------
+# STRATO Load Test Config — high-level (application-layer) scenario
+# -----------------------------------------------------------------------------
+# Wires up the canonical UI bridge-in flow scenario that exercises the full
+# Mercata application stack (ui + backend + STRATO + bridge):
+#   - tokenSale  (Sepolia USDC -> USDST -> AUTO_FORGE -> GOLDST)
+#
+# For low-level direct-node scenarios (contractDeploy / functionCall /
+# mixedWorkload) see config.example.yaml instead.
+#
+# Defaults below target helium (STRATO chainId 114784819836269) but
+# nothing here is specific to helium — point the URLs and addresses at any
+# other STRATO network and the same scenario will run.
+#
+# HOW TO USE THIS FILE
+# --------------------
+# The single source of truth for every knob's built-in default is in
+# src/config.ts (the per-scenario default objects in `loadConfig`). This
+# file documents every field — fields matching the code default are
+# commented out so you only need to uncomment and edit what you want to
+# override. Fields that MUST be supplied for a scenario to start are left
+# uncommented with a REPLACE_* placeholder.
+#
+# Copy to config.highlevel.yaml and fill in the credentials + addresses for
+# your environment. Run via:
+#   npm run test:token-sale -- --config config.highlevel.yaml
+# -----------------------------------------------------------------------------
+
+nodes:
+  - name: "helium"
+    # Backend URL — /strato and /bloc are proxied through nginx to the STRATO
+    # node, so you can point this at the public app URL.
+    url: "https://app.testnet.strato.nexus"
+    auth:
+      # Keycloak OAuth 2.0 confidential client credentials + user. clientId
+      # refers to the Keycloak client (application) registered in the mercata
+      # realm, NOT the end user.
+      openIdDiscoveryUrl: "https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+      clientId: "REPLACE_CLIENT_ID"           # e.g. "localhost" in dev, or the confidential client for loadtests
+      clientSecret: "REPLACE_CLIENT_SECRET"
+      username: "REPLACE_LOAD_TEST_USER"
+      password: "REPLACE_LOAD_TEST_PASSWORD"
+
+# gas:                       # defaults: { limit: 32100000000, price: 1 }
+#   limit: 32100000000
+#   price: 1
+
+# polling:                   # defaults: { interval: 2000, timeout: 120000 }
+#   interval: 2000
+#   timeout: 120000
+
+scenarios:
+  # ---------------------------------------------------------------------------
+  # Token Sale TPS — canonical UI bridge-in flow (1000 sales / 30s)
+  # ---------------------------------------------------------------------------
+  # Replays the "Fund > Bridge-In (Sepolia USDC → STRATO USDST → AUTO_FORGE
+  # GOLDST)" composition performed by mercata/ui/src/components/bridge/BridgeIn.tsx.
+  # Each "sale" is the composition of:
+  #   1. Sign Permit2 typed-data (EIP-712) for USDC on Sepolia.
+  #   2. Broadcast DepositRouter.deposit(USDC, ..., signature) on Sepolia.
+  #   3. POST /api/bridge/requestDepositAction
+  #      { externalChainId, externalTxHash, action: 2 (AUTO_FORGE),
+  #        targetToken: GOLDST }.
+  # The bridge service polls Sepolia, sees the deposit, mints USDST to the
+  # recipient and auto-forges USDST → GOLDST server-side. The load test does
+  # NOT call /api/metal-forge/buy — AUTO_FORGE handles the metal mint.
+  #
+  # An optional warm-up issues the same GETs the Fund page does on mount
+  # (networkConfigs / depositActions / bridgeableTokens / metal-forge/configs).
+  #
+  # Prerequisites:
+  #   - Sepolia USDC in the broadcaster EOA (faucet at https://faucet.circle.com).
+  #   - Sepolia ETH in the same EOA for gas.
+  #   - On first run, init() submits a one-time approve(MAX) for Permit2 to
+  #     spend USDC from the EOA.
+  #   - Voucher or USDST gas coverage on the STRATO recipient (for the
+  #     bridgeRequest backend call's on-STRATO tx).
+  tokenSale:
+    enabled: true
+    # REQUIRED — GOLDST (or another metal token) address on STRATO.
+    # Discover via `curl $BACKEND/api/metal-forge/configs`.
+    metalTokenAddress: "REPLACE_GOLDST_ADDRESS"
+    # REQUIRED — Sepolia broadcaster (one funded EOA signs every iteration).
+    bridge:
+      sepoliaRpcUrl:           "https://eth-sepolia.g.alchemy.com/v2/REPLACE_KEY"
+      sepoliaPrivateKey:       "0xREPLACE_FUNDED_PRIVATE_KEY"
+      depositRouterAddress:    "0xREPLACE_DEPOSIT_ROUTER_ADDRESS_ON_SEPOLIA"
+      stratoRecipientAddress:  "REPLACE_STRATO_RECIPIENT"          # hex, with or without 0x
+      sepoliaTokenAddress:     "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"  # Sepolia USDC (Circle's)
+      targetStratoToken:       "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"     # USDST on STRATO
+      amountPerTx:             "1000"                              # 0.001 USDC (USDC has 6 decimals)
+      # On first run with this EOA, init() submits a one-time approve(MAX) for
+      # Permit2 on the configured ERC20. After that, every iteration only
+      # signs a Permit2 typed-data and calls DepositRouter.deposit(...).
+      # permit2Address:        "0x000000000022D473030F116dDEE9F6B43aC78BA3"   # default: canonical Permit2
+      # permitDeadlineSec:     1800                                  # default 30 min Permit2 deadline
+      # chainId:                 11155111                             # default Sepolia
+      # awaitConfirmation:       false                                # default — block on Sepolia receipt per iteration?
+      # gasLimit:                250000                               # default
+      # maxFeePerGasGwei:        30                                   # default
+      # maxPriorityFeePerGasGwei: 2                                   # default
+      # startNonce: 0                                                 # default: read from chain ("pending")
+    # --- everything below has a code default; uncomment to override ---
+    # backendUrl: "https://app.testnet.strato.nexus"   # default: node[0].url
+    # networkLabel: "helium"                # default (report metadata only)
+    # chainId: 114784819836269              # default (STRATO helium testnet)
+    # totalTxCount: 1000                    # default
+    # timeWindowMs: 30000                   # default (paces rate to hit totalTxCount over this window)
+    # concurrentUsers: 50                   # default — parallel sales, spread across the user pool round-robin
+    # externalChainId: "11155111"           # default Ethereum Sepolia ("1" Ethereum mainnet | "8453" Base | ...)
+    # payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"  # default — helium USDST (intermediate token AUTO_FORGE consumes)
+    # metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6"   # default (helium MetalForge — used only for forge-side balance reads)
+    # includePageLoad: true                 # default (4 Fund-page GETs once per user during warmup)
+    # --- transient-error retry (per-iteration backend POST) ---
+    # Retries on HTTP 429 + any 5xx (e.g. backend 503 when the bridge service
+    # is overloaded). Backoff between attempts is exponential with ±0..500 ms
+    # jitter — attempt 2 fires after ~1.5s, attempt 3 after ~3s, attempt 4
+    # after ~6s. Final post-retry failures still surface as `… FAILED:` lines.
+    # requestRetries: 3                     # default; 0 disables retry
+    # --- balance logging ---
+    # logBalances: "summary"                # default — "summary" | "none"
+    #                                       # summary: per-user STRATO snapshot before + after the run
+    #                                       #          (auth-filtered to each entry of `users:`), plus a
+    #                                       #          shared forge/global snapshot and a pool-aggregate
+    #                                       #          Δ line when N>1. Reports the CALLING user's
+    #                                       #          balances, not the bridge recipient's — see the
+    #                                       #          autoForgeWait* settings below for the end-to-end
+    #                                       #          mint check on the recipient.
+    #                                       # none:    no balance reads (max throughput).
+    # --- end-to-end AUTO_FORGE verification ---
+    # After all bridge requests have been posted, the bridge service still
+    # has to (a) wait for Sepolia confirmations, (b) MercataBridge.completeDeposit
+    # mint USDST, (c) MetalForge.mintMetal mint GOLDST. The scenario polls the
+    # recipient's STRATO GOLDST balance in Cirrus (keyed by stratoRecipientAddress
+    # directly, NOT auth-filtered) until either:
+    #   - Number of distinct GOLDST balance increments == number of successful
+    #     Sepolia broadcasts (each AUTO_FORGE mint yields one increment), or
+    #   - Balance is stable for >=2 polls AND at least one mint was observed
+    #     (treated as "PARTIAL — some bridges may have failed silently"), or
+    #   - autoForgeWaitTimeoutSec elapses (treated as a hard "TIMEOUT" signal —
+    #     bridge service may still drain afterwards; check Cirrus manually).
+    # Final outcome tagged "[OK]" / "[PARTIAL]" / "[TIMEOUT]" in the run summary.
+    # autoForgeWaitTimeoutSec: 300          # default 300 s (5 min). Set to 0 to disable the wait
+    #                                       # entirely — useful when you only care about Sepolia/backend
+    #                                       # latency and not end-to-end correctness.
+    # autoForgeWaitPollIntervalSec: 5       # default 5 s (~60 polls over the default 5 min timeout)
+    # --- optional user pool (cycles across concurrentUsers for more realistic auth load) ---
+    # users:
+    #   - { username: "loadtest1", password: "pw1" }
+    #   - { username: "loadtest2", password: "pw2" }
+    # openIdDiscoveryUrl: ""                # default: node[0].auth.openIdDiscoveryUrl
+    # clientId: ""                          # default: node[0].auth.clientId
+    # clientSecret: ""                      # default: node[0].auth.clientSecret
+
+  # ---------------------------------------------------------------------------
+  # Forge Buy — direct /api/metal-forge/buy stress (no bridge service involved)
+  # ---------------------------------------------------------------------------
+  # Replays the simpler "user already holds USDST on STRATO; clicks Buy Gold"
+  # flow. Per iteration POSTs /api/metal-forge/buy { metalToken, payToken,
+  # payAmount, minMetalOut }; the backend executes MetalForge.mintMetal on
+  # STRATO in a single tx (USDST → GOLDST). No Sepolia, no bridge service,
+  # no asynchronous wait — the on-STRATO tx hash is in the response body.
+  #
+  # Useful for:
+  #   - Stressing the metal-forge backend route + on-STRATO MetalForge contract
+  #     in isolation (without the Sepolia + bridge-service dependency).
+  #   - Testing on networks where the bridge service isn't deployed.
+  #   - Quick smoke tests when you don't want to deal with Sepolia funding.
+  #
+  # Prerequisites:
+  #   - The calling Keycloak user (or every entry of `users:` below) must hold
+  #     ≥ totalTxCount × payAmount ÷ concurrentUsers of USDST on STRATO, plus
+  #     voucher gas headroom for the on-STRATO mintMetal tx.
+  forgeBuy:
+    # enabled: false                        # default — set true to run this scenario
+    # REQUIRED — GOLDST address on STRATO. Discover via /api/metal-forge/configs.
+    metalTokenAddress: "REPLACE_GOLDST_ADDRESS"
+    # --- everything below has a code default; uncomment to override ---
+    # backendUrl: "https://app.testnet.strato.nexus"   # default: node[0].url
+    # networkLabel: "helium"                # default (report metadata only)
+    # chainId: 114784819836269              # default (helium testnet)
+    # totalTxCount: 1000                    # default
+    # timeWindowMs: 30000                   # default
+    # concurrentUsers: 50                   # default
+    # payTokenAddress: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"  # default — helium USDST
+    # payAmount: "1000000000000000"         # default — 0.001 USDST per iteration (18-dec wei)
+    # minMetalOut: "0"                      # default — slippage guard (set from oracle in production)
+    # metalForgeAddress: "c5ed981b816a626981a5747d125e0e7296b2c7c6"   # default — helium MetalForge
+    # includePageLoad: true                 # default — 2 GETs per user during warmup
+    # requestRetries: 3                     # default
+    # logBalances: "summary"                # default — "summary" | "none". summary: per-user
+    #                                       # STRATO snapshot before + after the run (auth-filtered
+    #                                       # to each entry of `users:`), plus a shared forge/global
+    #                                       # snapshot and a pool-aggregate Δ line when N>1.
+    # users:
+    #   - { username: "loadtest1", password: "pw1" }
+    #   - { username: "loadtest2", password: "pw2" }
+    # openIdDiscoveryUrl: ""                # default: node[0].auth.openIdDiscoveryUrl
+    # clientId: ""                          # default: node[0].auth.clientId
+    # clientSecret: ""                      # default: node[0].auth.clientSecret
+
+  # ---------------------------------------------------------------------------
+  # Low-level legacy scenarios — use config.example.yaml for a richer setup.
+  # Each defaults to enabled=false, so leaving these commented is fine.
+  # ---------------------------------------------------------------------------
+  # contractDeploy:
+  #   enabled: false
+  # functionCall:
+  #   enabled: false
+  # mixedWorkload:
+  #   enabled: false
+  # multiNode:
+  #   enabled: false
+
+# report:                    # defaults: { outputDir: "./reports", formats: ["json", "html"] }
+#   outputDir: "./reports"
+#   formats:
+#     - json
+#     - html

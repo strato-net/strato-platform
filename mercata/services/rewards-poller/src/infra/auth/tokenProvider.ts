@@ -44,6 +44,12 @@ const TOKEN_LIFETIME_THRESHOLD_SECONDS = 10;
 let oauthInitialized = false;
 let oauthInstance: any = null;
 
+// In-flight promise trackers to deduplicate concurrent fetches (single-flight pattern).
+// Prevents cache stampede when multiple parallel callers (e.g. Promise.all in checkBalances)
+// arrive while the cache is empty/stale.
+let inFlightTokenRequest: Promise<string> | null = null;
+let inFlightAddressRequest: Promise<string> | null = null;
+
 export const initOpenIdConfig = async () => {
   if (oauthInitialized) {
     logInfo("Auth", "OAuth already initialized, skipping");
@@ -91,44 +97,56 @@ export const getBAUserToken = async (): Promise<string> => {
     return userTokenData.token;
   }
 
-  try {
-    if (!oauthInstance) {
-      throw new Error(
-        "OAuth client not initialized. Call initOpenIdConfig() first",
-      );
-    }
-
-    if (!config.auth.baPassword) {
-      throw new Error("BA_PASSWORD is not configured");
-    }
-
-    const tokenObj =
-      await oauthInstance.getAccessTokenByResourceOwnerCredential(
-        config.auth.baUsername,
-        config.auth.baPassword,
-      );
-
-    const token = tokenObj.token[getOAuthConfig().tokenField] as string;
-    const expiresAt = tokenObj.token.expires_at as number;
-
-    CACHED_DATA[cacheKey] = { token, expiresAt };
-    
-    return token;
-  } catch (error: any) {
-    logError("Auth", error as Error, {
-      operation: "getBAUserToken",
-      errorMessage: error?.message,
-      errorName: error?.name,
-      errorStack: error?.stack,
-      hasOAuthInstance: !!oauthInstance,
-      hasPassword: !!config.auth.baPassword,
-      username: config.auth.baUsername
-    });
-    
-    throw new Error(
-      `Failed to fetch user OAuth token: ${error?.message || "Unknown error"}`,
-    );
+  // If another caller is already fetching a fresh token, await that same promise
+  // instead of issuing a duplicate OAuth request.
+  if (inFlightTokenRequest) {
+    return inFlightTokenRequest;
   }
+
+  inFlightTokenRequest = (async () => {
+    try {
+      if (!oauthInstance) {
+        throw new Error(
+          "OAuth client not initialized. Call initOpenIdConfig() first",
+        );
+      }
+
+      if (!config.auth.baPassword) {
+        throw new Error("BA_PASSWORD is not configured");
+      }
+
+      const tokenObj =
+        await oauthInstance.getAccessTokenByResourceOwnerCredential(
+          config.auth.baUsername,
+          config.auth.baPassword,
+        );
+
+      const token = tokenObj.token[getOAuthConfig().tokenField] as string;
+      const expiresAt = tokenObj.token.expires_at as number;
+
+      CACHED_DATA[cacheKey] = { token, expiresAt };
+
+      return token;
+    } catch (error: any) {
+      logError("Auth", error as Error, {
+        operation: "getBAUserToken",
+        errorMessage: error?.message,
+        errorName: error?.name,
+        errorStack: error?.stack,
+        hasOAuthInstance: !!oauthInstance,
+        hasPassword: !!config.auth.baPassword,
+        username: config.auth.baUsername
+      });
+
+      throw new Error(
+        `Failed to fetch user OAuth token: ${error?.message || "Unknown error"}`,
+      );
+    } finally {
+      inFlightTokenRequest = null;
+    }
+  })();
+
+  return inFlightTokenRequest;
 };
 
 export const getBAUserAddress = async (): Promise<string> => {
@@ -136,13 +154,23 @@ export const getBAUserAddress = async (): Promise<string> => {
     return cachedUserAddress;
   }
 
-  try {
-    const response = await strato.get('/key');
-    cachedUserAddress = response.address;
-    return cachedUserAddress!;
-  } catch (error: any) {
-    throw new Error(
-      `Failed to fetch user address: ${error?.message || "Unknown error"}`,
-    );
+  if (inFlightAddressRequest) {
+    return inFlightAddressRequest;
   }
+
+  inFlightAddressRequest = (async () => {
+    try {
+      const response = await strato.get('/key');
+      cachedUserAddress = response.address;
+      return cachedUserAddress!;
+    } catch (error: any) {
+      throw new Error(
+        `Failed to fetch user address: ${error?.message || "Unknown error"}`,
+      );
+    } finally {
+      inFlightAddressRequest = null;
+    }
+  })();
+
+  return inFlightAddressRequest;
 };

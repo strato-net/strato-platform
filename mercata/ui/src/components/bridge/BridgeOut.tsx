@@ -36,10 +36,10 @@ interface BridgeOutProps {
 
 const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = false }) => {
   // Hooks & Context
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
-  const { userAddress } = useUser();
+  const { externalEvmWalletAddress, isExternalEvmWalletConnected, isAppAuthenticated } = useUser();
 
   const {
     requestWithdrawal: bridgeOutAPI,
@@ -63,6 +63,8 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   // Computed values
   const modeLabels = BRIDGE_MODE_LABELS[isSaving ? "convert" : "bridge"];
+  const externalRecipient = externalEvmWalletAddress;
+  const hasExternalRecipient = isConnected && isExternalEvmWalletConnected && !!externalRecipient;
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
@@ -143,7 +145,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       isLoading ||
       !hasValidAmount ||
       !selectedToken ||
-      !isConnected ||
+      !hasExternalRecipient ||
       !currentNetwork ||
       isBalanceLoading,
     [
@@ -151,7 +153,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       isLoading,
       hasValidAmount,
       selectedToken,
-      isConnected,
+      hasExternalRecipient,
       currentNetwork,
       isBalanceLoading,
     ]
@@ -230,10 +232,10 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
   );
 
   const showConfirmModal = () => {
-    if (!selectedToken?.stratoToken || !address || !selectedNetwork) {
+    if (!selectedToken?.stratoToken || !externalRecipient || !selectedNetwork) {
       toast({
         title: "Error",
-        description: "Please select network and asset.",
+        description: "Please connect an external wallet and select network and asset.",
         variant: "destructive",
       });
       return;
@@ -256,7 +258,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
   const handleBridgeOut = async () => {
     setIsModalOpen(false);
 
-    if (!hasValidAmount || !selectedToken || !address || !currentNetwork) {
+    if (!hasValidAmount || !selectedToken || !externalRecipient || !currentNetwork) {
       return;
     }
 
@@ -265,10 +267,10 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
     setIsLoading(true);
 
     if (!isSaving) {
-    toast({
-      title: "Preparing transaction...",
-      description: "Please wait while we prepare your transaction",
-    });
+      toast({
+        title: "Preparing transaction...",
+        description: "Please wait while we prepare your transaction",
+      });
     }
 
     try {
@@ -276,25 +278,29 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
         ? NATIVE_TOKEN_ADDRESS
         : selectedToken.externalToken;
 
-      const res = await bridgeOutAPI({
-        routeType: selectedToken.routeType,
-        externalChainId: currentNetwork.chainId,
-        externalRecipient: address,
-        externalToken,
-        stratoToken: selectedToken.stratoToken,
-        stratoTokenAmount,
-      });
+      const useExternalWalletSigning = isExternalEvmWalletConnected && !isAppAuthenticated;
+      const res = await bridgeOutAPI(
+        {
+          routeType: selectedToken.routeType,
+          externalChainId: currentNetwork.chainId,
+          externalRecipient,
+          externalToken,
+          stratoToken: selectedToken.stratoToken,
+          stratoTokenAmount,
+        },
+        useExternalWalletSigning ? { walletAuth: true } : undefined
+      );
 
       if (!res?.success) {
         throw new Error("Failed to request withdrawal");
       }
 
-        toast({
+      toast({
         title: "Withdrawal requested",
-          description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${address}.`,
-        });
+        description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${externalRecipient}.`,
+      });
 
-        setAmount("");
+      setAmount("");
 
       await Promise.all([
         fetchUsdstBalance(),
@@ -317,7 +323,13 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
       </div>
 
       <div className="w-full">
-        <BridgeWalletStatus guestMode={guestMode} />
+        <BridgeWalletStatus
+          guestMode={guestMode}
+          externalOnly
+          connectedLabel="External Wallet Connected"
+          connectLabel="Connect External Wallet"
+          copiedDescription="External wallet address copied to clipboard"
+        />
       </div>
 
       <TokenSelector
@@ -372,18 +384,18 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
           type="text"
           inputMode="decimal"
           pattern="[0-9]*\.?[0-9]*"
-          placeholder={isConnected ? "0.00" : "Connect wallet to enter amount"}
+          placeholder={hasExternalRecipient ? "0.00" : "Connect external wallet to enter amount"}
           className={`w-full ${
             amountError ? "border-red-500 focus:ring-red-400" : ""
           }`}
           value={amount}
           onChange={(e) => { if (!guestMode) handleAmountChange(e.target.value); }}
-          disabled={guestMode || !isConnected || isLoading}
+          disabled={guestMode || !hasExternalRecipient || isLoading}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
 
-        {isConnected && !guestMode && (
+        {hasExternalRecipient && !guestMode && (
           <PercentageButtons
             value={amount}
             maxValue={maxAmount}

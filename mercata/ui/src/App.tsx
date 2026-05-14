@@ -4,7 +4,7 @@ import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Transport, WagmiProvider } from "wagmi";
-import { mainnet, polygon, sepolia, base, baseSepolia } from "wagmi/chains";
+import { mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia } from "wagmi/chains";
 import {
   connectorsForWallets,
   RainbowKitProvider,
@@ -73,11 +73,13 @@ import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
-import { initializeCsrfToken, csrfOnRequest } from "./lib/csrf";
+import { csrfOnRequest, initializeCsrfToken } from "./lib/csrf";
+import { getNodeHealth, shouldShowNodeHealth, type NodeHealth } from "./lib/nodeHealth";
 
 
 const queryClient = new QueryClient();
-const baseChains = [mainnet, polygon, sepolia, base, baseSepolia] as const;
+const proxiedChainIds = new Set([mainnet.id, sepolia.id, base.id, baseSepolia.id, linea.id, lineaSepolia.id]);
+const baseChains = [mainnet, polygon, sepolia, base, baseSepolia, linea, lineaSepolia] as const;
 
 const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
@@ -87,6 +89,7 @@ const App = () => {
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
+  const [nodeHealth, setNodeHealth] = useState<NodeHealth | null>(null);
 
   // Initialize CSRF token on app startup
   useEffect(() => {
@@ -128,12 +131,37 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const refreshNodeHealth = async () => {
+      const health = await getNodeHealth();
+      if (!cancelled) {
+        setNodeHealth(shouldShowNodeHealth(health) ? health : null);
+      }
+    };
+
+    refreshNodeHealth();
+    const interval = setInterval(refreshNodeHealth, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!loading) {
-      const appName = "Mercata";
+      const appName = "STRATO";
       const stratoChain = getStratoChain();
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
-        chains.map((chain) => [chain.id, chain === stratoChain ? http(`/rpc`) : http()])
+        chains.map((chain) => [
+          chain.id,
+          chain === stratoChain
+            ? http(`/rpc`)
+            : proxiedChainIds.has(chain.id)
+              ? http(`/api/rpc/${chain.id}`, { fetchOptions: { credentials: "include" }, onFetchRequest: csrfOnRequest })
+              : http(),
+        ])
       );
 
       const connectors = connectorsForWallets(
@@ -168,7 +196,11 @@ const App = () => {
   }
 
   if (configError) {
-    return <SyncingPage />;
+    return <SyncingPage nodeHealth={nodeHealth} />;
+  }
+
+  if (nodeHealth) {
+    return <SyncingPage nodeHealth={nodeHealth} />;
   }
 
   if (!wagmiConfig) {

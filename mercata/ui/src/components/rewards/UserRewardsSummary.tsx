@@ -18,6 +18,7 @@ import { useUser } from "@/context/UserContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
 import CopyButton from "@/components/ui/copy";
+import { isTxPending } from "@/utils/transactionStatus";
 
 interface UserRewardsSummaryProps {
   userRewards: UserRewardsData | null;
@@ -82,7 +83,7 @@ export const UserRewardsSummary = ({
   rewardsStateLoading,
 }: UserRewardsSummaryProps) => {
   const { toast } = useToast();
-  const { userAddress } = useUser();
+  const { userAddress, isAppAuthenticated } = useUser();
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
   const handleClaimAll = async () => {
@@ -106,11 +107,11 @@ export const UserRewardsSummary = ({
 
     try {
       setIsClaimingAll(true);
-      const result = await claimAllRewards(userAddress);
+      const result = await claimAllRewards(userAddress, { walletAuth: !isAppAuthenticated });
 
       if (result.success) {
         toast({
-          title: "Claim Successful",
+          title: isTxPending(result.status) ? "Claim Submitted" : "Claim Successful",
           description: result.txHash
             ? `Transaction hash: ${result.txHash.slice(0, 10)}...`
             : "Rewards claimed successfully",

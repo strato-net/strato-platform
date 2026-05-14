@@ -61,7 +61,7 @@ const AssetsList = ({
   const { tokenApys, tokenApysLoaded } = useEarnContext();
 
   const earnByAddr = useMemo(() => {
-    return buildEarnApyMap(tokenApys, { includeVaultSources: false });
+    return buildEarnApyMap(tokenApys);
   }, [tokenApys]);
 
   const hasEarningAssets = tokens.length > 0;

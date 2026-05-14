@@ -66,7 +66,6 @@ library
     , hflags
     , http-client
     , iproute
-    , kafka-monad
     , lens
     , lifted-async
     , lifted-base
@@ -82,11 +81,11 @@ library
     , servant-client
     , servant-server
     , split
-    , sql-monad
     , stm-conduit
     , strato-conf
     , strato-model
     , strato-redis-blockdb
+    , streaming
     , text
     , time
     , unliftio
@@ -108,7 +107,6 @@ executable strato-p2p
     , common-log
     , ethereum-discovery
     , hflags
-    , kafka-monad
     , lifted-async
     , ordered-containers
     , process-monitor
@@ -116,6 +114,7 @@ executable strato-p2p
     , strato-conf
     , strato-model
     , strato-p2p
+    , streaming
     , vault-monad
     , vm-tools
     , wai-middleware-prometheus

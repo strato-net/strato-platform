@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications  #-}
@@ -8,10 +9,11 @@ module Commands
 where
 
 import Binary
+import EthLog (eventRowToLog, matchesTopics)
 import TransactionReceipt (TransactionReceipt, mkTransactionReceipt)
 import Blockchain.Constants (stratoVersionString)
 import Blockchain.CommunicationConduit (ethVersion)
-import Blockchain.EthConf (runKafkaMConfigured, ethConf)
+import Blockchain.EthConf (runStreamMConfigured, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (blockBlockData, blockReceiptTransactions)
@@ -21,13 +23,14 @@ import Blockchain.Data.RLP (rlpDecode, rlpDeserialize)
 import Blockchain.Data.Transaction (Transaction(..), transactionHash, txAndTime2RawTX)
 import Blockchain.Data.TXOrigin (TXOrigin(API))
 import Blockchain.Model.JsonBlock (AddressStateRef' (..), Block', RawTransaction'(..), Transaction'(..), bPrimeToB)
-import Blockchain.Sequencer.Event (JsonRpcCommand(..), VmTask(..))
+import Blockchain.Sequencer.Event (JsonRpcCommand(..), JsonRpcResponse(..), VmTask(..))
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
 import Blockchain.Strato.Model.Address (Address(..), addressToHex)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, keccak256ToHex)
 import Text.Format (format)
+import Control.Monad (void)
 import Control.Monad.IO.Class
-import Control.Monad.Composable.Kafka (fetchItems, execKafka)
+import Control.Monad.Composable.Streaming (consumeFromLatest)
 import Control.Monad.Except
 import Blockchain.Sequencer.HexData (HexData(..))
 import qualified Blockchain.Sequencer.TxCallObject as TxCall
@@ -37,22 +40,26 @@ import qualified Handlers.Transaction as Tx
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Blocks
 import qualified Handlers.TransactionResult as TxResults
-import Network.Kafka (getLastOffset, KafkaTime(..))
-import Network.Kafka.Protocol (Offset(..))
+import System.Timeout (timeout)
+import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (UTCTime(..))
 import Data.List (find)
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.Aeson (FromJSON(..), ToJSON(..), Value(..), withObject, (.:?), (.!=))
+import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
 import Prelude hiding (id)
 import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
+import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents)
 
 type Server = IO
 
@@ -246,32 +253,21 @@ eth_blockNumber = toMethod "eth_blockNumber" f ()
 
 ----------------
 
-emitJsonRpcCommand :: JsonRpcCommand -> IO ()
-emitJsonRpcCommand c = do
-  putStrLn $ "emitJsonRpcCommand: " ++ show c
-  _ <- runKafkaMConfigured "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
-  return ()
-
-waitForResponse :: String -> Int -> Offset -> IO B.ByteString
-waitForResponse rpcId retries offset = do
-  if retries <= 0
-    then return $ BC.pack "error: timeout waiting for vm-runner response"
-    else do
-      responses <- runKafkaMConfigured "ethereum-jsonrpc" $
-        fetchItems "jsonrpcresponse" offset
-      let matched = filter ((rpcId ==) . fst) (responses :: [(String, B.ByteString)])
-      case matched of
-        ((_, val) : _) -> return val
-        [] -> do
-          let newOffset = offset + fromIntegral (length responses)
-          waitForResponse rpcId (retries - 1) newOffset
-
-callVM :: JsonRpcCommand -> IO B.ByteString
+callVM :: JsonRpcCommand -> IO JsonRpcResponse
 callVM c = do
-  lastOffset <- runKafkaMConfigured "ethereum-jsonrpc" $
-    execKafka $ getLastOffset LatestTime 0 "jsonrpcresponse"
-  emitJsonRpcCommand c
-  waitForResponse (jrcId c) 50 lastOffset
+  putStrLn $ "callVM: " ++ show (jrcId c)
+  result <- timeout 30000000 $ runStreamMConfigured "ethereum-jsonrpc" $
+    consumeFromLatest "jsonrpcresponse"
+      (void $ writeSeqVmTasks [VmJsonRpcCommand c])
+      (\responses ->
+        let matched = filter ((jrcId c ==) . fst) (responses :: [(String, B.ByteString)])
+        in case matched of
+          ((_, val) : _) -> return $ Just $ Bin.decode (BL.fromStrict val)
+          [] -> return Nothing
+      )
+  return $ case result of
+    Just resp -> resp
+    Nothing -> Error (jrcId c) "timeout waiting for vm-runner response"
 
 eth_getBalance :: Method Server
 eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "blockString" :+: ())
@@ -296,12 +292,12 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
                 , TxCall.data_ = HexData calldata
                 }
               rpcId = "eth_getBalance_" ++ showHex addr ""
-          result <- liftIO $ callVM $ JRCCall txObj rpcId "latest"
-          if B.length result == 32
-            then do
+          resp <- liftIO $ callVM $ JRCCall txObj rpcId "latest"
+          case resp of
+            Success _ result | B.length result == 32 -> do
               let balance = foldl (\acc b -> acc * 256 + fromIntegral b) (0 :: Integer) (B.unpack result)
               return $ "0x" ++ showHex balance ""
-            else return "0x0"
+            _ -> return "0x0"
 
 eth_getCode :: Method Server
 eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" :+: ())
@@ -349,9 +345,14 @@ eth_call = toMethod "eth_call" f (Required "txObject" :+: Required "blockTag" :+
           rpcId = "eth_call_" ++ take 16 (BC.unpack $ B16.encode callData)
       liftIO $ putStrLn $ "eth_call: block=" ++ blockTag ++ " data=" ++ show callData
       liftIO $ putStrLn $ "eth_call: submitting JRCCall to vm-runner, id=" ++ rpcId
-      result <- liftIO $ callVM $ JRCCall txObj rpcId blockTag
-      liftIO $ putStrLn $ "eth_call: vm-runner returned: " ++ show result
-      return $ "0x" ++ BC.unpack (B16.encode result)
+      resp <- liftIO $ callVM $ JRCCall txObj rpcId blockTag
+      case resp of
+        Success _ result -> do
+          liftIO $ putStrLn $ "eth_call: vm-runner returned: " ++ show result
+          return $ "0x" ++ BC.unpack (B16.encode result)
+        Error _ msg -> do
+          liftIO $ putStrLn $ "eth_call: vm-runner error: " ++ msg
+          throwError $ rpcError 3 (T.pack $ "execution reverted: " ++ msg)
 
 -------------------
 
@@ -602,11 +603,34 @@ eth_getFilterLogs = toMethod "eth_getFilterLogs" f ()
     f :: RpcResult Server String
     f = throwError $ rpcError (-32601) "eth_getFilterLogs not yet implemented"
 
+data LogFilter = LogFilter
+  { lfFromBlock :: String
+  , lfToBlock   :: String
+  , lfAddress   :: Maybe String
+  , lfTopics    :: [String]
+  } deriving (Show, Generic)
+
+instance FromJSON LogFilter where
+  parseJSON = withObject "LogFilter" $ \o ->
+    LogFilter
+      <$> o .:? "fromBlock" .!= "latest"
+      <*> o .:? "toBlock"   .!= "latest"
+      <*> o .:? "address"
+      <*> o .:? "topics"    .!= []
+
 eth_getLogs :: Method Server
-eth_getLogs = toMethod "eth_getLogs" f ()
+eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
   where
-    f :: RpcResult Server String
-    f = throwError $ rpcError (-32601) "eth_getLogs not yet implemented"
+    f :: LogFilter -> RpcResult Server [Value]
+    f filt = do
+      let fromBlock = maybe 0 (\x -> x) $ parseBlockNum (lfFromBlock filt)
+          toBlock   = maybe maxBlock (\x -> x) $ parseBlockNum (lfToBlock filt)
+          maxBlock  = 999999999
+          mAddr     = fmap T.pack (lfAddress filt)
+      rows <- runCodeDBM $ queryEvents mAddr fromBlock toBlock
+      logs <- runCodeDBM $ mapM eventRowToLog rows
+      let filtered = filter (matchesTopics (lfTopics filt)) logs
+      return $ map toJSON filtered
 
 eth_getWork :: Method Server
 eth_getWork = toMethod "eth_getWork" f ()

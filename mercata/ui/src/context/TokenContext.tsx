@@ -12,6 +12,7 @@ import { Token, CreateTokenPayload } from '@/interface';
 import { Token as TokenType, EarningAsset, BalanceSnapshot } from '@mercata/shared-types';
 import { cataAddress, usdstAddress } from '@/lib/constants';
 import { useUser } from '@/context/UserContext';
+import { isTxSubmitted } from '@/utils/transactionStatus';
 
 export interface BulkTransferItem {
   to: string;
@@ -30,6 +31,8 @@ export interface BulkTransferResponse {
   results: BulkTransferResult[];
   successCount: number;
   failureCount: number;
+  status?: string;
+  hash?: string;
 }
 
 type TokenContextType = {
@@ -407,6 +410,20 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     try {
       const response = await api.post<BulkTransferResponse>('/tokens/bulk-transfer', payload);
       fetchNetBalance();
+      if (
+        response.data.results.length === 1 &&
+        isTxSubmitted(response.data.status) &&
+        !isTxSubmitted(response.data.results[0].status)
+      ) {
+        return {
+          ...response.data,
+          results: [{
+            ...response.data.results[0],
+            status: response.data.status,
+            hash: response.data.hash || response.data.results[0].hash,
+          }],
+        };
+      }
       return response.data;
     } catch (err) {
       throw err;

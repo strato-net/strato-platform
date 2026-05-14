@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import BridgeController from "../controllers/bridge.controller";
 
 const router = Router();
+const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**
  * @openapi
@@ -58,7 +59,7 @@ const router = Router();
  *                     message:
  *                       type: string
  */
-router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeController.requestWithdrawal);
+router.post("/requestWithdrawal", walletAuth, BridgeController.requestWithdrawal);
 
 /**
  * @openapi
@@ -146,7 +147,7 @@ router.post("/requestNativeWithdrawal", authHandler.authorizeRequest(), BridgeCo
  *                     hash:
  *                       type: string
  */
-router.post("/requestDepositAction", authHandler.authorizeRequest(), BridgeController.requestDepositAction);
+router.post("/requestDepositAction", walletAuth, BridgeController.requestDepositAction);
 
 /**
  * @openapi

@@ -12,9 +12,10 @@ import { Loader2, ArrowRight } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { requestWalletConnection } from "@/lib/auth";
 
 const WithdrawalsPage = () => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, loading, isAppAuthenticated, externalWalletAddress } = useUser();
   const [activeTab, setActiveTab] = useState<"from-savings" | "bridge-out">(
     "from-savings"
   );
@@ -23,6 +24,7 @@ const WithdrawalsPage = () => {
     useBridgeContext();
 
   const withdrawalSummaryIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const canLoadWithdrawData = !loading && (isAppAuthenticated || !!externalWalletAddress);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -32,13 +34,17 @@ const WithdrawalsPage = () => {
   }, [searchParams]);
 
   useEffect(() => {
+    if (!canLoadWithdrawData) return;
+
     loadNetworksAndTokens().catch((error) => {
       console.error('Failed to load networks and tokens:', error);
     });
-  }, [loadNetworksAndTokens]);
+  }, [canLoadWithdrawData, loadNetworksAndTokens]);
 
   // Withdrawal summary polling (15s interval)
   useEffect(() => {
+    if (!canLoadWithdrawData) return;
+
     const hasExistingData = !!withdrawalSummary;
     fetchWithdrawalSummary(!hasExistingData);
 
@@ -52,7 +58,7 @@ const WithdrawalsPage = () => {
         withdrawalSummaryIntervalRef.current = null;
       }
     };
-  }, [fetchWithdrawalSummary]);
+  }, [canLoadWithdrawData, fetchWithdrawalSummary]);
 
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
@@ -98,6 +104,7 @@ const WithdrawalsPage = () => {
                       onClick={(e) => {
                         if (!isLoggedIn) {
                           e.preventDefault();
+                          requestWalletConnection();
                           return;
                         }
                         setTargetTransactionTab('WithdrawalInitiated');
@@ -105,7 +112,7 @@ const WithdrawalsPage = () => {
                       className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${
                         isLoggedIn 
                           ? "text-blue-600 hover:text-blue-800 cursor-pointer" 
-                          : "text-muted-foreground cursor-not-allowed opacity-50 pointer-events-none"
+                          : "text-muted-foreground hover:text-foreground cursor-pointer"
                       }`}
                     >
                       <ArrowRight size={14} className="md:w-4 md:h-4" />
