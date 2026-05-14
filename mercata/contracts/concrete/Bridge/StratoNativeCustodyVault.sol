@@ -13,6 +13,7 @@ contract record StratoNativeCustodyVault is Ownable {
 
     /// @notice Circuit breaker for vault lock/unlock operations.
     bool public paused;
+    bool private locked;
 
     /// @notice Total amount locked per STRATO token.
     mapping(address => uint256) public record lockedBalance;
@@ -31,6 +32,13 @@ contract record StratoNativeCustodyVault is Ownable {
     modifier whenNotPaused() {
         require(!paused, "SNCV: paused");
         _;
+    }
+
+    modifier nonReentrant() {
+        require(!locked, "SNCV: reentrant call");
+        locked = true;
+        _;
+        locked = false;
     }
 
     constructor(address initialOwner) Ownable(initialOwner) {}
@@ -86,7 +94,7 @@ contract record StratoNativeCustodyVault is Ownable {
         address token,
         address from,
         uint256 amount
-    ) external onlyBridge whenNotPaused returns (uint256 actualAmount) {
+    ) external onlyBridge whenNotPaused nonReentrant returns (uint256 actualAmount) {
         require(token != address(0), "SNCV: invalid token");
         require(from != address(0), "SNCV: invalid from");
         require(amount > 0, "SNCV: zero amount");
@@ -108,7 +116,7 @@ contract record StratoNativeCustodyVault is Ownable {
         address token,
         address to,
         uint256 amount
-    ) external onlyBridge whenNotPaused returns (uint256 actualAmount) {
+    ) external onlyBridge whenNotPaused nonReentrant returns (uint256 actualAmount) {
         require(token != address(0), "SNCV: invalid token");
         require(to != address(0), "SNCV: invalid to");
         require(amount > 0, "SNCV: zero amount");
