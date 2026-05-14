@@ -88,6 +88,7 @@ const App = () => {
   const [networkId, setNetworkId] = useState<string | null>(null);
   const [creditCardTopUpAddress, setCreditCardTopUpAddress] = useState<string | null>(null);
   const [contactEnabled, setContactEnabled] = useState(false);
+  const [fixedPriceSaleEnabled, setFixedPriceSaleEnabled] = useState(false);
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
@@ -115,6 +116,7 @@ const App = () => {
           if (configData.networkId) setNetworkId(String(configData.networkId));
           if (configData.creditCardTopUpAddress) setCreditCardTopUpAddress(String(configData.creditCardTopUpAddress));
           if (configData.contactEnabled) setContactEnabled(true);
+          if (configData.fixedPriceSaleEnabled) setFixedPriceSaleEnabled(true);
           setConfigError(false);
         }
       } catch (error) {
@@ -216,7 +218,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NetworkProvider initialNetworkId={networkIdStr} initialCreditCardTopUpAddress={creditCardTopUpAddressStr} initialContactEnabled={contactEnabled}>
+      <NetworkProvider initialNetworkId={networkIdStr} initialCreditCardTopUpAddress={creditCardTopUpAddressStr} initialContactEnabled={contactEnabled} initialFixedPriceSaleEnabled={fixedPriceSaleEnabled}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <WagmiProvider config={wagmiConfig}>
             <RainbowKitProvider>

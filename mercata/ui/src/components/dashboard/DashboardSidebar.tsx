@@ -22,6 +22,7 @@ import {
   Rocket
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import { useNetwork } from '@/context/NetworkContext';
 import STRATOLOGO from '@/assets/strato.png';
 import STRATOLOGODARK from '@/assets/strato-dark.png';
 
@@ -37,7 +38,7 @@ interface NavCategory {
   items: NavItem[];
 }
 
-const NAV_CATEGORIES: NavCategory[] = [
+const buildNavCategories = ({ fixedPriceSaleEnabled }: { fixedPriceSaleEnabled: boolean }): NavCategory[] => [
   {
     items: [
       { icon: LayoutDashboard, label: 'Portfolio', path: '/dashboard' },
@@ -51,7 +52,9 @@ const NAV_CATEGORIES: NavCategory[] = [
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Transfer', path: '/dashboard/transfer' },
       { icon: Download, label: 'Withdrawals', path: '/dashboard/withdrawals' },
-      { icon: Rocket, label: 'STRATO Sale', path: '/dashboard/strato-sale' },
+      ...(fixedPriceSaleEnabled
+        ? [{ icon: Rocket, label: 'STRATO Sale', path: '/dashboard/strato-sale' }]
+        : []),
     ],
   },
   {
@@ -82,8 +85,10 @@ const NAV_CATEGORIES: NavCategory[] = [
 
 const DashboardSidebar = () => {
   const { isAdmin } = useUser();
+  const { fixedPriceSaleEnabled } = useNetwork();
   const { pathname } = useLocation();
   const { resolvedTheme } = useTheme();
+  const navCategories = buildNavCategories({ fixedPriceSaleEnabled });
 
   useEffect(() => {
     const updateWidth = () => {
@@ -130,7 +135,7 @@ const DashboardSidebar = () => {
       </div>
 
       <nav className="flex-1 py-4 px-3 overflow-y-auto">
-        {NAV_CATEGORIES.map((category, idx) => {
+        {navCategories.map((category, idx) => {
           const visibleItems = category.items.filter(item => !item.adminOnly || isAdmin);
           if (visibleItems.length === 0) return null;
           return (

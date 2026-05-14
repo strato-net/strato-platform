@@ -9,6 +9,7 @@ interface NetworkContextType {
   creditCardTopUpAddress: string | null;
   isTestnet: boolean;
   contactEnabled: boolean;
+  fixedPriceSaleEnabled: boolean;
   loading: boolean;
 }
 
@@ -20,12 +21,14 @@ interface NetworkProviderProps {
   initialNetworkId?: string | null;
   initialCreditCardTopUpAddress?: string | null;
   initialContactEnabled?: boolean;
+  initialFixedPriceSaleEnabled?: boolean;
 }
 
-export const NetworkProvider = ({ children, initialNetworkId, initialCreditCardTopUpAddress, initialContactEnabled }: NetworkProviderProps) => {
+export const NetworkProvider = ({ children, initialNetworkId, initialCreditCardTopUpAddress, initialContactEnabled, initialFixedPriceSaleEnabled }: NetworkProviderProps) => {
   const [networkId, setNetworkId] = useState<string | null>(initialNetworkId ?? null);
   const [creditCardTopUpAddress, setCreditCardTopUpAddress] = useState<string | null>(initialCreditCardTopUpAddress ?? null);
   const [contactEnabled, setContactEnabled] = useState(initialContactEnabled ?? false);
+  const [fixedPriceSaleEnabled, setFixedPriceSaleEnabled] = useState(initialFixedPriceSaleEnabled ?? false);
   const [loading, setLoading] = useState(typeof initialNetworkId === "undefined" && typeof initialCreditCardTopUpAddress === "undefined");
 
   useEffect(() => {
@@ -33,6 +36,7 @@ export const NetworkProvider = ({ children, initialNetworkId, initialCreditCardT
       setNetworkId(initialNetworkId ?? null);
       setCreditCardTopUpAddress(initialCreditCardTopUpAddress ?? null);
       setContactEnabled(initialContactEnabled ?? false);
+      setFixedPriceSaleEnabled(initialFixedPriceSaleEnabled ?? false);
       setLoading(false);
       return;
     }
@@ -43,6 +47,7 @@ export const NetworkProvider = ({ children, initialNetworkId, initialCreditCardT
         if (data?.networkId) setNetworkId(String(data.networkId));
         if (data?.creditCardTopUpAddress) setCreditCardTopUpAddress(String(data.creditCardTopUpAddress));
         if (data?.contactEnabled) setContactEnabled(true);
+        if (data?.fixedPriceSaleEnabled) setFixedPriceSaleEnabled(true);
       } catch (error) {
         console.error('Failed to fetch network config:', error);
       } finally {
@@ -50,12 +55,12 @@ export const NetworkProvider = ({ children, initialNetworkId, initialCreditCardT
       }
     };
     fetchConfig();
-  }, [initialNetworkId, initialCreditCardTopUpAddress, initialContactEnabled]);
+  }, [initialNetworkId, initialCreditCardTopUpAddress, initialContactEnabled, initialFixedPriceSaleEnabled]);
 
   const isTestnet = networkId === TESTNET_NETWORK_ID;
 
   return (
-    <NetworkContext.Provider value={{ networkId, creditCardTopUpAddress, isTestnet, contactEnabled, loading }}>
+    <NetworkContext.Provider value={{ networkId, creditCardTopUpAddress, isTestnet, contactEnabled, fixedPriceSaleEnabled, loading }}>
       {children}
     </NetworkContext.Provider>
   );
