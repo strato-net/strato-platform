@@ -729,6 +729,35 @@ contract Describe_CDPEngine is Authorizable {
         require(!cdpEngine.globalPaused(), "Engine should be unpaused");
     }
 
+    function it_cdp_engine_pause_shims_set_true_only() {
+        // pauseAsset shim
+        cdpEngine.pauseAsset(collateralTokenAddress);
+        (, , , , , , , , bool _paused) = cdpEngine.collateralConfigs(collateralTokenAddress);
+        require(_paused == true, "pauseAsset should set isPaused true");
+
+        // Idempotent
+        cdpEngine.pauseAsset(collateralTokenAddress);
+        (, , , , , , , , bool _paused2) = cdpEngine.collateralConfigs(collateralTokenAddress);
+        require(_paused2 == true, "pauseAsset should remain true on repeat");
+
+        // pauseGlobal shim
+        cdpEngine.pauseGlobal();
+        require(cdpEngine.globalPaused(), "pauseGlobal should set globalPaused true");
+
+        // Unsupported asset reverts
+        bool reverted = false;
+        try {
+            cdpEngine.pauseAsset(address(0xdead));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "pauseAsset should reject unsupported asset");
+
+        // Reset for other tests
+        cdpEngine.setPaused(collateralTokenAddress, false);
+        cdpEngine.setPausedGlobal(false);
+    }
+
     // // ============ SUPPORTED ASSET TOGGLE TESTS ============
 
     function it_cdp_engine_can_toggle_supported_asset_and_block_deposit_and_mint() {

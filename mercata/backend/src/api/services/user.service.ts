@@ -7,6 +7,57 @@ import { extractContractName } from "../../utils/utils";
 import JSONBig from "json-bigint";
 const { AdminRegistry, adminRegistry } = constants;
 
+const normalizeIssueArg = (arg: any, typeInfo: any): any => {
+  const tag = typeInfo?.tag?.toLowerCase();
+
+  if (tag === "address" && typeof arg === "string" && /^[0-9a-fA-F]{40}$/.test(arg)) {
+    return `0x${arg}`;
+  }
+
+  if (tag === "array" && Array.isArray(arg)) {
+    return arg.map((entry) => normalizeIssueArg(entry, typeInfo?.entry));
+  }
+
+  return arg;
+};
+
+const normalizeIssueArgs = async (
+  accessToken: string,
+  target: string,
+  func: string,
+  args: any[],
+): Promise<any[]> => {
+  if (!Array.isArray(args)) {
+    console.log("[AdminVoteDebug] issue args were not an array", { target, func, args });
+    return args;
+  }
+
+  const contractDetails = await getContractDetails(accessToken, target);
+  const functionInfo = (contractDetails as any)?._functions?.[func];
+  const funcArgs = functionInfo?._funcArgs as Array<[string, { type?: any }]> | undefined;
+
+  if (!Array.isArray(funcArgs)) {
+    console.log("[AdminVoteDebug] missing function metadata for issue args", {
+      target,
+      func,
+      args,
+      functionNames: Object.keys((contractDetails as any)?._functions || {}),
+    });
+    return args;
+  }
+
+  const normalizedArgs = args.map((arg, index) => normalizeIssueArg(arg, funcArgs[index]?.[1]?.type));
+  console.log("[AdminVoteDebug] normalized issue args", {
+    target,
+    func,
+    args,
+    normalizedArgs,
+    funcArgs: funcArgs.map(([name, metadata]) => ({ name, type: metadata?.type })),
+  });
+
+  return normalizedArgs;
+};
+
 export const isUserAdmin = async (
   accessToken: string,
   userAddress: string
@@ -112,6 +163,58 @@ export const removeAdmin = async (
   }
 };
 
+// Add a new guardian to the registry
+export const addGuardian = async (
+  accessToken: string,
+  userAddress: string,
+  guardianAddress: string
+): Promise<{ status: string; hash: string }> => {
+  try {
+    const tx = await buildFunctionTx({
+      contractName: extractContractName(AdminRegistry),
+      contractAddress: adminRegistry,
+      method: "addGuardian",
+      args: {
+        _guardian: guardianAddress,
+      },
+    }, userAddress, accessToken);
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Remove a guardian from the registry
+export const removeGuardian = async (
+  accessToken: string,
+  userAddress: string,
+  guardianAddress: string
+): Promise<{ status: string; hash: string }> => {
+  try {
+    const tx = await buildFunctionTx({
+      contractName: extractContractName(AdminRegistry),
+      contractAddress: adminRegistry,
+      method: "removeGuardian",
+      args: {
+        _guardian: guardianAddress,
+      },
+    }, userAddress, accessToken);
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
+};
+
 // Cast a vote on an issue in the registry
 export const castVoteOnIssue = async (
   accessToken: string,
@@ -156,6 +259,64 @@ export const dismissIssue = async (
     method: "dismissIssue",
     args: { _issueId: issueId },
   }, userAddress, accessToken);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
+export const executeIssue = async (
+  accessToken: string,
+  userAddress: string,
+  target: string,
+  func: string,
+  args: any[],
+): Promise<{ status: string; hash: string }> => {
+  console.log("[AdminVoteDebug] executeIssue service input", { userAddress, target, func, args });
+  const normalizedArgs = await normalizeIssueArgs(accessToken, target, func, args);
+
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(AdminRegistry),
+    contractAddress: adminRegistry,
+    method: "executeIssue",
+    args: {
+      _target: target,
+      _func: func,
+      _args: normalizedArgs,
+    },
+  }, userAddress, accessToken);
+  console.log("[AdminVoteDebug] executeIssue tx args", tx.txs?.[0]?.payload?.args);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
+export const withdrawVote = async (
+  accessToken: string,
+  userAddress: string,
+  target: string,
+  func: string,
+  args: any[],
+): Promise<{ status: string; hash: string }> => {
+  console.log("[AdminVoteDebug] withdrawVote service input", { userAddress, target, func, args });
+  const normalizedArgs = await normalizeIssueArgs(accessToken, target, func, args);
+
+  const tx = await buildFunctionTx({
+    contractName: extractContractName(AdminRegistry),
+    contractAddress: adminRegistry,
+    method: "withdrawVote",
+    args: {
+      _target: target,
+      _func: func,
+      _args: normalizedArgs,
+    },
+  }, userAddress, accessToken);
+  console.log("[AdminVoteDebug] withdrawVote tx args", tx.txs?.[0]?.payload?.args);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -210,6 +371,24 @@ export const castVoteOnIssueById = async (
         throw new Error('Admin address not found in args');
       }
       return await removeAdmin(accessToken, userAddress, adminAddress);
+    }
+
+    // If func is _addGuardian, call the addGuardian endpoint directly
+    if (func === '_addGuardian') {
+      const guardianAddress = Array.isArray(args) ? args[0] : args._guardian;
+      if (!guardianAddress) {
+        throw new Error('Guardian address not found in args');
+      }
+      return await addGuardian(accessToken, userAddress, guardianAddress);
+    }
+
+    // If func is _removeGuardian, call the removeGuardian endpoint directly
+    if (func === '_removeGuardian') {
+      const guardianAddress = Array.isArray(args) ? args[0] : args._guardian;
+      if (!guardianAddress) {
+        throw new Error('Guardian address not found in args');
+      }
+      return await removeGuardian(accessToken, userAddress, guardianAddress);
     }
 
     // Get contract name from Cirrus
@@ -270,6 +449,16 @@ export const castVoteOnIssueById = async (
   }
 };
 
+const parseTimelock = (row: any) => {
+  const raw = row?.timelock || row?.value || {};
+  return {
+    issueId: row?.issueId || row?.key,
+    queuedAt: Number(row?.queuedAt ?? raw?.queuedAt ?? 0),
+    executableAt: Number(row?.executableAt ?? raw?.executableAt ?? 0),
+    expiresAt: Number(row?.expiresAt ?? raw?.expiresAt ?? 0),
+  };
+};
+
 export const getOpenIssues = async (
   accessToken: string,
 ): Promise<object> => {
@@ -277,7 +466,7 @@ export const getOpenIssues = async (
     const response = await cirrus.get(accessToken, "/" + AdminRegistry, {
       params: {
         address: `eq.${adminRegistry}`,
-        select: `*,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value)`,
+        select: `*,admins:${AdminRegistry}-admins(address:value),guardians:${AdminRegistry}-guardians(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value)`,
         ['votes.value']: 'neq.""',
         ['votes.value->>length']: 'is.null',
       },
@@ -291,16 +480,37 @@ export const getOpenIssues = async (
       return {};
     }
 
-    const { admins: adminsRaw, votes, defaultVotingThresholdBps, thresholds } = response.data[0];
+    const { admins: adminsRaw = [], guardians: guardiansRaw = [], votes: votesRaw = [], defaultVotingThresholdBps, thresholds = [] } = response.data[0];
+    const votes = Array.isArray(votesRaw) ? votesRaw : [];
     const admins = adminsRaw.filter((admin: any) => admin.address && admin.address !== 'Unknown'); // remove blank admins
+    const guardians = (guardiansRaw || []).filter((guardian: any) => guardian.address && guardian.address !== 'Unknown'); // remove blank guardians
 
     const issueIds = new Set(votes.map((v: any) => v.issueId));
 
-    const issuesResponse = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
-      params: {
-        issueId: `in.(${[...issueIds].join(',')})`
-      },
-    });
+    const [issuesResponse, timelocksResponse] = await Promise.all([
+      issueIds.size > 0
+        ? cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
+            params: {
+              issueId: `in.(${[...issueIds].join(',')})`
+            },
+          })
+        : Promise.resolve({ data: [] }),
+      issueIds.size > 0
+        ? cirrus.get(accessToken, "/" + AdminRegistry + "-timelocks", {
+            params: {
+              key: `in.(${[...issueIds].join(',')})`,
+              select: "issueId:key,timelock:value,queuedAt:value->>queuedAt,executableAt:value->>executableAt,expiresAt:value->>expiresAt",
+            },
+          })
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    const timelocksMap = new Map(
+      (timelocksResponse?.data || [])
+        .map(parseTimelock)
+        .filter((timelock: any) => timelock.issueId)
+        .map((timelock: any) => [timelock.issueId, timelock])
+    );
 
     // Deduplicate issues by issueId, keeping the most recent one based on block_number
     const issuesMap = new Map();
@@ -309,7 +519,10 @@ export const getOpenIssues = async (
       if (!existingIssue || 
           (issue.block_number && existingIssue.block_number && 
            Number(issue.block_number) > Number(existingIssue.block_number))) {
-        issuesMap.set(issue.issueId, issue);
+        issuesMap.set(issue.issueId, {
+          ...issue,
+          timelock: timelocksMap.get(issue.issueId) || { queuedAt: 0, executableAt: 0, expiresAt: 0 },
+        });
       }
     });
     const uniqueIssues = Array.from(issuesMap.values()).sort((a, b) => {
@@ -319,13 +532,17 @@ export const getOpenIssues = async (
       }
       return 0;
     });
+    const queuedIssues = uniqueIssues.filter((issue: any) => Number(issue.timelock?.executableAt || 0) > 0);
+    const openIssues = uniqueIssues.filter((issue: any) => Number(issue.timelock?.executableAt || 0) === 0);
 
     return { 
       admins, 
+      guardians,
       votes, 
       globalThreshold: defaultVotingThresholdBps, 
       thresholds, 
-      issues: uniqueIssues 
+      issues: openIssues,
+      queuedIssues,
     };
   } catch (error) {
     console.log(error);

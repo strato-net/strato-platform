@@ -99,6 +99,59 @@ router.delete("/admin", walletAuth, UserController.removeAdmin);
 
 /**
  * @openapi
+ * /user/admin/guardian:
+ *   post:
+ *     summary: Propose granting guardian access
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userAddress
+ *             properties:
+ *               userAddress:
+ *                 type: string
+ *                 description: Address to promote to guardian
+ *     responses:
+ *       201:
+ *         description: Guardian grant transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ *   delete:
+ *     summary: Propose revoking guardian access
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userAddress
+ *             properties:
+ *               userAddress:
+ *                 type: string
+ *                 description: Address to revoke guardian rights from
+ *     responses:
+ *       200:
+ *         description: Guardian revoke transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/guardian", authHandler.authorizeRequest(), UserController.addGuardian);
+router.delete("/admin/guardian", authHandler.authorizeRequest(), UserController.removeGuardian);
+
+/**
+ * @openapi
  * /user/admin/contract/search:
  *   get:
  *     summary: Search contracts by name or address
@@ -212,6 +265,10 @@ router.post("/admin/vote", walletAuth, UserController.castVoteOnIssue);
  *               additionalProperties: true
  */
 router.post("/admin/vote/by-id", walletAuth, UserController.castVoteOnIssueById);
+
+router.post("/admin/issues/execute", authHandler.authorizeRequest(), UserController.executeIssue);
+
+router.post("/admin/vote/withdraw", authHandler.authorizeRequest(), UserController.withdrawVote);
 
 /**
  * @openapi

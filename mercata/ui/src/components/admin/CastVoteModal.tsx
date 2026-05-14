@@ -13,12 +13,19 @@ interface CastVoteModalProps {
     issueId: string;
     target: string;
     func: string;
-    args: any[];
+    args: unknown[];
     votesCast: number;
     votesNeeded: number;
     threshold: number;
+    timelock?: {
+      queuedAt: number;
+      executableAt: number;
+      expiresAt: number;
+    };
   } | null;
   onCastVote: (issueId: string) => Promise<void> | void;
+  onExecuteIssue?: (target: string, func: string, args: unknown[]) => Promise<void> | void;
+  onWithdrawVote?: (target: string, func: string, args: unknown[]) => Promise<void> | void;
   onDismissIssue?: (issueId: string) => Promise<void> | void;
   votes?: Array<{ issueId: string; index: number; voter: string }>;
   userAddress?: string | null;
@@ -31,6 +38,8 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
   onOpenChange,
   issue,
   onCastVote,
+  onExecuteIssue,
+  onWithdrawVote,
   onDismissIssue,
   votes = [],
   userAddress,
@@ -38,6 +47,8 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDismissing, setIsDismissing] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   const handleSubmit = async () => {
     if (!issue) return;
@@ -75,13 +86,63 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
     }
   };
 
+  const handleWithdraw = async () => {
+    if (!issue || !onWithdrawVote) return;
+
+    setIsWithdrawing(true);
+    try {
+      await onWithdrawVote(issue.target, issue.func, issue.args);
+      
+      toast({
+        title: 'Vote Withdrawn Successfully',
+        description: 'Your vote has been withdrawn.',
+      });
+
+      onOpenChange(false);
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
+  const handleExecute = async () => {
+    if (!issue || !onExecuteIssue) return;
+
+    setIsExecuting(true);
+    try {
+      await onExecuteIssue(issue.target, issue.func, issue.args);
+
+      toast({
+        title: 'Issue Executed Successfully',
+        description: 'The queued issue has been executed.',
+      });
+
+      onOpenChange(false);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const issueVotes = issue ? votes.filter(v => v.issueId === issue.issueId) : [];
+  const hasUserVoted = !!userAddress && issueVotes.some(v => v.voter === userAddress);
+  const isQueued = Number(issue?.timelock?.executableAt || 0) > 0;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const executableAt = Number(issue?.timelock?.executableAt || 0);
+  const expiresAt = Number(issue?.timelock?.expiresAt || 0);
+  const canExecute = !!onExecuteIssue && isQueued && nowSeconds >= executableAt && nowSeconds <= expiresAt;
+  const isExpired = isQueued && expiresAt > 0 && nowSeconds > expiresAt;
+
+  const formatTime = (timestamp?: number) => {
+    if (!timestamp) return '-';
+    return new Date(timestamp * 1000).toLocaleString();
+  };
+
   // Check if dismiss button should be enabled
   const canDismiss = issue && onDismissIssue && userAddress && votes.length > 0
     ? (() => {
-        const issueVotes = votes.filter(v => v.issueId === issue.issueId);
-        return issueVotes.length === 1 && normalizeAddress(issueVotes[0]?.voter) === normalizeAddress(userAddress);
+        return issueVotes.length === 1 && issueVotes[0]?.voter === userAddress;
       })()
     : false;
+  const canWithdraw = !!onWithdrawVote && hasUserVoted;
 
   // Get tooltip message for disabled button
   const getTooltipMessage = (): string | null => {
@@ -89,7 +150,6 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
       return null;
     }
     
-    const issueVotes = votes.filter(v => v.issueId === issue.issueId);
     if (issueVotes.length === 0) {
       return null;
     }
@@ -110,7 +170,7 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
   if (!issue) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !isSubmitting && onOpenChange(o)}>
+    <Dialog open={open} onOpenChange={(o) => !isSubmitting && !isDismissing && !isWithdrawing && !isExecuting && onOpenChange(o)}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Vote on Issue</DialogTitle>
@@ -182,6 +242,26 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
               <div className="text-2xl font-bold text-strato-blue">{issue.threshold}%</div>
             </div>
           </div>
+
+          {isQueued && (
+            <div className="space-y-2">
+              <div className="text-sm font-semibold text-foreground">Queue Status</div>
+              <div className="grid grid-cols-1 gap-2 p-3 bg-muted/50 rounded-lg border border-border text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Queued</span>
+                  <span className="font-mono text-right">{formatTime(issue.timelock?.queuedAt)}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Executable</span>
+                  <span className="font-mono text-right">{formatTime(issue.timelock?.executableAt)}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Expires</span>
+                  <span className="font-mono text-right">{formatTime(issue.timelock?.expiresAt)}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -195,7 +275,7 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
                       type="button"
                       variant="outline"
                       onClick={handleDismiss}
-                      disabled={!onDismissIssue || !canDismiss || isDismissing || isSubmitting}
+                      disabled={!onDismissIssue || !canDismiss || isQueued || isDismissing || isSubmitting || isWithdrawing || isExecuting}
                       className="text-red-600 border-red-600 hover:bg-red-50"
                     >
                       {isDismissing ? (
@@ -218,26 +298,44 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
             </TooltipProvider>
           </div>
           <div className="flex gap-3">
+            {hasUserVoted && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleWithdraw}
+                disabled={!canWithdraw || isSubmitting || isDismissing || isWithdrawing || isExecuting}
+                className="text-red-600 border-red-600 hover:bg-red-50"
+              >
+                {isWithdrawing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Withdrawing...
+                  </>
+                ) : (
+                  'Withdraw Vote'
+                )}
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isSubmitting || isDismissing}
+              disabled={isSubmitting || isDismissing || isWithdrawing || isExecuting}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || isDismissing}
+              onClick={isQueued ? handleExecute : handleSubmit}
+              disabled={(isQueued ? !canExecute : hasUserVoted) || isSubmitting || isDismissing || isWithdrawing || isExecuting}
               className="bg-strato-blue hover:bg-strato-blue/90"
             >
-              {isSubmitting ? (
+              {isSubmitting || isExecuting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Casting Vote...
+                  {isExecuting ? 'Executing...' : 'Casting Vote...'}
                 </>
               ) : (
-                'Confirm Vote'
+                isQueued ? (canExecute ? 'Execute' : isExpired ? 'Expired' : 'Queued') : hasUserVoted ? 'Vote Cast' : 'Confirm Vote'
               )}
             </Button>
           </div>
