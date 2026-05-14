@@ -27,6 +27,8 @@ contract DirectMintPSM is Ownable {
 
     address public mintableToken;
     FeeCollector public feeCollector;
+    bool public mintPaused;
+    bool public burnPaused;
     mapping(address => MintConfig) public record mintConfigs;
     mapping(address => BurnConfig) public record burnConfigs;
     mapping(address => uint) public record pendingRedemptions;
@@ -40,6 +42,8 @@ contract DirectMintPSM is Ownable {
     event BurnCancelled(uint id, uint burnAmount, address redeemToken, address requester);
     event DirectPSMMinted(address user, uint depositAmount, uint mintAmount, address againstToken);
     event FeeCollectorSet(address feeCollector);
+    event MintPauseSet(bool isPaused);
+    event BurnPauseSet(bool isPaused);
 
     bool private reentrancyLock;
     modifier nonReentrant() {
@@ -68,6 +72,26 @@ contract DirectMintPSM is Ownable {
         require(_feeCollector != address(0), "Invalid fee collector");
         feeCollector = FeeCollector(_feeCollector);
         emit FeeCollectorSet(_feeCollector);
+    }
+
+    function pauseMint() external onlyOwner {
+        mintPaused = true;
+        emit MintPauseSet(true);
+    }
+
+    function unpauseMint() external onlyOwner {
+        mintPaused = false;
+        emit MintPauseSet(false);
+    }
+
+    function pauseBurn() external onlyOwner {
+        burnPaused = true;
+        emit BurnPauseSet(true);
+    }
+
+    function unpauseBurn() external onlyOwner {
+        burnPaused = false;
+        emit BurnPauseSet(false);
     }
 
     function _requireValidConfigToken(address token) internal view {
@@ -200,6 +224,7 @@ contract DirectMintPSM is Ownable {
     function mint(uint amount, address againstToken) external nonReentrant {
         MintConfig config = mintConfigs[againstToken];
         require(amount > 0, "Amount must be nonzero");
+        require(!mintPaused, "Minting is paused");
         require(config.isEnabled, "Minting for this token is disabled");
         require(config.maxBalance == 0 || (IERC20(againstToken).balanceOf(address(this)) <= config.maxBalance && amount <= config.maxBalance - IERC20(againstToken).balanceOf(address(this))), "Token balance cap exceeded");
         uint feeAmount = (amount * config.feeBps) / 10000;
@@ -227,6 +252,7 @@ contract DirectMintPSM is Ownable {
     function requestBurn(uint amount, address redeemToken) external nonReentrant returns (uint) {
         BurnConfig config = burnConfigs[redeemToken];
         require(amount > 0, "Amount must be nonzero");
+        require(!burnPaused, "Burning is paused");
         require(config.isEnabled, "Token burn is disabled");
         uint payoutAmount = amount - ((amount * config.feeBps) / 10000);
         require(payoutAmount > 0, "Payout amount must be nonzero");
@@ -254,6 +280,7 @@ contract DirectMintPSM is Ownable {
 
         // Ensure eligibility
         require(burnAmount > 0, "Invalid burn request ID");
+        require(!burnPaused, "Burning is paused");
         require(burnConfigs[redeemToken].isEnabled, "Token burn is disabled");
         require(requester == msg.sender, "Unauthorized");
         uint burnDelay = burnConfigs[redeemToken].burnDelay;
