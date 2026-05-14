@@ -63,6 +63,7 @@ generateDockerCompose = do
             , ("ADMIN_REGISTRY", "${ADMIN_REGISTRY:-}")
             , ("MERCATA_BRIDGE", "${MERCATA_BRIDGE:-}")
             , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")
+            , ("FIXED_PRICE_SALE", "${FIXED_PRICE_SALE:-}")
             , ("STRIPE_SECRET_KEY", "${STRIPE_SECRET_KEY:-}")
             , ("STRIPE_PUBLISHABLE_KEY", "${STRIPE_PUBLISHABLE_KEY:-}")
             , ("STRIPE_WEBHOOK_SECRET", "${STRIPE_WEBHOOK_SECRET:-}")
