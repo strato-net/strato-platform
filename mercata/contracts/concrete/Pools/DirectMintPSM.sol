@@ -33,6 +33,7 @@ contract DirectMintPSM is Ownable {
     mapping(address => BurnConfig) public record burnConfigs;
     mapping(address => uint) public record pendingRedemptions;
     uint public burnReqCounter; // follows MercataBridge.withdrawalCounter pattern
+    uint constant BURN_REQUEST_GRACE_PERIOD = 7 * 24 * 60 * 60;
     mapping(uint => BurnRequest) public burnRequests;
 
     event MintConfigSet(address token, bool isEnabled, uint maxBalance, uint feeBps);
@@ -307,18 +308,7 @@ contract DirectMintPSM is Ownable {
         emit BurnCompleted(id, burnAmount, payoutAmount, redeemToken, requester);
     }
 
-    function cancelBurn(uint id) nonReentrant external {
-        // Local copy
-        uint burnAmount = burnRequests[id].burnAmount;
-        uint payoutAmount = burnRequests[id].payoutAmount;
-        address redeemToken = burnRequests[id].redeemToken;
-        address requester = burnRequests[id].requester;
-        uint requestTime = burnRequests[id].requestTime;
-
-        // Validate request
-        require(burnAmount > 0, "Invalid burn request ID");
-        require(requester == msg.sender, "Unauthorized");
-
+    function _cancelBurn(uint id, uint burnAmount, address redeemToken, address requester) internal {
         // Remove burn request
         _deleteBurnRequest(id);
 
@@ -332,5 +322,33 @@ contract DirectMintPSM is Ownable {
         _transfer(mintableToken, requester, burnAmount);
 
         emit BurnCancelled(id, burnAmount, redeemToken, requester);
+    }
+
+    function clearExpiredBurnRequest(uint id) external onlyOwner nonReentrant {
+        // Local copy
+        uint burnAmount = burnRequests[id].burnAmount;
+        address redeemToken = burnRequests[id].redeemToken;
+        address requester = burnRequests[id].requester;
+        uint requestTime = burnRequests[id].requestTime;
+
+        // Validate request
+        require(burnAmount > 0, "Invalid burn request ID");
+        uint burnDelay = burnConfigs[redeemToken].burnDelay;
+        require(requestTime + burnDelay + BURN_REQUEST_GRACE_PERIOD <= block.timestamp, "Burn request not expired");
+
+        _cancelBurn(id, burnAmount, redeemToken, requester);
+    }
+
+    function cancelBurn(uint id) nonReentrant external {
+        // Local copy
+        uint burnAmount = burnRequests[id].burnAmount;
+        address redeemToken = burnRequests[id].redeemToken;
+        address requester = burnRequests[id].requester;
+
+        // Validate request
+        require(burnAmount > 0, "Invalid burn request ID");
+        require(requester == msg.sender, "Unauthorized");
+
+        _cancelBurn(id, burnAmount, redeemToken, requester);
     }
 }
