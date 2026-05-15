@@ -65,6 +65,7 @@ runtimeConfig = def
       , nativeTokenAddress = getNativeTokenForNetwork flags_network
       }
   , debugConfig = def { svmTrace = flags_svmTrace }
+  , vmConfig = def { sqlDiff = flags_sqlDiff, diffPublish = flags_diffPublish }
   }
 
 getNodeKey :: IO (VC.PublicKey, Address)

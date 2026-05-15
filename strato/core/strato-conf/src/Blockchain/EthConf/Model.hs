@@ -56,7 +56,8 @@ data EthConf = EthConf
     contractsConfig :: ContractsConf,
     urlConfig :: UrlConfig,
     networkConfig :: NetworkConf,
-    debugConfig :: DebugConfig
+    debugConfig :: DebugConfig,
+    vmConfig :: VmConf
   }
   deriving (Show, Eq, Generic)
 
@@ -80,6 +81,7 @@ instance FromJSON EthConf where
     <*> v .:? "urlConfig" .!= def
     <*> v .:? "networkConfig" .!= def
     <*> v .:? "debugConfig" .!= def
+    <*> v .:? "vmConfig" .!= def
 
 instance ToJSON EthConf where
   toJSON = Aeson.genericToJSON Aeson.defaultOptions { Aeson.omitNothingFields = True }
@@ -218,6 +220,12 @@ data DebugConfig = DebugConfig
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
+data VmConf = VmConf
+  { sqlDiff :: Bool
+  , diffPublish :: Bool
+  }
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
 -- Default instances
 
 instance Default SqlConf where
@@ -287,6 +295,12 @@ instance Default DebugConfig where
     { svmTrace = False
     }
 
+instance Default VmConf where
+  def = VmConf
+    { sqlDiff = True
+    , diffPublish = True
+    }
+
 instance Default ContractsConf where
   def = ContractsConf
     { railgunProxy = Nothing
@@ -328,4 +342,5 @@ instance Default EthConf where
     , urlConfig = def
     , networkConfig = def
     , debugConfig = def
+    , vmConfig = def
     }

@@ -72,7 +72,7 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
-import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress)
+import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress, vmConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Conduit
@@ -190,7 +190,7 @@ addBlocks unfiltered = do
           when didReplaceBest' $ do
             $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
             nbb <- readIORef replacedBest
-            when flags_sqlDiff $
+            when (Conf.sqlDiff $ vmConfig ethConf) $
               timeit "calculateAndEmitStateDiffs" timerToUse $
                 calculateAndEmitStateDiffs srLog oldHeader
             yield . OutIndexEvent $ NewBestBlock nbb
@@ -699,7 +699,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           transactionResultDeletedStorage = "",
           transactionResultStatus = Just txrStatus
         }
-  yield . OutVMEvents . (txr:) $ if not flags_diffPublish
+  yield . OutVMEvents . (txr:) $ if not (Conf.diffPublish $ vmConfig ethConf)
     then []
     else case erAction <$> result of
       Right (Just act) -> extractCodeCollectionAddedMessages act
