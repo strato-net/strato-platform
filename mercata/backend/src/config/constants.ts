@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, stratoNativeBridge, stratoNativeCustodyVault, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
 import * as config from "./config";
 import {
   SWAP_CONTRACTS,
@@ -164,8 +164,8 @@ export const constants = (() => {
     safetyModule,
     sToken,
     mercataBridge,
-    stratoNativeBridge,
-    stratoNativeCustodyVault,
+    get stratoNativeBridge() { return config.stratoNativeBridge; },
+    get stratoNativeCustodyVault() { return config.stratoNativeCustodyVault; },
     get creditCardTopUp() { return config.creditCardTopUp; },  // Use getter to get current value after init
     Event,
     tokenSelectFields,

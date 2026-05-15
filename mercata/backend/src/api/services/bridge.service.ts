@@ -274,6 +274,16 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
       ? cirrus.get(accessToken, `/${StratoNativeBridge}-assets`, { params: nativeParams })
       : Promise.resolve({ data: [] }),
   ]);
+  console.log(
+    "Bridgeable tokens native route query",
+    JSON.stringify({
+      chainId,
+      stratoNativeBridge: constants.stratoNativeBridge,
+      nativeQueryEnabled: Boolean(constants.stratoNativeBridge),
+      standardRows: Array.isArray(standardResponse.data) ? standardResponse.data.length : null,
+      nativeRows: Array.isArray(nativeResponse.data) ? nativeResponse.data.length : null,
+    })
+  );
 
   const standardRoutes = Array.isArray(standardResponse.data)
     ? parseBridgeRouteMappings(standardResponse.data as BridgeMappingRow[])

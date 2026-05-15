@@ -122,7 +122,7 @@ export interface WithdrawalRequestParams {
   routeType?: BridgeRouteType;
   externalChainId: string;
   externalRecipient: string;
-  externalToken: string;
+  externalToken?: string;
   stratoToken: string;
   stratoTokenAmount: string;
 }

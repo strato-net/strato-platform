@@ -98,7 +98,7 @@ router.post("/requestWithdrawal", walletAuth, BridgeController.requestWithdrawal
  *       200:
  *         description: Native withdrawal transaction submitted
  */
-router.post("/requestNativeWithdrawal", authHandler.authorizeRequest(), BridgeController.requestNativeWithdrawal);
+router.post("/requestNativeWithdrawal", walletAuth, BridgeController.requestNativeWithdrawal);
 
 /**
  * @openapi
