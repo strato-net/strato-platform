@@ -147,7 +147,7 @@ export const defaultWbtcCarryVaultFor: Record<string, string> = {
 
 export const defaultUsdcYieldVaultFor: Record<string, string> = {
   "114784819836269": "9c9bcc6e040910c6705d15864067720923bacc82", // Helium testnet
-  "33056204878082667": "afcfc4d847d59fbc402856fd6934aff6796812b1",                                       // Upquark mainnet
+  "33056204878082667": "afcfc4d847d59fbc402856fd6934aff6796812b1",// Upquark mainnet
 };
 
 export let bridgeUrl: string | undefined;
