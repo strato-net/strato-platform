@@ -286,6 +286,7 @@ const DirectMintPSMSection = () => {
   const estimatedRedeemPayout = selectedRedeemToken
     ? applyBpsFee(safeParseUnits(redeemAmount, 18), selectedRedeemToken.burnFeeBps)
     : 0n;
+  const noRedeemTokens = Boolean(isLoggedIn && psmInfo && !redeemTokens.length);
 
   return (
     <div>
@@ -412,23 +413,24 @@ const DirectMintPSMSection = () => {
               </div>
 
               {/* Redeem (Request Burn) Section */}
-              <div className="bg-card rounded-lg p-4 border border-border">
-                <h3 className="font-medium mb-3">
-                  Redeem {psmInfo?.mintableTokenSymbol || "USDST"}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Request to exchange {psmInfo?.mintableTokenSymbol || "USDST"}{" "}
-                  for an enabled redemption token.
-                  {selectedRedeemToken && burnDelaySec > 0 && (
-                    <span className="block mt-1">
-                      {selectedRedeemToken.symbol} redemptions have a{" "}
-                      {formatTimeRemaining(burnDelaySec)} delay
-                      before they can be completed.
-                    </span>
-                  )}
-                </p>
+              <div className="relative bg-card rounded-lg p-4 border border-border overflow-hidden">
+                <div className={noRedeemTokens ? "opacity-40 pointer-events-none" : ""}>
+                  <h3 className="font-medium mb-3">
+                    Redeem {psmInfo?.mintableTokenSymbol || "USDST"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Request to exchange {psmInfo?.mintableTokenSymbol || "USDST"}{" "}
+                    for an enabled redemption token.
+                    {selectedRedeemToken && burnDelaySec > 0 && (
+                      <span className="block mt-1">
+                        {selectedRedeemToken.symbol} redemptions have a{" "}
+                        {formatTimeRemaining(burnDelaySec)} delay
+                        before they can be completed.
+                      </span>
+                    )}
+                  </p>
 
-                <div className="space-y-2">
+                  <div className="space-y-2">
                   <Select
                     value={redeemToken}
                     onValueChange={setRedeemToken}
@@ -526,7 +528,16 @@ const DirectMintPSMSection = () => {
                   >
                     {isProcessing ? "Processing..." : "Request Redeem"}
                   </Button>
+                  </div>
                 </div>
+
+                {noRedeemTokens && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted/60 px-4 text-center">
+                    <p className="text-sm font-medium text-foreground">
+                      No tokens available for redemption at this time
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
