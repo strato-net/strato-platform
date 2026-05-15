@@ -235,6 +235,7 @@ export interface YieldVaultUserInfo extends YieldVaultInfo {
 const CARRY_VAULT_ENTRIES: (Omit<YieldVaultDef, "address"> & { getAddress: () => string })[] = [
   { key: "eth-carry",  name: "ETH Carry Vault",  assetSymbol: "ETH",  shareSymbol: "carryETH",  getAddress: () => config.ethCarryVault },
   { key: "wbtc-carry", name: "wBTC Carry Vault", assetSymbol: "wBTC", shareSymbol: "carryWBTC", getAddress: () => config.wbtcCarryVault },
+  { key: "usdc-yield", name: "USDC Yield Vault", assetSymbol: "USDC", shareSymbol: "yieldUSDC", getAddress: () => config.usdcYieldVault },
 ];
 
 const parseBigIntLike = (value: unknown): bigint => {

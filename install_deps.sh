@@ -175,6 +175,7 @@ Darwin)
     brew install --quiet \
         leveldb \
         libpq \
+        librdkafka \
         libsodium \
         pkgconf \
         secp256k1 \
@@ -203,11 +204,13 @@ Linux)
             # Install git
             sudo dnf update -q -y
             sudo dnf install -q -y git
-            
+
             # Install Docker
+            # Note: docs.docker.com does not officially support Amazon Linux 2023.
+            # AWS provides Docker via its own repositories; install via dnf and
+            # use the buildx/compose plugins where available (compose is fetched below).
             sudo dnf install -q -y docker
-            sudo systemctl enable docker
-            sudo systemctl start docker
+            sudo systemctl enable --now docker
 
             # Add current user to docker group so Docker runs as non-root user
             # See https://docs.docker.com/engine/install/linux-postinstall/
@@ -216,10 +219,14 @@ Linux)
 
             # Docker-compose
             DOCKER_CONFIG=/usr/local/lib/docker
-            sudo mkdir -p $DOCKER_CONFIG/cli-plugins
-            sudo curl -SL https://github.com/docker/compose/releases/download/v2.36.0/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
-            sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-            
+            if [ ! -x "$DOCKER_CONFIG/cli-plugins/docker-compose" ]; then
+                sudo mkdir -p $DOCKER_CONFIG/cli-plugins
+                sudo curl -SL https://github.com/docker/compose/releases/download/v2.36.0/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+                sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+            else
+                echo "docker-compose is already installed, skipping download."
+            fi
+
             # Install Haskell Stack
             sudo dnf install -q -y \
                 gcc \
@@ -227,43 +234,77 @@ Linux)
                 gmp-devel \
                 ncurses-devel \
                 zlib-devel
-            curl -sSL https://get.haskellstack.org/ | sh -s - -f
-            
+            if ! command -v stack > /dev/null 2>&1; then
+                curl -sSL https://get.haskellstack.org/ | sh -s - -f
+            else
+                echo "Haskell Stack is already installed, skipping install."
+            fi
+
             # Install STRATO dependencies
             sudo dnf install -q -y \
                 libsodium-devel \
                 postgresql15 \
                 postgresql-devel \
                 xz-devel
-            
+
             # Build leveldb (not available in Amazon Linux 2023 repositories)
-            sudo dnf install -q -y snappy-devel
-            git clone --branch v1.20 --recurse-submodules https://github.com/google/leveldb.git
-            cd leveldb
-            make
-            sudo mkdir -p /usr/local/include/leveldb
-            sudo cp -r include/leveldb/* /usr/local/include/leveldb/
-            sudo cp out-shared/libleveldb.* /usr/local/lib/
-            sudo cp out-static/libleveldb.a /usr/local/lib/
-            sudo cp /usr/local/lib/libleveldb.so.1 /lib64
-            cd ..
-            rm -rf leveldb
-            
+            if [ ! -f /usr/local/lib/libleveldb.so.1 ] || [ ! -f /lib64/libleveldb.so.1 ]; then
+                sudo dnf install -q -y snappy-devel
+                rm -rf leveldb
+                git clone --branch v1.20 --recurse-submodules https://github.com/google/leveldb.git
+                cd leveldb
+                make
+                sudo mkdir -p /usr/local/include/leveldb
+                sudo cp -r include/leveldb/* /usr/local/include/leveldb/
+                sudo cp out-shared/libleveldb.* /usr/local/lib/
+                sudo cp out-static/libleveldb.a /usr/local/lib/
+                sudo cp /usr/local/lib/libleveldb.so.1 /lib64
+                cd ..
+                rm -rf leveldb
+            else
+                echo "leveldb is already installed, skipping build."
+            fi
+
             # Build secp256k1 (not available in Amazon Linux 2023 repositories)
-            sudo dnf install -y autoconf libtool make
-            git clone --branch v0.7.0 https://github.com/bitcoin-core/secp256k1.git
-            cd secp256k1
-            ./autogen.sh
-            ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
-            make
-            sudo make install
-            # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
-            # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
-            # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
-            sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
-            sudo cp /usr/local/lib/libsecp256k1.so.6 /lib64
-            cd ..
-            rm -rf secp256k1
+            if [ ! -f /usr/local/lib/libsecp256k1.so.6 ] || [ ! -f /lib64/libsecp256k1.so.6 ] || [ ! -f /usr/share/pkgconfig/libsecp256k1.pc ]; then
+                sudo dnf install -y autoconf libtool make
+                rm -rf secp256k1
+                git clone --branch v0.7.0 https://github.com/bitcoin-core/secp256k1.git
+                cd secp256k1
+                ./autogen.sh
+                ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
+                make
+                sudo make install
+                # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
+                # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
+                # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
+                sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
+                sudo cp /usr/local/lib/libsecp256k1.so.6 /lib64
+                cd ..
+                rm -rf secp256k1
+            else
+                echo "secp256k1 is already installed, skipping build."
+            fi
+
+            # Build librdkafka (not available in Amazon Linux 2023 repositories)
+            if [ ! -f /usr/local/lib/librdkafka.so.1 ] || [ ! -f /lib64/librdkafka.so.1 ] || [ ! -f /usr/share/pkgconfig/rdkafka.pc ]; then
+                sudo dnf install -y cmake openssl-devel cyrus-sasl-devel zlib-devel
+                rm -rf librdkafka
+                git clone --branch v2.3.0 https://github.com/confluentinc/librdkafka.git
+                cd librdkafka
+                ./configure
+                make
+                sudo make install
+                # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
+                sudo cp /usr/local/lib/pkgconfig/rdkafka.pc /usr/share/pkgconfig/
+                sudo cp /usr/local/lib/pkgconfig/rdkafka++.pc /usr/share/pkgconfig/
+                sudo cp /usr/local/lib/librdkafka.so.1 /lib64
+                sudo cp /usr/local/lib/librdkafka++.so.1 /lib64
+                cd ..
+                rm -rf librdkafka
+            else
+                echo "librdkafka is already installed, skipping build."
+            fi
 
             # Update library cache
             sudo ldconfig
@@ -293,6 +334,19 @@ Linux)
             sudo dnf config-manager --set-enabled ol8_codeready_builder
 
             # Install Docker
+            # Per https://docs.docker.com/engine/install/centos/
+            # Remove any unofficial Docker packages that could conflict with docker-ce.
+            sudo dnf remove -y \
+                docker \
+                docker-client \
+                docker-client-latest \
+                docker-common \
+                docker-latest \
+                docker-latest-logrotate \
+                docker-logrotate \
+                docker-engine 2>/dev/null || true
+            # Set up Docker's official repository.
+            sudo dnf -y install dnf-plugins-core
             sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
             sudo dnf install -y \
                 docker-ce \
@@ -300,8 +354,7 @@ Linux)
                 containerd.io \
                 docker-buildx-plugin \
                 docker-compose-plugin
-            sudo systemctl enable docker
-            sudo systemctl start docker
+            sudo systemctl enable --now docker
 
             # Add current user to docker group so Docker runs as non-root user
             # See https://docs.docker.com/engine/install/linux-postinstall/
@@ -316,7 +369,11 @@ Linux)
                 make \
                 ncurses-devel \
                 zlib-devel
-            curl -sSL https://get.haskellstack.org/ | sh -s - -f
+            if ! command -v stack > /dev/null 2>&1; then
+                curl -sSL https://get.haskellstack.org/ | sh -s - -f
+            else
+                echo "Haskell Stack is already installed, skipping install."
+            fi
 
             # Install PostgreSQL 15 via the official PGDG repo (OL8 AppStream only ships PG 13)
             sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
@@ -333,33 +390,63 @@ Linux)
                 xz-devel
 
             # Build leveldb from source (not available in Oracle Linux 8 repositories)
-            sudo dnf install -y snappy-devel
-            git clone --branch v1.20 --recurse-submodules https://github.com/google/leveldb.git
-            cd leveldb
-            make
-            sudo mkdir -p /usr/local/include/leveldb
-            sudo cp -r include/leveldb/* /usr/local/include/leveldb/
-            sudo cp out-shared/libleveldb.* /usr/local/lib/
-            sudo cp out-static/libleveldb.a /usr/local/lib/
-            sudo cp /usr/local/lib/libleveldb.so.1 /lib64
-            cd ..
-            rm -rf leveldb
+            if [ ! -f /usr/local/lib/libleveldb.so.1 ] || [ ! -f /lib64/libleveldb.so.1 ]; then
+                sudo dnf install -y snappy-devel
+                rm -rf leveldb
+                git clone --branch v1.20 --recurse-submodules https://github.com/google/leveldb.git
+                cd leveldb
+                make
+                sudo mkdir -p /usr/local/include/leveldb
+                sudo cp -r include/leveldb/* /usr/local/include/leveldb/
+                sudo cp out-shared/libleveldb.* /usr/local/lib/
+                sudo cp out-static/libleveldb.a /usr/local/lib/
+                sudo cp /usr/local/lib/libleveldb.so.1 /lib64
+                cd ..
+                rm -rf leveldb
+            else
+                echo "leveldb is already installed, skipping build."
+            fi
 
             # Build secp256k1 from source (not available in Oracle Linux 8 repositories)
-            sudo dnf install -y autoconf libtool make
-            git clone --branch v0.7.0 https://github.com/bitcoin-core/secp256k1.git
-            cd secp256k1
-            ./autogen.sh
-            ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
-            make
-            sudo make install
-            # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
-            # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
-            # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
-            sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
-            sudo cp /usr/local/lib/libsecp256k1.so.6 /lib64
-            cd ..
-            rm -rf secp256k1
+            if [ ! -f /usr/local/lib/libsecp256k1.so.6 ] || [ ! -f /lib64/libsecp256k1.so.6 ] || [ ! -f /usr/share/pkgconfig/libsecp256k1.pc ]; then
+                sudo dnf install -y autoconf libtool make
+                rm -rf secp256k1
+                git clone --branch v0.7.0 https://github.com/bitcoin-core/secp256k1.git
+                cd secp256k1
+                ./autogen.sh
+                ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
+                make
+                sudo make install
+                # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
+                # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
+                # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
+                sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
+                sudo cp /usr/local/lib/libsecp256k1.so.6 /lib64
+                cd ..
+                rm -rf secp256k1
+            else
+                echo "secp256k1 is already installed, skipping build."
+            fi
+
+            # Build librdkafka from source (not available in Oracle Linux 8 repositories)
+            if [ ! -f /usr/local/lib/librdkafka.so.1 ] || [ ! -f /lib64/librdkafka.so.1 ] || [ ! -f /usr/share/pkgconfig/rdkafka.pc ]; then
+                sudo dnf install -y cmake openssl-devel cyrus-sasl-devel zlib-devel
+                rm -rf librdkafka
+                git clone --branch v2.3.0 https://github.com/confluentinc/librdkafka.git
+                cd librdkafka
+                ./configure
+                make
+                sudo make install
+                # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
+                sudo cp /usr/local/lib/pkgconfig/rdkafka.pc /usr/share/pkgconfig/
+                sudo cp /usr/local/lib/pkgconfig/rdkafka++.pc /usr/share/pkgconfig/
+                sudo cp /usr/local/lib/librdkafka.so.1 /lib64
+                sudo cp /usr/local/lib/librdkafka++.so.1 /lib64
+                cd ..
+                rm -rf librdkafka
+            else
+                echo "librdkafka is already installed, skipping build."
+            fi
 
             # Update library cache
             sudo ldconfig
@@ -394,38 +481,52 @@ Linux)
                 fi
             fi
             
-            # If Docker is already installed, remove any stale apt source/key files left by a
-            # previous run of this script to prevent "Conflicting values set for Signed-By" errors
-            # (e.g. a prior run wrote docker.gpg but the existing install uses docker.asc).
-            if command -v docker > /dev/null 2>&1; then
-                sudo rm -f /etc/apt/sources.list.d/docker.list
-                sudo rm -f /etc/apt/keyrings/docker.gpg
-            fi
+            # Remove stale apt source/key files left by previous versions of this
+            # script (e.g. the old .gpg keyring or .list source file) to prevent
+            # "Conflicting values set for Signed-By" errors when re-running.
+            sudo rm -f /etc/apt/sources.list.d/docker.list
+            sudo rm -f /etc/apt/keyrings/docker.gpg
 
             # Install git
             sudo apt -q update
             sudo apt install -qy --no-install-recommends git
 
             # Install Docker if not already installed
+            # Per https://docs.docker.com/engine/install/ubuntu/
             if ! command -v docker > /dev/null 2>&1; then
+                # Remove any unofficial Docker packages that could conflict with docker-ce.
+                for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
+                    sudo apt remove -qy "$pkg" 2>/dev/null || true
+                done
+
                 # Install packaging-related tools needed for the Docker install
                 sudo apt install -qy --no-install-recommends \
                     ca-certificates \
                     curl \
-                    gnupg \
                     lsb-release
 
-                # Download Docker GPG key and add to our Apt keyrings
-                sudo mkdir -p /etc/apt/keyrings
-                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
+                # Add Docker's official GPG key (PEM-armored .asc per current docs)
+                sudo install -m 0755 -d /etc/apt/keyrings
+                sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+                sudo chmod a+r /etc/apt/keyrings/docker.asc
 
-                # Add the appropriate "Additional Sources List" for the stable Docker packages for this distro version
+                # Determine the Ubuntu codename (Linux Mint reports its own codename;
+                # the upstream Ubuntu codename is needed for Docker's repo).
                 if [ "$DISTRO_NAME" = "Linux Mint" ]; then
                     UBUNTU_CODENAME=$(cat /etc/upstream-release/lsb-release | grep DISTRIB_CODENAME | cut -d= -f2)
                 else
-                    UBUNTU_CODENAME=$(lsb_release -cs)
+                    UBUNTU_CODENAME=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
                 fi
-                echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+                # Add the Docker repository using the deb822 .sources format
+                sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $UBUNTU_CODENAME
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
 
                 # Install the Docker packages
                 sudo apt -q update
@@ -439,6 +540,9 @@ Linux)
                 echo "Docker is already installed."
             fi
 
+            # Enable and start Docker
+            sudo systemctl enable --now docker
+
             # Add current user to docker group so Docker runs as non-root user
             # See https://docs.docker.com/engine/install/linux-postinstall/
             sudo groupadd docker 2>/dev/null || true
@@ -450,13 +554,18 @@ Linux)
                 curl \
                 libgmp-dev \
                 zlib1g-dev
-            curl -sSL https://get.haskellstack.org/ | sh -s - -f
-            
+            if ! command -v stack > /dev/null 2>&1; then
+                curl -sSL https://get.haskellstack.org/ | sh -s - -f
+            else
+                echo "Haskell Stack is already installed, skipping install."
+            fi
+
             # Install STRATO dependencies
             sudo apt install -qy --no-install-recommends \
                 libleveldb-dev \
                 liblzma-dev \
                 libpq-dev \
+                librdkafka-dev \
                 libsecp256k1-dev \
                 libsodium-dev \
                 postgresql-client
@@ -488,11 +597,11 @@ check_package_version "ubuntu-or-mint" "docker-ce" "5:28.3.3-1~ubuntu.24.04~nobl
 check_package_version "ubuntu-or-mint" "docker-ce-cli" "5:28.3.3-1~ubuntu.24.04~noble"
 check_package_version "ubuntu-or-mint" "docker-compose-plugin" "2.39.1-1~ubuntu.24.04~noble"
 check_package_version "ubuntu-or-mint" "git" "1:2.43.0-1ubuntu7.3"
-check_package_version "ubuntu-or-mint" "gnupg" "2.4.4-2ubuntu17.3"
 check_package_version "ubuntu-or-mint" "libgmp-dev" "2:6.3.0+dfsg-2ubuntu6.1"
 check_package_version "ubuntu-or-mint" "libleveldb-dev" "1.23-5build1"
 check_package_version "ubuntu-or-mint" "liblzma-dev" "5.6.1+really5.4.5-1ubuntu0.2"
 check_package_version "ubuntu-or-mint" "libpq-dev" "16.9-0ubuntu0.24.04.1"
+check_package_version "ubuntu-or-mint" "librdkafka-dev" "2.3.0-1build2"
 check_package_version "ubuntu-or-mint" "libsecp256k1-dev" "0.2.0-2"
 check_package_version "ubuntu-or-mint" "libsodium-dev" "1.0.18-1build3"
 check_package_version "ubuntu-or-mint" "lsb-release" "12.0-2"
