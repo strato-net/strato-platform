@@ -224,8 +224,12 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           clientSecret <- case envClientSecret of
             Just cs | not (null cs) -> return cs
             _ -> generatePassword 48
-          let localOauthConfig = unlines
-                [ "discoveryUrl: \"http://" ++ localHostname ++ ":" ++ show flags_httpPort ++ "/auth/.well-known/openid-configuration\""
+          let ssl = not $ null flags_sslDir
+              discoveryUrl = if ssl
+                then "https://" ++ localHostname ++ "/auth/.well-known/openid-configuration"
+                else "http://" ++ localHostname ++ ":" ++ show flags_httpPort ++ "/auth/.well-known/openid-configuration"
+              localOauthConfig = unlines
+                [ "discoveryUrl: \"" ++ discoveryUrl ++ "\""
                 , "clientId: \"" ++ clientId ++ "\""
                 , "clientSecret: \"" ++ clientSecret ++ "\""
                 ]
