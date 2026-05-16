@@ -22,6 +22,13 @@ const announcedManualNativeWithdrawals = new Map<string, string | null>();
 const pendingNativeInstantWithdrawalTxHashes = new Map<string, string>();
 const inFlightSafeProposalWithdrawals = new Set<string>();
 
+const normalizeOptionalHash = (value?: string | null): string | null => {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+  const withoutPrefix = normalized.replace(/^0x/i, "");
+  return /^0+$/.test(withoutPrefix) ? null : normalized;
+};
+
 const getStratoNetworkId = async (): Promise<bigint> => {
   if (cachedStratoNetworkId != null) {
     return cachedStratoNetworkId;
@@ -742,14 +749,18 @@ export const queueManualNativeWithdrawalBatch = async (
       continue;
     }
 
+    const recordedProposalReference = normalizeOptionalHash(
+      withdrawal.nativeMintProposalHash,
+    );
     const existingProposalReference =
-      withdrawal.nativeMintProposalHash ||
-      announcedManualNativeWithdrawals.get(withdrawal.withdrawalId) ||
-      null;
+      recordedProposalReference ||
+      normalizeOptionalHash(
+        announcedManualNativeWithdrawals.get(withdrawal.withdrawalId),
+      );
 
     if (existingProposalReference) {
       try {
-        if (!withdrawal.nativeMintProposalHash) {
+        if (!recordedProposalReference) {
           await recordNativeWithdrawalProposal(
             withdrawal.withdrawalId,
             existingProposalReference,

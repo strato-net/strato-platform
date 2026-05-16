@@ -291,6 +291,15 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
   const nativeRoutes = Array.isArray(nativeResponse.data)
     ? parseNativeBridgeAssets(nativeResponse.data as NativeBridgeAssetRow[])
     : [];
+  console.log(
+    "Bridgeable tokens parsed routes",
+    JSON.stringify({
+      chainId,
+      standardRoutes: standardRoutes.length,
+      nativeRoutes: nativeRoutes.length,
+      enabledNativeRoutes: nativeRoutes.filter((route) => route.AssetInfo.enabled).length,
+    })
+  );
   const routes = [...standardRoutes, ...nativeRoutes];
   if (!routes.length) return [];
 

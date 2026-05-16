@@ -24,6 +24,7 @@ export type BridgeMappingRow = {
 export type BridgeAssetInfo = {
   routeType: "standard" | "native";
   externalChainId: string;
+  externalBridge?: string;
   externalToken: string;
   externalName: string;
   externalSymbol: string;
@@ -379,6 +380,7 @@ export function parseNativeBridgeAssets(rows: NativeBridgeAssetRow[]): Bridgeabl
     const asset: BridgeAssetInfo = {
       routeType: "native",
       externalChainId,
+      externalBridge: typeof raw.externalBridge === "string" ? normalizeBridgeAddress(raw.externalBridge) : "",
       externalToken: representationToken,
       externalName: typeof raw.externalName === "string" ? raw.externalName : "",
       externalSymbol: typeof raw.externalSymbol === "string" ? raw.externalSymbol : "",
@@ -389,7 +391,7 @@ export function parseNativeBridgeAssets(rows: NativeBridgeAssetRow[]): Bridgeabl
           ? String(raw.instantWithdrawalThreshold)
           : "0",
       stratoToken,
-      enabled: raw.enabled === true,
+      enabled: isMappingTrue(raw.enabled),
     };
 
     routes.push({

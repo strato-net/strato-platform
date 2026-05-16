@@ -32,6 +32,7 @@ export interface BridgeToken {
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
   externalChainId: string;       // Matches AssetInfo.externalChainId
+  externalBridge?: string;       // Native-only representation bridge address
   externalName: string;          // Matches AssetInfo.externalName
   externalToken: string;         // Matches AssetInfo.externalToken
   externalSymbol: string;        // Matches AssetInfo.externalSymbol

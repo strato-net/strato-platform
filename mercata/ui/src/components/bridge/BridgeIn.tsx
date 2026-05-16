@@ -19,6 +19,7 @@ import {
   DEPOSIT_ROUTER_ABI,
   ERC20_ABI,
   PERMIT2_ADDRESS,
+  STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
 } from "@/lib/bridge/constants";
 import {
   getTokenConfig,
@@ -340,6 +341,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const [progressTxHash, setProgressTxHash] = useState<string>();
   const [progressError, setProgressError] = useState<string>();
   const [progressIsNative, setProgressIsNative] = useState(true);
+  const [progressIsRedemption, setProgressIsRedemption] = useState(false);
   const [metalProgressOpen, setMetalProgressOpen] = useState(false);
   const [metalSteps, setMetalSteps] = useState<MetalBuyStep[]>([]);
   const [metalProgressError, setMetalProgressError] = useState<string>();
@@ -365,7 +367,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [availableNetworks, selectedNetwork]);
 
   const depositableBridgeTokens = useMemo(
-    () => bridgeableTokens.filter((token) => token.routeType !== "native"),
+    () => bridgeableTokens,
     [bridgeableTokens]
   );
 
@@ -375,8 +377,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
     );
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
-    const mintStratoTokens = new Set(routes.filter(r => r.isDefaultRoute).map(r => normAddr(r.stratoToken)));
-    const actions = depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
+    const mintStratoTokens = new Set(
+      routes
+        .filter(r => r.routeType !== "native" && r.isDefaultRoute)
+        .map(r => normAddr(r.stratoToken))
+    );
+    const actions = selectedToken.routeType === "native"
+      ? []
+      : depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
     if (routes.length > 0) prevCardsRef.current = { routes, actions };
     return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
   }, [depositableBridgeTokens, selectedToken, depositActions]);
@@ -454,7 +462,8 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   const stratoRecipient = userAddress;
   const hasExternalWallet = isConnected && isExternalEvmWalletConnected && !!externalSenderHex;
   const isCorrectNetwork = hasExternalWallet && !!chainId && !!expectedChainId && chainId === expectedChainId;
-  const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n;
+  const isNativeRedemption = selectedToken?.routeType === "native";
+  const isNativeToken = !isNativeRedemption && BigInt(selectedToken?.externalToken || "0") === 0n;
   const useExternalWalletSigning = hasExternalWallet && !isAppAuthenticated;
   const visibleMatchingActions = useMemo(
     () => useExternalWalletSigning ? [] : matchingActions,
@@ -560,6 +569,11 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [useExternalWalletSigning, selectedAction]);
 
   useEffect(() => {
+    if (selectedToken?.routeType === "native") {
+      setMinDepositInfo({ amount: "0", amountWei: 0n, loading: false });
+      setIsTokenPermitted(true);
+      return;
+    }
     if (selectedToken && currentNetwork) {
       fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
     }
@@ -815,8 +829,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     setIsLoading(true);
     setProgressError(undefined);
     
-    const isNative = BigInt(selectedToken.externalToken || "0") === 0n;
+    const isNative = selectedToken.routeType !== "native" && BigInt(selectedToken.externalToken || "0") === 0n;
     setProgressIsNative(isNative);
+    setProgressIsRedemption(selectedToken.routeType === "native");
     
     setProgressModalOpen(true);
 
@@ -824,7 +839,86 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       const activeChainId = currentNetwork.chainId;
       const depositRouter = currentNetwork.depositRouter;
       const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
-      
+      const depositAmount = safeParseUnits(
+        amount,
+        parseInt(selectedToken.externalDecimals || "18"),
+      );
+
+      if (selectedToken.routeType === "native") {
+        if (!selectedToken.externalBridge) {
+          throw new Error("Native representation bridge is not configured for this route.");
+        }
+
+        setProgressIsNative(false);
+        setCurrentStep("approve");
+        const representationToken = ensureHexPrefix(selectedToken.externalToken);
+        const representationBridge = ensureHexPrefix(selectedToken.externalBridge);
+
+        const approveTx = await writeContractAsync({
+          address: representationToken as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [representationBridge as `0x${string}`, depositAmount],
+          chain: await resolveViemChain(activeChainId),
+          account: externalSenderHex,
+        });
+
+        const approveSuccess = await waitForTransaction(approveTx, activeChainId);
+        if (!approveSuccess) {
+          throw new Error(`Approval reverted on ${selectedNetwork} network. Please try again.`);
+        }
+
+        setCurrentStep("confirm_tx");
+        const txHash = await writeContractAsync({
+          address: representationBridge as `0x${string}`,
+          abi: STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
+          functionName: "requestRedemption",
+          args: [
+            representationToken as `0x${string}`,
+            depositAmount,
+            ensureHexPrefix(stratoRecipient) as `0x${string}`,
+          ],
+          chain: await resolveViemChain(activeChainId),
+          account: externalSenderHex,
+        });
+
+        setProgressTxHash(txHash);
+        setCurrentStep("waiting_tx");
+        const success = await waitForTransaction(txHash, activeChainId);
+        if (!success) {
+          throw new Error(`Transaction reverted on ${selectedNetwork} network. No funds were redeemed to STRATO. Please try again.`);
+        }
+
+        const existing = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+        existing.push({
+          externalChainId: parseInt(activeChainId),
+          externalTxHash: txHash,
+          type: 'bridge',
+          DepositInfo: {
+            externalSender,
+            stratoRecipient,
+            stratoToken: selectedToken.stratoToken,
+            stratoTokenAmount: depositAmount.toString(),
+            bridgeStatus: "1",
+          },
+          block_timestamp: new Date().toISOString(),
+          stratoTokenSymbol: selectedToken.stratoTokenSymbol,
+          externalName: selectedToken.externalName,
+          externalSymbol: selectedToken.externalSymbol,
+        });
+        localStorage.setItem('pendingDeposits', JSON.stringify(existing));
+        triggerDepositRefresh();
+
+        setCurrentStep("complete");
+        setAmount("");
+
+        await Promise.all([
+          refetchToken(),
+          fetchUsdstBalance(),
+        ]);
+        return;
+      }
+
       // Set initial step based on token type
       if (!isNative) {
         // ERC20 tokens need approval
@@ -833,11 +927,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         // Native tokens (ETH) go straight to confirm
         setCurrentStep("confirm_tx");
       }
-      const depositAmount = safeParseUnits(
-        amount,
-        parseInt(selectedToken.externalDecimals || "18"),
-      );
-
       const validation = await validateRouterContract({
         depositRouterAddress: depositRouter,
         amount,
@@ -1338,7 +1427,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             disabled={fundingMode === "metals" ? (isLoading || !selectedPayToken || !selectedMetal || !amount || guestMode) : isButtonDisabled}
             className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
           >
-            {isLoading ? "Processing..." : fundingMode === "metals" ? `Buy ${selectedMetal?.symbol || "Metal"}` : "Deposit"}
+            {isLoading
+              ? "Processing..."
+              : fundingMode === "metals"
+                ? `Buy ${selectedMetal?.symbol || "Metal"}`
+                : selectedToken?.routeType === "native"
+                  ? "Redeem to STRATO"
+                  : "Deposit"}
           </Button>
           <div className={`overflow-hidden transition-all duration-300 ease-in-out text-right ${
             fundingMode === "bridge" ? "max-h-[30px] opacity-100" : "max-h-0 opacity-0"
@@ -1384,12 +1479,14 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           chainId={currentNetwork?.chainId ? parseInt(currentNetwork.chainId) : undefined}
           isEasySavings={(selectedAction?.action || 0) > 0}
           isNative={progressIsNative}
+          isRedemption={progressIsRedemption}
           error={progressError}
           onClose={() => {
             setProgressModalOpen(false);
             setCurrentStep("confirm_tx");
             setProgressTxHash(undefined);
             setProgressError(undefined);
+            setProgressIsRedemption(false);
           }}
         />
         <MetalBuyProgressModal
