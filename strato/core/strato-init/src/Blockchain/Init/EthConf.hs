@@ -155,6 +155,7 @@ genEthConf = do
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl
+        , cookieRealm = localHostname
         }
     , networkConfig = def
         { network = flags_network

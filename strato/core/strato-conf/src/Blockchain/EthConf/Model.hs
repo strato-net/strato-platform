@@ -184,6 +184,7 @@ data UrlConfig = UrlConfig
   , fileServerUrl :: String
   , notificationServerUrl :: String
   , repoUrl :: String  -- Docker registry URL prefix for images
+  , cookieRealm :: String  -- Domain for auth cookies (hostname, or parent domain for subdomain sharing)
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -314,6 +315,7 @@ instance Default UrlConfig where
     , fileServerUrl = ""
     , notificationServerUrl = ""
     , repoUrl = ""
+    , cookieRealm = "localhost"
     }
 
 instance Default NetworkConf where

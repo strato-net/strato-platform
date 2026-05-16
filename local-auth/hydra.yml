@@ -14,11 +14,11 @@ serve:
 
 urls:
   self:
-    issuer: http://__HOSTNAME__:__HTTP_PORT__/auth
-  consent: http://__HOSTNAME__:__HTTP_PORT__/auth/ui/consent
-  login: http://__HOSTNAME__:__HTTP_PORT__/auth/ui/login
-  logout: http://__HOSTNAME__:__HTTP_PORT__/auth/ui/logout
-  error: http://__HOSTNAME__:__HTTP_PORT__/auth/ui/error
+    issuer: __NODE_URL__/auth
+  consent: __NODE_URL__/auth/ui/consent
+  login: __NODE_URL__/auth/ui/login
+  logout: __NODE_URL__/auth/ui/logout
+  error: __NODE_URL__/auth/ui/error
 
 secrets:
   system:
