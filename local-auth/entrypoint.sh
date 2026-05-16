@@ -61,6 +61,7 @@ KRATOS_COOKIE_SECRET_ESCAPED=$(escape_sed_replacement "$KRATOS_COOKIE_SECRET")
 sed -i "s|__HYDRA_SYSTEM_SECRET__|${HYDRA_SYSTEM_SECRET_ESCAPED}|g" /etc/config/hydra.yml
 sed -i "s|__HYDRA_PAIRWISE_SALT__|${HYDRA_PAIRWISE_SALT_ESCAPED}|g" /etc/config/hydra.yml
 sed -i "s|__NODE_URL__|${NODE_URL}|g" /etc/config/hydra.yml
+sed -i "s|__COOKIE_REALM__|${COOKIE_REALM}|g" /etc/config/hydra.yml
 sed -i "s|__KRATOS_COOKIE_SECRET__|${KRATOS_COOKIE_SECRET_ESCAPED}|g" /etc/config/kratos.yml
 sed -i "s|__NODE_URL__|${NODE_URL}|g" /etc/config/kratos.yml
 sed -i "s|__COOKIE_REALM__|${COOKIE_REALM}|g" /etc/config/kratos.yml
