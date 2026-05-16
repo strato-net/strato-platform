@@ -5,6 +5,7 @@ set -e
 OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
+NODE_URL=${NODE_URL:-NULL}
 HOST_IP=${HOST_IP:-host.docker.internal}
 DOCKERIZED_APP=${DOCKERIZED_APP:-true}
 
@@ -15,6 +16,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
     echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required for OAuth. Exit'
+    exit 4
+  fi
+  if [[ ${NODE_URL} = NULL ]] ; then
+    echo 'NODE_URL is required to proxy /rpc to the upstream STRATO node. Exit'
     exit 4
   fi
 
@@ -38,6 +43,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i "s|__BACKEND_HOST__|$HOST_IP|g" /tmp/nginx.conf
     sed -i "s|__UI_HOST__|$HOST_IP|g" /tmp/nginx.conf
   fi
+
+  # Strip trailing slash from NODE_URL so `__NODE_URL__/rpc` is well-formed
+  NODE_URL_STRIPPED="${NODE_URL%/}"
+  sed -i "s|__NODE_URL__|$NODE_URL_STRIPPED|g" /tmp/nginx.conf
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
