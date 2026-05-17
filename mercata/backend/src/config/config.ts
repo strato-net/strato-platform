@@ -223,16 +223,6 @@ function setStratoNativeBridgeConfig(networkId: string) {
     process.env.STRATO_NATIVE_CUSTODY_VAULT ||
     defaultStratoNativeCustodyVaultFor[networkId] ||
     "";
-  console.log(
-    "Native bridge config resolved",
-    JSON.stringify({
-      networkId,
-      stratoNativeBridge,
-      stratoNativeCustodyVault,
-      bridgeSource: process.env.STRATO_NATIVE_BRIDGE ? "env" : "default",
-      custodyVaultSource: process.env.STRATO_NATIVE_CUSTODY_VAULT ? "env" : "default",
-    })
-  );
 }
 
 function setMetalForgeConfig(networkId: string) {

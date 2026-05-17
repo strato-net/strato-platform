@@ -288,7 +288,7 @@ interface BridgeInProps {
 
 const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: externalFundingMode, onFundingModeChange, onMetalPurchase }) => {
   // Hooks & Context
-  const { isConnected } = useAccount();
+  const { isConnected, connector } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
   const { switchChain } = useSwitchChain();
@@ -367,15 +367,23 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
   }, [availableNetworks, selectedNetwork]);
 
   const depositableBridgeTokens = useMemo(
-    () => bridgeableTokens,
+    () => bridgeableTokens.filter((token) => token.routeType !== "native"),
+    [bridgeableTokens]
+  );
+
+  const nativeBridgeTokens = useMemo(
+    () => bridgeableTokens.filter((token) => token.routeType === "native"),
     [bridgeableTokens]
   );
 
   const { sourceTokenRoutes, matchingActions } = useMemo(() => {
     if (!selectedToken) return { sourceTokenRoutes: prevCardsRef.current.routes, matchingActions: prevCardsRef.current.actions };
-    const routes = depositableBridgeTokens.filter((token) =>
-      token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
-    );
+    const routes = selectedToken.routeType === "native"
+      ? nativeBridgeTokens.filter((token) => token.id === selectedToken.id)
+      : depositableBridgeTokens.filter((token) =>
+          token.routeType !== "native" &&
+          token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
+        );
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
     const mintStratoTokens = new Set(
       routes
@@ -387,7 +395,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       : depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
     if (routes.length > 0) prevCardsRef.current = { routes, actions };
     return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
-  }, [depositableBridgeTokens, selectedToken, depositActions]);
+  }, [depositableBridgeTokens, nativeBridgeTokens, selectedToken, depositActions]);
 
   const getApyInfo = useMemo(() => {
     const m = buildEarnApyMap(tokenApys);
@@ -536,13 +544,13 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     if (!selectedNetwork && availableNetworks.length) {
       setSelectedNetwork(availableNetworks[0].chainName);
     }
-    if (!selectedToken && depositableBridgeTokens.length) {
-      setSelectedToken(depositableBridgeTokens[0]);
+    if (!selectedToken && (depositableBridgeTokens.length || nativeBridgeTokens.length)) {
+      setSelectedToken(depositableBridgeTokens[0] || nativeBridgeTokens[0]);
     } else if (
       selectedToken &&
-      !depositableBridgeTokens.some((t) => t.id === selectedToken.id)
+      !bridgeableTokens.some((t) => t.id === selectedToken.id)
     ) {
-      setSelectedToken(depositableBridgeTokens[0] || null);
+      setSelectedToken(depositableBridgeTokens[0] || nativeBridgeTokens[0] || null);
     }
 
     const currentExternal = (selectedToken?.externalToken || "").toLowerCase();
@@ -555,7 +563,9 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
     prevExternalTokenRef.current = currentExternal;
   }, [
     availableNetworks,
+    bridgeableTokens,
     depositableBridgeTokens,
+    nativeBridgeTokens,
     selectedNetwork,
     selectedToken,
     setSelectedNetwork,
@@ -590,6 +600,10 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         return;
       }
       if (chainId !== expectedChainId) {
+        if (!connector || typeof connector.getChainId !== "function") {
+          setNetworkError(`Please switch to ${selectedNetwork}`);
+          return;
+        }
         try {
           await switchChain({ chainId: expectedChainId });
           setNetworkError("");
@@ -601,7 +615,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       }
     };
     handleNetworkSwitch();
-  }, [chainId, fundingMode, hasExternalWallet, selectedNetwork, expectedChainId, switchChain]);
+  }, [chainId, connector, fundingMode, hasExternalWallet, selectedNetwork, expectedChainId, switchChain]);
 
   // Handlers
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
@@ -837,6 +851,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
 
     try {
       const activeChainId = currentNetwork.chainId;
+      const activeChainIdNumber = Number(activeChainId);
       const depositRouter = currentNetwork.depositRouter;
       const targetStratoToken = ensureHexPrefix(selectedToken.stratoToken);
       const depositAmount = safeParseUnits(
@@ -859,7 +874,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
           abi: ERC20_ABI,
           functionName: "approve",
           args: [representationBridge as `0x${string}`, depositAmount],
-          chain: await resolveViemChain(activeChainId),
+          chainId: activeChainIdNumber,
           account: externalSenderHex,
         });
 
@@ -878,7 +893,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             depositAmount,
             ensureHexPrefix(stratoRecipient) as `0x${string}`,
           ],
-          chain: await resolveViemChain(activeChainId),
+          chainId: activeChainIdNumber,
           account: externalSenderHex,
         });
 
@@ -1010,7 +1025,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
         setCurrentStep("confirm_tx");
       }
       const chain = await resolveViemChain(activeChainId);
-
       let txHash: `0x${string}`;
       if (isNative) {
         txHash = await writeContractAsync({
@@ -1268,19 +1282,30 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
             <CrossfadePanel active={fundingMode === "bridge"}>
               <div className="rounded-md border-2 border-border p-3 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Select value={(selectedToken?.externalToken || "").toLowerCase()}
+                  <Select value={
+                    selectedToken?.routeType === "native"
+                      ? `native:${selectedToken.id}`
+                      : (selectedToken?.externalToken || "").toLowerCase()
+                  }
                     onValueChange={(val) => {
-                      const match = depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
-                        || depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
+                      const match = val.startsWith("native:")
+                        ? nativeBridgeTokens.find((t) => `native:${t.id}` === val) || null
+                        : depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val && t.isDefaultRoute)
+                          || depositableBridgeTokens.find((t) => (t.externalToken || "").toLowerCase() === val) || null;
                       setSelectedToken(match);
                     }}
-                    disabled={!uniqueExternalTokens.length || guestMode || isLoading}>
+                    disabled={(!uniqueExternalTokens.length && !nativeBridgeTokens.length) || guestMode || isLoading}>
                     <SelectTrigger className="h-10 min-w-[120px] w-auto shrink-0 gap-1 rounded-md border-border text-sm font-semibold text-foreground px-2">
                       <SelectValue placeholder="Token" />
                     </SelectTrigger>
                     <SelectContent>
                       {uniqueExternalTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
                         <SelectItem key={t.externalToken} value={(t.externalToken || "").toLowerCase()}>
+                          {fundTokenLabel(t)}
+                        </SelectItem>
+                      ))}
+                      {nativeBridgeTokens.filter((t) => t.externalSymbol || t.externalName).map((t) => (
+                        <SelectItem key={t.id} value={`native:${t.id}`}>
                           {fundTokenLabel(t)}
                         </SelectItem>
                       ))}
