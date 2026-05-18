@@ -109,8 +109,7 @@ const App = () => {
 
     const fetchConfig = async () => {
       try {
-        const configData = await getConfig();
-        await initStratoChain(configData);
+        const [configData] = await Promise.all([getConfig(), initStratoChain()]);
         if (!cancelled) {
           setProjectId(configData.projectId ?? "PROJECT_ID_UNSET");
           if (configData.networkId) setNetworkId(String(configData.networkId));

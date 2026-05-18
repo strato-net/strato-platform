@@ -110,19 +110,22 @@ export async function ensureStratoChainInWallet(walletClient: WalletLike | null 
   }
 }
 
-export async function initStratoChain(configData?: { networkName?: string } | null): Promise<Chain | null> {
+export async function initStratoChain(): Promise<Chain | null> {
   if (_chain) return _chain;
   try {
-    const rpcRes = await fetch(rpcUrl || "/rpc", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
-    });
+    const [rpcRes, metaRes] = await Promise.all([
+      fetch(rpcUrl || "/rpc", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
+      }),
+      fetch("/api/config").then(r => r.json()).catch(() => null),
+    ]);
     const { result } = await rpcRes.json();
     if (!result) return null;
     _chainId = Number(result);
 
-    const networkName: string = configData?.networkName || "";
+    const networkName: string = metaRes?.data?.networkName || "";
     const isProduction = networkName === "upquark";
     const chainLabel = networkName ? `STRATO ${networkName}` : "STRATO";
     const explorerUrl = isProduction
