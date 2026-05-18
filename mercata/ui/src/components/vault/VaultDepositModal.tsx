@@ -21,7 +21,7 @@ import { useVaultContext } from "@/context/VaultContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits, parseUnits } from "ethers";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewardsContext } from "@/context/RewardsContext";
 
 const MIN_FIRST_DEPOSIT_USD = 50000;
 
@@ -57,7 +57,7 @@ const VaultDepositModal = ({ isOpen, onClose, onSuccess }: VaultDepositModalProp
 
   const { vaultState, deposit, refreshVault } = useVaultContext();
   const { toast } = useToast();
-  const { userRewards } = useRewardsUserInfo();
+  const { userRewards } = useRewardsContext();
 
   const {
     deficitAssets,

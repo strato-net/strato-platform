@@ -3,6 +3,7 @@ import { api } from "./axios";
 export interface ConfigData {
   projectId: string;
   networkId?: string;
+  networkName?: string;
   creditCardTopUpAddress?: string;
   featuredEarnOpportunity?: string;
   stripePublishableKey: string | null;

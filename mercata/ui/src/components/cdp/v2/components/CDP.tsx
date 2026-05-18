@@ -10,7 +10,7 @@ import BadDebtView from '../../BadDebtView';
 import LiquidationsView from '../../LiquidationsView';
 import { useCDP } from '@/context/CDPContext';
 import { useUserTokens } from '@/context/UserTokensContext';
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useRewardsContext } from "@/context/RewardsContext";
 
 const CDP = () => {
   const navigate = useNavigate();
@@ -19,7 +19,7 @@ const CDP = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const { refreshVaults } = useCDP();
   const { fetchTokens } = useUserTokens();
-  const { refetch: refetchRewards } = useRewardsUserInfo();
+  const { refetchUserRewards: refetchRewards } = useRewardsContext();
 
   const handleRefresh = useCallback(async () => {
     setRefreshKey(prev => prev + 1);

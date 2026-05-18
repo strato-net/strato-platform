@@ -10,7 +10,7 @@ import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
 import { useUser } from '@/context/UserContext';
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useRewardsContext } from "@/context/RewardsContext";
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import { safeParseUnits } from "@/utils/numberUtils";
 import { formatUnits } from "ethers";
@@ -36,7 +36,7 @@ const Advanced = () => {
   const { isLoggedIn, userAddress } = useUser();
   const { toast } = useToast();
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { userRewards, userRewardsLoading: rewardsLoading } = useRewardsContext();
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');

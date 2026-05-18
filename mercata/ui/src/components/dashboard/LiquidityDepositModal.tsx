@@ -18,7 +18,7 @@ import { usdstAddress, DEPOSIT_FEE } from "@/lib/constants";
 import { Pool, PoolCoin } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useRewardsContext } from "@/context/RewardsContext";
 import { isMultiTokenPool } from '@/helpers/swapCalculations';
 import EarnApyTooltip from '@/components/earn/EarnApyTooltip';
 import { BestApyInfoTooltip } from '@/components/earn/BestApyInfoTooltip';
@@ -74,7 +74,7 @@ const LiquidityDepositModal = ({
   const isMultiToken = useMemo(() => selectedPool ? isMultiTokenPool(selectedPool) : false, [selectedPool]);
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { userRewards, userRewardsLoading: rewardsLoading } = useRewardsContext();
   const { tokenApys } = useEarnContext();
   const selectedPoolApyInfo = useMemo(
     () => (selectedPool ? findPoolEarnApyInfo(tokenApys, selectedPool.address) : null),

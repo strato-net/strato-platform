@@ -15,7 +15,7 @@ import { Pool } from '@/interface';
 import { safeParseUnits, formatWeiAmount, formatUnits } from '@/utils/numberUtils';
 import { handleAmountInputChange, computeMaxTransferable } from '@/utils/transferValidation';
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useRewardsContext } from "@/context/RewardsContext";
 import { isMultiTokenPool } from '@/helpers/swapCalculations';
 
 interface WithdrawFormValues {
@@ -88,7 +88,7 @@ const LiquidityWithdrawModal = ({
 
   const isMultiToken = useMemo(() => selectedPool ? isMultiTokenPool(selectedPool) : false, [selectedPool]);
   const { toast } = useToast();
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { userRewards, userRewardsLoading: rewardsLoading } = useRewardsContext();
 
   const form = useForm<WithdrawFormValues>({
     defaultValues: {

@@ -9,19 +9,29 @@ export const WALLET_CONNECT_REQUEST_EVENT = 'mercata:wallet-connect-request';
 // Also returns the parsed user data when available so callers can avoid a
 // duplicate /user/me request (which would otherwise mask transient flags like
 // `isNewUser` that only appear on the first call after key creation).
-export const isAuthenticated = async (): Promise<{ authenticated: boolean; userData?: any }> => {
-  try {
-    const res = await fetch('/api/user/me', { credentials: 'include' });
-    if (!res.ok) return { authenticated: false };
+// Deduplicates concurrent in-flight calls so multiple callers (UserContext +
+// wagmi stratoWallet.isAuthorized) share one network request.
+let pendingProbe: Promise<{ authenticated: boolean; userData?: any }> | null = null;
+
+export const isAuthenticated = (): Promise<{ authenticated: boolean; userData?: any }> => {
+  if (pendingProbe) return pendingProbe;
+  pendingProbe = (async () => {
     try {
-      const userData = await res.json();
-      return { authenticated: true, userData };
+      const res = await fetch('/api/user/me', { credentials: 'include' });
+      if (!res.ok) return { authenticated: false };
+      try {
+        const userData = await res.json();
+        return { authenticated: true, userData };
+      } catch {
+        return { authenticated: true };
+      }
     } catch {
-      return { authenticated: true };
+      return { authenticated: false };
+    } finally {
+      pendingProbe = null;
     }
-  } catch {
-    return { authenticated: false };
-  }
+  })();
+  return pendingProbe;
 };
 
 // Logout function that redirects to external logout endpoint

@@ -13,7 +13,7 @@ import { computeTotalHeadroom } from '@/components/cdp/v2/cdpUtils';
 import type { VaultCandidate, Allocation, TransactionProgress, WEI } from '@/components/cdp/v2/cdpTypes';
 import { formatUnits } from 'ethers';
 import { formatNumberWithCommas, parseCommaNumber } from '@/utils/numberUtils';
-import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
+import { useRewardsContext } from "@/context/RewardsContext";
 import { RewardsWidget } from '@/components/rewards/RewardsWidget';
 import { requestWalletConnection } from '@/lib/auth';
 import EarnApyTooltip from '@/components/earn/EarnApyTooltip';
@@ -60,7 +60,7 @@ const Mint: React.FC<MintProps> = ({ onSuccess, refreshTrigger, guestMode = fals
   const { tokenApys } = useEarnContext();
   const { vaultState } = useVaultContext();
   const { activities: rewardsActivities } = useRewardsActivities();
-  const { userRewards } = useRewardsUserInfo();
+  const { userRewards } = useRewardsContext();
   // ============================================================================
   // State - UI Controls
   // ============================================================================

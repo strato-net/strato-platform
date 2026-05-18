@@ -1,7 +1,7 @@
 import { createConnector } from "wagmi";
 import { type WalletDetailsParams } from "@rainbow-me/rainbowkit";
 import { type Wallet } from "@rainbow-me/rainbowkit";
-import { redirectToLogin } from "@/lib/auth";
+import { redirectToLogin, isAuthenticated } from "@/lib/auth";
 import { type Address, type EIP1193Provider, type Hex, keccak256, toRlp } from "viem";
 import { getStratoChainId, rpcUrl } from "@/lib/stratoChain";
 
@@ -168,11 +168,9 @@ function stratoConnector(walletDetails: Record<string, unknown> = {}) {
     async isAuthorized() {
       if (currentAddress) return true;
       try {
-        const res = await fetch("/api/user/me", { credentials: "include" });
-        if (!res.ok) return false;
-        const data = await res.json();
-        const addr = data.userAddress as Address;
-        if (!addr) return false;
+        const { authenticated, userData } = await isAuthenticated();
+        if (!authenticated || !userData?.userAddress) return false;
+        const addr = userData.userAddress as Address;
         const chainId = getStratoChainId();
         if (!chainId) return false;
         currentAddress = addr;
