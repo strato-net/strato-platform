@@ -23,10 +23,10 @@ interface DashboardHeaderProps {
 const GRADIENT_BUTTON_CLASS = "w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
 
 const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
-  const { userAddress, userName, logout, isLoggedIn } = useUser();
+  const { logout, isLoggedIn } = useUser();
   const { isTestnet } = useNetwork();
   const { resolvedTheme } = useTheme();
-  const { address: walletAddress, isConnected } = useAccount();
+  const { address: walletAddress, isConnected, connector } = useAccount();
   const { disconnect } = useDisconnect();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -105,67 +105,26 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
         {isLoggedIn && <LiquidationNotification />}
         <ModeToggle />
         
-        {userName ? (
+        {isConnected ? (
           <Popover>
             <PopoverTrigger asChild>
-              <button className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#1e2a4a] flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
+              <button className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity ${connector?.id === 'stratoWallet' ? 'bg-[#1e2a4a]' : 'bg-[#f6851b]'}`}>
                 <span className="text-white text-xs md:text-sm font-semibold">
-                  {userName.slice(0, 2).toUpperCase()}
+                  {connector?.id === 'stratoWallet' ? 'ST' : 'MM'}
                 </span>
               </button>
             </PopoverTrigger>
-            
+
             <PopoverContent className="w-64 md:w-72 p-3 md:p-4" align="end">
               <div className="space-y-3 md:space-y-4">
-                {/* User Info */}
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#1e2a4a] flex items-center justify-center shrink-0">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${connector?.id === 'stratoWallet' ? 'bg-[#1e2a4a]' : 'bg-[#f6851b]'}`}>
                     <span className="text-white text-sm font-semibold">
-                      {userName?.slice(0, 2).toUpperCase() || "NA"}
+                      {connector?.id === 'stratoWallet' ? 'ST' : 'MM'}
                     </span>
                   </div>
                   <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{userName || "N/A"}</p>
-                    <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground font-mono">
-                      <span className="truncate">{truncateAddress(userAddress, 8, 4)}</span>
-                      <button onClick={() => copyAddress(userAddress, 'User')} className="hover:text-foreground shrink-0">
-                        <Copy size={10} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Logout */}
-                <div className="border-t pt-3">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={logout} 
-                    className="w-full h-9 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 justify-start gap-2"
-                  >
-                    <LogOutIcon size={16} />
-                    <span className="text-sm font-medium">Logout</span>
-                  </Button>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        ) : isConnected ? (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#f6851b] flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity">
-                <span className="text-white text-xs md:text-sm font-semibold">MM</span>
-              </button>
-            </PopoverTrigger>
-
-            <PopoverContent className="w-64 md:w-72 p-3 md:p-4" align="end">
-              <div className="space-y-3 md:space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#f6851b] flex items-center justify-center shrink-0">
-                    <span className="text-white text-sm font-semibold">MM</span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">External Wallet</p>
+                    <p className="font-medium text-sm truncate">{connector?.id === 'stratoWallet' ? 'STRATO Wallet' : 'External Wallet'}</p>
                     <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-muted-foreground font-mono">
                       <span className="truncate">{truncateAddress(walletAddress, 8, 4)}</span>
                       <button onClick={() => copyAddress(walletAddress, 'Wallet')} className="hover:text-foreground shrink-0">
@@ -176,9 +135,21 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
                 </div>
 
                 <div className="border-t pt-3">
-                  <Button onClick={() => disconnect()} size="sm" className={`${GRADIENT_BUTTON_CLASS} h-8 text-xs`}>
-                    Disconnect Wallet
-                  </Button>
+                  {connector?.id === 'stratoWallet' ? (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={logout} 
+                      className="w-full h-9 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 justify-start gap-2"
+                    >
+                      <LogOutIcon size={16} />
+                      <span className="text-sm font-medium">Logout</span>
+                    </Button>
+                  ) : (
+                    <Button onClick={() => disconnect()} size="sm" className={`${GRADIENT_BUTTON_CLASS} h-8 text-xs`}>
+                      Disconnect Wallet
+                    </Button>
+                  )}
                 </div>
               </div>
             </PopoverContent>
