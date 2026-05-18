@@ -276,21 +276,131 @@ contract Describe_StratoNativeBridge is Authorizable {
     }
 
     function it_native_abort_withdrawal_unlocks_back_to_sender_for_whitelisted_relayer() {
-        require(address(user1) != address(0), "User1 helper should exist");
-        require(address(user2) != address(0), "User2 helper should exist");
-        require(address(relayer) != address(0), "Relayer helper should exist");
+        uint256 user1BalanceBefore = IERC20(nativeTokenAddress).balanceOf(address(user1));
+
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 withdrawalId = user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        );
+
+        require(
+            IERC20(nativeTokenAddress).balanceOf(address(user1)) == user1BalanceBefore - 50e18,
+            "Sender balance should decrease by locked amount"
+        );
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 50e18, "Vault should lock requested amount");
+
+        relayer.do(nativeBridgeAddress, "abortWithdrawal", withdrawalId);
+
+        (BridgeStatus abortedStatus,,,,,,,,,,,) = nativeBridge.getWithdrawalInfo(withdrawalId);
+        require(abortedStatus == BridgeStatus.ABORTED, "Withdrawal should be aborted by whitelisted relayer");
+        require(
+            IERC20(nativeTokenAddress).balanceOf(address(user1)) == user1BalanceBefore,
+            "Aborted withdrawal should return funds to original sender"
+        );
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 0, "Vault locked balance should be released on abort");
     }
 
     function it_native_deposit_review_then_confirm_unlocks_to_recipient() {
-        require(externalChainId == 1, "Expected seeded external chain id");
-        require(externalBridge == address(0x3333), "Expected seeded external bridge");
-        require(externalRedemptionId == 7, "Expected seeded external redemption id");
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 100e18);
+        user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            100e18
+        );
+
+        uint256 recipientBalanceBefore = IERC20(nativeTokenAddress).balanceOf(address(user2));
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 100e18, "Vault should be pre-seeded by withdrawal");
+
+        relayer.do(
+            nativeBridgeAddress,
+            "recordDeposit",
+            externalChainId,
+            externalBridge,
+            externalRedemptionId,
+            externalSender,
+            externalTxHash,
+            representationToken,
+            address(user2),
+            60e18
+        );
+
+        string depositId = nativeBridge.getDepositId(externalChainId, externalBridge, externalRedemptionId);
+        (BridgeStatus initiatedStatus,,,,,,,,,,) = nativeBridge.getDepositInfo(depositId);
+        require(initiatedStatus == BridgeStatus.INITIATED, "Recorded deposit should be initiated");
+
+        relayer.do(nativeBridgeAddress, "reviewDeposit", externalChainId, externalBridge, externalRedemptionId);
+
+        (BridgeStatus reviewedStatus,,,,,,,,,,) = nativeBridge.getDepositInfo(depositId);
+        require(reviewedStatus == BridgeStatus.PENDING_REVIEW, "Reviewed deposit should be pending review");
+
+        relayer.do(nativeBridgeAddress, "confirmDeposit", externalChainId, externalBridge, externalRedemptionId);
+
+        (BridgeStatus confirmedStatus,,,,,,,,,,) = nativeBridge.getDepositInfo(depositId);
+        require(confirmedStatus == BridgeStatus.COMPLETED, "Confirmed deposit should be completed");
+        require(
+            IERC20(nativeTokenAddress).balanceOf(address(user2)) == recipientBalanceBefore + 60e18,
+            "Recipient should receive unlocked amount"
+        );
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 40e18, "Vault locked balance should reflect unlock");
     }
 
     function it_native_deposit_rejects_duplicate_normalized_external_tx_hash() {
-        require(externalRecipient == address(0x2222), "Expected seeded external recipient");
-        require(externalSender == address(0x1111), "Expected seeded external sender");
-        require(representationToken == address(0x5555), "Expected seeded representation token");
+        relayer.do(
+            nativeBridgeAddress,
+            "recordDeposit",
+            externalChainId,
+            externalBridge,
+            externalRedemptionId,
+            externalSender,
+            externalTxHash,
+            representationToken,
+            address(user2),
+            10e18
+        );
+
+        bool reverted = false;
+        try relayer.do(
+            nativeBridgeAddress,
+            "recordDeposit",
+            externalChainId,
+            externalBridge,
+            externalRedemptionId,
+            externalSender,
+            externalTxHash,
+            representationToken,
+            address(user2),
+            10e18
+        ) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Duplicate (chainId, bridge, redemptionId) should be rejected");
+
+        reverted = false;
+        try relayer.do(
+            nativeBridgeAddress,
+            "recordDeposit",
+            externalChainId,
+            externalBridge,
+            externalRedemptionId,
+            externalSender,
+            "0xDEADBEEF",
+            representationToken,
+            address(user2),
+            10e18
+        ) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Duplicate depositId should be rejected even with a different tx hash");
     }
 
     function it_native_deposit_requires_matching_external_bridge_route() {
@@ -313,6 +423,97 @@ contract Describe_StratoNativeBridge is Authorizable {
         }
 
         require(reverted, "Deposit should revert for unexpected external bridge");
+    }
+
+    function it_native_setPause_rejects_non_owner_non_guardian() {
+        bool reverted = false;
+        try relayer.do(nativeBridgeAddress, "setPause", true, false) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Bridge operator should not be allowed to pause");
+
+        reverted = false;
+        try user1.do(nativeBridgeAddress, "setPause", true, false) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Random user should not be allowed to pause");
+    }
+
+    function it_native_setPause_guardian_can_pause_but_cannot_unpause() {
+        nativeBridge.setPause(true, true);
+        require(nativeBridge.depositsPaused(), "Guardian should pause deposits");
+        require(nativeBridge.withdrawalsPaused(), "Guardian should pause withdrawals");
+
+        bool reverted = false;
+        try {
+            nativeBridge.setPause(false, false);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Guardian should not be able to unpause");
+        require(nativeBridge.depositsPaused(), "Deposits should remain paused after failed unpause");
+        require(nativeBridge.withdrawalsPaused(), "Withdrawals should remain paused after failed unpause");
+    }
+
+    function it_native_paused_state_blocks_user_and_operator_flows() {
+        nativeBridge.setPause(true, true);
+
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+
+        bool withdrawalReverted = false;
+        try user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        ) {
+        } catch {
+            withdrawalReverted = true;
+        }
+        require(withdrawalReverted, "Paused withdrawals should block requestWithdrawal");
+
+        bool depositReverted = false;
+        try relayer.do(
+            nativeBridgeAddress,
+            "recordDeposit",
+            externalChainId,
+            externalBridge,
+            externalRedemptionId,
+            externalSender,
+            externalTxHash,
+            representationToken,
+            address(user2),
+            10e18
+        ) {
+        } catch {
+            depositReverted = true;
+        }
+        require(depositReverted, "Paused deposits should block recordDeposit");
+    }
+
+    function it_native_custody_vault_paused_blocks_lock_and_unlock() {
+        custodyVault.setPause(true);
+        require(custodyVault.paused(), "Guardian should pause vault");
+
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+
+        bool lockReverted = false;
+        try user1.do(
+            nativeBridgeAddress,
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            nativeTokenAddress,
+            50e18
+        ) {
+        } catch {
+            lockReverted = true;
+        }
+        require(lockReverted, "Paused vault should reject lock from bridge");
     }
 
     function it_native_bridge_proxy_upgrade_preserves_state() {
