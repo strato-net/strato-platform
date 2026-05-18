@@ -182,21 +182,20 @@ export const computeVaultPerformanceMetrics = async (
     const startDateObj = new Date(startDate + "T00:00:00Z");
     const actualDays = Math.max((now.getTime() - startDateObj.getTime()) / (24 * 60 * 60 * 1000), 1);
 
-    const { data: histStorage } = await cirrus.get(accessToken, "/history@storage", {
-      params: {
-        address: `eq.${shareTokenAddress}`,
-        valid_from: `lte.${startDate}`,
-        valid_to: `gte.${startDate}`,
-        select: "data",
-      },
-    });
-    const histTotalSupply = safeBigInt(histStorage?.[0]?.data?._totalSupply);
-    if (histTotalSupply <= 0n) return noData;
-
-    const [histBalances, histPrices] = await Promise.all([
+    const [{ data: histStorage }, histBalances, histPrices] = await Promise.all([
+      cirrus.get(accessToken, "/history@storage", {
+        params: {
+          address: `eq.${shareTokenAddress}`,
+          valid_from: `lte.${startDate}`,
+          valid_to: `gte.${startDate}`,
+          select: "data",
+        },
+      }),
       getHistoricalTokenBalances(accessToken, supportedAssets, botExecutor, startDate),
       getHistoricalAssetPrices(accessToken, priceOracleAddress, supportedAssets, startDate),
     ]);
+    const histTotalSupply = safeBigInt(histStorage?.[0]?.data?._totalSupply);
+    if (histTotalSupply <= 0n) return noData;
 
     let histEquity = 0n;
     let hodlEquity = 0n;

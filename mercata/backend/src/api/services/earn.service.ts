@@ -47,9 +47,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const ctx = parsePhase1(phase1, vaultAddr, rewAddr, saveUsdstVault);
   const phase1b = await fetchPhase1b(accessToken, ctx, saveUsdstVault);
 
-  const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, ctx.prices).catch(
-    () => new Map<string, string>(),
-  );
+  const carryVaultUsdPriceMap = getCarryVaultUsdPriceMap(ctx.prices);
   const rewardActivities = buildRewardActivitiesFromMappings(
     ctx.rewardActivityCfgById, ctx.rewardActivityStateById, {
       priceMap: ctx.prices,

@@ -221,6 +221,46 @@ const inferStakeUsdInfo = (
   return empty;
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRICING CONTEXT CACHE — 30 s TTL, shared across all rewards endpoints
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type PricingCtx = {
+  priceMap: Map<string, string>;
+  mTokenAddress: string | null;
+  sTokenAddress: string | null;
+  vaultShareTokenAddress: string | null;
+  carryVaultUsdPriceMap: Map<string, string>;
+};
+
+let _pricingCtxCache: { ctx: PricingCtx; expiry: number } | null = null;
+const PRICING_CTX_TTL = 30_000;
+
+const buildPricingCtx = async (accessToken: string, forceRefresh: boolean = false): Promise<PricingCtx> => {
+  if (!forceRefresh && _pricingCtxCache && Date.now() < _pricingCtxCache.expiry) {
+    return _pricingCtxCache.ctx;
+  }
+
+  const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
+    getCompletePriceMap(accessToken),
+    getMTokenAddress(accessToken),
+    getVaultShareTokenAddress(accessToken).catch(() => ""),
+  ]);
+  const carryVaultUsdPriceMap = getCarryVaultUsdPriceMap(priceMap);
+  const { sToken } = getSafetyModuleConfig();
+
+  const ctx: PricingCtx = {
+    priceMap,
+    mTokenAddress,
+    sTokenAddress: sToken.address || null,
+    vaultShareTokenAddress: vaultShareTokenAddress || null,
+    carryVaultUsdPriceMap,
+  };
+
+  _pricingCtxCache = { ctx, expiry: Date.now() + PRICING_CTX_TTL };
+  return ctx;
+};
+
 /**
  * Get rewards contract address or throw error
  */
@@ -423,29 +463,14 @@ export const fetchUserActivities = async (
 
     const activityIds = activities.map((a: any) => a.activityId);
 
-    const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap, bonusResult] = await Promise.all([
+    const [activityStatesMap, userInfoMap, unclaimedRewards, claimedRewardsMap, bonusResult, pricingCtx] = await Promise.all([
       fetchActivityStates(accessToken, rewardsAddress, forceRefresh),
       fetchUserInfo(accessToken, rewardsAddress, normalizedUserAddress, activityIds, forceRefresh),
       fetchUnclaimedRewards(accessToken, rewardsAddress, normalizedUserAddress, forceRefresh),
       fetchClaimedRewards(accessToken, rewardsAddress),
-      fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress)
+      fetchBonusRewards(accessToken, rewardsAddress, normalizedUserAddress),
+      buildPricingCtx(accessToken, forceRefresh),
     ]);
-
-    // Build shared pricing context once (used for LP/share-token TVL conversions)
-    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
-      getCompletePriceMap(accessToken),
-      getMTokenAddress(accessToken),
-      getVaultShareTokenAddress(accessToken).catch(() => ""),
-    ]);
-    const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, priceMap);
-    const { sToken } = getSafetyModuleConfig();
-    const pricingCtx = {
-      priceMap,
-      mTokenAddress,
-      sTokenAddress: sToken.address || null,
-      vaultShareTokenAddress: vaultShareTokenAddress || null,
-      carryVaultUsdPriceMap,
-    };
 
     // Combine all data
     const userActivities = await Promise.all(activities.map(async (activity: any) => {
@@ -536,21 +561,7 @@ export const fetchAllActivities = async (
       return [];
     }
 
-    // Build shared pricing context once (used for LP/share-token TVL conversions)
-    const [priceMap, mTokenAddress, vaultShareTokenAddress] = await Promise.all([
-      getCompletePriceMap(accessToken),
-      getMTokenAddress(accessToken),
-      getVaultShareTokenAddress(accessToken).catch(() => ""),
-    ]);
-    const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, priceMap);
-    const { sToken } = getSafetyModuleConfig();
-    const pricingCtx = {
-      priceMap,
-      mTokenAddress,
-      sTokenAddress: sToken.address || null,
-      vaultShareTokenAddress: vaultShareTokenAddress || null,
-      carryVaultUsdPriceMap,
-    };
+    const pricingCtx = await buildPricingCtx(accessToken, forceRefresh);
 
     // Combine activities with their states
     const enriched = await Promise.all(activities.map(async (activity: any) => {

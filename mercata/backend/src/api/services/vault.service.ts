@@ -9,6 +9,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
+import { computeVaultPerformanceMetrics } from "../helpers/vaultPerformance.helper";
 
 const {
   Vault,
@@ -337,206 +338,6 @@ const getBatchPrices = async (
   return result;
 };
 
-/**
- * Get historical token balance for an address at a specific date
- */
-const getHistoricalTokenBalance = async (
-  accessToken: string,
-  tokenAddress: string,
-  holderAddress: string,
-  date: string // Format: YYYY-MM-DD
-): Promise<string> => {
-  try {
-    const { data } = await cirrus.get(accessToken, "/history@mapping", {
-      params: {
-        select: "value::text",
-        address: `eq.${tokenAddress}`,
-        collection_name: "eq._balances",
-        "key->>key": `eq.${holderAddress}`,
-        valid_from: `lte.${date}`,
-        valid_to: `gte.${date}`,
-      },
-    });
-
-    const value = data?.[0]?.value;
-    // Ensure we always return a valid number string, never empty
-    if (!value || value === "") return "0";
-    return value;
-  } catch (error) {
-    console.error(`Error fetching historical balance for ${tokenAddress}:`, error);
-    return "0";
-  }
-};
-
-/**
- * Get historical price for an asset at a specific date
- */
-const getHistoricalAssetPrice = async (
-  accessToken: string,
-  oracleAddress: string,
-  assetAddress: string,
-  date: string // Format: YYYY-MM-DD
-): Promise<string> => {
-  try {
-    const { data } = await cirrus.get(accessToken, "/history@mapping", {
-      params: {
-        select: "value::text",
-        address: `eq.${oracleAddress}`,
-        collection_name: "eq.prices",
-        "key->>key": `eq.${assetAddress}`,
-        valid_from: `lte.${date}`,
-        valid_to: `gte.${date}`,
-      },
-    });
-
-    const value = data?.[0]?.value;
-    // Ensure we always return a valid number string, never empty
-    if (!value || value === "") return "0";
-    return value;
-  } catch (error) {
-    console.error(`Error fetching historical price for ${assetAddress}:`, error);
-    return "0";
-  }
-};
-
-/**
- * Get the first deposit timestamp for the vault
- */
-const getFirstDepositDate = async (
-  accessToken: string,
-  vaultAddress: string
-): Promise<{ date: string; timestamp: Date } | null> => {
-  try {
-    const { data: depositEvents } = await cirrus.get(accessToken, `/${Vault}-Deposited`, {
-      params: {
-        select: "block_timestamp",
-        address: `eq.${vaultAddress}`,
-        order: "block_timestamp.asc",
-        limit: "1",
-      },
-    });
-
-    if (!depositEvents?.length || !depositEvents[0]?.block_timestamp) {
-      return null;
-    }
-
-    const timestamp = new Date(depositEvents[0].block_timestamp);
-    const date = timestamp.toISOString().split("T")[0]; // YYYY-MM-DD
-    return { date, timestamp };
-  } catch (error) {
-    console.error("Error fetching first deposit date:", error);
-    return null;
-  }
-};
-
-/**
- * Get vault performance metrics using time-weighted return (TWR) via NAV/share.
- * Returns both the vault APY and the alpha (outperformance vs HODL benchmark).
- * Alpha = vaultAPY - hodlAPY, where HODL reprices historical balances at current prices.
- */
-const getPerformanceMetrics = async (
-  accessToken: string,
-  vaultAddress: string,
-  currentEquity: bigint,
-  currentTotalShares: bigint,
-  shareTokenAddress: string,
-  botExecutor: string,
-  priceOracleAddress: string,
-  supportedAssets: string[],
-  currentPrices: Map<string, string>
-): Promise<{ apy: string; alpha: string }> => {
-  const noData = { apy: "-", alpha: "-" };
-  try {
-    if (currentTotalShares <= 0n || currentEquity <= 0n) return noData;
-
-    const currentNAV = (currentEquity * WAD) / currentTotalShares;
-
-    const firstDeposit = await getFirstDepositDate(accessToken, vaultAddress);
-    if (!firstDeposit) return noData;
-
-    const now = new Date();
-    const dayAfterFirstDeposit = new Date(firstDeposit.timestamp.getTime() + 24 * 60 * 60 * 1000);
-    const earliestStartDate = dayAfterFirstDeposit.toISOString().split("T")[0];
-    const todayStr = now.toISOString().split("T")[0];
-
-    if (earliestStartDate >= todayStr) return noData;
-
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const startDate = thirtyDaysAgo >= dayAfterFirstDeposit
-      ? thirtyDaysAgo.toISOString().split("T")[0]
-      : earliestStartDate;
-
-    const startDateObj = new Date(startDate + "T00:00:00Z");
-    const actualDays = Math.max((now.getTime() - startDateObj.getTime()) / (24 * 60 * 60 * 1000), 1);
-
-    // Historical total supply
-    const { data: histStorage } = await cirrus.get(accessToken, "/history@storage", {
-      params: {
-        address: `eq.${shareTokenAddress}`,
-        valid_from: `lte.${startDate}`,
-        valid_to: `gte.${startDate}`,
-        select: "data",
-      },
-    });
-    const histTotalSupply = safeBigInt(histStorage?.[0]?.data?._totalSupply);
-    if (histTotalSupply <= 0n) return noData;
-
-    // Fetch all historical balances and prices in parallel
-    const [histBalances, histPrices] = await Promise.all([
-      Promise.all(supportedAssets.map(addr =>
-        getHistoricalTokenBalance(accessToken, addr, botExecutor, startDate)
-      )),
-      Promise.all(supportedAssets.map(addr =>
-        getHistoricalAssetPrice(accessToken, priceOracleAddress, addr, startDate)
-      )),
-    ]);
-
-    let histEquity = 0n;
-    let hodlEquity = 0n;
-
-    for (let i = 0; i < supportedAssets.length; i++) {
-      const histBalanceBN = safeBigInt(histBalances[i]);
-      const histPriceBN = safeBigInt(histPrices[i]);
-
-      if (histPriceBN > 0n) {
-        histEquity += (histBalanceBN * histPriceBN) / WAD;
-      }
-
-      const currentPriceBN = safeBigInt(currentPrices.get(supportedAssets[i]));
-      if (currentPriceBN > 0n) {
-        hodlEquity += (histBalanceBN * currentPriceBN) / WAD;
-      }
-    }
-
-    if (histEquity <= 0n) return noData;
-
-    // Vault APY (NAV-based TWR)
-    const histNAV = (histEquity * WAD) / histTotalSupply;
-    if (histNAV <= 0n) return noData;
-
-    const vaultReturn = Number(((currentNAV - histNAV) * WAD) / histNAV) / 1e18;
-    if (vaultReturn <= -1) return noData;
-
-    const vaultApy = Math.pow(1 + vaultReturn, 365 / actualDays) - 1;
-
-    // HODL APY (passive benchmark)
-    const hodlReturn = Number(((hodlEquity - histEquity) * WAD) / histEquity) / 1e18;
-    const hodlApy = hodlReturn <= -1 ? -1 : Math.pow(1 + hodlReturn, 365 / actualDays) - 1;
-
-    // Alpha = vault outperformance vs HODL
-    const alpha = vaultApy - hodlApy;
-
-    return {
-      apy: (vaultApy * 100).toFixed(2),
-      alpha: (alpha * 100).toFixed(2),
-    };
-  } catch (error) {
-    console.error("Error calculating performance metrics:", error);
-    return noData;
-  }
-};
-
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // PUBLIC SERVICE FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -786,8 +587,7 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     navPerShare = ((totalEquity * WAD) / totalSharesBN).toString();
   }
 
-  // Calculate APY and alpha vs HODL
-  const { apy, alpha } = await getPerformanceMetrics(
+  const { apy, alpha } = await computeVaultPerformanceMetrics(
     accessToken,
     vaultAddress,
     totalEquity,
