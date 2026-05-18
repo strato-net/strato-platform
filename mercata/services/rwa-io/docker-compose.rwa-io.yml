@@ -1,10 +1,9 @@
-#rwa-io-version:<VERSION>
 services:
   rwa-io:
     environment:
     - RWA_IO_API_KEY=${RWA_IO_API_KEY}
     build: .
-    image: ${RWA_IO_IMAGE:-<REPO_URL>mercata-rwa-io-adapter:<VERSION>-<HASH_RWA_IO_ADAPTER>}
+    image: mercata-rwa-io-adapter
     restart: unless-stopped
     logging:
       driver: "json-file"

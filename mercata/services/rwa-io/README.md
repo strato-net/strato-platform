@@ -15,11 +15,10 @@ Optional overrides for the STRATO endpoint and cron schedule live in `src/config
 ## Running standalone
 
 ```sh
+cd mercata/services/rwa-io
 export RWA_IO_API_KEY=...
-docker compose -f docker-compose.rwa-io.yml up -d
+docker compose -f docker-compose.rwa-io.yml up -d --build
 ```
-
-(`docker-compose.rwa-io.yml` is generated from `docker-compose.rwa-io.tpl.yml` by `make docker-compose`. To build the image first: `make rwa-io-adapter` or `make rwa-io-adapter-force`.)
 
 ## Local development
 
