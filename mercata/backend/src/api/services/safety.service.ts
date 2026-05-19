@@ -55,6 +55,9 @@ const getSafetyExchangeRate = (totalAssets: bigint, totalShares: bigint): bigint
   return (totalAssets * WAD) / totalShares;
 };
 
+let _safetyApyCache: { apy: string; expiry: number } | null = null;
+const SAFETY_APY_TTL = 60_000;
+
 const getSafetyApy = async (
   accessToken: string,
   safetyModuleAddress: string,
@@ -62,6 +65,9 @@ const getSafetyApy = async (
   totalSharesNow: bigint
 ): Promise<string> => {
   if (!safetyModuleAddress) return "-";
+  if (_safetyApyCache && Date.now() < _safetyApyCache.expiry) {
+    return _safetyApyCache.apy;
+  }
 
   const nowMs = Date.now();
   const thirtyDaysAgoMs = nowMs - THIRTY_DAYS_MS;
@@ -140,8 +146,13 @@ const getSafetyApy = async (
   const apy = (Math.pow(1 + periodReturn, 365 / lookbackDays) - 1) * 100;
   if (!Number.isFinite(apy)) return "-";
 
-  return apy.toFixed(2);
+  const result = apy.toFixed(2);
+  _safetyApyCache = { apy: result, expiry: Date.now() + SAFETY_APY_TTL };
+  return result;
 };
+
+const _safetyFlowCache = new Map<string, { data: { totalDepositedUsd: bigint; totalWithdrawnUsd: bigint }; expiry: number }>();
+const SAFETY_FLOW_TTL = 60_000;
 
 const getSafetyUserFlowTotals = async (
   accessToken: string,
@@ -156,6 +167,12 @@ const getSafetyUserFlowTotals = async (
 
   if (!safetyModuleAddress || !normalizedUser) {
     return { totalDepositedUsd, totalWithdrawnUsd };
+  }
+
+  const cacheKey = `${safetyModuleAddress}:${normalizedUser}`;
+  const cached = _safetyFlowCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.data;
   }
 
   try {
@@ -200,7 +217,9 @@ const getSafetyUserFlowTotals = async (
     console.warn("Failed to compute safety flow totals:", error);
   }
 
-  return { totalDepositedUsd, totalWithdrawnUsd };
+  const result = { totalDepositedUsd, totalWithdrawnUsd };
+  _safetyFlowCache.set(cacheKey, { data: result, expiry: Date.now() + SAFETY_FLOW_TTL });
+  return result;
 };
 
 interface SafetyModuleInfo {
@@ -362,6 +381,9 @@ export const getPublicSafetyModuleInfo = async (
   }
 };
 
+let _safetyPoolCache: { safetyModuleData: any[]; sTokenTotalSupply: any[]; expiry: number } | null = null;
+const SAFETY_POOL_TTL = 30_000;
+
 export const getSafetyModuleInfo = async (
   accessToken: string,
   userAddress: string
@@ -371,88 +393,37 @@ export const getSafetyModuleInfo = async (
   const sTokenAddress = safetyModuleConfig.sToken.address;
 
   try {
-    // Note: We need to query multiple sources for complete SafetyModule data:
-    // 1. SafetyModule contract config and _managedAssets (COOLDOWN_SECONDS, UNSTAKE_WINDOW, _managedAssets, etc.)
-    // 2. sToken totalSupply (this is totalShares)
-    // 3. User's sToken balance
-    // 4. User's cooldown start time
-    
-    let safetyModuleData: any[] = [];
-    let sTokenTotalSupply: any[] = [];
-    let userTokenBalance: any[] = [];
-    let cooldownData: any[] = [];
+    let safetyModuleData: any[];
+    let sTokenTotalSupply: any[];
 
-    try {
-      // Query SafetyModule contract configuration and _managedAssets
-      const response1 = await cirrus.get(
-        accessToken,
-        `/BlockApps-SafetyModule`,
-        {
-          params: {
-            address: `eq.${safetyModuleAddress}`,
-            select: "*,_managedAssets::text"
-          }
-        }
-      );
-      safetyModuleData = response1.data || [];
-    } catch (error) {
-      console.warn("SafetyModule contract not found or not deployed:", error);
+    if (_safetyPoolCache && Date.now() < _safetyPoolCache.expiry) {
+      safetyModuleData = _safetyPoolCache.safetyModuleData;
+      sTokenTotalSupply = _safetyPoolCache.sTokenTotalSupply;
+    } else {
+      [safetyModuleData, sTokenTotalSupply] = await Promise.all([
+        cirrus.get(accessToken, `/BlockApps-SafetyModule`, {
+          params: { address: `eq.${safetyModuleAddress}`, select: "*,_managedAssets::text" },
+        }).then(r => r.data || []).catch(() => []),
+        cirrus.get(accessToken, `/BlockApps-Token`, {
+          params: { address: `eq.${sTokenAddress}`, select: "_totalSupply::text" },
+        }).then(r => r.data || []).catch(() => []),
+      ]);
+      _safetyPoolCache = { safetyModuleData, sTokenTotalSupply, expiry: Date.now() + SAFETY_POOL_TTL };
     }
 
-    try {
-      // Query sToken total supply (this represents totalShares)
-      const response2 = await cirrus.get(
-        accessToken,
-        `/BlockApps-Token`,
-        {
-          params: {
-            address: `eq.${sTokenAddress}`,
-            select: "_totalSupply::text"
-          }
-        }
-      );
-      sTokenTotalSupply = response2.data || [];
-    } catch (error) {
-      console.warn("sToken total supply query failed:", error);
-    }
+    const [userTokenBalance, cooldownData] = await Promise.all([
+      cirrus.get(accessToken, `/BlockApps-Token`, {
+        params: {
+          address: `eq.${sTokenAddress}`,
+          select: `address,balances:BlockApps-Token-_balances(user:key,balance:value::text)`,
+          "balances.key": `eq.${userAddress.toLowerCase()}`,
+        },
+      }).then(r => r.data?.[0]?.balances || []).catch(() => []),
+      cirrus.get(accessToken, `/BlockApps-SafetyModule-cooldownStart`, {
+        params: { key: `eq.${userAddress.toLowerCase()}`, select: "value::text" },
+      }).then(r => r.data || []).catch(() => []),
+    ]);
 
-    try {
-      // Query user's sUSDST token balance using nested relationship pattern
-      const response3 = await cirrus.get(
-        accessToken,
-        `/BlockApps-Token`,
-        {
-          params: {
-            address: `eq.${sTokenAddress}`,
-            select: `address,balances:BlockApps-Token-_balances(user:key,balance:value::text)`,
-            "balances.key": `eq.${userAddress.toLowerCase()}`
-          }
-        }
-      );
-      const tokenData = response3.data || [];
-      userTokenBalance = tokenData?.[0]?.balances || [];
-    } catch (error) {
-      console.warn("sUSDST token balance query failed:", error);
-    }
-
-    try {
-      // Query user's cooldown start from SafetyModule
-      const response4 = await cirrus.get(
-        accessToken,
-        `/BlockApps-SafetyModule-cooldownStart`,
-        {
-          params: {
-            key: `eq.${userAddress.toLowerCase()}`,
-            select: "value::text"
-          }
-        }
-      );
-      cooldownData = response4.data || [];
-    } catch (error) {
-      console.warn("SafetyModule cooldown data query failed:", error);
-    }
-
-    // Extract data from responses
     const safetyModule = safetyModuleData?.[0] || {};
     
     // Get totalAssets from SafetyModule's _managedAssets state variable

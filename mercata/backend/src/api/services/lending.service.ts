@@ -76,6 +76,9 @@ const parseBigIntLike = (value: unknown): bigint => {
   }
 };
 
+const _userFlowCache = new Map<string, { data: { totalDepositedUsd: bigint; totalWithdrawnUsd: bigint }; expiry: number }>();
+const USER_FLOW_CACHE_TTL = 60_000;
+
 const getLendingUserFlowTotals = async (
   accessToken: string,
   lendingPoolAddress: string,
@@ -89,6 +92,12 @@ const getLendingUserFlowTotals = async (
 
   if (!lendingPoolAddress || !normalizedUser) {
     return { totalDepositedUsd, totalWithdrawnUsd };
+  }
+
+  const cacheKey = `${lendingPoolAddress}:${normalizedUser}`;
+  const cached = _userFlowCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.data;
   }
 
   try {
@@ -134,7 +143,9 @@ const getLendingUserFlowTotals = async (
     console.warn("Failed to compute lending flow totals:", error);
   }
 
-  return { totalDepositedUsd, totalWithdrawnUsd };
+  const result = { totalDepositedUsd, totalWithdrawnUsd };
+  _userFlowCache.set(cacheKey, { data: result, expiry: Date.now() + USER_FLOW_CACHE_TTL });
+  return result;
 };
 
 
@@ -669,16 +680,22 @@ export const liquidityAndBalance = async (
     throw new Error("Lending pool, borrowable asset, or mToken not found");
   }
 
-  // Fetch token metadata with balances included
-  const tokenData = await getTokens(accessToken, {
-    address: `in.(${borrowableAsset},${mToken})`,
-    select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
-    "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
-  });
+  // Parallel: token metadata + exchange rate + user flow totals
+  const [{ data: tokenRows }, exchangeRate, flowTotals] = await Promise.all([
+    cirrus.get(accessToken, `/${Token}`, {
+      params: {
+        address: `in.(${borrowableAsset},${mToken})`,
+        select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
+        "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`,
+      },
+    }),
+    getExchangeRateFromCirrus(accessToken),
+    getLendingUserFlowTotals(accessToken, registry.lendingPool?.address || "", userAddress),
+  ]);
 
-  // Extract token data and user balances
-  const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
-  const mTokenInfo = tokenData.find(token => token.address === mToken);
+  const tokenData = tokenRows || [];
+  const borrowableToken = tokenData.find((token: any) => token.address === borrowableAsset);
+  const mTokenInfo = tokenData.find((token: any) => token.address === mToken);
 
   const borrowableBalance = borrowableToken?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
   const mTokenBalance = mTokenInfo?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
@@ -695,12 +712,6 @@ export const liquidityAndBalance = async (
   (registry.oracle?.prices || []).forEach((p: any) => {
     priceMap.set(p.asset, p.price);
   });
-  if (!priceMap.has(borrowableAsset)) {
-    priceMap.set(borrowableAsset, borrowableToken?.price?.toString() || "0");
-  }
-  if (!priceMap.has(mToken)) {
-    priceMap.set(mToken, mTokenInfo?.price?.toString() || "0");
-  }
 
   // Index/scaled-debt state from Cirrus
   const borrowIndexStr     = registry.lendingPool?.borrowIndex     || "0";
@@ -730,11 +741,8 @@ export const liquidityAndBalance = async (
   const totalAmountOwedClamped = (() => { try { return (BigInt(totalAmountOwed) <= 1n) ? "0" : totalAmountOwed; } catch { return totalAmountOwed; } })();
   const totalAmountOwedPreviewClamped = (() => { try { return (BigInt(totalAmountOwedPreview) <= 1n) ? "0" : totalAmountOwedPreview; } catch { return totalAmountOwedPreview; } })();
 
-  // System totals and exchange rate
+  // System totals
   const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
-
-  // Get exchange rate from Cirrus events instead of calculating manually
-  const exchangeRate = await getExchangeRateFromCirrus(accessToken);
 
   const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
 
@@ -771,11 +779,7 @@ export const liquidityAndBalance = async (
     ? ((userMTokenBalanceTotal * BigInt(exchangeRate)) / WAD)
     : 0n;
 
-  const { totalDepositedUsd, totalWithdrawnUsd } = await getLendingUserFlowTotals(
-    accessToken,
-    registry.lendingPool?.address || "",
-    userAddress
-  );
+  const { totalDepositedUsd, totalWithdrawnUsd } = flowTotals;
   const userNetInvestedUsd = totalDepositedUsd - totalWithdrawnUsd;
   const userAllTimeEarningsUsd = userUSDSTValueTotal - userNetInvestedUsd;
 
@@ -1414,27 +1418,56 @@ export interface LiquidationEntry {
   maxRepay?: string;
 }
 
+let _liquidationCache: { data: { registry: any; tokenInfoMap: Map<string, any> }; expiry: number } | null = null;
+const LIQUIDATION_CACHE_TTL = 30_000;
+
 export const listLoansForLiquidation = async (
   accessToken: string,
   margin?: number
 ): Promise<LiquidationEntry[]> => {
-  const select =
-    `lendingPool:lendingPool_fkey(` +
-      `address,` +
-      `borrowableAsset,` +
-      `borrowIndex::text,` +
-      `_paused,` +
-      `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
-      `loans:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
-    `),` +
-    `collateralVault:collateralVault_fkey(` +
-      `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
-    `),` +
-    `oracle:priceOracle_fkey(` +
-      `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
-    `)`;
+  let registry: any;
+  let tokenInfoMap: Map<string, any>;
 
-  const registry = await getPool(accessToken, { select });
+  if (_liquidationCache && Date.now() < _liquidationCache.expiry) {
+    registry = _liquidationCache.data.registry;
+    tokenInfoMap = _liquidationCache.data.tokenInfoMap;
+  } else {
+    const select =
+      `lendingPool:lendingPool_fkey(` +
+        `address,` +
+        `borrowableAsset,` +
+        `borrowIndex::text,` +
+        `_paused,` +
+        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
+        `loans:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
+      `),` +
+      `collateralVault:collateralVault_fkey(` +
+        `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
+      `),` +
+      `oracle:priceOracle_fkey(` +
+        `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
+      `)`;
+
+    registry = await getPool(accessToken, { select });
+
+    const borrowable: string = registry.lendingPool?.borrowableAsset;
+    const collateralsArr = registry.collateralVault?.userCollaterals || [];
+    const tokenSet = new Set<string>([borrowable]);
+    collateralsArr.forEach((c: any) => tokenSet.add(c.asset));
+
+    tokenInfoMap = new Map<string, any>();
+    try {
+      const { data: tokenRows } = await cirrus.get(accessToken, `/${Token}`, {
+        params: {
+          address: `in.(${Array.from(tokenSet).join(',')})`,
+          select: "address,_symbol,_name",
+        },
+      });
+      tokenInfoMap = new Map<string, any>((tokenRows || []).map((t: any) => [t.address, t]));
+    } catch {}
+
+    _liquidationCache = { data: { registry, tokenInfoMap }, expiry: Date.now() + LIQUIDATION_CACHE_TTL };
+  }
 
   const borrowableAsset: string = registry.lendingPool?.borrowableAsset;
   const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
@@ -1455,17 +1488,6 @@ export const listLoansForLiquidation = async (
     list.push({ asset: c.asset, amount: c.amount });
     collMap.set(c.user, list);
   }
-
-  const tokenSet = new Set<string>([borrowableAsset]);
-  collateralsArr.forEach((c: any) => tokenSet.add(c.asset));
-  let tokenInfoMap = new Map<string, any>();
-  try {
-    const tokenRows = await getTokens(accessToken, {
-      address: `in.(${Array.from(tokenSet).join(',')})`,
-      select: "address,_symbol,_name"
-    });
-    tokenInfoMap = new Map<string, any>(tokenRows.map((t: any) => [t.address, t]));
-  } catch {}
 
   const results: LiquidationEntry[] = [];
 
