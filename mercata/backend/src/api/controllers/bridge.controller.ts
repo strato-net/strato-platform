@@ -28,6 +28,9 @@ import {
   NoMatchingFinalizationError,
 } from "../services/lineaProof.service";
 import {
+  NoVoteAttestationError,
+} from "../services/bscProof.service";
+import {
   listConfiguredChains,
   loadTrustlessConfig,
   trustlessClaim,
@@ -545,6 +548,13 @@ class BridgeController {
         // submitted a SNARK whose endBlock reaches our deposit. UI
         // shows the same "waiting for L1 finalization" panel.
         res.status(425).json({ error: error.message, code: "NO_MATCHING_FINALIZATION" });
+        return;
+      }
+      if (error instanceof NoVoteAttestationError) {
+        // 425 Too Early: BSC produced the deposit block, but no
+        // descendant block within the scan window carries a vote
+        // attestation targeting it. UI shows "Waiting for finality".
+        res.status(425).json({ error: error.message, code: "NO_VOTE_ATTESTATION" });
         return;
       }
       if (error instanceof DepositTooOldError) {

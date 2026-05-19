@@ -170,6 +170,64 @@ library BLSVerify {
         aggPubkey = acc;
     }
 
+    /**
+     * @notice Aggregate a variable-size validator set by uint256 bitmap.
+     *
+     *         Designed for protocols like BSC fast finality (BEP-126)
+     *         where the validator set is small (~21–41 active) and
+     *         participation is encoded as a uint64 bitmap in the
+     *         VoteAttestation. Bit `i` set means `pubkeysCompressed[i]`
+     *         participated; bit 0 is LSB.
+     *
+     *         Bits beyond `pubkeysCompressed.length` MUST be zero; we
+     *         revert if a high bit refers to a non-existent validator.
+     *         Pubkeys are assumed pre-sorted by the caller (BSC orders
+     *         them byte-ascending by consensus address, and the bitmap
+     *         indexes into that order).
+     *
+     * @param pubkeysCompressed Validator BLS voting keys, each in
+     *        48-byte IETF compressed G1 form, in the canonical chain
+     *        ordering (BSC: ascending consensus address).
+     * @param bitmap Participation bitmap (LSB-first). For BSC, this is
+     *        VoteAttestation.VoteAddressSet (uint64 widened to uint256).
+     *
+     * @return aggPubkey 128-byte EIP-2537 G1 aggregate of the signers.
+     * @return count Number of participating signers. Caller enforces
+     *         the ≥⅔ supermajority threshold.
+     */
+    function aggregateByBitmap(
+        bytes[] pubkeysCompressed,
+        uint256 bitmap
+    ) internal returns (bytes aggPubkey, uint256 count) {
+        uint256 n = pubkeysCompressed.length;
+        require(n > 0, "BLSVerify: empty validator set");
+        // High bits past the validator count must be unset.
+        if (n < 256) {
+            uint256 mask = (uint256(1) << n) - 1;
+            require((bitmap & ~mask) == 0, "BLSVerify: bitmap has stray bits");
+        }
+
+        bytes acc;
+        bool started = false;
+        count = 0;
+
+        for (uint256 i = 0; i < n; i = i + 1) {
+            if (((bitmap >> i) & 1) == 1) {
+                bytes pk = bls12381DecompressG1(pubkeysCompressed[i]);
+                if (started) {
+                    acc = bls12381G1Add(acc + pk);
+                } else {
+                    acc = pk;
+                    started = true;
+                }
+                count = count + 1;
+            }
+        }
+
+        require(started, "BLSVerify: zero participants");
+        aggPubkey = acc;
+    }
+
     // ─────────────────────────────────────────────────────────────────
     // Bit utility (kept here so EthLightClient can sanity-check
     // participation thresholds without re-implementing the loop).

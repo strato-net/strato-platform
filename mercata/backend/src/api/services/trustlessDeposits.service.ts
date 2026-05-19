@@ -25,6 +25,7 @@ import { ConfiguredChain } from "./trustlessBridge.service";
 import { MAX_PARENT_CHAIN_HEADERS } from "./bridgeProof.service";
 import { getLatestAnchoredL2BlockNumber } from "./baseProof.service";
 import { getLatestFinalizedLineaL2BlockNumber } from "./lineaProof.service";
+import { getLatestFinalizedBscBlockNumber } from "./bscProof.service";
 import { keccak256 } from "../helpers/keccak.helper";
 
 const { mercataBridge } = constants;
@@ -39,13 +40,14 @@ export interface FinalizedHead {
   /** EL block number (decimal string). Eth flavor → beacon-finalized
    *  EL block. Base flavor → highest L2 block covered by any recent
    *  L1 DisputeGameCreated. Linea flavor → highest L2 block covered
-   *  by any recent L1 DataFinalizedV3. UI uses this to decide ready-
-   *  vs-waiting per deposit. */
+   *  by any recent L1 DataFinalizedV3. BSC flavor → latest fast-
+   *  finalized block (BEP-126). UI uses this to decide ready-vs-
+   *  waiting per deposit. */
   blockNumber: string;
   /** Unix timestamp of `blockNumber` (seconds). */
   timestamp: string;
   /** Tag the UI renders ("Sepolia finalized at block …"). */
-  flavor: "eth" | "base" | "linea";
+  flavor: "eth" | "base" | "linea" | "bsc";
 }
 
 /**
@@ -90,20 +92,37 @@ export async function getFinalizedHead(
       flavor: "base",
     };
   }
-  // Linea flavor: L2 blocks become claimable when a DataFinalizedV3
-  // event on L1 covers them (endBlockNumber ≥ deposit). Highest such
-  // endBlock is the ready/waiting cutoff. Deposits newer than that
-  // show "Waiting for L1 finalization" in the modal.
-  const latestFinalizedL2 = await getLatestFinalizedLineaL2BlockNumber(chain.chainId);
+  if (chain.flavor === "linea") {
+    // Linea flavor: L2 blocks become claimable when a DataFinalizedV3
+    // event on L1 covers them (endBlockNumber ≥ deposit). Highest such
+    // endBlock is the ready/waiting cutoff. Deposits newer than that
+    // show "Waiting for L1 finalization" in the modal.
+    const latestFinalizedL2 = await getLatestFinalizedLineaL2BlockNumber(chain.chainId);
+    const headHex = await getBlockNumber(chain.chainId);
+    const block = await getBlockByNumber(
+      chain.chainId,
+      "0x" + Math.min(latestFinalizedL2, headHex).toString(16),
+    );
+    return {
+      blockNumber: latestFinalizedL2.toString(),
+      timestamp: block?.timestamp ? BigInt(block.timestamp).toString() : "0",
+      flavor: "linea",
+    };
+  }
+  // BSC flavor: deposits become claimable as soon as BSC's own fast-
+  // finality covers them (≥⅔ BLS supermajority on a vote attestation
+  // targeting the block). No L1 piggyback — return BSC's own finalized
+  // head.
+  const latestFinalizedBsc = await getLatestFinalizedBscBlockNumber(chain.chainId);
   const headHex = await getBlockNumber(chain.chainId);
   const block = await getBlockByNumber(
     chain.chainId,
-    "0x" + Math.min(latestFinalizedL2, headHex).toString(16),
+    "0x" + Math.min(latestFinalizedBsc, headHex).toString(16),
   );
   return {
-    blockNumber: latestFinalizedL2.toString(),
+    blockNumber: latestFinalizedBsc.toString(),
     timestamp: block?.timestamp ? BigInt(block.timestamp).toString() : "0",
-    flavor: "linea",
+    flavor: "bsc",
   };
 }
 

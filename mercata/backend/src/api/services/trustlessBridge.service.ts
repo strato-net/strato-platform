@@ -48,19 +48,25 @@ import {
   buildLineaAnchorChainInputs,
   buildLineaClaimInputs,
 } from "./lineaProof.service";
+import {
+  BscAnchorBundle,
+  buildBscAnchorBundle,
+  buildBscClaimInputs,
+} from "./bscProof.service";
 
 const { MercataBridge, mercataBridge } = constants;
 const EthBridgeInName    = "BlockApps-EthBridgeIn";
 const EthLightClientName = "BlockApps-EthLightClient";
 const BaseLightClientName = "BlockApps-BaseLightClient";
 const LineaLightClientName = "BlockApps-LineaLightClient";
+const BscLightClientName = "BlockApps-BscLightClient";
 
 /**
  * Tag identifying which on-chain anchor flow a given source chain
  * uses. Drives both the contract dispatch (which method to call) and
  * the proof-builder selection (which off-chain service runs).
  */
-type LightClientFlavor = "eth" | "base" | "linea";
+export type LightClientFlavor = "eth" | "base" | "linea" | "bsc";
 
 const FLAVOR_BY_CHAIN_ID: Record<string, LightClientFlavor> = {
   "1":        "eth",
@@ -69,6 +75,8 @@ const FLAVOR_BY_CHAIN_ID: Record<string, LightClientFlavor> = {
   "84532":    "base",
   "59144":    "linea",
   "59141":    "linea",
+  "56":       "bsc",
+  "97":       "bsc",
 };
 
 /** Display name for a supported source chain. Used by
@@ -81,6 +89,8 @@ const CHAIN_NAMES: Record<string, string> = {
   "84532":    "Base Sepolia",
   "59144":    "Linea",
   "59141":    "Linea Sepolia",
+  "56":       "BNB Smart Chain",
+  "97":       "BSC Testnet",
 };
 
 export interface TrustlessClaimParams {
@@ -185,7 +195,9 @@ export const loadTrustlessConfig = async (
     throw new Error("EthBridgeIn: depositRoutedSig unset");
   }
 
-  if (flavor === "eth") {
+  if (flavor === "eth" || flavor === "bsc") {
+    // Eth flavor has no wrapper; BSC has its own self-contained light
+    // client (no L1 piggyback) — neither needs an l1LightClient lookup.
     return { flavor, bridgeIn, lightClient, depositRoutedSig };
   }
 
@@ -366,6 +378,57 @@ const fetchLineaLightClientAnchored = async (
     blockNumber,
   );
   return v === true || v === "true";
+};
+
+/**
+ * Read BscLightClient.anchoredFlag[blockNumber]. Same shape as the
+ * Base / Linea readers.
+ */
+const fetchBscLightClientAnchored = async (
+  accessToken: string,
+  lightClient: string,
+  blockNumber: string,
+): Promise<boolean> => {
+  const v = await fetchMappingValue(
+    accessToken,
+    `${BscLightClientName}-anchoredFlag`,
+    lightClient,
+    blockNumber,
+  );
+  return v === true || v === "true";
+};
+
+/**
+ * Read BscLightClient.latestEpoch + .epochLength. Both live on the
+ * top-level row so we can fetch them with one cirrus select. Returns
+ * undefined if the LC's row isn't present yet (pre-bootstrap).
+ */
+const fetchBscLightClientState = async (
+  accessToken: string,
+  lightClient: string,
+): Promise<{ latestEpoch: number; epochLength: number } | undefined> => {
+  try {
+    const { data } = await cirrus.get(accessToken, `/${BscLightClientName}`, {
+      params: {
+        address: `eq.${lightClient.replace(/^0x/, "")}`,
+        select: "latestEpoch,epochLength",
+      },
+    });
+    const row = data?.[0];
+    if (!row) return undefined;
+    const latestEpoch = Number(row.latestEpoch);
+    const epochLength = Number(row.epochLength);
+    if (
+      !Number.isFinite(latestEpoch) ||
+      !Number.isFinite(epochLength) ||
+      epochLength === 0
+    ) {
+      return undefined;
+    }
+    return { latestEpoch, epochLength };
+  } catch {
+    return undefined;
+  }
 };
 
 const fetchMappingValue = async (
@@ -603,6 +666,18 @@ const buildLineaAnchorArgs = (b: LineaAnchorChainInputs) => ({
   parentChain:           strip0xArr(b.parentChain),
 });
 
+const buildBscRotateArgs = (r: BscAnchorBundle["rotations"][number]) => ({
+  newEpoch:           r.newEpoch,
+  newEpochHeaderRLP:  strip0x(r.newEpochHeaderRLP),
+  votingHeaderRLP:    strip0x(r.votingHeaderRLP),
+});
+
+const buildBscAnchorArgs = (b: BscAnchorBundle["anchor"]) => ({
+  targetHeaderRLP: strip0x(b.targetHeaderRLP),
+  votingHeaderRLP: strip0x(b.votingHeaderRLP),
+  parentChain:     strip0xArr(b.parentChain),
+});
+
 const ZERO_BYTES32 =
   "0000000000000000000000000000000000000000000000000000000000000000";
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
@@ -712,7 +787,9 @@ export const trustlessClaim = async (
       ? await buildBaseClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig)
       : cfg.flavor === "linea"
         ? await buildLineaClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig)
-        : await buildClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
+        : cfg.flavor === "bsc"
+          ? await buildBscClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig)
+          : await buildClaimInputs(externalChainId, externalTxHash, cfg.depositRoutedSig);
 
   const txInputs: Array<{ contractName: string; contractAddress: string; method: string; args: Record<string, any> }> = [];
   let l1AnchorSkipped = false;
@@ -813,7 +890,7 @@ export const trustlessClaim = async (
       // Both anchors already on-chain — record the skip.
       l1AnchorSkipped = true;
     }
-  } else {
+  } else if (cfg.flavor === "linea") {
     // Linea / zk-rollup path. Same overall shape as Base — anchor an
     // L1 block on EthLightClient, then anchor the L2 endBlock + parent
     // walk on LineaLightClient — but the L2-side anchor binds against a
@@ -858,6 +935,51 @@ export const trustlessClaim = async (
       });
     } else {
       l1AnchorSkipped = true;
+    }
+  } else {
+    // BSC path. Self-contained: no L1 piggyback. We may need to advance
+    // the LC's epoch chain forward (analogous to sync-committee catchup
+    // on Ethereum) before the anchor step is provable.
+    const alreadyAnchoredBsc = await fetchBscLightClientAnchored(
+      accessToken, cfg.lightClient, claim.blockNumber,
+    );
+    anchorSkipped = alreadyAnchoredBsc;
+    // No notion of an L1 anchor here — BSC's light client is self-
+    // contained. Mark as "skipped" so the response shape is uniform.
+    l1AnchorSkipped = true;
+
+    if (!alreadyAnchoredBsc) {
+      const state = await fetchBscLightClientState(accessToken, cfg.lightClient);
+      if (!state) {
+        throw new Error(
+          `BscLightClient ${cfg.lightClient} state unavailable in cirrus — not yet bootstrapped?`,
+        );
+      }
+      const bundle: BscAnchorBundle = await buildBscAnchorBundle(
+        externalChainId,
+        externalTxHash,
+        state.latestEpoch,
+        state.epochLength,
+      );
+
+      // Prepend any needed epoch rotations. Each is a permissionless
+      // tx; the OLD set's BLS aggregate signs the new boundary, then
+      // we pin the new validator set from the boundary header.
+      for (const r of bundle.rotations) {
+        txInputs.push({
+          contractName: extractContractName(BscLightClientName),
+          contractAddress: cfg.lightClient,
+          method: "rotateValidatorSet",
+          args: buildBscRotateArgs(r),
+        });
+      }
+
+      txInputs.push({
+        contractName: extractContractName(BscLightClientName),
+        contractAddress: cfg.lightClient,
+        method: "anchorBscBlockChain",
+        args: buildBscAnchorArgs(bundle.anchor),
+      });
     }
   }
 

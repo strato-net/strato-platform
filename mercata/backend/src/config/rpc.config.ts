@@ -6,6 +6,8 @@ const baseChainId = "8453";
 const baseSepoliaChainId = "84532";
 const lineaChainId = "59144";
 const lineaSepoliaChainId = "59141";
+const bscChainId = "56";
+const bscTestnetChainId = "97";
 
 const fallbackRpcUpstreams: RpcMapping = {
   [mainnetChainId]: process.env.RPC_URL_MAINNET_FALLBACK || "https://eth.merkle.io",
@@ -14,6 +16,8 @@ const fallbackRpcUpstreams: RpcMapping = {
   [baseSepoliaChainId]: process.env.RPC_URL_BASE_SEPOLIA_FALLBACK || "https://sepolia.base.org",
   [lineaChainId]: process.env.RPC_URL_LINEA_FALLBACK || "https://rpc.linea.build",
   [lineaSepoliaChainId]: process.env.RPC_URL_LINEA_SEPOLIA_FALLBACK || "https://rpc.sepolia.linea.build",
+  [bscChainId]: process.env.RPC_URL_BSC_FALLBACK || "https://bsc-dataseed.bnbchain.org",
+  [bscTestnetChainId]: process.env.RPC_URL_BSC_TESTNET_FALLBACK || "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
 };
 
 const rpcUpstreams: RpcMapping = {
@@ -23,6 +27,8 @@ const rpcUpstreams: RpcMapping = {
   [baseSepoliaChainId]: process.env.RPC_URL_BASE_SEPOLIA || fallbackRpcUpstreams[baseSepoliaChainId],
   [lineaChainId]: process.env.RPC_URL_LINEA || fallbackRpcUpstreams[lineaChainId],
   [lineaSepoliaChainId]: process.env.RPC_URL_LINEA_SEPOLIA || fallbackRpcUpstreams[lineaSepoliaChainId],
+  [bscChainId]: process.env.RPC_URL_BSC || fallbackRpcUpstreams[bscChainId],
+  [bscTestnetChainId]: process.env.RPC_URL_BSC_TESTNET || fallbackRpcUpstreams[bscTestnetChainId],
 };
 
 export function getRpcUpstream(chainId: string): { upstream: string | undefined; fallback: string | undefined } {
