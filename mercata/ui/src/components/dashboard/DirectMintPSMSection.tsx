@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { formatUnits } from "ethers";
-import { ArrowDownUp, Clock, X, Flame, BarChart3 } from "lucide-react";
+import { ArrowDownUp, Clock, Flame, BarChart3 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -31,6 +31,7 @@ import {
   PSM_MINT_FEE,
   PSM_BURN_REQUEST_FEE,
   PSM_BURN_COMPLETE_FEE,
+  PSM_BURN_CANCEL_FEE,
 } from "@/lib/constants";
 
 const formatTimeRemaining = (seconds: number): string => {
@@ -84,8 +85,9 @@ const DirectMintPSMSection = () => {
   const [redeemToken, setRedeemToken] = useState<string>("");
   const [redeemAmount, setRedeemAmount] = useState("");
 
-  // Cancel confirmation state: tracks which request ID has the expanded cancel
-  const [cancelExpandedId, setCancelExpandedId] = useState<string | null>(null);
+  // Cancel confirmation modal
+  const [cancelDialogRequest, setCancelDialogRequest] =
+    useState<BurnRequest | null>(null);
 
   // Complete confirmation modal
   const [completeDialogRequest, setCompleteDialogRequest] =
@@ -252,7 +254,7 @@ const DirectMintPSMSection = () => {
   const handleCancelBurn = async (id: string) => {
     try {
       setIsProcessing(true);
-      setCancelExpandedId(null);
+      setCancelDialogRequest(null);
       await psmService.cancelBurn(id);
       toast({
         title: "Request Cancelled",
@@ -280,12 +282,18 @@ const DirectMintPSMSection = () => {
         safeBigInt(selectedRedeemToken.availableLiquidity)
       )
     : 0n;
+  const redeemSystemLimit = selectedRedeemToken
+    ? safeBigInt(selectedRedeemToken.minReserve) === 0n
+      ? selectedRedeemToken.psmBalance
+      : selectedRedeemToken.availableLiquidity
+    : "0";
   const estimatedMintAmount = selectedMintToken
     ? applyBpsFee(safeParseUnits(mintAmount, 18), selectedMintToken.mintFeeBps)
     : 0n;
   const estimatedRedeemPayout = selectedRedeemToken
     ? applyBpsFee(safeParseUnits(redeemAmount, 18), selectedRedeemToken.burnFeeBps)
     : 0n;
+  const noMintTokens = Boolean(isLoggedIn && psmInfo && !mintTokens.length);
   const noRedeemTokens = Boolean(isLoggedIn && psmInfo && !redeemTokens.length);
 
   return (
@@ -302,114 +310,124 @@ const DirectMintPSMSection = () => {
             {/* Left: Mint + Redeem forms */}
             <div className="flex flex-col space-y-4">
               {/* Mint Section */}
-              <div className="bg-card rounded-lg p-4 border border-border">
-                <h3 className="font-medium mb-3">
-                  Mint {psmInfo?.mintableTokenSymbol || "USDST"}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Deposit an enabled collateral token to mint{" "}
-                  {psmInfo?.mintableTokenSymbol || "USDST"}.
-                </p>
+              <div className="relative bg-card rounded-lg p-4 border border-border overflow-hidden">
+                <div className={noMintTokens ? "opacity-40 pointer-events-none" : ""}>
+                  <h3 className="font-medium mb-3">
+                    Mint {psmInfo?.mintableTokenSymbol || "USDST"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Deposit an enabled collateral token to mint{" "}
+                    {psmInfo?.mintableTokenSymbol || "USDST"}.
+                  </p>
 
-                <div className="space-y-2">
-                  <Select
-                    value={mintToken}
-                    onValueChange={setMintToken}
-                    disabled={
-                      !isLoggedIn ||
-                      !mintTokens.length ||
-                      isProcessing
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select token" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mintTokens.map((t) => (
-                        <SelectItem key={t.address} value={t.address}>
-                          {t.symbol || t.address.slice(0, 8)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Select
+                      value={mintToken}
+                      onValueChange={setMintToken}
+                      disabled={
+                        !isLoggedIn ||
+                        !mintTokens.length ||
+                        isProcessing
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select token" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mintTokens.map((t) => (
+                          <SelectItem key={t.address} value={t.address}>
+                            {t.symbol || t.address.slice(0, 8)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                  <Input
-                    type="number"
-                    placeholder="0.00"
-                    value={mintAmount}
-                    onChange={(e) => setMintAmount(e.target.value)}
-                    disabled={!isLoggedIn || isProcessing}
-                  />
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={mintAmount}
+                      onChange={(e) => setMintAmount(e.target.value)}
+                      disabled={!isLoggedIn || isProcessing}
+                    />
 
-                  {isLoggedIn && selectedMintToken && (
-                    <div className="text-sm text-muted-foreground">
-                      <button
-                        type="button"
-                        className="text-blue-600 hover:underline mr-2"
-                        onClick={() => {
-                          if (mintMaxAmount <= 0n) return;
-                          const formatted = formatUnits(mintMaxAmount, 18);
-                          const [w, f = ""] = formatted.split(".");
-                          setMintAmount(`${w}.${f.slice(0, 18)}`);
-                        }}
-                      >
-                        Max
-                      </button>
-                      Available:{" "}
-                      {formatBalance(
-                        selectedMintToken.userBalance,
-                        undefined,
-                        18,
-                        2
-                      )}{" "}
-                      {selectedMintToken.symbol}
-                      {mintCapacity !== null && (
-                        <>
-                          {" · "}
-                          Capacity:{" "}
-                          {formatBalance(mintCapacity, undefined, 18, 2)}{" "}
-                          {selectedMintToken.symbol}
-                        </>
-                      )}
-                    </div>
-                  )}
+                    {isLoggedIn && selectedMintToken && (
+                      <div className="text-sm text-muted-foreground">
+                        <button
+                          type="button"
+                          className="text-blue-600 hover:underline mr-2"
+                          onClick={() => {
+                            if (mintMaxAmount <= 0n) return;
+                            const formatted = formatUnits(mintMaxAmount, 18);
+                            const [w, f = ""] = formatted.split(".");
+                            setMintAmount(`${w}.${f.slice(0, 18)}`);
+                          }}
+                        >
+                          Max
+                        </button>
+                        Available:{" "}
+                        {formatBalance(
+                          selectedMintToken.userBalance,
+                          undefined,
+                          18,
+                          2
+                        )}{" "}
+                        {selectedMintToken.symbol}
+                        {mintCapacity !== null && (
+                          <>
+                            {" · "}
+                            System Limit:{" "}
+                            {formatBalance(mintCapacity, undefined, 18, 2)}{" "}
+                            {selectedMintToken.symbol}
+                          </>
+                        )}
+                      </div>
+                    )}
 
-                  {isLoggedIn && selectedMintToken && (
-                    <div className="text-sm text-muted-foreground">
-                      PSM Fee: {formatBps(selectedMintToken.mintFeeBps)}
-                      {estimatedMintAmount > 0n && (
-                        <>
-                          {" · "}
-                          You receive:{" "}
-                          {formatBalance(estimatedMintAmount, undefined, 18, 2, 6)}{" "}
-                          {psmInfo?.mintableTokenSymbol || "USDST"}
-                        </>
-                      )}
-                    </div>
-                  )}
+                  {isLoggedIn && selectedMintToken && safeBigInt(selectedMintToken.mintFeeBps) > 0n && (
+                      <div className="text-sm text-muted-foreground">
+                        PSM Fee: {formatBps(selectedMintToken.mintFeeBps)}
+                        {estimatedMintAmount > 0n && (
+                          <>
+                            {" · "}
+                            You receive:{" "}
+                            {formatBalance(estimatedMintAmount, undefined, 18, 2, 6)}{" "}
+                            {psmInfo?.mintableTokenSymbol || "USDST"}
+                          </>
+                        )}
+                      </div>
+                    )}
 
-                  {isLoggedIn && psmInfo?.mintPaused && (
-                    <div className="text-sm text-destructive">
-                      Minting is currently paused.
-                    </div>
-                  )}
+                    {isLoggedIn && psmInfo?.mintPaused && (
+                      <div className="text-sm text-destructive">
+                        Minting is currently paused.
+                      </div>
+                    )}
 
-                  {isLoggedIn && (
-                    <div className="text-sm text-muted-foreground">
-                      Transaction Fee: {PSM_MINT_FEE} USDST
-                    </div>
-                  )}
+                    {isLoggedIn && (
+                      <div className="text-sm text-muted-foreground">
+                        Transaction Fee: {PSM_MINT_FEE} USDST
+                      </div>
+                    )}
 
-                  <Button
-                    onClick={handleMint}
-                    className="bg-strato-blue hover:bg-strato-blue/90 w-full"
-                    disabled={!isLoggedIn || isProcessing || !isMintValid()}
-                  >
-                    {isProcessing
-                      ? "Processing..."
-                      : `Mint ${psmInfo?.mintableTokenSymbol || "USDST"}`}
-                  </Button>
+                    <Button
+                      onClick={handleMint}
+                      className="bg-strato-blue hover:bg-strato-blue/90 w-full"
+                      disabled={!isLoggedIn || isProcessing || !isMintValid()}
+                    >
+                      {isProcessing
+                        ? "Processing..."
+                        : `Mint ${psmInfo?.mintableTokenSymbol || "USDST"}`}
+                    </Button>
+                  </div>
                 </div>
+
+                {noMintTokens && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted/60 px-4 text-center">
+                    <p className="text-sm font-medium text-foreground">
+                      No tokens available for minting at this time
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Redeem (Request Burn) Section */}
@@ -483,18 +501,13 @@ const DirectMintPSMSection = () => {
                         2
                       )}
                       {" · "}
-                      Available liquidity:{" "}
-                      {formatBalance(
-                        selectedRedeemToken.availableLiquidity,
-                        undefined,
-                        18,
-                        2
-                      )}{" "}
+                      System Limit:{" "}
+                      {formatBalance(redeemSystemLimit, undefined, 18, 2)}{" "}
                       {selectedRedeemToken.symbol}
                     </div>
                   )}
 
-                  {isLoggedIn && selectedRedeemToken && (
+                  {isLoggedIn && selectedRedeemToken && safeBigInt(selectedRedeemToken.burnFeeBps) > 0n && (
                     <div className="text-sm text-muted-foreground">
                       PSM Fee: {formatBps(selectedRedeemToken.burnFeeBps)}
                       {estimatedRedeemPayout > 0n && (
@@ -556,23 +569,11 @@ const DirectMintPSMSection = () => {
 
               {psmInfo && (
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Minting</span>
-                    <span className="font-medium">
-                      {psmInfo.mintPaused ? "Paused" : "Active"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Redemptions</span>
-                    <span className="font-medium">
-                      {psmInfo.burnPaused ? "Paused" : "Active"}
-                    </span>
-                  </div>
                   {psmInfo.eligibleTokens.map((t) => (
                     <div key={t.address} className="rounded-md border border-border p-2">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">
-                          PSM {t.symbol} Reserves
+                          {t.symbol} Reserves
                         </span>
                         <span className="font-medium">
                           {formatBalance(t.psmBalance, undefined, 18, 2)}
@@ -620,13 +621,17 @@ const DirectMintPSMSection = () => {
                     const payoutFormatted = formatUnits(req.payoutAmount || req.amount, 18);
                     const remaining = parseInt(req.availableAt) - nowSec;
                     const available = remaining <= 0;
-                    const isCancelExpanded = cancelExpandedId === req.id;
                     const redeemTokenInfo = psmInfo?.eligibleTokens.find(
                       (t) => t.address === req.redeemToken
                     );
                     const insufficientReserves =
                       BigInt(req.amount) >
                       BigInt(redeemTokenInfo?.psmBalance || "0");
+                    const completionDisabled = Boolean(
+                      psmInfo?.burnPaused || !redeemTokenInfo?.burnEnabled
+                    );
+                    const canComplete =
+                      available && !insufficientReserves && !completionDisabled;
 
                     return (
                       <div
@@ -634,7 +639,7 @@ const DirectMintPSMSection = () => {
                         className={`rounded-lg border p-3 ${
                           !available
                             ? "border-yellow-200 dark:border-yellow-900 bg-yellow-50/50 dark:bg-yellow-950/20"
-                            : insufficientReserves
+                            : insufficientReserves || completionDisabled
                               ? "border-border bg-muted/50 opacity-60"
                               : "border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-950/20"
                         }`}
@@ -651,6 +656,14 @@ const DirectMintPSMSection = () => {
                               {!available ? (
                                 <span className="text-yellow-600 dark:text-yellow-400">
                                   Available in {formatTimeRemaining(remaining)}
+                                </span>
+                              ) : psmInfo?.burnPaused ? (
+                                <span className="text-muted-foreground">
+                                  Redemptions are paused
+                                </span>
+                              ) : !redeemTokenInfo?.burnEnabled ? (
+                                <span className="text-muted-foreground">
+                                  Redemption token disabled
                                 </span>
                               ) : insufficientReserves ? (
                                 <span className="text-muted-foreground">
@@ -670,7 +683,7 @@ const DirectMintPSMSection = () => {
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {available && !insufficientReserves && (
+                            {canComplete && (
                               <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs px-2"
@@ -682,36 +695,15 @@ const DirectMintPSMSection = () => {
                               </Button>
                             )}
 
-                            {isCancelExpanded ? (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="h-7 text-xs px-2"
-                                  disabled={isProcessing}
-                                  onClick={() => handleCancelBurn(req.id)}
-                                >
-                                  Cancel
-                                </Button>
-                                <button
-                                  type="button"
-                                  className="text-muted-foreground hover:text-foreground p-0.5"
-                                  onClick={() => setCancelExpandedId(null)}
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                className="text-muted-foreground hover:text-destructive p-0.5 transition-colors"
-                                onClick={() => setCancelExpandedId(req.id)}
-                                disabled={isProcessing}
-                                title="Cancel request"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-7 text-xs px-2"
+                              disabled={isProcessing}
+                              onClick={() => setCancelDialogRequest(req)}
+                            >
+                              Cancel
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -772,6 +764,58 @@ const DirectMintPSMSection = () => {
               }}
             >
               Confirm & Complete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Burn Confirmation Dialog */}
+      <AlertDialog
+        open={!!cancelDialogRequest}
+        onOpenChange={(open) => {
+          if (!open) setCancelDialogRequest(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Redemption Request</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  This will cancel your request to redeem{" "}
+                  <span className="font-semibold text-foreground">
+                    {cancelDialogRequest &&
+                      formatUnits(cancelDialogRequest.amount, 18)}{" "}
+                    {psmInfo?.mintableTokenSymbol || "USDST"}
+                  </span>{" "}
+                  for{" "}
+                  <span className="font-semibold text-foreground">
+                    {cancelDialogRequest &&
+                      formatUnits(
+                        cancelDialogRequest.payoutAmount ||
+                          cancelDialogRequest.amount,
+                        18
+                      )}{" "}
+                    {cancelDialogRequest?.redeemTokenSymbol}
+                  </span>
+                  .
+                </p>
+                <p className="text-xs">
+                  Transaction fee: {PSM_BURN_CANCEL_FEE} USDST
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Request</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (cancelDialogRequest)
+                  handleCancelBurn(cancelDialogRequest.id);
+              }}
+            >
+              Confirm Cancel
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
