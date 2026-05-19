@@ -18,7 +18,7 @@ const normalizeArrayLike = (value: any): string[] => {
       value = JSONbigString.parse(value);
     } catch {
       return [];
-    }
+    } 
   }
   if (Array.isArray(value)) return value.map(String);
   if (!value || typeof value !== "object") return [];
