@@ -306,10 +306,6 @@ const Earn = () => {
     }
   }, [isLoggedIn, fetchUsdstBalance]);
 
-  useEffect(() => {
-    fetchPools();
-  }, [fetchPools]);
-
   const handlePoolDeposit = (pool: Pool) => {
     if (!isLoggedIn) return;
     setSelectedPool(pool);

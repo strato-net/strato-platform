@@ -121,7 +121,7 @@ const WIDGET_STORAGE_KEY = 'price-tracking-widgets';
 const PriceTracking = () => {
   const { earningAssets, usdstBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
-  const { setFromAsset, setToAsset, swappableTokens, refetchSwappableTokens, fetchPairableTokens, getPoolByTokenPair, getPoolByAddress } = useSwapContext();
+  const { setFromAsset, setToAsset, swappableTokens, refetchSwappableTokens, fetchPairableTokens, getPoolByTokenPair, getPoolByAddress, fetchPools } = useSwapContext();
   const [swapModalOpen, setSwapModalOpen] = useState(false);
   const [swapMode, setSwapMode] = useState<'buy' | 'sell' | 'arb' | null>(null);
   const [swapAsset, setSwapAsset] = useState<EarningAsset | null>(null);
@@ -575,9 +575,7 @@ const PriceTracking = () => {
         });
         const tokens = Array.isArray(tokensResponse.data) ? tokensResponse.data : (tokensResponse.data?.tokens || []);
 
-        // Fetch pools from /swap-pools endpoint
-        const poolsResponse = await api.get<any[]>('/swap-pools');
-        const pools = poolsResponse.data || [];
+        const pools = await fetchPools();
 
         // Create a map of user token balances from activeTokens
         const userBalances: Map<string, string> = new Map();

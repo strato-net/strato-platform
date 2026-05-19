@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE, mUsdstAddress } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewardsContext } from "@/context/RewardsContext";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { findBestEarnApyInfo } from "@/utils/earnUtils";
@@ -35,7 +35,7 @@ const LendingPoolSection = () => {
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
+  const { userRewards, userRewardsLoading: rewardsLoading } = useRewardsContext();
   const { tokenApys } = useEarnContext();
   const lendingEarnApyInfo = useMemo(() => findBestEarnApyInfo(tokenApys, mUsdstAddress), [tokenApys]);
   const lendingDisplayApy = lendingEarnApyInfo?.total.toFixed(2);

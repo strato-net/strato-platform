@@ -14,7 +14,7 @@ import { useVaultContext } from "@/context/VaultContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits, parseUnits } from "ethers";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
+import { useRewardsContext } from "@/context/RewardsContext";
 import { api } from "@/lib/axios";
 import WithdrawBasketPreview, { BasketItem } from "./WithdrawBasketPreview";
 import { Alert, AlertDescription } from "../ui/alert";
@@ -61,7 +61,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
 
   const { vaultState, withdraw, refreshVault } = useVaultContext();
   const { toast } = useToast();
-  const { userRewards } = useRewardsUserInfo();
+  const { userRewards } = useRewardsContext();
 
   const {
     userShares,

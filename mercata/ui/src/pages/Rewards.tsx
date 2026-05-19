@@ -8,9 +8,8 @@ import { ActivitiesTable } from "@/components/rewards/ActivitiesTable";
 import { UserRewardsSection } from "@/components/rewards/UserRewardsSection";
 import { UserRewardsSummary } from "@/components/rewards/UserRewardsSummary";
 import { LeaderboardTable } from "@/components/rewards/LeaderboardTable";
-import { useRewards } from "@/hooks/useRewards";
+import { useRewardsContext } from "@/context/RewardsContext";
 import { useRewardsActivities } from "@/hooks/useRewardsActivities";
-import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import { useTokenContext } from "@/context/TokenContext";
 import { useRewardsLeaderboard } from "@/hooks/useRewardsLeaderboard";
 import { useSearchParams } from "react-router-dom";
@@ -28,10 +27,10 @@ const Rewards = () => {
 
   const [activeTab, setActiveTab] = useState<"activities" | "my-rewards" | "leaderboard">("activities");
 
-  const { state, loading: stateLoading, refetch: refetchState } = useRewards();
+  const { state, loading: stateLoading, refetch: refetchState } = useRewardsContext();
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useRewardsActivities();
   // Only fetch user rewards if logged in
-  const { userRewards, loading: userRewardsLoading, refetch: refetchUserRewards } = useRewardsUserInfo();
+  const { userRewards, userRewardsLoading, refetchUserRewards } = useRewardsContext();
   const { inactiveTokens, getInactiveTokens } = useTokenContext();
   const [leaderboardLimit] = useState(10);
   const [leaderboardPage, setLeaderboardPage] = useState(1);
