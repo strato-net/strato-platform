@@ -14,6 +14,8 @@ STRATO_NATIVE_TOKEN=<STRATO token to bridge>
 
 SEPOLIA_ADMIN_SAFE=<Safe address>
 SEPOLIA_DEPLOYER_PRIVATE_KEY=<EOA private key in mercata/ethereum .env>
+SEPOLIA_LIQUIDITY_LAUNCHER=<LiquidityLauncher address>
+SEPOLIA_AUCTION_CONTRACT=<auction contract address after deployment>
 STRATO_VAULT_BACKED_SIGNER=<native mint attestation signer address>
 ATTESTATION_THRESHOLD=<required native mint signature count>
 MAX_ATTESTATION_VALIDITY_SECONDS=604800
@@ -466,7 +468,119 @@ mercata/backend env:
 
 Native routes should appear through the backend bridge routes API once the backend env is present and the STRATO native route has been configured.
 
-## 10. Enable General Transfers Later
+## 10. Auction Setup
+
+Use this section when preparing the Sepolia STRATO representation token for an auction while general transfers remain disabled.
+
+### 10.1 Rename CATA To STRATO
+
+Run from `mercata/contracts` if the STRATO-side token was originally deployed as CATA and must be renamed before sale operations.
+
+Step 1: upgrade the CATA token proxy to the implementation that supports the rename function:
+
+```bash
+npm run upgrade -- \
+  --proxy-address <STRATO_NATIVE_TOKEN> \
+  --contract-name <CATA_TOKEN_CONTRACT_NAME> \
+  --contract-file BaseCodeCollection.sol \
+  +OVERRIDE-CHECKS
+```
+
+Step 2: call the token rename function:
+
+```text
+target: <STRATO_NATIVE_TOKEN>
+method: setNameAndSymbol(string,string)
+args:
+  name: STRATO
+  symbol: STRATO
+```
+
+If the deployed function name differs in that token implementation, use the exact function name exposed by the upgraded token contract.
+
+### 10.2 Whitelist Auction Operational Endpoints
+
+While `transfersEnabled()` is `false`, representation token transfers are allowed only for mint/burn or when either the sender or recipient is configured as a transfer endpoint. Add temporary transfer endpoints for the auction deployer Safe and LiquidityLauncher before moving tokens for auction setup.
+
+Known Sepolia auction endpoints:
+
+```text
+GovernedLBPStrategy: 0xf220e6f60F1223Cf56ca304A460c3d655E39E080
+  Sends 250 STRATO to CCA at construction, sends approximately 250 STRATO to PositionManager at migrate(), and sweeps leftovers to operator.
+
+CCA initializer: 0xacE8f1F7d38f531e918Cc452e63CabEcfAD0AD9b
+  Sends STRATO to bidders during claimTokens and sends unsold STRATO to strategy via sweepUnsoldTokens.
+
+Uniswap v4 PositionManager: 0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4
+  Relays STRATO into PoolManager.settle() during LP mint.
+
+Uniswap v4 PoolManager: 0xE03A1074c86CFeDd5C142C4F04F1a1536e203543
+  Custodies pool liquidity and pays out STRATO on swaps via take().
+```
+
+Safe Transaction Builder JSON:
+
+```json
+[
+  {
+    "to": "<SEPOLIA_REPRESENTATION_TOKEN_PROXY>",
+    "value": "0",
+    "data": null,
+    "contractMethod": {
+      "inputs": [
+        { "name": "account", "type": "address", "internalType": "address" },
+        { "name": "allowed", "type": "bool", "internalType": "bool" }
+      ],
+      "name": "setTransferEndpoint",
+      "payable": false
+    },
+    "contractInputsValues": {
+      "account": "<SEPOLIA_ADMIN_SAFE>",
+      "allowed": "true"
+    }
+  },
+  {
+    "to": "<SEPOLIA_REPRESENTATION_TOKEN_PROXY>",
+    "value": "0",
+    "data": null,
+    "contractMethod": {
+      "inputs": [
+        { "name": "account", "type": "address", "internalType": "address" },
+        { "name": "allowed", "type": "bool", "internalType": "bool" }
+      ],
+      "name": "setTransferEndpoint",
+      "payable": false
+    },
+    "contractInputsValues": {
+      "account": "<SEPOLIA_LIQUIDITY_LAUNCHER>",
+      "allowed": "true"
+    }
+  }
+]
+```
+
+These temporary whitelists can be removed after the auction has been deployed and funded if they are no longer needed:
+
+```text
+StratoNativeRepresentationToken.setTransferEndpoint(<SEPOLIA_ADMIN_SAFE>, false)
+StratoNativeRepresentationToken.setTransferEndpoint(<SEPOLIA_LIQUIDITY_LAUNCHER>, false)
+```
+
+### 10.3 Whitelist Deployed Auction Contract
+
+After the auction contract has been deployed, whitelist the auction contract itself so it can receive or distribute STRATO while general transfers remain disabled. For the Sepolia auction deployment above, whitelist each contract that sends, receives, or custodies STRATO during sale, claim, migration, and pool operations:
+
+```text
+StratoNativeRepresentationToken.setTransferEndpoint(<SEPOLIA_AUCTION_CONTRACT>, true)
+StratoNativeRepresentationToken.setTransferEndpoint(0xf220e6f60F1223Cf56ca304A460c3d655E39E080, true)
+StratoNativeRepresentationToken.setTransferEndpoint(0xacE8f1F7d38f531e918Cc452e63CabEcfAD0AD9b, true)
+StratoNativeRepresentationToken.setTransferEndpoint(0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4, true)
+StratoNativeRepresentationToken.setTransferEndpoint(0xE03A1074c86CFeDd5C142C4F04F1a1536e203543, true)
+```
+
+Prefer whitelisting the final auction contract for sale operations rather than relying permanently on deployer or intermediary accounts. General peer-to-peer transfers should remain disabled until the sale or release condition is met.
+
+## 11. Enable General Transfers Later
 
 Only after the sale or release condition is met, import this Safe transaction:
 

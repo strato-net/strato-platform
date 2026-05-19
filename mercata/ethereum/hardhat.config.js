@@ -20,7 +20,7 @@ module.exports = {
       gasPrice: "auto",
     },
     mainnet: {
-      url: process.env.MAINNET_RPC_URL || "https://mainnet.infura.io/v3/YOUR_KEY", 
+      url: process.env.MAINNET_RPC_URL,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: "auto",
     },
