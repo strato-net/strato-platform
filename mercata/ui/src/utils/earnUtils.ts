@@ -262,6 +262,19 @@ export const findBestEarnApyInfo = (tokenApys: TokenApyEntry[], tokenAddress?: s
   return buildEarnApyMap(tokenApys).get(normAddr(tokenAddress)) || null;
 };
 
+export const buildActivityRewardsApyInfo = (
+  emissionRate?: string | null,
+  totalStakeUsd?: string | null
+): EarnApyInfo | null => {
+  const rewards = roundRewardsApy(getRewardsApyPercent(emissionRate, totalStakeUsd));
+  if (!rewards) return null;
+  return {
+    total: parsePositiveApy(rewards),
+    source: "rewards",
+    breakdown: [{ label: "Rewards APY", apy: rewards }],
+  };
+};
+
 export const findBestNonVaultEarnApyInfo = (tokenApys: TokenApyEntry[], tokenAddress?: string | null): EarnApyInfo | null => {
   if (!tokenAddress) return null;
   return buildEarnApyMap(tokenApys, { includeVaultSources: false }).get(normAddr(tokenAddress)) || null;

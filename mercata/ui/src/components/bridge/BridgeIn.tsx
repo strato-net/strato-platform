@@ -372,7 +372,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
       token.externalToken?.toLowerCase() === selectedToken.externalToken?.toLowerCase()
     );
     if (routes.length > 0) prevRouteCountRef.current = routes.length;
-    const mintStratoTokens = new Set(routes.filter(r => !r.isDefaultRoute).map(r => normAddr(r.stratoToken)));
+    const mintStratoTokens = new Set(routes.filter(r => r.isDefaultRoute).map(r => normAddr(r.stratoToken)));
     const actions = depositActions.filter(a => a.payToken && mintStratoTokens.has(normAddr(a.payToken)));
     if (routes.length > 0) prevCardsRef.current = { routes, actions };
     return { sourceTokenRoutes: routes.length > 0 ? routes : prevCardsRef.current.routes, matchingActions: routes.length > 0 ? actions : prevCardsRef.current.actions };
