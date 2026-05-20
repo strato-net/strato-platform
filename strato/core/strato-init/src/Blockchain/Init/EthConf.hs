@@ -160,6 +160,7 @@ genEthConf = do
     , networkConfig = def
         { network = flags_network
         , networkID = computeNetworkID
+        , chainId = computeChainId flags_network
         , httpPort = flags_httpPort
         , txSizeLimit = flags_txSizeLimit
         , gasLimit = flags_gasLimit

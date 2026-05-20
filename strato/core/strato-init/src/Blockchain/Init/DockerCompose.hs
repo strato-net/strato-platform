@@ -81,7 +81,7 @@ generateDockerCompose = do
   let mercataUi = def
         { image = "mercata-ui:" ++ stratoVersionTag ++ "-" ++ hashMercataUi
         , depends_on = Just $ DependsOnList ["mercata-backend"]
-        , volumes = Just ["./logs:/logs"]
+        , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , environment = Just $ Map.fromList
             [ ("LUCKY_ORANGE_SITE_ID", "${LUCKY_ORANGE_SITE_ID:-}")
             , ("GOOGLE_ANALYTICS_ID", "${GOOGLE_ANALYTICS_ID:-}")

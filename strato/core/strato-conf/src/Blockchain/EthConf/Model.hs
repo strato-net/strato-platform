@@ -191,6 +191,7 @@ data UrlConfig = UrlConfig
 data NetworkConf = NetworkConf
   { network :: String
   , networkID :: Integer
+  , chainId :: Integer
   , httpPort :: Int
   , txSizeLimit :: Int
   , gasLimit :: Integer
@@ -200,20 +201,22 @@ data NetworkConf = NetworkConf
   deriving (Show, Eq, Generic, ToJSON)
 
 instance FromJSON NetworkConf where
-  parseJSON = withObject "NetworkConf" $ \v -> NetworkConf
-    <$> v .:? "network" .!= "upquark"
-    <*> v .:? "networkID" .!= (-1)
-    <*> v .:? "httpPort" .!= 8081
-    <*> v .:? "txSizeLimit" .!= 2097152
-    <*> v .:? "gasLimit" .!= 1000000
-    <*> v .:? "blockPeriodMs" .!= 1000
-    <*> v .:? "roundPeriodS" .!= 120
+  parseJSON = withObject "NetworkConf" $ \v -> do
+    net <- v .:? "network" .!= "upquark"
+    NetworkConf net
+      <$> v .:? "networkID" .!= (-1)
+      <*> v .:? "chainId" .!= computeChainId net
+      <*> v .:? "httpPort" .!= 8081
+      <*> v .:? "txSizeLimit" .!= 2097152
+      <*> v .:? "gasLimit" .!= 1000000
+      <*> v .:? "blockPeriodMs" .!= 1000
+      <*> v .:? "roundPeriodS" .!= 120
 
 -- EIP-155 chain ID: keccak256(networkName), first 6 bytes (48 bits).
 -- Fits in JS Number.MAX_SAFE_INTEGER with room for v = chainId * 2 + 35.
-chainId :: NetworkConf -> Integer
-chainId nc =
-  let digest = keccak256ToByteString $ hash $ C8.pack $ network nc
+computeChainId :: String -> Integer
+computeChainId networkName =
+  let digest = keccak256ToByteString $ hash $ C8.pack networkName
   in foldl (\acc b -> acc * 256 + fromIntegral b) 0 (B.unpack $ B.take 6 digest)
 
 data DebugConfig = DebugConfig
@@ -322,6 +325,7 @@ instance Default NetworkConf where
   def = NetworkConf
     { network = "upquark"
     , networkID = -1  -- will be computed from network name
+    , chainId = computeChainId "upquark"
     , httpPort = 8081
     , txSizeLimit = 2097152  -- 2 MiB
     , gasLimit = 1000000
