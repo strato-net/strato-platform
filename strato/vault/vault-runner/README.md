@@ -51,6 +51,17 @@ strato-up mynode \
 You may want to migrate the existing keys from BlockApps shared Vault to you local vault.
 > TODO: Steps are TBD.
 
+### Killing the Vault
+
+- To bring down but keep database:
+    ```
+    docker compose -f docker-compose.vault.yml -p vault down
+    ```
+- To wipe the vault:
+    ```
+    docker compose -f docker-compose.vault.yml -p vault down -vt0
+    ```
+
 
 ---
 
