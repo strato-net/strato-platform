@@ -207,9 +207,15 @@ export const getCarryVaultUsdPriceMap = (
   return out;
 };
 
+let _completePriceMapCache: { data: Map<string, string>; expiry: number } | null = null;
+const COMPLETE_PRICE_MAP_TTL = 30_000;
+
 export const getCompletePriceMap = async (
   accessToken: string
 ): Promise<Map<string, string>> => {
+  if (_completePriceMapCache && Date.now() < _completePriceMapCache.expiry) {
+    return _completePriceMapCache.data;
+  }
   const priceMap = await getOraclePrices(accessToken);
   await Promise.all([
     addMTokenPrice(accessToken, priceMap),
@@ -219,5 +225,6 @@ export const getCompletePriceMap = async (
     addSaveUsdstTokenPrice(accessToken, priceMap),
     addYieldVaultTokenPrices(accessToken, priceMap),
   ]);
+  _completePriceMapCache = { data: priceMap, expiry: Date.now() + COMPLETE_PRICE_MAP_TTL };
   return priceMap;
 };
