@@ -681,11 +681,19 @@ export const getBalanceHistory = async (
   return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.balance}));
 };
 
+const _netBalanceHistoryCache = new Map<string, { data: BalanceSnapshot[]; expiry: number }>();
+const NET_BALANCE_HISTORY_TTL = 60_000;
+
 export const getNetBalanceHistory = async (
   accessToken: string,
   userAddress: string,
   historyParams: HistoryParams,
 ): Promise<BalanceSnapshot[]> => {
+  const cacheKey = `${userAddress}:${historyParams.numTicks}:${historyParams.interval}`;
+  const cached = _netBalanceHistoryCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.data;
+  }
 
   // Pre-fetch vault config and carry vault active request IDs in parallel
   const carryVaultAddrs = listVaultDefs().filter(v => v.address).map(v => v.address);
@@ -751,7 +759,9 @@ export const getNetBalanceHistory = async (
     updatePortfolioInfoMapping,
     processBalanceSnapshot
   );
-  return balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
+  const result = balanceHistory.map(({timestamp, data}) => ({timestamp, balance: data.netBalance}));
+  _netBalanceHistoryCache.set(cacheKey, { data: result, expiry: Date.now() + NET_BALANCE_HISTORY_TTL });
+  return result;
 };
 
 export const getBorrowingHistory = async (

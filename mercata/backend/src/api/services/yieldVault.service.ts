@@ -1321,10 +1321,16 @@ const computeApy = async (
   }
 };
 
+const _vaultInfoCache = new Map<string, { data: YieldVaultInfo; ts: number }>();
+const VAULT_INFO_TTL = 30_000;
+
 export const getYieldVaultInfo = async (
   _accessToken: string,
   key: string
 ): Promise<YieldVaultInfo> => {
+  const cached = _vaultInfoCache.get(key);
+  if (cached && Date.now() - cached.ts < VAULT_INFO_TTL) return cached.data;
+
   const def = resolveVaultDef(key);
   const fallback = emptyInfo(def, key);
   if (!def?.address) return fallback;
@@ -1409,7 +1415,7 @@ export const getYieldVaultInfo = async (
   const tvlUsd = underlyingUsdWad(idleAssets + deployedAssets, assetPrice, decimals);
   const apy = await computeApy(serviceToken, def.address, assetAddress, totalAssets, totalShares);
 
-  return {
+  const result: YieldVaultInfo = {
     key,
     configured: true,
     deployed: true,
@@ -1436,6 +1442,8 @@ export const getYieldVaultInfo = async (
     minIdleRequirement: minIdleRequirement.toString(),
     deployBlockedReason,
   };
+  _vaultInfoCache.set(key, { data: result, ts: Date.now() });
+  return result;
 };
 
 export const getYieldVaultUserInfo = async (

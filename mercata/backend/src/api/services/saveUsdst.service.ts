@@ -333,11 +333,17 @@ const getVaultState = async (accessToken: string): Promise<Record<string, any> |
   return data?.[0] || null;
 };
 
+const _userFlowCache = new Map<string, { data: { totalDepositedAssets: bigint; totalWithdrawnAssets: bigint }; ts: number }>();
+const USER_FLOW_TTL = 60_000;
+
 const getUserFlowTotals = async (
   accessToken: string,
   vaultAddress: string,
   userAddress: string
 ): Promise<{ totalDepositedAssets: bigint; totalWithdrawnAssets: bigint }> => {
+  const cacheKey = `${vaultAddress}:${userAddress}`;
+  const cached = _userFlowCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < USER_FLOW_TTL) return cached.data;
   const normalizedUser = normalizeAddress(userAddress);
   if (!vaultAddress || !normalizedUser) {
     return { totalDepositedAssets: 0n, totalWithdrawnAssets: 0n };
@@ -390,10 +396,17 @@ const getUserFlowTotals = async (
     console.warn("Failed to compute saveUSDST flow totals:", error);
   }
 
-  return { totalDepositedAssets, totalWithdrawnAssets };
+  const result = { totalDepositedAssets, totalWithdrawnAssets };
+  _userFlowCache.set(cacheKey, { data: result, ts: Date.now() });
+  return result;
 };
 
+let _saveInfoCache: { data: SaveUsdstInfo; ts: number } | null = null;
+const SAVE_INFO_TTL = 30_000;
+
 export const getSaveUsdstInfo = async (accessToken: string): Promise<SaveUsdstInfo> => {
+  if (_saveInfoCache && Date.now() - _saveInfoCache.ts < SAVE_INFO_TTL) return _saveInfoCache.data;
+
   const fallback = emptyInfo();
   const vaultState = await getVaultState(accessToken);
 
@@ -434,7 +447,7 @@ export const getSaveUsdstInfo = async (accessToken: string): Promise<SaveUsdstIn
     totalShares
   );
 
-  return {
+  const result: SaveUsdstInfo = {
     configured: true,
     deployed: true,
     vaultAddress,
@@ -450,6 +463,8 @@ export const getSaveUsdstInfo = async (accessToken: string): Promise<SaveUsdstIn
     apy,
     paused: Boolean(vaultState._paused),
   };
+  _saveInfoCache = { data: result, ts: Date.now() };
+  return result;
 };
 
 export const getSaveUsdstUserInfo = async (
