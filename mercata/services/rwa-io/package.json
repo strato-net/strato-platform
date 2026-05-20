@@ -1,0 +1,25 @@
+{
+  "name": "mercata-rwa-io-adapter",
+  "version": "1.0.0",
+  "description": "RWA.io time-series adapter — pushes STRATO TVL metrics to RWA.io",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "dry-run": "RWA_IO_API_KEY=dry-run ts-node src/dry-run.ts"
+  },
+  "engines": {
+    "node": ">=22.12 <23.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "node-cron": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/node-cron": "^3.0.11",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  }
+}

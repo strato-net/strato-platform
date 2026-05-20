@@ -4,6 +4,7 @@ import { useUser } from "@/context/UserContext";
 import { useCDP } from '@/context/CDPContext';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
 import { useUserTokens } from '@/context/UserTokensContext';
+import { useTokenContext } from '@/context/TokenContext';
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -20,6 +21,7 @@ const Borrow = () => {
   const { refreshVaults } = useCDP();
   const { refetch: refetchRewards } = useRewardsUserInfo();
   const { fetchTokens } = useUserTokens();
+  const { fetchUsdstBalance, refreshNetBalance } = useTokenContext();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('vaults');
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
@@ -39,12 +41,14 @@ const Borrow = () => {
   const refreshAllCDPComponents = useCallback(async () => {
     setVaultsRefreshTrigger(prev => prev + 1);
     setMintPlannerRefreshTrigger(prev => prev + 1);
-    refreshVaults();
     await Promise.all([
+      refreshVaults(),
       refetchRewards(),
       fetchTokens(),
+      fetchUsdstBalance(),
+      refreshNetBalance(),
     ]);
-  }, [refreshVaults, refetchRewards, fetchTokens]);
+  }, [refreshVaults, refetchRewards, fetchTokens, fetchUsdstBalance, refreshNetBalance]);
 
   const handleVaultActionSuccess = useCallback(async () => {
     await refreshAllCDPComponents();

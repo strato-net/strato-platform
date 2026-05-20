@@ -78,9 +78,14 @@ class AuthHandler {
 
           if (!isServiceUser) {
             let userName: string = payload["preferred_username"];
-            req.address = walletAddress
-              ? walletAddress.replace(/^0x/i, "").toLowerCase()
-              : await createOrGetKey(token);
+            if (walletAddress) {
+              req.address = walletAddress.replace(/^0x/i, "").toLowerCase();
+              req.isNewUser = false;
+            } else {
+              const { address, isNew } = await createOrGetKey(token);
+              req.address = address;
+              req.isNewUser = isNew;
+            }
             req.userName = userName;
           } else if (walletAddress) {
             req.address = walletAddress.replace(/^0x/i, "").toLowerCase();
