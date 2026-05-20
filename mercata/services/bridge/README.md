@@ -1,200 +1,136 @@
 # Mercata Bridge Service
 
-The Mercata Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using dynamic RPC connections.
+The bridge service is a long-running Node service that moves tokens between Ethereum (and other EVM chains) and STRATO. It handles two directions:
 
-## Features
+- **Bridge-in** (Ethereum → STRATO): polls `DepositRouter` events via `eth_getLogs`, mirrors them to the `MercataBridge` contract on STRATO, verifies on-chain receipts, confirms deposits (which mints the STRATO-side tokens), and awards Voucher rewards.
+- **Bridge-out** (STRATO → Ethereum): picks up withdrawal requests from STRATO, builds and proposes Safe multisig transactions on the destination chain, monitors Safe execution, and finalizes or aborts on-chain.
 
-* **Dynamic Chain Support**: Automatically detects and configures RPC endpoints for all enabled chains from the bridge contract
-* **Safe Multisig Integration**: Proposes and executes transactions through Gnosis Safe for secure asset management
-* **Real-time Monitoring**: Polls blockchain events and transaction statuses across all supported chains
-* **Bridge Out Flow**: Complete STRATO → Ethereum asset transfer with Safe approval workflow
-* **Bridge In Flow**: Ethereum → STRATO deposit processing and confirmation
-* **Dynamic Asset Management**: Fetches enabled assets and chain information from on-chain bridge contract
-* **Email Notifications**: Sends transaction alerts to configured email addresses
-* **Comprehensive Logging**: Secure and contextual logging using Winston
-* **OAuth Integration**: Secure authentication with STRATO using OpenID Connect
+It also exposes `POST /request-deposit-action` for operators to manually unblock stuck deposits.
 
-## Prerequisites
+- **How it works end-to-end** → [docs/FLOW.md](docs/FLOW.md)
+- **Runbooks — add/remove a chain, add/remove an asset** → [docs/OPERATIONS.md](docs/OPERATIONS.md)
 
-- Node.js 18 or higher
-- Access to Alchemy API for Ethereum networks
-- Gnosis Safe multisig wallet
-- Safe owner private key
-- STRATO OAuth credentials
+---
 
-## Installation
+## Source map
 
-1. Clone the repository
-2. Navigate to the bridge service:
-```bash
-cd services/bridge
+```text
+src/
+├── index.ts                                   Express bootstrap, /health, /request-deposit-action, polling init
+├── polling/
+│   ├── alchemyPolling.ts                      Bridge-in: Ethereum event polling → depositBatch
+│   └── mercataPolling.ts                      STRATO-side: deposit verification, withdrawal request, withdrawal tx monitoring
+├── services/
+│   ├── bridgeService.ts                       MercataBridge contract call wrappers (deposit, confirm, review, withdrawal, finalize, abort)
+│   ├── verificationService.ts                 Deposit receipt verification (ETH-direct, ETH-via-router, ERC20)
+│   ├── depositActionService.ts                HTTP unblock: requestDepositAction wrapper
+│   ├── voucherService.ts                      Voucher.mint after deposit confirmation
+│   ├── blockTrackingService.ts                Per-chain bridge-in cursor (local + on-chain dual cursor)
+│   ├── cirrusService.ts                       Cirrus query helpers (chains, assets, deposits, withdrawals, prices)
+│   ├── emailService.ts                        SendGrid notification to withdrawal approvers
+│   ├── rpcService.ts                          Ethereum JSON-RPC helpers (eth_getLogs, eth_blockNumber, receipts, traces)
+│   └── safeService.ts                         Safe orchestration: create proposals, monitor tx status (executed / rejected / pending)
+├── controllers/
+│   └── depositAction.controller.ts            Express handler for POST /request-deposit-action
+├── auth/
+│   ├── index.ts                               OpenID / OAuth init + token helpers
+│   ├── oauth.ts                               simple-oauth2 wrapper
+│   └── tokenMiddleware.ts                     OIDC bearer-token verification middleware
+├── config/
+│   └── index.ts                               Single config object, constants, env validation
+├── types/
+│   └── index.ts                               Shared TypeScript types
+└── utils/
+    ├── api.ts                                 strato / bloc / cirrus axios clients
+    ├── stratoHelper.ts                        buildFunctionTx + execute (same pattern as rewards-poller)
+    ├── safeHelper.ts                          Safe low-level: nonce allocation, meta-tx building, signing, API proposal submission, hot-wallet execution
+    ├── balanceCheck.ts                        Pre-flight USDST/Voucher balance check
+    ├── configValidator.ts                     Startup validation: OIDC, auth probe, address formats, chain RPC URLs
+    ├── healthMonitor.ts                       Error flag file for /health
+    ├── logger.ts                              Structured console logging with secret redaction
+    └── utils.ts                               Address normalization, hex helpers
 ```
 
-3. Install dependencies:
-```bash
-npm install
-```
-
-4. Copy the example environment file and update the values:
-```bash
-cp .env.example .env
-```
+---
 
 ## Configuration
 
-### Required Environment Variables
+### Required environment variables
 
-#### Authentication
-- `BA_USERNAME` - BlockApps username
-- `BA_PASSWORD` - BlockApps password
-- `CLIENT_SECRET` - OAuth client secret
-- `CLIENT_ID` - OAuth client ID
-- `OPENID_DISCOVERY_URL` - OpenID discovery endpoint
+| Variable | Purpose |
+|:--|:--|
+| `BA_USERNAME`, `BA_PASSWORD` | BlockApps credentials |
+| `CLIENT_ID`, `CLIENT_SECRET` | OAuth client credentials |
+| `OPENID_DISCOVERY_URL` | OpenID discovery endpoint |
+| `BRIDGE_ADDRESS` | MercataBridge contract on STRATO |
+| `PRICE_ORACLE_ADDRESS` | Price Oracle contract (for rebase factors) |
+| `SAFE_ADDRESS` | Main Safe multisig address on Ethereum |
+| `SAFE_PROPOSER_ADDRESS` | Proposer EOA address |
+| `SAFE_PROPOSER_PRIVATE_KEY` | Proposer private key (signs Safe proposals) |
+| `CHAIN_<id>_RPC_URL` | Per-chain Ethereum RPC endpoint (one per enabled chain, e.g. `CHAIN_1_RPC_URL`) |
 
-#### Blockchain
-- `ALCHEMY_API_KEY` - Alchemy API key (used for all chains)
-- `BRIDGE_ADDRESS` - MercataBridge contract address
+### Optional environment variables
 
-#### Chain RPC URLs (Dynamically Validated)
-The service automatically validates that RPC URLs are configured for all enabled chains from the bridge contract:
+| Variable | Default | Purpose |
+|:--|:--|:--|
+| `PORT` | `3003` | Express port |
+| `NODE_URL` | — | STRATO node URL (not in `requiredEnvVars` but needed by `validateBridgeConfig`) |
+| `USDST_ADDRESS` | `937efa7e3a77e20bbdbd7c0d32b6514f368c1010` | USDST token |
+| `VOUCHER_CONTRACT_ADDRESS` | `000000000000000000000000000000000000100e` | Voucher token |
+| `SAFE_HOT_WALLET_ADDRESS` | — | Hot-wallet Safe for auto-executing small withdrawals |
+| `SAFE_API_KEY` | — | Safe Transaction Service API key |
+| `GAS_FEE_USDST` | `1` (= 0.01 USDST) | Gas estimate per tx, multiplied by 1e16 |
+| `GAS_FEE_VOUCHER` | `100` (= 1 Voucher) | Gas estimate per tx, multiplied by 1e16 |
+| `MIN_TRANSACTIONS_THRESHOLD` | `200` | Mark unhealthy if remaining txs ≤ this; exit if 0 |
+| `SENDGRID_API_KEY` | — | For withdrawal-approver email notifications |
+| `TRANSACTION_APPROVER_EMAILS` | — | Comma-separated list of approver emails |
 
-- `CHAIN_11155111_RPC_URL` - Sepolia RPC URL (e.g., `https://eth-sepolia.g.alchemy.com/v2`)
-- `CHAIN_1_RPC_URL` - Ethereum mainnet RPC URL (if using mainnet)
-- `CHAIN_${chainId}_RPC_URL` - RPC URL for any additional enabled chains
+> **Note:** `NODE_URL` is not in the `requiredEnvVars` array, but `validateBridgeConfig()` calls Cirrus at `${NODE_URL}/cirrus/search/...` to fetch enabled chains. If `NODE_URL` is unset, validation fails and the process exits before polling starts.
 
-#### Safe Wallet
-- `SAFE_ADDRESS` - Gnosis Safe wallet address
-- `SAFE_PROPOSER_ADDRESS` - Safe Proposer address
-- `SAFE_PROPOSER_PRIVATE_KEY` - Safe Proposer private key
+See [`src/config/index.ts`](src/config/index.ts) for the full config object and defaults.
 
-#### Optional
-- `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)
-- `TRANSACTION_APPROVER_EMAILS` - Comma-separated list of emails for transaction alerts
-- `SENDGRID_API_KEY` - SendGrid API key for sending emails
+---
 
-### Dynamic Configuration
-
-The service automatically:
-- Fetches enabled chains and assets from the bridge contract via Cirrus
-- Validates that all required RPC URLs are configured at startup
-- Uses the Alchemy API key for all chain connections
-- Filters all operations by the specific bridge contract address
-
-## Usage
-
-### Development
-
-Run the service in development mode with hot reloading:
+## Running
 
 ```bash
-npm run dev
+cd services/bridge
+npm install
+cp .env.example .env   # fill in the required variables
+npm start              # runs ts-node on src/index.ts
+npm run build          # compile to dist/ via tsc
 ```
 
-### Production
+> **Note:** `npm run dev` (nodemon) writes state files (`data/lastProcessedBlocks.json`) on every polling cycle, which triggers restart loops. Use `npm start` for local work.
 
-Build and run the service:
+---
 
-```bash
-npm run build
-npm start
+## Health, state, and logging
+
+### Health check
+
+```
+GET /health
 ```
 
-## Architecture
+Returns `200` when the error flag file is empty or missing; `500` when it has content. The `/health` handler calls `healthMonitor.errorFileExists()` ([`healthMonitor.ts`](src/utils/healthMonitor.ts)).
 
-### Service Layer
+The flag is append-only: every `logError` call writes to it. Once set, the service stays unhealthy until you delete or truncate `data/bridge-error.flag` after resolving the root cause.
 
-1. **Bridge Service** (`bridgeService.ts`)
-   - Core bridge contract interactions
-   - Handles deposit and withdrawal confirmations
-   - Manages batch operations for efficiency
+### State files (under `data/`)
 
-2. **Safe Service** (`safeService.ts`)
-   - Centralized Safe multisig wallet operations
-   - Transaction generation and proposal
-   - Status monitoring and execution
+| File | Shape | Purpose |
+|:--|:--|:--|
+| `data/lastProcessedBlocks.json` | `{ [chainId]: blockNumber }` | Per-chain bridge-in cursor. In-memory cache; dual-cursor with on-chain `MercataBridge.chains[chainId].lastProcessedBlock` |
+| `data/bridge-error.flag` | Append-only error log | Non-empty means `/health` reports unhealthy |
 
-3. **Cirrus Service** (`cirrusService.ts`)
-   - Dynamic chain and asset information fetching
-   - Withdrawal status queries
-   - Bridge contract data retrieval
+### Logging
 
-4. **Polling Services**
-   - **Mercata Polling**: Monitors STRATO bridge events
-   - **Alchemy Polling**: Monitors Ethereum bridge events
-   - Real-time transaction status tracking
+Structured console logs via [`src/utils/logger.ts`](src/utils/logger.ts) (plain `console`, not Winston):
 
-### Bridge Out Flow (STRATO → Ethereum)
+- `logInfo(context, message, data?)` — successful operations.
+- `logError(context, error, data?)` — failures; also appends to the error flag file.
 
-1. **Withdrawal Initiation**
-   - Service polls for withdrawals with status "1" (INITIATED)
-   - Groups withdrawals by destination chain and token
-   - Creates Safe transactions for each unique combination
+Redacted patterns: `api_key=` / `api-key=` / `apikey=`, `Bearer <token>`, `Authorization:` headers.
 
-2. **Safe Transaction Processing**
-   - Generates Safe transaction with total amount and destination address
-   - Proposes transaction to Safe multisig for approval
-   - Monitors transaction status (executed/rejected/pending)
-
-3. **Finalization**
-   - **Executed**: Calls `finaliseWithdrawalBatch` on bridge contract
-   - **Rejected**: Calls `abortWithdrawalBatch` on bridge contract
-   - Sends email notifications for completed transactions
-
-### Bridge In Flow (Ethereum → STRATO)
-
-1. **Deposit Detection**
-   - Alchemy polling monitors Ethereum deposit events
-   - Checks if deposit is already processed
-   - Records deposit on STRATO if new
-
-2. **Processing**
-   - Updates last processed block for chain
-   - Handles batch processing for efficiency
-
-### Key Components
-
-- **Dynamic RPC Management**: Uses `getChainRpcUrl(chainId)` for all chain interactions
-- **Safe Integration**: Leverages `@safe-global/protocol-kit` and `@safe-global/api-kit`
-- **OAuth Authentication**: Secure STRATO access with JWT validation
-- **Error Handling**: Comprehensive error handling with detailed logging
-
-## Error Handling
-
-The service includes comprehensive error handling:
-
-- **Network Errors**: Automatic retry mechanisms for RPC calls
-- **Safe Transaction Failures**: Proper error handling for proposal and execution
-- **Cirrus API Errors**: Graceful degradation when Cirrus is unavailable
-- **Configuration Errors**: Startup validation ensures all required config is present
-
-All errors are logged with appropriate context for debugging.
-
-## Monitoring
-
-The service logs important events and errors using Winston logger:
-
-- **Startup**: Chain validation, OAuth initialization
-- **Polling**: Event detection and processing
-- **Safe Operations**: Transaction proposals and executions
-- **Bridge Operations**: Deposit and withdrawal processing
-- **Errors**: Detailed error logging with context
-
-## Security Considerations
-
-- **Private Keys**: Stored securely in environment variables
-- **Safe Multisig**: All bridge operations require Safe approval
-- **OAuth**: Secure authentication with STRATO
-- **Contract Validation**: All operations filter by specific bridge contract address
-- **Error Handling**: Prevents service crashes and data corruption
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-MIT 
+> **Warning:** Raw credential strings outside those patterns are not auto-redacted. The `SAFE_PROPOSER_PRIVATE_KEY` is particularly sensitive — never log it in context objects.
