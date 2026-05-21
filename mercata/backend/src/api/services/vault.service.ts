@@ -482,10 +482,15 @@ export const getUserBalances = async (
   return { balances };
 };
 
+let _vaultInfoCache: { data: VaultInfo; ts: number } | null = null;
+const VAULT_INFO_TTL = 30_000;
+
 /**
  * Get comprehensive vault info (global state)
  */
 export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
+  if (_vaultInfoCache && Date.now() - _vaultInfoCache.ts < VAULT_INFO_TTL) return _vaultInfoCache.data;
+
   const vaultAddress = getVaultAddress();
   
   if (!vaultAddress) {
@@ -599,7 +604,7 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     currentPrices
   );
 
-  return {
+  const result: VaultInfo = {
     totalEquity: totalEquity.toString(),
     withdrawableEquity: withdrawableEquity.toString(),
     totalShares,
@@ -613,6 +618,8 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     shareTokenAddress: shareToken,
     botExecutor,
   };
+  _vaultInfoCache = { data: result, ts: Date.now() };
+  return result;
 };
 
 /**
