@@ -30,7 +30,7 @@ contract record AdminRegistry is Ownable {
 
     constructor() Ownable(this) { }
 
-    function initialize(address[] _initialAdmins) external onlyOnce {
+    function initialize(address[] _initialAdmins) external onlyOwner onlyOnce {
         defaultVotingThresholdBps = 6000; // 3/5
         require(admins.length == 0, "AdminRegistry is already initialized");
         for (uint i = 0; i < _initialAdmins.length; i++) {
