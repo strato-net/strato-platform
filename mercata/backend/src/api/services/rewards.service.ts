@@ -333,7 +333,7 @@ export interface RewardsOverview {
 }
 
 let _rewardTokenSymbolCache: { symbol: string | null; tokenAddress: string; expiry: number } | null = null;
-const REWARD_TOKEN_SYMBOL_TTL = 60_000;
+const REWARD_TOKEN_SYMBOL_TTL = 30_000;
 
 const getRewardTokenSymbol = async (accessToken: string, rewardToken: string): Promise<string | null> => {
   if (_rewardTokenSymbolCache && _rewardTokenSymbolCache.tokenAddress === rewardToken
