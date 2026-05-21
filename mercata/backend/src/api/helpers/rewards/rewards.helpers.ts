@@ -7,7 +7,7 @@ import { constants } from "../../../config/constants";
  */
 let contractStateCache: { address: string; state: any; timestamp: number } | null = null;
 let pendingRequest: Promise<any> | null = null;
-const CACHE_TTL = 5000; // 5 seconds cache
+const CACHE_TTL = 30_000; // 30 seconds cache
 const normalizeUserAddress = (address: string): string => address.replace(/^0x/i, "").toLowerCase();
 
 /**
