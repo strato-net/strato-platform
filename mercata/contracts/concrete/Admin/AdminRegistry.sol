@@ -143,13 +143,13 @@ contract record AdminRegistry is Ownable {
     }
 
     function _executeIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
-        variadic ret = _target.call(_func, _args);
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
             votes[_issueId][i] = address(0);
         }
         votes[_issueId].length = 0;
         delete currentIssues[_issueId];
+        variadic ret = _target.call(_func, _args);
         emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
         return ret;
     }
