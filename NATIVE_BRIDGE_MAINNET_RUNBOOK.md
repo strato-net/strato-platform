@@ -697,6 +697,19 @@ If a native withdrawal is stuck in `INITIATED`:
 4. Check bridge service logs for queueManualNativeWithdrawalBatch or finalizeNativeWithdrawalBatch.
 ```
 
+If a native redemption is stuck after the Ethereum-side burn:
+
+```text
+1. Treat the burn as final; there is no regular abort/redemption-refund path.
+2. Confirm the RedemptionRequested event was emitted by <ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY>.
+3. Confirm bridge service is running and polling CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS.
+4. Confirm STRATO_NATIVE_BRIDGE_ADDRESS, STRATO_NATIVE_CUSTODY_VAULT_ADDRESS, and BRIDGE_OPERATOR are correct.
+5. Check whether the STRATO native deposit was recorded in Cirrus.
+6. If not recorded, fix polling/RPC/service configuration and let the bridge service retry recordDeposit.
+7. If recorded but not completed, fix the blocking STRATO state (route enabled, deposits unpaused, custody vault unpaused, vault locked balance sufficient, token whitelist if paused) and let the bridge service retry confirmDeposit.
+8. Do not create an external re-mint or off-chain compensation without governance approval and a written incident record.
+```
+
 If Safe execution shows `GS013` for native mint:
 
 ```text
