@@ -149,6 +149,19 @@ const getVaultAddress = (): string | null => {
   return config.vault || null;
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// FIELD-LEVEL CACHES — cache static data, always fetch live data
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const VAULT_DATA_CACHE_TTL = 3_600_000;
+const TOKEN_INFO_CACHE_TTL = 3_600_000;
+const PERF_METRICS_CACHE_TTL = 600_000;
+
+let _vaultDataCache: { vaultAddress: string; data: Record<string, any>; expiresAt: number } | null = null;
+let _tokenInfoCache: { key: string; data: Map<string, { symbol: string; name: string; images?: { value: string }[] }>; expiresAt: number } | null = null;
+let _perfMetricsCache: { vaultAddress: string; apy: string; alpha: string; expiresAt: number } | null = null;
+const _firstDepositCache = new Map<string, { date: string; timestamp: Date } | null>();
+
 /**
  * Get vault data from Cirrus
  */
@@ -197,6 +210,20 @@ const getVaultData = async (
     console.error("Error fetching vault data:", error);
     return null;
   }
+};
+
+const getCachedVaultData = async (
+  accessToken: string,
+  vaultAddress: string
+): Promise<Record<string, any> | null> => {
+  if (_vaultDataCache && _vaultDataCache.vaultAddress === vaultAddress && Date.now() < _vaultDataCache.expiresAt) {
+    return _vaultDataCache.data;
+  }
+  const data = await getVaultData(accessToken, vaultAddress);
+  if (data) {
+    _vaultDataCache = { vaultAddress, data, expiresAt: Date.now() + VAULT_DATA_CACHE_TTL };
+  }
+  return data;
 };
 
 /**
@@ -283,6 +310,19 @@ const getBatchTokenInfo = async (
   return result;
 };
 
+const getCachedTokenInfo = async (
+  accessToken: string,
+  tokenAddresses: string[]
+): Promise<Map<string, { symbol: string; name: string; images?: { value: string }[] }>> => {
+  const key = [...tokenAddresses].sort().join(",");
+  if (_tokenInfoCache?.key === key && Date.now() < _tokenInfoCache.expiresAt) {
+    return _tokenInfoCache.data;
+  }
+  const data = await getBatchTokenInfo(accessToken, tokenAddresses);
+  _tokenInfoCache = { key, data, expiresAt: Date.now() + TOKEN_INFO_CACHE_TTL };
+  return data;
+};
+
 const getBatchBalances = async (
   accessToken: string,
   tokenAddresses: string[],
@@ -337,75 +377,71 @@ const getBatchPrices = async (
   return result;
 };
 
-/**
- * Get historical token balance for an address at a specific date
- */
-const getHistoricalTokenBalance = async (
+const getBatchHistoricalBalances = async (
   accessToken: string,
-  tokenAddress: string,
+  tokenAddresses: string[],
   holderAddress: string,
-  date: string // Format: YYYY-MM-DD
-): Promise<string> => {
+  date: string
+): Promise<Map<string, string>> => {
+  const result = new Map<string, string>();
+  if (!tokenAddresses.length) return result;
   try {
     const { data } = await cirrus.get(accessToken, "/history@mapping", {
       params: {
-        select: "value::text",
-        address: `eq.${tokenAddress}`,
+        select: "address,value::text",
+        address: `in.(${tokenAddresses.join(",")})`,
         collection_name: "eq._balances",
         "key->>key": `eq.${holderAddress}`,
         valid_from: `lte.${date}`,
         valid_to: `gte.${date}`,
       },
     });
-
-    const value = data?.[0]?.value;
-    // Ensure we always return a valid number string, never empty
-    if (!value || value === "") return "0";
-    return value;
+    for (const row of data || []) {
+      const addr = String(row?.address || "").toLowerCase();
+      if (addr && !result.has(addr)) result.set(addr, row?.value || "0");
+    }
   } catch (error) {
-    console.error(`Error fetching historical balance for ${tokenAddress}:`, error);
-    return "0";
+    console.error("Error batch fetching historical balances:", error);
   }
+  return result;
 };
 
-/**
- * Get historical price for an asset at a specific date
- */
-const getHistoricalAssetPrice = async (
+const getBatchHistoricalPrices = async (
   accessToken: string,
   oracleAddress: string,
-  assetAddress: string,
-  date: string // Format: YYYY-MM-DD
-): Promise<string> => {
+  assetAddresses: string[],
+  date: string
+): Promise<Map<string, string>> => {
+  const result = new Map<string, string>();
+  if (!assetAddresses.length) return result;
   try {
     const { data } = await cirrus.get(accessToken, "/history@mapping", {
       params: {
-        select: "value::text",
+        select: "key->>key,value::text",
         address: `eq.${oracleAddress}`,
         collection_name: "eq.prices",
-        "key->>key": `eq.${assetAddress}`,
+        "key->>key": `in.(${assetAddresses.join(",")})`,
         valid_from: `lte.${date}`,
         valid_to: `gte.${date}`,
       },
     });
-
-    const value = data?.[0]?.value;
-    // Ensure we always return a valid number string, never empty
-    if (!value || value === "") return "0";
-    return value;
+    for (const row of data || []) {
+      const asset = String(row?.key || "").toLowerCase();
+      if (asset && !result.has(asset)) result.set(asset, row?.value || "0");
+    }
   } catch (error) {
-    console.error(`Error fetching historical price for ${assetAddress}:`, error);
-    return "0";
+    console.error("Error batch fetching historical prices:", error);
   }
+  return result;
 };
 
-/**
- * Get the first deposit timestamp for the vault
- */
-const getFirstDepositDate = async (
+const getCachedFirstDepositDate = async (
   accessToken: string,
   vaultAddress: string
 ): Promise<{ date: string; timestamp: Date } | null> => {
+  const cached = _firstDepositCache.get(vaultAddress);
+  if (cached !== undefined) return cached;
+
   try {
     const { data: depositEvents } = await cirrus.get(accessToken, `/${Vault}-Deposited`, {
       params: {
@@ -417,12 +453,15 @@ const getFirstDepositDate = async (
     });
 
     if (!depositEvents?.length || !depositEvents[0]?.block_timestamp) {
+      _firstDepositCache.set(vaultAddress, null);
       return null;
     }
 
     const timestamp = new Date(depositEvents[0].block_timestamp);
-    const date = timestamp.toISOString().split("T")[0]; // YYYY-MM-DD
-    return { date, timestamp };
+    const date = timestamp.toISOString().split("T")[0];
+    const result = { date, timestamp };
+    _firstDepositCache.set(vaultAddress, result);
+    return result;
   } catch (error) {
     console.error("Error fetching first deposit date:", error);
     return null;
@@ -430,11 +469,10 @@ const getFirstDepositDate = async (
 };
 
 /**
- * Get vault performance metrics using time-weighted return (TWR) via NAV/share.
- * Returns both the vault APY and the alpha (outperformance vs HODL benchmark).
- * Alpha = vaultAPY - hodlAPY, where HODL reprices historical balances at current prices.
+ * Vault performance metrics (TWR via NAV/share). Cached for 10 minutes.
+ * On cache miss: 3 parallel Cirrus calls (historical storage + batched balances + batched prices).
  */
-const getPerformanceMetrics = async (
+const getCachedPerformanceMetrics = async (
   accessToken: string,
   vaultAddress: string,
   currentEquity: bigint,
@@ -445,13 +483,17 @@ const getPerformanceMetrics = async (
   supportedAssets: string[],
   currentPrices: Map<string, string>
 ): Promise<{ apy: string; alpha: string }> => {
+  if (_perfMetricsCache && _perfMetricsCache.vaultAddress === vaultAddress && Date.now() < _perfMetricsCache.expiresAt) {
+    return { apy: _perfMetricsCache.apy, alpha: _perfMetricsCache.alpha };
+  }
+
   const noData = { apy: "-", alpha: "-" };
   try {
     if (currentTotalShares <= 0n || currentEquity <= 0n) return noData;
 
     const currentNAV = (currentEquity * WAD) / currentTotalShares;
 
-    const firstDeposit = await getFirstDepositDate(accessToken, vaultAddress);
+    const firstDeposit = await getCachedFirstDepositDate(accessToken, vaultAddress);
     if (!firstDeposit) return noData;
 
     const now = new Date();
@@ -469,40 +511,34 @@ const getPerformanceMetrics = async (
     const startDateObj = new Date(startDate + "T00:00:00Z");
     const actualDays = Math.max((now.getTime() - startDateObj.getTime()) / (24 * 60 * 60 * 1000), 1);
 
-    // Historical total supply
-    const { data: histStorage } = await cirrus.get(accessToken, "/history@storage", {
-      params: {
-        address: `eq.${shareTokenAddress}`,
-        valid_from: `lte.${startDate}`,
-        valid_to: `gte.${startDate}`,
-        select: "data",
-      },
-    });
+    const [{ data: histStorage }, histBalanceMap, histPriceMap] = await Promise.all([
+      cirrus.get(accessToken, "/history@storage", {
+        params: {
+          address: `eq.${shareTokenAddress}`,
+          valid_from: `lte.${startDate}`,
+          valid_to: `gte.${startDate}`,
+          select: "data",
+        },
+      }),
+      getBatchHistoricalBalances(accessToken, supportedAssets, botExecutor, startDate),
+      getBatchHistoricalPrices(accessToken, priceOracleAddress, supportedAssets, startDate),
+    ]);
     const histTotalSupply = safeBigInt(histStorage?.[0]?.data?._totalSupply);
     if (histTotalSupply <= 0n) return noData;
-
-    // Fetch all historical balances and prices in parallel
-    const [histBalances, histPrices] = await Promise.all([
-      Promise.all(supportedAssets.map(addr =>
-        getHistoricalTokenBalance(accessToken, addr, botExecutor, startDate)
-      )),
-      Promise.all(supportedAssets.map(addr =>
-        getHistoricalAssetPrice(accessToken, priceOracleAddress, addr, startDate)
-      )),
-    ]);
 
     let histEquity = 0n;
     let hodlEquity = 0n;
 
-    for (let i = 0; i < supportedAssets.length; i++) {
-      const histBalanceBN = safeBigInt(histBalances[i]);
-      const histPriceBN = safeBigInt(histPrices[i]);
+    for (const assetAddress of supportedAssets) {
+      const assetKey = assetAddress.toLowerCase();
+      const histBalanceBN = safeBigInt(histBalanceMap.get(assetKey));
+      const histPriceBN = safeBigInt(histPriceMap.get(assetKey));
 
       if (histPriceBN > 0n) {
         histEquity += (histBalanceBN * histPriceBN) / WAD;
       }
 
-      const currentPriceBN = safeBigInt(currentPrices.get(supportedAssets[i]));
+      const currentPriceBN = safeBigInt(currentPrices.get(assetAddress));
       if (currentPriceBN > 0n) {
         hodlEquity += (histBalanceBN * currentPriceBN) / WAD;
       }
@@ -510,7 +546,6 @@ const getPerformanceMetrics = async (
 
     if (histEquity <= 0n) return noData;
 
-    // Vault APY (NAV-based TWR)
     const histNAV = (histEquity * WAD) / histTotalSupply;
     if (histNAV <= 0n) return noData;
 
@@ -519,17 +554,18 @@ const getPerformanceMetrics = async (
 
     const vaultApy = Math.pow(1 + vaultReturn, 365 / actualDays) - 1;
 
-    // HODL APY (passive benchmark)
     const hodlReturn = Number(((hodlEquity - histEquity) * WAD) / histEquity) / 1e18;
     const hodlApy = hodlReturn <= -1 ? -1 : Math.pow(1 + hodlReturn, 365 / actualDays) - 1;
 
-    // Alpha = vault outperformance vs HODL
     const alpha = vaultApy - hodlApy;
 
-    return {
+    const result = {
       apy: (vaultApy * 100).toFixed(2),
       alpha: (alpha * 100).toFixed(2),
     };
+
+    _perfMetricsCache = { vaultAddress, ...result, expiresAt: Date.now() + PERF_METRICS_CACHE_TTL };
+    return result;
   } catch (error) {
     console.error("Error calculating performance metrics:", error);
     return noData;
@@ -558,7 +594,7 @@ export const getVaultShareTokenAddress = async (
 ): Promise<string> => {
   const vaultAddress = getVaultAddress();
   if (!vaultAddress) return "";
-  const vaultData = await getVaultData(accessToken, vaultAddress);
+  const vaultData = await getCachedVaultData(accessToken, vaultAddress);
   return vaultData?.shareToken || "";
 };
 
@@ -571,7 +607,7 @@ export const getVaultHistoryConfig = async (
 ): Promise<{ shareToken: string; botExecutor: string; supportedAssets: string[] } | null> => {
   const vaultAddress = getVaultAddress();
   if (!vaultAddress) return null;
-  const vaultData = await getVaultData(accessToken, vaultAddress);
+  const vaultData = await getCachedVaultData(accessToken, vaultAddress);
   if (!vaultData) return null;
   return {
     shareToken: vaultData.shareToken || "",
@@ -595,7 +631,7 @@ export const getVaultShareTokenPrice = async (
     return { shareTokenAddress: "", pricePerShare: "0" };
   }
 
-  const vaultData = await getVaultData(accessToken, vaultAddress);
+  const vaultData = await getCachedVaultData(accessToken, vaultAddress);
 
   if (!vaultData) {
     return { shareTokenAddress: "", pricePerShare: "0" };
@@ -645,7 +681,7 @@ export const getUserBalances = async (
     return { balances: [] };
   }
 
-  const vaultData = await getVaultData(accessToken, vaultAddress);
+  const vaultData = await getCachedVaultData(accessToken, vaultAddress);
 
   if (!vaultData) {
     return { balances: [] };
@@ -704,7 +740,7 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     };
   }
 
-  const vaultData = await getVaultData(accessToken, vaultAddress);
+  const vaultData = await getCachedVaultData(accessToken, vaultAddress);
   
   if (!vaultData) {
     throw new Error("Vault not found");
@@ -721,9 +757,9 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
 
   const allTokenAddresses = [shareToken, ...supportedAssetAddresses];
 
-  // Single parallel phase: batch token info + batch balances + batch prices + total supply
+  // Static data (cached 1hr) + live data (always fresh) in parallel
   const [tokenInfoMap, balanceMap, priceMap, totalShares] = await Promise.all([
-    getBatchTokenInfo(accessToken, allTokenAddresses),
+    getCachedTokenInfo(accessToken, allTokenAddresses),
     getBatchBalances(accessToken, supportedAssetAddresses, botExecutor),
     getBatchPrices(accessToken, priceOracleAddress, supportedAssetAddresses),
     getTokenTotalSupply(accessToken, shareToken),
@@ -779,15 +815,13 @@ export const getVaultInfo = async (accessToken: string): Promise<VaultInfo> => {
     });
   }
 
-  // Calculate NAV per share
   let navPerShare = WAD.toString();
   const totalSharesBN = safeBigInt(totalShares);
   if (totalSharesBN > 0n && totalEquity > 0n) {
     navPerShare = ((totalEquity * WAD) / totalSharesBN).toString();
   }
 
-  // Calculate APY and alpha vs HODL
-  const { apy, alpha } = await getPerformanceMetrics(
+  const { apy, alpha } = await getCachedPerformanceMetrics(
     accessToken,
     vaultAddress,
     totalEquity,
@@ -827,7 +861,7 @@ export const getUserPosition = async (
   const vaultAddress = getVaultAddress();
   if (!vaultAddress) return noPosition;
 
-  const vaultData = await getVaultData(accessToken, vaultAddress);
+  const vaultData = await getCachedVaultData(accessToken, vaultAddress);
   if (!vaultData?.shareToken) return noPosition;
 
   const shareToken = vaultData.shareToken;
@@ -929,7 +963,7 @@ export const getWithdrawPreview = async (
     return { basket: [] };
   }
 
-  const vaultData = await getVaultData(accessToken, vaultAddress);
+  const vaultData = await getCachedVaultData(accessToken, vaultAddress);
 
   if (!vaultData) {
     return { basket: [] };
@@ -1236,8 +1270,7 @@ export const getTransactions = async (
     return { transactions: [] };
   }
 
-  // Get bot executor address from vault
-  const vaultData = await getVaultData(accessToken, vaultAddress);
+  const vaultData = await getCachedVaultData(accessToken, vaultAddress);
   if (!vaultData?.botExecutor) {
     return { transactions: [] };
   }
