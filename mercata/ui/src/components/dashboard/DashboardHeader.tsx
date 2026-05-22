@@ -4,11 +4,12 @@ import { useTheme } from 'next-themes';
 import { LogOutIcon, Copy, ChevronLeft } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { useAccount, useDisconnect } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { ModeToggle } from '../mode-toggle';
+import { useEffect } from 'react';
+import { PENDING_STRATO_WALLET_CONNECT_KEY } from '@/lib/auth';
 
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import STRATOICON from '@/assets/icon.png';
@@ -26,7 +27,8 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
   const { logout, isLoggedIn } = useUser();
   const { isTestnet } = useNetwork();
   const { resolvedTheme } = useTheme();
-  const { address: walletAddress, isConnected, connector } = useAccount();
+  const { address: walletAddress, isConnected, isConnecting, connector } = useAccount();
+  const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -34,6 +36,15 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
   const [searchParams] = useSearchParams();
 
   const isPortfolioPage = pathname === '/dashboard';
+  const stratoConnector = connectors.find((connector) => connector.id === 'stratoWallet');
+
+  useEffect(() => {
+    if (!isLoggedIn || isConnected || isConnecting || !stratoConnector) return;
+    if (sessionStorage.getItem(PENDING_STRATO_WALLET_CONNECT_KEY) !== "1") return;
+
+    sessionStorage.removeItem(PENDING_STRATO_WALLET_CONNECT_KEY);
+    connect({ connector: stratoConnector });
+  }, [connect, isConnected, isConnecting, isLoggedIn, stratoConnector]);
   
   // Handle back navigation - check for 'from' query param for bridge-transactions page
   const handleBackClick = () => {
@@ -155,20 +166,15 @@ const DashboardHeader = ({ title, subtitle }: DashboardHeaderProps) => {
             </PopoverContent>
           </Popover>
         ) : (
-          <ConnectButton.Custom>
-            {({ openConnectModal, mounted, authenticationStatus }) => {
-              if (!mounted || authenticationStatus === 'loading') return null;
-              return (
-                <Button
-                  onClick={openConnectModal}
-                  size="sm"
-                  className="h-8 md:h-9 px-3 md:px-4 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 gap-1.5"
-                >
-                  <span className="text-xs md:text-sm font-medium">Connect Wallet</span>
-                </Button>
-              );
+          <Button
+            onClick={() => {
+              if (stratoConnector) connect({ connector: stratoConnector });
             }}
-          </ConnectButton.Custom>
+            size="sm"
+            className="h-8 md:h-9 px-3 md:px-4 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 gap-1.5"
+          >
+            <span className="text-xs md:text-sm font-medium">Connect Wallet</span>
+          </Button>
         )}
       </div>
     </header>

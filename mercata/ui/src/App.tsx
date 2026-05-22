@@ -173,7 +173,6 @@ const App = () => {
         connectors,
         chains: chains as unknown as readonly [typeof mainnet, ...(typeof baseChains)],
         transports,
-        ssr: true,
       });
 
       setWagmiConfig(config);
