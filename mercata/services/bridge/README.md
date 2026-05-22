@@ -71,7 +71,7 @@ The service automatically validates that RPC URLs are configured for all enabled
 - `STRATO_NATIVE_BRIDGE_ADDRESS` - STRATO native bridge proxy address
 - `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS` - External representation bridge address for each native route chain
 - `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY` - Destination-chain key used to pay gas and sign native mint attestations
-- `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY_2`, `_3`, ... - Optional additional destination-chain signer keys when the destination bridge attestation threshold is raised
+- `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY_1`, `_2`, ... - Optional additional destination-chain signer keys when the destination bridge attestation threshold is raised
 
 Native withdrawal review delay and attestation validity are enforced by the native bridge contracts, not bridge-service environment variables.
 

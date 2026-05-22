@@ -1,6 +1,8 @@
 # Native Bridge Deployment
 
-This is the end-to-end install guide for a new native bridge deployment. Follow the numbered sections in order:
+This is the canonical end-to-end install guide for a new non-production native bridge deployment. For production, use `NATIVE_BRIDGE_MAINNET_RUNBOOK.md`. For contract lifecycle and audit workflow details, use `NATIVE_BRIDGE_CONTRACT_WORKFLOWS.md`.
+
+Follow the numbered sections in order:
 1. `Naming`
 2. `STRATO`
 3. `Ethereum Sepolia`
@@ -303,7 +305,7 @@ Before running the native flow end to end, update the bridge service environment
 - `CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>`
 - `CHAIN_11155111_RPC_URL=<sepolia-rpc-url>` if it is not already configured
 - `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY=<destination-native-bridge-key>` for paying gas and signing native mint attestations
-- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2=<additional-signer-key>` and higher numbered keys if the destination bridge attestation threshold is greater than `1`
+- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_1=<additional-signer-key>` and higher numbered keys if the destination bridge attestation threshold is greater than `1`
 
 Confirm that `StratoNativeBridge` has the bridge service STRATO address configured as its bridge operator before starting native withdrawals. The operator must be the STRATO address for the same `BA_USERNAME` account running the service.
 
@@ -313,7 +315,7 @@ If the bridge service is deployed through `docker-compose.bridge.tpl.yml`, these
 - `STRATO_NATIVE_BRIDGE_ADDRESS`
 - `CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`
 - `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY`
-- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2` through `_5`
+- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_1` through `_5`
 
 The bridge service now has a native mint path:
 - instant withdrawals move to `PENDING_REVIEW`, wait until the STRATO contract-provided `nativeMintNotBefore`, sign the EIP-712 `NativeMintAttestation`, submit `mintRepresentationWithAttestation(attestation, signatures)` with the chain-specific native bridge key, wait for a successful destination receipt, then call `finalizeWithdrawal` on STRATO with the destination tx hash
@@ -637,7 +639,7 @@ args:
   enabled: true
 ```
 
-`signer` must be the address recovered from the bridge service's `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY`. If multiple numbered signer keys are configured (`CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2`, etc.), each signer needed to satisfy the threshold must be enabled. If the service signs with a key that is not enabled here, native withdrawal minting fails on Sepolia with `BadAttestationSignatures()`.
+`signer` must be the address recovered from the bridge service's `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY`. If multiple numbered signer keys are configured (`CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_1`, etc.), each signer needed to satisfy the threshold must be enabled. If the service signs with a key that is not enabled here, native withdrawal minting fails on Sepolia with `BadAttestationSignatures()`.
 
 ```text
 target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
@@ -699,8 +701,8 @@ CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY=<key-for-signer-and-gas>
 If `attestationThreshold()` is greater than `1`, add enough enabled signer keys:
 
 ```bash
-CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2=<second-signer-key>
-CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_3=<third-signer-key>
+CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_1=<second-signer-key>
+CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2=<third-signer-key>
 ```
 
 Each configured private key must recover to a signer enabled through `setAttestationSigner`. The bridge service validates at startup that all configured keys are enabled on the destination bridge and that enough enabled keys exist to satisfy `attestationThreshold()`.

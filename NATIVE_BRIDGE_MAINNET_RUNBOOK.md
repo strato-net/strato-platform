@@ -28,6 +28,12 @@ Safe signers confirmed:
   STRATO governance/admin signer set
   Ethereum mainnet Safe owners and threshold
 
+Deployment authority confirmed:
+  STRATO deployer is funded and approved only for deployment execution
+  Ethereum deployer is funded and approved only for deployment execution
+  Final STRATO owner/admin is ADMIN_REGISTRY
+  Final Ethereum admin is ETHEREUM_ADMIN_SAFE
+
 Operational credentials confirmed:
   bridge service STRATO account
   Ethereum mainnet RPC
@@ -40,6 +46,9 @@ Operational credentials confirmed:
 STRATO_NETWORK_NAME=upquark
 STRATO_NETWORK_ID=33056204878082667
 ETHEREUM_CHAIN_ID=1
+
+STRATO_DEPLOYER=<STRATO deployer account used to deploy/upgrade proxies>
+ETHEREUM_DEPLOYER=<Ethereum deployer EOA used to deploy proxies>
 
 ADMIN_REGISTRY=<STRATO admin/governance address>
 ADMIN_REGISTRY_WITHOUT_0X=<same address without 0x>
@@ -106,6 +115,8 @@ The application code can be built earlier, but do not activate the app container
 ## 3. STRATO Mainnet Contracts
 
 Run from `mercata/contracts`.
+
+The STRATO deployer may be a funded operational account, but it must not be the final authority. The upgrade commands below set `initialOwner` to `<ADMIN_REGISTRY_WITHOUT_0X>`, so owner-only native bridge and custody vault administration belongs to STRATO governance/admin after deployment.
 
 If deploying new proxies, deploy two `Proxy` contracts and record:
 
@@ -177,6 +188,8 @@ args:
 ## 4. Ethereum Mainnet Contracts
 
 Run from `mercata/ethereum`.
+
+The Ethereum deployer may be any approved funded EOA. It should only submit deployment transactions. The initializer params below assign `DEFAULT_ADMIN_ROLE` to `<ETHEREUM_ADMIN_SAFE>`, not to the deployer. Do not continue to production activation if the deployer retains unexpected admin roles after deployment.
 
 ```bash
 npm ci
@@ -419,8 +432,8 @@ CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY=<native-mint-signer-and-gas-key>
 If multiple signers are required:
 
 ```bash
-CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_2=<second-native-mint-signer-key>
-CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_3=<third-native-mint-signer-key>
+CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_1=<second-native-mint-signer-key>
+CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_2=<third-native-mint-signer-key>
 ```
 
 Mercata backend mainnet addresses should be added to `mercata/backend/src/config/config.ts` before building the backend image. Update the Upquark entries after the production proxies are final:
@@ -484,6 +497,8 @@ docker exec <mercata-backend-container> sh -lc 'grep -R "parseNativeBridgeAssets
 Ethereum token checks:
 
 ```text
+StratoNativeRepresentationToken.hasRole(DEFAULT_ADMIN_ROLE, <ETHEREUM_ADMIN_SAFE>) == true
+StratoNativeRepresentationToken.hasRole(DEFAULT_ADMIN_ROLE, <ETHEREUM_DEPLOYER>) == false
 StratoNativeRepresentationToken.hasRole(<BRIDGE_ROLE>, <ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY>) == true
 StratoNativeRepresentationToken.transfersEnabled() == false
 StratoNativeRepresentationToken.transferEndpoints(<ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY>) == true
@@ -492,6 +507,8 @@ StratoNativeRepresentationToken.transferEndpoints(<ETHEREUM_NATIVE_REPRESENTATIO
 Ethereum bridge checks:
 
 ```text
+StratoNativeRepresentationBridge.hasRole(DEFAULT_ADMIN_ROLE, <ETHEREUM_ADMIN_SAFE>) == true
+StratoNativeRepresentationBridge.hasRole(DEFAULT_ADMIN_ROLE, <ETHEREUM_DEPLOYER>) == false
 StratoNativeRepresentationBridge.attestationSigners(<NATIVE_MINT_SIGNER_1>) == true
 StratoNativeRepresentationBridge.attestationThreshold() == <ATTESTATION_THRESHOLD>
 StratoNativeRepresentationBridge.maxAttestationValiditySeconds() == <MAX_ATTESTATION_VALIDITY_SECONDS>
@@ -502,6 +519,8 @@ StratoNativeRepresentationBridge.routeActive(<STRATO_NATIVE_TOKEN>) == true
 STRATO route checks:
 
 ```text
+StratoNativeBridge.owner() == <ADMIN_REGISTRY>
+StratoNativeCustodyVault.owner() == <ADMIN_REGISTRY>
 StratoNativeBridge.assets(<STRATO_NATIVE_TOKEN>, 1).enabled == true
 StratoNativeBridge.assets(<STRATO_NATIVE_TOKEN>, 1).externalBridge == <ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY>
 StratoNativeBridge.assets(<STRATO_NATIVE_TOKEN>, 1).representationToken == <ETHEREUM_REPRESENTATION_TOKEN_PROXY>
