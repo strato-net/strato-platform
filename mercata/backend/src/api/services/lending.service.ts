@@ -1421,6 +1421,10 @@ export interface LiquidationEntry {
 let _liquidationCache: { data: { registry: any; tokenInfoMap: Map<string, any> }; expiry: number } | null = null;
 const LIQUIDATION_CACHE_TTL = 30_000;
 
+export const clearLiquidationCache = (): void => {
+  _liquidationCache = null;
+};
+
 export const listLoansForLiquidation = async (
   accessToken: string,
   margin?: number

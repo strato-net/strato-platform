@@ -706,9 +706,11 @@ export const deposit = async (
 
   const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   
-  return await postAndWaitForTx(accessToken, () =>
+  const result = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
+  _vaultInfoCache = null;
+  return result;
 };
 
 export interface WithdrawBasketItem {
@@ -858,9 +860,11 @@ export const withdraw = async (
     args: { amountUSD: amountUsd },
   }, userAddress, accessToken);
 
-  return await postAndWaitForTx(accessToken, () =>
+  const result = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
+  _vaultInfoCache = null;
+  return result;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
