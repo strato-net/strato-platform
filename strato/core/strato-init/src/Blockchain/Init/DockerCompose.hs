@@ -62,6 +62,8 @@ generateDockerCompose = do
             , ("TOKEN_FACTORY", "${TOKEN_FACTORY:-}")
             , ("ADMIN_REGISTRY", "${ADMIN_REGISTRY:-}")
             , ("MERCATA_BRIDGE", "${MERCATA_BRIDGE:-}")
+            , ("STRATO_NATIVE_BRIDGE", "${STRATO_NATIVE_BRIDGE:-}")
+            , ("STRATO_NATIVE_CUSTODY_VAULT", "${STRATO_NATIVE_CUSTODY_VAULT:-}")
             , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")
             , ("STRIPE_SECRET_KEY", "${STRIPE_SECRET_KEY:-}")
             , ("STRIPE_PUBLISHABLE_KEY", "${STRIPE_PUBLISHABLE_KEY:-}")
