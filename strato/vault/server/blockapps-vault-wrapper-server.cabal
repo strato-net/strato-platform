@@ -104,22 +104,14 @@ executable change-vault-password
   hs-source-dirs:
       app
   build-depends:
-      aeson
-    , base
+      base
     , blockapps-vault-wrapper-api
     , blockapps-vault-wrapper-server
     , bytestring
-    , directory
     , hflags
-    , http-client
-    , http-types
     , opaleye
     , postgresql-simple
-    , process
     , saltine
-    , strato-model
-    , text
-    , unix
   default-language: Haskell2010
 
 executable migrate-keys
