@@ -10,7 +10,7 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
-          docker system prune -f || true
+          docker system prune -fa || true
         '''
       }
     }
@@ -22,16 +22,8 @@ pipeline {
         script {
           sh '''#!/bin/bash -le
             set -o pipefail
-            make app | tee make-app.log
+            make | tee make.log
           '''
-          // Last line of `make app` is:
-          //   strato-patch-app <node-dir> <OPTIONAL_PREFIX>mercata-backend:<TAG> <OPTIONAL_PREFIX>mercata-ui:<TAG>
-          // Strip the `strato-patch-app <node-dir>` prefix so we keep just the two image args.
-          env.PATCH_APP_IMAGES = sh(
-            script: "tail -n 1 make-app.log | sed -E 's/^[[:space:]]*strato-patch-app[[:space:]]+[^[:space:]]+[[:space:]]+//'",
-            returnStdout: true
-          ).trim()
-          echo "Captured patch-app image args: ${env.PATCH_APP_IMAGES}"
         }
       }
     }
