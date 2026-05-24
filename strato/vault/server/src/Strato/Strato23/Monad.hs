@@ -220,7 +220,7 @@ formatTopLocation ((_, x) : _) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocSta
 -- timeout, RDS Proxy backend switch). Returns False for application errors
 -- such as constraint violations, syntax errors, permission denials, etc.
 isTransientSqlError :: SqlError -> Bool
-isTransientSqlError SqlError {sqlState, sqlErrorMsg} =
+isTransientSqlError SqlError {..} =
   let st = BS.unpack sqlState
       msg = BS.unpack sqlErrorMsg
    in -- SQLSTATE class 08 = connection_exception (always transient)
