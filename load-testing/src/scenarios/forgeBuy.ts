@@ -32,7 +32,7 @@ import { AppScenario } from "./appScenario";
  * tx. No Sepolia, no bridge service, no asynchronous wait — the on-STRATO
  * tx hash is in the response body the moment the POST returns.
  *
- * Page-load warmup (when `includePageLoad: true`):
+ * Page-load warmup (when `includePageLoad: true`, default false):
  *   - GET /api/metal-forge/configs  (forge rate + metal addresses)
  *   - GET /api/tokens/balance       (calling user's USDST balance)
  *

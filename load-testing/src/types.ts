@@ -280,8 +280,9 @@ export interface ForgeBuyScenarioConfig {
   metalForgeAddress?: string;
 
   /* ---- Behaviour toggles ---- */
-  /** If true, do a small page-load warm-up (GETs that the relevant UI page
-   *  fires on mount) once per user before hitting the POSTs. Default true. */
+  /** If true, do a small page-load warm-up (GETs that the forge Buy page
+   *  fires on mount) once per user before hitting the POSTs. Default false.
+   *  For an isolated page-load benchmark prefer the `pageLoad` scenario. */
   includePageLoad?: boolean;
   /** Max retries on HTTP 429 + 5xx for /api/metal-forge/buy. Default 3. */
   requestRetries?: number;
@@ -298,6 +299,39 @@ export interface ForgeBuyScenarioConfig {
   clientSecret?: string;
 }
 
+// ----------------------------------------------------------------------------
+// Page Load (Scenario 3): warmup-only.
+// ----------------------------------------------------------------------------
+// Runs a configurable list of authenticated GETs once per virtual user, in
+// parallel across users. No POSTs, no balance snapshots, no chain activity.
+// Used to isolate page-load behaviour (Keycloak grants + backend GETs +
+// Cloudflare path) from the transaction phase of forgeBuy/tokenSale.
+// ----------------------------------------------------------------------------
+
+export interface PageLoadStep {
+  name: string;
+  path: string;
+}
+
+export interface PageLoadScenarioConfig {
+  enabled: boolean;
+  /** Backend URL (e.g. https://app.testnet.strato.nexus). Defaults to node[0].url. */
+  backendUrl?: string;
+  /** Number of concurrent virtual users issuing the page-load GETs. */
+  concurrentUsers: number;
+  /** Network identifier label, e.g. "helium". Report metadata only. */
+  networkLabel?: string;
+  /** Ordered list of GETs each virtual user issues. Default mirrors the
+   *  forgeBuy page-load steps (/api/metal-forge/configs + /api/tokens/balance). */
+  steps?: PageLoadStep[];
+
+  /* ---- Auth ---- */
+  users?: LoadTestUser[];
+  openIdDiscoveryUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
+}
+
 export interface ScenariosConfig {
   contractDeploy: ContractDeployScenarioConfig;
   functionCall: FunctionCallScenarioConfig;
@@ -305,6 +339,7 @@ export interface ScenariosConfig {
   multiNode: MultiNodeConfig;
   tokenSale: TokenSaleScenarioConfig;
   forgeBuy: ForgeBuyScenarioConfig;
+  pageLoad: PageLoadScenarioConfig;
 }
 
 export interface ReportConfig {
