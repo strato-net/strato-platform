@@ -1,11 +1,22 @@
 import { bloc, strato, extractErrorMessage } from "./api";
 import { config } from "../config";
-import { logInfo } from "./logger";
+import { logError, logInfo } from "./logger";
 import { FunctionInput, BuiltTx, TxResult, TxResponse } from "../types";
 
 // ============================================================================
 // Core Transaction Functions
 // ============================================================================
+
+let stratoWriteQueue: Promise<void> = Promise.resolve();
+
+const enqueueStratoWrite = async <T>(task: () => Promise<T>): Promise<T> => {
+  const run = stratoWriteQueue.then(task, task);
+  stratoWriteQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+};
 
 /**
  * Build transaction from inputs (single or batch)
@@ -23,6 +34,30 @@ export const buildFunctionTx = (
     gasLimit: config.strato.gas.limit,
     gasPrice: config.strato.gas.price,
   },
+});
+
+const getTxFailureMessage = (result: any): string => {
+  return (
+    result?.txResult?.status?.details ||
+    result?.txResult?.status?.type?.contents ||
+    result?.txResult?.message ||
+    result?.txResult?.response ||
+    result?.error ||
+    result?.message ||
+    "Transaction failed"
+  );
+};
+
+const getTxFailureDetails = (result: any) => ({
+  hash: result?.hash,
+  status: result?.status,
+  message: result?.message,
+  error: result?.error,
+  txResultMessage: result?.txResult?.message,
+  txResultResponse: result?.txResult?.response,
+  txResultStatus: result?.txResult?.status,
+  blockHash: result?.txResult?.blockHash,
+  transactionHash: result?.txResult?.transactionHash,
 });
 
 /**
@@ -60,11 +95,11 @@ const getImmediateResult = (
       return { status: "Success", hash: first.hash };
     case "Failed":
     case "Failure": {
-      const msg =
-        first.txResult?.message ||
-        first.error ||
-        first.message ||
-        "Transaction failed";
+      const msg = getTxFailureMessage(first);
+      logError("StratoHelper", new Error(extractErrorMessage(msg)), {
+        operation: "immediateTransactionFailure",
+        result: getTxFailureDetails(first),
+      });
       throw new Error(extractErrorMessage(msg));
     }
     case "Pending":
@@ -104,11 +139,12 @@ export const postAndWaitForTx = async (
     (res: TxResult[]) => {
       const failed = res.find((r) => r?.status === "Failure");
       if (failed) {
-        const msg =
-          failed.txResult?.message ||
-          failed.error ||
-          failed.message ||
-          "Transaction failed";
+        const msg = getTxFailureMessage(failed);
+        logError("StratoHelper", new Error(extractErrorMessage(msg)), {
+          operation: "polledTransactionFailure",
+          result: getTxFailureDetails(failed),
+          txHashes,
+        });
         throw new Error(extractErrorMessage(msg));
       }
       return res.every((r) => r?.status !== "Pending");
@@ -134,19 +170,21 @@ export const execute = async (
   const { method = "unknown", contractName = "unknown" } = inputArray[0] || {};
   const context = `${method} on ${contractName}`;
 
-  logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx)`);
+  return enqueueStratoWrite(async () => {
+    logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx)`);
 
-  const result = await postAndWaitForTx(
-    () =>
-      strato.post(
-        "/transaction/parallel?resolve=true",
-        buildFunctionTx(inputs),
-      ),
-    timeout,
-  );
+    const result = await postAndWaitForTx(
+      () =>
+        strato.post(
+          "/transaction/parallel?resolve=true",
+          buildFunctionTx(inputs),
+        ),
+      timeout,
+    );
 
-  logInfo("StratoHelper", `${result.status}: ${context} (${result.hash})`);
-  return result;
+    logInfo("StratoHelper", `${result.status}: ${context} (${result.hash})`);
+    return result;
+  });
 };
 
 // ============================================================================
