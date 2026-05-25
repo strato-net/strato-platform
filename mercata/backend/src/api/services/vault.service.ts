@@ -553,13 +553,19 @@ export interface UserTokenBalance {
 /**
  * Get the vault share token address.
  */
+// Static address — only changes on redeploy
+let _shareTokenAddrCache: { value: string; expiresAt: number } | null = null;
+
 export const getVaultShareTokenAddress = async (
   accessToken: string
 ): Promise<string> => {
+  if (_shareTokenAddrCache && Date.now() < _shareTokenAddrCache.expiresAt) return _shareTokenAddrCache.value;
   const vaultAddress = getVaultAddress();
   if (!vaultAddress) return "";
   const vaultData = await getVaultData(accessToken, vaultAddress);
-  return vaultData?.shareToken || "";
+  const value = vaultData?.shareToken || "";
+  _shareTokenAddrCache = { value, expiresAt: Date.now() + 3_600_000 };
+  return value;
 };
 
 /**
