@@ -16,6 +16,7 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
+import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
 import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
@@ -162,51 +163,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
 
-    -- Set vault password for local auth mode: use env var if provided, otherwise generate random
-    when flags_localAuth $ do
-      let vaultPasswordFile = "secrets" </> "vault_password"
-      vaultPasswordExists <- doesFileExist vaultPasswordFile
-      unless vaultPasswordExists $ liftIO $ do
-        envPassword <- lookupEnv "vault_password"
-        password <- case envPassword of
-          Just pw | not (null pw) -> return pw
-          _ -> generatePassword 32
-        putStrLn $ "  Creating vault password file: " ++ vaultPasswordFile
-        writeFile vaultPasswordFile password
-        void $ chmod roo vaultPasswordFile
-
-      let hydraSystemSecretFile = "secrets" </> "local_auth_hydra_system_secret"
-      hydraSystemSecretExists <- doesFileExist hydraSystemSecretFile
-      unless hydraSystemSecretExists $ liftIO $ do
-        envSecret <- lookupEnv "LOCAL_AUTH_HYDRA_SYSTEM_SECRET"
-        secret <- case envSecret of
-          Just s | not (null s) -> return s
-          _ -> generatePassword 64
-        putStrLn $ "  Creating local-auth Hydra system secret file: " ++ hydraSystemSecretFile
-        writeFile hydraSystemSecretFile secret
-        void $ chmod roo hydraSystemSecretFile
-
-      let hydraPairwiseSaltFile = "secrets" </> "local_auth_hydra_pairwise_salt"
-      hydraPairwiseSaltExists <- doesFileExist hydraPairwiseSaltFile
-      unless hydraPairwiseSaltExists $ liftIO $ do
-        envSalt <- lookupEnv "LOCAL_AUTH_HYDRA_PAIRWISE_SALT"
-        salt <- case envSalt of
-          Just s | not (null s) -> return s
-          _ -> generatePassword 64
-        putStrLn $ "  Creating local-auth Hydra pairwise salt file: " ++ hydraPairwiseSaltFile
-        writeFile hydraPairwiseSaltFile salt
-        void $ chmod roo hydraPairwiseSaltFile
-
-      let kratosCookieSecretFile = "secrets" </> "local_auth_kratos_cookie_secret"
-      kratosCookieSecretExists <- doesFileExist kratosCookieSecretFile
-      unless kratosCookieSecretExists $ liftIO $ do
-        envSecret <- lookupEnv "LOCAL_AUTH_KRATOS_COOKIE_SECRET"
-        secret <- case envSecret of
-          Just s | not (null s) -> return s
-          _ -> generatePassword 64
-        putStrLn $ "  Creating local-auth Kratos cookie secret file: " ++ kratosCookieSecretFile
-        writeFile kratosCookieSecretFile secret
-        void $ chmod roo kratosCookieSecretFile
+    when flags_localAuth $ liftIO setupLocalAuthSecrets
 
     -- OAuth credentials: generate secure local creds for --localAuth,
     -- otherwise copy from ~/.secrets/ (external OAuth mode)

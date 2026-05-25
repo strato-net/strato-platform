@@ -53,6 +53,7 @@ escape_sed_replacement() {
 HYDRA_SYSTEM_SECRET=$(read_secret_file "/run/secrets/local_auth_hydra_system_secret" "HYDRA_SYSTEM_SECRET")
 HYDRA_PAIRWISE_SALT=$(read_secret_file "/run/secrets/local_auth_hydra_pairwise_salt" "HYDRA_PAIRWISE_SALT")
 KRATOS_COOKIE_SECRET=$(read_secret_file "/run/secrets/local_auth_kratos_cookie_secret" "KRATOS_COOKIE_SECRET")
+LOCAL_AUTH_ADMIN_PASSWORD=$(read_secret_file "/run/secrets/local_auth_admin_password" "LOCAL_AUTH_ADMIN_PASSWORD")
 
 HYDRA_SYSTEM_SECRET_ESCAPED=$(escape_sed_replacement "$HYDRA_SYSTEM_SECRET")
 HYDRA_PAIRWISE_SALT_ESCAPED=$(escape_sed_replacement "$HYDRA_PAIRWISE_SALT")
@@ -181,14 +182,13 @@ fi
 
 # Create default admin user in Kratos if needed
 echo "Checking for default admin user..."
-DEFAULT_USER_EMAIL="${DEFAULT_USER_EMAIL:-admin@local.strato}"
-DEFAULT_USER_PASSWORD="${DEFAULT_USER_PASSWORD:-localdev123}"
+LOCAL_AUTH_ADMIN_USERNAME="${LOCAL_AUTH_ADMIN_USERNAME:-admin}"
 
-# Check if user exists by trying to get identities with that email
-EXISTING_USER=$(curl -s "http://localhost:4434/admin/identities" | grep -o "\"$DEFAULT_USER_EMAIL\"" || true)
+# Check if user exists by trying to get identities with that username
+EXISTING_USER=$(curl -s "http://localhost:4434/admin/identities" | grep -o "\"$LOCAL_AUTH_ADMIN_USERNAME\"" || true)
 
 if [ -z "$EXISTING_USER" ]; then
-    echo "Creating default admin user: $DEFAULT_USER_EMAIL"
+    echo "Creating default admin user: $LOCAL_AUTH_ADMIN_USERNAME"
     
     # Create identity via Kratos Admin API
     curl -s -X POST "http://localhost:4434/admin/identities" \
@@ -196,13 +196,12 @@ if [ -z "$EXISTING_USER" ]; then
         -d "{
             \"schema_id\": \"default\",
             \"traits\": {
-                \"email\": \"$DEFAULT_USER_EMAIL\",
-                \"username\": \"admin\"
+                \"username\": \"$LOCAL_AUTH_ADMIN_USERNAME\"
             },
             \"credentials\": {
                 \"password\": {
                     \"config\": {
-                        \"password\": \"$DEFAULT_USER_PASSWORD\"
+                        \"password\": \"$LOCAL_AUTH_ADMIN_PASSWORD\"
                     }
                 }
             },
@@ -212,9 +211,8 @@ if [ -z "$EXISTING_USER" ]; then
     echo "Default user created."
     echo ""
     echo "============================================"
-    echo "  Default credentials:"
-    echo "    Email:    $DEFAULT_USER_EMAIL"
-    echo "    Password: $DEFAULT_USER_PASSWORD"
+    echo "  Local auth admin user:"
+    echo "    Username: $LOCAL_AUTH_ADMIN_USERNAME"
     echo "============================================"
     echo ""
 else

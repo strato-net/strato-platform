@@ -4,7 +4,7 @@ A bundled OAuth2/OIDC identity provider for local STRATO deployments. Contains:
 
 - **Ory Kratos** - Identity management (users, passwords, 2FA)
 - **Ory Hydra** - OAuth2/OIDC token server
-- **Login UI** - Simple web interface for login/registration/consent
+- **Login UI** - Simple web interface for login/consent
 
 ## Quick Start
 
@@ -17,22 +17,21 @@ docker compose up --build
 
 | Service | Port | Description |
 |---------|------|-------------|
-| Kratos Public | 4433 | Self-service flows (login, registration) |
+| Kratos Public | 4433 | Self-service flows |
 | Kratos Admin | 4434 | User management API |
 | Hydra Public | 4444 | OAuth2/OIDC endpoints |
 | Hydra Admin | 4445 | Client management API |
 | Login UI | 3000 | Web interface |
 
-## Default Credentials
+## Admin User
 
-On first start, a default user is created:
+On first start, a single admin user is created:
 
-- **Email:** `admin@local.strato`
-- **Password:** `localdev123`
+- **Username:** `admin`
+- **Password:** read from `/run/secrets/local_auth_admin_password`
 
 Override with environment variables:
-- `DEFAULT_USER_EMAIL`
-- `DEFAULT_USER_PASSWORD`
+- `LOCAL_AUTH_ADMIN_USERNAME`
 
 ## OAuth Configuration
 
@@ -64,7 +63,7 @@ http://localhost:4444/.well-known/openid-configuration
 
 3. Or use the authorization code flow:
    - Open: http://localhost:3000/login
-   - Sign in with default credentials
+   - Sign in as `admin`
    - You'll be redirected back with an authorization code
 
 ## Integration with STRATO
@@ -80,7 +79,7 @@ When integrated with STRATO:
 
 - `kratos.yml` - Kratos configuration (identity schemas, self-service flows)
 - `hydra.yml` - Hydra configuration (OAuth settings, token TTLs)
-- `identity.schema.json` - User identity schema (email, username)
+- `identity.schema.json` - User identity schema
 
 ## Production Notes
 
@@ -88,6 +87,5 @@ Before production use:
 
 1. Change secrets in `kratos.yml` and `hydra.yml`
 2. Configure proper database DSN (not in-memory)
-3. Set up proper SMTP for email verification
-4. Enable HTTPS
-5. Review password policies in `kratos.yml`
+3. Enable HTTPS
+4. Review password policies in `kratos.yml`

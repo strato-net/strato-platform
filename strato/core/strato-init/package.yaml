@@ -22,6 +22,7 @@ library:
     - Blockchain.Init.DockerComposeAllDocker
     - Blockchain.Init.EthConf
     - Blockchain.Init.Generator
+    - Blockchain.Init.LocalAuth
     - Blockchain.Init.BuildMetadata
     - Blockchain.Init.BuildMetadata.TH
     - Blockchain.Init.Monad
