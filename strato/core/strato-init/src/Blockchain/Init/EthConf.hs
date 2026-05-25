@@ -146,6 +146,7 @@ genEthConf = do
         , vaultUrl = if Opts.flags_localAuth
             then nodeBaseUrl ++ "/vault/strato/v2.3"
             else flags_vaultUrl
+        , vaultTimeoutSec = flags_vaultTimeoutSec
         , fileServerUrl = deriveFileServerUrl flags_fileServerUrl flags_network
         , notificationServerUrl = flags_notificationServerUrl
         , repoUrl = flags_repoUrl

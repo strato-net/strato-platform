@@ -39,6 +39,8 @@ defineFlag "svmTrace" (False :: Bool) "Enable verbose logging in SolidVM"
 
 defineFlag "vaultUrl" "https://vault.blockapps.net:8093/strato/v2.3" "URL of the shared vault service"
 
+defineFlag "vaultTimeoutSec" (12 :: Int) "HTTP response timeout (seconds) for vault-wrapper signature / key requests"
+
 defineFlag "fileServerUrl" "" "URL of the file server for marketplace (derived from network if not provided)"
 
 defineFlag "notificationServerUrl" "" "URL of the notification server for marketplace"
