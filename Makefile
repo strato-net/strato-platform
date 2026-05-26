@@ -185,7 +185,7 @@ all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force app
 
 app: mercata-backend mercata-ui
 	@echo ""
@@ -373,6 +373,17 @@ migrate-key:
 	@echo
 	@echo "Installed: ${HOME}/.local/bin/migrate-key"
 	@echo "Next steps: see strato/vault/vault-runner/README.md - 'Migrating a single key between Vaults'"
+
+# Builds the change-vault-password admin tool on the host and installs it to ~/.local/bin.
+# See strato/vault/vault-runner/README.md ("Changing the existing Vault password")
+# for the full operator workflow (docker cp into the vault-wrapper container, etc).
+change-vault-password:
+	@echo Now building change-vault-password...
+	cd strato && stack ${NIX_FLAG} build blockapps-vault-wrapper-server:exe:change-vault-password
+	cd strato && stack ${NIX_FLAG} --local-bin-path ${HOME}/.local/bin install blockapps-vault-wrapper-server:exe:change-vault-password
+	@echo
+	@echo "Installed: ${HOME}/.local/bin/change-vault-password"
+	@echo "Next steps: see strato/vault/vault-runner/README.md - 'Changing the existing Vault password'"
 
 vault-nginx:
 	@echo Now building vault-nginx...
