@@ -68,9 +68,10 @@ const formatCountdown = (targetUnix: bigint, now: bigint): string => {
 };
 
 const FixedPriceSalePage = () => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, isAppAuthenticated, isExternalEvmWalletConnected } = useUser();
   const { toast } = useToast();
   const guestMode = !isLoggedIn;
+  const useExternalWalletSigning = isExternalEvmWalletConnected && !isAppAuthenticated;
 
   const [info, setInfo] = useState<SaleInfo | null>(null);
   const [position, setPosition] = useState<UserSalePosition>({ purchased: "0", remainingForWallet: "0" });
@@ -210,7 +211,12 @@ const FixedPriceSalePage = () => {
 
     setBuyLoading(true);
     try {
-      const result = await fixedPriceSaleService.buy(paymentToken, amountWei.toString(), quotePayment);
+      const result = await fixedPriceSaleService.buy(
+        paymentToken,
+        amountWei.toString(),
+        quotePayment,
+        useExternalWalletSigning ? { walletAuth: true } : undefined,
+      );
       toast({
         title: "Purchase submitted",
         description: `Tx ${result.hash?.slice(0, 10)}…`,

@@ -1,4 +1,12 @@
 import { api } from "@/lib/axios";
+import type { WalletTxProgressHandler } from "@/lib/axios";
+
+export interface BuyOptions {
+  /** When true, forces the X-Wallet-Address header so the backend returns unsigned txs
+   *  for MetaMask/external-wallet signing. Mirrors the bridge flow. */
+  walletAuth?: boolean;
+  walletTxProgress?: WalletTxProgressHandler;
+}
 
 export interface SaleToken {
   address: string;
@@ -84,12 +92,20 @@ export const fixedPriceSaleService = {
     return res.data;
   },
 
-  async buy(paymentToken: string, saleAmount: string, paymentAmount: string): Promise<TxResult> {
-    const res = await api.post<TxResult>("/fixed-price-sale/buy", {
-      paymentToken,
-      saleAmount,
-      paymentAmount,
-    });
+  async buy(
+    paymentToken: string,
+    saleAmount: string,
+    paymentAmount: string,
+    options?: BuyOptions,
+  ): Promise<TxResult> {
+    const config: any = {};
+    if (options?.walletAuth) config.walletAuth = true;
+    if (options?.walletTxProgress) config.walletTxProgress = options.walletTxProgress;
+    const res = await api.post<TxResult>(
+      "/fixed-price-sale/buy",
+      { paymentToken, saleAmount, paymentAmount },
+      Object.keys(config).length ? config : undefined,
+    );
     return res.data;
   },
 
