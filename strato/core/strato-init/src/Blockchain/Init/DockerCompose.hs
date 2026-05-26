@@ -179,7 +179,7 @@ generateDockerCompose = do
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=300 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
+        , command = Just ["exec docker-entrypoint.sh postgres -c max_connections=500 -c shared_buffers=512MB >> /logs/postgres.log 2>&1"]
         , restart = Just "unless-stopped"
         , healthcheck = Just Healthcheck
             { test = ["CMD-SHELL", "pg_isready -U postgres"]
