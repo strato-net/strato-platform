@@ -185,7 +185,7 @@ all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force mercata-backend-force mercata-ui-force bridge-force bridge-nginx-force app
 
 app: mercata-backend mercata-ui
 	@echo ""
@@ -362,6 +362,17 @@ vault-wrapper: build_common_docker
 	cp strato/vault/doit.sh ${VAULTDIR}
 	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}vault-wrapper:${VERSION} ${REPO_AWS_ECR_URL}vault-wrapper:${VERSION}
+
+# Builds the migrate-key admin tool on the host and installs it to ~/.local/bin.
+# See strato/vault/vault-runner/README.md ("Migrating a single key between Vaults")
+# for the full operator workflow (docker cp into the vault-wrapper container, etc).
+migrate-key:
+	@echo Now building migrate-key...
+	cd strato && stack ${NIX_FLAG} build blockapps-vault-wrapper-server:exe:migrate-key
+	cd strato && stack ${NIX_FLAG} --local-bin-path ${HOME}/.local/bin install blockapps-vault-wrapper-server:exe:migrate-key
+	@echo
+	@echo "Installed: ${HOME}/.local/bin/migrate-key"
+	@echo "Next steps: see strato/vault/vault-runner/README.md - 'Migrating a single key between Vaults'"
 
 vault-nginx:
 	@echo Now building vault-nginx...

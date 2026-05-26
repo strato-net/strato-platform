@@ -48,8 +48,9 @@ strato-up mynode \
 
 ### Key migration
 
-You may want to migrate the existing keys from BlockApps shared Vault to you local vault.
-> TODO: Steps are TBD.
+You may want to migrate a specific user's key from one Vault instance to another (for example,
+from the BlockApps shared Vault to your local vault). See the
+[Migrating a single key between Vaults](#migrating-a-single-key-between-vaults) section below.
 
 ### Killing the Vault
 
@@ -188,3 +189,129 @@ rm -rf update-password.sh
     curl -sf http://localhost:8000/strato/v2.3/verify-password`
     # Expected: true
     ```
+
+
+---
+
+
+## Migrating a single key between Vaults
+
+The `migrate-key` tool moves a specific user's key from one Vault instance to another
+(different Postgres DB, different vault password) without ever writing the plaintext private
+key to disk. It runs in two modes selected by `--out` vs `--in`:
+
+1. `--out=<path>` (**export**): on the **source** vault, decrypt the user's key with the
+   source vault password and re-encrypt it under a one-time **transport password**. Writes
+   a JSON envelope to `<path>`.
+2. `--in=<path>` (**import**): on the **destination** vault, decrypt the envelope with the
+   transport password and re-encrypt under the destination vault password. Inserts a new
+   user row (or, with `--force`, overwrites an existing one).
+
+Both modes read passwords from **stdin** (two lines, newline-separated). Passwords are never
+accepted on the command line or via environment variables, so they do not appear in `ps` or
+in shell history.
+
+- Export reads: line 1 = source vault password, line 2 = transport password.
+- Import reads: line 1 = transport password, line 2 = destination vault password.
+
+### Postgres connection settings
+
+Postgres connection settings are resolved with the standard CLI > env > default
+precedence:
+
+1. **CLI flag** if explicitly passed: `--pghost`, `--pgport`, `--pguser`,
+   `--password`, `--database`.
+2. **Environment variable** (the same names the vault-wrapper daemon already
+   reads from `docker-compose.vault.yml`):
+   - `postgres_host`
+   - `postgres_port`
+   - `postgres_user`
+   - `postgres_password`
+   - `postgres_vault_wrapper_db`
+3. **Default** if neither is set: `postgres` / `5432` / `postgres` / `api` /
+   `oauth`.
+
+When running `migrate-key` via `docker exec` inside a `vault-wrapper-*`
+container, those env vars are already set by the compose file, so on the
+destination vault you usually don't need any `--pghost`/`--pguser`/`--password`/
+`--database` flags even if the destination vault uses non-default settings.
+
+### Build and prepare
+
+Build on the source host, install into both vault-wrapper containers (source and destination)
+the same way as `change-vault-password` above:
+```
+cd strato-platform/strato/
+stack build blockapps-vault-wrapper-server:exe:migrate-key
+stack --local-bin-path ~/.local/bin/ install blockapps-vault-wrapper-server:exe:migrate-key
+sudo docker cp ~/.local/bin/migrate-key vault-vault-wrapper-1:/usr/local/bin/migrate-key
+sudo docker exec vault-vault-wrapper-1 chmod 755 /usr/local/bin/migrate-key
+```
+Copy the required dynamically linked libs (secp256k1, libsodium):
+```
+ldd "$(which migrate-key)" | grep -E 'libsecp256k1|libsodium' | awk '{print $3}' | while read so; do
+  real=$(readlink -f "$so")
+  echo "copying $real as $(basename $so)"
+  sudo docker cp "$real" vault-vault-wrapper-1:/usr/local/lib/$(basename $so)
+done
+```
+Repeat the two `docker cp` steps on the destination host's vault-wrapper container.
+
+### Export the key from the source vault
+
+```
+SRC_VAULT_PW=...      # current source-vault password
+TRANSPORT_PW=...      # one-time password used only to protect the file in transit
+
+printf '%s\n%s\n' "$SRC_VAULT_PW" "$TRANSPORT_PW" \
+| sudo docker exec -i vault-vault-wrapper-1 \
+    /usr/local/bin/migrate-key \
+      --x_user_unique_name='alice@example.com' \
+      --x_identity_provider_id='https://my-oauth.example.com' \
+      --out=/tmp/alice.key.json
+# Inside the vault-wrapper container, $postgres_host/$postgres_user/$postgres_password
+# /$postgres_vault_wrapper_db are already set by docker-compose.vault.yml, so
+# migrate-key picks them up automatically. To override, pass --pghost / --pguser /
+# --password / --database / --pgport explicitly.
+
+sudo docker cp vault-vault-wrapper-1:/tmp/alice.key.json ./alice.key.json
+sudo docker exec vault-vault-wrapper-1 rm -f /tmp/alice.key.json
+```
+
+Move `alice.key.json` to the destination host (e.g. `scp`).
+
+### Import the key into the destination vault
+
+```
+TRANSPORT_PW=...      # same one-time password used during export
+DST_VAULT_PW=...      # destination-vault password
+
+sudo docker cp ./alice.key.json vault-vault-wrapper-1:/tmp/alice.key.json
+
+printf '%s\n%s\n' "$TRANSPORT_PW" "$DST_VAULT_PW" \
+| sudo docker exec -i vault-vault-wrapper-1 \
+    /usr/local/bin/migrate-key \
+      --in=/tmp/alice.key.json
+# Connection settings come from the container's env vars (postgres_host etc.).
+# If the destination vault uses a different host/user/password/db that is NOT
+# already in the vault-wrapper container's environment, pass the flags
+# explicitly, e.g.:
+#     --pghost=my-pg-host --pguser=myuser --password=mypass --database=mydb
+
+sudo docker exec vault-vault-wrapper-1 rm -f /tmp/alice.key.json
+rm -f ./alice.key.json
+```
+
+If a user with the same `(x_user_unique_name, x_identity_provider_id)` already exists in the
+destination DB, the import aborts. Pass `--force` to overwrite the existing row.
+
+### Safety properties
+
+- The plaintext private key only exists in process memory during the run; it is never written
+  to disk in either mode.
+- The transport file is unreadable without the transport password (NaCl SecretBox / scrypt).
+- On both ends the tool verifies that the decrypted private key derives the same Ethereum
+  address that was recorded on the source side; any mismatch aborts before any DB write.
+- The import runs in a serializable transaction; any failure rolls back with no changes.
+- Both vault passwords are validated against the canonical message row before the tool will
+  touch the `users` table.
