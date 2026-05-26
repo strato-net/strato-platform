@@ -62,6 +62,7 @@ local wallet_auth_route_prefixes = {
   "/api/cdp/",
   "/api/credit-card/config/",
   "/api/earn/",
+  "/api/fixed-price-sale/",
   "/api/lend/",
   "/api/lending/",
   "/api/refer/",
