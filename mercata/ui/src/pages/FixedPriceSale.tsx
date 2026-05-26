@@ -223,8 +223,8 @@ const FixedPriceSalePage = () => {
         useExternalWalletSigning ? { walletAuth: true } : undefined,
       );
       toast({
-        title: "Purchase submitted",
-        description: `Tx ${result.hash?.slice(0, 10)}…`,
+        title: "Purchase successful",
+        description: '',
       });
       setAmount("");
       await refresh();
