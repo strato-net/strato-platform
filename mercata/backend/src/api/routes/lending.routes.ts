@@ -249,7 +249,7 @@ router.get("/liquidity/public", authHandler.authorizeRequest(true), LendingContr
  *               type: object
  *               additionalProperties: true
  */
-router.get("/loans", authHandler.authorizeRequest(), LendingController.getLoans);
+router.get("/loans", authHandler.authorizeRequest(false), LendingController.getLoans);
 router.post("/loans", walletAuth, LendingController.borrow);
 router.patch("/loans", walletAuth, LendingController.repay);
 

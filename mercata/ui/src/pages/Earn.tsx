@@ -1350,7 +1350,7 @@ const Earn = () => {
                                 <p className="text-xs text-muted-foreground">Your Position</p>
                               </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
-                                Carry Vault
+                                {cfg.badge}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-end">

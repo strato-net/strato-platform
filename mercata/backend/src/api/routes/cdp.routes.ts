@@ -22,7 +22,7 @@ const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
  *                 type: object
  *                 additionalProperties: true
  */
-router.get("/vaults", authHandler.authorizeRequest(), CDPController.getVaults);
+router.get("/vaults", authHandler.authorizeRequest(false), CDPController.getVaults);
 
 /**
  * @openapi

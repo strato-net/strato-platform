@@ -29,6 +29,7 @@ export const constants = (() => {
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
+  const StratoNativeBridge = `${CONTRACT_PREFIX}StratoNativeBridge`;
   const CreditCardTopUp = `${CONTRACT_PREFIX}CreditCardTopUp`;
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
@@ -143,6 +144,7 @@ export const constants = (() => {
     PoolConfigurator,
     AdminRegistry,
     MercataBridge,
+    StratoNativeBridge,
     CreditCardTopUp,
     CDPEngine,
     CDPVault,
@@ -168,6 +170,8 @@ export const constants = (() => {
     safetyModule,
     sToken,
     mercataBridge,
+    get stratoNativeBridge() { return config.stratoNativeBridge; },
+    get stratoNativeCustodyVault() { return config.stratoNativeCustodyVault; },
     get creditCardTopUp() { return config.creditCardTopUp; },  // Use getter to get current value after init
     Event,
     tokenSelectFields,
