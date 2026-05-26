@@ -1369,9 +1369,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                 {sourceTokenRoutes.length > 0 ? [
                   ...sourceTokenRoutes.map((rt) => {
                     let est = amount || "0";
-                    const routePrice = rt.rebaseFactor
-                      ? fmtSpotDollarWei(rt.rebaseFactor)
-                      : "$1.00";
                     if (rt.rebaseFactor && amount) {
                       try {
                         const factor = BigInt(rt.rebaseFactor);
@@ -1385,7 +1382,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ guestMode = false, fundingMode: ext
                         estimated={est}
                         onClick={() => { setSelectedToken(rt); setSelectedAction(null); }}
                         disabled={guestMode || isLoading}
-                        effectivePrice={routePrice}
                         apyBadge={<ApyLine addr={rt.stratoToken} />}
                       />
                     );
