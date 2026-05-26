@@ -68,15 +68,10 @@ const formatCountdown = (targetUnix: bigint, now: bigint): string => {
 };
 
 const FixedPriceSalePage = () => {
-  const { isLoggedIn, isExternalEvmWalletConnected } = useUser();
+  const { isLoggedIn, isAppAuthenticated, isExternalEvmWalletConnected } = useUser();
   const { toast } = useToast();
   const guestMode = !isLoggedIn;
-  // When MetaMask (or any non-STRATO EVM wallet) is connected, sign with it.
-  // The bridge gates this on `!isAppAuthenticated`, but for sale purchases we
-  // want the connected wallet to take precedence even if a STRATO OAuth session
-  // also exists — otherwise the backend tries the STRATO-wallet signing path
-  // and 401s because the user is actually intending to spend their MetaMask funds.
-  const useExternalWalletSigning = isExternalEvmWalletConnected;
+  const useExternalWalletSigning = isExternalEvmWalletConnected && !isAppAuthenticated;
 
   const [info, setInfo] = useState<SaleInfo | null>(null);
   const [position, setPosition] = useState<UserSalePosition>({ purchased: "0", remainingForWallet: "0" });
