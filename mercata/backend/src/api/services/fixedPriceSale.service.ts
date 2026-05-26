@@ -20,6 +20,15 @@ const {
 } = constants;
 
 const WAD = 10n ** 18n;
+// Fallback used only if the on-chain `priceQuantizationUSD` field is missing
+// (e.g. pre-quantization sale deploys). Matches the contract's initializer default.
+const DEFAULT_PRICE_QUANTIZATION = 10n ** 16n; // $0.01
+
+/** Round `raw` to the nearest `step` using half-up rounding. Mirrors `_quantizedPaymentPrice` in FixedPriceSale.sol. */
+const quantizePrice = (raw: bigint, step: bigint): bigint => {
+  if (step <= 0n) return raw;
+  return ((raw + step / 2n) / step) * step;
+};
 
 const safeBigInt = (value: string | number | null | undefined): bigint => {
   if (value === null || value === undefined) return 0n;
@@ -99,6 +108,7 @@ interface SaleRowState {
   startTime: string;
   endTime: string;
   paused: boolean;
+  priceQuantizationUSD: string;
   supportedPayments: string[];
 }
 
@@ -111,7 +121,7 @@ const fetchSaleState = async (
       cirrus.get(accessToken, `/${FixedPriceSaleTable}`, {
         params: {
           select:
-            "address,saleToken,priceOracle,pricePerTokenUSD::text,hardCap::text,totalSold::text,perWalletCap::text,startTime::text,endTime::text,_paused",
+            "address,saleToken,priceOracle,pricePerTokenUSD::text,hardCap::text,totalSold::text,perWalletCap::text,startTime::text,endTime::text,_paused,priceQuantizationUSD::text",
           address: `eq.${saleAddress}`,
         },
       }),
@@ -137,6 +147,7 @@ const fetchSaleState = async (
       startTime: row.startTime || "0",
       endTime: row.endTime || "0",
       paused: row._paused || false,
+      priceQuantizationUSD: row.priceQuantizationUSD || DEFAULT_PRICE_QUANTIZATION.toString(),
       supportedPayments: (paymentRows || [])
         .map((p: any) => p.value)
         .filter((addr: string) => addr && addr !== constants.ZERO_ADDRESS),
@@ -246,14 +257,19 @@ export const getSaleInfo = async (accessToken: string): Promise<SaleInfo | null>
   ]);
 
   const saleTokenInfo = tokenInfoMap.get(state.saleToken) || null;
+  // Display the quantized price (what the contract will actually charge against),
+  // not the raw oracle reading, so the UI matches the on-chain buy math.
+  const quantizationStep = safeBigInt(state.priceQuantizationUSD) || DEFAULT_PRICE_QUANTIZATION;
   const paymentTokens: SalePaymentToken[] = state.supportedPayments.map((addr) => {
     const info = tokenInfoMap.get(addr) || { symbol: "UNKNOWN", name: "Unknown Token", decimals: 18 };
+    const rawPrice = safeBigInt(priceMap.get(addr));
+    const priceUsd = rawPrice > 0n ? quantizePrice(rawPrice, quantizationStep).toString() : "0";
     return {
       address: addr,
       symbol: info.symbol,
       name: info.name,
       decimals: info.decimals,
-      priceUsd: priceMap.get(addr) || "0",
+      priceUsd,
       images: info.images,
     };
   });
@@ -360,9 +376,16 @@ export const quoteBuy = async (
   }
 
   const priceMap = await fetchPrices(accessToken, state.priceOracle, [paymentToken]);
-  const paymentPrice = safeBigInt(priceMap.get(paymentToken));
-  if (paymentPrice <= 0n) {
+  const rawPaymentPrice = safeBigInt(priceMap.get(paymentToken));
+  if (rawPaymentPrice <= 0n) {
     throw new Error("Oracle returned zero price for payment token");
+  }
+  // Apply the same half-up quantization the contract uses so the quoted
+  // paymentAmount matches what `buy()` will actually charge.
+  const quantizationStep = safeBigInt(state.priceQuantizationUSD) || DEFAULT_PRICE_QUANTIZATION;
+  const paymentPrice = quantizePrice(rawPaymentPrice, quantizationStep);
+  if (paymentPrice <= 0n) {
+    throw new Error("Quantized payment price rounds to zero");
   }
 
   const pricePerTokenUSD = safeBigInt(state.pricePerTokenUSD);

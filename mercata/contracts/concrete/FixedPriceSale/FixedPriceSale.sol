@@ -51,6 +51,7 @@ contract record FixedPriceSale is Ownable, Pausable {
     event PerWalletCapUpdated(uint newPerWalletCap);
     event ScheduleUpdated(uint newStartTime, uint newEndTime);
     event PriceOracleUpdated(address indexed newPriceOracle);
+    event PriceQuantizationUpdated(uint newPriceQuantizationUSD);
     event ProceedsSwept(address indexed paymentToken, address indexed to, uint amount);
     event UnsoldSwept(address indexed to, uint amount);
 
@@ -81,6 +82,11 @@ contract record FixedPriceSale is Ownable, Pausable {
 
     // Oracle used to price payment tokens in USD (1e18 = $1).
     PriceOracle public priceOracle;
+
+    // Granularity for rounding the oracle's payment-token price before computing payment amount.
+    // 1e16 = $0.01. Buyers always pay an amount derived from a half-up-rounded price, so a
+    // payment token reading $0.999 charges as if it were $1.00 instead of 1.001 tokens per $1.
+    uint public priceQuantizationUSD;
 
     // Supported payment tokens
     address[] public record supportedPayments;
@@ -135,6 +141,7 @@ contract record FixedPriceSale is Ownable, Pausable {
         perWalletCap = _perWalletCap;
         startTime = _startTime;
         endTime = _endTime;
+        priceQuantizationUSD = 1e16; // $0.01
         saleInitialized = true;
 
         emit Initialized(
@@ -164,6 +171,22 @@ contract record FixedPriceSale is Ownable, Pausable {
         require(block.timestamp >= startTime, "FixedPriceSale: not started");
         require(block.timestamp < endTime, "FixedPriceSale: ended");
         _;
+    }
+
+    /**
+     * @dev Fetch the oracle's payment-token price and round half-up to the nearest
+     *      `priceQuantizationUSD` step (default $0.01). Reverts if the raw price is
+     *      zero or the quantized price rounds to zero (e.g. tokens worth less than
+     *      half a step are not buyable).
+     */
+    function _quantizedPaymentPrice(address paymentToken) internal view returns (uint) {
+        uint raw = priceOracle.getAssetPrice(paymentToken);
+        require(raw > 0, "FixedPriceSale: invalid payment price");
+        uint q = priceQuantizationUSD;
+        require(q > 0, "FixedPriceSale: invalid quantization");
+        uint quantized = ((raw + (q / 2)) / q) * q;
+        require(quantized > 0, "FixedPriceSale: quantized price is zero");
+        return quantized;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -206,9 +229,9 @@ contract record FixedPriceSale is Ownable, Pausable {
         uint usdValue = (saleAmount * pricePerTokenUSD) / WAD;
         require(usdValue > 0, "FixedPriceSale: zero usd value");
 
-        // Convert USD value to payment-token amount via the oracle
-        uint paymentPrice = priceOracle.getAssetPrice(paymentToken);
-        require(paymentPrice > 0, "FixedPriceSale: invalid payment price");
+        // Convert USD value to payment-token amount using a price that's been
+        // rounded to the nearest priceQuantizationUSD step (default $0.01).
+        uint paymentPrice = _quantizedPaymentPrice(paymentToken);
         paymentAmount = (usdValue * WAD) / paymentPrice;
         require(paymentAmount > 0, "FixedPriceSale: zero payment amount");
 
@@ -234,7 +257,8 @@ contract record FixedPriceSale is Ownable, Pausable {
 
     /**
      * @notice Quote how much `paymentToken` is required to buy `saleAmount` sale tokens
-     *         at the current price and oracle reading. Does not consider caps or active window.
+     *         at the current price and the quantized oracle reading. Does not consider
+     *         caps or active window.
      */
     function quoteBuy(address paymentToken, uint saleAmount)
         external
@@ -245,8 +269,7 @@ contract record FixedPriceSale is Ownable, Pausable {
         require(saleAmount > 0, "FixedPriceSale: zero amount");
 
         usdValue = (saleAmount * pricePerTokenUSD) / WAD;
-        uint paymentPrice = priceOracle.getAssetPrice(paymentToken);
-        require(paymentPrice > 0, "FixedPriceSale: invalid payment price");
+        uint paymentPrice = _quantizedPaymentPrice(paymentToken);
         paymentAmount = (usdValue * WAD) / paymentPrice;
     }
 
@@ -368,6 +391,17 @@ contract record FixedPriceSale is Ownable, Pausable {
         require(newPriceOracle != address(0), "FixedPriceSale: invalid oracle");
         priceOracle = PriceOracle(newPriceOracle);
         emit PriceOracleUpdated(newPriceOracle);
+    }
+
+    /**
+     * @notice Update the payment-price quantization step (default 1e16 = $0.01).
+     *         Set higher (e.g. 1e17 = $0.10) to round more aggressively, lower
+     *         (e.g. 1e15 = $0.001) to quote sub-cent precision.
+     */
+    function setPriceQuantization(uint newPriceQuantizationUSD) external onlyOwner {
+        require(newPriceQuantizationUSD > 0, "FixedPriceSale: invalid quantization");
+        priceQuantizationUSD = newPriceQuantizationUSD;
+        emit PriceQuantizationUpdated(newPriceQuantizationUSD);
     }
 
     function pause() external onlyOwner {
