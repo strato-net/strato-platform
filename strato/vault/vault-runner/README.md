@@ -72,23 +72,13 @@ from the BlockApps shared Vault to your local vault). See the
 This is an example process to update the Vault password with minimal (2-3 seconds) downtime. The process requires decrypting and re-encrypting the values in database. Proceed carefully.
 
 ### Build and prepare
-```
-cd strato-platform/strato/
-# here install dependencies if needed, using ../install_deps.sh
-stack build blockapps-vault-wrapper-server:exe:change-vault-password
-stack --local-bin-path ~/.local/bin/ install  blockapps-vault-wrapper-server:exe:change-vault-password
-sudo docker cp /home/ec2-user/.local/bin/change-vault-password vault-vault-wrapper-1:/usr/local/bin/change-vault-password
-sudo docker exec vault-vault-wrapper-1 chmod 755 /usr/local/bin/change-vault-password
-```
 
-Copy the required dynamically linked libs (secp256k1, libsodium) into docker container:
+Build on Ubuntu 24.04 to match the vault-wrapper container's base image (for dynamicly linked libraries to work).
 ```
-ldd "$(which change-vault-password)" | grep -E 'libsecp256k1|libsodium' | awk '{print $3}' | while read so; do
-  # resolve symlinks to get the real file
-  real=$(readlink -f "$so")
-  echo "copying $real as $(basename $so)"
-  sudo docker cp "$real" vault-vault-wrapper-1:/usr/local/lib/$(basename $so)
-done
+set -e
+make change-vault-password
+sudo docker cp ~/.local/bin/change-vault-password vault-vault-wrapper-1:/usr/local/bin/change-vault-password
+sudo docker exec vault-vault-wrapper-1 chmod 755 /usr/local/bin/change-vault-password
 ```
 
 ### Backup DB
@@ -115,11 +105,14 @@ sudo docker exec -i \
     --pguser=postgres --password=api --database=oauth
 #
 sudo docker restart -t 0 vault-vault-wrapper-1
-cd strato-getting-started
-
-
-# sudo PASSWORD="${NEW_PASSWORD}" ./vault --set-password
+for i in {1..200}; do
+  if curl --fail -sS -o /dev/null --insecure https://localhost:8093/ping 2>/dev/null; then
+    break
+  fi
+done
 sudo docker exec -i vault-vault-wrapper-1 curl -s -H "Content-Type: application/json" -d @- localhost:8000/strato/v2.3/password <<< \"$NEW_PASSWORD\"
+echo 
+echo "If you see [] above - that's the success. Otherwise repeat the last command in the script"
 ```
 
 Run it:
@@ -141,55 +134,46 @@ rm -rf update-password.sh
     ```
     sudo docker stop vault-vault-wrapper-1
     ```
-
 2. Terminate connections to oauth.
     ```
     sudo docker exec vault-postgres-1 psql -U postgres -d postgres -c \
     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'oauth' AND pid <> pg_backend_pid();"`
     ```
-
 3. Drop the database.
     ```sudo docker exec vault-postgres-1 psql -U postgres -d postgres -c \
     "DROP DATABASE IF EXISTS oauth;"
    ```
-
 4. Recreate it.
     ```
     sudo docker exec vault-postgres-1 psql -U postgres -d postgres -c \
     "CREATE DATABASE oauth OWNER postgres;"
     ```
-
 5. Restore the dump. Execute from the directory with `vault-dump-file.sql` file:
     ```
     sudo docker exec -i vault-postgres-1 \
     psql -U postgres -d oauth \
     < vault-dump-file.sql
     ```
-
 6. Sanity check.
     ```
     sudo docker exec vault-postgres-1 psql -U postgres -d oauth -c \
     "SELECT (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM message) AS message;"
     ```
-
 7. Start the vault.
     ```
     sudo docker start vault-vault-wrapper-1
     ```
-
 8. POST the old password.
     ```
     sudo ./enter-password.sh
     # > enter the old password
     ```
-
 9. Verify.
     ```
     sudo docker exec vault-vault-wrapper-1 \
     curl -sf http://localhost:8000/strato/v2.3/verify-password`
     # Expected: true
     ```
-
 
 ---
 
@@ -264,8 +248,7 @@ SRC_VAULT_PW=...      # current source-vault password
 TRANSPORT_PW=...      # one-time password used only to protect the file in transit
 
 printf '%s\n%s\n' "$SRC_VAULT_PW" "$TRANSPORT_PW" \
-| sudo docker exec -i vault-vault-wrapper-1 \
-    /usr/local/bin/migrate-key \
+  | sudo docker exec -i vault-vault-wrapper-1 /usr/local/bin/migrate-key \
       --x_user_unique_name='alice@example.com' \
       --x_identity_provider_id='https://my-oauth.example.com' \
       --out=/tmp/alice.key.json
@@ -289,9 +272,7 @@ DST_VAULT_PW=...      # destination-vault password
 sudo docker cp ./alice.key.json vault-vault-wrapper-1:/tmp/alice.key.json
 
 printf '%s\n%s\n' "$TRANSPORT_PW" "$DST_VAULT_PW" \
-| sudo docker exec -i vault-vault-wrapper-1 \
-    /usr/local/bin/migrate-key \
-      --in=/tmp/alice.key.json
+  | sudo docker exec -i vault-vault-wrapper-1 /usr/local/bin/migrate-key --in=/tmp/alice.key.json
 # Connection settings come from the container's env vars (postgres_host etc.).
 # If the destination vault uses a different host/user/password/db that is NOT
 # already in the vault-wrapper container's environment, pass the flags
