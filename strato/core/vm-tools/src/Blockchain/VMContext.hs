@@ -12,6 +12,7 @@
 module Blockchain.VMContext
   ( CurrentBlockHash (..),
     withCurrentBlockHash,
+    withCurrentBlockHashNoCommit,
     VMBase,
     ContextDBs (..),
     MemDBs (..),
@@ -338,6 +339,22 @@ withCurrentBlockHash bh f = do
   flushMemAddressStateDB
   Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
+  pure a
+
+withCurrentBlockHashNoCommit ::
+  ( MonadUnliftIO m,
+    Mod.Modifiable MemDBs m,
+    Mod.Modifiable CurrentBlockHash m
+  ) =>
+  Keccak256 ->
+  m a ->
+  m a
+withCurrentBlockHashNoCommit bh f = do
+  memDBs' <- Mod.get (Mod.Proxy @MemDBs)
+  let restore = Mod.put (Mod.Proxy @MemDBs) memDBs'
+  Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
+  a <- f `onException` restore
+  restore
   pure a
 
 
