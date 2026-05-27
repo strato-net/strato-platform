@@ -25,13 +25,17 @@ docker compose up --build
 
 ## Admin User
 
-On first start, a single admin user is created:
+Local auth supports a single admin user:
 
 - **Username:** `admin`
-- **Password:** read from `/run/secrets/local_auth_admin_password`
 
-Override with environment variables:
-- `LOCAL_AUTH_ADMIN_USERNAME`
+Create it after the node is running:
+
+```bash
+strato-local-user-add /path/to/mynode
+```
+
+Override the username with `LOCAL_AUTH_ADMIN_USERNAME` if needed.
 
 ## OAuth Configuration
 
@@ -62,6 +66,7 @@ http://localhost:4444/.well-known/openid-configuration
    ```
 
 3. Or use the authorization code flow:
+   - Create the admin user with `strato-local-user-add`
    - Open: http://localhost:3000/login
    - Sign in as `admin`
    - You'll be redirected back with an authorization code
@@ -73,7 +78,7 @@ When integrated with STRATO:
 1. nginx routes `/oauth/*` to this container's Hydra (4444)
 2. nginx routes `/auth/*` to this container's Login UI (3000)
 3. STRATO services use OAuth discovery URL pointing to local Hydra
-4. User IDs from Kratos map to keys in STRATO vault
+4. The fixed localAuth subject `admin` maps to the bootstrapped key in STRATO vault
 
 ## Configuration Files
 

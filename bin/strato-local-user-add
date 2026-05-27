@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: strato-local-user-add NODE_DIR" >&2
+  exit 1
+}
+
+NODE_DIR="${1:-}"
+if [[ -z "$NODE_DIR" ]]; then
+  usage
+fi
+
+if [[ ! -d "$NODE_DIR" ]]; then
+  echo "Error: node directory does not exist: $NODE_DIR" >&2
+  exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Error: docker is required" >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "Error: python3 is required" >&2
+  exit 1
+fi
+
+cd "$NODE_DIR"
+
+USERNAME="${LOCAL_AUTH_ADMIN_USERNAME:-admin}"
+COMPOSE=(docker compose -p strato)
+
+if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "local-auth"; then
+  echo "Error: local-auth service is not running. Start the node first." >&2
+  exit 1
+fi
+
+identities="$("${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities")"
+if IDENTITY_JSON="$identities" python3 -c 'import json, os, sys; username = sys.argv[1]; identities = json.loads(os.environ["IDENTITY_JSON"]); sys.exit(0 if any(i.get("traits", {}).get("username") == username for i in identities) else 1)' "$USERNAME"; then
+  echo "Local auth admin user already exists: $USERNAME"
+  exit 0
+fi
+
+prompt_hidden() {
+  local prompt="$1"
+  local value
+  printf "%s" "$prompt" >&2
+  stty -echo
+  IFS= read -r value
+  stty echo
+  printf "\n" >&2
+  printf "%s" "$value"
+}
+
+echo "Creating local auth admin user: $USERNAME"
+password="$(prompt_hidden "Create admin password: ")"
+confirm="$(prompt_hidden "Confirm admin password: ")"
+
+if [[ "$password" != "$confirm" ]]; then
+  echo "Error: admin passwords do not match" >&2
+  exit 1
+fi
+
+if [[ "${#password}" -lt 8 ]]; then
+  echo "Error: admin password must be at least 8 characters" >&2
+  exit 1
+fi
+
+python3 -c 'import json, sys; username = sys.argv[1]; password = sys.stdin.read().rstrip("\n"); print(json.dumps({"schema_id": "default", "traits": {"username": username}, "credentials": {"password": {"config": {"password": password}}}, "state": "active"}))' "$USERNAME" <<< "$password" \
+  | "${COMPOSE[@]}" exec -T local-auth curl -fsS -X POST "http://localhost:4434/admin/identities" -H "Content-Type: application/json" -d @- >/dev/null
+unset password confirm
+
+echo "Local auth admin user created: $USERNAME"
