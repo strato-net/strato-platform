@@ -1,7 +1,9 @@
 import {
   config,
+  getChainRpcUrl,
   getNativeRepresentationBridgeAddress,
 } from "../config";
+import { JsonRpcProvider } from "ethers";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
@@ -70,6 +72,36 @@ const submitNativeMint = async (
 ): Promise<string> => {
   const payload = await getNativeMintRequest(withdrawal, sourceChainId);
   return executeNativeMint(payload);
+};
+
+const getDestinationChainLatestTimestamp = async (
+  externalChainId: string | number,
+): Promise<bigint | null> => {
+  const provider = new JsonRpcProvider(getChainRpcUrl(BigInt(externalChainId)));
+  const latestBlock = await provider.getBlock("latest");
+  return latestBlock ? BigInt(latestBlock.timestamp) : null;
+};
+
+const isDestinationMintReady = async (
+  withdrawal: NativeWithdrawalInfo,
+): Promise<boolean> => {
+  const notBefore = BigInt(withdrawal.nativeMintNotBefore || 0);
+  if (notBefore <= 0n) {
+    return true;
+  }
+
+  const latestTimestamp = await getDestinationChainLatestTimestamp(
+    withdrawal.externalChainId,
+  );
+  if (latestTimestamp == null || latestTimestamp >= notBefore) {
+    return true;
+  }
+
+  logInfo(
+    "BridgeService",
+    `Native withdrawal ${withdrawal.withdrawalId} destination chain is not ready for mint; latest block timestamp ${latestTimestamp.toString()} is before notBefore ${notBefore.toString()}`,
+  );
+  return false;
 };
 
 const findExistingNativeMint = async (
@@ -657,6 +689,10 @@ export const finalizeNativeWithdrawalBatch = async (
           "BridgeService",
           `Native instant withdrawal ${withdrawal.withdrawalId} is pending review for ${delayRemaining}s before destination mint`,
         );
+        continue;
+      }
+
+      if (!(await isDestinationMintReady(withdrawal))) {
         continue;
       }
 

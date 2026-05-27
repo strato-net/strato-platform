@@ -23,10 +23,7 @@ postSignature userName (MsgHash msgBS) = do
   (_, nonce, pKey, _) <- case cachedPk of
     Just (KeyStore a b c d) -> pure (a, b, c, d)
     Nothing -> do
-      mpk <-
-        vaultTransaction
-          . vaultQueryMaybe
-          $ getUserKeyQuery userName
+      mpk <- vaultQueryMaybe $ getUserKeyQuery userName
       (a, b, c, d) <- case mpk of
         Just pk -> return pk
         Nothing -> vaultWrapperError $ UserError ("User " <> userName <> " doesn't exist")
@@ -45,10 +42,7 @@ postSignature' userName oauthProvider (MsgHash msgBS) = do
   (_, nonce, pKey, _) <- case cachedPk of
     Just (KeyStore a b c d) -> pure (a, b, c, d)
     Nothing -> do
-      mpk <-
-        vaultTransaction
-          . vaultQueryMaybe
-          $ getUserKeyQuery' userName oauthProvider
+      mpk <- vaultQueryMaybe $ getUserKeyQuery' userName oauthProvider
       (a, b, c, d) <- case mpk of
         Just pk -> return pk
         Nothing -> vaultWrapperError $ UserError ("User " <> userName <> " doesn't exist")
