@@ -227,6 +227,70 @@ export const getPool = async (
   return poolData;
 };
 
+// --- Lending-specific caches ---
+// Three tiers: static (1hr), slow-changing (30s), live (no cache)
+
+const STATIC_CACHE_TTL = 3_600_000; // 1hr — contract addresses, token metadata
+const LENDING_CACHE_TTL = 30_000;    // 30s — exchange rate, public endpoint response
+
+// Contract addresses — only change on redeploy (1hr)
+let _lendingAddrs: {
+  borrowableAsset: string;
+  mToken: string;
+  liquidityPool: string;
+  lendingPoolAddr: string;
+  expiresAt: number;
+} | null = null;
+
+// Token metadata — name/symbol/decimals are static (1hr)
+let _tokenMeta: Map<string, Record<string, any>> | null = null;
+let _tokenMetaExpiry = 0;
+
+// Exchange rate — updates on supply/borrow events (30s)
+let _exchRateCache: { value: string; expiresAt: number } | null = null;
+
+// Public endpoint full response — all data is global, no user-specific fields (30s)
+let _publicLiquidityCache: { data: any; expiresAt: number } | null = null;
+
+const getCachedExchangeRate = async (accessToken: string): Promise<string> => {
+  if (_exchRateCache && Date.now() < _exchRateCache.expiresAt) return _exchRateCache.value;
+  const value = await getExchangeRateFromCirrus(accessToken);
+  _exchRateCache = { value, expiresAt: Date.now() + LENDING_CACHE_TTL };
+  return value;
+};
+
+// Direct Cirrus fetch — bypasses getTokens()'s hidden getPool + getCompletePriceMap overhead
+const getLendingTokenData = async (
+  accessToken: string,
+  tokenAddresses: string[],
+  balanceFilter: string
+): Promise<any[]> => {
+  const metaCached = _tokenMeta && Date.now() < _tokenMetaExpiry;
+
+  // On warm metadata cache: skip static fields, fetch only live data (balances + totalSupply)
+  const select = metaCached
+    ? `address,_totalSupply::text,balances:${Token}-_balances(user:key,balance:value::text)`
+    : `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`;
+
+  const { data } = await cirrus.get(accessToken, `/${Token}`, {
+    params: { address: `in.(${tokenAddresses.join(",")})`, select, "balances.key": balanceFilter }
+  });
+  const tokens = data || [];
+
+  if (metaCached) {
+    // Merge cached metadata with live balances/supply
+    return tokens.map((t: any) => ({ ...(_tokenMeta!.get(t.address) || {}), ...t }));
+  }
+
+  // Cache static metadata (1hr)
+  _tokenMeta = new Map();
+  for (const t of tokens) {
+    _tokenMeta.set(t.address, { _name: t._name, _symbol: t._symbol, _owner: t._owner, customDecimals: t.customDecimals });
+  }
+  _tokenMetaExpiry = Date.now() + STATIC_CACHE_TTL;
+  return tokens;
+};
+
 export const depositLiquidity = async (
   accessToken: string,
   userAddress: string,
@@ -633,24 +697,31 @@ export const liquidityAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  // Fetch pool data with explicit select (index fields + userLoan + prices + pause status)
-  const registry = await getPool(accessToken, {
-    select:
-      `lendingPool:lendingPool_fkey(` +
-        `address,borrowableAsset,mToken,_paused,` +
-        `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
-        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
-        `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
-      `),` +
-      `collateralVault:collateralVault_fkey(` +
-        `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
-      `),` +
-      `oracle:priceOracle_fkey(address,` +
-        `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
-      `),` +
-      `liquidityPool:liquidityPool_fkey(address)`,
-    "lendingPool.userLoan.key": `eq.${userAddress}`
-  });
+  const addrs = _lendingAddrs && Date.now() < _lendingAddrs.expiresAt ? _lendingAddrs : null;
+
+  const poolSelect =
+    `lendingPool:lendingPool_fkey(` +
+      `address,borrowableAsset,mToken,_paused,` +
+      `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
+      `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
+      `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
+    `),` +
+    `collateralVault:collateralVault_fkey(` +
+      `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
+    `),` +
+    `oracle:priceOracle_fkey(address,` +
+      `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
+    `),` +
+    `liquidityPool:liquidityPool_fkey(address)`;
+
+  // On warm address cache: ALL fetches run in parallel (getPool refreshes live state alongside)
+  const earlyFetches = addrs ? Promise.all([
+    getLendingTokenData(accessToken, [addrs.borrowableAsset, addrs.mToken], `in.(${userAddress},${addrs.liquidityPool})`),
+    getCachedExchangeRate(accessToken),
+    getLendingUserFlowTotals(accessToken, addrs.lendingPoolAddr, userAddress)
+  ]) : null;
+
+  const registry = await getPool(accessToken, { select: poolSelect, "lendingPool.userLoan.key": `eq.${userAddress}` });
 
   const { borrowableAsset, mToken, assetConfigs, _paused } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
@@ -660,16 +731,26 @@ export const liquidityAndBalance = async (
     throw new Error("Lending pool, borrowable asset, or mToken not found");
   }
 
-  // Fetch token metadata with balances included
-  const tokenData = await getTokens(accessToken, {
-    address: `in.(${borrowableAsset},${mToken})`,
-    select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
-    "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
-  });
+  // Update address cache from live data
+  _lendingAddrs = {
+    borrowableAsset, mToken,
+    liquidityPool: registry.liquidityPool?.address || '',
+    lendingPoolAddr: registry.lendingPool?.address || '',
+    expiresAt: Date.now() + STATIC_CACHE_TTL
+  };
 
-  // Extract token data and user balances
-  const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
-  const mTokenInfo = tokenData.find(token => token.address === mToken);
+  // Use speculative results if addresses unchanged, else re-fetch with fresh addresses
+  const [tokenData, exchangeRate, { totalDepositedUsd, totalWithdrawnUsd }] =
+    (earlyFetches && addrs!.borrowableAsset === borrowableAsset && addrs!.mToken === mToken)
+      ? await earlyFetches
+      : await Promise.all([
+          getLendingTokenData(accessToken, [borrowableAsset, mToken], `in.(${userAddress},${registry.liquidityPool?.address || ''})`),
+          getCachedExchangeRate(accessToken),
+          getLendingUserFlowTotals(accessToken, registry.lendingPool?.address || "", userAddress)
+        ]);
+
+  const borrowableToken = tokenData.find((token: any) => token.address === borrowableAsset);
+  const mTokenInfo = tokenData.find((token: any) => token.address === mToken);
 
   const borrowableBalance = borrowableToken?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
   const mTokenBalance = mTokenInfo?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
@@ -681,17 +762,14 @@ export const liquidityAndBalance = async (
   // Asset config for borrowable asset
   const borrowableAssetConfig = assetConfigs?.find((c: any) => c.asset === borrowableAsset)?.AssetConfig || {};
 
-  // Build price map (USD 1e18)
+  // Build price map from oracle (USD 1e18)
   const priceMap = new Map<string, string>();
   (registry.oracle?.prices || []).forEach((p: any) => {
     priceMap.set(p.asset, p.price);
   });
-  if (!priceMap.has(borrowableAsset)) {
-    priceMap.set(borrowableAsset, borrowableToken?.price?.toString() || "0");
-  }
-  if (!priceMap.has(mToken)) {
-    priceMap.set(mToken, mTokenInfo?.price?.toString() || "0");
-  }
+  // Attach oracle price to tokens — preserves response shape after bypassing getTokens
+  if (borrowableToken) borrowableToken.price = priceMap.get(borrowableAsset) || "0";
+  if (mTokenInfo) mTokenInfo.price = priceMap.get(mToken) || "0";
 
   // Index/scaled-debt state from Cirrus
   const borrowIndexStr     = registry.lendingPool?.borrowIndex     || "0";
@@ -721,11 +799,8 @@ export const liquidityAndBalance = async (
   const totalAmountOwedClamped = (() => { try { return (BigInt(totalAmountOwed) <= 1n) ? "0" : totalAmountOwed; } catch { return totalAmountOwed; } })();
   const totalAmountOwedPreviewClamped = (() => { try { return (BigInt(totalAmountOwedPreview) <= 1n) ? "0" : totalAmountOwedPreview; } catch { return totalAmountOwedPreview; } })();
 
-  // System totals and exchange rate
+  // System totals (exchange rate already fetched in parallel above)
   const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
-
-  // Get exchange rate from Cirrus events instead of calculating manually
-  const exchangeRate = await getExchangeRateFromCirrus(accessToken);
 
   const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
 
@@ -762,11 +837,6 @@ export const liquidityAndBalance = async (
     ? ((userMTokenBalanceTotal * BigInt(exchangeRate)) / WAD)
     : 0n;
 
-  const { totalDepositedUsd, totalWithdrawnUsd } = await getLendingUserFlowTotals(
-    accessToken,
-    registry.lendingPool?.address || "",
-    userAddress
-  );
   const userNetInvestedUsd = totalDepositedUsd - totalWithdrawnUsd;
   const userAllTimeEarningsUsd = userUSDSTValueTotal - userNetInvestedUsd;
 
@@ -818,6 +888,11 @@ export const liquidityAndBalance = async (
 export const getPublicLiquidityInfo = async (
   accessToken: string,
 ) => {
+  // Full response cache — all data is global, 30s TTL acceptable for guests
+  if (_publicLiquidityCache && Date.now() < _publicLiquidityCache.expiresAt) {
+    return _publicLiquidityCache.data;
+  }
+
   // Build query - no userLoan filter for public data
   const queryParams: Record<string, string> = {
     select:
@@ -846,16 +921,22 @@ export const getPublicLiquidityInfo = async (
     throw new Error("Lending pool, borrowable asset, or mToken not found");
   }
 
-  // Fetch token metadata - only pool balances (no user balances)
-  const tokenData = await getTokens(accessToken, {
-    address: `in.(${borrowableAsset},${mToken})`,
-    select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
-    "balances.key": `eq.${registry.liquidityPool?.address || ''}`
-  });
+  // Update address cache (shared with authenticated endpoint)
+  _lendingAddrs = {
+    borrowableAsset, mToken,
+    liquidityPool: registry.liquidityPool?.address || '',
+    lendingPoolAddr: registry.lendingPool?.address || '',
+    expiresAt: Date.now() + STATIC_CACHE_TTL
+  };
 
-  // Extract token data
-  const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
-  const mTokenInfo = tokenData.find(token => token.address === mToken);
+  // Parallelize: token fetch and exchange rate (both depend only on getPool)
+  const [tokenData, exchangeRate] = await Promise.all([
+    getLendingTokenData(accessToken, [borrowableAsset, mToken], `eq.${registry.liquidityPool?.address || ''}`),
+    getCachedExchangeRate(accessToken)
+  ]);
+
+  const borrowableToken = tokenData.find((token: any) => token.address === borrowableAsset);
+  const mTokenInfo = tokenData.find((token: any) => token.address === mToken);
 
   // User balances are always "0" for guests
   const borrowableBalance = "0";
@@ -868,17 +949,14 @@ export const getPublicLiquidityInfo = async (
   // Asset config for borrowable asset
   const borrowableAssetConfig = assetConfigs?.find((c: any) => c.asset === borrowableAsset)?.AssetConfig || {};
 
-  // Build price map (USD 1e18)
+  // Build price map from oracle (USD 1e18)
   const priceMap = new Map<string, string>();
   (registry.oracle?.prices || []).forEach((p: any) => {
     priceMap.set(p.asset, p.price);
   });
-  if (!priceMap.has(borrowableAsset)) {
-    priceMap.set(borrowableAsset, borrowableToken?.price?.toString() || "0");
-  }
-  if (!priceMap.has(mToken)) {
-    priceMap.set(mToken, mTokenInfo?.price?.toString() || "0");
-  }
+  // Attach oracle price to tokens — preserves response shape after bypassing getTokens
+  if (borrowableToken) borrowableToken.price = priceMap.get(borrowableAsset) || "0";
+  if (mTokenInfo) mTokenInfo.price = priceMap.get(mToken) || "0";
 
   // Index/scaled-debt state from Cirrus
   const borrowIndexStr     = registry.lendingPool?.borrowIndex     || "0";
@@ -898,11 +976,8 @@ export const getPublicLiquidityInfo = async (
   const totalAmountOwedClamped = "0";
   const totalAmountOwedPreviewClamped = "0";
 
-  // System totals and exchange rate
+  // System totals (exchange rate already fetched in parallel above)
   const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
-
-  // Get exchange rate from Cirrus events instead of calculating manually
-  const exchangeRate = await getExchangeRateFromCirrus(accessToken);
 
   const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
 
@@ -935,7 +1010,7 @@ export const getPublicLiquidityInfo = async (
   // Back-compat field
   const totalBorrowPrincipal = systemTotalDebt;
 
-  return {
+  const result = {
     supplyable: {
       ...borrowableTokenClean,
       userBalance: borrowableBalance, // "0" for guests
@@ -967,6 +1042,8 @@ export const getPublicLiquidityInfo = async (
     // Pause status
     isPaused,
   };
+  _publicLiquidityCache = { data: result, expiresAt: Date.now() + LENDING_CACHE_TTL };
+  return result;
 };
 
 export const getLoan = async (
