@@ -12,13 +12,9 @@
         <meta name="author" content="BlockApps">
       
       
-        <link rel="canonical" href="https://docs.strato.nexus/scenarios/first-time-user/">
+        <link rel="canonical" href="https://docs.strato.nexus/design-docs/rewards/">
       
       
-        <link rel="prev" href="../../tokenomics/">
-      
-      
-        <link rel="next" href="../../guides/borrow/">
       
       
         
@@ -29,7 +25,7 @@
     
     
       
-        <title>First-Time User - STRATO Technical Docs</title>
+        <title>Rewards System - Technical Implementation Guide - STRATO Technical Docs</title>
       
     
     
@@ -84,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#first-time-user-journey" class="md-skip">
+        <a href="#rewards-system-technical-implementation-guide" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              First-Time User
+              Rewards System - Technical Implementation Guide
             
           </span>
         </div>
@@ -349,10 +345,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -367,11 +361,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
@@ -392,7 +388,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -407,37 +403,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    First-Time User
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../scenarios/first-time-user/" class="md-nav__link">
         
   
   
@@ -453,359 +422,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#your-goal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your Goal
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#complete-walkthrough" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Walkthrough
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Complete Walkthrough">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#part-1-bridge-your-assets-15-20-minutes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Part 1: Bridge Your Assets (15-20 minutes)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#part-2-get-usdst-for-fees-5-minutes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Part 2: Get USDST for Fees (5 minutes)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#part-3-supply-collateral-2-minutes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Part 3: Supply Collateral (2 minutes)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#part-4-borrow-usdst-2-minutes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Part 4: Borrow USDST (2 minutes)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary-what-you-achieved" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary: What You Achieved
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#option-a-start-trading" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option A: Start Trading
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-b-earn-passive-income" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option B: Earn Passive Income
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-c-expand-your-position" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option C: Expand Your Position
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-d-try-cdp-for-lower-fees" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option D: Try CDP for Lower Fees
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#important-reminders" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Important Reminders
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Important Reminders">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#monitor-your-health-factor" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitor Your Health Factor
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#keep-usdst-for-gas" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Keep USDST for Gas
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#accrue-interest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Accrue Interest
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Questions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Questions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#how-do-i-get-more-ethst-on-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "How do I get more ETHST on STRATO?"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#can-i-withdraw-my-ethst" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Can I withdraw my ETHST?"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-if-i-need-to-exit-completely" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "What if I need to exit completely?"
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#bridge-taking-too-long" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bridge taking too long
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#insufficient-usdst-for-transaction-fee" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Insufficient USDST for transaction fee"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#health-factor-warnings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Health factor warnings
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#congratulations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Congratulations! 🎉
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Congratulations! 🎉">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#continue-your-journey" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue Your Journey
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Get Help
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1146,7 +762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../grow-position/" class="md-nav__link">
+      <a href="../../scenarios/grow-position/" class="md-nav__link">
         
   
   
@@ -1174,7 +790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../maximize-yield/" class="md-nav__link">
+      <a href="../../scenarios/maximize-yield/" class="md-nav__link">
         
   
   
@@ -1202,7 +818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dca-strategy/" class="md-nav__link">
+      <a href="../../scenarios/dca-strategy/" class="md-nav__link">
         
   
   
@@ -1230,7 +846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../platform-migration/" class="md-nav__link">
+      <a href="../../scenarios/platform-migration/" class="md-nav__link">
         
   
   
@@ -1258,7 +874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../portfolio-rebalancing/" class="md-nav__link">
+      <a href="../../scenarios/portfolio-rebalancing/" class="md-nav__link">
         
   
   
@@ -1286,7 +902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../risk-hedging/" class="md-nav__link">
+      <a href="../../scenarios/risk-hedging/" class="md-nav__link">
         
   
   
@@ -1314,7 +930,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../leverage-long/" class="md-nav__link">
+      <a href="../../scenarios/leverage-long/" class="md-nav__link">
         
   
   
@@ -1342,7 +958,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../multi-asset-strategy/" class="md-nav__link">
+      <a href="../../scenarios/multi-asset-strategy/" class="md-nav__link">
         
   
   
@@ -1370,7 +986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../collateral-optimization/" class="md-nav__link">
+      <a href="../../scenarios/collateral-optimization/" class="md-nav__link">
         
   
   
@@ -1398,7 +1014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../arbitrage-market-making/" class="md-nav__link">
+      <a href="../../scenarios/arbitrage-market-making/" class="md-nav__link">
         
   
   
@@ -1426,7 +1042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../withdrawals/" class="md-nav__link">
+      <a href="../../scenarios/withdrawals/" class="md-nav__link">
         
   
   
@@ -2303,66 +1919,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#your-goal" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Your Goal
+        Overview
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#complete-walkthrough" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Walkthrough
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Complete Walkthrough">
+    <nav class="md-nav" aria-label="Overview">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#part-1-bridge-your-assets-15-20-minutes" class="md-nav__link">
+  <a href="#core-principles" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Part 1: Bridge Your Assets (15-20 minutes)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#part-2-get-usdst-for-fees-5-minutes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Part 2: Get USDST for Fees (5 minutes)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#part-3-supply-collateral-2-minutes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Part 3: Supply Collateral (2 minutes)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#part-4-borrow-usdst-2-minutes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Part 4: Borrow USDST (2 minutes)
+        Core Principles
       
     </span>
   </a>
@@ -2375,33 +1947,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#summary-what-you-achieved" class="md-nav__link">
+  <a href="#activity-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Summary: What You Achieved
+        Activity Types
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
+    <nav class="md-nav" aria-label="Activity Types">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#option-a-start-trading" class="md-nav__link">
+  <a href="#position-activities-activitytypeposition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option A: Start Trading
+        Position Activities (ActivityType.Position)
       
     </span>
   </a>
@@ -2409,32 +1970,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-b-earn-passive-income" class="md-nav__link">
+  <a href="#onetime-activities-activitytypeonetime" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option B: Earn Passive Income
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-c-expand-your-position" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option C: Expand Your Position
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-d-try-cdp-for-lower-fees" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option D: Try CDP for Lower Fees
+        OneTime Activities (ActivityType.OneTime)
       
     </span>
   </a>
@@ -2447,22 +1986,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#important-reminders" class="md-nav__link">
+  <a href="#architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Important Reminders
+        Architecture
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Important Reminders">
+    <nav class="md-nav" aria-label="Architecture">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#monitor-your-health-factor" class="md-nav__link">
+  <a href="#data-structures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Monitor Your Health Factor
+        Data Structures
       
     </span>
   </a>
@@ -2470,21 +2009,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#keep-usdst-for-gas" class="md-nav__link">
+  <a href="#state-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Keep USDST for Gas
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#accrue-interest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Accrue Interest
+        State Variables
       
     </span>
   </a>
@@ -2497,22 +2025,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#common-questions" class="md-nav__link">
+  <a href="#reward-calculation-logic" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Common Questions
+        Reward Calculation Logic
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Common Questions">
+    <nav class="md-nav" aria-label="Reward Calculation Logic">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#how-do-i-get-more-ethst-on-strato" class="md-nav__link">
+  <a href="#the-global-index-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
-        "How do I get more ETHST on STRATO?"
+        The Global Index Pattern
       
     </span>
   </a>
@@ -2520,10 +2048,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#can-i-withdraw-my-ethst" class="md-nav__link">
+  <a href="#how-rewards-accrue" class="md-nav__link">
     <span class="md-ellipsis">
       
-        "Can I withdraw my ETHST?"
+        How Rewards Accrue
       
     </span>
   </a>
@@ -2531,10 +2059,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-if-i-need-to-exit-completely" class="md-nav__link">
+  <a href="#for-users" class="md-nav__link">
     <span class="md-ellipsis">
       
-        "What if I need to exit completely?"
+        For Users
       
     </span>
   </a>
@@ -2547,91 +2075,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
+  <a href="#administration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Troubleshooting
+        Administration
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#bridge-taking-too-long" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bridge taking too long
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#insufficient-usdst-for-transaction-fee" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Insufficient USDST for transaction fee"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#health-factor-warnings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Health factor warnings
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#congratulations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Congratulations! 🎉
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Congratulations! 🎉">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#continue-your-journey" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue Your Journey
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Get Help
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2652,295 +2102,126 @@
 
 
 
-<h1 id="first-time-user-journey">First-Time User Journey<a class="headerlink" href="#first-time-user-journey" title="Permanent link">&para;</a></h1>
-<p>Complete walkthrough from getting assets onto STRATO to your first DeFi transaction.</p>
-<hr />
-<h2 id="your-goal">Your Goal<a class="headerlink" href="#your-goal" title="Permanent link">&para;</a></h2>
-<p>Get your crypto onto STRATO and borrow USDST to start using DeFi.</p>
-<p><strong>What you have:</strong></p>
+<h1 id="rewards-system-technical-implementation-guide">Rewards System - Technical Implementation Guide<a class="headerlink" href="#rewards-system-technical-implementation-guide" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>The Rewards system is a global incentives controller that distributes CATA token rewards to users based on their participation in various protocol activities. The system uses an Aave-style cumulative index pattern to achieve O(1) gas efficiency for all operations.</p>
+<p><strong>Key Implementation File:</strong> <code>mercata/contracts/concrete/Rewards/Rewards.sol</code></p>
+<h3 id="core-principles">Core Principles<a class="headerlink" href="#core-principles" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>No Asset Custody</strong>: The contract never holds user assets (LP tokens, collateral, etc.) - only CATA rewards and accounting state</li>
+<li><strong>O(1) Operations</strong>: All user interactions are constant time - no loops over users or time periods</li>
+<li><strong>Global Index Pattern</strong>: Uses cumulative reward-per-stake indices for efficient calculation</li>
+<li><strong>Activity-Based</strong>: Each reward stream is an "activity" with independent tracking</li>
+<li><strong>Pre-Funded Model</strong>: Contract must be funded with CATA tokens before users can claim</li>
+</ol>
+<h2 id="activity-types">Activity Types<a class="headerlink" href="#activity-types" title="Permanent link">&para;</a></h2>
+<p>The system supports two types of activities (see <code>Rewards.sol:11-14</code>):</p>
+<h3 id="position-activities-activitytypeposition">Position Activities (<code>ActivityType.Position</code>)<a class="headerlink" href="#position-activities-activitytypeposition" title="Permanent link">&para;</a></h3>
 <ul>
-<li>1 ETH on Ethereum mainnet</li>
-<li>MetaMask wallet</li>
+<li><strong>Use Case</strong>: Ongoing positions where users can increase/decrease participation</li>
+<li><strong>Examples</strong>: Liquidity provision, lending supply, borrowing</li>
+<li><strong>API</strong>: <code>deposit(activityId, user, amount)</code> and <code>withdraw(activityId, user, amount)</code></li>
+<li><strong>Behavior</strong>: User stake can go up or down based on position changes</li>
 </ul>
-<p><strong>What you'll achieve:</strong></p>
+<h3 id="onetime-activities-activitytypeonetime">OneTime Activities (<code>ActivityType.OneTime</code>)<a class="headerlink" href="#onetime-activities-activitytypeonetime" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Bridge ETH to STRATO</li>
-<li>Use it as collateral</li>
-<li>Borrow 500 USDST</li>
-<li>Start using STRATO DeFi</li>
+<li><strong>Use Case</strong>: Discrete actions where participation only increases</li>
+<li><strong>Examples</strong>: Swap volume tracking, one-time milestones</li>
+<li><strong>API</strong>: <code>occurred(activityId, user, amount)</code></li>
+<li><strong>Behavior</strong>: User stake only increases (never decreases)</li>
 </ul>
-<p><strong>Time needed:</strong> 30 minutes (mostly waiting for bridge)<br />
-<strong>Total cost:</strong> ~$21 (Ethereum gas + STRATO fees)</p>
-<hr />
-<h2 id="complete-walkthrough">Complete Walkthrough<a class="headerlink" href="#complete-walkthrough" title="Permanent link">&para;</a></h2>
-<h3 id="part-1-bridge-your-assets-15-20-minutes">Part 1: Bridge Your Assets (15-20 minutes)<a class="headerlink" href="#part-1-bridge-your-assets-15-20-minutes" title="Permanent link">&para;</a></h3>
-<p><strong>Step 1: Go to Deposits Page</strong></p>
-<ol>
-<li>Visit <a href="https://app.strato.nexus/bridge">https://app.strato.nexus/bridge</a></li>
-<li>Connect your MetaMask wallet</li>
-<li>Ensure you're on <strong>Ethereum Mainnet</strong> network</li>
-</ol>
-<p><strong>Step 2: Initiate Bridge</strong></p>
-<ol>
-<li>From: <strong>Ethereum</strong> → To: <strong>STRATO</strong></li>
-<li>Asset: <strong>ETH</strong></li>
-<li>Amount: <strong>1.0</strong></li>
-<li>
-<p>Review costs:</p>
-</li>
-<li>
-<p>Ethereum gas: ~$20 (varies with congestion)</p>
-</li>
-<li>Total: ~$20</li>
-</ol>
-<p><strong>Step 3: Confirm &amp; Wait</strong></p>
-<ol>
-<li>Click <strong>"Bridge"</strong></li>
-<li>Confirm transaction in MetaMask</li>
-<li>
-<p>Wait for:</p>
-</li>
-<li>
-<p>Ethereum confirmation: 1-2 minutes</p>
-</li>
-<li>Bridge processing: 10-15 minutes</li>
-<li>Track status in Bridge page</li>
-</ol>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>✅ Bridged: 1 ETH from Ethereum to STRATO
-✅ Time: ~15 minutes
-✅ Cost: ~$21
-✅ Now have: 1 ETHST on STRATO
+<p>The contract enforces these restrictions at the function level (see <code>Rewards.sol:240</code>, <code>Rewards.sol:255</code>, <code>Rewards.sol:270</code>).</p>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<h3 id="data-structures">Data Structures<a class="headerlink" href="#data-structures" title="Permanent link">&para;</a></h3>
+<p><strong>Activity</strong> (<code>Rewards.sol:21-29</code>)
+<div class="highlight"><pre><span></span><code>struct Activity {
+    string name;                 // Human-readable identifier
+    ActivityType activityType;   // Position or OneTime
+    uint256 emissionRate;        // CATA tokens per second for this activity
+    uint256 accRewardPerStake;   // Cumulative reward index (scaled by 1e18)
+    uint256 lastUpdateTime;      // Last time index was updated
+    uint256 totalStake;          // Sum of all user stakes (tracked internally)
+    address allowedCaller;       // Only this address can call deposit/withdraw/occurred
+}
 </code></pre></div></p>
-<p><strong>While waiting:</strong></p>
-<ul>
-<li>Read <a href="../../concepts/">Core Concepts</a> to understand health factor</li>
-</ul>
-<hr />
-<h3 id="part-2-get-usdst-for-fees-5-minutes">Part 2: Get USDST for Fees (5 minutes)<a class="headerlink" href="#part-2-get-usdst-for-fees-5-minutes" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> You need USDST to pay gas fees on STRATO</p>
-<p><strong>Solution:</strong> Quick borrow to get gas fees</p>
-<ol>
-<li><strong>Go to Borrow page</strong> (in sidebar)</li>
-<li>
-<p><strong>Try to supply ETHST as collateral:</strong></p>
-</li>
-<li>
-<p>In the Collateral Management table, find <strong>ETHST</strong></p>
-</li>
-<li>Click the <strong>"Supply"</strong> button</li>
-<li>Enter <strong>0.1</strong> (keep 0.9 for now)</li>
-<li>Click <strong>"Supply"</strong> → Confirm</li>
-<li>Wait... <strong>ERROR: Need USDST for gas!</strong></li>
-</ol>
-<p><strong>Catch-22 Solution:</strong></p>
-<ul>
-<li>Get from a friend</li>
-<li>OR use the app's "Get Gas" feature if available</li>
-<li>OR bridge in USDC first, swap USDST for USDST</li>
-</ul>
-<p><strong>For this guide, assume you got 10 USDST for fees.</strong></p>
-<hr />
-<h3 id="part-3-supply-collateral-2-minutes">Part 3: Supply Collateral (2 minutes)<a class="headerlink" href="#part-3-supply-collateral-2-minutes" title="Permanent link">&para;</a></h3>
-<p><strong>Now you have gas, let's continue:</strong></p>
-<p><strong>Step 1: Supply ETHST</strong></p>
-<ol>
-<li>Go to <strong>Borrow</strong> (sidebar)</li>
-<li><strong>In the Collateral Management table</strong>, find <strong>ETHST</strong></li>
-<li>Click the <strong>"Supply"</strong> button</li>
-<li><strong>In the modal:</strong></li>
-<li>Enter <strong>1.0</strong> (use all of it)</li>
-<li>Review the preview</li>
-<li>Click <strong>"Supply"</strong></li>
-<li>Confirm (~$0.10 gas in USDST)</li>
-<li>Approval + supply happen automatically in one transaction</li>
-<li>Wait 1-2 seconds</li>
-</ol>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>✅ Supplied: 1 ETHST ($3,000)
-✅ Can borrow: Up to $2,250 USDST
-✅ Health Factor: N/A (no debt yet)
+<p><strong>RewardsUserInfo</strong> (<code>Rewards.sol:16-19</code>)
+<div class="highlight"><pre><span></span><code>struct RewardsUserInfo {
+    uint256 stake;       // User&#39;s effective stake in this activity
+    uint256 rewardDebt;  // Accounting variable for reward calculation
+}
 </code></pre></div></p>
-<p><strong>Your balances:</strong></p>
+<h3 id="state-variables">State Variables<a class="headerlink" href="#state-variables" title="Permanent link">&para;</a></h3>
 <ul>
-<li>ETHST: 0 (moved to collateral)</li>
-<li>USDST: 9.90 (spent $0.10 on gas for one transaction)</li>
-<li>Collateral: 1 ETHST</li>
+<li><code>activities[activityId]</code> - Activity data by ID</li>
+<li><code>userInfo[activityId][user]</code> - Per-user state for each activity</li>
+<li><code>unclaimedRewards[user]</code> - Accumulated claimable rewards across all activities</li>
+<li><code>totalRewardsEmission</code> - Sum of emission rates across all activities</li>
+<li><code>activityIds[]</code> - Array of all activity IDs for enumeration</li>
 </ul>
-<hr />
-<h3 id="part-4-borrow-usdst-2-minutes">Part 4: Borrow USDST (2 minutes)<a class="headerlink" href="#part-4-borrow-usdst-2-minutes" title="Permanent link">&para;</a></h3>
-<p><strong>Step 1: Borrow</strong></p>
-<ol>
-<li>Go to <strong>Borrow</strong> (sidebar) → <strong>Borrow</strong> section</li>
-<li>Enter <strong>500</strong> USDST</li>
-<li>
-<p>Review:</p>
-</li>
-<li>
-<p>Borrowing: 500 USDST</p>
-</li>
-<li>New Health Factor: <strong>3.6</strong> (very safe)</li>
-<li>Interest: ~5% annually</li>
-<li>Click <strong>"Borrow"</strong></li>
-<li>Confirm (~$0.10 gas)</li>
-<li>Wait 1-2 seconds</li>
-</ol>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>✅ Borrowed: 500 USDST
-✅ Health Factor: 3.6 (Very safe)
-✅ Your wallet: +500 USDST
+<h2 id="reward-calculation-logic">Reward Calculation Logic<a class="headerlink" href="#reward-calculation-logic" title="Permanent link">&para;</a></h2>
+<h3 id="the-global-index-pattern">The Global Index Pattern<a class="headerlink" href="#the-global-index-pattern" title="Permanent link">&para;</a></h3>
+<p>The system uses a cumulative index to track how much reward has accrued per unit of stake over time. This is the key to O(1) efficiency.</p>
+<p><strong>Index Update</strong> (see <code>_updateActivityIndex()</code> at <code>Rewards.sol:345-370</code>):
+<div class="highlight"><pre><span></span><code>Time elapsed: dt = now - lastUpdateTime
+Rewards generated: reward = emissionRate * dt
+Index increment: accRewardPerStake += (reward * 1e18) / totalStake
 </code></pre></div></p>
-<p><strong>Your balances:</strong></p>
-<ul>
-<li>ETHST: 0</li>
-<li>USDST: 509.70 (9.70 remaining + 500 borrowed)</li>
-<li>Collateral: 1 ETHST ($3,000)</li>
-<li>Debt: 500 USDST</li>
-</ul>
-<hr />
-<h2 id="summary-what-you-achieved">Summary: What You Achieved<a class="headerlink" href="#summary-what-you-achieved" title="Permanent link">&para;</a></h2>
-<p><strong>Starting point:</strong></p>
-<ul>
-<li>1 ETH on Ethereum</li>
-</ul>
-<p><strong>Ending point:</strong></p>
-<ul>
-<li>1 ETHST as collateral on STRATO</li>
-<li>509.70 USDST in wallet</li>
-<li>Health Factor: 3.6 (very safe)</li>
-<li>Ready to use STRATO DeFi</li>
-</ul>
-<p><strong>Total costs:</strong></p>
-<ul>
-<li>Ethereum gas: ~$20</li>
-<li>STRATO gas: ~$0.30</li>
-<li><strong>Total: ~$20.30</strong></li>
-</ul>
-<p><strong>What you can do now:</strong></p>
-<ul>
-<li>✅ Use USDST for transaction fees</li>
-<li>✅ Swap USDST for other tokens</li>
-<li>✅ Provide liquidity and earn fees</li>
-<li>✅ Keep borrowing against collateral</li>
-<li>✅ Earn Reward Points</li>
-</ul>
-<hr />
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<h3 id="option-a-start-trading">Option A: Start Trading<a class="headerlink" href="#option-a-start-trading" title="Permanent link">&para;</a></h3>
-<p><strong><a href="../../guides/swap/">Swap USDST for other tokens →</a></strong>
-- Trade for any token on STRATO
-- Build your portfolio
-- Take advantage of opportunities</p>
-<h3 id="option-b-earn-passive-income">Option B: Earn Passive Income<a class="headerlink" href="#option-b-earn-passive-income" title="Permanent link">&para;</a></h3>
-<p><strong><a href="../../guides/liquidity/">Provide Liquidity →</a></strong>
-- Use your USDST to provide liquidity
-- Earn 8-15% APR in trading fees
-- Plus Reward Points</p>
-<h3 id="option-c-expand-your-position">Option C: Expand Your Position<a class="headerlink" href="#option-c-expand-your-position" title="Permanent link">&para;</a></h3>
-<p><strong><a href="../../guides/borrow/">Borrow More →</a></strong>
-- You can borrow up to $2,250 total
-- Currently using only $500
-- Health factor is very safe at 3.6</p>
-<h3 id="option-d-try-cdp-for-lower-fees">Option D: Try CDP for Lower Fees<a class="headerlink" href="#option-d-try-cdp-for-lower-fees" title="Permanent link">&para;</a></h3>
-<p><strong><a href="../../guides/mint-cdp/">Mint via CDP →</a></strong>
-- Lower fees than borrowing
-- Better for long-term positions
-- More capital efficient</p>
-<hr />
-<h2 id="important-reminders">Important Reminders<a class="headerlink" href="#important-reminders" title="Permanent link">&para;</a></h2>
-<h3 id="monitor-your-health-factor">Monitor Your Health Factor<a class="headerlink" href="#monitor-your-health-factor" title="Permanent link">&para;</a></h3>
-<p><strong>Check daily:</strong></p>
+<p><strong>User Pending Rewards</strong> (calculated in <code>_handleActivity()</code> and <code>_settlePendingRewards()</code>):
+<div class="highlight"><pre><span></span><code>accumulated = (userStake * accRewardPerStake) / 1e18
+pending = accumulated - rewardDebt
+</code></pre></div></p>
+<p>The <code>rewardDebt</code> tracks what the user has already been credited, so the difference gives new rewards since last update.</p>
+<h3 id="how-rewards-accrue">How Rewards Accrue<a class="headerlink" href="#how-rewards-accrue" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Go to <strong>Borrow</strong> (sidebar)</li>
-<li>See your health factor</li>
-<li>Keep it above 2.0</li>
+<li>
+<p><strong>Index Update</strong>: When any user interacts with an activity, the global index is updated first using the <strong>current</strong> totalStake (before the user's change is applied)</p>
+</li>
+<li>
+<p><strong>Settle User Rewards</strong>: Calculate pending rewards using the freshly updated index and add to <code>unclaimedRewards[user]</code></p>
+</li>
+<li>
+<p><strong>Update User State</strong>:</p>
+</li>
+<li>Update user's stake based on the action</li>
+<li>
+<p>Set <code>rewardDebt = (newStake * accRewardPerStake) / 1e18</code></p>
+</li>
+<li>
+<p><strong>Update Total Stake</strong>: <code>totalStake = totalStake + newStake - oldStake</code></p>
+</li>
 </ol>
-<p><strong>If ETHST price drops:</strong></p>
+<p>This ensures:
+- Users get credit for rewards accrued before their action
+- The new stake is properly initialized for future accrual
+- Total stake stays consistent (sum of all user stakes)</p>
+<p>See <code>_handleActivity()</code> implementation at <code>Rewards.sol:268-313</code>.</p>
+<h3 id="for-users">For Users<a class="headerlink" href="#for-users" title="Permanent link">&para;</a></h3>
+<p>Users interact with activities through pools, then claim rewards:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Claim from specific activities</span>
+<span class="kt">uint256</span><span class="p">[]</span><span class="w"> </span><span class="kt">memory</span><span class="w"> </span>activityIds<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="m m-Decimal">1</span><span class="p">,</span><span class="w"> </span><span class="m m-Decimal">2</span><span class="p">,</span><span class="w"> </span><span class="m m-Decimal">3</span><span class="p">];</span>
+rewards<span class="p">.</span>claimRewards<span class="p">(</span>activityIds<span class="p">);</span>
+
+<span class="c1">// Or claim from all activities</span>
+rewards<span class="p">.</span>claimAllRewards<span class="p">();</span>
+</code></pre></div>
+<p>Claiming:
+1. Updates indices for specified activities
+2. Settles pending rewards (without changing stakes)
+3. Transfers all <code>unclaimedRewards[user]</code> to the user
+4. Resets <code>unclaimedRewards[user]</code> to 0</p>
+<p>See <code>claimRewards()</code> at <code>Rewards.sol:188-205</code> and <code>claimAllRewards()</code> at <code>Rewards.sol:210-227</code>.</p>
+<h2 id="administration">Administration<a class="headerlink" href="#administration" title="Permanent link">&para;</a></h2>
+<p><strong>Owner Functions</strong> (all require <code>onlyOwner</code>):</p>
 <ul>
-<li>Health factor decreases</li>
-<li>Add more collateral or repay debt</li>
-<li>Don't let it drop below 1.0!</li>
+<li><code>addActivity()</code> - Register new activity (see <code>Rewards.sol:121-147</code>)</li>
+<li><code>setEmissionRate()</code> - Update emission rate for an activity (see <code>Rewards.sol:154-167</code>)</li>
+<li><code>setAllowedCaller()</code> - Change the allowed caller for an activity (see <code>Rewards.sol:174-182</code>)</li>
 </ul>
-<h3 id="keep-usdst-for-gas">Keep USDST for Gas<a class="headerlink" href="#keep-usdst-for-gas" title="Permanent link">&para;</a></h3>
-<p><strong>Always maintain:</strong></p>
-<ul>
-<li>At least 10-20 USDST in wallet</li>
-<li>For transaction fees</li>
-<li>Gas is cheap (~$0.10) but you need it</li>
-</ul>
-<h3 id="accrue-interest">Accrue Interest<a class="headerlink" href="#accrue-interest" title="Permanent link">&para;</a></h3>
-<p><strong>Remember:</strong></p>
-<ul>
-<li>Your 500 USDST debt grows daily</li>
-<li>~5% annually = $0.07/day</li>
-<li>After 30 days: Owe ~$502</li>
-<li>Track and repay when ready</li>
-</ul>
-<hr />
-<h2 id="common-questions">Common Questions<a class="headerlink" href="#common-questions" title="Permanent link">&para;</a></h2>
-<h3 id="how-do-i-get-more-ethst-on-strato">"How do I get more ETHST on STRATO?"<a class="headerlink" href="#how-do-i-get-more-ethst-on-strato" title="Permanent link">&para;</a></h3>
-<p>Bridge more from Ethereum:</p>
-<ol>
-<li>Follow Part 1 again</li>
-<li>Bridge additional ETH</li>
-<li>Supply as collateral</li>
-</ol>
-<h3 id="can-i-withdraw-my-ethst">"Can I withdraw my ETHST?"<a class="headerlink" href="#can-i-withdraw-my-ethst" title="Permanent link">&para;</a></h3>
-<p>Only if you maintain health factor above 1.0:</p>
-<ol>
-<li>Repay your debt first (or partially)</li>
-<li>Then withdraw collateral</li>
-<li>Health factor must stay safe</li>
-</ol>
-<h3 id="what-if-i-need-to-exit-completely">"What if I need to exit completely?"<a class="headerlink" href="#what-if-i-need-to-exit-completely" title="Permanent link">&para;</a></h3>
-<p>See <strong><a href="../withdrawals/">Withdrawals Guide →</a></strong></p>
-<hr />
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<h3 id="bridge-taking-too-long">Bridge taking too long<a class="headerlink" href="#bridge-taking-too-long" title="Permanent link">&para;</a></h3>
-<p><strong>Normal:</strong> 15-20 minutes total</p>
-<p><strong>If &gt; 30 minutes:</strong></p>
-<ul>
-<li>Check Ethereum transaction confirmed on Etherscan</li>
-<li>Contact support with transaction hash</li>
-<li>Monitor bridge status page</li>
-</ul>
-<h3 id="insufficient-usdst-for-transaction-fee">"Insufficient USDST for transaction fee"<a class="headerlink" href="#insufficient-usdst-for-transaction-fee" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> Ran out of gas USDST</p>
-<p><strong>Solution:</strong></p>
-<ul>
-<li>Get more USDST (borrow small amount, or swap)</li>
-<li>Ask in community for small amount</li>
-</ul>
-<h3 id="health-factor-warnings">Health factor warnings<a class="headerlink" href="#health-factor-warnings" title="Permanent link">&para;</a></h3>
-<p><strong>If health factor drops below 2.0:</strong></p>
-<ol>
-<li>Check ETHST price movement</li>
-<li>Add more collateral or repay debt</li>
-<li>Don't ignore yellow/red warnings</li>
-</ol>
-<hr />
-<h2 id="congratulations">Congratulations! 🎉<a class="headerlink" href="#congratulations" title="Permanent link">&para;</a></h2>
-<p>You've successfully:</p>
-<ul>
-<li>✅ Bridged assets to STRATO</li>
-<li>✅ Supplied collateral</li>
-<li>✅ Borrowed USDST</li>
-<li>✅ Ready for DeFi</li>
-</ul>
-<p><strong>You're now a STRATO user!</strong></p>
-<h3 id="continue-your-journey">Continue Your Journey<a class="headerlink" href="#continue-your-journey" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><a href="../../concepts/">Core Concepts</a></strong> - Deepen your understanding</li>
-<li><strong><a href="../../safety/">Safety Guide</a></strong> - Protect your assets</li>
-<li><strong><a href="../../guides/borrow/">All Guides</a></strong> - Explore more features</li>
-<li><strong><a href="../../faq/">FAQ</a></strong> - Common questions</li>
-</ul>
-<h3 id="get-help">Get Help<a class="headerlink" href="#get-help" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
-<li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
-<li><strong>Docs</strong>: <a href="https://docs.strato.nexus">docs.strato.nexus</a></li>
-</ul>
+<p><strong>Emission Rate Updates</strong>: When updating emission rates, the contract:
+1. Updates the activity index first (with old rate)
+2. Changes the emission rate
+3. Updates <code>totalRewardsEmission</code> accordingly</p>
+<p>This ensures a clean transition between emission rates without retroactive changes.</p>
 
 
 
@@ -2973,7 +2254,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 5, 2026 01:56:17 UTC"><span class="timeago" datetime="2026-03-05T01:56:17+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 5, 2026 01:56:17 UTC">2026-03-05</span>
   </span>
 
     

@@ -12,13 +12,9 @@
         <meta name="author" content="BlockApps">
       
       
-        <link rel="canonical" href="https://docs.strato.nexus/scenarios/arbitrage-market-making/">
+        <link rel="canonical" href="https://docs.strato.nexus/design-docs/save-usdst/">
       
       
-        <link rel="prev" href="../collateral-optimization/">
-      
-      
-        <link rel="next" href="../withdrawals/">
       
       
         
@@ -29,7 +25,7 @@
     
     
       
-        <title>Arbitrage & Market Making - STRATO Technical Docs</title>
+        <title>saveUSDST Technical Spec - STRATO Technical Docs</title>
       
     
     
@@ -84,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#arbitrage-market-making" class="md-skip">
+        <a href="#saveusdst-technical-spec" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Arbitrage & Market Making
+              saveUSDST Technical Spec
             
           </span>
         </div>
@@ -410,7 +406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../first-time-user/" class="md-nav__link">
+      <a href="../../scenarios/first-time-user/" class="md-nav__link">
         
   
   
@@ -685,10 +681,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -723,11 +717,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
@@ -748,7 +744,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -766,7 +762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../grow-position/" class="md-nav__link">
+      <a href="../../scenarios/grow-position/" class="md-nav__link">
         
   
   
@@ -794,7 +790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../maximize-yield/" class="md-nav__link">
+      <a href="../../scenarios/maximize-yield/" class="md-nav__link">
         
   
   
@@ -822,7 +818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dca-strategy/" class="md-nav__link">
+      <a href="../../scenarios/dca-strategy/" class="md-nav__link">
         
   
   
@@ -850,7 +846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../platform-migration/" class="md-nav__link">
+      <a href="../../scenarios/platform-migration/" class="md-nav__link">
         
   
   
@@ -878,7 +874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../portfolio-rebalancing/" class="md-nav__link">
+      <a href="../../scenarios/portfolio-rebalancing/" class="md-nav__link">
         
   
   
@@ -906,7 +902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../risk-hedging/" class="md-nav__link">
+      <a href="../../scenarios/risk-hedging/" class="md-nav__link">
         
   
   
@@ -934,7 +930,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../leverage-long/" class="md-nav__link">
+      <a href="../../scenarios/leverage-long/" class="md-nav__link">
         
   
   
@@ -962,7 +958,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../multi-asset-strategy/" class="md-nav__link">
+      <a href="../../scenarios/multi-asset-strategy/" class="md-nav__link">
         
   
   
@@ -990,7 +986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../collateral-optimization/" class="md-nav__link">
+      <a href="../../scenarios/collateral-optimization/" class="md-nav__link">
         
   
   
@@ -1015,37 +1011,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Arbitrage & Market Making
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../scenarios/arbitrage-market-making/" class="md-nav__link">
         
   
   
@@ -1061,526 +1030,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-strategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The Strategy
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#strategy-1-cross-dex-arbitrage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Strategy 1: Cross-DEX Arbitrage
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Strategy 1: Cross-DEX Arbitrage">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#the-concept" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The Concept
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#complete-example-ethst-arbitrage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: ETHST Arbitrage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#when-arbitrage-is-profitable" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When Arbitrage is Profitable
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#strategy-2-on-chain-arbitrage-no-bridge" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Strategy 2: On-Chain Arbitrage (No Bridge)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Strategy 2: On-Chain Arbitrage (No Bridge)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#the-concept_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The Concept
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#complete-example-routing-arbitrage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: Routing Arbitrage
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#strategy-3-liquidity-providing-market-making" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Strategy 3: Liquidity Providing (Market Making)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Strategy 3: Liquidity Providing (Market Making)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#the-concept_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The Concept
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#complete-example-concentrated-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: Concentrated Liquidity
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#implementation-narrow-range-strategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Implementation: Narrow Range Strategy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#managing-concentrated-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Managing Concentrated Liquidity
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#impermanent-loss-reality-check" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Impermanent Loss Reality Check
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Impermanent Loss Reality Check">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-is-il" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What is IL?
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#comparing-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Comparing Strategies
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-automated-market-making" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced: Automated Market Making
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Advanced: Automated Market Making">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#bot-strategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bot Strategy
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Risk Management
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Risk Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#for-arbitrage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Arbitrage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#for-market-making" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Market Making
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tax-implications" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tax Implications
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#real-example-professional-lp" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Real Example: Professional LP
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Started
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Getting Started">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#week-1-learn" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Week 1: Learn
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#week-2-test" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Week 2: Test
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#week-3-scale" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Week 3: Scale
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#month-2-optimize" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Month 2+: Optimize
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tools-resources" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tools &amp; Resources
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Tools &amp; Resources">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tracking-tools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tracking Tools
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#calculators" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Calculators
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-mistakes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Mistakes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Mistakes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#providing-to-low-volume-pools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Providing to Low-Volume Pools
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ignoring-impermanent-loss" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Ignoring Impermanent Loss
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#over-concentrating-range" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Over-Concentrating Range
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#related-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related Strategies
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#learn-more" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Learn More
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#need-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Need Help?
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1593,7 +1042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../withdrawals/" class="md-nav__link">
+      <a href="../../scenarios/withdrawals/" class="md-nav__link">
         
   
   
@@ -2470,10 +1919,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-strategy" class="md-nav__link">
+  <a href="#business-context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Strategy
+        Business Context
       
     </span>
   </a>
@@ -2481,22 +1930,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#strategy-1-cross-dex-arbitrage" class="md-nav__link">
+  <a href="#current-protocol-context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Strategy 1: Cross-DEX Arbitrage
+        Current Protocol Context
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Strategy 1: Cross-DEX Arbitrage">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definitions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Definitions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#the-concept" class="md-nav__link">
+  <a href="#usdst" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Concept
+        USDST
       
     </span>
   </a>
@@ -2504,10 +1964,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#complete-example-ethst-arbitrage" class="md-nav__link">
+  <a href="#saveusdst" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: ETHST Arbitrage
+        saveUSDST
       
     </span>
   </a>
@@ -2515,10 +1975,65 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#when-arbitrage-is-profitable" class="md-nav__link">
+  <a href="#cdp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        When Arbitrage is Profitable
+        CDP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lending-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lending pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safetyusdst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safetyUSDST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metastable-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metastable pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#psm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PSM
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#external-yield-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External yield assets
       
     </span>
   </a>
@@ -2531,22 +2046,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#strategy-2-on-chain-arbitrage-no-bridge" class="md-nav__link">
+  <a href="#scope-assumptions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Strategy 2: On-Chain Arbitrage (No Bridge)
+        Scope Assumptions
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Strategy 2: On-Chain Arbitrage (No Bridge)">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#product-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Product Definition
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="System Model">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#the-concept_1" class="md-nav__link">
+  <a href="#underlying-and-share-asset" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Concept
+        Underlying and share asset
       
     </span>
   </a>
@@ -2554,10 +2113,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#complete-example-routing-arbitrage" class="md-nav__link">
+  <a href="#accounting-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Routing Arbitrage
+        Accounting model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accounting-requirement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accounting requirement
       
     </span>
   </a>
@@ -2570,22 +2140,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#strategy-3-liquidity-providing-market-making" class="md-nav__link">
+  <a href="#functional-requirements" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Strategy 3: Liquidity Providing (Market Making)
+        Functional Requirements
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Strategy 3: Liquidity Providing (Market Making)">
+    <nav class="md-nav" aria-label="Functional Requirements">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#the-concept_2" class="md-nav__link">
+  <a href="#user-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Concept
+        User actions
       
     </span>
   </a>
@@ -2593,10 +2163,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#complete-example-concentrated-liquidity" class="md-nav__link">
+  <a href="#protocol-governance-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Concentrated Liquidity
+        Protocol / governance actions
       
     </span>
   </a>
@@ -2604,21 +2174,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#implementation-narrow-range-strategy" class="md-nav__link">
+  <a href="#interface-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation: Narrow Range Strategy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#managing-concentrated-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Managing Concentrated Liquidity
+        Interface shape
       
     </span>
   </a>
@@ -2631,22 +2190,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#impermanent-loss-reality-check" class="md-nav__link">
+  <a href="#product-positioning-relative-to-existing-components" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Impermanent Loss Reality Check
+        Product Positioning Relative To Existing Components
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Impermanent Loss Reality Check">
+    <nav class="md-nav" aria-label="Product Positioning Relative To Existing Components">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-is-il" class="md-nav__link">
+  <a href="#lending-pool_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What is IL?
+        Lending pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safetyusdst_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safetyUSDST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#external-yield-assets_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External yield assets
       
     </span>
   </a>
@@ -2659,33 +2240,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#comparing-strategies" class="md-nav__link">
+  <a href="#funding-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Comparing Strategies
+        Funding Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Funding Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-bootstrap-incentives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: bootstrap incentives
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-automated-market-making" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-fee-share-transition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Advanced: Automated Market Making
+        Phase 2: fee-share transition
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Advanced: Automated Market Making">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
-  <a href="#bot-strategy" class="md-nav__link">
+  <a href="#phase-3-steady-state" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bot Strategy
+        Phase 3: steady state
       
     </span>
   </a>
@@ -2698,22 +2290,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
+  <a href="#economics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Risk Management
+        Economics
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Risk Management">
+    <nav class="md-nav" aria-label="Economics">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#for-arbitrage" class="md-nav__link">
+  <a href="#strategic-target" class="md-nav__link">
     <span class="md-ellipsis">
       
-        For Arbitrage
+        Strategic target
       
     </span>
   </a>
@@ -2721,10 +2313,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#for-market-making" class="md-nav__link">
+  <a href="#implied-fee-funded-base-rate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        For Market Making
+        Implied fee-funded base rate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#launch-yield-range" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Launch yield range
       
     </span>
   </a>
@@ -2737,10 +2340,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#tax-implications" class="md-nav__link">
+  <a href="#yield-presentation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tax Implications
+        Yield Presentation
       
     </span>
   </a>
@@ -2748,33 +2351,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#real-example-professional-lp" class="md-nav__link">
+  <a href="#launch-policy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Real Example: Professional LP
+        Launch Policy
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Started
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Getting Started">
+    <nav class="md-nav" aria-label="Launch Policy">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#week-1-learn" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Week 1: Learn
+        Scope
       
     </span>
   </a>
@@ -2782,10 +2374,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#week-2-test" class="md-nav__link">
+  <a href="#collateral-policy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Week 2: Test
+        Collateral policy
       
     </span>
   </a>
@@ -2793,21 +2385,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#week-3-scale" class="md-nav__link">
+  <a href="#rationale" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Week 3: Scale
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#month-2-optimize" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Month 2+: Optimize
+        Rationale
       
     </span>
   </a>
@@ -2820,99 +2401,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#tools-resources" class="md-nav__link">
+  <a href="#integrations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tools &amp; Resources
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Tools &amp; Resources">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tracking-tools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tracking Tools
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#calculators" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Calculators
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-mistakes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Mistakes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Mistakes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#providing-to-low-volume-pools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Providing to Low-Volume Pools
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ignoring-impermanent-loss" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Ignoring Impermanent Loss
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#over-concentrating-range" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Over-Concentrating Range
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
+        Integrations
       
     </span>
   </a>
@@ -2920,22 +2412,55 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
+  <a href="#kpis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next Steps
+        KPIs
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Next Steps">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Notes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Notes">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#related-strategies" class="md-nav__link">
+  <a href="#existing-contract" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related Strategies
+        Existing contract
       
     </span>
   </a>
@@ -2943,10 +2468,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#learn-more" class="md-nav__link">
+  <a href="#contract-interactions-at-launch" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Learn More
+        Contract interactions at launch
       
     </span>
   </a>
@@ -2954,10 +2479,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#need-help" class="md-nav__link">
+  <a href="#what-notifyreward-is-and-when-it-matters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Need Help?
+        What notifyReward is and when it matters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui-and-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI and API
       
     </span>
   </a>
@@ -2986,665 +2533,381 @@
 
 
 
-<h1 id="arbitrage-market-making">Arbitrage &amp; Market Making<a class="headerlink" href="#arbitrage-market-making" title="Permanent link">&para;</a></h1>
-<p>Profit from price differences and provide liquidity to earn trading fees.</p>
-<hr />
-<h2 id="the-strategy">The Strategy<a class="headerlink" href="#the-strategy" title="Permanent link">&para;</a></h2>
-<p>Two complementary strategies:</p>
+<h1 id="saveusdst-technical-spec">saveUSDST Technical Spec<a class="headerlink" href="#saveusdst-technical-spec" title="Permanent link">&para;</a></h1>
+<p>Draft: 2026-03-18</p>
+<h2 id="business-context">Business Context<a class="headerlink" href="#business-context" title="Permanent link">&para;</a></h2>
+<p>The protocol needs <code>USDST</code> to do three things well:</p>
 <ol>
-<li><strong>Arbitrage</strong>: Buy low on one venue, sell high on another</li>
-<li><strong>Market Making</strong>: Provide liquidity to earn fees from traders</li>
+<li>circulate</li>
+<li>trade at size</li>
+<li>be worth holding</li>
 </ol>
-<p><strong>Skills needed:</strong> Moderate-Advanced<br />
-<strong>Capital required:</strong> $5k+ minimum<br />
-<strong>Time commitment:</strong> Active monitoring or automation</p>
-<hr />
-<h2 id="strategy-1-cross-dex-arbitrage">Strategy 1: Cross-DEX Arbitrage<a class="headerlink" href="#strategy-1-cross-dex-arbitrage" title="Permanent link">&para;</a></h2>
-<h3 id="the-concept">The Concept<a class="headerlink" href="#the-concept" title="Permanent link">&para;</a></h3>
-<p><strong>Price differences exist between platforms:</strong></p>
+<p>The first comes from CDP minting. The second comes from stable liquidity. <code>saveUSDST</code> is the third leg: the native hold asset for <code>USDST</code>.</p>
+<p>This matches the current internal framing:</p>
 <ul>
-<li>STRATO DEX: ETHST = $3,000</li>
-<li>Uniswap: ETH = $3,015</li>
-<li><strong>Opportunity:</strong> Buy on STRATO, sell on Uniswap, profit $15</li>
+<li>mint <code>USDST</code> against collateral</li>
+<li>LP in the metastable stable surface</li>
+<li>hold <code>saveUSDST</code></li>
 </ul>
-<p><strong>Why it exists:</strong></p>
-<ul>
-<li>Different liquidity depths</li>
-<li>Trading activity imbalances</li>
-<li>Bridge delays</li>
-<li>Market inefficiencies</li>
-</ul>
-<hr />
-<h3 id="complete-example-ethst-arbitrage">Complete Example: ETHST Arbitrage<a class="headerlink" href="#complete-example-ethst-arbitrage" title="Permanent link">&para;</a></h3>
-<p><strong>Setup:</strong></p>
-<ul>
-<li>Capital: $10,000 USDST - Split: $5k on STRATO, $5k on Uniswap (Ethereum)</li>
-<li>Assets: USDST on both chains</li>
-</ul>
-<p><strong>Opportunity spotted:</strong></p>
-<ul>
-<li>STRATO: 1 ETHST = $2,990 USDST</li>
-<li>Uniswap: 1 ETH = $3,010 USDC</li>
-<li><strong>Spread:</strong> $20 (0.67%)</li>
-</ul>
-<p><strong>Execution:</strong></p>
+<p>The point of <code>saveUSDST</code> is not to replace lending or external yieldcoins. It is to give Mercata a simple native savings product for <code>USDST</code> and a clean path from bootstrap incentives to fee-funded savings yield.</p>
+<h2 id="current-protocol-context">Current Protocol Context<a class="headerlink" href="#current-protocol-context" title="Permanent link">&para;</a></h2>
+<p>This spec assumes the current Mercata / STRATO product stack has four relevant pieces:</p>
 <ol>
+<li><code>USDST</code></li>
+<li>the protocol stablecoin</li>
 <li>
-<p><strong>Buy on STRATO:</strong></p>
+<p>the unit users mint, borrow, swap, spend, and save</p>
 </li>
 <li>
-<p>Swap $2,990 USDST → 1 ETHST</p>
+<p><code>CDP</code></p>
 </li>
-<li>Fee: 0.3% = $9</li>
+<li>the lower-cost path for minting new <code>USDST</code> against collateral</li>
 <li>
-<p>Cost: $2,999 per ETHST</p>
-</li>
-<li>
-<p><strong>Bridge ETH to Ethereum:</strong></p>
+<p>intended to be the primary supply engine for <code>USDST</code></p>
 </li>
 <li>
-<p>Bridge 1 ETH to Ethereum</p>
+<p>Lending pool</p>
 </li>
-<li>Time: 15 minutes</li>
+<li>a separate money market for supplying and borrowing <code>USDST</code></li>
 <li>
-<p>Cost: ~$15</p>
-</li>
-<li>
-<p><strong>Sell on Uniswap:</strong></p>
+<p>yield for suppliers depends on borrow demand and utilization</p>
 </li>
 <li>
-<p>Swap 1 ETHST → $3,010 USDST    - Fee: 0.3% = $9</p>
+<p>Stable liquidity surface</p>
 </li>
-<li>Receive: $3,001 USDST </li>
-<li>
-<p><strong>Bridge USDC back:</strong></p>
-</li>
-<li>
-<p>Optional: Keep capital balanced</p>
-</li>
-<li>Or accumulate on one side</li>
+<li>pools that let users move between <code>USDST</code> and external stable or yield-bearing assets such as <code>syrupUSDC</code>, <code>sUSDS</code>, and <code>sUSDe</code></li>
 </ol>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>Bought: $2,999
-Sold: $3,001
-Bridge: $15
-Net: -$13 ❌
-</code></pre></div></p>
-<p><strong>Wait, we lost money!</strong></p>
-<hr />
-<h3 id="when-arbitrage-is-profitable">When Arbitrage is Profitable<a class="headerlink" href="#when-arbitrage-is-profitable" title="Permanent link">&para;</a></h3>
-<p><strong>Break-even calculation:</strong></p>
-<div class="highlight"><pre><span></span><code>Profit = Spread - (Swap fees + Bridge costs)
-$20 - ($9 + $15 + $9) = -$13
-
-Minimum profitable spread:
-$33 / $3,000 = 1.1%
-
-Need at least 1.1% price difference
-</code></pre></div>
-<p><strong>Profitable opportunities:</strong></p>
+<p>The current strategic picture is:</p>
 <ul>
-<li>High volatility (spreads widen)</li>
-<li>Large trades (better $/tx ratio)</li>
-<li>Lower bridge costs (L2s, not Ethereum)</li>
-<li>Flash opportunities (&gt; 2% spreads)</li>
+<li>CDP grows <code>USDST</code> supply</li>
+<li>stable liquidity makes <code>USDST</code> usable</li>
+<li><code>saveUSDST</code> creates hold demand</li>
 </ul>
-<p><strong>Reality:</strong> Most arbitrage is done by bots that:</p>
+<h2 id="definitions">Definitions<a class="headerlink" href="#definitions" title="Permanent link">&para;</a></h2>
+<h3 id="usdst">USDST<a class="headerlink" href="#usdst" title="Permanent link">&para;</a></h3>
+<p>The protocol stablecoin. It is the base asset for this spec.</p>
+<h3 id="saveusdst">saveUSDST<a class="headerlink" href="#saveusdst" title="Permanent link">&para;</a></h3>
+<p>The proposed native savings token for <code>USDST</code>. Users deposit <code>USDST</code> and receive a non-rebasing claim whose value rises over time.</p>
+<h3 id="cdp">CDP<a class="headerlink" href="#cdp" title="Permanent link">&para;</a></h3>
+<p>Collateralized debt position system. Users lock collateral and mint new <code>USDST</code> against it. In current protocol economics, this is the cheaper borrowing path and the main source of new <code>USDST</code> circulation.</p>
+<h3 id="lending-pool">Lending pool<a class="headerlink" href="#lending-pool" title="Permanent link">&para;</a></h3>
+<p>Separate from the CDP. Users supply <code>USDST</code> or supported collateral to a money market. Supplier yield comes from borrower demand, not from a protocol savings rate.</p>
+<h3 id="safetyusdst">safetyUSDST<a class="headerlink" href="#safetyusdst" title="Permanent link">&para;</a></h3>
+<p>The safety-module token. It exists for protocol backstop and bad-debt handling. It is not the savings product described here.</p>
+<h3 id="metastable-pool">Metastable pool<a class="headerlink" href="#metastable-pool" title="Permanent link">&para;</a></h3>
+<p>The main stable liquidity surface for <code>USDST</code> against other stable or yield-bearing stable assets. Its job is to keep <code>USDST</code> easy to move into and out of at size.</p>
+<h3 id="psm">PSM<a class="headerlink" href="#psm" title="Permanent link">&para;</a></h3>
+<p>Peg stability mechanism. A backstop convertibility path, typically against <code>USDC</code> or <code>USDT</code>, used to anchor the peg and support arbitrage during larger deviations. It is not intended to be the normal day-to-day user route.</p>
+<h3 id="external-yield-assets">External yield assets<a class="headerlink" href="#external-yield-assets" title="Permanent link">&para;</a></h3>
+<p>Stable or dollar-like assets outside the native <code>saveUSDST</code> product that already earn yield, such as <code>syrupUSDC</code>, <code>sUSDS</code>, and <code>sUSDe</code>.</p>
+<h2 id="scope-assumptions">Scope Assumptions<a class="headerlink" href="#scope-assumptions" title="Permanent link">&para;</a></h2>
+<p>This document assumes:</p>
 <ul>
-<li>Execute in milliseconds</li>
-<li>Use flash loans (no capital needed)</li>
-<li>Have lower fees (market makers)</li>
-<li>Can capture 0.1-0.5% spreads profitably</li>
+<li><code>saveUSDST</code> is a new product, not a rename of an existing token</li>
+<li>the lending pool remains in place</li>
+<li><code>safetyUSDST</code> remains in place</li>
+<li>launch support comes from explicit rewards first</li>
+<li>fee-share support comes later</li>
+<li>collateral use is out of scope for launch</li>
 </ul>
-<hr />
-<h2 id="strategy-2-on-chain-arbitrage-no-bridge">Strategy 2: On-Chain Arbitrage (No Bridge)<a class="headerlink" href="#strategy-2-on-chain-arbitrage-no-bridge" title="Permanent link">&para;</a></h2>
-<h3 id="the-concept_1">The Concept<a class="headerlink" href="#the-concept_1" title="Permanent link">&para;</a></h3>
-<p><strong>Find price differences within STRATO:</strong></p>
-<p><strong>Example routes:</strong></p>
-<ul>
-<li>Direct: USDST → ETHST (one swap)</li>
-<li>Routed: USDST → USDST → ETHST (two swaps)</li>
-</ul>
-<p><strong>If routing is cheaper, arbitrage exists!</strong></p>
-<hr />
-<h3 id="complete-example-routing-arbitrage">Complete Example: Routing Arbitrage<a class="headerlink" href="#complete-example-routing-arbitrage" title="Permanent link">&para;</a></h3>
-<p><strong>Scenario:</strong></p>
-<p>Direct swap:</p>
-<ul>
-<li>USDST → ETHST: Rate = $3,000 per ETHST</li>
-</ul>
-<p>Routed swap:</p>
-<ul>
-<li>USDST → USDST: Rate = 1:1 (stable pair, low fee)</li>
-<li>USDST → ETHST: Rate = $2,985 per ETHST (lower price!)</li>
-</ul>
-<p><strong>Opportunity:</strong></p>
-<ul>
-<li>Buy via route: $2,985 + fees</li>
-<li>Sell direct: $3,000</li>
-<li>Profit: ~$12 per ETHST</li>
-</ul>
-<p><strong>Execution:</strong></p>
+<h2 id="product-definition">Product Definition<a class="headerlink" href="#product-definition" title="Permanent link">&para;</a></h2>
+<p><code>saveUSDST</code> is a non-rebasing, exchange-rate token backed by deposited <code>USDST</code>.</p>
+<p>User flow:</p>
 <ol>
-<li>
-<p><strong>Buy ETHST via route:</strong></p>
-</li>
-<li>
-<p>Swap $2,985 USDST → USDST (0.05% fee = $1.50)</p>
-</li>
-<li>Swap $2,985 USDST → 1 ETHST (0.3% fee = $9)</li>
-<li>
-<p>Total cost: $2,995.50</p>
-</li>
-<li>
-<p><strong>Sell ETHST direct:</strong></p>
-</li>
-<li>
-<p>Swap 1 ETHST → $3,000 USDST (0.3% fee = $9)</p>
-</li>
-<li>Receive: $2,991 USDST</li>
+<li>deposit <code>USDST</code></li>
+<li>receive <code>saveUSDST</code></li>
+<li>hold while the exchange rate rises</li>
+<li>redeem back to <code>USDST</code></li>
 </ol>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>Bought: $2,995.50
-Sold: $2,991.00
-Loss: -$4.50 ❌
-</code></pre></div></p>
-<p><strong>Still not profitable!</strong></p>
-<p><strong>Why:</strong></p>
+<p><code>saveUSDST</code> is:</p>
 <ul>
-<li>Fees eat the spread</li>
-<li>Need larger price differences</li>
-<li>Or market maker fee tier (&lt; 0.3%)</li>
+<li>the savings product for <code>USDST</code></li>
+<li>separate from the lending pool</li>
+<li>separate from <code>safetyUSDST</code></li>
+<li>intended to look and behave like an <code>sDAI</code> / <code>sUSDS</code> style asset</li>
 </ul>
-<hr />
-<h2 id="strategy-3-liquidity-providing-market-making">Strategy 3: Liquidity Providing (Market Making)<a class="headerlink" href="#strategy-3-liquidity-providing-market-making" title="Permanent link">&para;</a></h2>
-<h3 id="the-concept_2">The Concept<a class="headerlink" href="#the-concept_2" title="Permanent link">&para;</a></h3>
-<p><strong>Instead of chasing arbitrage:</strong></p>
+<p><code>saveUSDST</code> is not:</p>
 <ul>
-<li>Provide liquidity</li>
-<li>Earn fees from OTHER people's trades</li>
-<li>More passive, more reliable</li>
+<li>a lending-pool receipt token</li>
+<li>a bad-debt recovery token</li>
+<li>a CDP position</li>
+<li>a rebasing balance token</li>
 </ul>
-<p><strong>Your role:</strong> Be the "house" not the "gambler"</p>
-<hr />
-<h3 id="complete-example-concentrated-liquidity">Complete Example: Concentrated Liquidity<a class="headerlink" href="#complete-example-concentrated-liquidity" title="Permanent link">&para;</a></h3>
-<p><strong>Starting capital:</strong> $10,000 (5 ETHST @ $2,000 or equivalent)</p>
-<p><strong>Choose pool:</strong> ETHST-USDST (high volume)</p>
-<p><strong>Strategy decision:</strong></p>
-<p><strong>Option A: Wide range (passive)</strong>
-- Provide liquidity: $1,500-$3,500 ETHST price range
-- Always in range
-- Lower fees but consistent
-- APR: 8-12%</p>
-<p><strong>Option B: Narrow range (active)</strong>
-- Provide liquidity: $1,950-$2,050 (±2.5%)
-- Higher fees when in range
-- Must rebalance frequently
-- APR: 20-40% when in range</p>
-<hr />
-<h3 id="implementation-narrow-range-strategy">Implementation: Narrow Range Strategy<a class="headerlink" href="#implementation-narrow-range-strategy" title="Permanent link">&para;</a></h3>
-<p><strong>Starting position:</strong></p>
+<h2 id="goals">Goals<a class="headerlink" href="#goals" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Price: $2,000</li>
-<li>Range: $1,950-$2,050</li>
-<li>Capital: 2.5 ETHST + $5,000 USDST</li>
+<li>Create a simple reason to hold <code>USDST</code></li>
+<li>Increase sticky <code>USDST</code> balances in the system</li>
+<li>Give the protocol a native savings-rate outlet</li>
+<li>Make the asset easy to explain and integrate</li>
+<li>Start with explicit support, then transition to fee share</li>
 </ul>
-<p><strong>Deploy liquidity:</strong></p>
+<h2 id="non-goals">Non-Goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Do not use <code>saveUSDST</code> for protocol safety</li>
+<li>Do not tie core yield to lending-pool utilization</li>
+<li>Do not allow collateral use at launch</li>
+<li>Do not rely on permanent token emissions</li>
+</ul>
+<h2 id="system-model">System Model<a class="headerlink" href="#system-model" title="Permanent link">&para;</a></h2>
+<h3 id="underlying-and-share-asset">Underlying and share asset<a class="headerlink" href="#underlying-and-share-asset" title="Permanent link">&para;</a></h3>
+<ul>
+<li>underlying: <code>USDST</code></li>
+<li>share token: <code>saveUSDST</code></li>
+</ul>
+<h3 id="accounting-model">Accounting model<a class="headerlink" href="#accounting-model" title="Permanent link">&para;</a></h3>
+<p>The vault tracks:</p>
+<ul>
+<li>total managed <code>USDST</code></li>
+<li>total <code>saveUSDST</code> shares</li>
+<li>user share balances</li>
+</ul>
+<p>Economic identity:</p>
+<ul>
+<li><code>exchangeRate = totalManagedUSDST / totalSaveUSDSTShares</code></li>
+</ul>
+<p>User value:</p>
+<ul>
+<li><code>userUnderlyingValue = userShares * exchangeRate</code></li>
+</ul>
+<p>When rewards are added:</p>
+<ul>
+<li>managed <code>USDST</code> increases</li>
+<li>share supply stays unchanged</li>
+<li>exchange rate rises</li>
+</ul>
+<p>This is the right model for the product because it is simple, non-rebasing, and familiar to users who know <code>sDAI</code> or <code>sUSDS</code>.</p>
+<h3 id="accounting-requirement">Accounting requirement<a class="headerlink" href="#accounting-requirement" title="Permanent link">&para;</a></h3>
+<p>The implementation should account against managed assets, not blindly against raw token balance. Reward injections must be explicit. Unexpected direct transfers should not silently distort the exchange rate.</p>
+<h2 id="functional-requirements">Functional Requirements<a class="headerlink" href="#functional-requirements" title="Permanent link">&para;</a></h2>
+<h3 id="user-actions">User actions<a class="headerlink" href="#user-actions" title="Permanent link">&para;</a></h3>
+<ul>
+<li>deposit <code>USDST</code></li>
+<li>mint shares</li>
+<li>withdraw <code>USDST</code></li>
+<li>redeem shares</li>
+<li>view exchange rate</li>
+<li>view current redeemable value</li>
+</ul>
+<h3 id="protocol-governance-actions">Protocol / governance actions<a class="headerlink" href="#protocol-governance-actions" title="Permanent link">&para;</a></h3>
+<ul>
+<li>configure or approve any fee-share routing into the product</li>
+<li>pause / unpause if needed</li>
+<li>recover stray assets without affecting core accounting</li>
+</ul>
+<h3 id="interface-shape">Interface shape<a class="headerlink" href="#interface-shape" title="Permanent link">&para;</a></h3>
+<p>The interface should be ERC-4626-shaped:</p>
+<ul>
+<li><code>deposit</code></li>
+<li><code>mint</code></li>
+<li><code>withdraw</code></li>
+<li><code>redeem</code></li>
+<li><code>totalAssets</code></li>
+<li><code>convertToShares</code></li>
+<li><code>convertToAssets</code></li>
+<li>preview functions</li>
+</ul>
+<p>The important point is standard savings-vault semantics, even if the implementation uses repo-specific accounting patterns internally.</p>
+<h2 id="product-positioning-relative-to-existing-components">Product Positioning Relative To Existing Components<a class="headerlink" href="#product-positioning-relative-to-existing-components" title="Permanent link">&para;</a></h2>
+<h3 id="lending-pool_1">Lending pool<a class="headerlink" href="#lending-pool_1" title="Permanent link">&para;</a></h3>
+<p>The lending pool remains the money-market layer for <code>USDST</code>. It is not being replaced.</p>
+<p>The reason not to make it the primary savings product is that supplier yield depends on borrow demand in a venue where users already have cheaper ways to borrow through the CDP path. If utilization has to be subsidized to make the savings story work, it is cleaner to support <code>saveUSDST</code> directly.</p>
+<h3 id="safetyusdst_1">safetyUSDST<a class="headerlink" href="#safetyusdst_1" title="Permanent link">&para;</a></h3>
+<p><code>safetyUSDST</code> is the safety layer. It exists for bad-debt recovery and protocol backstop functions.</p>
+<p><code>saveUSDST</code> is the savings layer. It should not inherit cooldown, slashing, or backstop semantics.</p>
+<h3 id="external-yield-assets_1">External yield assets<a class="headerlink" href="#external-yield-assets_1" title="Permanent link">&para;</a></h3>
+<p><code>saveUSDST</code> does not need to outyield every external asset in every regime. It does need to be the best native destination for <code>USDST</code>.</p>
+<h2 id="funding-model">Funding Model<a class="headerlink" href="#funding-model" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-bootstrap-incentives">Phase 1: bootstrap incentives<a class="headerlink" href="#phase-1-bootstrap-incentives" title="Permanent link">&para;</a></h3>
+<p>At launch, <code>saveUSDST</code> should not use a hard <code>USDST</code> cash subsidy as the main incentive.</p>
+<p>Reason:</p>
+<ul>
+<li>cheap internal borrow paths make a hard-cash savings subsidy mechanically loopable</li>
+<li>if users can mint or borrow <code>USDST</code> below the headline <code>saveUSDST</code> rate, the protocol is just paying for a carry trade</li>
+<li>that is especially unattractive before fee-funded yield is real</li>
+</ul>
+<p>The launch posture should therefore be:</p>
+<ul>
+<li>no hard-cash <code>USDST</code> base subsidy</li>
+<li>use the floating token for temporary promotional incentives if needed</li>
+<li>reserve direct exchange-rate growth for real fee-funded cash flows or very deliberate governance decisions</li>
+</ul>
+<p>This keeps early incentives softer, reduces obvious carry extraction, and preserves the long-run meaning of <code>saveUSDST</code> as a savings product rather than a farm.</p>
+<p>At launch, the exchange rate starts at 1:1 and remains flat. Exchange-rate growth begins when fee-share routing is activated.</p>
+<h3 id="phase-2-fee-share-transition">Phase 2: fee-share transition<a class="headerlink" href="#phase-2-fee-share-transition" title="Permanent link">&para;</a></h3>
+<p>As protocol revenues grow, part of protocol revenue should be routed to <code>saveUSDST</code>.</p>
+<p>Candidate sources:</p>
+<ul>
+<li>stability fees</li>
+<li>lending fees</li>
+<li>swap fees</li>
+<li>other protocol revenues, subject to governance choice</li>
+</ul>
+<h3 id="phase-3-steady-state">Phase 3: steady state<a class="headerlink" href="#phase-3-steady-state" title="Permanent link">&para;</a></h3>
+<p>Long-term target:</p>
+<ul>
+<li>fee-funded base savings rate</li>
+<li>market-level stability fees over time</li>
+<li>temporary token incentives only when strategically justified</li>
+</ul>
+<p>The product should move from "promotion-supported" to "fee-supported", not remain a perpetual emissions sink.</p>
+<h2 id="economics">Economics<a class="headerlink" href="#economics" title="Permanent link">&para;</a></h2>
+<h3 id="strategic-target">Strategic target<a class="headerlink" href="#strategic-target" title="Permanent link">&para;</a></h3>
+<p>The current internal materials imply a working <code>saveUSDST</code> hold-demand target around <code>$20M</code>.</p>
+<p>That is a useful planning target because it is large enough to matter for <code>USDST</code> retention, but still small enough to bootstrap deliberately.</p>
+<h3 id="implied-fee-funded-base-rate">Implied fee-funded base rate<a class="headerlink" href="#implied-fee-funded-base-rate" title="Permanent link">&para;</a></h3>
+<p>The useful thing about <code>saveUSDST</code> is that the long-run exchange-rate growth is modelable before fee share is turned on.</p>
+<p>Very roughly:</p>
+<ul>
+<li><code>saveUSDST base rate ~= (USDST debt outstanding * stability fee * allocation to saveUSDST) / saveUSDST TVL</code></li>
+</ul>
+<p>This should be the anchor for the product.</p>
+<p>It allows the team to estimate:</p>
+<ul>
+<li>the fee-funded rate the product can support later</li>
+<li>the gap between that rate and the headline launch rate</li>
+<li>how much temporary promotion is actually needed</li>
+</ul>
+<p>If the protocol becomes widely used and stability fees rise toward market, the fee-funded base rate should rise with it.</p>
+<h3 id="launch-yield-range">Launch yield range<a class="headerlink" href="#launch-yield-range" title="Permanent link">&para;</a></h3>
+<p>The current internal materials point to a visible launch rate in the mid-single digits. That is still the right qualitative range for the headline number.</p>
+<p>Recommended working range:</p>
+<ul>
+<li><code>5-8%</code> headline launch APY, assuming the floating token launches and incentives are active</li>
+</ul>
+<p>This should be understood as a combined number, not a pure fee-funded rate.</p>
+<p>Why:</p>
+<ul>
+<li>below that, the product may not feel different enough from idle <code>USDST</code></li>
+<li>far above that, it starts to look like a short-lived subsidy rather than a real savings product</li>
+</ul>
+<h2 id="yield-presentation">Yield Presentation<a class="headerlink" href="#yield-presentation" title="Permanent link">&para;</a></h2>
+<p>Users should see one headline yield number.</p>
+<p>That is how vault products are understood in practice.</p>
+<p>Recommended presentation:</p>
+<ul>
+<li>headline APY: one combined current rate</li>
+<li>below the fold: breakdown by source</li>
+</ul>
+<p>The breakdown should separate:</p>
+<ul>
+<li>modeled or actual fee-funded base rate</li>
+<li>temporary floating-token incentive rate</li>
+<li>any other temporary promotional components</li>
+</ul>
+<p>The product should not expect users to parse the decomposition before deciding whether the vault is attractive.</p>
+<p>At the same time, the protocol must track the decomposition internally so it is always clear which part of the yield is durable and which part is promotional.</p>
+<h2 id="launch-policy">Launch Policy<a class="headerlink" href="#launch-policy" title="Permanent link">&para;</a></h2>
+<h3 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h3>
+<p>Launch <code>saveUSDST</code> as:</p>
+<ul>
+<li>deposit</li>
+<li>hold</li>
+<li>redeem</li>
+</ul>
+<p>Only.</p>
+<h3 id="collateral-policy">Collateral policy<a class="headerlink" href="#collateral-policy" title="Permanent link">&para;</a></h3>
+<p>Do not allow <code>saveUSDST</code> as collateral anywhere at launch.</p>
+<p>That means:</p>
+<ul>
+<li>no CDP collateral</li>
+<li>no lending-pool collateral</li>
+</ul>
+<h3 id="rationale">Rationale<a class="headerlink" href="#rationale" title="Permanent link">&para;</a></h3>
+<p>CDP collateral is too reflexive:</p>
+<ul>
+<li>mint <code>USDST</code></li>
+<li>wrap into <code>saveUSDST</code></li>
+<li>use a claim on <code>USDST</code> to mint more <code>USDST</code></li>
+</ul>
+<p>Lending collateral is more defensible because there is a financing cost and actual pool liquidity constraints. Even so, launch exclusion is still preferable because bootstrap rewards would distort the loop and complicate the rollout.</p>
+<p>Future lending-collateral eligibility can be revisited once:</p>
+<ul>
+<li>fee share is the dominant yield source</li>
+<li>bootstrap support is no longer the main APY driver</li>
+<li>haircut, cap, and monitoring policy are defined</li>
+</ul>
+<p>CDP collateral should remain out of scope.</p>
+<h2 id="integrations">Integrations<a class="headerlink" href="#integrations" title="Permanent link">&para;</a></h2>
+<p>The system needs to support:</p>
+<ul>
+<li>wallet / portfolio visibility for <code>saveUSDST</code></li>
+<li>exchange-rate and redeemable-value display</li>
+<li>API endpoints for public and user-specific vault state</li>
+<li>standard preview functions for integrators</li>
+<li>clear labeling distinct from lending and safety</li>
+</ul>
+<p>User-facing copy should consistently frame:</p>
+<ul>
+<li><code>USDST</code> as the routing and transaction asset</li>
+<li><code>saveUSDST</code> as the native savings asset</li>
+</ul>
+<h2 id="kpis">KPIs<a class="headerlink" href="#kpis" title="Permanent link">&para;</a></h2>
+<p>Primary KPIs:</p>
+<ul>
+<li><code>saveUSDST</code> TVL</li>
+<li>share of circulating <code>USDST</code> held in <code>saveUSDST</code></li>
+<li>average holding duration</li>
+<li>retention after incentives taper</li>
+<li>share of newly minted / borrowed <code>USDST</code> that ends up saved</li>
+<li>fee-share coverage ratio over time</li>
+</ul>
+<h2 id="risks">Risks<a class="headerlink" href="#risks" title="Permanent link">&para;</a></h2>
+<ul>
+<li>If launch support is too low, users route directly into external yield assets</li>
+<li>If launch support is too high, TVL can become mercenary</li>
+<li>If taper is too sharp, retention will be poor</li>
+<li>If product boundaries are blurry, users will confuse savings, lending, and safety</li>
+<li>If collateral is enabled too early, recursive loops complicate risk before the savings product is proven</li>
+</ul>
+<h2 id="recommendation">Recommendation<a class="headerlink" href="#recommendation" title="Permanent link">&para;</a></h2>
+<p>Launch <code>saveUSDST</code> as the native savings-rate product for <code>USDST</code>.</p>
+<p>Keep the story simple:</p>
+<ul>
+<li>mint <code>USDST</code></li>
+<li>use <code>USDST</code></li>
+<li>save <code>USDST</code></li>
+</ul>
+<p>Keep the first version simple too:</p>
+<ul>
+<li>exchange-rate token</li>
+<li>no hard-cash <code>USDST</code> launch subsidy</li>
+<li>optional floating-token promotional incentives</li>
+<li>later fee share</li>
+<li>no collateral at launch</li>
+</ul>
+<p>That is the cleanest way to create durable hold demand for <code>USDST</code> without mixing savings, leverage, and safety into one product.</p>
+<h2 id="implementation-notes">Implementation Notes<a class="headerlink" href="#implementation-notes" title="Permanent link">&para;</a></h2>
+<h3 id="existing-contract">Existing contract<a class="headerlink" href="#existing-contract" title="Permanent link">&para;</a></h3>
+<p><code>SaveUSDSTVault.sol</code> in <code>mercata/contracts/concrete/Savings/</code> already implements the core vault. It is the share token itself (ERC-20), with ERC-4626-shaped deposit / mint / withdraw / redeem and managed-asset accounting.</p>
+<h3 id="contract-interactions-at-launch">Contract interactions at launch<a class="headerlink" href="#contract-interactions-at-launch" title="Permanent link">&para;</a></h3>
+<p>The vault's only runtime dependency is the <code>USDST</code> ERC-20 token. It does not interact with the CDP, lending pool, safety module, or any rewards system.</p>
+<p>This is the key architectural difference from <code>SafetyModule</code> (safetyUSDST), which imports and calls <code>LendingPool</code>, <code>LiquidityPool</code>, and <code>LendingRegistry</code>. <code>SaveUSDSTVault</code> is standalone.</p>
+<p>At launch:</p>
+<ul>
+<li><code>deposit</code> / <code>mint</code>: pull <code>USDST</code> from user via <code>transferFrom</code>, mint shares</li>
+<li><code>withdraw</code> / <code>redeem</code>: burn shares, transfer <code>USDST</code> to user</li>
+<li><code>exchangeRate</code>: read-only, returns <code>totalAssets * 1e18 / totalSupply</code></li>
+</ul>
+<p>No other contract calls. No external state reads. The vault holds <code>USDST</code> and tracks <code>_managedAssets</code> internally.</p>
+<h3 id="what-notifyreward-is-and-when-it-matters">What <code>notifyReward</code> is and when it matters<a class="headerlink" href="#what-notifyreward-is-and-when-it-matters" title="Permanent link">&para;</a></h3>
+<p>The current contract has a <code>notifyReward</code> method that pulls <code>USDST</code> from the owner and adds it to <code>_managedAssets</code>, raising the exchange rate for all holders.</p>
+<p>At launch, this is unused. The exchange rate is flat at 1:1. Promotional incentives use the floating token through a separate system that does not touch the vault.</p>
+<p>When fee-share routing activates (Phase 2), the vault will need a mechanism to receive protocol revenue and credit it as managed assets. Whether that mechanism is the existing <code>notifyReward</code> (pull from owner), a push-style <code>recordTransfer</code> (like SafetyModule uses for LendingPool), or a continuous drip is a Phase 2 design decision. The launch contract does not need to commit to one.</p>
+<h3 id="deployment-sequence">Deployment sequence<a class="headerlink" href="#deployment-sequence" title="Permanent link">&para;</a></h3>
 <ol>
-<li><strong>Go to Advanced</strong> (in sidebar) → <strong>Swap Pools</strong> tab</li>
-<li>Select <strong>ETHST-USDST</strong> pool</li>
-<li>
-<p><strong>Choose concentrated range:</strong></p>
-</li>
-<li>
-<p>Min: $1,950</p>
-</li>
-<li>Max: $2,050</li>
-<li>
-<p><strong>Deposit:</strong></p>
-</li>
-<li>
-<p>2.5 ETHST</p>
-</li>
-<li>$5,000 USDST</li>
-<li><strong>Click "Add Liquidity"</strong> (~$0.10 gas, approvals automatic)</li>
+<li>Deploy <code>SaveUSDSTVault</code> behind proxy (via <code>BaseCodeCollection</code>)</li>
+<li>Call <code>initialize(USDST, "Save USDST", "saveUSDST")</code></li>
+<li>Set pause authority</li>
+<li>Register in UI and API as a first-class product</li>
 </ol>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>✅ Providing liquidity: $10,000
-✅ Active range: $1,950-$2,050
-✅ Expected daily volume: $500k
-✅ Your share: ~2%
-✅ Daily fees: ~$30 (0.3% daily = ~110% APR)
-</code></pre></div></p>
-<p><strong>Too good to be true?</strong></p>
-<hr />
-<h3 id="managing-concentrated-liquidity">Managing Concentrated Liquidity<a class="headerlink" href="#managing-concentrated-liquidity" title="Permanent link">&para;</a></h3>
-<p><strong>Scenario 1: Price Stays in Range</strong></p>
-<p><strong>Days 1-5: ETHST = $1,980-$2,020</strong>
-- Your liquidity is active
-- Earn fees: ~$30/day × 5 = $150
-- No action needed ✅</p>
-<p><strong>Weekly return:</strong> $150 on $10k = 1.5% (78% APR)</p>
-<hr />
-<p><strong>Scenario 2: Price Moves Out of Range</strong></p>
-<p><strong>Day 6: ETHST pumps to $2,100</strong></p>
-<p><strong>Your position:</strong></p>
+<h3 id="ui-and-api">UI and API<a class="headerlink" href="#ui-and-api" title="Permanent link">&para;</a></h3>
+<p>The system needs:</p>
 <ul>
-<li>All converted to USDST (sold ETHST automatically)</li>
-<li>Now have: ~$10,150 USDST, 0 ETHST</li>
-<li>Out of range = no fees earned ❌</li>
+<li>public vault state (total assets, total supply, exchange rate)</li>
+<li>user share balance and redeemable value</li>
+<li>deposit and redeem actions</li>
 </ul>
-<p><strong>Action needed:</strong></p>
-<ol>
-<li>Remove liquidity</li>
-<li>Rebalance: Buy some ETHST back</li>
-<li>Set new range: $2,050-$2,150</li>
-<li>Re-provide liquidity</li>
-</ol>
-<p><strong>Costs:</strong></p>
-<ul>
-<li>Remove + re-add: ~$0.60 gas</li>
-<li>Swap fee: ~$30</li>
-<li>Time: 10 minutes</li>
-</ul>
-<p><strong>Was it worth it?</strong>
-- Earned: $150 in 5 days
-- Rebalancing cost: ~$31
-- Net: $119 ✅</p>
-<hr />
-<p><strong>Scenario 3: Price Whipsaws</strong></p>
-<p><strong>Week 1:</strong></p>
-<ul>
-<li>Price: $1,900 → $2,100 → $1,950 → $2,080</li>
-</ul>
-<p><strong>Your experience:</strong></p>
-<ul>
-<li>Out of range 3 times</li>
-<li>Rebalanced 3 times</li>
-<li>Fees earned: $200</li>
-<li>Rebalancing costs: $90</li>
-<li>Net: $110</li>
-</ul>
-<p><strong>vs Wide Range:</strong></p>
-<ul>
-<li>Would have earned: $80</li>
-<li>No rebalancing: $0 cost</li>
-<li>Net: $80</li>
-</ul>
-<p><strong>Narrow range still better, but more work</strong></p>
-<hr />
-<h2 id="impermanent-loss-reality-check">Impermanent Loss Reality Check<a class="headerlink" href="#impermanent-loss-reality-check" title="Permanent link">&para;</a></h2>
-<h3 id="what-is-il">What is IL?<a class="headerlink" href="#what-is-il" title="Permanent link">&para;</a></h3>
-<p><strong>When you provide liquidity:</strong></p>
-<ul>
-<li>You hold equal value of both assets</li>
-<li>As prices change, your holdings rebalance automatically</li>
-<li>vs just holding assets, you may have less</li>
-</ul>
-<p><strong>Example:</strong></p>
-<p><strong>Start:</strong></p>
-<ul>
-<li>Provide 1 ETHST ($2,000) + $2,000 USDST</li>
-<li>Total: $4,000</li>
-</ul>
-<p><strong>ETH doubles to $4,000:</strong></p>
-<p><strong>If you just held:</strong></p>
-<ul>
-<li>1 ETHST = $4,000</li>
-<li>$2,000 USDST</li>
-<li>Total: $6,000</li>
-</ul>
-<p><strong>As LP:</strong></p>
-<ul>
-<li>0.707 ETHST = $2,828</li>
-<li>$2,828 USDST</li>
-<li>Total: $5,656</li>
-<li><strong>IL: $344 (5.7%)</strong></li>
-</ul>
-<p><strong>But you earned fees:</strong></p>
-<ul>
-<li>Trading fees: $450 (over time)</li>
-<li>Net: $450 - $344 = $106 profit ✅</li>
-</ul>
-<p><strong>IL is offset by fees</strong></p>
-<hr />
-<h2 id="comparing-strategies">Comparing Strategies<a class="headerlink" href="#comparing-strategies" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Strategy</th>
-<th>Capital</th>
-<th>Time</th>
-<th>Skill</th>
-<th>Annual Return</th>
-<th>Risk</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Cross-DEX Arb</strong></td>
-<td>$10k+</td>
-<td>Active</td>
-<td>High</td>
-<td>5-20%</td>
-<td>Medium</td>
-</tr>
-<tr>
-<td><strong>On-Chain Arb</strong></td>
-<td>$5k+</td>
-<td>Very Active</td>
-<td>High</td>
-<td>10-30%</td>
-<td>Low</td>
-</tr>
-<tr>
-<td><strong>Wide LP</strong></td>
-<td>$1k+</td>
-<td>Passive</td>
-<td>Low</td>
-<td>8-15%</td>
-<td>Low</td>
-</tr>
-<tr>
-<td><strong>Narrow LP</strong></td>
-<td>$10k+</td>
-<td>Active</td>
-<td>Medium</td>
-<td>20-50%</td>
-<td>Medium</td>
-</tr>
-<tr>
-<td><strong>Market Making Bot</strong></td>
-<td>$50k+</td>
-<td>Automated</td>
-<td>Very High</td>
-<td>30-80%</td>
-<td>Medium</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Recommendation for most users: Wide range LP</strong>
-- Passive income
-- Reliable returns
-- Low maintenance</p>
-<hr />
-<h2 id="advanced-automated-market-making">Advanced: Automated Market Making<a class="headerlink" href="#advanced-automated-market-making" title="Permanent link">&para;</a></h2>
-<h3 id="bot-strategy">Bot Strategy<a class="headerlink" href="#bot-strategy" title="Permanent link">&para;</a></h3>
-<p><strong>Components:</strong></p>
-<ol>
-<li>Monitor prices across all pools</li>
-<li>Detect price imbalances</li>
-<li>Execute swaps automatically</li>
-<li>Rebalance LP positions when needed</li>
-</ol>
-<p><strong>Requirements:</strong></p>
-<ul>
-<li>Programming skills (Python/TypeScript)</li>
-<li>Server to run bot 24/7</li>
-<li>Smart contract integration</li>
-<li>Risk management logic</li>
-</ul>
-<p><strong>Expected returns:</strong></p>
-<ul>
-<li>Manual active LP: 20-30% APR</li>
-<li>Semi-automated: 30-50% APR</li>
-<li>Fully automated bot: 50-100% APR (but requires expertise)</li>
-</ul>
-<p><strong>Risks:</strong></p>
-<ul>
-<li>Smart contract bugs</li>
-<li>Bot logic errors</li>
-<li>Flash loan attacks</li>
-<li>Rug pulls in new pools</li>
-</ul>
-<p><strong>Not recommended unless experienced developer</strong></p>
-<hr />
-<h2 id="risk-management">Risk Management<a class="headerlink" href="#risk-management" title="Permanent link">&para;</a></h2>
-<h3 id="for-arbitrage">For Arbitrage<a class="headerlink" href="#for-arbitrage" title="Permanent link">&para;</a></h3>
-<p><strong>Risks:</strong></p>
-<ol>
-<li><strong>Execution risk:</strong> Price moves during trade</li>
-<li><strong>Bridge risk:</strong> Assets stuck or lost</li>
-<li><strong>Gas spikes:</strong> Ethereum fees eat profit</li>
-<li><strong>Slippage:</strong> Large trades have price impact</li>
-</ol>
-<p><strong>Mitigations:</strong></p>
-<ul>
-<li>Use small positions first</li>
-<li>Set slippage limits</li>
-<li>Monitor bridge status</li>
-<li>Check gas before bridging</li>
-</ul>
-<h3 id="for-market-making">For Market Making<a class="headerlink" href="#for-market-making" title="Permanent link">&para;</a></h3>
-<p><strong>Risks:</strong></p>
-<ol>
-<li><strong>Impermanent loss:</strong> Price movements reduce value</li>
-<li><strong>Smart contract risk:</strong> Protocol exploits</li>
-<li><strong>Pool rug pulls:</strong> Fake tokens or exit scams</li>
-<li><strong>Low liquidity:</strong> Can't exit position</li>
-</ol>
-<p><strong>Mitigations:</strong></p>
-<ul>
-<li>Stick to major pairs (ETHST-USDST, etc.)</li>
-<li>Use audited protocols only</li>
-<li>Diversify across pools</li>
-<li>Monitor IL regularly</li>
-</ul>
-<hr />
-<h2 id="tax-implications">Tax Implications<a class="headerlink" href="#tax-implications" title="Permanent link">&para;</a></h2>
-<p><strong>Every swap is taxable:</strong></p>
-<p><strong>Arbitrage:</strong></p>
-<ul>
-<li>May execute 10-50 trades/day</li>
-<li>Each swap = taxable event</li>
-<li>Complex record keeping</li>
-<li>Consider tax software (Koinly, etc.)</li>
-</ul>
-<p><strong>Market Making:</strong></p>
-<ul>
-<li>LP fees = taxable income (continuously)</li>
-<li>Adding/removing liquidity = swaps (taxable)</li>
-<li>Impermanent loss ≠ realized loss (until exit)</li>
-<li>Track cost basis carefully</li>
-</ul>
-<p><strong>Recommendation:</strong></p>
-<ul>
-<li>Use automated tax tools</li>
-<li>Consult crypto tax specialist</li>
-<li>Keep detailed logs</li>
-<li>Consider tax-deferred accounts if possible</li>
-</ul>
-<hr />
-<h2 id="real-example-professional-lp">Real Example: Professional LP<a class="headerlink" href="#real-example-professional-lp" title="Permanent link">&para;</a></h2>
-<p><strong>User: Carlos</strong></p>
-<p><strong>Strategy:</strong> Active narrow-range LP</p>
-<p><strong>Capital:</strong> $50,000</p>
-<p><strong>Pairs:</strong></p>
-<ul>
-<li>ETHST-USDST: $25k</li>
-<li>WBTCST-USDST: $15k</li>
-<li>USDST-USDST: $10k</li>
-</ul>
-<p><strong>Time commitment:</strong> 30 min/day</p>
-<p><strong>Results over 3 months:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Pool</th>
-<th>Fees Earned</th>
-<th>IL</th>
-<th>Net</th>
-<th>APR</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>ETHST-USDST</td>
-<td>$2,100</td>
-<td>-$350</td>
-<td>$1,750</td>
-<td>28%</td>
-</tr>
-<tr>
-<td>WBTCST-USDST</td>
-<td>$1,350</td>
-<td>-$180</td>
-<td>$1,170</td>
-<td>31%</td>
-</tr>
-<tr>
-<td>USDST-USDST</td>
-<td>$280</td>
-<td>-$5</td>
-<td>$275</td>
-<td>11%</td>
-</tr>
-<tr>
-<td><strong>Total</strong></td>
-<td><strong>$3,730</strong></td>
-<td><strong>-$535</strong></td>
-<td><strong>$3,195</strong></td>
-<td><strong>26%</strong></td>
-</tr>
-</tbody>
-</table>
-<p><strong>Carlos's routine:</strong></p>
-<ul>
-<li>Morning: Check positions, rebalance if needed</li>
-<li>Evening: Claim fees, compound</li>
-<li>Weekly: Adjust ranges based on volatility</li>
-</ul>
-<p><strong>His takeaway:</strong> "Treat it like a job, it pays like one"</p>
-<hr />
-<h2 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h2>
-<h3 id="week-1-learn">Week 1: Learn<a class="headerlink" href="#week-1-learn" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] Read all LP documentation</li>
-<li>[ ] Understand IL concept</li>
-<li>[ ] Study pool mechanics</li>
-<li>[ ] Watch prices for a week</li>
-<li>[ ] Identify opportunities</li>
-</ul>
-<h3 id="week-2-test">Week 2: Test<a class="headerlink" href="#week-2-test" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] Start with $500-1,000</li>
-<li>[ ] Choose stable pair (USDST-USDST)</li>
-<li>[ ] Wide range (low risk)</li>
-<li>[ ] Track daily performance</li>
-<li>[ ] Learn the UI</li>
-</ul>
-<h3 id="week-3-scale">Week 3: Scale<a class="headerlink" href="#week-3-scale" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] If comfortable, add capital</li>
-<li>[ ] Try volatile pair</li>
-<li>[ ] Experiment with ranges</li>
-<li>[ ] Set up tracking spreadsheet</li>
-<li>[ ] Optimize based on data</li>
-</ul>
-<h3 id="month-2-optimize">Month 2+: Optimize<a class="headerlink" href="#month-2-optimize" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] Analyze best pools</li>
-<li>[ ] Refine range strategy</li>
-<li>[ ] Consider automation</li>
-<li>[ ] Compound earnings</li>
-<li>[ ] Scale to target size</li>
-</ul>
-<hr />
-<h2 id="tools-resources">Tools &amp; Resources<a class="headerlink" href="#tools-resources" title="Permanent link">&para;</a></h2>
-<h3 id="tracking-tools">Tracking Tools<a class="headerlink" href="#tracking-tools" title="Permanent link">&para;</a></h3>
-<p><strong>Portfolio dashboards:</strong></p>
-<ul>
-<li>DeBank</li>
-<li>Zapper.fi</li>
-<li>APY.vision (advanced IL tracking)</li>
-</ul>
-<p><strong>Pool analytics:</strong></p>
-<ul>
-<li>STRATO pool stats page</li>
-<li>Volume charts</li>
-<li>Fee tier analysis</li>
-</ul>
-<p><strong>Price monitoring:</strong></p>
-<ul>
-<li>TradingView</li>
-<li>CoinGecko</li>
-<li>Telegram price bots</li>
-</ul>
-<h3 id="calculators">Calculators<a class="headerlink" href="#calculators" title="Permanent link">&para;</a></h3>
-<p><strong>LP profitability:</strong></p>
-<ul>
-<li>dailydefi.org/tools/impermanent-loss-calculator</li>
-<li>defi-lab.xyz/uniswapv3simulator</li>
-</ul>
-<p><strong>Arbitrage:</strong></p>
-<ul>
-<li>Custom spreadsheets</li>
-<li>Real-time price feeds</li>
-<li>Profit calculators (build your own)</li>
-</ul>
-<hr />
-<h2 id="common-mistakes">Common Mistakes<a class="headerlink" href="#common-mistakes" title="Permanent link">&para;</a></h2>
-<h3 id="providing-to-low-volume-pools">❌ Providing to Low-Volume Pools<a class="headerlink" href="#providing-to-low-volume-pools" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> No trades = no fees</p>
-<p><strong>Fix:</strong></p>
-<ul>
-<li>Check 24h volume</li>
-<li>Minimum $100k daily volume</li>
-<li>Stick to major pairs</li>
-</ul>
-<h3 id="ignoring-impermanent-loss">❌ Ignoring Impermanent Loss<a class="headerlink" href="#ignoring-impermanent-loss" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> Price moves, but you focus only on fees</p>
-<p><strong>Fix:</strong></p>
-<ul>
-<li>Calculate IL regularly</li>
-<li>Ensure fees &gt; IL</li>
-<li>Exit if losing money</li>
-</ul>
-<h3 id="over-concentrating-range">❌ Over-Concentrating Range<a class="headerlink" href="#over-concentrating-range" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> Price moves out of range constantly</p>
-<p><strong>Fix:</strong></p>
-<ul>
-<li>Start wide</li>
-<li>Narrow gradually based on data</li>
-<li>Balance active time vs fees</li>
-</ul>
-<hr />
-<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
-<p><strong>Arbitrage:</strong></p>
-<ul>
-<li>High skill, active management</li>
-<li>Profit opportunities exist but small</li>
-<li>Better suited for bots</li>
-<li>5-20% APR for retail</li>
-</ul>
-<p><strong>Market Making (LP):</strong></p>
-<ul>
-<li>More accessible</li>
-<li>Passive to semi-active</li>
-<li>Reliable income</li>
-<li>8-50% APR depending on strategy</li>
-</ul>
-<p><strong>Recommendation: Start with wide-range LP</strong></p>
-<hr />
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<h3 id="related-strategies">Related Strategies<a class="headerlink" href="#related-strategies" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><a href="../maximize-yield/">Maximize Yield</a></strong> - Combine with other strategies</li>
-<li><strong><a href="../multi-asset-strategy/">Multi-Asset Strategy</a></strong> - LP in multiple pools</li>
-<li><strong><a href="../dca-strategy/">DCA Strategy</a></strong> - Regular LP additions</li>
-</ul>
-<h3 id="learn-more">Learn More<a class="headerlink" href="#learn-more" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><a href="../../guides/liquidity/">Liquidity Guide</a></strong> - Detailed LP walkthrough</li>
-<li><strong><a href="../../guides/swap/">Swap Guide</a></strong> - Understand trading mechanics</li>
-<li><strong><a href="../../safety/">Safety Guide</a></strong> - Risk management</li>
-</ul>
-<h3 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
-<li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
-<li><strong>Docs</strong>: <a href="https://docs.strato.nexus">docs.strato.nexus</a></li>
-</ul>
+<p>Present <code>saveUSDST</code> as its own product, not as a tab inside lending or safety.</p>
 
 
 
@@ -3677,7 +2940,7 @@ Loss: -$4.50 ❌
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 19, 2026 05:23:52 UTC"><span class="timeago" datetime="2026-03-19T05:23:52+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 19, 2026 05:23:52 UTC">2026-03-19</span>
   </span>
 
     
