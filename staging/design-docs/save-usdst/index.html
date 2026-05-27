@@ -12,13 +12,9 @@
         <meta name="author" content="BlockApps">
       
       
-        <link rel="canonical" href="https://docs.strato.nexus/guides/liquidity/">
+        <link rel="canonical" href="https://docs.strato.nexus/design-docs/save-usdst/">
       
       
-        <link rel="prev" href="../swap/">
-      
-      
-        <link rel="next" href="../bridge/">
       
       
         
@@ -29,7 +25,7 @@
     
     
       
-        <title>Provide Liquidity - STRATO Technical Docs</title>
+        <title>saveUSDST Technical Spec - STRATO Technical Docs</title>
       
     
     
@@ -84,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#provide-liquidity" class="md-skip">
+        <a href="#saveusdst-technical-spec" class="md-skip">
           Skip to content
         </a>
       
@@ -120,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Provide Liquidity
+              saveUSDST Technical Spec
             
           </span>
         </div>
@@ -415,10 +411,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -443,11 +437,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
@@ -468,7 +464,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -486,7 +482,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../borrow/" class="md-nav__link">
+      <a href="../../guides/borrow/" class="md-nav__link">
         
   
   
@@ -514,7 +510,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mint-cdp/" class="md-nav__link">
+      <a href="../../guides/mint-cdp/" class="md-nav__link">
         
   
   
@@ -542,7 +538,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../swap/" class="md-nav__link">
+      <a href="../../guides/swap/" class="md-nav__link">
         
   
   
@@ -567,37 +563,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Provide Liquidity
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../guides/liquidity/" class="md-nav__link">
         
   
   
@@ -613,670 +582,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#complete-example-provide-6000-ethst-usdst-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Example: Provide $6,000 ETHST-USDST Liquidity
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Complete Example: Provide $6,000 ETHST-USDST Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#quick-walkthrough" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Walkthrough
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-liquidity-pools-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How Liquidity Pools Work
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="How Liquidity Pools Work">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#automated-market-maker-amm" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Automated Market Maker (AMM)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pool-math" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pool Math
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#your-share" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your Share
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-by-step-add-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step-by-Step: Add Liquidity
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Step-by-Step: Add Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-choose-a-pool" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Choose a Pool
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-enter-amounts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Enter Amounts
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-review-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Review Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-4-add-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 4: Add Liquidity
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#earning-from-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Earning from Liquidity
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Earning from Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#trading-fees" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Trading Fees
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reward-points" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reward Points
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tracking-earnings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tracking Earnings
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#removing-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Removing Liquidity
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Removing Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-go-to-your-positions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Go to Your Positions
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-choose-amount" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Choose Amount
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-confirm-withdrawal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Confirm Withdrawal
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#understanding-impermanent-loss" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Understanding Impermanent Loss
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Understanding Impermanent Loss">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-is-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What Is It?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#when-is-it-a-problem" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When Is It a Problem?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mitigating-il" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mitigating IL
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Best Practices">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#choosing-pools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Choosing Pools
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#managing-il-risk" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Managing IL Risk
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#position-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Position Management
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pool-stats-explained" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pool Stats Explained
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pool Stats Explained">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tvl-total-value-locked" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TVL (Total Value Locked)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#volume-24h" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Volume 24h
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#apr-annual-percentage-rate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        APR (Annual Percentage Rate)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#your-pool-share" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your Pool Share
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced Strategies
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Advanced Strategies">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#liquidity-farming" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Liquidity Farming
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#range-orders-concentrated-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Range Orders (Concentrated Liquidity)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#arbitrage-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Arbitrage Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Issues
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Issues">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#insufficient-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Insufficient Balance"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#price-updated-warning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Price Updated" Warning
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#slippage-tolerance-exceeded" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Slippage Tolerance Exceeded"
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Risk Management
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Risk Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#diversification" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Diversification
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#start-small" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Start Small
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#monitor-regularly" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitor Regularly
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#emergency-exit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Emergency Exit
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#whats-next" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What's Next?
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What&#39;s Next?">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#claim-your-rewards" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claim Your Rewards
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#optimize-your-portfolio" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimize Your Portfolio
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#need-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Need Help?
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1289,7 +594,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bridge/" class="md-nav__link">
+      <a href="../../guides/bridge/" class="md-nav__link">
         
   
   
@@ -1317,7 +622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../rewards/" class="md-nav__link">
+      <a href="../../guides/rewards/" class="md-nav__link">
         
   
   
@@ -2587,22 +1892,121 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#complete-example-provide-6000-ethst-usdst-liquidity" class="md-nav__link">
+  <a href="#business-context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Provide $6,000 ETHST-USDST Liquidity
+        Business Context
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Complete Example: Provide $6,000 ETHST-USDST Liquidity">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-protocol-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Protocol Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definitions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Definitions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#quick-walkthrough" class="md-nav__link">
+  <a href="#usdst" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Walkthrough
+        USDST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#saveusdst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        saveUSDST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cdp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CDP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lending-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lending pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safetyusdst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safetyUSDST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metastable-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metastable pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#psm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PSM
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#external-yield-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External yield assets
       
     </span>
   </a>
@@ -2615,10 +2019,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#scope-assumptions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Scope Assumptions
       
     </span>
   </a>
@@ -2626,10 +2030,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
+  <a href="#product-definition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prerequisites
+        Product Definition
       
     </span>
   </a>
@@ -2637,22 +2041,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-liquidity-pools-work" class="md-nav__link">
+  <a href="#goals" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How Liquidity Pools Work
+        Goals
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="How Liquidity Pools Work">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="System Model">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#automated-market-maker-amm" class="md-nav__link">
+  <a href="#underlying-and-share-asset" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Automated Market Maker (AMM)
+        Underlying and share asset
       
     </span>
   </a>
@@ -2660,10 +2086,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pool-math" class="md-nav__link">
+  <a href="#accounting-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pool Math
+        Accounting model
       
     </span>
   </a>
@@ -2671,10 +2097,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#your-share" class="md-nav__link">
+  <a href="#accounting-requirement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Your Share
+        Accounting requirement
       
     </span>
   </a>
@@ -2687,22 +2113,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-by-step-add-liquidity" class="md-nav__link">
+  <a href="#functional-requirements" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step-by-Step: Add Liquidity
+        Functional Requirements
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Step-by-Step: Add Liquidity">
+    <nav class="md-nav" aria-label="Functional Requirements">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#step-1-choose-a-pool" class="md-nav__link">
+  <a href="#user-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1: Choose a Pool
+        User actions
       
     </span>
   </a>
@@ -2710,10 +2136,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-2-enter-amounts" class="md-nav__link">
+  <a href="#protocol-governance-actions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2: Enter Amounts
+        Protocol / governance actions
       
     </span>
   </a>
@@ -2721,21 +2147,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-review-details" class="md-nav__link">
+  <a href="#interface-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Review Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-4-add-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 4: Add Liquidity
+        Interface shape
       
     </span>
   </a>
@@ -2748,22 +2163,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#earning-from-liquidity" class="md-nav__link">
+  <a href="#product-positioning-relative-to-existing-components" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Earning from Liquidity
+        Product Positioning Relative To Existing Components
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Earning from Liquidity">
+    <nav class="md-nav" aria-label="Product Positioning Relative To Existing Components">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#trading-fees" class="md-nav__link">
+  <a href="#lending-pool_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Trading Fees
+        Lending pool
       
     </span>
   </a>
@@ -2771,10 +2186,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#reward-points" class="md-nav__link">
+  <a href="#safetyusdst_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reward Points
+        safetyUSDST
       
     </span>
   </a>
@@ -2782,10 +2197,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tracking-earnings" class="md-nav__link">
+  <a href="#external-yield-assets_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tracking Earnings
+        External yield assets
       
     </span>
   </a>
@@ -2798,22 +2213,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#removing-liquidity" class="md-nav__link">
+  <a href="#funding-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Removing Liquidity
+        Funding Model
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Removing Liquidity">
+    <nav class="md-nav" aria-label="Funding Model">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#step-1-go-to-your-positions" class="md-nav__link">
+  <a href="#phase-1-bootstrap-incentives" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1: Go to Your Positions
+        Phase 1: bootstrap incentives
       
     </span>
   </a>
@@ -2821,10 +2236,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-2-choose-amount" class="md-nav__link">
+  <a href="#phase-2-fee-share-transition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2: Choose Amount
+        Phase 2: fee-share transition
       
     </span>
   </a>
@@ -2832,10 +2247,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#step-3-confirm-withdrawal" class="md-nav__link">
+  <a href="#phase-3-steady-state" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3: Confirm Withdrawal
+        Phase 3: steady state
       
     </span>
   </a>
@@ -2848,22 +2263,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#understanding-impermanent-loss" class="md-nav__link">
+  <a href="#economics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Understanding Impermanent Loss
+        Economics
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Understanding Impermanent Loss">
+    <nav class="md-nav" aria-label="Economics">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-is-it" class="md-nav__link">
+  <a href="#strategic-target" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What Is It?
+        Strategic target
       
     </span>
   </a>
@@ -2871,10 +2286,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#implied-fee-funded-base-rate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example
+        Implied fee-funded base rate
       
     </span>
   </a>
@@ -2882,21 +2297,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#when-is-it-a-problem" class="md-nav__link">
+  <a href="#launch-yield-range" class="md-nav__link">
     <span class="md-ellipsis">
       
-        When Is It a Problem?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mitigating-il" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mitigating IL
+        Launch yield range
       
     </span>
   </a>
@@ -2909,22 +2313,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
+  <a href="#yield-presentation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Best Practices
+        Yield Presentation
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Best Practices">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#launch-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Launch Policy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Launch Policy">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#choosing-pools" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choosing Pools
+        Scope
       
     </span>
   </a>
@@ -2932,10 +2347,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#managing-il-risk" class="md-nav__link">
+  <a href="#collateral-policy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Managing IL Risk
+        Collateral policy
       
     </span>
   </a>
@@ -2943,10 +2358,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#position-management" class="md-nav__link">
+  <a href="#rationale" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Position Management
+        Rationale
       
     </span>
   </a>
@@ -2959,22 +2374,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pool-stats-explained" class="md-nav__link">
+  <a href="#integrations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pool Stats Explained
+        Integrations
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Pool Stats Explained">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kpis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KPIs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Notes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Notes">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#tvl-total-value-locked" class="md-nav__link">
+  <a href="#existing-contract" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TVL (Total Value Locked)
+        Existing contract
       
     </span>
   </a>
@@ -2982,10 +2441,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#volume-24h" class="md-nav__link">
+  <a href="#contract-interactions-at-launch" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Volume 24h
+        Contract interactions at launch
       
     </span>
   </a>
@@ -2993,10 +2452,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#apr-annual-percentage-rate" class="md-nav__link">
+  <a href="#what-notifyreward-is-and-when-it-matters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        APR (Annual Percentage Rate)
+        What notifyReward is and when it matters
       
     </span>
   </a>
@@ -3004,10 +2463,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#your-pool-share" class="md-nav__link">
+  <a href="#deployment-sequence" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Your Pool Share
+        Deployment sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui-and-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI and API
       
     </span>
   </a>
@@ -3016,217 +2486,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced Strategies
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Advanced Strategies">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#liquidity-farming" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Liquidity Farming
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#range-orders-concentrated-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Range Orders (Concentrated Liquidity)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#arbitrage-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Arbitrage Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Issues
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Issues">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#insufficient-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Insufficient Balance"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#price-updated-warning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Price Updated" Warning
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#slippage-tolerance-exceeded" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Slippage Tolerance Exceeded"
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Risk Management
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Risk Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#diversification" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Diversification
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#start-small" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Start Small
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#monitor-regularly" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitor Regularly
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#emergency-exit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Emergency Exit
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#whats-next" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What's Next?
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What&#39;s Next?">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#claim-your-rewards" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claim Your Rewards
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#optimize-your-portfolio" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimize Your Portfolio
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#need-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Need Help?
-      
-    </span>
-  </a>
   
 </li>
       
@@ -3247,396 +2506,381 @@
 
 
 
-<h1 id="provide-liquidity">Provide Liquidity<a class="headerlink" href="#provide-liquidity" title="Permanent link">&para;</a></h1>
-<p>Earn fees by providing liquidity to STRATO's decentralized exchange pools.</p>
-<div class="admonition note">
-<p class="admonition-title">Variable Returns &amp; Risks</p>
-<p>APR estimates, gas costs, and trading fees shown are based on historical data and typical conditions. Actual returns may vary significantly based on trading volume, pool size, and market conditions. You may also experience impermanent loss. Always research pool performance before providing liquidity.</p>
-</div>
-<hr />
-<h2 id="complete-example-provide-6000-ethst-usdst-liquidity">Complete Example: Provide $6,000 ETHST-USDST Liquidity<a class="headerlink" href="#complete-example-provide-6000-ethst-usdst-liquidity" title="Permanent link">&para;</a></h2>
-<p><strong>Your situation:</strong></p>
-<ul>
-<li>You have: 1 ETHST ($3,000) + 3,000 USDST</li>
-<li>You want: Earn trading fees passively</li>
-</ul>
-<p><strong>What you'll do:</strong></p>
+<h1 id="saveusdst-technical-spec">saveUSDST Technical Spec<a class="headerlink" href="#saveusdst-technical-spec" title="Permanent link">&para;</a></h1>
+<p>Draft: 2026-03-18</p>
+<h2 id="business-context">Business Context<a class="headerlink" href="#business-context" title="Permanent link">&para;</a></h2>
+<p>The protocol needs <code>USDST</code> to do three things well:</p>
 <ol>
-<li>Choose ETHST-USDST pool</li>
-<li>Add liquidity</li>
-<li>Earn fees automatically</li>
-<li>Remove liquidity (anytime)</li>
+<li>circulate</li>
+<li>trade at size</li>
+<li>be worth holding</li>
 </ol>
-<p><strong>Time needed:</strong> 5 minutes<br />
-<strong>Potential earnings:</strong> ~8-15% APR (fees + Reward Points)<br />
-<strong>Total gas cost:</strong> ~$0.30</p>
-<hr />
-<h3 id="quick-walkthrough">Quick Walkthrough<a class="headerlink" href="#quick-walkthrough" title="Permanent link">&para;</a></h3>
-<p><strong>Step 1: Choose Pool</strong>
-- Go to <strong>Pools</strong> page
-- Select <strong>ETHST-USDST pool</strong>
-- Check: 24h volume $500k, APR 12%</p>
-<p><strong>Step 2: Enter Amounts</strong>
-- Enter: <strong>1 ETHST</strong>
-- Auto-fills: <strong>3,000 USDST</strong> (to match ratio)
-- Your share: 0.5% of pool</p>
-<p><strong>Step 3: Add Liquidity</strong>
-- Click <strong>"Add Liquidity"</strong> (~$0.10 gas)
-- Confirm in wallet
-  - Approvals + add liquidity happen automatically in one transaction
-- Wait 1-2 seconds</p>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>✅ Added: 1 ETHST + 3,000 USDST to pool
-✅ Received: LP tokens (representing your 0.5% share)
-✅ Earning: ~$2/day in fees (12% APR)
-✅ Plus: Reward Points
-</code></pre></div></p>
-<p><strong>Your position:</strong></p>
+<p>The first comes from CDP minting. The second comes from stable liquidity. <code>saveUSDST</code> is the third leg: the native hold asset for <code>USDST</code>.</p>
+<p>This matches the current internal framing:</p>
 <ul>
-<li>Pool share: 0.5%</li>
-<li>Value: $6,000</li>
-<li>Daily earnings: ~$2 in fees</li>
-<li>Monthly: ~$60 (if volume stays constant)</li>
+<li>mint <code>USDST</code> against collateral</li>
+<li>LP in the metastable stable surface</li>
+<li>hold <code>saveUSDST</code></li>
 </ul>
-<hr />
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p><strong>What is liquidity providing?</strong>
-- Deposit token pairs into liquidity pools (e.g., ETHST + USDC)
-- Earn trading fees from every swap that uses your pool
-- Receive LP (Liquidity Provider) tokens representing your share
-- Plus earn Reward Points</p>
-<p><strong>Why provide liquidity?</strong>
-- <strong>Passive income</strong>: Earn from trading fees (typically 0.3% per trade)
-- <strong>Reward Points</strong>: Bonus rewards for liquidity providers
-- <strong>Support ecosystem</strong>: Enable trading for others
-- <strong>Capital efficiency</strong>: Put idle assets to work</p>
-<hr />
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>Before providing liquidity:</p>
-<ul>
-<li>[ ] STRATO account set up (<a href="../../quick-start/">Quick Start Guide</a>)</li>
-<li>[ ] Wallet connected to STRATO network</li>
-<li>[ ] Both tokens of a pair in your wallet (e.g., ETHST + USDC)</li>
-<li>[ ] Small amount of USDST for gas fees</li>
-<li>[ ] Understanding of impermanent loss (<a href="../../concepts/#impermanent-loss-liquidity-provision">Core Concepts</a>)</li>
-</ul>
-<hr />
-<h2 id="how-liquidity-pools-work">How Liquidity Pools Work<a class="headerlink" href="#how-liquidity-pools-work" title="Permanent link">&para;</a></h2>
-<h3 id="automated-market-maker-amm">Automated Market Maker (AMM)<a class="headerlink" href="#automated-market-maker-amm" title="Permanent link">&para;</a></h3>
+<p>The point of <code>saveUSDST</code> is not to replace lending or external yieldcoins. It is to give Mercata a simple native savings product for <code>USDST</code> and a clean path from bootstrap incentives to fee-funded savings yield.</p>
+<h2 id="current-protocol-context">Current Protocol Context<a class="headerlink" href="#current-protocol-context" title="Permanent link">&para;</a></h2>
+<p>This spec assumes the current Mercata / STRATO product stack has four relevant pieces:</p>
 <ol>
-<li><strong>You deposit</strong> equal value of two tokens (e.g., $1,000 ETHST + $1,000 USDC)</li>
-<li><strong>Traders swap</strong> between these tokens, paying fees</li>
-<li><strong>You earn</strong> a share of fees proportional to your pool share</li>
-<li><strong>You can withdraw</strong> anytime (subject to available liquidity)</li>
-</ol>
-<h3 id="pool-math">Pool Math<a class="headerlink" href="#pool-math" title="Permanent link">&para;</a></h3>
-<p>Pools maintain a constant product:</p>
-<div class="highlight"><pre><span></span><code>x × y = k (constant)
-
-Where:
-x = Token A reserves
-y = Token B reserves  
-k = constant product
-</code></pre></div>
-<p>This formula automatically sets prices based on supply and demand.</p>
-<h3 id="your-share">Your Share<a class="headerlink" href="#your-share" title="Permanent link">&para;</a></h3>
-<p>You receive <strong>LP tokens</strong> representing your ownership:</p>
-<div class="highlight"><pre><span></span><code>Your LP tokens / Total LP tokens = Your % of pool
-</code></pre></div>
-<p><strong>Example</strong>: You own 1,000 LP tokens, total is 100,000 LP tokens
-- Your share: 1%
-- You earn: 1% of all trading fees</p>
-<hr />
-<h2 id="step-by-step-add-liquidity">Step-by-Step: Add Liquidity<a class="headerlink" href="#step-by-step-add-liquidity" title="Permanent link">&para;</a></h2>
-<h3 id="step-1-choose-a-pool">Step 1: Choose a Pool<a class="headerlink" href="#step-1-choose-a-pool" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Navigate to <strong>Pools</strong> section in STRATO app</li>
-<li>Browse available pools or search for specific pair</li>
+<li><code>USDST</code></li>
+<li>the protocol stablecoin</li>
 <li>
-<p>Check pool stats:</p>
+<p>the unit users mint, borrow, swap, spend, and save</p>
 </li>
 <li>
-<p><strong>TVL (Total Value Locked)</strong>: Pool size</p>
+<p><code>CDP</code></p>
 </li>
-<li><strong>Volume 24h</strong>: Trading activity</li>
-<li><strong>APR</strong>: Estimated annual returns (fees + rewards)</li>
+<li>the lower-cost path for minting new <code>USDST</code> against collateral</li>
+<li>
+<p>intended to be the primary supply engine for <code>USDST</code></p>
+</li>
+<li>
+<p>Lending pool</p>
+</li>
+<li>a separate money market for supplying and borrowing <code>USDST</code></li>
+<li>
+<p>yield for suppliers depends on borrow demand and utilization</p>
+</li>
+<li>
+<p>Stable liquidity surface</p>
+</li>
+<li>pools that let users move between <code>USDST</code> and external stable or yield-bearing assets such as <code>syrupUSDC</code>, <code>sUSDS</code>, and <code>sUSDe</code></li>
 </ol>
-<p><strong>Popular pools</strong>:</p>
+<p>The current strategic picture is:</p>
 <ul>
-<li>ETHST / USDST - High volume, stable</li>
-<li>WBTC / ETHST - Dual crypto exposure</li>
-<li>USDST / USDST - Minimal impermanent loss</li>
+<li>CDP grows <code>USDST</code> supply</li>
+<li>stable liquidity makes <code>USDST</code> usable</li>
+<li><code>saveUSDST</code> creates hold demand</li>
 </ul>
-<h3 id="step-2-enter-amounts">Step 2: Enter Amounts<a class="headerlink" href="#step-2-enter-amounts" title="Permanent link">&para;</a></h3>
+<h2 id="definitions">Definitions<a class="headerlink" href="#definitions" title="Permanent link">&para;</a></h2>
+<h3 id="usdst">USDST<a class="headerlink" href="#usdst" title="Permanent link">&para;</a></h3>
+<p>The protocol stablecoin. It is the base asset for this spec.</p>
+<h3 id="saveusdst">saveUSDST<a class="headerlink" href="#saveusdst" title="Permanent link">&para;</a></h3>
+<p>The proposed native savings token for <code>USDST</code>. Users deposit <code>USDST</code> and receive a non-rebasing claim whose value rises over time.</p>
+<h3 id="cdp">CDP<a class="headerlink" href="#cdp" title="Permanent link">&para;</a></h3>
+<p>Collateralized debt position system. Users lock collateral and mint new <code>USDST</code> against it. In current protocol economics, this is the cheaper borrowing path and the main source of new <code>USDST</code> circulation.</p>
+<h3 id="lending-pool">Lending pool<a class="headerlink" href="#lending-pool" title="Permanent link">&para;</a></h3>
+<p>Separate from the CDP. Users supply <code>USDST</code> or supported collateral to a money market. Supplier yield comes from borrower demand, not from a protocol savings rate.</p>
+<h3 id="safetyusdst">safetyUSDST<a class="headerlink" href="#safetyusdst" title="Permanent link">&para;</a></h3>
+<p>The safety-module token. It exists for protocol backstop and bad-debt handling. It is not the savings product described here.</p>
+<h3 id="metastable-pool">Metastable pool<a class="headerlink" href="#metastable-pool" title="Permanent link">&para;</a></h3>
+<p>The main stable liquidity surface for <code>USDST</code> against other stable or yield-bearing stable assets. Its job is to keep <code>USDST</code> easy to move into and out of at size.</p>
+<h3 id="psm">PSM<a class="headerlink" href="#psm" title="Permanent link">&para;</a></h3>
+<p>Peg stability mechanism. A backstop convertibility path, typically against <code>USDC</code> or <code>USDT</code>, used to anchor the peg and support arbitrage during larger deviations. It is not intended to be the normal day-to-day user route.</p>
+<h3 id="external-yield-assets">External yield assets<a class="headerlink" href="#external-yield-assets" title="Permanent link">&para;</a></h3>
+<p>Stable or dollar-like assets outside the native <code>saveUSDST</code> product that already earn yield, such as <code>syrupUSDC</code>, <code>sUSDS</code>, and <code>sUSDe</code>.</p>
+<h2 id="scope-assumptions">Scope Assumptions<a class="headerlink" href="#scope-assumptions" title="Permanent link">&para;</a></h2>
+<p>This document assumes:</p>
+<ul>
+<li><code>saveUSDST</code> is a new product, not a rename of an existing token</li>
+<li>the lending pool remains in place</li>
+<li><code>safetyUSDST</code> remains in place</li>
+<li>launch support comes from explicit rewards first</li>
+<li>fee-share support comes later</li>
+<li>collateral use is out of scope for launch</li>
+</ul>
+<h2 id="product-definition">Product Definition<a class="headerlink" href="#product-definition" title="Permanent link">&para;</a></h2>
+<p><code>saveUSDST</code> is a non-rebasing, exchange-rate token backed by deposited <code>USDST</code>.</p>
+<p>User flow:</p>
 <ol>
-<li>Click <strong>Add Liquidity</strong> on chosen pool</li>
-<li>Enter amount for one token</li>
-<li>Second token amount auto-fills to maintain pool ratio</li>
+<li>deposit <code>USDST</code></li>
+<li>receive <code>saveUSDST</code></li>
+<li>hold while the exchange rate rises</li>
+<li>redeem back to <code>USDST</code></li>
 </ol>
-<p><strong>Example</strong>:</p>
+<p><code>saveUSDST</code> is:</p>
 <ul>
-<li>Pool is 50% ETHST, 50% USDST</li>
-<li>You enter: 1 ETHST ($3,000)</li>
-<li>Auto-fills: 3,000 USDST (to match value)</li>
+<li>the savings product for <code>USDST</code></li>
+<li>separate from the lending pool</li>
+<li>separate from <code>safetyUSDST</code></li>
+<li>intended to look and behave like an <code>sDAI</code> / <code>sUSDS</code> style asset</li>
 </ul>
-<div class="admonition tip">
-<p class="admonition-title">Start Small</p>
-<p>Test with ~$100-500 first to understand the process before committing large amounts.</p>
-</div>
-<h3 id="step-3-review-details">Step 3: Review Details<a class="headerlink" href="#step-3-review-details" title="Permanent link">&para;</a></h3>
-<p>Check:</p>
+<p><code>saveUSDST</code> is not:</p>
 <ul>
-<li><strong>Token amounts</strong>: Both tokens and their USD values</li>
-<li><strong>Pool share</strong>: Your % of total pool</li>
-<li><strong>Exchange rate</strong>: Current price in pool</li>
-<li><strong>Estimated APR</strong>: Expected annual returns</li>
-<li><strong>Fees</strong>: Gas cost (&lt; $0.10 in USDST)</li>
+<li>a lending-pool receipt token</li>
+<li>a bad-debt recovery token</li>
+<li>a CDP position</li>
+<li>a rebasing balance token</li>
 </ul>
-<h3 id="step-4-add-liquidity">Step 4: Add Liquidity<a class="headerlink" href="#step-4-add-liquidity" title="Permanent link">&para;</a></h3>
+<h2 id="goals">Goals<a class="headerlink" href="#goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Create a simple reason to hold <code>USDST</code></li>
+<li>Increase sticky <code>USDST</code> balances in the system</li>
+<li>Give the protocol a native savings-rate outlet</li>
+<li>Make the asset easy to explain and integrate</li>
+<li>Start with explicit support, then transition to fee share</li>
+</ul>
+<h2 id="non-goals">Non-Goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Do not use <code>saveUSDST</code> for protocol safety</li>
+<li>Do not tie core yield to lending-pool utilization</li>
+<li>Do not allow collateral use at launch</li>
+<li>Do not rely on permanent token emissions</li>
+</ul>
+<h2 id="system-model">System Model<a class="headerlink" href="#system-model" title="Permanent link">&para;</a></h2>
+<h3 id="underlying-and-share-asset">Underlying and share asset<a class="headerlink" href="#underlying-and-share-asset" title="Permanent link">&para;</a></h3>
+<ul>
+<li>underlying: <code>USDST</code></li>
+<li>share token: <code>saveUSDST</code></li>
+</ul>
+<h3 id="accounting-model">Accounting model<a class="headerlink" href="#accounting-model" title="Permanent link">&para;</a></h3>
+<p>The vault tracks:</p>
+<ul>
+<li>total managed <code>USDST</code></li>
+<li>total <code>saveUSDST</code> shares</li>
+<li>user share balances</li>
+</ul>
+<p>Economic identity:</p>
+<ul>
+<li><code>exchangeRate = totalManagedUSDST / totalSaveUSDSTShares</code></li>
+</ul>
+<p>User value:</p>
+<ul>
+<li><code>userUnderlyingValue = userShares * exchangeRate</code></li>
+</ul>
+<p>When rewards are added:</p>
+<ul>
+<li>managed <code>USDST</code> increases</li>
+<li>share supply stays unchanged</li>
+<li>exchange rate rises</li>
+</ul>
+<p>This is the right model for the product because it is simple, non-rebasing, and familiar to users who know <code>sDAI</code> or <code>sUSDS</code>.</p>
+<h3 id="accounting-requirement">Accounting requirement<a class="headerlink" href="#accounting-requirement" title="Permanent link">&para;</a></h3>
+<p>The implementation should account against managed assets, not blindly against raw token balance. Reward injections must be explicit. Unexpected direct transfers should not silently distort the exchange rate.</p>
+<h2 id="functional-requirements">Functional Requirements<a class="headerlink" href="#functional-requirements" title="Permanent link">&para;</a></h2>
+<h3 id="user-actions">User actions<a class="headerlink" href="#user-actions" title="Permanent link">&para;</a></h3>
+<ul>
+<li>deposit <code>USDST</code></li>
+<li>mint shares</li>
+<li>withdraw <code>USDST</code></li>
+<li>redeem shares</li>
+<li>view exchange rate</li>
+<li>view current redeemable value</li>
+</ul>
+<h3 id="protocol-governance-actions">Protocol / governance actions<a class="headerlink" href="#protocol-governance-actions" title="Permanent link">&para;</a></h3>
+<ul>
+<li>configure or approve any fee-share routing into the product</li>
+<li>pause / unpause if needed</li>
+<li>recover stray assets without affecting core accounting</li>
+</ul>
+<h3 id="interface-shape">Interface shape<a class="headerlink" href="#interface-shape" title="Permanent link">&para;</a></h3>
+<p>The interface should be ERC-4626-shaped:</p>
+<ul>
+<li><code>deposit</code></li>
+<li><code>mint</code></li>
+<li><code>withdraw</code></li>
+<li><code>redeem</code></li>
+<li><code>totalAssets</code></li>
+<li><code>convertToShares</code></li>
+<li><code>convertToAssets</code></li>
+<li>preview functions</li>
+</ul>
+<p>The important point is standard savings-vault semantics, even if the implementation uses repo-specific accounting patterns internally.</p>
+<h2 id="product-positioning-relative-to-existing-components">Product Positioning Relative To Existing Components<a class="headerlink" href="#product-positioning-relative-to-existing-components" title="Permanent link">&para;</a></h2>
+<h3 id="lending-pool_1">Lending pool<a class="headerlink" href="#lending-pool_1" title="Permanent link">&para;</a></h3>
+<p>The lending pool remains the money-market layer for <code>USDST</code>. It is not being replaced.</p>
+<p>The reason not to make it the primary savings product is that supplier yield depends on borrow demand in a venue where users already have cheaper ways to borrow through the CDP path. If utilization has to be subsidized to make the savings story work, it is cleaner to support <code>saveUSDST</code> directly.</p>
+<h3 id="safetyusdst_1">safetyUSDST<a class="headerlink" href="#safetyusdst_1" title="Permanent link">&para;</a></h3>
+<p><code>safetyUSDST</code> is the safety layer. It exists for bad-debt recovery and protocol backstop functions.</p>
+<p><code>saveUSDST</code> is the savings layer. It should not inherit cooldown, slashing, or backstop semantics.</p>
+<h3 id="external-yield-assets_1">External yield assets<a class="headerlink" href="#external-yield-assets_1" title="Permanent link">&para;</a></h3>
+<p><code>saveUSDST</code> does not need to outyield every external asset in every regime. It does need to be the best native destination for <code>USDST</code>.</p>
+<h2 id="funding-model">Funding Model<a class="headerlink" href="#funding-model" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-bootstrap-incentives">Phase 1: bootstrap incentives<a class="headerlink" href="#phase-1-bootstrap-incentives" title="Permanent link">&para;</a></h3>
+<p>At launch, <code>saveUSDST</code> should not use a hard <code>USDST</code> cash subsidy as the main incentive.</p>
+<p>Reason:</p>
+<ul>
+<li>cheap internal borrow paths make a hard-cash savings subsidy mechanically loopable</li>
+<li>if users can mint or borrow <code>USDST</code> below the headline <code>saveUSDST</code> rate, the protocol is just paying for a carry trade</li>
+<li>that is especially unattractive before fee-funded yield is real</li>
+</ul>
+<p>The launch posture should therefore be:</p>
+<ul>
+<li>no hard-cash <code>USDST</code> base subsidy</li>
+<li>use the floating token for temporary promotional incentives if needed</li>
+<li>reserve direct exchange-rate growth for real fee-funded cash flows or very deliberate governance decisions</li>
+</ul>
+<p>This keeps early incentives softer, reduces obvious carry extraction, and preserves the long-run meaning of <code>saveUSDST</code> as a savings product rather than a farm.</p>
+<p>At launch, the exchange rate starts at 1:1 and remains flat. Exchange-rate growth begins when fee-share routing is activated.</p>
+<h3 id="phase-2-fee-share-transition">Phase 2: fee-share transition<a class="headerlink" href="#phase-2-fee-share-transition" title="Permanent link">&para;</a></h3>
+<p>As protocol revenues grow, part of protocol revenue should be routed to <code>saveUSDST</code>.</p>
+<p>Candidate sources:</p>
+<ul>
+<li>stability fees</li>
+<li>lending fees</li>
+<li>swap fees</li>
+<li>other protocol revenues, subject to governance choice</li>
+</ul>
+<h3 id="phase-3-steady-state">Phase 3: steady state<a class="headerlink" href="#phase-3-steady-state" title="Permanent link">&para;</a></h3>
+<p>Long-term target:</p>
+<ul>
+<li>fee-funded base savings rate</li>
+<li>market-level stability fees over time</li>
+<li>temporary token incentives only when strategically justified</li>
+</ul>
+<p>The product should move from "promotion-supported" to "fee-supported", not remain a perpetual emissions sink.</p>
+<h2 id="economics">Economics<a class="headerlink" href="#economics" title="Permanent link">&para;</a></h2>
+<h3 id="strategic-target">Strategic target<a class="headerlink" href="#strategic-target" title="Permanent link">&para;</a></h3>
+<p>The current internal materials imply a working <code>saveUSDST</code> hold-demand target around <code>$20M</code>.</p>
+<p>That is a useful planning target because it is large enough to matter for <code>USDST</code> retention, but still small enough to bootstrap deliberately.</p>
+<h3 id="implied-fee-funded-base-rate">Implied fee-funded base rate<a class="headerlink" href="#implied-fee-funded-base-rate" title="Permanent link">&para;</a></h3>
+<p>The useful thing about <code>saveUSDST</code> is that the long-run exchange-rate growth is modelable before fee share is turned on.</p>
+<p>Very roughly:</p>
+<ul>
+<li><code>saveUSDST base rate ~= (USDST debt outstanding * stability fee * allocation to saveUSDST) / saveUSDST TVL</code></li>
+</ul>
+<p>This should be the anchor for the product.</p>
+<p>It allows the team to estimate:</p>
+<ul>
+<li>the fee-funded rate the product can support later</li>
+<li>the gap between that rate and the headline launch rate</li>
+<li>how much temporary promotion is actually needed</li>
+</ul>
+<p>If the protocol becomes widely used and stability fees rise toward market, the fee-funded base rate should rise with it.</p>
+<h3 id="launch-yield-range">Launch yield range<a class="headerlink" href="#launch-yield-range" title="Permanent link">&para;</a></h3>
+<p>The current internal materials point to a visible launch rate in the mid-single digits. That is still the right qualitative range for the headline number.</p>
+<p>Recommended working range:</p>
+<ul>
+<li><code>5-8%</code> headline launch APY, assuming the floating token launches and incentives are active</li>
+</ul>
+<p>This should be understood as a combined number, not a pure fee-funded rate.</p>
+<p>Why:</p>
+<ul>
+<li>below that, the product may not feel different enough from idle <code>USDST</code></li>
+<li>far above that, it starts to look like a short-lived subsidy rather than a real savings product</li>
+</ul>
+<h2 id="yield-presentation">Yield Presentation<a class="headerlink" href="#yield-presentation" title="Permanent link">&para;</a></h2>
+<p>Users should see one headline yield number.</p>
+<p>That is how vault products are understood in practice.</p>
+<p>Recommended presentation:</p>
+<ul>
+<li>headline APY: one combined current rate</li>
+<li>below the fold: breakdown by source</li>
+</ul>
+<p>The breakdown should separate:</p>
+<ul>
+<li>modeled or actual fee-funded base rate</li>
+<li>temporary floating-token incentive rate</li>
+<li>any other temporary promotional components</li>
+</ul>
+<p>The product should not expect users to parse the decomposition before deciding whether the vault is attractive.</p>
+<p>At the same time, the protocol must track the decomposition internally so it is always clear which part of the yield is durable and which part is promotional.</p>
+<h2 id="launch-policy">Launch Policy<a class="headerlink" href="#launch-policy" title="Permanent link">&para;</a></h2>
+<h3 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h3>
+<p>Launch <code>saveUSDST</code> as:</p>
+<ul>
+<li>deposit</li>
+<li>hold</li>
+<li>redeem</li>
+</ul>
+<p>Only.</p>
+<h3 id="collateral-policy">Collateral policy<a class="headerlink" href="#collateral-policy" title="Permanent link">&para;</a></h3>
+<p>Do not allow <code>saveUSDST</code> as collateral anywhere at launch.</p>
+<p>That means:</p>
+<ul>
+<li>no CDP collateral</li>
+<li>no lending-pool collateral</li>
+</ul>
+<h3 id="rationale">Rationale<a class="headerlink" href="#rationale" title="Permanent link">&para;</a></h3>
+<p>CDP collateral is too reflexive:</p>
+<ul>
+<li>mint <code>USDST</code></li>
+<li>wrap into <code>saveUSDST</code></li>
+<li>use a claim on <code>USDST</code> to mint more <code>USDST</code></li>
+</ul>
+<p>Lending collateral is more defensible because there is a financing cost and actual pool liquidity constraints. Even so, launch exclusion is still preferable because bootstrap rewards would distort the loop and complicate the rollout.</p>
+<p>Future lending-collateral eligibility can be revisited once:</p>
+<ul>
+<li>fee share is the dominant yield source</li>
+<li>bootstrap support is no longer the main APY driver</li>
+<li>haircut, cap, and monitoring policy are defined</li>
+</ul>
+<p>CDP collateral should remain out of scope.</p>
+<h2 id="integrations">Integrations<a class="headerlink" href="#integrations" title="Permanent link">&para;</a></h2>
+<p>The system needs to support:</p>
+<ul>
+<li>wallet / portfolio visibility for <code>saveUSDST</code></li>
+<li>exchange-rate and redeemable-value display</li>
+<li>API endpoints for public and user-specific vault state</li>
+<li>standard preview functions for integrators</li>
+<li>clear labeling distinct from lending and safety</li>
+</ul>
+<p>User-facing copy should consistently frame:</p>
+<ul>
+<li><code>USDST</code> as the routing and transaction asset</li>
+<li><code>saveUSDST</code> as the native savings asset</li>
+</ul>
+<h2 id="kpis">KPIs<a class="headerlink" href="#kpis" title="Permanent link">&para;</a></h2>
+<p>Primary KPIs:</p>
+<ul>
+<li><code>saveUSDST</code> TVL</li>
+<li>share of circulating <code>USDST</code> held in <code>saveUSDST</code></li>
+<li>average holding duration</li>
+<li>retention after incentives taper</li>
+<li>share of newly minted / borrowed <code>USDST</code> that ends up saved</li>
+<li>fee-share coverage ratio over time</li>
+</ul>
+<h2 id="risks">Risks<a class="headerlink" href="#risks" title="Permanent link">&para;</a></h2>
+<ul>
+<li>If launch support is too low, users route directly into external yield assets</li>
+<li>If launch support is too high, TVL can become mercenary</li>
+<li>If taper is too sharp, retention will be poor</li>
+<li>If product boundaries are blurry, users will confuse savings, lending, and safety</li>
+<li>If collateral is enabled too early, recursive loops complicate risk before the savings product is proven</li>
+</ul>
+<h2 id="recommendation">Recommendation<a class="headerlink" href="#recommendation" title="Permanent link">&para;</a></h2>
+<p>Launch <code>saveUSDST</code> as the native savings-rate product for <code>USDST</code>.</p>
+<p>Keep the story simple:</p>
+<ul>
+<li>mint <code>USDST</code></li>
+<li>use <code>USDST</code></li>
+<li>save <code>USDST</code></li>
+</ul>
+<p>Keep the first version simple too:</p>
+<ul>
+<li>exchange-rate token</li>
+<li>no hard-cash <code>USDST</code> launch subsidy</li>
+<li>optional floating-token promotional incentives</li>
+<li>later fee share</li>
+<li>no collateral at launch</li>
+</ul>
+<p>That is the cleanest way to create durable hold demand for <code>USDST</code> without mixing savings, leverage, and safety into one product.</p>
+<h2 id="implementation-notes">Implementation Notes<a class="headerlink" href="#implementation-notes" title="Permanent link">&para;</a></h2>
+<h3 id="existing-contract">Existing contract<a class="headerlink" href="#existing-contract" title="Permanent link">&para;</a></h3>
+<p><code>SaveUSDSTVault.sol</code> in <code>mercata/contracts/concrete/Savings/</code> already implements the core vault. It is the share token itself (ERC-20), with ERC-4626-shaped deposit / mint / withdraw / redeem and managed-asset accounting.</p>
+<h3 id="contract-interactions-at-launch">Contract interactions at launch<a class="headerlink" href="#contract-interactions-at-launch" title="Permanent link">&para;</a></h3>
+<p>The vault's only runtime dependency is the <code>USDST</code> ERC-20 token. It does not interact with the CDP, lending pool, safety module, or any rewards system.</p>
+<p>This is the key architectural difference from <code>SafetyModule</code> (safetyUSDST), which imports and calls <code>LendingPool</code>, <code>LiquidityPool</code>, and <code>LendingRegistry</code>. <code>SaveUSDSTVault</code> is standalone.</p>
+<p>At launch:</p>
+<ul>
+<li><code>deposit</code> / <code>mint</code>: pull <code>USDST</code> from user via <code>transferFrom</code>, mint shares</li>
+<li><code>withdraw</code> / <code>redeem</code>: burn shares, transfer <code>USDST</code> to user</li>
+<li><code>exchangeRate</code>: read-only, returns <code>totalAssets * 1e18 / totalSupply</code></li>
+</ul>
+<p>No other contract calls. No external state reads. The vault holds <code>USDST</code> and tracks <code>_managedAssets</code> internally.</p>
+<h3 id="what-notifyreward-is-and-when-it-matters">What <code>notifyReward</code> is and when it matters<a class="headerlink" href="#what-notifyreward-is-and-when-it-matters" title="Permanent link">&para;</a></h3>
+<p>The current contract has a <code>notifyReward</code> method that pulls <code>USDST</code> from the owner and adds it to <code>_managedAssets</code>, raising the exchange rate for all holders.</p>
+<p>At launch, this is unused. The exchange rate is flat at 1:1. Promotional incentives use the floating token through a separate system that does not touch the vault.</p>
+<p>When fee-share routing activates (Phase 2), the vault will need a mechanism to receive protocol revenue and credit it as managed assets. Whether that mechanism is the existing <code>notifyReward</code> (pull from owner), a push-style <code>recordTransfer</code> (like SafetyModule uses for LendingPool), or a continuous drip is a Phase 2 design decision. The launch contract does not need to commit to one.</p>
+<h3 id="deployment-sequence">Deployment sequence<a class="headerlink" href="#deployment-sequence" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Click <strong>Add Liquidity</strong></li>
-<li>Review transaction in wallet popup</li>
-<li>Confirm transaction</li>
-<li>Wait for confirmation (~1-2 seconds)</li>
+<li>Deploy <code>SaveUSDSTVault</code> behind proxy (via <code>BaseCodeCollection</code>)</li>
+<li>Call <code>initialize(USDST, "Save USDST", "saveUSDST")</code></li>
+<li>Set pause authority</li>
+<li>Register in UI and API as a first-class product</li>
 </ol>
-<p>✅ <strong>Done!</strong> You now have LP tokens in your wallet.</p>
-<hr />
-<h2 id="earning-from-liquidity">Earning from Liquidity<a class="headerlink" href="#earning-from-liquidity" title="Permanent link">&para;</a></h2>
-<h3 id="trading-fees">Trading Fees<a class="headerlink" href="#trading-fees" title="Permanent link">&para;</a></h3>
-<p><strong>How you earn</strong>:</p>
+<h3 id="ui-and-api">UI and API<a class="headerlink" href="#ui-and-api" title="Permanent link">&para;</a></h3>
+<p>The system needs:</p>
 <ul>
-<li>Every swap pays 0.3% fee (typical)</li>
-<li>Fees distributed proportionally to all LP holders</li>
-<li>Automatically added to pool (compounds)</li>
+<li>public vault state (total assets, total supply, exchange rate)</li>
+<li>user share balance and redeemable value</li>
+<li>deposit and redeem actions</li>
 </ul>
-<p><strong>Example</strong>:</p>
-<ul>
-<li>You own 1% of ETH-USDC pool</li>
-<li>Pool does $1,000,000 daily volume</li>
-<li>Daily fees: $1,000,000 × 0.3% = $3,000</li>
-<li>Your share: $3,000 × 1% = $30/day</li>
-</ul>
-<h3 id="reward-points">Reward Points<a class="headerlink" href="#reward-points" title="Permanent link">&para;</a></h3>
-<p>Additional rewards in Reward Points:</p>
-<ul>
-<li>Distributed to select pools</li>
-<li>Varies by pool and season</li>
-<li>Claim anytime in Rewards section</li>
-</ul>
-<h3 id="tracking-earnings">Tracking Earnings<a class="headerlink" href="#tracking-earnings" title="Permanent link">&para;</a></h3>
-<p>Monitor your position:</p>
-<ol>
-<li>Go to <strong>Advanced</strong> (in sidebar) → <strong>Swap Pools</strong> tab</li>
-<li>See your LP positions</li>
-<li>View accumulated fees</li>
-<li>Check current value vs. initial deposit</li>
-</ol>
-<hr />
-<h2 id="removing-liquidity">Removing Liquidity<a class="headerlink" href="#removing-liquidity" title="Permanent link">&para;</a></h2>
-<h3 id="step-1-go-to-your-positions">Step 1: Go to Your Positions<a class="headerlink" href="#step-1-go-to-your-positions" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Navigate to <strong>Portfolio</strong> → <strong>Liquidity</strong></li>
-<li>Select pool to withdraw from</li>
-</ol>
-<h3 id="step-2-choose-amount">Step 2: Choose Amount<a class="headerlink" href="#step-2-choose-amount" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Remove All</strong>: Withdraw 100% of position</li>
-<li><strong>Partial</strong>: Enter % or amount to withdraw</li>
-<li>Receive both tokens proportionally</li>
-</ul>
-<h3 id="step-3-confirm-withdrawal">Step 3: Confirm Withdrawal<a class="headerlink" href="#step-3-confirm-withdrawal" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Click <strong>Remove Liquidity</strong></li>
-<li>Review amounts you'll receive</li>
-<li>Confirm transaction in wallet</li>
-<li>Wait for confirmation</li>
-</ol>
-<p>Tokens (including earned fees) return to your wallet.</p>
-<hr />
-<h2 id="understanding-impermanent-loss">Understanding Impermanent Loss<a class="headerlink" href="#understanding-impermanent-loss" title="Permanent link">&para;</a></h2>
-<h3 id="what-is-it">What Is It?<a class="headerlink" href="#what-is-it" title="Permanent link">&para;</a></h3>
-<p><strong>Impermanent Loss (IL)</strong>: Loss vs. simply holding the tokens when prices diverge.</p>
-<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
-<p><strong>Initial deposit</strong>:</p>
-<ul>
-<li>1 ETHST ($3,000) + 3,000 USDST = $6,000 total</li>
-</ul>
-<p><strong>ETH doubles to $6,000</strong>:</p>
-<ul>
-<li>Pool rebalances: 0.707 ETHST + 4,242 USDST - Pool value: $8,485</li>
-<li>If you just held: 1 ETHST ($6,000) + 3,000 USDST = $9,000</li>
-<li><strong>Impermanent loss: $515 (5.7%)</strong></li>
-</ul>
-<h3 id="when-is-it-a-problem">When Is It a Problem?<a class="headerlink" href="#when-is-it-a-problem" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>High IL</strong>: When token prices diverge significantly</li>
-<li><strong>Low IL</strong>: Stablecoin pairs (USDC-USDST) or correlated assets</li>
-</ul>
-<h3 id="mitigating-il">Mitigating IL<a class="headerlink" href="#mitigating-il" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Choose stable pairs</strong>: USDC-USDST has minimal IL</li>
-<li><strong>Earn fees to offset</strong>: High-volume pools compensate with fees</li>
-<li><strong>Long-term provide</strong>: Price often reverts, making loss "impermanent"</li>
-<li><strong>Reward Points</strong>: Additional rewards can exceed IL</li>
-</ol>
-<div class="admonition note">
-<p class="admonition-title">IL is Impermanent</p>
-<p>Loss only realizes if you withdraw. If prices revert, the "loss" disappears. Plus trading fees and rewards often exceed IL.</p>
-</div>
-<hr />
-<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
-<h3 id="choosing-pools">Choosing Pools<a class="headerlink" href="#choosing-pools" title="Permanent link">&para;</a></h3>
-<p><strong>Good pools have</strong>:</p>
-<ul>
-<li>✅ High trading volume (more fees earned)</li>
-<li>✅ Deep liquidity (lower IL from your deposits)</li>
-<li>✅ Verified tokens (avoid scams)</li>
-<li>✅ Reward Points incentives</li>
-</ul>
-<p><strong>Avoid pools with</strong>:</p>
-<ul>
-<li>❌ Unknown/unverified tokens</li>
-<li>❌ Extremely low liquidity</li>
-<li>❌ Suspicious APR (too good to be true)</li>
-</ul>
-<h3 id="managing-il-risk">Managing IL Risk<a class="headerlink" href="#managing-il-risk" title="Permanent link">&para;</a></h3>
-<p><strong>Low IL strategies</strong>:</p>
-<ul>
-<li>Stablecoin pairs (USDC-USDST, USDC-DAI)</li>
-<li>Correlated assets (WBTC-ETH move together)</li>
-<li>Short time horizons in stable markets</li>
-</ul>
-<p><strong>Higher IL but profitable</strong>:</p>
-<ul>
-<li>High-volume pairs (fees offset IL)</li>
-<li>Pools with Reward Points</li>
-<li>Long-term positions (price reverts)</li>
-</ul>
-<h3 id="position-management">Position Management<a class="headerlink" href="#position-management" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] Monitor positions weekly</li>
-<li>[ ] Check if fees exceed IL</li>
-<li>[ ] Rebalance between pools based on APR</li>
-<li>[ ] Claim Reward Points regularly</li>
-<li>[ ] Withdraw if IL becomes too large</li>
-</ul>
-<hr />
-<h2 id="pool-stats-explained">Pool Stats Explained<a class="headerlink" href="#pool-stats-explained" title="Permanent link">&para;</a></h2>
-<h3 id="tvl-total-value-locked">TVL (Total Value Locked)<a class="headerlink" href="#tvl-total-value-locked" title="Permanent link">&para;</a></h3>
-<p>Total $ value in the pool. Higher = more stable prices, lower price impact.</p>
-<h3 id="volume-24h">Volume 24h<a class="headerlink" href="#volume-24h" title="Permanent link">&para;</a></h3>
-<p>Total trading volume in last 24 hours. Higher = more fees earned.</p>
-<h3 id="apr-annual-percentage-rate">APR (Annual Percentage Rate)<a class="headerlink" href="#apr-annual-percentage-rate" title="Permanent link">&para;</a></h3>
-<p>Estimated yearly returns from:</p>
-<ul>
-<li>Trading fees</li>
-<li>Reward Points</li>
-</ul>
-<p><strong>Example</strong>: 25% APR on $10,000 = ~$2,500/year</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>APR is estimated based on recent activity. Actual returns vary with volume and prices.</p>
-</div>
-<h3 id="your-pool-share">Your Pool Share<a class="headerlink" href="#your-pool-share" title="Permanent link">&para;</a></h3>
-<p>Your % of total pool. Determines your fee earnings:</p>
-<div class="highlight"><pre><span></span><code>Your fees = Total pool fees × Your share %
-</code></pre></div>
-<hr />
-<h2 id="advanced-strategies">Advanced Strategies<a class="headerlink" href="#advanced-strategies" title="Permanent link">&para;</a></h2>
-<h3 id="liquidity-farming">Liquidity Farming<a class="headerlink" href="#liquidity-farming" title="Permanent link">&para;</a></h3>
-<p>Maximize returns by:</p>
-<ol>
-<li>Choose highest APR pools</li>
-<li>Reinvest earned fees (compound)</li>
-<li>Claim and reinvest Reward Points</li>
-<li>Rotate to best-performing pools</li>
-</ol>
-<h3 id="range-orders-concentrated-liquidity">Range Orders (Concentrated Liquidity)<a class="headerlink" href="#range-orders-concentrated-liquidity" title="Permanent link">&para;</a></h3>
-<p>Some pools support concentrated liquidity:</p>
-<ul>
-<li>Provide liquidity in specific price ranges</li>
-<li>Earn more fees per capital</li>
-<li>Higher risk if price exits range</li>
-</ul>
-<p><strong>Not yet available on all STRATO pools</strong> - check pool type.</p>
-<h3 id="arbitrage-protection">Arbitrage Protection<a class="headerlink" href="#arbitrage-protection" title="Permanent link">&para;</a></h3>
-<p>Be aware of:</p>
-<ul>
-<li>Price discrepancies between exchanges</li>
-<li>Arbitrageurs quickly correct, earning fees from your pool</li>
-<li>You still earn fees, but IL can occur rapidly</li>
-</ul>
-<hr />
-<h2 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h2>
-<h3 id="insufficient-balance">"Insufficient Balance"<a class="headerlink" href="#insufficient-balance" title="Permanent link">&para;</a></h3>
-<p><strong>Cause</strong>: Not enough of one or both tokens</p>
-<p><strong>Fix</strong>:</p>
-<ul>
-<li>Check you have both tokens</li>
-<li>Verify balances cover amounts + gas</li>
-<li>Swap to get missing token</li>
-</ul>
-<h3 id="price-updated-warning">"Price Updated" Warning<a class="headerlink" href="#price-updated-warning" title="Permanent link">&para;</a></h3>
-<p><strong>Cause</strong>: Pool ratio changed since you started</p>
-<p><strong>Fix</strong>:</p>
-<ul>
-<li>Accept new price</li>
-<li>Or cancel and try again with updated amounts</li>
-</ul>
-<h3 id="slippage-tolerance-exceeded">"Slippage Tolerance Exceeded"<a class="headerlink" href="#slippage-tolerance-exceeded" title="Permanent link">&para;</a></h3>
-<p><strong>Cause</strong>: Pool price moved beyond tolerance</p>
-<p><strong>Fix</strong>:</p>
-<ul>
-<li>Increase slippage in settings</li>
-<li>Try again with updated amounts</li>
-</ul>
-<hr />
-<h2 id="risk-management">Risk Management<a class="headerlink" href="#risk-management" title="Permanent link">&para;</a></h2>
-<h3 id="diversification">Diversification<a class="headerlink" href="#diversification" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Don't put all capital in one pool</li>
-<li>Split across 3-5 pools</li>
-<li>Mix stable and volatile pairs</li>
-</ul>
-<h3 id="start-small">Start Small<a class="headerlink" href="#start-small" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Test with $100-500 first</li>
-<li>Learn the mechanics</li>
-<li>Scale up gradually</li>
-</ul>
-<h3 id="monitor-regularly">Monitor Regularly<a class="headerlink" href="#monitor-regularly" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Check positions weekly</li>
-<li>Compare returns vs. holding</li>
-<li>Exit if IL exceeds comfort level</li>
-</ul>
-<h3 id="emergency-exit">Emergency Exit<a class="headerlink" href="#emergency-exit" title="Permanent link">&para;</a></h3>
-<p>If you need to exit quickly:</p>
-<ul>
-<li>Remove liquidity anytime</li>
-<li>Receive both tokens back</li>
-<li>May realize impermanent loss</li>
-<li>But you keep all earned fees</li>
-</ul>
-<hr />
-<h2 id="whats-next">What's Next?<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
-<h3 id="claim-your-rewards">Claim Your Rewards<a class="headerlink" href="#claim-your-rewards" title="Permanent link">&para;</a></h3>
-<p>Maximize earnings:</p>
-<p>→ <strong><a href="../rewards/">Rewards Guide</a></strong> - Learn to claim Reward Points</p>
-<h3 id="optimize-your-portfolio">Optimize Your Portfolio<a class="headerlink" href="#optimize-your-portfolio" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><a href="../swap/">Swap Guide</a></strong> - Rebalance between pools</li>
-<li><strong><a href="../borrow/">Borrow USDST</a></strong> - Leverage your LP positions</li>
-<li><strong><a href="../../concepts/">Core Concepts</a></strong> - Deepen your understanding</li>
-</ul>
-<hr />
-<h2 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>FAQ</strong>: <a href="../../faq/#swaps-liquidity">Common Questions</a></li>
-<li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
-<li><strong>API Reference</strong>: <a href="../../reference/interactive-api/">Interactive API (Swagger)</a></li>
-<li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
-</ul>
+<p>Present <code>saveUSDST</code> as its own product, not as a tab inside lending or safety.</p>
 
 
 
@@ -3669,7 +2913,7 @@ k = constant product
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 19, 2026 05:23:52 UTC"><span class="timeago" datetime="2026-03-19T05:23:52+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 19, 2026 05:23:52 UTC">2026-03-19</span>
   </span>
 
     

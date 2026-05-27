@@ -12,31 +12,27 @@
         <meta name="author" content="BlockApps">
       
       
-        <link rel="canonical" href="https://docs.strato.nexus/safety/">
+        <link rel="canonical" href="https://docs.strato.nexus/design-docs/rewards/">
       
       
-        <link rel="prev" href="../reference/strato-node-api/">
-      
-      
-        <link rel="next" href="../faq/">
       
       
         
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Safety & Risk - STRATO Technical Docs</title>
+        <title>Rewards System - Technical Implementation Guide - STRATO Technical Docs</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -55,11 +51,11 @@
       
     
     
-      <link rel="stylesheet" href="../css/timeago.css">
+      <link rel="stylesheet" href="../../css/timeago.css">
     
-      <link rel="stylesheet" href="../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -84,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#safety-best-practices" class="md-skip">
+        <a href="#rewards-system-technical-implementation-guide" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +96,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -120,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Safety & Risk
+              Rewards System - Technical Implementation Guide
             
           </span>
         </div>
@@ -226,7 +222,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -244,7 +240,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -271,7 +267,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../quick-start/" class="md-nav__link">
+      <a href="../../quick-start/" class="md-nav__link">
         
   
   
@@ -298,7 +294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../concepts/" class="md-nav__link">
+      <a href="../../concepts/" class="md-nav__link">
         
   
   
@@ -383,7 +379,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/first-time-user/" class="md-nav__link">
+      <a href="../../scenarios/first-time-user/" class="md-nav__link">
         
   
   
@@ -486,7 +482,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/borrow/" class="md-nav__link">
+      <a href="../../guides/borrow/" class="md-nav__link">
         
   
   
@@ -514,7 +510,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/mint-cdp/" class="md-nav__link">
+      <a href="../../guides/mint-cdp/" class="md-nav__link">
         
   
   
@@ -542,7 +538,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/swap/" class="md-nav__link">
+      <a href="../../guides/swap/" class="md-nav__link">
         
   
   
@@ -570,7 +566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/liquidity/" class="md-nav__link">
+      <a href="../../guides/liquidity/" class="md-nav__link">
         
   
   
@@ -598,7 +594,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/bridge/" class="md-nav__link">
+      <a href="../../guides/bridge/" class="md-nav__link">
         
   
   
@@ -626,7 +622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/rewards/" class="md-nav__link">
+      <a href="../../guides/rewards/" class="md-nav__link">
         
   
   
@@ -739,7 +735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/grow-position/" class="md-nav__link">
+      <a href="../../scenarios/grow-position/" class="md-nav__link">
         
   
   
@@ -767,7 +763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/maximize-yield/" class="md-nav__link">
+      <a href="../../scenarios/maximize-yield/" class="md-nav__link">
         
   
   
@@ -795,7 +791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/dca-strategy/" class="md-nav__link">
+      <a href="../../scenarios/dca-strategy/" class="md-nav__link">
         
   
   
@@ -823,7 +819,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/platform-migration/" class="md-nav__link">
+      <a href="../../scenarios/platform-migration/" class="md-nav__link">
         
   
   
@@ -851,7 +847,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/portfolio-rebalancing/" class="md-nav__link">
+      <a href="../../scenarios/portfolio-rebalancing/" class="md-nav__link">
         
   
   
@@ -879,7 +875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/risk-hedging/" class="md-nav__link">
+      <a href="../../scenarios/risk-hedging/" class="md-nav__link">
         
   
   
@@ -907,7 +903,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/leverage-long/" class="md-nav__link">
+      <a href="../../scenarios/leverage-long/" class="md-nav__link">
         
   
   
@@ -935,7 +931,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/multi-asset-strategy/" class="md-nav__link">
+      <a href="../../scenarios/multi-asset-strategy/" class="md-nav__link">
         
   
   
@@ -963,7 +959,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/collateral-optimization/" class="md-nav__link">
+      <a href="../../scenarios/collateral-optimization/" class="md-nav__link">
         
   
   
@@ -991,7 +987,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/arbitrage-market-making/" class="md-nav__link">
+      <a href="../../scenarios/arbitrage-market-making/" class="md-nav__link">
         
   
   
@@ -1019,7 +1015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scenarios/withdrawals/" class="md-nav__link">
+      <a href="../../scenarios/withdrawals/" class="md-nav__link">
         
   
   
@@ -1116,7 +1112,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../contribute/setup/" class="md-nav__link">
+      <a href="../../contribute/setup/" class="md-nav__link">
         
   
   
@@ -1144,7 +1140,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../contribute/architecture/" class="md-nav__link">
+      <a href="../../contribute/architecture/" class="md-nav__link">
         
   
   
@@ -1172,7 +1168,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../contribute/contributing/" class="md-nav__link">
+      <a href="../../contribute/contributing/" class="md-nav__link">
         
   
   
@@ -1328,7 +1324,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build-apps/overview/" class="md-nav__link">
+      <a href="../../build-apps/overview/" class="md-nav__link">
         
   
   
@@ -1356,7 +1352,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/architecture/" class="md-nav__link">
+      <a href="../../reference/architecture/" class="md-nav__link">
         
   
   
@@ -1384,7 +1380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build-apps/quickstart/" class="md-nav__link">
+      <a href="../../build-apps/quickstart/" class="md-nav__link">
         
   
   
@@ -1477,7 +1473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build-apps/integration/" class="md-nav__link">
+      <a href="../../build-apps/integration/" class="md-nav__link">
         
   
   
@@ -1505,7 +1501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build-apps/e2e/" class="md-nav__link">
+      <a href="../../build-apps/e2e/" class="md-nav__link">
         
   
   
@@ -1598,7 +1594,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build-apps/contract-addresses/" class="md-nav__link">
+      <a href="../../build-apps/contract-addresses/" class="md-nav__link">
         
   
   
@@ -1626,7 +1622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build-apps/quick-reference/" class="md-nav__link">
+      <a href="../../build-apps/quick-reference/" class="md-nav__link">
         
   
   
@@ -1731,7 +1727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/api/" class="md-nav__link">
+      <a href="../../reference/api/" class="md-nav__link">
         
   
   
@@ -1759,7 +1755,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/interactive-api/" class="md-nav__link">
+      <a href="../../reference/interactive-api/" class="md-nav__link">
         
   
   
@@ -1787,7 +1783,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/strato-node-api/" class="md-nav__link">
+      <a href="../../reference/strato-node-api/" class="md-nav__link">
         
   
   
@@ -1819,37 +1815,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Safety & Risk
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../safety/" class="md-nav__link">
         
   
   
@@ -1865,392 +1834,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#security-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Security Checklist
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Security Checklist">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#wallet-security" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Wallet Security
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#transaction-security" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transaction Security
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#account-security" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Account Security
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Risk Management
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Risk Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#for-borrowingminting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Borrowing/Minting
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#for-liquidity-provision" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Liquidity Provision
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#for-bridging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Bridging
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-mistakes-to-avoid" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Mistakes to Avoid
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Mistakes to Avoid">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-borrowing-too-much" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Borrowing Too Much ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-ignoring-gas-fees" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Ignoring Gas Fees ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-not-monitoring-positions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Not Monitoring Positions ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-panic-selling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Panic Selling ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-skipping-approvals" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Skipping Approvals ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-withdrawing-too-much" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Withdrawing Too Much ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#7-using-full-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7. Using Full Balance ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#liquidation-prevention" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Liquidation Prevention
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Liquidation Prevention">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#watch-these-metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Watch These Metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#action-plan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Action Plan
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#example-prevention" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example Prevention
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Help
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Getting Help">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#before-asking" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before Asking
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#when-asking-for-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When Asking for Help
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#official-channels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Official Channels
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#emergency-procedures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Emergency Procedures
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Emergency Procedures">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#if-you-think-youre-compromised" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        If You Think You're Compromised
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#if-transaction-stuck" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        If Transaction Stuck
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#if-wrong-address" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        If Wrong Address
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#resources" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resources
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#ready-to-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Ready to Start?
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2262,7 +1845,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../faq/" class="md-nav__link">
+      <a href="../../faq/" class="md-nav__link">
         
   
   
@@ -2309,44 +1892,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#security-checklist" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Security Checklist
+        Overview
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Security Checklist">
+    <nav class="md-nav" aria-label="Overview">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#wallet-security" class="md-nav__link">
+  <a href="#core-principles" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Wallet Security
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#transaction-security" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transaction Security
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#account-security" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Account Security
+        Core Principles
       
     </span>
   </a>
@@ -2359,22 +1920,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
+  <a href="#activity-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Risk Management
+        Activity Types
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Risk Management">
+    <nav class="md-nav" aria-label="Activity Types">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#for-borrowingminting" class="md-nav__link">
+  <a href="#position-activities-activitytypeposition" class="md-nav__link">
     <span class="md-ellipsis">
       
-        For Borrowing/Minting
+        Position Activities (ActivityType.Position)
       
     </span>
   </a>
@@ -2382,21 +1943,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#for-liquidity-provision" class="md-nav__link">
+  <a href="#onetime-activities-activitytypeonetime" class="md-nav__link">
     <span class="md-ellipsis">
       
-        For Liquidity Provision
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#for-bridging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        For Bridging
+        OneTime Activities (ActivityType.OneTime)
       
     </span>
   </a>
@@ -2409,22 +1959,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#common-mistakes-to-avoid" class="md-nav__link">
+  <a href="#architecture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Common Mistakes to Avoid
+        Architecture
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Common Mistakes to Avoid">
+    <nav class="md-nav" aria-label="Architecture">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-borrowing-too-much" class="md-nav__link">
+  <a href="#data-structures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Borrowing Too Much ❌
+        Data Structures
       
     </span>
   </a>
@@ -2432,65 +1982,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-ignoring-gas-fees" class="md-nav__link">
+  <a href="#state-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Ignoring Gas Fees ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-not-monitoring-positions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Not Monitoring Positions ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-panic-selling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Panic Selling ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-skipping-approvals" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Skipping Approvals ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-withdrawing-too-much" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Withdrawing Too Much ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#7-using-full-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7. Using Full Balance ❌
+        State Variables
       
     </span>
   </a>
@@ -2503,22 +1998,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#liquidation-prevention" class="md-nav__link">
+  <a href="#reward-calculation-logic" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Liquidation Prevention
+        Reward Calculation Logic
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Liquidation Prevention">
+    <nav class="md-nav" aria-label="Reward Calculation Logic">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#watch-these-metrics" class="md-nav__link">
+  <a href="#the-global-index-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Watch These Metrics
+        The Global Index Pattern
       
     </span>
   </a>
@@ -2526,10 +2021,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#action-plan" class="md-nav__link">
+  <a href="#how-rewards-accrue" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Action Plan
+        How Rewards Accrue
       
     </span>
   </a>
@@ -2537,10 +2032,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#example-prevention" class="md-nav__link">
+  <a href="#for-users" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example Prevention
+        For Users
       
     </span>
   </a>
@@ -2553,121 +2048,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#getting-help" class="md-nav__link">
+  <a href="#administration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Getting Help
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Getting Help">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#before-asking" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before Asking
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#when-asking-for-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When Asking for Help
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#official-channels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Official Channels
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#emergency-procedures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Emergency Procedures
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Emergency Procedures">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#if-you-think-youre-compromised" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        If You Think You're Compromised
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#if-transaction-stuck" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        If Transaction Stuck
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#if-wrong-address" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        If Wrong Address
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#resources" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resources
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#ready-to-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Ready to Start?
+        Administration
       
     </span>
   </a>
@@ -2691,254 +2075,126 @@
 
 
 
-<h1 id="safety-best-practices">Safety &amp; Best Practices<a class="headerlink" href="#safety-best-practices" title="Permanent link">&para;</a></h1>
-<p>Essential security and risk management guidelines for using STRATO safely.</p>
-<h2 id="security-checklist">Security Checklist<a class="headerlink" href="#security-checklist" title="Permanent link">&para;</a></h2>
-<h3 id="wallet-security">Wallet Security<a class="headerlink" href="#wallet-security" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] <strong>Never share seed phrase</strong> - Not with support, not with anyone</li>
-<li>[ ] <strong>Verify URLs</strong> - Bookmark official STRATO URL, watch for phishing</li>
-<li>[ ] <strong>Check transaction details</strong> - Review before signing in wallet</li>
-<li>[ ] <strong>Keep backups</strong> - Secure seed phrase backup in multiple locations</li>
-<li>[ ] <strong>Use hardware wallet</strong> - For large amounts (Ledger, Trezor)</li>
-</ul>
-<h3 id="transaction-security">Transaction Security<a class="headerlink" href="#transaction-security" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] <strong>Start small</strong> - Test with small amounts first</li>
-<li>[ ] <strong>Double-check addresses</strong> - Verify recipient addresses carefully</li>
-<li>[ ] <strong>Review gas fees</strong> - Check Ethereum gas before bridging</li>
-<li>[ ] <strong>Monitor confirmations</strong> - Wait for full transaction confirmation</li>
-</ul>
-<h3 id="account-security">Account Security<a class="headerlink" href="#account-security" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] <strong>Enable 2FA</strong> - On centralized services (exchanges, email)</li>
-<li>[ ] <strong>Use strong passwords</strong> - Unique password for each service</li>
-<li>[ ] <strong>Beware of scams</strong> - Never click suspicious links in Telegram or DMs</li>
-<li>[ ] <strong>Verify support</strong> - STRATO team will never DM you first</li>
-</ul>
-<h2 id="risk-management">Risk Management<a class="headerlink" href="#risk-management" title="Permanent link">&para;</a></h2>
-<h3 id="for-borrowingminting">For Borrowing/Minting<a class="headerlink" href="#for-borrowingminting" title="Permanent link">&para;</a></h3>
-<p><strong>Keep Health Factor / CR Safe:</strong></p>
-<ul>
-<li>Maintain health factor &gt; 2.0 or CR &gt; 200%</li>
-<li>Set price alerts for collateral assets</li>
-<li>Don't borrow maximum - leave buffer</li>
-<li>Monitor positions daily during volatility</li>
-</ul>
-<p><strong>Add Safety Margins:</strong>
-<div class="highlight"><pre><span></span><code>Example Safe Position:
-
-- Collateral: 2 ETHST ($6,000)
-- Borrow: Only 2,000 USDST (not max $4,200)
-- Health Factor: ~2.4 (very safe)
-- Can withstand 58% ETHST price drop
-</code></pre></div></p>
-<p><strong>Monitor and React:</strong></p>
+<h1 id="rewards-system-technical-implementation-guide">Rewards System - Technical Implementation Guide<a class="headerlink" href="#rewards-system-technical-implementation-guide" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>The Rewards system is a global incentives controller that distributes CATA token rewards to users based on their participation in various protocol activities. The system uses an Aave-style cumulative index pattern to achieve O(1) gas efficiency for all operations.</p>
+<p><strong>Key Implementation File:</strong> <code>mercata/contracts/concrete/Rewards/Rewards.sol</code></p>
+<h3 id="core-principles">Core Principles<a class="headerlink" href="#core-principles" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Check health factor daily</li>
-<li>Set alerts at liquidation prices</li>
-<li>Have plan to add collateral or repay</li>
-<li>Act quickly during market volatility</li>
+<li><strong>No Asset Custody</strong>: The contract never holds user assets (LP tokens, collateral, etc.) - only CATA rewards and accounting state</li>
+<li><strong>O(1) Operations</strong>: All user interactions are constant time - no loops over users or time periods</li>
+<li><strong>Global Index Pattern</strong>: Uses cumulative reward-per-stake indices for efficient calculation</li>
+<li><strong>Activity-Based</strong>: Each reward stream is an "activity" with independent tracking</li>
+<li><strong>Pre-Funded Model</strong>: Contract must be funded with CATA tokens before users can claim</li>
 </ol>
-<h3 id="for-liquidity-provision">For Liquidity Provision<a class="headerlink" href="#for-liquidity-provision" title="Permanent link">&para;</a></h3>
-<p><strong>Understand Impermanent Loss:</strong></p>
+<h2 id="activity-types">Activity Types<a class="headerlink" href="#activity-types" title="Permanent link">&para;</a></h2>
+<p>The system supports two types of activities (see <code>Rewards.sol:11-14</code>):</p>
+<h3 id="position-activities-activitytypeposition">Position Activities (<code>ActivityType.Position</code>)<a class="headerlink" href="#position-activities-activitytypeposition" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Start with stablecoin pairs (minimal IL)</li>
-<li>Calculate potential IL before depositing</li>
-<li>Track fees earned vs. IL regularly</li>
-<li>Only use funds you can afford to hold long-term</li>
+<li><strong>Use Case</strong>: Ongoing positions where users can increase/decrease participation</li>
+<li><strong>Examples</strong>: Liquidity provision, lending supply, borrowing</li>
+<li><strong>API</strong>: <code>deposit(activityId, user, amount)</code> and <code>withdraw(activityId, user, amount)</code></li>
+<li><strong>Behavior</strong>: User stake can go up or down based on position changes</li>
 </ul>
-<p><strong>Choose Pools Wisely:</strong></p>
+<h3 id="onetime-activities-activitytypeonetime">OneTime Activities (<code>ActivityType.OneTime</code>)<a class="headerlink" href="#onetime-activities-activitytypeonetime" title="Permanent link">&para;</a></h3>
 <ul>
-<li>High volume = more fees to offset IL</li>
-<li>Check pool size (larger = less slippage)</li>
-<li>Verify both tokens are legitimate</li>
-<li>Start with well-known pairs (ETH-USDC)</li>
+<li><strong>Use Case</strong>: Discrete actions where participation only increases</li>
+<li><strong>Examples</strong>: Swap volume tracking, one-time milestones</li>
+<li><strong>API</strong>: <code>occurred(activityId, user, amount)</code></li>
+<li><strong>Behavior</strong>: User stake only increases (never decreases)</li>
 </ul>
-<p><strong>Example Calculation:</strong>
-<div class="highlight"><pre><span></span><code>Pool: ETH-USDC
-Deposit: $10,000
-Daily volume: $100,000
-Fee tier: 0.3%
-
-Daily fees: $100,000 × 0.003 = $300
-Your share (1%): $3/day = $90/month
-
-If IL is $50/month: Net +$40/month
+<p>The contract enforces these restrictions at the function level (see <code>Rewards.sol:240</code>, <code>Rewards.sol:255</code>, <code>Rewards.sol:270</code>).</p>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<h3 id="data-structures">Data Structures<a class="headerlink" href="#data-structures" title="Permanent link">&para;</a></h3>
+<p><strong>Activity</strong> (<code>Rewards.sol:21-29</code>)
+<div class="highlight"><pre><span></span><code>struct Activity {
+    string name;                 // Human-readable identifier
+    ActivityType activityType;   // Position or OneTime
+    uint256 emissionRate;        // CATA tokens per second for this activity
+    uint256 accRewardPerStake;   // Cumulative reward index (scaled by 1e18)
+    uint256 lastUpdateTime;      // Last time index was updated
+    uint256 totalStake;          // Sum of all user stakes (tracked internally)
+    address allowedCaller;       // Only this address can call deposit/withdraw/occurred
+}
 </code></pre></div></p>
-<h3 id="for-bridging">For Bridging<a class="headerlink" href="#for-bridging" title="Permanent link">&para;</a></h3>
-<p><strong>Minimize Risks:</strong></p>
-<ul>
-<li>Double-check destination address</li>
-<li>Bridge during low gas times</li>
-<li>Keep transaction hashes</li>
-<li>Wait for full confirmations (12+ blocks Ethereum)</li>
-<li>Start with test amount</li>
-</ul>
-<p><strong>Gas Optimization:</strong>
-<div class="highlight"><pre><span></span><code>High gas time: 8am-5pm UTC weekdays ($30-50)
-Low gas time: Weekends/late night UTC ($5-15)
-
-Savings on $10k bridge: $20-35 in gas fees
+<p><strong>RewardsUserInfo</strong> (<code>Rewards.sol:16-19</code>)
+<div class="highlight"><pre><span></span><code>struct RewardsUserInfo {
+    uint256 stake;       // User&#39;s effective stake in this activity
+    uint256 rewardDebt;  // Accounting variable for reward calculation
+}
 </code></pre></div></p>
-<h2 id="common-mistakes-to-avoid">Common Mistakes to Avoid<a class="headerlink" href="#common-mistakes-to-avoid" title="Permanent link">&para;</a></h2>
-<h3 id="1-borrowing-too-much">1. Borrowing Too Much ❌<a class="headerlink" href="#1-borrowing-too-much" title="Permanent link">&para;</a></h3>
-<p><strong>Mistake:</strong> Borrowing maximum allowed amount</p>
-<p><strong>Risk:</strong> No buffer for price volatility, instant liquidation risk</p>
-<p><strong>Fix:</strong> Borrow 50-70% of max, keep health factor &gt; 2.0</p>
-<h3 id="2-ignoring-gas-fees">2. Ignoring Gas Fees ❌<a class="headerlink" href="#2-ignoring-gas-fees" title="Permanent link">&para;</a></h3>
-<p><strong>Mistake:</strong> Bridging small amounts when gas is high</p>
-<p><strong>Risk:</strong> Fees eat into capital</p>
-<p><strong>Fix:</strong> Check gas prices, bridge larger amounts, use low-gas times</p>
-<h3 id="3-not-monitoring-positions">3. Not Monitoring Positions ❌<a class="headerlink" href="#3-not-monitoring-positions" title="Permanent link">&para;</a></h3>
-<p><strong>Mistake:</strong> Set and forget</p>
-<p><strong>Risk:</strong> Liquidation during market moves</p>
-<p><strong>Fix:</strong> Check daily, set alerts, have action plan</p>
-<h3 id="4-panic-selling">4. Panic Selling ❌<a class="headerlink" href="#4-panic-selling" title="Permanent link">&para;</a></h3>
-<p><strong>Mistake:</strong> Selling collateral at a loss during volatility</p>
-<p><strong>Risk:</strong> Realizing losses unnecessarily</p>
-<p><strong>Fix:</strong> Have plan before volatility, maintain high health factor to weather storms</p>
-<h3 id="5-skipping-approvals">5. Skipping Approvals ❌<a class="headerlink" href="#5-skipping-approvals" title="Permanent link">&para;</a></h3>
-<p><strong>Mistake:</strong> Not understanding approve + transaction flow</p>
-<p><strong>Risk:</strong> Confusion, failed transactions</p>
-<p><strong>Fix:</strong> Expect 2-step process (approve then execute)</p>
-<h3 id="6-withdrawing-too-much">6. Withdrawing Too Much ❌<a class="headerlink" href="#6-withdrawing-too-much" title="Permanent link">&para;</a></h3>
-<p><strong>Mistake:</strong> Withdrawing collateral without checking health factor</p>
-<p><strong>Risk:</strong> Triggering liquidation</p>
-<p><strong>Fix:</strong> Use "max safe withdrawal" in UI, leave buffer</p>
-<h3 id="7-using-full-balance">7. Using Full Balance ❌<a class="headerlink" href="#7-using-full-balance" title="Permanent link">&para;</a></h3>
-<p><strong>Mistake:</strong> Not keeping USDST for fees</p>
-<p><strong>Risk:</strong> Can't execute transactions</p>
-<p><strong>Fix:</strong> Always keep 5-10 USDST reserve</p>
-<h2 id="liquidation-prevention">Liquidation Prevention<a class="headerlink" href="#liquidation-prevention" title="Permanent link">&para;</a></h2>
-<h3 id="watch-these-metrics">Watch These Metrics<a class="headerlink" href="#watch-these-metrics" title="Permanent link">&para;</a></h3>
-<p><strong>Daily checks:</strong></p>
+<h3 id="state-variables">State Variables<a class="headerlink" href="#state-variables" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Current health factor / CR</li>
-<li>Collateral asset prices</li>
-<li>Distance to liquidation price</li>
+<li><code>activities[activityId]</code> - Activity data by ID</li>
+<li><code>userInfo[activityId][user]</code> - Per-user state for each activity</li>
+<li><code>unclaimedRewards[user]</code> - Accumulated claimable rewards across all activities</li>
+<li><code>totalRewardsEmission</code> - Sum of emission rates across all activities</li>
+<li><code>activityIds[]</code> - Array of all activity IDs for enumeration</li>
 </ul>
-<p><strong>Set alerts at:</strong></p>
-<ul>
-<li>Health factor &lt; 1.5 or CR &lt; 180%</li>
-<li>Collateral price drops 10% from deposit</li>
-<li>Liquidation price approaching</li>
-</ul>
-<h3 id="action-plan">Action Plan<a class="headerlink" href="#action-plan" title="Permanent link">&para;</a></h3>
-<p><strong>If health factor drops below 1.5:</strong></p>
-<p><strong>Option 1: Add Collateral</strong>
-- Fastest way to improve health factor
-- No need to have extra USDST
-- Immediately improves position</p>
-<p><strong>Option 2: Repay Debt</strong>
-- Reduces risk permanently
-- Requires having USDST available
-- May trigger tax event</p>
-<p><strong>Option 3: Do Nothing</strong>
-- Only if you're confident price will recover
-- Very risky below 1.2
-- Have plan ready if continues dropping</p>
-<h3 id="example-prevention">Example Prevention<a class="headerlink" href="#example-prevention" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>Starting position:
+<h2 id="reward-calculation-logic">Reward Calculation Logic<a class="headerlink" href="#reward-calculation-logic" title="Permanent link">&para;</a></h2>
+<h3 id="the-global-index-pattern">The Global Index Pattern<a class="headerlink" href="#the-global-index-pattern" title="Permanent link">&para;</a></h3>
+<p>The system uses a cumulative index to track how much reward has accrued per unit of stake over time. This is the key to O(1) efficiency.</p>
+<p><strong>Index Update</strong> (see <code>_updateActivityIndex()</code> at <code>Rewards.sol:345-370</code>):
+<div class="highlight"><pre><span></span><code>Time elapsed: dt = now - lastUpdateTime
+Rewards generated: reward = emissionRate * dt
+Index increment: accRewardPerStake += (reward * 1e18) / totalStake
+</code></pre></div></p>
+<p><strong>User Pending Rewards</strong> (calculated in <code>_handleActivity()</code> and <code>_settlePendingRewards()</code>):
+<div class="highlight"><pre><span></span><code>accumulated = (userStake * accRewardPerStake) / 1e18
+pending = accumulated - rewardDebt
+</code></pre></div></p>
+<p>The <code>rewardDebt</code> tracks what the user has already been credited, so the difference gives new rewards since last update.</p>
+<h3 id="how-rewards-accrue">How Rewards Accrue<a class="headerlink" href="#how-rewards-accrue" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Index Update</strong>: When any user interacts with an activity, the global index is updated first using the <strong>current</strong> totalStake (before the user's change is applied)</p>
+</li>
+<li>
+<p><strong>Settle User Rewards</strong>: Calculate pending rewards using the freshly updated index and add to <code>unclaimedRewards[user]</code></p>
+</li>
+<li>
+<p><strong>Update User State</strong>:</p>
+</li>
+<li>Update user's stake based on the action</li>
+<li>
+<p>Set <code>rewardDebt = (newStake * accRewardPerStake) / 1e18</code></p>
+</li>
+<li>
+<p><strong>Update Total Stake</strong>: <code>totalStake = totalStake + newStake - oldStake</code></p>
+</li>
+</ol>
+<p>This ensures:
+- Users get credit for rewards accrued before their action
+- The new stake is properly initialized for future accrual
+- Total stake stays consistent (sum of all user stakes)</p>
+<p>See <code>_handleActivity()</code> implementation at <code>Rewards.sol:268-313</code>.</p>
+<h3 id="for-users">For Users<a class="headerlink" href="#for-users" title="Permanent link">&para;</a></h3>
+<p>Users interact with activities through pools, then claim rewards:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Claim from specific activities</span>
+<span class="kt">uint256</span><span class="p">[]</span><span class="w"> </span><span class="kt">memory</span><span class="w"> </span>activityIds<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="m m-Decimal">1</span><span class="p">,</span><span class="w"> </span><span class="m m-Decimal">2</span><span class="p">,</span><span class="w"> </span><span class="m m-Decimal">3</span><span class="p">];</span>
+rewards<span class="p">.</span>claimRewards<span class="p">(</span>activityIds<span class="p">);</span>
 
-- 10 ETH @ $3,000 = $30,000
-- Borrowed: 15,000 USDST
-- Health factor: 1.6
-
-ETHST drops to $2,700:
-
-- Collateral now: $27,000
-- Health factor: 1.44 ⚠️
-
-Action: Add 2 ETH collateral
-- New collateral: $32,400
-- Health factor: 1.73 ✅ Safe again
+<span class="c1">// Or claim from all activities</span>
+rewards<span class="p">.</span>claimAllRewards<span class="p">();</span>
 </code></pre></div>
-<h2 id="getting-help">Getting Help<a class="headerlink" href="#getting-help" title="Permanent link">&para;</a></h2>
-<h3 id="before-asking">Before Asking<a class="headerlink" href="#before-asking" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Check this documentation</li>
-<li>Search community Telegram or FAQ</li>
-<li>Review FAQ (if available)</li>
-</ol>
-<h3 id="when-asking-for-help">When Asking for Help<a class="headerlink" href="#when-asking-for-help" title="Permanent link">&para;</a></h3>
-<p><strong>Provide:</strong></p>
+<p>Claiming:
+1. Updates indices for specified activities
+2. Settles pending rewards (without changing stakes)
+3. Transfers all <code>unclaimedRewards[user]</code> to the user
+4. Resets <code>unclaimedRewards[user]</code> to 0</p>
+<p>See <code>claimRewards()</code> at <code>Rewards.sol:188-205</code> and <code>claimAllRewards()</code> at <code>Rewards.sol:210-227</code>.</p>
+<h2 id="administration">Administration<a class="headerlink" href="#administration" title="Permanent link">&para;</a></h2>
+<p><strong>Owner Functions</strong> (all require <code>onlyOwner</code>):</p>
 <ul>
-<li>Clear description of issue</li>
-<li>Steps you've taken</li>
-<li>Transaction hashes (if applicable)</li>
-<li>Screenshots (crop out sensitive info)</li>
+<li><code>addActivity()</code> - Register new activity (see <code>Rewards.sol:121-147</code>)</li>
+<li><code>setEmissionRate()</code> - Update emission rate for an activity (see <code>Rewards.sol:154-167</code>)</li>
+<li><code>setAllowedCaller()</code> - Change the allowed caller for an activity (see <code>Rewards.sol:174-182</code>)</li>
 </ul>
-<p><strong>Never share:</strong></p>
-<ul>
-<li>Seed phrase / private keys</li>
-<li>Password</li>
-<li>Full wallet address publicly</li>
-</ul>
-<h3 id="official-channels">Official Channels<a class="headerlink" href="#official-channels" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Documentation</strong>: <a href="https://docs.strato.nexus">docs.strato.nexus</a></li>
-<li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
-<li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
-</ul>
-<div class="admonition warning">
-<p class="admonition-title">Beware of Scammers</p>
-<ul>
-<li>Official team will NEVER DM you first</li>
-<li>Never click links in unsolicited DMs</li>
-<li>Always verify you're on official channels</li>
-<li>If something seems too good to be true, it is</li>
-</ul>
-</div>
-<h2 id="emergency-procedures">Emergency Procedures<a class="headerlink" href="#emergency-procedures" title="Permanent link">&para;</a></h2>
-<h3 id="if-you-think-youre-compromised">If You Think You're Compromised<a class="headerlink" href="#if-you-think-youre-compromised" title="Permanent link">&para;</a></h3>
-<p><strong>Immediate actions:</strong></p>
-<ol>
-<li><strong>Transfer assets</strong> to new wallet immediately</li>
-<li><strong>Revoke approvals</strong> on compromised wallet</li>
-<li><strong>Change passwords</strong> on all connected services</li>
-<li><strong>Enable 2FA</strong> on new accounts</li>
-<li><strong>Report</strong> to STRATO team and community</li>
-</ol>
-<h3 id="if-transaction-stuck">If Transaction Stuck<a class="headerlink" href="#if-transaction-stuck" title="Permanent link">&para;</a></h3>
-<p><strong>Causes:</strong></p>
-<ul>
-<li>Low gas price (Ethereum)</li>
-<li>Network congestion</li>
-<li>Nonce issues</li>
-</ul>
-<p><strong>Fixes:</strong></p>
-<ul>
-<li>Speed up transaction (if wallet supports)</li>
-<li>Wait for network to clear</li>
-<li>Cancel and resubmit with higher gas</li>
-</ul>
-<h3 id="if-wrong-address">If Wrong Address<a class="headerlink" href="#if-wrong-address" title="Permanent link">&para;</a></h3>
-<p><strong>Unfortunately:</strong></p>
-<ul>
-<li>Blockchain transactions are irreversible</li>
-<li>Funds sent to wrong address are likely lost</li>
-<li>Always double-check addresses</li>
-</ul>
-<p><strong>Prevention:</strong></p>
-<ul>
-<li>Copy-paste addresses (don't type)</li>
-<li>Verify first and last 6 characters</li>
-<li>Send test transaction first</li>
-</ul>
-<h2 id="resources">Resources<a class="headerlink" href="#resources" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong><a href="../concepts/">Core Concepts</a></strong> - Understand the fundamentals</li>
-<li><strong><a href="../guides/borrow/">Borrow Guide</a></strong> - Lending pool guide</li>
-<li><strong><a href="../guides/mint-cdp/">CDP Guide</a></strong> - CDP guide</li>
-<li><strong><a href="../guides/bridge/">Bridge Guide</a></strong> - Bridging guide</li>
-</ul>
-<h2 id="ready-to-start">Ready to Start?<a class="headerlink" href="#ready-to-start" title="Permanent link">&para;</a></h2>
-<p>With safety practices in mind, choose your path:</p>
-<ul>
-<li><strong><a href="../guides/borrow/">Borrow USDST Guide</a></strong></li>
-<li><strong><a href="../guides/mint-cdp/">Mint USDST via CDP Guide</a></strong></li>
-</ul>
+<p><strong>Emission Rate Updates</strong>: When updating emission rates, the contract:
+1. Updates the activity index first (with old rate)
+2. Changes the emission rate
+3. Updates <code>totalRewardsEmission</code> accordingly</p>
+<p>This ensures a clean transition between emission rates without retroactive changes.</p>
 
 
 
@@ -2961,7 +2217,7 @@ Action: Add 2 ETH collateral
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 27, 2026 07:52:26 UTC"><span class="timeago" datetime="2026-05-27T07:52:26+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 27, 2026 07:52:26 UTC">2026-05-27</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 27, 2026 07:52:27 UTC"><span class="timeago" datetime="2026-05-27T07:52:27+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 27, 2026 07:52:27 UTC">2026-05-27</span>
   </span>
 
     
@@ -2971,7 +2227,7 @@ Action: Add 2 ETH collateral
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="January 5, 2026 17:52:18 UTC"><span class="timeago" datetime="2026-01-05T17:52:18+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="January 5, 2026 17:52:18 UTC">2026-01-05</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 5, 2026 01:56:17 UTC"><span class="timeago" datetime="2026-03-05T01:56:17+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 5, 2026 01:56:17 UTC">2026-03-05</span>
   </span>
 
     
@@ -3059,14 +2315,14 @@ Action: Add 2 ETH collateral
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../js/timeago.min.js"></script>
+        <script src="../../js/timeago.min.js"></script>
       
-        <script src="../js/timeago_mkdocs_material.js"></script>
+        <script src="../../js/timeago_mkdocs_material.js"></script>
       
     
   </body>
